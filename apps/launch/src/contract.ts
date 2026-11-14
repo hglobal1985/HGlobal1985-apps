@@ -34,7 +34,49 @@ export type Member = {
   center: string | null;
   /** 可以使用「統計分析」頁（超級管理員、總部秘書，或被超級管理員指定的職務）。 */
   canViewStats?: boolean;
+  /** 課程管理權限（總部、該中心的會長與音控、小編）。沒有任何課程權限為 undefined。 */
+  courseRights?: CourseRights;
 };
+
+/** 登入者的課程管理權限摘要（前端用來決定要不要顯示「＋新增」「編輯」「小編管理」等入口；後端每個請求仍會再檢查）。 */
+export type CourseRights = {
+  /** 總部（超級管理員、總部秘書）：所有中心。 */
+  all: boolean;
+  /** 可以新增課程。 */
+  create: boolean;
+  /** 可以管理小編（總部、會長、音控）。 */
+  manageEditors: boolean;
+  /** 所屬中心（總部可能為 null）。 */
+  center: string | null;
+  /** 小編身分（不是小編為 null）。 */
+  editor: { create: boolean; editOthers: boolean; deleteOthers: boolean } | null;
+};
+
+/** 這位管理者對某門課能做什麼（只有管理者拿得到）。 */
+export type CourseCan = {
+  /** 修改內容、章節、上架／下架。 */
+  edit: boolean;
+  /** 刪除（沒人報名）或下架封存（有人報名）。 */
+  remove: boolean;
+  /** 把「下架封存」的課程還原。 */
+  restore: boolean;
+};
+
+/** 小編（各中心自己的編輯人員，只存在行動大學）。 */
+export type CourseEditor = {
+  memberId: string;
+  name: string;
+  center: string;
+  canCreate: boolean;
+  canEditOthers: boolean;
+  canDeleteOthers: boolean;
+  createdAt: string;
+};
+/** 指派小編時從會員中心取得的同中心會員（不保存）。 */
+export type EditorCandidate = { memberId: string; name: string; avatarUrl: string | null; signedIn: boolean; already: boolean };
+
+/** 中心 EDM（全部課程頁選了中心才顯示）。 */
+export type CenterArt = { centerKey: string; center: string; edmUrl: string };
 
 export type EnrollmentState = "opened" | "pending" | null;
 
@@ -116,6 +158,11 @@ export type CourseSummary = {
   edmViewY: number;
   /** 封面裁切框（占 EDM 圖寬高的比例，高由 16:9 算出）；課程介紹頁的預設停留位置＝它的上緣（永遠同步）。null＝未知（舊資料）。 */
   coverRect: { x: number; y: number; w: number } | null;
+  /** 主辦中心（第一個非總部的主辦單位）與其正規化代碼；全部課程頁「中心」篩選用。沒有為空字串／null。 */
+  hostCenter: string;
+  hostCenterKey: string | null;
+  /** 只有管理清單（/admin/courses）與管理者看課程頁時才有：這位管理者能做什麼。 */
+  can?: CourseCan;
 };
 
 export type MediaType = "demo" | "youtube" | "mux" | "audio";
@@ -153,7 +200,24 @@ export type CourseDetail = CourseSummary & {
   description: string;
   lessons: Lesson[];
   /** 只有管理員會拿到。 */
-  admin?: { hostCenterKey: string | null; freeFrom: string | null; freeUntil: string | null; reviewGroupId: string | null; basePriceTwd: number };
+  admin?: {
+    hostCenterKey: string | null;
+    freeFrom: string | null;
+    freeUntil: string | null;
+    reviewGroupId: string | null;
+    basePriceTwd: number;
+    /** 這位管理者能做什麼。 */
+    can: CourseCan;
+    /** 有效報名數（已開通、免費報名、待審核；不含已退回）：大於 0 時「刪除」改為「下架封存」。 */
+    registrations: number;
+    /** 最後修改者與時間（顯示在進階設定最下方）。 */
+    editedByName: string;
+    editedAt: string | null;
+    /** 儲存時帶回做「別人剛改過」檢查。 */
+    updatedAt: string;
+    /** 是這位管理者自己新增的課程。 */
+    mine: boolean;
+  };
 };
 
 export type OrderStatus = "pending" | "opened" | "rejected";

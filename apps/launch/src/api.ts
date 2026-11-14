@@ -16,6 +16,11 @@ import {
   type ClientPlatform,
   type CourseDetail,
   type CourseSummary,
+  type CourseCan,
+  type CourseEditor,
+  type CourseRights,
+  type CenterArt,
+  type EditorCandidate,
   type Lesson,
   type Member,
   type Attachment,
@@ -30,7 +35,7 @@ import {
   type Rank,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
-import { rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { centerMembers, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { evaluateAchievements } from "./achievements.ts";
@@ -69,7 +74,7 @@ const fail = (status: number, code: string, message: string): never => {
 /** demo：模擬會員（rankCode 為示範獎銜）；central：中央會員（不持有獎銜，資格每次向中央查詢）。 */
 type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
-type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null };
+type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string };
 
 // ---------- helpers ----------
 
@@ -325,12 +330,16 @@ type CourseRow = {
   cover_rect: string | null;
   edm_key: string | null;
   art_version: number;
+  created_by_sub: string;
+  edited_by_name: string;
+  edited_at: string | null;
+  updated_at: string;
   lesson_count: number;
   total_minutes: number;
   zero_minute_lessons: number;
 };
 
-const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.show_full, c.chapter_covers, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version,
+const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.show_full, c.chapter_covers, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.duration_minutes = 0) AS zero_minute_lessons
@@ -400,6 +409,8 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     coverUrl: row.cover_key ? pubUrl(row.cover_key, row.art_version) : null,
     edmViewY: row.edm_view_y,
     coverRect: parseCoverRect(row.cover_rect),
+    hostCenter: hostCenterOf(row.host_unit),
+    hostCenterKey: row.host_center_key,
     status: row.status,
     guidanceUnit: row.guidance_unit,
     hostUnit: row.host_unit,
@@ -445,22 +456,111 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
   };
 }
 
-async function listCourses(ctx: Ctx, all: boolean, manager?: Session): Promise<CourseSummary[]> {
-  // 管理清單：管理員看全部；會長、音控只看主辦單位是自己中心的課程。
-  const own = all && manager && manager.role !== "admin";
-  const where = all ? (own ? " WHERE c.host_center_key = ?" : "") : " WHERE c.status = 'published'";
+async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
+  const s = ctx.session;
+  let where = " WHERE c.status = 'published'";
+  let args: unknown[] = [];
+  let rights: Rights | null = null;
+  if (all) {
+    // 管理清單：總部看全部；會長、音控、小編只看主辦單位是自己中心的課程（含未上架、已封存）。
+    rights = await rightsOf(ctx);
+    if (!rights.any) fail(403, "forbidden", "需要課程管理權限");
+    if (rights.admin) where = "";
+    else {
+      const keys = [...rights.centerKeys];
+      where = keys.length ? ` WHERE c.host_center_key IN (${keys.map(() => "?").join(",")})` : " WHERE 0";
+      args = keys;
+    }
+  } else if (s) {
+    // 公開清單：已上架的課程；另外附上這位會員有報名、審核中或學習過的「下架封存」課程（學習中照常顯示，全部課程不顯示）。
+    where = " WHERE c.status = 'published' OR (c.status = 'archived' AND (c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?1) OR c.id IN (SELECT i.course_id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.member_sub = ?1 AND o.status = 'pending') OR c.id IN (SELECT course_id FROM learning_started WHERE member_sub = ?1)))";
+    args = [s.sub];
+  }
   const [{ results }, rankMap, state] = await Promise.all([
-    ctx.db.prepare(`${COURSE_SELECT}${where} ORDER BY c.sort_order, c.created_at`).bind(...(own ? [manager.center?.key ?? ""] : [])).all<CourseRow>(),
+    ctx.db.prepare(`${COURSE_SELECT}${where} ORDER BY c.sort_order, c.created_at`).bind(...args).all<CourseRow>(),
     ranks(ctx.db),
-    memberCourseState(ctx.db, ctx.session?.sub),
+    memberCourseState(ctx.db, s?.sub),
   ]);
-  const eligibility = await eligibilityFor(ctx.session, rankMap, [...results.map((r) => r.min_rank_code), DIAMOND]);
-  return results.map((r) => summarize(r, ctx, rankMap, state, eligibility));
+  const eligibility = await eligibilityFor(s, rankMap, [...results.map((r) => r.min_rank_code), DIAMOND]);
+  const out = results.map((r) => summarize(r, ctx, rankMap, state, eligibility));
+  if (!rights || !s) return out;
+  const r = rights;
+  return out.flatMap((c, i) => {
+    const can = courseCan(r, s, results[i]!);
+    // 小編看不到「別人的、自己又不能動」的未上架課程。
+    if (c.status !== "published" && !can.edit && !can.remove && !can.restore) return [];
+    return [{ ...c, can }];
+  });
 }
 
-/** 課程介紹頁：需登入（未登入只能看課程清單）。 */
-/** 管理員，或主辦單位是自己中心的會長、音控：可看草稿、預覽、看到管理欄位。 */
-const managesCourse = (s: Session, hostCenterKey: string | null) => s.role === "admin" || (!!s.center && !!hostCenterKey && hostCenterKey === s.center.key && s.roles.some((r) => ART_TYPES.has(r)));
+// ---------- 課程管理權限：總部、該中心的會長與音控、小編 ----------
+
+/** 小編的三種權限。 */
+type EditorFlags = { create: boolean; editOthers: boolean; deleteOthers: boolean };
+type Rights = {
+  /** 有任何課程管理權限。 */
+  any: boolean;
+  /** 總部（超級管理員、總部秘書）。 */
+  admin: boolean;
+  /** 所屬中心的會長、音控。 */
+  staff: boolean;
+  /** 所屬中心的代碼（同時放會員中心給的 key 與本地正規化，兩種寫法都比對得到）。 */
+  centerKeys: Set<string>;
+  center: { key: string; label: string } | null;
+  editor: EditorFlags | null;
+};
+const NO_RIGHTS: Rights = { any: false, admin: false, staff: false, centerKeys: new Set(), center: null, editor: null };
+const rightsMemo = new WeakMap<Ctx, Promise<Rights>>();
+
+/** 登入者的課程管理權限（同一個請求只查一次）。小編身分要「現在的中心」與被指派的中心相同才有效（換中心自動失效）。 */
+function rightsOf(ctx: Ctx): Promise<Rights> {
+  const hit = rightsMemo.get(ctx);
+  if (hit) return hit;
+  const p = (async (): Promise<Rights> => {
+    const s = ctx.session;
+    if (!s) return NO_RIGHTS;
+    const admin = s.role === "admin";
+    const center = s.center;
+    const centerKeys = new Set(center ? [center.key, centerKey(center.label)] : []);
+    const staff = !!center && s.roles.some((r) => ART_TYPES.has(r));
+    let editor: EditorFlags | null = null;
+    if (center && !admin && !staff) {
+      const keys = [...centerKeys];
+      const row = await ctx.db
+        .prepare(`SELECT can_create, can_edit_others, can_delete_others FROM course_editors WHERE member_sub = ? AND center_key IN (${keys.map(() => "?").join(",")}) LIMIT 1`)
+        .bind(s.sub, ...keys)
+        .first<{ can_create: number; can_edit_others: number; can_delete_others: number }>();
+      if (row) editor = { create: row.can_create === 1, editOthers: row.can_edit_others === 1, deleteOthers: row.can_delete_others === 1 };
+    }
+    return { any: admin || staff || !!editor, admin, staff, centerKeys, center, editor };
+  })();
+  rightsMemo.set(ctx, p);
+  return p;
+}
+
+const canCreateCourse = (r: Rights) => r.admin || r.staff || !!r.editor?.create;
+
+/** 對某門課能做什麼：總部全部；同中心的會長、音控全部；小編：自己新增的課程完整權限，別人的看「修改別人／刪除別人」。還原封存只有總部、會長、音控。 */
+function courseCan(r: Rights, s: Session, row: { host_center_key: string | null; created_by_sub: string }): CourseCan {
+  if (r.admin) return { edit: true, remove: true, restore: true };
+  if (!row.host_center_key || !r.centerKeys.has(row.host_center_key)) return { edit: false, remove: false, restore: false };
+  if (r.staff) return { edit: true, remove: true, restore: true };
+  if (!r.editor) return { edit: false, remove: false, restore: false };
+  const own = !!row.created_by_sub && row.created_by_sub === s.sub;
+  return { edit: own || r.editor.editOthers, remove: own || r.editor.deleteOthers, restore: false };
+}
+
+/** 有效報名數：已開通、免費報名、待審核（不含已退回）。大於 0 的課程不能永久刪除，只能「下架封存」。 */
+async function registrationCount(db: D1Database, courseId: string): Promise<number> {
+  const r = await db
+    .prepare("SELECT (SELECT COUNT(*) FROM enrollments WHERE course_id = ?1) + (SELECT COUNT(DISTINCT o.id) FROM order_items i JOIN orders o ON o.id = i.order_id WHERE i.course_id = ?1 AND o.status = 'pending') AS n")
+    .bind(courseId)
+    .first<{ n: number }>();
+  return r?.n ?? 0;
+}
+
+/** 主辦中心：主辦單位裡第一個不是總部的名稱。 */
+const hostCenterOf = (hostUnit: string) => splitCats(hostUnit).find((x) => x !== HQ_UNIT) ?? "";
 
 type LessonRowLite = { id: string; position: number; title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null };
 
@@ -499,7 +599,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const row = await ctx.db.prepare(`${COURSE_SELECT} WHERE c.id = ?`).bind(id).first<CourseRow>();
   // 未登入的訪客：只有「完全公開」且已上架的課程可以看；其他一律要求登入。
   if (!s && (!row || row.status !== "published" || row.is_public !== 1)) return fail(401, "unauthenticated", "請先登入");
-  if (!row || (s && row.status !== "published" && !managesCourse(s, row.host_center_key))) return fail(404, "not_found", "找不到這門課程");
+  if (!row) return fail(404, "not_found", "找不到這門課程");
+  const can = s ? courseCan(await rightsOf(ctx), s, row) : { edit: false, remove: false, restore: false };
+  const manages = can.edit || can.remove || can.restore;
   const [rankMap, state, lessons, done] = await Promise.all([
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
@@ -509,12 +611,16 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number }>(),
     s ? ctx.db.prepare("SELECT lesson_id FROM lesson_progress WHERE member_sub = ? AND course_id = ?").bind(s.sub, id).all<{ lesson_id: string }>() : Promise.resolve({ results: [] as { lesson_id: string }[] }),
   ]);
+  // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
+  const archivedForMe = row.status === "archived" && (state.enrolled.has(id) || state.pending.has(id) || state.started.has(id));
+  if (row.status !== "published" && !manages && !archivedForMe) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
-  const admin = !!s && managesCourse(s, row.host_center_key);
+  const admin = manages;
   return {
-    ...summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND])),
+    ...summaryNow,
+    ...(manages ? { can } : {}),
     description: row.description ?? "",
     lessons: [...lessons.results.map((l) => ({
       id: l.id,
@@ -539,7 +645,23 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
       ...(admin ? { media: { type: l.media_type, ref: l.media_ref } } : {}),
     })), ...fullVersions(lessons.results, state, id, row, admin, watchFree)],
-    ...(admin ? { admin: { hostCenterKey: row.host_center_key, freeFrom: row.free_from, freeUntil: row.free_until, reviewGroupId: row.review_group_id, basePriceTwd: row.price_twd } } : {}),
+    ...(admin
+      ? {
+          admin: {
+            hostCenterKey: row.host_center_key,
+            freeFrom: row.free_from,
+            freeUntil: row.free_until,
+            reviewGroupId: row.review_group_id,
+            basePriceTwd: row.price_twd,
+            can,
+            registrations: await registrationCount(ctx.db, id),
+            editedByName: row.edited_by_name,
+            editedAt: row.edited_at,
+            updatedAt: row.updated_at,
+            mine: !!s && !!row.created_by_sub && row.created_by_sub === s.sub,
+          },
+        }
+      : {}),
   };
 }
 
@@ -553,9 +675,13 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
   }
   if (s.role === "admin") return true;
   if ((await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND status = 'published'").bind(courseId).first())) return true; // 完全公開的課程，會員也不必報名
-  if (s.center && s.roles.some((r) => ART_TYPES.has(r))) {
-    const c = await ctx.db.prepare("SELECT host_center_key FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null }>();
-    if (c && managesCourse(s, c.host_center_key)) return true;
+  const rights = await rightsOf(ctx);
+  if (rights.any) {
+    const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string }>();
+    if (c) {
+      const can = courseCan(rights, s, c);
+      if (can.edit || can.remove || can.restore) return true;
+    }
   }
   const row = await ctx.db.prepare("SELECT 1 AS ok FROM enrollments WHERE member_sub = ? AND course_id = ? LIMIT 1").bind(s.sub, courseId).first();
   if (row) return true;
@@ -624,21 +750,26 @@ const pubUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURICompo
 const cleanAnnouncement = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, 120) : "");
 const ART_TYPES = new Set(["president", "sound"]);
 
-/** 編輯某門課的 EDM／封面：管理員（超級管理員、總部秘書）不限；其他有權限者只能編輯主辦單位是自己中心的課程。 */
-async function requireCourseArt(ctx: Ctx, s: Session, courseId: string): Promise<void> {
-  const c = await ctx.db.prepare("SELECT host_center_key FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null }>();
-  if (!c) return fail(404, "not_found", "找不到這門課程");
-  if (s.role === "admin") return;
-  if (!s.center || !s.roles.some((r) => ART_TYPES.has(r)) || c.host_center_key !== s.center.key) fail(403, "forbidden", "只能編輯主辦單位是自己中心的課程");
+/** 編輯某門課的 EDM／封面：要有這門課的「修改」權限。 */
+async function requireCourseArt(ctx: Ctx, _s: Session, courseId: string): Promise<void> {
+  await requireCourseManager(ctx, courseId);
 }
 
-/** 課程管理者：管理員（超級管理員、總部秘書）不限；各中心的會長、音控只能管理「主辦單位是自己中心」的課程。 */
-async function requireCourseManager(ctx: Ctx, courseId: string): Promise<Session> {
+/** 取得課程的管理權限；need＝要的權限（預設「修改」）。 */
+async function courseRightsFor(ctx: Ctx, courseId: string): Promise<{ s: Session; can: CourseCan; rights: Rights }> {
   const s = requireMember(ctx);
-  if (s.role === "admin") return s;
-  const c = await ctx.db.prepare("SELECT host_center_key FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null }>();
+  const rights = await rightsOf(ctx);
+  if (!rights.any) fail(403, "forbidden", "需要課程管理權限");
+  const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string }>();
   if (!c) return fail(404, "not_found", "找不到這門課程");
-  if (!s.center || !s.roles.some((r) => ART_TYPES.has(r)) || c.host_center_key !== s.center.key) fail(403, "forbidden", "只能管理主辦單位是自己中心的課程");
+  return { s, can: courseCan(rights, s, c), rights };
+}
+
+/** 課程「修改」權限：總部不限；同中心的會長、音控；小編自己新增的課程，或有「修改別人」權限。 */
+async function requireCourseManager(ctx: Ctx, courseId: string): Promise<Session> {
+  const { s, can } = await courseRightsFor(ctx, courseId);
+  if (!can.edit) fail(403, "forbidden", "沒有修改這門課程的權限（只能管理主辦單位是自己中心、而且有權限的課程）");
+  if (ctx.req.method !== "GET") ctx.touched = courseId; // 成功後記下最後修改者
   return s;
 }
 async function managerVia(ctx: Ctx, sql: string, id: string, what: string): Promise<Session> {
@@ -648,12 +779,21 @@ async function managerVia(ctx: Ctx, sql: string, id: string, what: string): Prom
 }
 const requireLessonManager = (ctx: Ctx, id: string) => managerVia(ctx, "SELECT course_id FROM lessons WHERE id = ?", id, "章節");
 const requireAttachmentManager = (ctx: Ctx, id: string) => managerVia(ctx, "SELECT course_id FROM lesson_attachments WHERE id = ?", id, "附件");
-/** 可以新增課程的人：管理員，或有中心的會長、音控。 */
-function requireCourseCreator(ctx: Ctx): Session {
+/** 可以新增課程的人：總部、有中心的會長與音控、有「新增」權限的小編。 */
+async function requireCourseCreator(ctx: Ctx): Promise<Session> {
   const s = requireMember(ctx);
-  if (s.role !== "admin" && !(s.center && s.roles.some((r) => ART_TYPES.has(r)))) fail(403, "forbidden", "只有管理員、各中心的會長與音控可以管理課程");
+  if (!canCreateCourse(await rightsOf(ctx))) fail(403, "forbidden", "沒有新增課程的權限");
   return s;
 }
+/** 有任何課程管理權限（看管理清單、選項）。 */
+async function requireCourseStaff(ctx: Ctx): Promise<Session> {
+  const s = requireMember(ctx);
+  if (!(await rightsOf(ctx)).any) fail(403, "forbidden", "需要課程管理權限");
+  return s;
+}
+
+/** 記下最後修改者（章節、圖片等修改也算），顯示在編輯模式的進階設定最下方。 */
+const touchCourse = (db: D1Database, courseId: string, s: Session) => db.prepare("UPDATE courses SET edited_by_name = ?, edited_at = ? WHERE id = ?").bind(s.name.slice(0, 60), iso(), courseId);
 
 const ATTACH_TYPES: Record<string, string> = {
   pdf: "application/pdf",
@@ -1187,6 +1327,63 @@ export function youtubeId(input: string): string | null {
   }
 }
 
+
+// ---------- 小編與中心 EDM 的共用檢查 ----------
+
+/** 要管理哪個中心的小編：總部要指定中心（必須在會員中心的清單內）；會長、音控只能管自己中心。 */
+async function editorCenter(ctx: Ctx, rights: Rights, label: string | null | undefined): Promise<{ key: string; label: string }> {
+  const want = (label ?? "").trim().slice(0, 100);
+  if (rights.admin) {
+    if (!want) {
+      if (rights.center) return { key: centerKey(rights.center.label), label: rights.center.label };
+      return fail(400, "center_required", "請先選擇中心");
+    }
+    await assertCentralCenters(ctx, [want]);
+    return { key: centerKey(want), label: want };
+  }
+  if (!rights.staff || !rights.center) fail(403, "forbidden", "只有總部、各中心的會長與音控可以管理小編");
+  if (want && centerKey(want) !== centerKey(rights.center!.label)) fail(403, "forbidden", "只能管理自己中心的小編");
+  return { key: centerKey(rights.center!.label), label: rights.center!.label };
+}
+
+function editorFlags(body: Record<string, unknown>, cur: EditorFlags): EditorFlags {
+  const b = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
+  return { create: b(body.canCreate, cur.create), editOthers: b(body.canEditOthers, cur.editOthers), deleteOthers: b(body.canDeleteOthers, cur.deleteOthers) };
+}
+const editorFlagText = (f: EditorFlags) => [f.create && "新增課程", f.editOthers && "修改別人的課程", f.deleteOthers && "刪除別人的課程"].filter(Boolean).join("、") || "只能看";
+
+async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Promise<CourseEditor[]> {
+  const rights = await rightsOf(ctx);
+  let center = only;
+  if (!center) {
+    const want = ctx.url.searchParams.get("center");
+    // 總部沒指定中心：列出所有中心的小編。
+    if (rights.admin && !want) center = undefined;
+    else center = await editorCenter(ctx, rights, want);
+  }
+  if (!rights.admin && !rights.staff) fail(403, "forbidden", "只有總部、各中心的會長與音控可以管理小編");
+  const { results } = await (center
+    ? ctx.db.prepare("SELECT * FROM course_editors WHERE center_key = ? ORDER BY created_at").bind(center.key)
+    : ctx.db.prepare("SELECT * FROM course_editors ORDER BY center_label, created_at")
+  ).all<{ center_label: string; member_sub: string; member_name: string; can_create: number; can_edit_others: number; can_delete_others: number; created_at: string }>();
+  return results.map((r) => ({ memberId: r.member_sub, name: r.member_name, center: r.center_label, canCreate: r.can_create === 1, canEditOthers: r.can_edit_others === 1, canDeleteOthers: r.can_delete_others === 1, createdAt: r.created_at }));
+}
+
+/** 中心 EDM：總部任何中心（名稱必須在會員中心清單內）；會長、音控、有「修改別人」權限的小編只能改自己中心。 */
+async function requireCenterArt(ctx: Ctx, label: string | null): Promise<{ s: Session; center: { key: string; label: string } }> {
+  const s = requireMember(ctx);
+  const rights = await rightsOf(ctx);
+  const want = (label ?? "").trim().slice(0, 100);
+  if (!want) fail(400, "center_required", "請先選擇中心");
+  if (rights.admin) {
+    await assertCentralCenters(ctx, [want]);
+    return { s, center: { key: centerKey(want), label: want } };
+  }
+  const mine = rights.center && centerKey(want) === centerKey(rights.center.label);
+  if (!mine || !(rights.staff || rights.editor?.editOthers)) fail(403, "forbidden", "只能修改自己中心的 EDM");
+  return { s, center: { key: centerKey(rights.center!.label), label: rights.center!.label } };
+}
+
 // ---------- admin: courses & lessons ----------
 
 const THEMES = ["sage", "rose", "gold", "blue", "clay", "violet"];
@@ -1351,8 +1548,11 @@ async function createCourse(ctx: Ctx, admin: Session) {
   await checkGuidanceGroup(ctx, body.guidanceUnit, body.reviewGroupId);
   const id = `c${randomId(7)}`;
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const cols = ["id", "sort_order", "status", ...sets.map(([c]) => c).filter((c) => c !== "status")];
-  const vals = [id, (max?.m ?? 0) + 1, sets.find(([c]) => c === "status")?.[1] ?? "draft", ...sets.filter(([c]) => c !== "status").map(([, v]) => v)];
+  // 新課程一律先是草稿（小編也一樣，自己再決定上架）；記下建立者。
+  const status = sets.find(([c]) => c === "status")?.[1] === "published" ? "published" : "draft";
+  const rest = sets.filter(([c]) => c !== "status");
+  const cols = ["id", "sort_order", "status", "created_by_sub", "edited_by_name", "edited_at", ...rest.map(([c]) => c)];
+  const vals = [id, (max?.m ?? 0) + 1, status, admin.sub, admin.name.slice(0, 60), iso(), ...rest.map(([, v]) => v)];
   await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO courses (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...vals),
     ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, event_date) VALUES (?, ?, 1, '第 1 堂', 0, 'demo', ?)").bind(`${id}-${randomId(6)}`, id, (sets.find(([c]) => c === "event_start")?.[1] as string | null | undefined) ?? null),
@@ -1415,7 +1615,7 @@ async function rewriteCategories(ctx: Ctx, fn: (list: string[]) => string): Prom
   });
 }
 
-type ShortLinkItem = { kind: "category" | "series"; value: string; slug: string | null };
+type ShortLinkItem = { kind: "category" | "series" | "center"; value: string; slug: string | null };
 /** 短網址設定清單：所有分類與系列（含還沒設定縮寫的），各帶目前的縮寫。 */
 async function aiModelsView(ctx: Ctx) {
   return { jobs: AI_JOBS, models: AI_MODELS, selection: await loadSelection(ctx.db), usage: await usageSummary(ctx.db), keys: keyStatuses(ctx.env) };
@@ -1426,6 +1626,11 @@ async function listShortLinks(ctx: Ctx): Promise<ShortLinkItem[]> {
   const slugOf = new Map(links.results.map((r) => [`${r.kind}:${r.value}`, r.slug]));
   const out: ShortLinkItem[] = [];
   for (const kind of ["category", "series"] as const) for (const k of kw[kind]) out.push({ kind, value: k.value, slug: slugOf.get(`${kind}:${k.value}`) ?? null });
+  // 中心：課程的主辦中心（名稱在寫入時已確認是會員中心清單內的）＋已上傳 EDM 或已設定短網址的中心。
+  const hosts = await ctx.db.prepare("SELECT DISTINCT host_unit AS v FROM courses WHERE host_center_key IS NOT NULL").all<{ v: string }>();
+  const arts = await ctx.db.prepare("SELECT center_label AS v FROM center_art").all<{ v: string }>();
+  const centers = new Set([...hosts.results.map((r) => hostCenterOf(r.v)), ...arts.results.map((r) => r.v), ...links.results.filter((r) => r.kind === "center").map((r) => r.value)].filter(Boolean));
+  for (const v of [...centers].sort((a, b) => a.localeCompare(b, "zh-Hant"))) out.push({ kind: "center", value: v, slug: slugOf.get(`center:${v}`) ?? null });
   return out;
 }
 
@@ -1467,8 +1672,8 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
   const keep = ["subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "show_full", "chapter_covers"];
-  const cols = ["id", "sort_order", "status", "title", "series", ...keep];
-  const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, ...keep.map((k) => row[k] ?? null)];
+  const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
+  const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
     ctx.db.prepare(`INSERT INTO courses (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...vals),
     ...lessons.map((l) => {
@@ -1484,16 +1689,29 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   return courseDetail(ctx, newId);
 }
 
-async function updateCourse(ctx: Ctx, id: string, admin: Session) {
+async function updateCourse(ctx: Ctx, id: string) {
+  const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
+  const cur = await ctx.db.prepare("SELECT status, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
+  if (!cur) return fail(404, "not_found", "找不到這門課程");
+  // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
+  const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
+  if (body.status === "archived" && cur.status !== "archived") {
+    if (!can.remove) fail(403, "forbidden", "沒有下架封存這門課程的權限");
+  } else if (cur.status === "archived" && body.status !== undefined && body.status !== "archived") {
+    if (!can.restore) fail(403, "forbidden", "還原封存的課程只有總部、會長與音控可以做");
+  } else if (!can.edit) fail(403, "forbidden", "沒有修改這門課程的權限");
+  if (!onlyStatus && !can.edit) fail(403, "forbidden", "沒有修改這門課程的權限");
+  // 別人剛改過：帶 ifUpdatedAt 的儲存，若資料已被改過就先提醒（force 仍要覆蓋）。
+  if (typeof body.ifUpdatedAt === "string" && body.ifUpdatedAt !== cur.updated_at && body.force !== true)
+    fail(409, "edit_conflict", `這門課程剛被${cur.edited_by_name || "其他管理者"}修改過，請重新載入後再改，或選擇仍要覆蓋`);
   const sets = await courseFields(ctx, body, false, admin);
   if (!sets.length) fail(400, "nothing_to_update", "沒有要更新的欄位");
-  const cur = await ctx.db.prepare("SELECT guidance_unit, review_group_id, price_twd, is_public, price_tba FROM courses WHERE id = ?").bind(id).first<{ guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number }>();
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
-  checkPublicFree(Number(pick("price_twd", cur?.price_twd ?? 0)), pick("is_public", cur?.is_public ?? 0) === 1, pick("price_tba", cur?.price_tba ?? 0) === 1);
-  await checkGuidanceGroup(ctx, pick("guidance_unit", cur?.guidance_unit), pick("review_group_id", cur?.review_group_id));
+  checkPublicFree(Number(pick("price_twd", cur.price_twd)), pick("is_public", cur.is_public) === 1, pick("price_tba", cur.price_tba) === 1);
+  await checkGuidanceGroup(ctx, pick("guidance_unit", cur.guidance_unit), pick("review_group_id", cur.review_group_id));
   const [res] = await ctx.db.batch([
-    ctx.db.prepare(`UPDATE courses SET ${sets.map(([c]) => `${c} = ?`).join(", ")}, updated_at = ? WHERE id = ?`).bind(...sets.map(([, v]) => v), iso(), id),
+    ctx.db.prepare(`UPDATE courses SET ${sets.map(([c]) => `${c} = ?`).join(", ")}, updated_at = ?, edited_by_name = ?, edited_at = ? WHERE id = ?`).bind(...sets.map(([, v]) => v), iso(), admin.name.slice(0, 60), iso(), id),
     audit(ctx.db, admin.sub, "course.update", "course", id, sets.map(([c]) => c).join(",")),
   ]);
   if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
@@ -1606,7 +1824,9 @@ async function requireGroupManager(ctx: Ctx, groupId: string): Promise<Session> 
 async function listGroups(ctx: Ctx): Promise<ReviewGroup[]> {
   const s = requireMember(ctx);
   const manager = s.role === "admin" || s.roles.includes("president") || s.roles.includes("sound");
-  if (!manager) fail(403, "forbidden", "沒有管理審核群組的權限");
+  // 小編：只能「選用」自己中心的群組（課程設定用），不能管理群組。
+  const rights = await rightsOf(ctx);
+  if (!manager && !rights.any) fail(403, "forbidden", "沒有管理審核群組的權限");
   const [g, m, c] = await ctx.db.batch([
     ctx.db.prepare("SELECT id, name, owner_center_key, owner_center_label FROM review_groups ORDER BY created_at"),
     ctx.db.prepare("SELECT group_id, center_key, center_label, member_sub, member_name, duty FROM review_group_members ORDER BY center_label, created_at"),
@@ -1615,14 +1835,14 @@ async function listGroups(ctx: Ctx): Promise<ReviewGroup[]> {
   type G = { id: string; name: string; owner_center_key: string | null; owner_center_label: string };
   type M = { group_id: string; center_key: string; center_label: string; member_sub: string; member_name: string; duty: Duty };
   return (g.results as G[])
-    .filter((x) => s.role === "admin" || (x.owner_center_key && canManageCenter(s, x.owner_center_key)))
+    .filter((x) => s.role === "admin" || (x.owner_center_key && (canManageCenter(s, x.owner_center_key) || rights.centerKeys.has(x.owner_center_key))))
     .map((x) => ({
       id: x.id,
       name: x.name,
       ownerCenter: x.owner_center_key ? x.owner_center_label : null,
       courses: (c.results as { id: string; title: string; review_group_id: string }[]).filter((k) => k.review_group_id === x.id).map((k) => ({ id: k.id, title: k.title })),
       members: (m.results as M[]).filter((k) => k.group_id === x.id).map((k) => ({ centerKey: k.center_key, centerLabel: k.center_label, memberSub: k.member_sub, memberName: k.member_name, duty: k.duty })),
-      canManage: true,
+      canManage: s.role === "admin" || (!!x.owner_center_key && canManageCenter(s, x.owner_center_key)),
     }));
 }
 
@@ -1777,6 +1997,13 @@ const routes: [string, RegExp, Handler][] = [
       ]);
       const member = memberOf(s, rankMap, { duties: results.map((r) => labels[r.duty]) });
       member.canViewStats = await canViewStats(ctx, s).catch(() => false);
+      const rights = await rightsOf(ctx);
+      if (rights.any) {
+        member.courseRights = { all: rights.admin, create: canCreateCourse(rights), manageEditors: rights.admin || rights.staff, center: rights.center?.label ?? null, editor: rights.editor };
+        if (rights.editor) member.titles = [...new Set([...member.titles, "小編"])];
+      }
+      // 小編登入時更新名單上的姓名。
+      await ctx.db.prepare("UPDATE course_editors SET member_name = ? WHERE member_sub = ? AND member_name <> ?").bind(s.name.slice(0, 60), s.sub, s.name.slice(0, 60)).run();
       if (central) {
         // 獎銜：值為空或「無／none」顯示「安麗寶寶」；其餘用中央選項的名稱，查不到退回本地階梯名稱。
         if (rv !== undefined) member.rankLabel = rv && rv !== "none" && rv !== "無" ? (opts?.get(rv) ?? rankLabelOf(rv, rankMap)) : "安麗寶寶";
@@ -2723,8 +2950,8 @@ const routes: [string, RegExp, Handler][] = [
       // 課程封面與 EDM 是公開圖片（課程列表本來就要顯示；EDM 開放下載）。只服務資料庫裡仍在使用的檔案。
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
-      if (!bucket || !/^(edm|cover|series|lesson)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ?").bind(key, key, key, key, key).first();
+      if (!bucket || !/^(edm|cover|series|center|lesson)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
+      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ?").bind(key, key, key, key, key, key).first();
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       return new Response(obj.body, {
@@ -2927,13 +3154,144 @@ const routes: [string, RegExp, Handler][] = [
       }
     },
   ],
-  ["GET", /^\/admin\/courses$/, async (ctx) => listCourses(ctx, true, requireCourseCreator(ctx))],
-  ["POST", /^\/admin\/courses$/, async (ctx) => createCourse(ctx, requireCourseCreator(ctx))],
+  // ---------- 小編（各中心的課程編輯人員，只存在行動大學） ----------
+  ["GET", /^\/admin\/editors$/, async (ctx) => listEditors(ctx)],
+  [
+    "GET",
+    /^\/admin\/editors\/candidates$/,
+    async (ctx) => {
+      const s = requireMember(ctx);
+      const rights = await rightsOf(ctx);
+      const center = await editorCenter(ctx, rights, ctx.url.searchParams.get("center"));
+      const q = (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 30);
+      const taken = new Set((await ctx.db.prepare("SELECT member_sub FROM course_editors WHERE center_key = ?").bind(center.key).all<{ member_sub: string }>()).results.map((r) => r.member_sub));
+      if (s.kind !== "central") {
+        // 本機測試：用模擬會員代替會員中心的名單。
+        const list = DEMO_MEMBERS.filter((d) => d.center && centerKey(d.center) === center.key && d.sub !== s.sub && (!q || d.name.includes(q)));
+        return { center: center.label, members: list.map((d): EditorCandidate => ({ memberId: d.sub, name: d.name, avatarUrl: null, signedIn: true, already: taken.has(d.sub) })), next: null };
+      }
+      try {
+        const page = await centerMembers(s.token, { q, cursor: ctx.url.searchParams.get("cursor"), center: rights.admin ? center.label : null, limit: 30 });
+        return { center: page.center?.label ?? center.label, members: page.members.map((m): EditorCandidate => ({ ...m, already: taken.has(m.memberId) })), next: page.next };
+      } catch (e) {
+        const err = e as { status?: number; code?: string };
+        if (err.code === "field_not_allowed") fail(503, "central_field_not_allowed", "會員中心尚未開放「顯示名稱」給行動大學：請超級管理員到會員中心後台「平台設定」勾選 display_name");
+        if (err.status === 403) fail(403, "central_forbidden", "會員中心不允許查詢這個中心的名單（需要該中心已審核的音控或會長職務）");
+        if (err.status === 404) fail(404, "unknown_center", "會員中心找不到這個中心");
+        if (err.status === 422) fail(400, "center_required", "請先選擇中心");
+        return fail(503, "central_unavailable", "暫時無法取得會員中心的名單，請稍後再試");
+      }
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/editors$/,
+    async (ctx) => {
+      const s = requireMember(ctx);
+      const rights = await rightsOf(ctx);
+      const body = await readJson<Record<string, unknown>>(ctx.req);
+      const center = await editorCenter(ctx, rights, typeof body.center === "string" ? body.center : null);
+      const sub = typeof body.memberId === "string" ? body.memberId.trim() : "";
+      if (!/^[\w-]{3,128}$/.test(sub)) fail(400, "invalid_member", "請從名單選擇會員");
+      if (sub === s.sub) fail(400, "invalid_member", "不能指派自己");
+      const name = text(body.name, 60) ?? "";
+      const flags = editorFlags(body, { create: true, editOthers: false, deleteOthers: false });
+      const existed = await ctx.db.prepare("SELECT 1 AS ok FROM course_editors WHERE center_key = ? AND member_sub = ?").bind(center.key, sub).first();
+      if (existed) fail(409, "already_editor", "這位會員已經是這個中心的小編");
+      await ctx.db.batch([
+        ctx.db
+          .prepare("INSERT INTO course_editors (center_key, center_label, member_sub, member_name, can_create, can_edit_others, can_delete_others, added_by_sub) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(center.key, center.label, sub, name, flags.create ? 1 : 0, flags.editOthers ? 1 : 0, flags.deleteOthers ? 1 : 0, s.sub),
+        notify(ctx.db, { sub }, `您已被指派為「${center.label}」的小編`, `${s.name || "管理者"}指派您協助編輯${center.label}的課程與章節。權限：${editorFlagText(flags)}。登入寰宇行動大學後，在課程介紹頁上方按「編輯」即可開始。`, "/courses"),
+        audit(ctx.db, s.sub, "editor.add", "course_editor", sub, `${center.label}:${editorFlagText(flags)}`),
+      ]);
+      return listEditors(ctx, center);
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/editors\/([\w-]+)$/,
+    async (ctx, [sub]) => {
+      const s = requireMember(ctx);
+      const rights = await rightsOf(ctx);
+      const body = await readJson<Record<string, unknown>>(ctx.req);
+      const center = await editorCenter(ctx, rights, typeof body.center === "string" ? body.center : null);
+      const cur = await ctx.db.prepare("SELECT can_create, can_edit_others, can_delete_others FROM course_editors WHERE center_key = ? AND member_sub = ?").bind(center.key, sub).first<{ can_create: number; can_edit_others: number; can_delete_others: number }>();
+      if (!cur) return fail(404, "not_found", "找不到這位小編");
+      const flags = editorFlags(body, { create: cur.can_create === 1, editOthers: cur.can_edit_others === 1, deleteOthers: cur.can_delete_others === 1 });
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE course_editors SET can_create = ?, can_edit_others = ?, can_delete_others = ?, updated_at = ? WHERE center_key = ? AND member_sub = ?").bind(flags.create ? 1 : 0, flags.editOthers ? 1 : 0, flags.deleteOthers ? 1 : 0, iso(), center.key, sub),
+        audit(ctx.db, s.sub, "editor.update", "course_editor", sub!, `${center.label}:${editorFlagText(flags)}`),
+      ]);
+      return listEditors(ctx, center);
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/editors\/([\w-]+)$/,
+    async (ctx, [sub]) => {
+      const s = requireMember(ctx);
+      const rights = await rightsOf(ctx);
+      const center = await editorCenter(ctx, rights, ctx.url.searchParams.get("center"));
+      const [res] = await ctx.db.batch([
+        ctx.db.prepare("DELETE FROM course_editors WHERE center_key = ? AND member_sub = ?").bind(center.key, sub),
+        audit(ctx.db, s.sub, "editor.remove", "course_editor", sub!, center.label),
+      ]);
+      if (res.meta?.changes === 0) fail(404, "not_found", "找不到這位小編");
+      await ctx.db.batch([notify(ctx.db, { sub: sub! }, `您已不是「${center.label}」的小編`, `${s.name || "管理者"}取消了您在${center.label}的小編身分；之前的課程仍保留。`, "/courses")]);
+      return listEditors(ctx, center);
+    },
+  ],
+  // ---------- 中心 EDM（全部課程頁選了中心才顯示） ----------
+  [
+    "GET",
+    /^\/center-art$/,
+    async (ctx): Promise<CenterArt[]> => {
+      const { results } = await ctx.db.prepare("SELECT center_key, center_label, edm_key, art_version FROM center_art ORDER BY center_label").all<{ center_key: string; center_label: string; edm_key: string; art_version: number }>();
+      return results.map((r) => ({ centerKey: r.center_key, center: r.center_label, edmUrl: pubUrl(r.edm_key, r.art_version) }));
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/center-art$/,
+    async (ctx) => {
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      const max = 8 * 1024 * 1024;
+      if (!data.byteLength || data.byteLength > max) fail(413, "invalid_size", `圖片大小需在 ${max / 1024 / 1024}MB 以內（上傳時會自動壓縮）`);
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      const old = await ctx.db.prepare("SELECT edm_key AS k FROM center_art WHERE center_key = ?").bind(center.key).first<{ k: string }>();
+      const key = `center/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${img.ext}`;
+      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      await ctx.db.batch([
+        ctx.db
+          .prepare("INSERT INTO center_art (center_key, center_label, edm_key) VALUES (?, ?, ?) ON CONFLICT(center_key) DO UPDATE SET edm_key = excluded.edm_key, center_label = excluded.center_label, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+          .bind(center.key, center.label, key),
+        audit(ctx.db, s.sub, "center.edm_upload", "center", center.key, key),
+      ]);
+      if (old?.k) await bucket.delete(old.k).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/center-art$/,
+    async (ctx) => {
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const old = await ctx.db.prepare("SELECT edm_key AS k FROM center_art WHERE center_key = ?").bind(center.key).first<{ k: string }>();
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM center_art WHERE center_key = ?").bind(center.key), audit(ctx.db, s.sub, "center.edm_remove", "center", center.key)]);
+      if (old?.k) await ctx.env.MEDIA?.delete(old.k).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
+  ["GET", /^\/admin\/courses$/, async (ctx) => listCourses(ctx, true)],
+  ["POST", /^\/admin\/courses$/, async (ctx) => createCourse(ctx, await requireCourseCreator(ctx))],
   [
     "GET",
     /^\/admin\/(categories|series|locations)$/,
     async (ctx, [what]) => {
-      const who = requireCourseCreator(ctx);
+      const who = await requireCourseStaff(ctx);
       const kind = what === "categories" ? "category" : what === "series" ? "series" : "location";
       return keywordChoices(ctx, kind, who.role !== "admin" ? (who.center?.key ?? "") : null);
     },
@@ -2997,9 +3355,10 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       const s = requireSuperAdmin(ctx);
       const body = await readJson<Record<string, unknown>>(ctx.req);
-      const kind = keywordKind(body.kind);
-      if (kind === "location") fail(400, "invalid_kind", "只有分類與系列可以設定短網址");
+      const kind = body.kind === "center" ? "center" : keywordKind(body.kind);
+      if (kind === "location") fail(400, "invalid_kind", "只有分類、系列與中心可以設定短網址");
       const value = keywordText(body.value);
+      if (kind === "center") await assertCentralCenters(ctx, [value]);
       const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
       if (RESERVED_SLUGS.has(slug)) fail(400, "reserved_slug", `「${slug}」是網站頁面名稱，請換一個縮寫`);
       if (!SLUG_RE.test(slug)) fail(400, "invalid_slug", "縮寫只能用小寫英文字母、數字與連字號（-），長度 2～30 字");
@@ -3019,7 +3378,7 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       const s = requireSuperAdmin(ctx);
       const body = await readJson<Record<string, unknown>>(ctx.req);
-      const kind = keywordKind(body.kind);
+      const kind = body.kind === "center" ? "center" : keywordKind(body.kind);
       const value = keywordText(body.value);
       await ctx.db.batch([ctx.db.prepare("DELETE FROM short_links WHERE kind = ? AND value = ?").bind(kind, value), audit(ctx.db, s.sub, "short_link.remove", "short_link", kind, value)]);
       return listShortLinks(ctx);
@@ -3029,7 +3388,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/admin\/central-options$/,
     async (ctx) => {
-      const s = requireCourseCreator(ctx);
+      const s = await requireCourseStaff(ctx);
       // 獎銜選單與會員中心相同（正本）；測試帳號用本地階梯。
       if (s.kind === "central") {
         const list = await rankOptionList(s.token);
@@ -3135,14 +3494,21 @@ const routes: [string, RegExp, Handler][] = [
   [
     "POST",
     /^\/admin\/courses\/([\w-]+)\/duplicate$/,
-    async (ctx, [id]) => duplicateCourse(ctx, id!, await requireCourseManager(ctx, id!)),
+    async (ctx, [id]) => {
+      // 複製（建立下一梯）：要能新增課程，而且看得到（能修改）來源課程。
+      const s = await requireCourseCreator(ctx);
+      await requireCourseManager(ctx, id!);
+      ctx.touched = undefined; // 複製不算修改來源課程
+      return duplicateCourse(ctx, id!, s);
+    },
   ],
-  ["PATCH", /^\/admin\/courses\/([\w-]+)$/, async (ctx, [id]) => updateCourse(ctx, id, await requireCourseManager(ctx, id))],
+  ["PATCH", /^\/admin\/courses\/([\w-]+)$/, async (ctx, [id]) => updateCourse(ctx, id)],
   [
     "GET",
     /^\/admin\/courses\/([\w-]+)\/delete-impact$/,
     async (ctx, [id]) => {
-      await requireCourseManager(ctx, id);
+      const { can } = await courseRightsFor(ctx, id);
+      if (!can.edit && !can.remove) fail(403, "forbidden", "沒有管理這門課程的權限");
       return courseDeleteImpact(ctx.db, id);
     },
   ],
@@ -3150,12 +3516,12 @@ const routes: [string, RegExp, Handler][] = [
     "DELETE",
     /^\/admin\/courses\/([\w-]+)$/,
     async (ctx, [id]) => {
-      const admin = await requireCourseManager(ctx, id);
+      const { s: admin, can } = await courseRightsFor(ctx, id);
+      if (!can.remove) fail(403, "forbidden", "沒有刪除這門課程的權限");
       const impact = await courseDeleteImpact(ctx.db, id);
-      if (impact.registrations > 0 && admin.role !== "admin") fail(403, "forbidden", "已有人報名的課程請改為下架；刪除只有總部管理員可以做");
-      const body = (await ctx.req.json().catch(() => ({}))) as { confirm?: unknown };
-      // 已有人報名：必須明確輸入 YES 才能刪除，且報名紀錄、審核紀錄與學習進度會一併刪除。
-      if (impact.registrations > 0 && body.confirm !== "YES") fail(409, "confirm_required", `這門課程已有 ${impact.registrations} 筆報名紀錄；刪除需輸入 YES 確認`);
+      // 業主規定：已有人報名（已開通、免費報名、待審核）的課程不能永久刪除，只能「下架封存」。完全沒人報名才真的刪除。
+      const active = await registrationCount(ctx.db, id);
+      if (active > 0) fail(409, "has_registrations", `這門課程已有 ${active} 筆報名，不能永久刪除；請改用「下架封存」`);
       const audio = await ctx.db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_type = 'audio' AND media_ref IS NOT NULL").bind(id).all<{ media_ref: string }>();
       const files = await attachmentKeys(ctx.db, "course_id", id);
       const lessonArt = await ctx.db.prepare("SELECT cover_key, poster_key FROM lessons WHERE course_id = ?").bind(id).all<{ cover_key: string | null; poster_key: string | null }>();
@@ -3248,7 +3614,9 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
       fail(404, "not_found", "找不到這個 API");
     }
     const [, re, handler] = route!;
-    const out = await handler(await context(req, env, url), [...re.exec(path)!].slice(1));
+    const ctx = await context(req, env, url);
+    const out = await handler(ctx, [...re.exec(path)!].slice(1));
+    if (ctx.touched && ctx.session) await touchCourse(env.DB, ctx.touched, ctx.session).run().catch(() => undefined);
     res = out instanceof Response ? out : json(out);
   } catch (e) {
     if (e instanceof HttpError) res = json({ error: { code: e.code, message: e.message } }, e.status);

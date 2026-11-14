@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { handleApi } from "../src/api.ts";
-import type { CourseDetail, Playback } from "../src/contract.ts";
+import type { CourseDetail, CourseSummary, Playback } from "../src/contract.ts";
 import type { Env, R2Bucket } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
@@ -274,41 +274,59 @@ test("網址附件：自動判斷類型、自訂標題、只收 https、可改�
   assert.equal((await call("DELETE", `/admin/attachments/${custom.id}`, { token: admin })).status, 200);
 });
 
-test("刪除已有人報名的課程：先看影響、必須輸入 YES、報名／審核紀錄／進度一併刪除、不影響別門課", async () => {
+test("有人報名的課程只能「下架封存」（學員照常上課、可還原）；沒人報名（或只有已退回）才真的刪除", async () => {
   const { env, call, login } = setup({ MEDIA: fakeR2(), MEDIA_URL_SECRET: "s" });
-  const [admin, s1, s2] = await Promise.all(["demo-admin", "demo-student", "demo-silver"].map(login));
+  const [admin, s1, s2, other] = await Promise.all(["demo-admin", "demo-student", "demo-silver", "demo-desk"].map(login));
   const mk = async (title: string) => (await call<{ id: string }>("POST", "/admin/courses", { token: admin, body: { title, priceTwd: 100 } })).data.id;
-  const [a, b] = [await mk("要刪的課"), await mk("留下的課")];
+  const [a, b] = [await mk("要封存的課"), await mk("留下的課")];
   await call("PATCH", `/admin/courses/${a}`, { token: admin, body: { status: "published", minRank: "none" } });
   await call("PATCH", `/admin/courses/${b}`, { token: admin, body: { status: "published", minRank: "none" } });
   const [o1] = (await call<{ id: string }[]>("POST", "/orders", { token: s1, body: { courseIds: [a] } })).data;
-  const [o2] = (await call<{ id: string }[]>("POST", "/orders", { token: s2, body: { courseIds: [a] } })).data;
-  await call("POST", `/admin/orders/${o1.id}/review`, { token: admin, body: { action: "paid", paidTwd: 100 } });
-  const keep = (await call<{ id: string }[]>("POST", "/orders", { token: s1, body: { courseIds: [b] } })).data[0];
+  await call<{ id: string }[]>("POST", "/orders", { token: s2, body: { courseIds: [a] } });
+  await call("POST", `/admin/orders/${o1!.id}/review`, { token: admin, body: { action: "paid", paidTwd: 100 } });
 
   type Impact = { registrations: number; pending: number; opened: number; students: number; paidTwd: number; title: string };
   const impact = (await call<Impact>("GET", `/admin/courses/${a}/delete-impact`, { token: admin })).data;
-  assert.deepEqual([impact.title, impact.registrations, impact.pending, impact.opened, impact.students, impact.paidTwd], ["要刪的課", 2, 1, 1, 1, 100]);
+  assert.deepEqual([impact.title, impact.registrations, impact.pending, impact.opened, impact.students, impact.paidTwd], ["要封存的課", 2, 1, 1, 1, 100]);
   assert.equal((await call("GET", `/admin/courses/${a}/delete-impact`, { token: s1 })).status, 403);
+  const detail = (await call<CourseDetail>("GET", `/courses/${a}`, { token: admin })).data;
+  assert.equal(detail.admin?.registrations, 2, "已開通＋待審核");
 
-  assert.equal((await call("DELETE", `/admin/courses/${a}`, { token: admin })).status, 409, "沒帶確認不能刪");
-  assert.equal((await call("DELETE", `/admin/courses/${a}`, { token: admin, body: { confirm: "yes" } })).status, 409, "小寫 yes 不算");
-  assert.equal((await call("DELETE", `/admin/courses/${a}`, { token: s1, body: { confirm: "YES" } })).status, 403, "學員不能刪");
-  assert.equal((await call("DELETE", `/admin/courses/${a}`, { token: admin, body: { confirm: "YES" } })).status, 200);
+  // 有人報名：誰都不能永久刪除（總部也一樣），只能下架封存
+  assert.equal((await call("DELETE", `/admin/courses/${a}`, { token: admin, body: { confirm: "YES" } })).status, 409);
+  assert.equal((await call("DELETE", `/admin/courses/${a}`, { token: s1 })).status, 403, "學員不能刪");
+  assert.equal((await call("PATCH", `/admin/courses/${a}`, { token: s1, body: { status: "archived" } })).status, 403);
+  assert.equal((await call("PATCH", `/admin/courses/${a}`, { token: admin, body: { status: "archived" } })).status, 200);
 
+  // 封存後：已繳費與審核中的學員照常看得到（學習中），其他人看不到、也不在全部課程裡
+  const list1 = (await call<CourseSummary[]>("GET", "/courses", { token: s1 })).data;
+  assert.equal(list1.find((c) => c.id === a)?.status, "archived");
+  assert.equal((await call("GET", `/courses/${a}`, { token: s1 })).status, 200);
+  assert.equal((await call("GET", `/courses/${a}`, { token: s2 })).status, 200);
+  assert.equal((await call("GET", `/courses/${a}`, { token: other })).status, 404);
+  assert.equal((await call<CourseSummary[]>("GET", "/courses", { token: other })).data.some((c) => c.id === a), false);
+  assert.equal((await call("POST", "/orders", { token: other, body: { courseIds: [a] } })).status >= 400, true, "封存的課程不能再報名");
   const count = async (sql: string) => (await env.DB.prepare(sql).first<{ n: number }>())!.n;
-  assert.equal(await count(`SELECT COUNT(*) AS n FROM courses WHERE id = '${a}'`), 0);
-  assert.equal(await count(`SELECT COUNT(*) AS n FROM orders WHERE id IN ('${o1.id}', '${o2.id}')`), 0, "只含這門課的報名紀錄一併刪除");
-  assert.equal(await count(`SELECT COUNT(*) AS n FROM enrollments WHERE course_id = '${a}'`), 0);
-  assert.equal(await count(`SELECT COUNT(*) AS n FROM order_events WHERE order_id IN ('${o1.id}', '${o2.id}')`), 0);
-  assert.equal(await count(`SELECT COUNT(*) AS n FROM orders WHERE id = '${keep.id}'`), 1, "別門課的報名紀錄不受影響");
-  assert.equal((await call<unknown[]>("GET", "/notifications", { token: s2 })).data.some((n) => JSON.stringify(n).includes(o2.id)), false, "指向已刪報名的通知一併清掉");
-  const log = await env.DB.prepare("SELECT detail FROM audit_log WHERE action = 'course.delete' AND target_id = ?").bind(a).first<{ detail: string }>();
-  assert.equal(JSON.parse(log!.detail).registrations, 2, "稽核紀錄留下刪除統計");
+  assert.equal(await count(`SELECT COUNT(*) AS n FROM orders WHERE id = '${o1!.id}'`), 1, "報名紀錄保留");
+
+  // 還原
+  assert.equal((await call("PATCH", `/admin/courses/${a}`, { token: admin, body: { status: "published" } })).status, 200);
+  assert.equal((await call<CourseSummary[]>("GET", "/courses", { token: other })).data.some((c) => c.id === a), true);
+
+  // 只有已退回的報名：可以真的刪除，退回的紀錄一併清掉；別門課不受影響
+  const c = await mk("只有退回");
+  await call("PATCH", `/admin/courses/${c}`, { token: admin, body: { status: "published" } });
+  const [o3] = (await call<{ id: string }[]>("POST", "/orders", { token: s2, body: { courseIds: [c] } })).data;
+  assert.equal((await call("POST", `/admin/orders/${o3!.id}/review`, { token: admin, body: { action: "reject", reasonCode: "unpaid" } })).status, 200);
+  assert.equal((await call("DELETE", `/admin/courses/${c}`, { token: admin })).status, 200);
+  assert.equal(await count(`SELECT COUNT(*) AS n FROM orders WHERE id = '${o3!.id}'`), 0);
+  assert.equal(await count(`SELECT COUNT(*) AS n FROM courses WHERE id = '${b}'`), 1);
+  const log = await env.DB.prepare("SELECT detail FROM audit_log WHERE action = 'course.delete' AND target_id = ?").bind(c).first<{ detail: string }>();
+  assert.equal(JSON.parse(log!.detail).registrations, 1, "稽核紀錄留下刪除統計");
 
   // 沒人報名的課程照舊可直接刪除
-  const c = await mk("沒人報名");
-  assert.equal((await call("DELETE", `/admin/courses/${c}`, { token: admin })).status, 200);
+  const d = await mk("沒人報名");
+  assert.equal((await call("DELETE", `/admin/courses/${d}`, { token: admin })).status, 200);
 });
 
 test("EDM 與 16:9 封面（從 EDM 裁切）：公開網址、權限依中心、壓縮後格式檢查、換圖刪舊檔、刪課程時清檔", async () => {

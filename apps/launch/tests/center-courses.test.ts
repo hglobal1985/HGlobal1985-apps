@@ -65,6 +65,9 @@ test("各中心自行上架：會長只能管理主辦單位是自己中心的�
   assert.equal((await call("DELETE", `/admin/courses/${id}`, { token: pres })).status, 200);
   const again = await call<CourseDetail>("POST", "/admin/courses", { token: pres, body: { title: "第二門", priceTwd: 0, status: "published" } });
   await call("POST", "/orders", { token: student, body: { courseIds: [again.data.id] } });
-  assert.equal((await call("DELETE", `/admin/courses/${again.data.id}`, { token: pres, body: { confirm: "YES" } })).status, 403);
-  assert.equal((await call("DELETE", `/admin/courses/${again.data.id}`, { token: admin, body: { confirm: "YES" } })).status, 200);
+  // 有人報名：誰都不能永久刪除，只能下架封存；還原只有總部、會長、音控
+  assert.equal((await call("DELETE", `/admin/courses/${again.data.id}`, { token: pres })).status, 409);
+  assert.equal((await call("DELETE", `/admin/courses/${again.data.id}`, { token: admin })).status, 409);
+  assert.equal((await call("PATCH", `/admin/courses/${again.data.id}`, { token: pres, body: { status: "archived" } })).status, 200);
+  assert.equal((await call("PATCH", `/admin/courses/${again.data.id}`, { token: pres, body: { status: "published" } })).status, 200);
 });

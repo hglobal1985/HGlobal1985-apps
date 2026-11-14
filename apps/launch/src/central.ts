@@ -277,6 +277,35 @@ export async function memberContext(sub: string, token: string): Promise<MemberC
   });
 }
 
+export type CenterMember = { memberId: string; name: string; avatarUrl: string | null; signedIn: boolean };
+export type CenterMembersPage = { center: { key: string; label: string } | null; members: CenterMember[]; next: string | null };
+/**
+ * 同中心會員名單（指派小編用；串接指令 2026-11-15.4 三、14）：GET /v1/eligibility/center-members。
+ * 用呼叫者本人的 Token；音控／會長只會拿到自己中心，總部可帶 center。名單不保存、不快取、搜尋字不寫日誌。
+ * 失敗時丟出 { status, code }，由呼叫端轉成中文訊息。
+ */
+export async function centerMembers(token: string, opts: { q?: string; cursor?: string | null; center?: string | null; limit?: number }): Promise<CenterMembersPage> {
+  const qs = new URLSearchParams();
+  qs.set("q", (opts.q ?? "").slice(0, 30));
+  qs.set("limit", String(Math.min(50, Math.max(1, opts.limit ?? 20))));
+  if (opts.cursor) qs.set("cursor", opts.cursor.slice(0, 500));
+  if (opts.center) qs.set("center", opts.center.slice(0, 100));
+  const res = await callCentral(token, `/v1/eligibility/center-members?${qs.toString()}`);
+  if (!res) throw { status: 503, code: "central_unavailable" };
+  if (!res.ok) {
+    const b = (await res.json().catch(() => null)) as { error?: { code?: string } } | null;
+    throw { status: res.status, code: b?.error?.code ?? "error" };
+  }
+  const b = (await res.json().catch(() => null)) as { center?: { key?: unknown; label?: unknown } | null; members?: unknown[]; next_cursor?: unknown } | null;
+  const label = typeof b?.center?.label === "string" ? b.center.label : "";
+  const members = (b?.members ?? []).flatMap((m): CenterMember[] => {
+    const x = m as { member_id?: unknown; display_name?: unknown; avatar_url?: unknown; signed_in_app?: unknown };
+    if (typeof x.member_id !== "string" || !x.member_id) return [];
+    return [{ memberId: x.member_id, name: typeof x.display_name === "string" ? x.display_name.slice(0, 60) : "", avatarUrl: typeof x.avatar_url === "string" && /^https:\/\//.test(x.avatar_url) ? x.avatar_url : null, signedIn: x.signed_in_app === true }];
+  });
+  return { center: label ? { key: typeof b?.center?.key === "string" && b.center.key ? b.center.key : centerKey(label), label } : null, members, next: typeof b?.next_cursor === "string" && b.next_cursor ? b.next_cursor : null };
+}
+
 let lastCenters: string[] = [];
 /**
  * 中心清單：**唯一的正本是會員中心**（地區教育中心詞庫）。行動大學不可自行新增、也不可把本地資料（報名紀錄、審核群組…）裡出現過的名稱混進來。

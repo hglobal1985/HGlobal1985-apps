@@ -58,7 +58,8 @@ export async function flushEmails(env: Env): Promise<number> {
 /** 收件會員（只查誰要收；信箱本身寄信時才向中央查）。 */
 async function recipients(db: Env["DB"], n: Pending): Promise<string[]> {
   let stmt: D1PreparedStatement;
-  if (n.recipient_sub) stmt = db.prepare("SELECT member_sub FROM member_contacts WHERE member_sub = ? AND notify_email = 1").bind(n.recipient_sub);
+  // 個人通知：沒關掉 Email 就寄（還沒有聯絡資料列的人，例如剛被指派、還沒登入過的小編，也照寄；信箱由會員中心依同意範圍提供）。
+  if (n.recipient_sub) stmt = db.prepare("SELECT ?1 AS member_sub WHERE NOT EXISTS (SELECT 1 FROM member_contacts WHERE member_sub = ?1 AND notify_email = 0)").bind(n.recipient_sub);
   else if (n.recipient_role === "admin") stmt = db.prepare("SELECT member_sub FROM member_contacts WHERE is_admin = 1 AND notify_email = 1");
   else if (n.recipient_role === "president" && n.recipient_center_key) stmt = db.prepare("SELECT member_sub FROM member_contacts WHERE president_center_key = ? AND notify_email = 1").bind(n.recipient_center_key);
   else return [];
