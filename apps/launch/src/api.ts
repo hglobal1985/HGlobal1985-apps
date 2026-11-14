@@ -18,7 +18,6 @@ import {
   type CourseSummary,
   type CourseCan,
   type CourseEditor,
-  type CourseRights,
   type CenterArt,
   type EditorCandidate,
   type Lesson,

@@ -2,8 +2,15 @@ import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
-import type { CourseSummary } from "@/api/client";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import type { CenterArt, CourseSummary } from "@/api/client";
+import { CenterEdm } from "@/features/admin/center-edm";
+import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { NewCourseSheet } from "@/features/course-edit/new-course";
+import { ShortLinkRow } from "@/features/course-edit/short-link-row";
+import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { CourseCard } from "./course-card";
+import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
@@ -14,29 +21,55 @@ import { groupBySeries, orderGroups, sortCourses } from "./sort";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
-import { space } from "@/theme/tokens";
-import { AppText, EmptyState, ErrorView, LoadingView, Screen, Select } from "@/ui";
+import { minTouch, radius, space } from "@/theme/tokens";
+import { AppText, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Select } from "@/ui";
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
 const GAP = space.md;
 
-/** 全部課程清單。initialCategory／series 由網址（短網址 /c、/s 或 ?category=、?series=）帶入；series 篩選時上方有可清除的標籤。 */
-export function CoursesView({ initialCategory = "", series = "", inStack = false }: { initialCategory?: string; series?: string; inStack?: boolean }) {
+/**
+ * 全部課程清單。initialCategory／initialCenter／series 由網址（短網址、?category=、?center=、?series=）帶入。
+ * 「中心」下拉：選了中心，下方先顯示該中心的 EDM（有上傳才有），只列該中心主辦的課程。
+ * 管理者（總部、會長、音控、小編）另外看得到自己能管的「未上架」課程（標示未上架）、最下面可展開「已封存」、右下角「＋新增課程」。
+ */
+export function CoursesView({ initialCategory = "", initialCenter = "", series = "", inStack = false }: { initialCategory?: string; initialCenter?: string; series?: string; inStack?: boolean }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
+  const { member } = useSession();
+  const manager = canManageCourses(member);
+  const adminList = useApi<CourseSummary[]>(manager ? "/admin/courses" : null);
+  const centerArt = useApi<CenterArt[]>("/center-art");
   const [category, setCategory] = useState(initialCategory || ALL);
+  const [center, setCenter] = useState(initialCenter || ALL);
   const seriesFilter = series;
   useEffect(() => {
     if (initialCategory) setCategory(initialCategory);
   }, [initialCategory]);
-  // 網頁：選分類時，網址列同步成該分類的短網址（有設定縮寫才換；其餘維持 /courses），方便直接複製分享。
+  useEffect(() => {
+    if (initialCenter) setCenter(initialCenter);
+  }, [initialCenter]);
+  // 網頁：網址列跟著篩選變：只選分類或只選中心＝該短網址（有設定才換）；兩個都選＝/courses?center=…&category=…；都沒選＝/courses。
   const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
+  const syncUrl = (cat: string, cen: string) => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || seriesFilter) return;
+    const slugOf = (kind: string, v: string) => links.data?.find((l) => l.kind === kind && l.value === v)?.slug;
+    let url = "/courses";
+    if (cat !== ALL && cen !== ALL) url = `/courses?center=${encodeURIComponent(cen)}&category=${encodeURIComponent(cat)}`;
+    else if (cen !== ALL) url = slugOf("center", cen) ? `/${slugOf("center", cen)}` : `/courses?center=${encodeURIComponent(cen)}`;
+    else if (cat !== ALL) url = slugOf("category", cat) ? `/${slugOf("category", cat)}` : `/courses?category=${encodeURIComponent(cat)}`;
+    window.history.replaceState(window.history.state, "", url);
+  };
   const pickCategory = (v: string) => {
     setCategory(v);
-    if (Platform.OS !== "web" || typeof window === "undefined" || seriesFilter) return;
-    const slug = v === ALL ? null : links.data?.find((l) => l.kind === "category" && l.value === v)?.slug;
-    window.history.replaceState(window.history.state, "", slug ? `/${slug}` : "/courses");
+    syncUrl(v, center);
   };
+  const pickCenter = (v: string) => {
+    setCenter(v);
+    syncUrl(category, v);
+  };
+  const [newOpen, setNewOpen] = useState(false);
+  const [artOpen, setArtOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [boxW, setBoxW] = useState(0);
   // 搜尋：放大鏡展開後，每打一個字就即時過濾下方清單並列出關聯詞；搜尋時不受分類限制。
   const [searchOpen, setSearchOpen] = useState(false);
@@ -61,16 +94,33 @@ export function CoursesView({ initialCategory = "", series = "", inStack = false
   const [wantIndex, setWantIndex] = useState(false);
   const chapterMode = mode === "chapter" && !seriesFilter;
   const searchData = useApi<{ lessons: SearchLesson[] }>(wantIndex || chapterMode ? "/search-index" : null);
-  const { member } = useSession();
   const { c } = useTheme();
   const { config } = useUiConfig();
-  const courses = useMemo(() => sortCourses(data ?? [], member, config.sortGroups), [data, member, config.sortGroups]);
+  // 公開清單只取「已上架」（學習中用的下架封存課程不放這裡）；管理者再加上自己能管的未上架課程。
+  const merged = useMemo(() => {
+    const pub = (data ?? []).filter((x) => x.status === "published");
+    const ids = new Set(pub.map((x) => x.id));
+    return [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
+  }, [data, adminList.data]);
+  const courses = useMemo(() => sortCourses(merged, member, config.sortGroups), [merged, member, config.sortGroups]);
   const categories = useMemo(() => [...new Set(courses.flatMap((x) => x.category.split("、")).filter(Boolean))], [courses]);
+  // 中心：課程的主辦中心（名稱都是會員中心清單裡的）；管理者另外加上自己能管的中心（還沒有課程也能先上傳 EDM）。
+  const rights = member?.courseRights;
+  const centers = useMemo(() => {
+    const set = new Set(courses.map((x) => x.hostCenter).filter(Boolean));
+    if (rights?.center) set.add(rights.center);
+    if (rights?.all) for (const a of centerArt.data ?? []) set.add(a.center);
+    return [...set].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  }, [courses, rights, centerArt.data]);
+  const art = center !== ALL ? centerArt.data?.find((a) => a.center === center) : undefined;
+  const canEditArt = center !== ALL && !!rights && (rights.all || (rights.center === center && (rights.manageEditors || !!rights.editor?.editOthers)));
+  const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (center === ALL || x.hostCenter === center));
+  const inCenter = (x: CourseSummary) => center === ALL || x.hostCenter === center;
   const needIndex = wantIndex || chapterMode;
   const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? []) : null), [needIndex, courses, searchData.data]);
   const matched = searchIndex && !seriesFilter ? matchCourses(searchIndex, q) : null;
   const terms = searchIndex && q.trim() && q !== picked ? suggestTerms(searchIndex, q) : [];
-  const list = courses.filter((x) => (matched ? matched.has(x.id) : (category === ALL || x.category.split("、").includes(category)) && (!seriesFilter || x.series === seriesFilter)));
+  const list = courses.filter((x) => (matched ? matched.has(x.id) : (category === ALL || x.category.split("、").includes(category)) && inCenter(x) && (!seriesFilter || x.series === seriesFilter)));
   const pickTerm = (text: string) => {
     const head = q.trim().split(/\s+/).slice(0, -1).join(" ");
     const next = head ? `${head} ${text}` : text;
@@ -95,11 +145,11 @@ export function CoursesView({ initialCategory = "", series = "", inStack = false
     for (const l of searchData.data?.lessons ?? []) {
       const co = byId.get(l.courseId);
       if (!co) continue;
-      if (hit ? !hit.has(l.id) : category !== ALL && !co.category.split("、").includes(category)) continue;
+      if (hit ? !hit.has(l.id) : (category !== ALL && !co.category.split("、").includes(category)) || !inCenter(co)) continue;
       out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [chapterMode, courses, searchData.data, searchIndex, q, category, member, shuffleSeed]);
+  }, [chapterMode, courses, searchData.data, searchIndex, q, category, center, member, shuffleSeed]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
   const cols = boxW >= 520 ? 3 : 2;
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
@@ -116,7 +166,14 @@ export function CoursesView({ initialCategory = "", series = "", inStack = false
     <View style={styles.filters} onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}>
       {!seriesFilter ? <View style={{ width: SEARCH_ICON_W }} /> : null}
       <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end", gap: space.sm, opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
-      <Select value={shownCategory} options={[{ key: ALL, label: "全部分類" }, ...categories.map((x) => ({ key: x, label: x }))]} onChange={seriesFilter ? leaveSeries : pickCategory} />
+      <View style={{ flex: 1 }}>
+        <Select value={shownCategory} options={[{ key: ALL, label: "全部分類" }, ...categories.map((x) => ({ key: x, label: x }))]} onChange={seriesFilter ? leaveSeries : pickCategory} />
+      </View>
+      {!seriesFilter ? (
+        <View style={{ flex: 1 }}>
+          <Select value={center} options={[{ key: ALL, label: "全部中心" }, ...centers.map((x) => ({ key: x, label: x }))]} onChange={pickCenter} />
+        </View>
+      ) : null}
       {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
       </View>
       {!seriesFilter ? (
@@ -162,10 +219,38 @@ export function CoursesView({ initialCategory = "", series = "", inStack = false
       </Screen>
     );
   }
+  const centerHead =
+    center !== ALL ? (
+      <View style={{ gap: space.sm }}>
+        {art ? <EdmImageStage url={art.edmUrl} title={center} /> : null}
+        {canEditArt ? <Button variant="secondary" label={art ? "編輯中心 EDM" : "上傳中心 EDM"} icon="create-outline" onPress={() => setArtOpen(true)} fullWidth /> : null}
+      </View>
+    ) : null;
+  const archivedBlock =
+    manager && archived.length ? (
+      <View style={{ gap: space.sm }}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: showArchived }} onPress={() => setShowArchived(!showArchived)} style={[styles.archHead, { borderColor: c.border }]}>
+          <Ionicons name={showArchived ? "chevron-down" : "chevron-forward"} size={20} color={c.textMuted} />
+          <AppText variant="body" tone="muted">
+            已封存（{archived.length}）
+          </AppText>
+        </Pressable>
+        {showArchived ? (
+          <Card style={{ paddingVertical: 0 }}>
+            {archived.map((x) => (
+              <ListRow key={x.id} icon="archive-outline" title={x.title} subtitle={[x.hostCenter, x.eventStart ?? ""].filter(Boolean).join("・")} onPress={() => router.push(`/course/${x.id}`)} />
+            ))}
+          </Card>
+        ) : null}
+      </View>
+    ) : null;
+  const shortLink = center !== ALL ? links.data?.find((l) => l.kind === "center" && l.value === center) : undefined;
   return (
+    <View style={{ flex: 1 }}>
     <Screen header={!inStack} top={filterRow}>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
+      {centerHead}
       {chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingView /> : null}
@@ -180,7 +265,25 @@ export function CoursesView({ initialCategory = "", series = "", inStack = false
           </View>
         </>
       )}
+      {archivedBlock}
+      {canCreateCourse(member) ? <View style={{ height: 64 }} /> : null}
     </Screen>
+    {canCreateCourse(member) ? (
+      <Pressable accessibilityRole="button" accessibilityLabel="新增課程" onPress={() => setNewOpen(true)} style={[styles.fab, { backgroundColor: c.accent }]}>
+        <Ionicons name="add" size={26} color={c.textOnAccent} />
+        <AppText variant="headline" style={{ color: c.textOnAccent }}>
+          新增課程
+        </AppText>
+      </Pressable>
+    ) : null}
+    {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={center !== ALL ? center : undefined} /> : null}
+    {artOpen && center !== ALL ? (
+      <EditSheet title={`${center}的 EDM`} onClose={() => setArtOpen(false)} hideSave>
+        <CenterEdm center={center} edmUrl={art?.edmUrl} onChanged={centerArt.reload} />
+        {isSuperAdmin(member) ? <ShortLinkRow key={shortLink?.slug ?? "none"} item={{ kind: "center", value: center, slug: shortLink?.slug ?? null }} onChanged={links.reload} /> : null}
+      </EditSheet>
+    ) : null}
+    </View>
   );
 }
 
@@ -188,4 +291,7 @@ const styles = StyleSheet.create({
   terms: { marginTop: space.xs, borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   term: { minHeight: 44, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", gap: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   kind: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }, filters: { flexDirection: "row", alignItems: "flex-end", gap: space.sm },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP, rowGap: space.lg } });
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP, rowGap: space.lg },
+  archHead: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, paddingHorizontal: space.md, borderWidth: 1, borderStyle: "dashed", borderRadius: radius.md },
+  fab: { position: "absolute", right: space.lg, bottom: space.lg, flexDirection: "row", alignItems: "center", gap: 6, minHeight: 52, paddingHorizontal: space.lg, borderRadius: radius.pill, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
+});

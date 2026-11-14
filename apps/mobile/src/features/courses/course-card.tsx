@@ -33,7 +33,16 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
       <View style={styles.infoRow}>
         <View style={styles.meta}>
           {course.teacher.trim() ? <Pill label={course.teacher.trim()} /> : null}
-          {hostLine(course) ? <Pill label={hostLine(course)} tone="accent" /> : null}
+          {hostLine(course) ? (
+            course.hostCenter ? (
+              // 點「XX主辦」：到全部課程並選好該中心，看同中心的其他課。
+              <Pressable accessibilityRole="link" accessibilityLabel={`看${course.hostCenter}的所有課程`} hitSlop={6} onPress={() => router.push({ pathname: "/courses", params: { center: course.hostCenter } })}>
+                <Pill label={hostLine(course)} tone="accent" />
+              </Pressable>
+            ) : (
+              <Pill label={hostLine(course)} tone="accent" />
+            )
+          ) : null}
           <CoursePriceTag course={course} />
         </View>
         {course.eventStart ? (

@@ -32,6 +32,17 @@ export function EdmStage({ course }: { course: CourseSummary }) {
   );
 }
 
+/** 一般的 EDM 舞台（中心 EDM 等）：與課程頁相同的 16:9 外框、可上下拖曳、點一下放大。 */
+export function EdmImageStage({ url, title }: { url: string; title: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <StageFrame>
+      <EdmPan uri={resolveUrl(url)} viewY={0} onOpen={() => setOpen(true)} />
+      {open ? <EdmLightbox uri={url} title={title} onClose={() => setOpen(false)} /> : null}
+    </StageFrame>
+  );
+}
+
 function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: () => void }) {
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });

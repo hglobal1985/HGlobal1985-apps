@@ -5,7 +5,7 @@ import { confirmAsk } from "@/features/confirm";
 import { MemberHeader } from "@/features/member-header";
 import { openAccountCenter } from "@/features/account-link";
 import type { Achievement, AppConfig, Member } from "@/api/client";
-import { canManageCourses } from "@/lib/roles";
+import { canManageCourses, canManageEditors } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
@@ -143,7 +143,7 @@ export default function MeScreen() {
       {member && (member.reviewer || member.role === "admin" || canManageCourses(member) || member.canViewStats) ? (
         <Section title="管理">
           <Card style={{ paddingVertical: 0 }}>
-            {canManageCourses(member) ? <ListRow icon="ribbon-outline" title="課程設定" subtitle="新增／編輯課程、章節、影片與音檔" onPress={() => router.push("/admin/courses")} /> : null}
+            {canManageEditors(member) ? <ListRow icon="people-circle-outline" title="小編管理" subtitle="指派同中心的會員協助編輯課程與章節" onPress={() => router.push("/admin/editors")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="chatbubble-ellipses-outline" title="編輯學習金句" subtitle="首頁「繼續學習」下方的金句" onPress={() => router.push("/admin/quotes")} /> : null}
             {member.role === "admin" ? <ListRow icon="megaphone-outline" title="跑馬燈公告" subtitle="首頁公告：自動輪播、排序、停用" onPress={() => router.push("/admin/announcements")} /> : null}
             {isWeb && member.reviewer ? <ListRow icon="receipt-outline" title="報名審核" subtitle="確認繳費後開通、匯出對帳報表" onPress={() => router.push("/admin/orders")} /> : null}
@@ -153,7 +153,6 @@ export default function MeScreen() {
             {member.canViewStats ? <ListRow icon="stats-chart-outline" title="統計分析" subtitle="Mux 免費額度用量、觀看與播放品質統計" onPress={() => router.push("/admin/stats")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="swap-vertical-outline" title="課程排序與條件" subtitle="全部課程的排序優先順位、卡片緞帶文字與顏色" onPress={() => router.push("/admin/list-rules")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="pricetags-outline" title="關鍵字管理" subtitle="集中新增、改名、刪除課程的分類、系列、場地" onPress={() => router.push("/admin/keywords")} /> : null}
-            {member.titles.includes("超級管理員") ? <ListRow icon="link-outline" title="短網址" subtitle="自訂分類、系列的英文短網址縮寫" onPress={() => router.push("/admin/short-links")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="sparkles-outline" title="AI 模型" subtitle="切換逐字稿、關鍵字、語意搜尋用的 AI 模型，並比較花費" onPress={() => router.push("/admin/ai-models")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="trophy-outline" title="學習成就徽章設定" subtitle="設定要達成什麼條件才能獲得徽章" onPress={() => router.push("/admin/achievements")} /> : null}
             {member.role === "admin" ? <ListRow icon="flag-outline" title="留言檢舉" subtitle="處理被檢舉的留言" onPress={() => router.push("/admin/comments")} /> : null}

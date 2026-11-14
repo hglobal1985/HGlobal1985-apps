@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
@@ -49,6 +49,12 @@ export function SeriesTile({ group, width }: { group: SeriesGroup; width: number
         {edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
+        {/* 管理者才看得到的未上架課程：左下角標「未上架」（學員的清單裡不會有這些課）。 */}
+        {group.sessions.some((x) => x.status === "draft") ? (
+          <View style={[styles.draft, { backgroundColor: c.warning }]}>
+            <Text style={styles.draftText}>{group.sessions.every((x) => x.status === "draft") ? "未上架" : "含未上架"}</Text>
+          </View>
+        ) : null}
       </Pressable>
       {sheet ? <SeriesSheet title={inSeries ? rep.series : rep.title} items={group.sessions} showAllSeries={inSeries ? rep.series : undefined} onClose={() => setSheet(false)} /> : null}
     </View>
@@ -57,4 +63,6 @@ export function SeriesTile({ group, width }: { group: SeriesGroup; width: number
 
 const styles = StyleSheet.create({
   art: { borderRadius: radius.md, overflow: "hidden" },
+  draft: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  draftText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });

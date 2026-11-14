@@ -5,7 +5,7 @@ import { EmptyState, ErrorView, LoadingView, Screen, Button } from "@/ui";
 import { CoursesView } from "./courses-view";
 
 /**
- * 短網址頁（/縮寫，分類或系列）：網址列維持短網址不變，內容是該分類／系列的課程清單。
+ * 短網址頁（/縮寫，分類、系列或中心）：網址列維持短網址不變，內容是該分類／系列的課程清單。
  * 縮寫由超級管理員在「設定 → 短網址」自訂。
  */
 export function ShortLinkScreen() {
@@ -28,7 +28,7 @@ export function ShortLinkScreen() {
   return (
     <>
       <PageHeader title={data.value} path={`/${slug}`} />
-      {data.kind === "category" ? <CoursesView initialCategory={data.value} inStack /> : <CoursesView series={data.value} inStack />}
+      {data.kind === "category" ? <CoursesView initialCategory={data.value} inStack /> : data.kind === "center" ? <CoursesView initialCenter={data.value} inStack /> : <CoursesView series={data.value} inStack />}
     </>
   );
 }

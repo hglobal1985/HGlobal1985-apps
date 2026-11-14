@@ -1,4 +1,4 @@
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, type CourseDetail, type Lesson, type MediaType } from "@/api/client";
@@ -7,13 +7,12 @@ import { LessonArt } from "@/features/admin/lesson-art";
 import { LessonTranscript } from "@/features/admin/lesson-transcript";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { AttachmentManager } from "@/features/attachments";
-import { confirmAsk } from "@/features/confirm";
 import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
-import { canManageCourses } from "@/lib/roles";
-import { useApi, useSession } from "@/state/session";
+import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, DateSelect, EmptyState, ErrorView, Icon, LoadingView, NoticeBox, Pill, Screen, todayStr, type SelectOption } from "@/ui";
+import { AppText, Button, DateSelect, Icon, NoticeBox, Pill, todayStr, type SelectOption } from "@/ui";
+import { EditSheet } from "./edit-sheet";
 
 const kinds: { key: MediaType; label: string }[] = [
   { key: "demo", label: "示範短片" },
@@ -38,20 +37,15 @@ const formatDuration = (sec: number) => {
   return h ? `${h} 小時 ${m} 分 ${s} 秒` : `${m} 分 ${s} 秒`;
 };
 
-/** 管理員：章節管理（新增、改名、排序、刪除）與每堂的影片／音檔、時間軸區間。 */
-export default function LessonManagerScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { c } = useTheme();
-  const { member, invalidate } = useSession();
-  const isAdmin = canManageCourses(member);
-  const course = useApi<CourseDetail>(isAdmin ? `/courses/${id}` : null);
-  // YouTube 影片沒有長度時（章節顯示 0 分鐘），自動偵測並寫回，課程與章節就能顯示預估分鐘數（只有網頁版的管理員頁面做）。
+/** YouTube 影片沒有長度時（章節顯示 0 分鐘），自動偵測並寫回（只有網頁版的管理者畫面做）。 */
+export function useYoutubeLengthFix(course: CourseDetail | null | undefined, enabled: boolean) {
+  const { invalidate } = useSession();
   const [detecting, setDetecting] = useState(false);
   const detected = useRef(new Set<string>());
   useEffect(() => {
-    const lessons = (course.data?.lessons ?? []).filter((l) => !l.full);
+    const lessons = (course?.lessons ?? []).filter((l) => !l.full);
     const todo = lessons.filter((l) => l.media?.type === "youtube" && l.media.ref && l.minutes === 0 && !detected.current.has(l.id));
-    if (!todo.length || !isAdmin) return;
+    if (!todo.length || !enabled) return;
     let alive = true;
     setDetecting(true);
     (async () => {
@@ -72,100 +66,80 @@ export default function LessonManagerScreen() {
     return () => {
       alive = false;
     };
-  }, [course.data, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [newTitle, setNewTitle] = useState("");
-  const [newSharer, setNewSharer] = useState("");
-  const [newRank, setNewRank] = useState("");
-  const [newJob, setNewJob] = useState("");
-  const rankOptions = useRankOptions();
-  const tName = course.data?.teacher ?? "";
-  const tRank = course.data?.teacherRank ?? "";
-  const tJob = course.data?.teacherTitle ?? "";
-  const newSame = !!tName && newSharer === tName && newRank === tRank && newJob === tJob;
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  if (!isAdmin) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="需要課程管理權限" /></Screen>;
-  if (!course.data) return <Screen header={false}>{course.error ? <ErrorView message={course.error} onRetry={course.reload} /> : <LoadingView />}</Screen>;
-  const lessons = course.data.lessons.filter((l) => !l.full); // 「完整版」是系統自動產生的，不在編輯清單
+  }, [course, enabled]); // eslint-disable-line react-hooks/exhaustive-deps
+  return detecting;
+}
 
-  const run = async (fn: () => Promise<unknown>) => {
+/** 一個章節的完整設定（名稱、分享者、日期、影片／音檔、時間軸、封面、附件、逐字稿），從下方彈出。 */
+export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
+  const { member, invalidate } = useSession();
+  const rankOptions = useRankOptions();
+  const lessons = course.lessons.filter((l) => !l.full);
+  const i = lessons.findIndex((l) => l.id === lesson.id);
+  const [dirty, setDirty] = useState(false);
+  return (
+    <EditSheet title={`第 ${lesson.position} 堂：${lesson.title}`} onClose={onClose} dirty={dirty} hideSave>
+      <LessonEditor
+        key={`${lesson.id}:${lesson.media?.type}:${lesson.media?.ref}:${lesson.coverUrl}:${lesson.posterUrl}:${lesson.minutes}`}
+        lesson={lesson}
+        prevDate={i > 0 ? lessons[i - 1]?.eventDate ?? undefined : undefined}
+        allowMux={member?.role === "admin"}
+        teacher={course.teacher ?? ""}
+        teacherRank={course.teacherRank ?? ""}
+        teacherTitle={course.teacherTitle ?? ""}
+        rankOptions={rankOptions}
+        chapterCovers={course.chapterCovers}
+        courseDate={course.eventStart ?? undefined}
+        onSaved={invalidate}
+        onDirty={setDirty}
+      />
+    </EditSheet>
+  );
+}
+
+/** 新增章節（名稱、分享者），從下方彈出。 */
+export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onClose: () => void }) {
+  const { c } = useTheme();
+  const { invalidate } = useSession();
+  const rankOptions = useRankOptions();
+  const [title, setTitle] = useState("");
+  const [sharer, setSharer] = useState("");
+  const [rank, setRank] = useState("");
+  const [job, setJob] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const tName = course.teacher ?? "";
+  const tRank = course.teacherRank ?? "";
+  const tJob = course.teacherTitle ?? "";
+  const sameT = !!tName && sharer === tName && rank === tRank && job === tJob;
+  const submit = async () => {
+    if (!title.trim()) return setError("請輸入章節名稱");
     setBusy(true);
-    setMsg(null);
+    setError(null);
     try {
-      await fn();
+      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, eventDate: course.eventStart ?? todayStr() });
       invalidate();
+      onClose();
     } catch (e) {
-      setMsg((e as Error).message);
+      setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
-  const move = (from: number, to: number) => {
-    const ids = lessons.map((l) => l.id);
-    const [x] = ids.splice(from, 1);
-    ids.splice(to, 0, x);
-    return run(() => api("POST", `/admin/courses/${id}/lessons/order`, { ids }));
-  };
-
   return (
-    <Screen header={false}>
-      {detecting ? <NoticeBox text="正在偵測 YouTube 影片長度（讓課程顯示預估分鐘數）…" /> : null}
-      <Stack.Screen options={{ title: course.data.title }} />
-      <View style={styles.row}>
-        <Button variant="secondary" label="課程資料" icon="create-outline" onPress={() => router.push({ pathname: "/admin/course-edit", params: { id } })} />
-        <Pill label={course.data.status === "published" ? "上架中" : "未上架"} tone={course.data.status === "published" ? "success" : "danger"} />
+    <EditSheet title="新增章節" onClose={onClose} onSave={submit} saveLabel="新增" dirty={!!title || !!sharer} busy={busy} error={error}>
+      <View style={{ gap: space.xs }}>
+        <AppText variant="callout" tone="muted">
+          章節名稱
+        </AppText>
+        <TextInput value={title} onChangeText={setTitle} placeholder="例如：第 2 段 Q&A" placeholderTextColor={c.textMuted} accessibilityLabel="新章節名稱" style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
       </View>
-      <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段，播到結束時間自動停止。" />
-      {msg ? <NoticeBox tone="danger" text={msg} /> : null}
-      {lessons.map((l, i) => (
-        <LessonEditor
-          key={`${l.id}:${l.media?.type}:${l.media?.ref}:${l.start}:${l.end}:${l.title}:${l.sharer}:${l.sharerRank}:${l.sharerTitle}:${l.coverUrl}:${l.posterUrl}:${l.minutes}:${l.eventDate}`}
-          lesson={l}
-          prevDate={i > 0 ? lessons[i - 1]?.eventDate ?? undefined : undefined}
-          allowMux={member?.role === "admin"}
-          teacher={tName}
-          teacherRank={tRank}
-          teacherTitle={tJob}
-          rankOptions={rankOptions}
-          chapterCovers={!!course.data?.chapterCovers}
-          courseDate={course.data?.eventStart ?? undefined}
-          onSaved={invalidate}
-          onUp={i > 0 ? () => move(i, i - 1) : undefined}
-          onDown={i < lessons.length - 1 ? () => move(i, i + 1) : undefined}
-          onDelete={async () => {
-            if (await confirmAsk("刪除章節", `確定刪除「${l.title}」？`)) await run(() => api("DELETE", `/admin/lessons/${l.id}`));
-          }}
-          disabled={busy}
-        />
-      ))}
-      <Card>
-        <AppText variant="headline">新增章節</AppText>
-        <View style={styles.twoCol}>
-          <View style={{ flex: 3, gap: space.xs }}>
-            <AppText variant="callout" tone="muted">
-              章節名稱
-            </AppText>
-            <TextInput
-              value={newTitle}
-              onChangeText={setNewTitle}
-              placeholder="例如：第 2 段 Q&A"
-              placeholderTextColor={c.textMuted}
-              accessibilityLabel="新章節名稱"
-              style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
-            />
-          </View>
-          <SharerField value={newSharer} onChange={setNewSharer} teacher={tName} same={newSame} onToggleSame={() => (setNewSharer(newSame ? "" : tName), setNewRank(newSame ? "" : tRank), setNewJob(newSame ? "" : tJob))} label="新章節分享者" />
-        </View>
-        <RankTitleRow rank={newRank} title={newJob} onRank={setNewRank} onTitle={setNewJob} rankOptions={rankOptions} readOnly={newSame} who="新章節分享者" />
-        <Button
-          label="新增章節"
-          icon="add"
-          loading={busy}
-          disabled={!newTitle.trim()}
-          onPress={() => run(() => api("POST", `/admin/courses/${id}/lessons`, { title: newTitle, sharer: newSharer, sharerRank: newRank, sharerTitle: newJob, eventDate: todayStr() })).then(() => (setNewTitle(""), setNewSharer(""), setNewRank(""), setNewJob("")))}
-        />
-      </Card>
-    </Screen>
+      <SharerField value={sharer} onChange={setSharer} teacher={tName} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : tName), setRank(sameT ? "" : tRank), setJob(sameT ? "" : tJob))} label="新章節分享者" />
+      <RankTitleRow rank={rank} title={job} onRank={setRank} onTitle={setJob} rankOptions={rankOptions} readOnly={sameT} who="新章節分享者" />
+      <AppText variant="caption" tone="muted">
+        新增後再點章節旁的鉛筆，設定影片、音檔與附件。
+      </AppText>
+    </EditSheet>
   );
 }
 
@@ -234,12 +208,9 @@ function TimeInput({ label, value, onChange }: { label: string; value: Hms; onCh
 }
 
 function LessonEditor({
+  onDirty,
   lesson,
   onSaved,
-  onUp,
-  onDown,
-  onDelete,
-  disabled,
   allowMux,
   prevDate,
   teacher,
@@ -249,6 +220,8 @@ function LessonEditor({
   rankOptions,
   chapterCovers,
 }: {
+  /** 有沒有改了還沒儲存（關閉面板時提醒）。 */
+  onDirty?: (dirty: boolean) => void;
   allowMux: boolean;
   /** 上一堂的活動日期（有才會顯示「同上」勾選）。 */
   prevDate?: string;
@@ -263,10 +236,6 @@ function LessonEditor({
   chapterCovers: boolean;
   lesson: Lesson;
   onSaved: () => void;
-  onUp?: () => void;
-  onDown?: () => void;
-  onDelete: () => void;
-  disabled: boolean;
 }) {
   const { c } = useTheme();
   const [title, setTitle] = useState(lesson.title);
@@ -290,6 +259,17 @@ function LessonEditor({
   const rangeError = s === "invalid" || e === "invalid" ? "時間格式不正確（分、秒需在 0～59）" : e != null && (s ?? 0) >= e ? "結束時間必須晚於開始時間" : null;
   const length = !rangeError && e != null ? (e as number) - ((s as number | null) ?? 0) : null;
   const currentKind = lesson.media?.type ?? "demo";
+  const dirty =
+    title !== lesson.title ||
+    sharer !== (lesson.sharer ?? "") ||
+    sharerRank !== (lesson.sharerRank ?? "") ||
+    sharerTitle !== (lesson.sharerTitle ?? "") ||
+    eventDate !== (lesson.eventDate ?? "") ||
+    (kind !== currentKind && (kind === "demo" || kind === "youtube")) ||
+    (kind === "youtube" && ref !== (lesson.media?.type === "youtube" ? lesson.media.ref ?? "" : "")) ||
+    JSON.stringify(start) !== JSON.stringify(toHms(lesson.start)) ||
+    JSON.stringify(end) !== JSON.stringify(toHms(lesson.end));
+  useEffect(() => onDirty?.(dirty), [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (rangeError) return setMsg({ tone: "danger", text: rangeError });
@@ -337,15 +317,12 @@ function LessonEditor({
   };
 
   return (
-    <Card>
+    <View style={{ gap: space.md }}>
       <View style={styles.row}>
-        <AppText variant="headline" style={{ flex: 1 }}>
-          第 {lesson.position} 堂
+        <AppText variant="callout" tone="muted" style={{ flex: 1 }}>
+          目前內容
         </AppText>
         <Pill label={kinds.find((k) => k.key === currentKind)!.label} />
-        <IconButton icon="arrow-up" label="上移" onPress={onUp} disabled={disabled} />
-        <IconButton icon="arrow-down" label="下移" onPress={onDown} disabled={disabled} />
-        <IconButton icon="trash-outline" label="刪除章節" onPress={onDelete} disabled={disabled} danger />
       </View>
       <View style={styles.twoCol}>
         <View style={{ flex: 3, gap: space.xs }}>
@@ -473,11 +450,11 @@ function LessonEditor({
           <Button variant="secondary" label="播放檢查" icon="pulse-outline" loading={busy === "check"} disabled={!!busy} onPress={check} />
         ) : null}
       </View>
-    </Card>
+    </View>
   );
 }
 
-function IconButton({ icon, label, onPress, disabled, danger }: { icon: "arrow-up" | "arrow-down" | "trash-outline"; label: string; onPress?: () => void; disabled?: boolean; danger?: boolean }) {
+export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "arrow-up" | "arrow-down" | "trash-outline" | "create-outline"; label: string; onPress?: () => void; disabled?: boolean; danger?: boolean }) {
   const { c } = useTheme();
   const off = disabled || !onPress;
   return (

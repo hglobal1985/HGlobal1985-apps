@@ -44,7 +44,7 @@ function AppStack() {
             <Stack.Screen name="admin/list-rules" options={{ title: "課程排序與條件" }} />
             <Stack.Screen name="admin/stats" options={{ title: "統計分析" }} />
             <Stack.Screen name="admin/keywords" options={{ title: "關鍵字管理" }} />
-            <Stack.Screen name="admin/short-links" options={{ title: "短網址" }} />
+            <Stack.Screen name="admin/editors" options={{ title: "小編管理" }} />
             <Stack.Screen name="admin/ai-models" options={{ title: "AI 模型" }} />
             <Stack.Screen name="achievements" options={{ title: "學習成就" }} />
             <Stack.Screen name="admin/achievements" options={{ title: "學習成就徽章設定" }} />
@@ -55,9 +55,6 @@ function AppStack() {
             <Stack.Screen name="settings/notifications" options={{ title: "通知設定" }} />
             <Stack.Screen name="admin/announcements" options={{ title: "跑馬燈公告" }} />
             <Stack.Screen name="admin/quotes" options={{ title: "編輯學習金句" }} />
-            <Stack.Screen name="admin/courses" options={{ title: "課程設定" }} />
-            <Stack.Screen name="admin/course/[id]" options={{ title: "章節與影片" }} />
-            <Stack.Screen name="admin/course-edit" options={{ title: "課程資料" }} />
             <Stack.Screen name="admin/review-groups" options={{ title: "審核群組" }} />
             <Stack.Screen name="admin/comments" options={{ title: "留言檢舉" }} />
             <Stack.Screen name="admin/mux-picker" options={{ title: "從 Mux 選擇影片" }} />
