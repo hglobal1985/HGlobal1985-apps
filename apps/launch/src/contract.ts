@@ -114,6 +114,8 @@ export type CourseSummary = {
   coverUrl: string | null;
   /** EDM 預設停留位置（原圖高度的比例 0～1）。 */
   edmViewY: number;
+  /** 封面裁切框（占 EDM 圖寬高的比例，高由 16:9 算出）；課程介紹頁的預設停留位置＝它的上緣（永遠同步）。null＝未知（舊資料）。 */
+  coverRect: { x: number; y: number; w: number } | null;
 };
 
 export type MediaType = "demo" | "youtube" | "mux" | "audio";

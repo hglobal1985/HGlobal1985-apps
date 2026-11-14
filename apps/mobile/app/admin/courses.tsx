@@ -5,6 +5,7 @@ import { api, type CourseSummary, type Rank } from "@/api/client";
 import { cleanUnit } from "@/features/format";
 import { CourseCard } from "@/features/courses/course-card";
 import { collapseSeries, sortCourses } from "@/features/courses/sort";
+import { CoverSync } from "@/features/admin/cover-sync";
 import { canManageCourses } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
@@ -120,6 +121,7 @@ export default function AdminCoursesScreen() {
   return (
     <Screen header={false}>
       <Button label="新增課程" icon="add-circle-outline" onPress={() => router.push("/admin/course-edit")} fullWidth />
+      {member?.titles.includes("超級管理員") ? <CoverSync courses={courses.data} onDone={courses.reload} /> : null}
       <View style={styles.filters}>
         <Select label="分類" value={category} options={[{ key: ALL, label: "全部分類" }, ...categories.map((x) => ({ key: x, label: x }))]} onChange={setCategory} />
         {units.length ? <Select label="主辦單位" value={unit} options={[{ key: ALL, label: "全部單位" }, ...units.map((u) => ({ key: u, label: cleanUnit(u) }))]} onChange={setUnit} /> : null}

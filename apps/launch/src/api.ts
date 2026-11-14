@@ -323,6 +323,7 @@ type CourseRow = {
   chapter_covers: number;
   cover_key: string | null;
   edm_view_y: number;
+  cover_rect: string | null;
   edm_key: string | null;
   art_version: number;
   lesson_count: number;
@@ -330,7 +331,7 @@ type CourseRow = {
   zero_minute_lessons: number;
 };
 
-const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.show_full, c.chapter_covers, c.edm_key, c.cover_key, c.edm_view_y, c.art_version,
+const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.show_full, c.chapter_covers, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.duration_minutes = 0) AS zero_minute_lessons
@@ -399,6 +400,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     edmUrl: row.edm_key ? pubUrl(row.edm_key, row.art_version) : null,
     coverUrl: row.cover_key ? pubUrl(row.cover_key, row.art_version) : null,
     edmViewY: row.edm_view_y,
+    coverRect: parseCoverRect(row.cover_rect),
     status: row.status,
     guidanceUnit: row.guidance_unit,
     hostUnit: row.host_unit,
@@ -1198,6 +1200,17 @@ const dayOrNull = (v: unknown): string | null =>
   v === null || v === "" ? null : typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : fail(400, "invalid_date", "活動日期格式請用 2026-12-01");
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : undefined);
 
+/** 封面裁切框（占 EDM 圖片寬高的比例）：x、y 是左上角，w 是寬；高由 16:9 算出。 */
+export type CoverRect = { x: number; y: number; w: number };
+function parseCoverRect(raw: string | null): CoverRect | null {
+  if (!raw) return null;
+  try {
+    const r = JSON.parse(raw) as Partial<CoverRect>;
+    return [r.x, r.y, r.w].every((n) => typeof n === "number" && Number.isFinite(n)) ? (r as CoverRect) : null;
+  } catch {
+    return null;
+  }
+}
 async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: boolean, who: Session) {
   const centerOnly = who.role !== "admin"; // 會長、音控：主辦單位固定是自己的中心，不能自稱總部指導，審核群組只能用自己中心的
   const sets: [string, unknown][] = [];
@@ -1260,10 +1273,21 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   if (series !== undefined) sets.push(["series", series]);
   if (body.diamondFree !== undefined) sets.push(["diamond_free", body.diamondFree === true ? 1 : 0]);
   if (body.hideFromHome !== undefined) sets.push(["hide_home", body.hideFromHome === true ? 1 : 0]);
-  if (body.edmViewY !== undefined) {
+  // 封面框與預設停留位置永遠同步：有 coverRect 時，預設位置＝封面框上緣（edm_view_y 由它算出，不接受另外指定）。
+  // 只改預設位置（沒有封面框）時，封面框作廢（NULL），免得兩者不一致。
+  if (body.coverRect !== undefined) {
+    if (body.coverRect === null) sets.push(["cover_rect", null]);
+    else {
+      const r = body.coverRect as Partial<CoverRect>;
+      const ok = r && [r.x, r.y, r.w].every((n) => typeof n === "number" && Number.isFinite(n)) && r.w! > 0 && r.w! <= 1 && r.x! >= 0 && r.x! + r.w! <= 1.0001 && r.y! >= 0 && r.y! <= 1;
+      if (!ok) fail(400, "invalid_cover_rect", "封面裁切範圍不正確");
+      const rect = { x: Math.round(r.x! * 10000) / 10000, y: Math.round(r.y! * 10000) / 10000, w: Math.round(r.w! * 10000) / 10000 };
+      sets.push(["cover_rect", JSON.stringify(rect)], ["edm_view_y", rect.y]);
+    }
+  } else if (body.edmViewY !== undefined) {
     const y = Number(body.edmViewY);
     if (!Number.isFinite(y) || y < 0 || y > 1) fail(400, "invalid_view", "EDM 預設位置不正確");
-    sets.push(["edm_view_y", y]);
+    sets.push(["edm_view_y", y], ["cover_rect", null]);
   }
   const guidance = text(body.guidanceUnit, 60);
   if (centerOnly && guidance === HQ_UNIT) fail(403, "forbidden", `指導單位「${HQ_UNIT}」只有總部管理員可以設定`);
@@ -2738,7 +2762,7 @@ const routes: [string, RegExp, Handler][] = [
       const key = `${part}/${id}/${crypto.randomUUID()}.${img.ext}`;
       await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
       await ctx.db.batch([
-        ctx.db.prepare("UPDATE courses SET edm_key = ?, art_version = art_version + 1 WHERE id = ?").bind(key, id),
+        ctx.db.prepare("UPDATE courses SET edm_key = ?, cover_rect = NULL, art_version = art_version + 1 WHERE id = ?").bind(key, id),
         audit(ctx.db, s.sub, "course.edm_upload", "course", id, key),
       ]);
       if (old?.k) await bucket.delete(old.k).catch(() => undefined);

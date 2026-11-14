@@ -348,6 +348,18 @@ test("EDM 與 16:9 封面（從 EDM 裁切）：公開網址、權限依中心�
   const sum2 = (await call<{ id: string; coverUrl: string | null; edmViewY: number }[]>("GET", "/courses", { token: student })).data.find((c) => c.id === "start")!;
   assert.ok(decodeURIComponent(sum2.coverUrl ?? "").startsWith("/api/v2/media/pub?k=cover/start/"));
   assert.equal(sum2.edmViewY, 0.35);
+  // 封面框與預設停留位置永遠同步：給 coverRect 時，預設位置＝封面框上緣（不接受另外指定）
+  const cr = await call("PATCH", "/admin/courses/start", { token: admin, body: { coverRect: { x: 0, y: 0.2345678, w: 1 }, edmViewY: 0.9 } });
+  assert.equal(cr.status, 200);
+  const sum3 = (await call<{ id: string; edmViewY: number; coverRect: { x: number; y: number; w: number } | null }[]>("GET", "/courses", { token: student })).data.find((c) => c.id === "start")!;
+  assert.deepEqual(sum3.coverRect, { x: 0, y: 0.2346, w: 1 });
+  assert.equal(sum3.edmViewY, 0.2346);
+  assert.equal((await call("PATCH", "/admin/courses/start", { token: admin, body: { coverRect: { x: 0.5, y: 0.1, w: 0.9 } } })).status, 400); // 超出圖片範圍
+  // 之後只改預設位置：封面框作廢（避免兩者不一致）
+  await call("PATCH", "/admin/courses/start", { token: admin, body: { edmViewY: 0.4 } });
+  const sum4 = (await call<{ id: string; edmViewY: number; coverRect: unknown }[]>("GET", "/courses", { token: student })).data.find((c) => c.id === "start")!;
+  assert.equal(sum4.coverRect, null);
+  assert.equal(sum4.edmViewY, 0.4);
   assert.equal((await raw("GET", sum2.coverUrl!)).status, 200);
   assert.equal((await call("DELETE", "/admin/courses/start/cover", { token: pres })).status, 200);
   assert.equal((await call("DELETE", "/admin/courses/start/edm", { token: pres })).status, 200);
