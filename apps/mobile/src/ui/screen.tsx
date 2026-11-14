@@ -34,6 +34,7 @@ export function Screen({
   tight = false,
   gap = space.lg,
   footer,
+  top,
 }: {
   title?: string;
   subtitle?: string;
@@ -46,6 +47,8 @@ export function Screen({
   gap?: number;
   /** 固定在頁面下方（底部主選單上方）的操作列，例如「報名」、「取消報名／送出」。不會跟著內容捲動。 */
   footer?: ReactNode;
+  /** 固定在頁面最上方的功能列（篩選、搜尋…）：往下捲動內容時它永遠留在最上面、不會跟著捲走。 */
+  top?: ReactNode;
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -55,12 +58,17 @@ export function Screen({
   return (
     <FooterSlot.Provider value={setSlot}>
     <View style={{ flex: 1 }}>
+    {top ? (
+      <View style={[styles.top, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
+        <View style={styles.topInner}>{top}</View>
+      </View>
+    ) : null}
     <ScrollView
       refreshControl={refreshControl}
       style={{ flex: 1, backgroundColor: c.background }}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: (header ? insets.top : 0) + (tight ? space.xs : space.lg), paddingBottom: space.xxl },
+        { paddingTop: top ? space.md : (header ? insets.top : 0) + (tight ? space.xs : space.lg), paddingBottom: space.xxl },
       ]}
       contentInsetAdjustmentBehavior="automatic"
     >
@@ -98,6 +106,8 @@ export function Screen({
 const styles = StyleSheet.create({
   content: { paddingHorizontal: space.lg, alignItems: "center" },
   inner: { width: "100%", maxWidth: maxContentWidth, gap: space.lg },
+  top: { alignItems: "center", paddingHorizontal: space.lg, paddingBottom: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 5, elevation: 3, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  topInner: { width: "100%", maxWidth: maxContentWidth },
   footer: { alignItems: "center", paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm, borderTopWidth: 1, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: -2 }, elevation: 6 },
   footerInner: { width: "100%", maxWidth: maxContentWidth, gap: space.sm },
   header: { flexDirection: "row", alignItems: "flex-end", gap: space.md, marginBottom: space.xs },

@@ -59,13 +59,16 @@ export default function LearningScreen() {
       </Screen>
     );
   return (
-    <Screen>
-      {enrolled.length ? (
-        <View style={styles.filters}>
-          <Select label="費用" value={kind} options={[{ key: "", label: "全部（免費與付費）" }, { key: "free", label: "免費" }, { key: "paid", label: "付費" }]} onChange={setKind} />
-          <Select label="系列" value={seriesSel} options={[{ key: "", label: "全部系列" }, ...seriesList.map((x) => ({ key: x, label: x }))]} onChange={setSeriesSel} />
-        </View>
-      ) : null}
+    <Screen
+      top={
+        enrolled.length ? (
+          <View style={styles.filters}>
+            <Select label="費用" value={kind} options={[{ key: "", label: "全部（免費與付費）" }, { key: "free", label: "免費" }, { key: "paid", label: "付費" }]} onChange={setKind} />
+            <Select label="系列" value={seriesSel} options={[{ key: "", label: "全部系列" }, ...seriesList.map((x) => ({ key: x, label: x }))]} onChange={setSeriesSel} />
+          </View>
+        ) : undefined
+      }
+    >
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {pending.length ? <NoticeBox tone="warning" text={`${pending.length} 門課程等待管理員確認，開通後會通知你。`} /> : null}

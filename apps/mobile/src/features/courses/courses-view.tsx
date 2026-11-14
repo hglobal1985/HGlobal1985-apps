@@ -152,8 +152,7 @@ export function CoursesView({ initialCategory = "", series = "", inStack = false
   if (seriesFilter) {
     const all = farToNear(courses.filter((x) => x.series === seriesFilter));
     return (
-      <Screen header={!inStack}>
-        {filterRow}
+      <Screen header={!inStack} top={filterRow}>
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}
         {data && !all.length ? <EmptyState icon="library-outline" title="這個系列目前沒有課程" /> : null}
@@ -164,8 +163,7 @@ export function CoursesView({ initialCategory = "", series = "", inStack = false
     );
   }
   return (
-    <Screen header={!inStack}>
-      {filterRow}
+    <Screen header={!inStack} top={filterRow}>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {chapterMode ? (
