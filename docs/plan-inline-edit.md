@@ -16,7 +16,7 @@
 ### 小編
 - 音控、會長、總部可指派同中心會員為小編；小編歸屬中心（換音控不受影響）；小編不能再指派小編。
 - 三種權限可單獨開關：新增（自己新增的課程有完整權限，含上下架、刪除）、修改別人、刪除別人。「別人」＝同中心、非本人新增的課程（現有課程一律算別人的）。「修改別人」包含上下架、價格、報名資格、審核群組。
-- 選人：從中央「同中心會員名單」點選，不可手動貼 ID。需求已交中央（docs/central-request-center-members.md），等中央回覆串接指令。
+- 選人：從中央「同中心會員名單」點選，不可手動貼 ID。中央已完成（串接指令 2026-11-15.4，三、14；檢查清單 26；ADR 0028）：GET /v1/eligibility/center-members?q=&limit=&cursor=（&center= 僅總部），用呼叫者本人的 Access Token；回 center{key,label}、members[{member_id,display_name,avatar_url,signed_in_app}]、next_cursor；403 無權限／跨中心、404 中心不存在、422 缺中心或 cursor 錯；需業主在中央平台設定勾 display_name（頭像另勾 avatar），否則 403 field_not_allowed。只存小編 member_id 與當下顯示名稱，不存名單、不記搜尋字。
 - 小編每次登入以本人的 eligibility/context 確認中心仍相同，換中心自動失效。小編資料只存在行動大學。
 - 所有修改記錄是誰、何時改。
 
