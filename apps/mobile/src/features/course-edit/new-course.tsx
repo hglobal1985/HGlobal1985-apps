@@ -12,7 +12,7 @@ import { EditSheet } from "./edit-sheet";
  * 直接進入該課程介紹頁的編輯模式，其餘欄位在頁面上一區一區補（手機不用一口氣填完一大張表）。
  * 總部可以選主辦中心；中心的會長、音控、小編固定是自己的中心。
  */
-export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void; defaultCenter?: string }) {
+export function NewCourseSheet({ onClose, defaultCenter, defaultCenterCourse = false }: { onClose: () => void; defaultCenter?: string; /** 從「寰宇教育中心」頁按新增時為 true：預設勾「中心課程」，建好才會出現在該中心頁。 */ defaultCenterCourse?: boolean }) {
   const { member, invalidate } = useSession();
   const isHq = member?.role === "admin";
   const centers = useApi<string[]>(isHq ? "/centers" : null);
@@ -23,7 +23,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [seriesName, setSeriesName] = useState("");
   const [autoCover, setAutoCover] = useState(false);
-  const [centerCourse, setCenterCourse] = useState(false);
+  const [centerCourse, setCenterCourse] = useState(defaultCenterCourse);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {

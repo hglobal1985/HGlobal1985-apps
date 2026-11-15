@@ -405,7 +405,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     ) : null}
     <ModeFlash mode={mode} tick={flashTick} />
     {catOpen ? <CategorySheet courses={pool.filter(inCenter)} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
-    {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
+    {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} defaultCenterCourse={mode === "center"} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
         <CenterNameField key={activeCenter} center={activeCenter} />
