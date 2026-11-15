@@ -504,3 +504,4 @@
   ④課程設定：系列欄位只有超管（『不合併』改『無』）；進階設定文字『不顯示在首頁推薦（不建議勾選）』『指導單位…（不建議勾選）』，新增課程不再預設指導單位＝總部；主辦單位區塊預設收起（HostUnitBlock）。
   ⑤**課程專屬網址** `/中心縮寫/英譯姓名-001`：courses.url_name（唯一索引 host_center_key＋url_name）；src/romanize.ts（中文 pinyin-pro、韓文 RR、日文假名 Hepburn；日文漢字用中文讀音）；編號三位數、同中心同姓名依序、一旦產生固定、換主辦中心才重新產生；課程存檔／中心縮寫設定時自動產生；摘要 `shortPath`；路由 `app/[slug]/[name].tsx`（GET /short-links/:slug/:name）；分享預覽 og.ts courseUrlMeta。缺主講人或中心沒縮寫＝沒有（用 /course/編號）。
   ⑥首頁推薦只列『我的中心』（總部主辦的人人算）。測試 tests/center-course.test.ts（後端共 116 項）。本機手機寬度驗證；iOS／Android 實機未驗證。
+- 2026-11-16 **修正：中心短網址重新整理後出現兩條上方工具列**：`short-link-screen.tsx` 在中心短網址（kind=center）不再放 PageHeader（改 `headerShown:false`），因為中心頁（CoursesView）自己有 TopBar（返回／標題／編輯／分享）；分類、系列短網址仍用 PageHeader。

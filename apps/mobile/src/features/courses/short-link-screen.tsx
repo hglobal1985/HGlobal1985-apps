@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import { PageHeader } from "@/features/page-header";
 import { useApi } from "@/state/session";
 import { EmptyState, ErrorView, LoadingView, Screen, Button } from "@/ui";
@@ -27,7 +27,8 @@ export function ShortLinkScreen() {
     );
   return (
     <>
-      <PageHeader title={data.value} path={`/${slug}`} />
+      {/* 中心頁自己有上方工具列（返回、標題、編輯、分享），這裡不再放一條，否則重新整理後會出現兩條。 */}
+      {data.kind === "center" ? <Stack.Screen options={{ headerShown: false }} /> : <PageHeader title={data.value} path={`/${slug}`} />}
       {data.kind === "category" ? <CoursesView initialCategory={data.value} inStack /> : data.kind === "center" ? <CoursesView initialCenter={data.value} inStack /> : <CoursesView series={data.value} inStack />}
     </>
   );
