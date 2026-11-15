@@ -13,7 +13,7 @@ import { CourseCard } from "./course-card";
 import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
-import { CategoryFilterBox, CategoryHintBar, CategorySheet, NONE, courseCats as cats, matchesCats } from "./category-sheet";
+import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, matchesCats } from "./category-sheet";
 import { CenterTile } from "./center-tile";
 import { ModeFlash } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
@@ -135,7 +135,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   // 分類下拉＝「關鍵字管理」的分類清單（同步，沒有課程使用的分類也要列出）；載入前先用課程上出現過的分類。
   // 「地區教育中心」不放進下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
   const categoryList = useApi<string[]>("/categories");
-  // 每個分類的統計：課程數、我「學習中」（已開通）幾門、未上架幾門（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
+  // 每個分類的統計：課程數、我「學習中」（已開通）幾堂、未上架幾堂（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
   const catStats = useMemo(() => {
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
@@ -160,13 +160,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     if (st.learning) badges.push({ text: `學習中 ${st.learning}`, tone: "accent" });
     if (manager && st.draft) badges.push({ text: `未上架 ${st.draft}`, tone: "warn" });
     if (st.fresh) badges.push({ text: "新", tone: "new" });
-    return { key: x, label: x === NONE ? "未分類" : x, hint: `${st.n} 門`, badges };
+    return { key: x, label: x === NONE ? "未分類" : x, hint: `${st.n} 堂`, badges };
   };
   const allOption: SelectOption = {
     key: ALL,
     label: "全部分類",
     short: "分類",
-    hint: `${courses.length} 門`,
+    hint: `${courses.length} 堂`,
     badges: courses.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${courses.filter((x) => x.enrollment === "opened").length}`, tone: "accent" }] : [],
   };
   // 中心：課程的主辦中心（名稱都是會員中心清單裡的）；管理者另外加上自己能管的中心（還沒有課程也能先上傳 EDM）。
@@ -253,7 +253,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         {seriesFilter ? (
           <Select value={shownCategory} options={[allOption, ...categories.map(categoryOption)]} onChange={leaveSeries} />
         ) : (
-          <CategoryFilterBox picked={selCats} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
+          <CategoryFilterBox picked={selCats} total={courses.filter((x) => inCategory(x) && inCenter(x)).length} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
         )}
       </View>
       {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
@@ -269,7 +269,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         />
       ) : null}
     </View>
-    {!seriesFilter && selCats.length ? <CategoryHintBar picked={selCats} total={courses.filter((x) => inCategory(x) && inCenter(x)).length} onRefine={() => setCatOpen(true)} /> : null}
     {terms.length ? (
       <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
         {terms.map((t) => (

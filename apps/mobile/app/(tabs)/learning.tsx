@@ -71,7 +71,7 @@ export default function LearningScreen() {
     >
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
-      {pending.length ? <NoticeBox tone="warning" text={`${pending.length} 門課程等待管理員確認，開通後會通知你。`} /> : null}
+      {pending.length ? <NoticeBox tone="warning" text={`${pending.length} 堂課程等待管理員確認，開通後會通知你。`} /> : null}
       {data && !mine.length && enrolled.some(inLearning) ? <EmptyState icon="library-outline" title="沒有符合條件的課程" /> : null}
       {data && !enrolled.some(inLearning) ? (
         <EmptyState

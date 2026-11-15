@@ -413,11 +413,11 @@ export type AchievementType = "lessons_completed" | "courses_completed" | "cours
 /** 條件類型的中文說明（單位用在「累計 N ○」）。 */
 export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; needsCourse?: boolean }> = {
   lessons_completed: { label: "累計完成幾堂課", unit: "堂" },
-  courses_completed: { label: "累計完整學完幾門課程", unit: "門" },
-  courses_enrolled: { label: "累計報名（已開通）幾門課程", unit: "門" },
+  courses_completed: { label: "累計完整學完幾堂課程", unit: "堂" },
+  courses_enrolled: { label: "累計報名（已開通）幾堂課程", unit: "堂" },
   learning_days: { label: "累計幾個不同的日子有學習紀錄", unit: "天" },
   comments_posted: { label: "在課程留言板留言幾次", unit: "次" },
-  course_completed: { label: "學完指定的某一門課程", unit: "門", needsCourse: true },
+  course_completed: { label: "學完指定的某一門課程", unit: "堂", needsCourse: true },
 };
 /** 會員看到的徽章：已取得或尚未取得（含目前進度）。 */
 export type Achievement = {

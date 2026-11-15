@@ -6,9 +6,9 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
     case "lessons_completed":
       return `累計完成 ${threshold} 堂課`;
     case "courses_completed":
-      return `累計學完 ${threshold} 門課程`;
+      return `累計學完 ${threshold} 堂課程`;
     case "courses_enrolled":
-      return `累計報名 ${threshold} 門課程`;
+      return `累計報名 ${threshold} 堂課程`;
     case "learning_days":
       return `累計 ${threshold} 個不同的日子有學習紀錄`;
     case "comments_posted":

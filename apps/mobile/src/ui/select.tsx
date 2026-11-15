@@ -7,7 +7,7 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
 
 /** short＝收起時顯示在框內的短文字（例如「11 月」），展開的選單仍顯示完整的 label。 */
-/** hint＝展開選單裡靠右顯示的小字（例如「3 門」）。 */
+/** hint＝展開選單裡靠右顯示的小字（例如「3 堂」）。 */
 export type SelectBadge = { text: string; tone: "accent" | "warn" | "new" };
 export type SelectOption = { key: string; label: string; short?: string; hint?: string; /** 靠右的小色塊標籤（例如「學習中 2」「未上架 1」「新」）。 */ badges?: SelectBadge[] };
 export type SelectProps = {

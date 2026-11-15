@@ -64,7 +64,7 @@ export function useCourseSave(course: CourseDetail, onSaved: (d: CourseDetail) =
   return { save, busy, error, setError };
 }
 
-/** 各主辦單位已有幾門課（一門課可有多個主辦單位，每個各算一次）。 */
+/** 各主辦單位已有幾堂課（一門課可有多個主辦單位，每個各算一次）。 */
 export function countByHost(list: { hostUnit: string }[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const x of list) for (const h of x.hostUnit.split(/[、,，]+/).map((v) => v.trim()).filter(Boolean)) out[h] = (out[h] ?? 0) + 1;
@@ -115,7 +115,7 @@ export function AutoCoverCheck({ course, onChanged }: { course: CourseDetail; on
 }
 
 /** 可複選的圓角選項（分類、主辦單位）。值是「、」分隔文字。 */
-function MultiChips({ options, value, onChange, counts }: { options: string[]; value: string; onChange: (v: string) => void; /** 各選項已有幾門課（顯示在名稱後面）。 */ counts?: Record<string, number> }) {
+function MultiChips({ options, value, onChange, counts }: { options: string[]; value: string; onChange: (v: string) => void; /** 各選項已有幾堂課（顯示在名稱後面）。 */ counts?: Record<string, number> }) {
   const { c } = useTheme();
   const cur = value.split(/[、,，]+/).map((v) => v.trim()).filter(Boolean);
   return (

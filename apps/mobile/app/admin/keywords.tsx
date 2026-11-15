@@ -50,7 +50,7 @@ export default function KeywordsScreen() {
   const remove = async (kind: KeywordKind, item: KeywordItem) => {
     const ok = await confirmSheet({
       title: `刪除${KEYWORD_INFO[kind].title}「${item.value}」`,
-      message: item.count ? `有 ${item.count} 門課程正在使用。刪除後，這些課程的「${KEYWORD_INFO[kind].title}」會變成空白，課程本身不會刪除。` : "目前沒有課程使用這個關鍵字。",
+      message: item.count ? `有 ${item.count} 堂課程正在使用。刪除後，這些課程的「${KEYWORD_INFO[kind].title}」會變成空白，課程本身不會刪除。` : "目前沒有課程使用這個關鍵字。",
       confirmLabel: "刪除",
       cancelLabel: "先不要",
       danger: true,
@@ -89,7 +89,7 @@ export default function KeywordsScreen() {
                           {item.value}
                         </AppText>
                         <View style={styles.tags}>
-                          <Pill label={item.count ? `${item.count} 門課程使用` : "尚未使用"} tone={item.count ? "accent" : "neutral"} />
+                          <Pill label={item.count ? `${item.count} 堂課程使用` : "尚未使用"} tone={item.count ? "accent" : "neutral"} />
                         </View>
                         {kind === "series" ? <SeriesEdm series={item.value} edmUrl={item.edmUrl} onChanged={() => { invalidate(); reload(); }} /> : null}
                       </View>

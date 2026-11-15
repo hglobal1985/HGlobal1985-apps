@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from "react";
-import { Modal, PanResponder, Pressable, StyleSheet, View } from "react-native";
+import { Animated, Modal, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -13,12 +13,21 @@ export function BottomSheet({ onClose, children, swipeToClose = false }: { onClo
   const insets = useSafeAreaInsets();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  // 往下滑：面板跟著手指移動；放開時超過一小段就順勢滑出畫面再關閉，沒超過就彈回原位。往上滑一小段＝直接關閉。
+  const ty = useRef(new Animated.Value(0)).current;
+  const native = Platform.OS !== "web";
   const pan = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
-      onPanResponderRelease: (_e, g) => {
-        if (Math.abs(g.dy) > 40) closeRef.current();
+      onPanResponderMove: (_e, g) => {
+        if (g.dy > 0) ty.setValue(g.dy);
       },
+      onPanResponderRelease: (_e, g) => {
+        if (g.dy > 70 || (g.dy > 25 && g.vy > 0.7)) Animated.timing(ty, { toValue: 700, duration: 180, useNativeDriver: native }).start(() => closeRef.current());
+        else if (g.dy < -40) closeRef.current();
+        else Animated.spring(ty, { toValue: 0, useNativeDriver: native }).start();
+      },
+      onPanResponderTerminate: () => Animated.spring(ty, { toValue: 0, useNativeDriver: native }).start(),
     }),
   ).current;
   const swipe = swipeToClose ? pan.panHandlers : {};
@@ -26,10 +35,10 @@ export function BottomSheet({ onClose, children, swipeToClose = false }: { onClo
     <Modal transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop} {...swipe}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="關閉" onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: space.lg + insets.bottom }]} accessibilityViewIsModal {...swipe}>
+        <Animated.View style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: space.lg + insets.bottom, transform: [{ translateY: ty }] }]} accessibilityViewIsModal {...swipe}>
           <View style={[styles.handle, { backgroundColor: c.border }]} />
           {children}
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
