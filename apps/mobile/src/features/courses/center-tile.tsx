@@ -6,7 +6,7 @@ import { useCenterNames } from "@/state/center-names";
 import { AppText } from "@/ui";
 
 /**
- * 「寰宇教育中心」清單的卡片：整張 16:10 的圖，中心名稱（統一格式「XX中心」）用白字壓在左下角的暗色漸層上，名稱只出現一次；
+ * 「寰宇教育中心」清單的卡片：整張 16:10 的圖，中心名稱（統一格式「XX中心」）用白字壓在左下角的暗色漸層上，名稱只出現一次、貼著卡片底部（七個中文字以內不換行，減少遮住照片）；
  * 有上傳 EDM 就用照片，沒有就用品牌綠色漸層底，兩種長得一樣。整張可點。
  */
 export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edmUrl?: string | null; width: number; onPress: () => void }) {
@@ -20,7 +20,7 @@ export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edm
       ) : (
         <Gradient id="brand" from="#2F5D3A" to="#4C8A5B" fromOpacity={1} toOpacity={1} diagonal />
       )}
-      <Gradient id="shade" from="#000000" to="#000000" fromOpacity={0} toOpacity={0.62} startY={0.38} />
+      <Gradient id="shade" from="#000000" to="#000000" fromOpacity={0} toOpacity={0.6} startY={0.62} />
       <View style={styles.label} pointerEvents="none">
         <AppText numberOfLines={2} style={styles.name}>
           {title}
@@ -47,6 +47,6 @@ function Gradient({ id, from, to, fromOpacity, toOpacity, diagonal = false, star
 
 const styles = StyleSheet.create({
   card: { borderRadius: 16, overflow: "hidden", backgroundColor: "#2F5D3A" },
-  label: { position: "absolute", left: 12, right: 12, bottom: 10 },
-  name: { color: "#FFFFFF", fontSize: 16, lineHeight: 22, fontWeight: "600", letterSpacing: 0.5 },
+  label: { position: "absolute", left: 10, right: 8, bottom: 6 },
+  name: { color: "#FFFFFF", fontSize: 16, lineHeight: 20, fontWeight: "600", letterSpacing: 0.3 },
 });
