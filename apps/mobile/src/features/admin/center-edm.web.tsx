@@ -141,7 +141,7 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
           <AppText variant="headline">指定封面</AppText>
           <CoverModePicker mode={job.mode} img={job.img} onChange={(mode) => setJob({ ...job, mode })} />
           <AppText variant="callout" tone="muted">
-            {job.mode === "contain" ? "整張照片都會保留，放在中間，背景用同一張照片輕度模糊補滿。確認預覽後請按「儲存封面」。" : "拖曳框內移動位置，拖四個角調整大小（橫式 16:9，比例固定）。框內就是中心卡片的縮圖，框的上緣就是進入中心頁時一開始停留的位置。調整好請按「儲存封面」。"}
+            {job.mode === "contain" ? "整張照片都會保留，放在中間，背景用同一張照片模糊補滿。確認預覽後請按「儲存封面」。" : "拖曳框內移動位置，拖四個角調整大小（橫式 16:9，比例固定）。框內就是中心卡片的縮圖，框的上緣就是進入中心頁時一開始停留的位置。調整好請按「儲存封面」。"}
           </AppText>
           <View style={styles.buttons}>
             <Button label="儲存封面" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
