@@ -35,7 +35,12 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
   const [w, setW] = useState(0);
   const count = (s: string[]) => courses.filter((x) => matchesCats(x, s)).length;
   const total = count(sel);
-  const toggle = (name: string) => setSel((cur) => (cur.includes(name) ? cur.filter((v) => v !== name) : name === NONE ? [NONE] : [...cur, name]));
+  // 沒有確認鈕：每點一下就立刻套用到後面的清單；點面板外面的灰色區域關閉。
+  const change = (next: string[]) => {
+    setSel(next);
+    onApply(next);
+  };
+  const toggle = (name: string) => change(sel.includes(name) ? sel.filter((v) => v !== name) : name === NONE ? [NONE] : [...sel, name]);
   const title = sel.length ? `已選：${sel.map(catLabel).join("＋")}（${total} 門）` : "選擇分類";
   const cell = w ? Math.floor((w - GAP * (COLS - 1)) / COLS) : 0;
   return (
@@ -70,20 +75,8 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
             })
           : null}
       </ScrollView>
-      <View style={styles.actions}>
-        <View style={sel.length ? undefined : { opacity: 0.45 }} pointerEvents={sel.length ? "auto" : "none"}>
-          <Button variant="secondary" label="清除" onPress={() => setSel([])} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button
-            label={sel.length ? `顯示 ${total} 門課程` : `顯示全部 ${total} 門`}
-            onPress={() => {
-              onApply(sel);
-              onClose();
-            }}
-            fullWidth
-          />
-        </View>
+      <View style={sel.length ? undefined : { opacity: 0.45 }} pointerEvents={sel.length ? "auto" : "none"}>
+        <Button variant="secondary" label="清除" onPress={() => change([])} fullWidth />
       </View>
     </BottomSheet>
   );
@@ -137,7 +130,6 @@ export function CategoryHintBar({ picked, total, onRefine }: { picked: string[];
 const styles = StyleSheet.create({
   wrap: { flexDirection: "row", flexWrap: "wrap", gap: GAP, paddingVertical: space.xs },
   chip: { height: minTouch, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm, borderRadius: radius.pill, borderWidth: 1.5 },
-  actions: { flexDirection: "row", alignItems: "center", gap: space.sm },
   box: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm, flexDirection: "row", alignItems: "center", gap: space.xs },
   main: { flex: 1, minHeight: minTouch - 2, justifyContent: "center", paddingLeft: space.xs },
   clear: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.28)", alignItems: "center", justifyContent: "center" },
