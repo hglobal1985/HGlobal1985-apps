@@ -231,7 +231,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
   }, [chapterMode, courses, searchData.data, searchIndex, q, category, activeCenter, member, shuffleSeed]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
-  const cols = boxW >= 520 ? 3 : 2;
+  const cols = flat ? 3 : boxW >= 520 ? 3 : 2; // 中心頁的直式 EDM 卡一列三張
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
   // 系列單頁（顯示全部）時，分類下拉顯示這個系列所屬的分類（有多個分類就顯示「全部分類」）；改選別的分類就離開系列頁。
   const seriesCats = seriesFilter ? [...new Set(courses.filter((x) => x.series === seriesFilter).flatMap((x) => x.category.split("、")).filter(Boolean))] : [];
