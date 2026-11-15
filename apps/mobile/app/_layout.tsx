@@ -1,4 +1,3 @@
-import { barHeight } from "@/theme/tokens";
 import { Stack } from "expo-router/stack";
 import { useEffect } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
@@ -17,7 +16,7 @@ import { SessionProvider } from "@/state/session";
 import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { UpdateNotice } from "@/features/update-notice";
-import { BottomBar, HeaderBack, HeaderShadow } from "@/ui";
+import { BottomBar, TopBar, TopBarShadow } from "@/ui";
 
 /**
  * 全站頁面堆疊與上方標題列。標題列高度＝固定的 barHeight＋手機上方的安全區（瀏海、狀態列）；
@@ -25,16 +24,12 @@ import { BottomBar, HeaderBack, HeaderShadow } from "@/ui";
  */
 function AppStack() {
   const { c } = useTheme();
-  const insets = useSafeAreaInsets();
   return (
     <Stack
             screenOptions={{
-              headerBackButtonDisplayMode: "minimal",
-              headerLeft: () => <HeaderBack />, // 有標題列就一定有返回鍵
+              // 全站上方返回工具列只用一個元件 TopBar（src/ui/top-bar.tsx）：頁面用 Stack.Screen／PageHeader 設定的 title 與 headerRight 會傳給它。
+              header: ({ options, route }) => <TopBar title={typeof options.title === "string" ? options.title : route.name} right={options.headerRight?.({ canGoBack: true })} safeTop />,
               contentStyle: { backgroundColor: c.background },
-              // 上方標題列與下方主選單同高（barHeight），兩者都有陰影。
-              headerShadowVisible: false,
-              headerStyle: { height: barHeight + insets.top, zIndex: 10, position: "relative", boxShadow: "0 3px 8px rgba(0,0,0,0.18)", shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 } as object,
             }}
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "寰宇行動大學" }} />
@@ -95,7 +90,7 @@ export default function RootLayout() {
           <View style={{ flex: 1, backgroundColor: c.background }}>
           <View style={{ flex: 1 }}>
           <AppStack />
-          <HeaderShadow />
+          <TopBarShadow />
           </View>
           <MiniAudioBar />
           <UpdateNotice />

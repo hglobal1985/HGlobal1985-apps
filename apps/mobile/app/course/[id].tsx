@@ -16,7 +16,7 @@ import { eventDays, sharerLine, teacherLine } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Screen, Section, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
 
@@ -163,10 +163,7 @@ export default function CourseDetailScreen() {
         path={`/course/${course.id}`}
         extra={
           manages && mode === "view" ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="編輯這門課程" onPress={() => setMode("edit")} hitSlop={8} style={styles.headerBtn}>
-              <Ionicons name="create-outline" size={22} color={c.accent} />
-              <Text style={{ color: c.accent, fontSize: 17, fontWeight: "600" }}>編輯</Text>
-            </Pressable>
+            <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => setMode("edit")} />
           ) : null
         }
       />
@@ -290,7 +287,6 @@ function BannerButton({ label, onPress, strong }: { label: string; onPress: () =
 }
 
 const styles = StyleSheet.create({
-  headerBtn: { minWidth: minTouch, height: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 },
   banner: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, paddingVertical: space.xs, minHeight: minTouch },
   bannerText: { flex: 1, color: "#fff", fontWeight: "700", fontSize: 15 },
   bannerBtn: { minHeight: 36, minWidth: 64, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1.5, borderColor: "#fff", alignItems: "center", justifyContent: "center" },

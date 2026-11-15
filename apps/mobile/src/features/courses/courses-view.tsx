@@ -10,7 +10,6 @@ import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { ShortLinkRow } from "@/features/course-edit/short-link-row";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { CourseRow } from "./course-row";
-import { CenterTopBar } from "./center-top-bar";
 import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
@@ -26,7 +25,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Select, type SelectBadge, type SelectOption } from "@/ui";
+import { AppText, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Select, TopBar, TopBarButton, type SelectBadge, type SelectOption } from "@/ui";
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
@@ -338,7 +337,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     activeCenter !== ALL ? (
       <View style={{ gap: space.sm }}>
         {art ? <EdmImageStage url={art.edmUrl} title={center} viewY={art.edmViewY} /> : null}
-        {canEditArt ? <Button variant="secondary" label={art ? "編輯中心 EDM" : "上傳中心 EDM"} icon="create-outline" onPress={() => setArtOpen(true)} fullWidth /> : null}
       </View>
     ) : null;
   const archivedBlock =
@@ -362,7 +360,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const shortLink = activeCenter !== ALL ? links.data?.find((l) => l.kind === "center" && l.value === activeCenter) : undefined;
   return (
     <View style={{ flex: 1 }}>
-    <Screen header={!inStack} top={activeCenter !== ALL ? <CenterTopBar title={activeCenter} onBack={backFromCenter} /> : filterRow}>
+    <Screen header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={activeCenter} onBack={backFromCenter} right={canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心 EDM" iconName="create-outline" onPress={() => setArtOpen(true)} /> : undefined} /> : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {centerHead}

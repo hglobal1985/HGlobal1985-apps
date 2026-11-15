@@ -1,8 +1,6 @@
-import { Pressable, Text } from "react-native";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
-import { minTouch } from "@/theme/tokens";
-import { ShareIcon } from "@/ui";
+import { ShareIcon, TopBarButton } from "@/ui";
 import { showToast } from "@/ui/toast";
 
 /**
@@ -15,10 +13,5 @@ export function HeaderShare({ title, path }: { title: string; path: string }) {
     const r = await shareLink(title, path);
     if (r === "copied") showToast("已複製連結");
   };
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel="分享這一頁" onPress={share} hitSlop={8} style={{ minWidth: minTouch, height: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 }}>
-      <ShareIcon size={22} color={c.text} />
-      <Text style={{ color: c.text, fontSize: 17, fontWeight: "600" }}>分享</Text>
-    </Pressable>
-  );
+  return <TopBarButton label="分享" accessibilityLabel="分享這一頁" tone="text" icon={<ShareIcon size={22} color={c.text} />} onPress={share} />;
 }

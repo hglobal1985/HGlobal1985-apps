@@ -35,6 +35,7 @@ export function Screen({
   gap = space.lg,
   footer,
   top,
+  topBar,
 }: {
   title?: string;
   subtitle?: string;
@@ -49,6 +50,8 @@ export function Screen({
   footer?: ReactNode;
   /** 固定在頁面最上方的功能列（篩選、搜尋…）：往下捲動內容時它永遠留在最上面、不會跟著捲走。 */
   top?: ReactNode;
+  /** 最上方的返回工具列（TopBar）：滿版、不受頁面左右留白影響，放在 top 功能列之前。 */
+  topBar?: ReactNode;
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -58,6 +61,7 @@ export function Screen({
   return (
     <FooterSlot.Provider value={setSlot}>
     <View style={{ flex: 1 }}>
+    {topBar ? <View style={{ zIndex: 6 }}>{topBar}</View> : null}
     {top ? (
       <View style={[styles.top, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
         <View style={styles.topInner}>{top}</View>

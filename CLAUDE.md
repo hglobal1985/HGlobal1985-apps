@@ -27,6 +27,7 @@
 - **分享**：一律呼叫手機的系統分享選單（網頁用 Web Share、App 用系統 Share）；分享圖示**永遠使用各平台系統預設圖案**——iOS＝方框加向上箭頭、Android＝三個圓點相連。一律使用 `ShareIcon`（`src/ui/share-icon.tsx`）與 `shareLink`（`src/lib/share.ts`），不要自己畫別的。
 - **需要使用者確認的動作**（取消報名、刪除、中斷播放…）：一律從螢幕下方向上彈出「**底部確認面板**」（Bottom Sheet），不使用瀏覽器或系統內建對話框。左邊「取消／關閉」、右邊主要動作。外框統一用 `BottomSheet`（`src/ui/bottom-sheet.tsx`），確認用 `confirmSheet()`／`confirmAsk()`（`src/features/confirm.tsx`）。業主口語稱呼：「底部彈出確認視窗」。
 - **上拉式選單一律下滑跟手收起（業主 2026-11-15 永久指示）**：所有從下方彈出的面板（確認、選項、編輯、分類篩選…）都用 `BottomSheet`（`src/ui/bottom-sheet.tsx`），手勢在這一個元件內建：往下滑時面板跟著手指移動，放開滑過一小段就順勢滑出並關閉，沒滑夠彈回；`swipeUpClose` 可再加「往上滑也算關閉」。新增任何上拉式選單一律用 `BottomSheet`，不要自己用 `Modal` 重做。
+- **上方返回工具列一律用 `TopBar`（業主 2026-11-15 永久指示：全站一致）**：返回鍵＋標題＋右側按鈕只有一個來源 `src/ui/top-bar.tsx`。全站頁面堆疊（`app/_layout.tsx` 的 Stack `header`）自動套用，頁面用 `PageHeader`（`features/page-header.tsx`）設定標題與右側按鈕；頁面內的狀態頁（例如中心專屬頁）放進 `Screen` 的 `topBar`。右側按鈕（編輯、分享…）一律用 `TopBarButton`，下緣陰影在 `TopBarShadow`／`TopBar` 內。不要再自己畫標題列或另做一套樣式。
 - **播放控制列**：Mux 影片、YouTube、純音檔三種模式的時間軸／播放控制**共用同一個元件** `PlayerControls`（`src/features/player/player-controls.tsx`，時間軸本身是 `seek-bar.tsx`），位置在影片外面下方；要改設計只改這兩個檔案。
 - **上方舞台高度**：課程介紹頁的 EDM 區與上課頁的影片區都用 `StageFrame`（`src/ui/stage-frame.tsx`，16:9），高度永遠一致，下方版面不會跳動。
 - **課程編輯一律在課程介紹頁「原地編輯」（業主 2026-11-15）**：已刪除「設定→課程設定」頁，不可再做獨立的課程後台頁。編輯面板一律用 `EditSheet`（`src/features/course-edit/edit-sheet.tsx`），各區欄位在 `course-sections.tsx`、章節在 `lessons.tsx`。有人報名的課程不能永久刪除，只能「下架封存」；完全沒人報名才「刪除課程」。小編（各中心，只存行動大學）權限見 api.ts `rightsOf／courseCan`。
