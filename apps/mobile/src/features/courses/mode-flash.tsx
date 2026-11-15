@@ -6,8 +6,8 @@ import { radius, space } from "@/theme/tokens";
 import { AppText } from "@/ui";
 import type { CourseViewMode } from "./view-toggle";
 
-/** 兩種顯示模式的正式名稱（業主 2026-11-15）。 */
-export const MODE_NAME: Record<CourseViewMode, string> = { series: "課程／活動／場次", chapter: "主題／單元／各棒次", center: "中心" };
+/** 兩種顯示模式的正式名稱（業主 2026-11-15，同日再改為：相同系列／單元／寰宇教育中心）。 */
+export const MODE_NAME: Record<CourseViewMode, string> = { series: "相同系列", chapter: "單元", center: "寰宇教育中心" };
 
 /** 切換模式時，畫面正中間短暫浮出目前模式的名稱（約 1.2 秒淡出，不擋操作）。tick 每切換一次加 1。 */
 export function ModeFlash({ mode, tick }: { mode: CourseViewMode; tick: number }) {
