@@ -1,6 +1,6 @@
 import { handleApi } from "./api.ts";
 import type { Env } from "./d1.ts";
-import { shortLinkMeta, withShareMeta } from "./og.ts";
+import { courseUrlMeta, shortLinkMeta, withShareMeta } from "./og.ts";
 import { serveStatic, type StaticFiles } from "./site.ts";
 
 /**
@@ -16,8 +16,9 @@ export function createWorker(staticFiles: StaticFiles) {
       let res = serveStatic(req, staticFiles);
       // 短網址（/縮寫）：分享到 LINE 等的預覽卡片，標題與說明由伺服器帶入。
       const slug = /^\/([a-z0-9-]{2,30})$/.exec(url.pathname)?.[1];
-      if (slug && req.method === "GET" && res.status === 200 && (res.headers.get("content-type") ?? "").includes("text/html")) {
-        const meta = await shortLinkMeta(env.DB, slug, url.origin).catch(() => null);
+      const course = /^\/([a-z0-9-]{2,30})\/([a-z0-9-]{3,80})$/.exec(url.pathname);
+      if ((slug || course) && req.method === "GET" && res.status === 200 && (res.headers.get("content-type") ?? "").includes("text/html")) {
+        const meta = await (course ? courseUrlMeta(env.DB, course[1]!, course[2]!, url.origin) : shortLinkMeta(env.DB, slug!, url.origin)).catch(() => null);
         if (meta) {
           const headers = new Headers(res.headers);
           headers.delete("content-length");

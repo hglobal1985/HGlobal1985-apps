@@ -52,3 +52,17 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
   const image = art?.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(art.k)}&v=${art.v}` : `${origin}/icon-512.png`;
   return { title: `${row.kind === "center" ? await centerDisplayName(db, row.value) : row.value} | ${SITE}`, description: q?.body?.trim() || SITE, url: `${origin}/${slug}`, image };
 }
+
+/** 課程專屬網址（/中心縮寫/英譯姓名-編號）的分享預覽：標題「{課程名稱} | 寰宇行動大學」，圖用課程封面（沒有就用 EDM、再沒有用網站圖示）。找不到回 null。 */
+export async function courseUrlMeta(db: D1Database, slug: string, name: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
+  const center = await db.prepare("SELECT value FROM short_links WHERE slug = ? AND kind = 'center'").bind(slug).first<{ value: string }>();
+  if (!center) return null;
+  const c = await db
+    .prepare("SELECT title, subtitle, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE host_center_key = ? AND url_name = ? AND status = 'published'")
+    .bind(centerKey(center.value), name)
+    .first<{ title: string; subtitle: string | null; k: string | null; v: number }>();
+  if (!c) return null;
+  const q = await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null);
+  const image = c.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(c.k)}&v=${c.v}` : `${origin}/icon-512.png`;
+  return { title: `${c.title} | ${SITE}`, description: c.subtitle?.trim() || q?.body?.trim() || SITE, url: `${origin}/${slug}/${name}`, image };
+}

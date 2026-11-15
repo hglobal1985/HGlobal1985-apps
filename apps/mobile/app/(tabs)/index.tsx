@@ -2,7 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, type Announcement, type CourseSummary } from "@/api/client";
+import { api, HQ_UNIT, type Announcement, type CourseSummary } from "@/api/client";
 import { MemberHeader } from "@/features/member-header";
 import { ProfilePrompt } from "@/features/profile-prompt";
 import { HomeRail } from "@/features/courses/home-rail";
@@ -52,7 +52,14 @@ export default function HomeScreen() {
     .filter((x) => (x.enrollment === "opened" || x.started) && !x.hiddenFromLearning)
     .sort((a, b) => Number(b.completedLessons < b.lessonCount) - Number(a.completedLessons < a.lessonCount));
   // 會員：符合獎銜、尚未報名的課程；訪客：完全公開的課程。
-  const recommendedAll = courses.filter((x) => x.status === "published" && x.enrollment !== "opened" && !x.started && !x.hideFromHome && (member ? x.eligible && !x.isPublic : x.isPublic));
+  // 會員只推薦「我的中心」的課程（總部主辦的人人都算）：主辦單位沒有任何中心，或主辦的任一中心＝會員自己的中心。
+  const norm = (v: string) => v.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+  const myCenter = norm(member?.center ?? "");
+  const sameCenter = (x: CourseSummary) => {
+    const hosts = x.hostUnit.split(/[、,，]+/).map((h) => h.trim()).filter((h) => h && h !== HQ_UNIT);
+    return !hosts.length || (!!myCenter && hosts.some((h) => norm(h) === myCenter));
+  };
+  const recommendedAll = courses.filter((x) => x.status === "published" && x.enrollment !== "opened" && !x.started && !x.hideFromHome && (member ? x.eligible && !x.isPublic && sameCenter(x) : x.isPublic));
   // 同系列的課只推薦最近的一場。
   const recommended = collapseSeries(recommendedAll, recommendedAll).map((e) => e.course);
   return (
@@ -102,7 +109,7 @@ export default function HomeScreen() {
               icon="sparkles-outline"
               tone="orange"
               courses={recommended}
-              note="顯示您可報名的課程"
+              note="顯示您中心、您可報名的課程"
               empty={
                 <AppText variant="callout" tone="muted" style={{ textAlign: "center" }}>
                   {member ? "目前沒有符合你獎銜、尚未報名的課程。" : "目前沒有公開的課程，登入後顯示您可報名的課程。"}

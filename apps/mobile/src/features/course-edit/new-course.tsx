@@ -4,6 +4,7 @@ import { api, HQ_UNIT, type CourseDetail, type CourseSummary } from "@/api/clien
 import { useApi, useSession } from "@/state/session";
 import { AppText, Chips, Field, NoticeBox } from "@/ui";
 import { centerTitle } from "@/features/format";
+import { isSuperAdmin } from "@/lib/roles";
 import { Check, countByHost } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
@@ -12,18 +13,18 @@ import { EditSheet } from "./edit-sheet";
  * 直接進入該課程介紹頁的編輯模式，其餘欄位在頁面上一區一區補（手機不用一口氣填完一大張表）。
  * 總部可以選主辦中心；中心的會長、音控、小編固定是自己的中心。
  */
-export function NewCourseSheet({ onClose, defaultCenter, defaultCenterCourse = false }: { onClose: () => void; defaultCenter?: string; /** 從「寰宇教育中心」頁按新增時為 true：預設勾「中心課程」，建好才會出現在該中心頁。 */ defaultCenterCourse?: boolean }) {
+export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void; defaultCenter?: string }) {
   const { member, invalidate } = useSession();
   const isHq = member?.role === "admin";
+  const isSuper = isSuperAdmin(member);
   const centers = useApi<string[]>(isHq ? "/centers" : null);
-  const series = useApi<string[]>("/admin/series");
+  const series = useApi<string[]>(isSuper ? "/admin/series" : null);
   const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
   const hostCounts = countByHost(allCourses.data ?? []);
   const [title, setTitle] = useState("");
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [seriesName, setSeriesName] = useState("");
   const [autoCover, setAutoCover] = useState(false);
-  const [centerCourse, setCenterCourse] = useState(defaultCenterCourse);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
@@ -31,8 +32,8 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultCenterCourse = f
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { title: title.trim(), series: seriesName.trim(), autoCover, ...(isHq ? { centerCourse } : {}) };
-      if (isHq) Object.assign(body, { hostUnit: host, guidanceUnit: HQ_UNIT });
+      const body: Record<string, unknown> = { title: title.trim(), autoCover, ...(isSuper ? { series: seriesName.trim() } : {}) };
+      if (isHq) Object.assign(body, { hostUnit: host }); // 指導單位預設不勾（不建議勾選），建好後要的話到進階設定勾
       const d = await api<CourseDetail>("POST", "/admin/courses", body);
       invalidate();
       onClose();
@@ -54,13 +55,12 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultCenterCourse = f
       ) : (
         <NoticeBox text={`主辦中心固定為「${host}」。`} />
       )}
-      <Field label="系列（選填；同系列的課合併成一張卡）" value={seriesName} onChange={setSeriesName} placeholder="不填＝不合併" />
-      {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "不合併" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={seriesName} onChange={setSeriesName} /> : null}
-      {isHq ? (
-        <Check label="中心課程（只在「寰宇教育中心」頁出現，不在「全部課程」出現）" value={centerCourse} onChange={setCenterCourse} />
-      ) : (
-        <Check label="中心課程（各中心建立的課程固定是中心課程）" value disabled onChange={() => undefined} />
-      )}
+      {isSuper ? (
+        <>
+          <Field label="系列（選填；同系列的課合併成一張卡）" value={seriesName} onChange={setSeriesName} placeholder="不填＝無" />
+          {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={seriesName} onChange={setSeriesName} /> : null}
+        </>
+      ) : null}
       <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
         建立後是「未上架」，學員看不到；在課程頁補好資料再上架。

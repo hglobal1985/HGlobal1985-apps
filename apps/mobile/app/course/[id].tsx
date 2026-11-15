@@ -28,8 +28,13 @@ const isWeb = Platform.OS === "web";
  * 課程介紹頁：上方只有 EDM（與上課頁影片區同高、可上下拖曳、點一下放大），下面不再放任何課程說明文字，
  * 只有報名按鈕（依狀態）與課程章節。標題在上方導覽列。
  */
-export default function CourseDetailScreen() {
+export default function CourseRoute() {
   const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
+  return <CourseDetailScreen id={id} edit={edit} />;
+}
+
+/** 課程介紹頁本體（/course/編號 與課程專屬網址 /中心縮寫/英譯姓名-編號 共用）。 */
+export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
@@ -200,7 +205,7 @@ export default function CourseDetailScreen() {
     <View style={{ flex: 1 }}>
       <PageHeader
         title={course.title}
-        path={`/course/${course.id}`}
+        path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
         extra={
           manages && mode === "view" ? (
             <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => setMode("edit")} />

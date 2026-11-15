@@ -1,4 +1,5 @@
 import { RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
+import { romanizeName } from "./romanize.ts";
 import {
   DEMO_MEMBERS,
   HQ_UNIT,
@@ -72,7 +73,7 @@ const fail = (status: number, code: string, message: string): never => {
 /** demo：模擬會員（rankCode 為示範獎銜）；central：中央會員（不持有獎銜，資格每次向中央查詢）。 */
 type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
-type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string };
+type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string> };
 
 // ---------- helpers ----------
 
@@ -302,6 +303,8 @@ type CourseRow = {
   guidance_unit: string;
   host_unit: string;
   host_center_key: string | null;
+  is_shorts: number;
+  url_name: string | null;
   free_from: string | null;
   free_until: string | null;
   review_group_id: string | null;
@@ -341,7 +344,7 @@ type CourseRow = {
   zero_minute_lessons: number;
 };
 
-const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.url_name, c.is_shorts, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter' AND l.duration_minutes = 0) AS zero_minute_lessons
@@ -426,7 +429,10 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     // 封面：勾了「自動使用 YouTube 畫面」＝一律用第一支 YouTube 影片的縮圖；沒勾但完全沒有 EDM 與封面＝臨時用縮圖。
     ...courseArt(row),
     autoCover: row.auto_cover === 1,
-    centerCourse: row.center_course === 1,
+    // 中心課程＝主辦單位含某個中心（自動，不再手動勾選）；只有總部主辦的是一般課程。
+    centerCourse: row.host_center_key != null,
+    isShorts: row.is_shorts === 1,
+    shortPath: row.host_center_key && row.url_name && ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null,
     createdAt: row.created_at,
     hostCenter: hostCenterOf(row.host_unit),
     hostCenterKey: row.host_center_key,
@@ -500,6 +506,7 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
     memberCourseState(ctx.db, s?.sub),
   ]);
   const eligibility = await eligibilityFor(s, rankMap, [...results.map((r) => r.min_rank_code), DIAMOND]);
+  ctx.centerSlugs = await centerSlugMap(ctx.db);
   const out = results.map((r) => summarize(r, ctx, rankMap, state, eligibility));
   if (!rights || !s) return out;
   const r = rights;
@@ -577,6 +584,46 @@ async function registrationCount(db: D1Database, courseId: string): Promise<numb
   return r?.n ?? 0;
 }
 
+/** 中心縮寫對照：centerKey（主辦中心的正規化名稱）→ 短網址縮寫。 */
+async function centerSlugMap(db: D1Database): Promise<Map<string, string>> {
+  const { results } = await db.prepare("SELECT slug, value FROM short_links WHERE kind = 'center'").all<{ slug: string; value: string }>();
+  return new Map(results.map((r) => [centerKey(r.value), r.slug]));
+}
+
+/**
+ * 課程專屬網址：learn.hglobal1985.com/中心縮寫/英譯主講人-001。條件：有主講人、主辦中心已設定短網址；一旦產生就固定。
+ * 編號＝同一主辦中心＋同一英譯姓名已有的最大編號 + 1（三位數，超過 999 自動變四位）。
+ */
+async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
+  try {
+    const c = await ctx.db.prepare("SELECT teacher, host_center_key, url_name FROM courses WHERE id = ?").bind(courseId).first<{ teacher: string | null; host_center_key: string | null; url_name: string | null }>();
+    if (!c || c.url_name || !c.teacher?.trim() || !c.host_center_key) return;
+    if (!(await centerSlugMap(ctx.db)).has(c.host_center_key)) return;
+    const base = romanizeName(c.teacher);
+    if (!base) return;
+    const used = await ctx.db.prepare("SELECT url_name FROM courses WHERE host_center_key = ? AND url_name LIKE ? ESCAPE '\\'").bind(c.host_center_key, `${base.replace(/[%_\\]/g, "")}-%`).all<{ url_name: string }>();
+    let max = 0;
+    for (const r of used.results) {
+      const m = /-(\d+)$/.exec(r.url_name);
+      if (m && r.url_name.slice(0, -m[0].length) === base) max = Math.max(max, Number(m[1]));
+    }
+    await ctx.db.prepare("UPDATE courses SET url_name = ? WHERE id = ? AND url_name IS NULL").bind(`${base}-${String(max + 1).padStart(3, "0")}`, courseId).run();
+  } catch {
+    /* 不影響儲存 */
+  }
+}
+
+/** 補齊全站（或某個主辦中心）還沒有專屬網址的課程，依建立時間編號。 */
+async function backfillCourseUrls(ctx: Ctx, centerKeyOnly?: string): Promise<number> {
+  const { results } = await ctx.db
+    .prepare(`SELECT id FROM courses WHERE url_name IS NULL AND teacher <> '' AND host_center_key IS NOT NULL${centerKeyOnly ? " AND host_center_key = ?" : ""} ORDER BY created_at, id`)
+    .bind(...(centerKeyOnly ? [centerKeyOnly] : []))
+    .all<{ id: string }>();
+  for (const r of results) await ensureCourseUrl(ctx, r.id);
+  const left = await ctx.db.prepare("SELECT COUNT(*) AS n FROM courses WHERE url_name IS NOT NULL").first<{ n: number }>();
+  return left?.n ?? 0;
+}
+
 /** 主辦中心：主辦單位裡第一個不是總部的名稱。 */
 const hostCenterOf = (hostUnit: string) => splitCats(hostUnit).find((x) => x !== HQ_UNIT) ?? "";
 
@@ -607,6 +654,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     const n = { chapter: 0, material: 0 };
     for (const l of lessons.results) groupPos.set(l.id, ++n[l.kind === "material" ? "material" : "chapter"]);
   }
+  ctx.centerSlugs = await centerSlugMap(ctx.db);
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
   const admin = manages;
@@ -1450,10 +1498,8 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   if (body.isOnline !== undefined) sets.push(["is_online", body.isOnline === true ? 1 : 0]);
   if (body.chapterCovers !== undefined) sets.push(["chapter_covers", body.chapterCovers === true ? 1 : 0]);
   if (body.autoCover !== undefined) sets.push(["auto_cover", body.autoCover === true ? 1 : 0]);
-  // 中心課程：各中心的音控、小編建立的一律是中心課程且不能關閉；總部管理員預設不是，可自行勾選。
-  if (centerOnly) {
-    if (creating) sets.push(["center_course", 1]);
-  } else if (body.centerCourse !== undefined) sets.push(["center_course", body.centerCourse === true ? 1 : 0]);
+  // 短影音專輯：勾了的課程，其章節與影音教材在「單元」頁歸類為短影音。
+  if (body.isShorts !== undefined) sets.push(["is_shorts", body.isShorts === true ? 1 : 0]);
   if (body.earlyBird !== undefined) {
     if (body.earlyBird === true) {
       const price = Number(body.earlyPriceTwd);
@@ -1558,6 +1604,7 @@ async function createCourse(ctx: Ctx, admin: Session) {
     ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type) VALUES (?, ?, 1, '第 1 堂', 0, 'demo')").bind(`${id}-${randomId(6)}`, id), // 章節日期留空＝跟著課程日期
     audit(ctx.db, admin.sub, "course.create", "course", id, String(body.title ?? "")),
   ]);
+  await ensureCourseUrl(ctx, id);
   return courseDetail(ctx, id);
 }
 
@@ -1725,7 +1772,7 @@ function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -1740,6 +1787,9 @@ async function updateCourse(ctx: Ctx, id: string) {
     fail(409, "edit_conflict", `這門課程剛被${cur.edited_by_name || "其他管理者"}修改過，請重新載入後再改，或選擇仍要覆蓋`);
   const sets = await courseFields(ctx, body, false, admin);
   if (!sets.length) fail(400, "nothing_to_update", "沒有要更新的欄位");
+  // 換了主辦中心：專屬網址在新中心底下重新產生（主辦中心沒變就維持原網址）。
+  const newHost = sets.find(([c]) => c === "host_center_key");
+  if (newHost && newHost[1] !== cur.host_center_key) sets.push(["url_name", null]);
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
   checkPublicFree(Number(pick("price_twd", cur.price_twd)), pick("is_public", cur.is_public) === 1, pick("price_tba", cur.price_tba) === 1);
   await checkGuidanceGroup(ctx, pick("guidance_unit", cur.guidance_unit), pick("review_group_id", cur.review_group_id));
@@ -1750,6 +1800,7 @@ async function updateCourse(ctx: Ctx, id: string) {
     audit(ctx.db, admin.sub, "course.update", "course", id, sets.map(([c]) => c).join(",")),
   ]);
   if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
+  await ensureCourseUrl(ctx, id);
   return courseDetail(ctx, id);
 }
 
@@ -2223,6 +2274,16 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/short-links\/([a-z0-9-]{2,30})\/([a-z0-9-]{3,80})$/,
+    async (ctx, [slug, name]) => {
+      // 課程專屬網址：中心縮寫 + 英譯姓名-編號 → 課程編號。
+      const row = await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? AND kind = 'center'").bind(slug).first<{ value: string }>();
+      const course = row ? await ctx.db.prepare("SELECT id FROM courses WHERE host_center_key = ? AND url_name = ?").bind(centerKey(row.value), name).first<{ id: string }>() : null;
+      return course ? { courseId: course.id } : fail(404, "not_found", "找不到這個網址");
+    },
+  ],
+  [
+    "GET",
     /^\/short-links\/([a-z0-9-]{2,30})$/,
     async (ctx, [slug]) => {
       const row = await ctx.db.prepare("SELECT kind, value FROM short_links WHERE slug = ?").bind(slug).first<{ kind: string; value: string }>();
@@ -2239,10 +2300,10 @@ const routes: [string, RegExp, Handler][] = [
       const sub = ctx.session?.sub ?? "";
       const { results } = await ctx.db
         .prepare(
-          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND l.kind = 'chapter' ORDER BY l.course_id, l.position",
+          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, c.is_shorts AS isShorts, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND (l.kind = 'chapter' OR (c.is_shorts = 1 AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position",
         )
         .bind(sub)
-        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
+        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; isShorts: number; lessonKind: string; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
       return {
         lessons: results.map((r) => ({
           id: r.id,
@@ -2254,6 +2315,8 @@ const routes: [string, RegExp, Handler][] = [
           sharerTitle: r.sharerTitle,
           eventDate: r.eventDate,
           isSpeaker: r.isSpeaker === 1,
+          isShorts: r.isShorts === 1,
+          isMaterial: r.lessonKind === "material",
           minutes: r.minutes,
           coverUrl: r.autoCover === 1 && r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
           // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
@@ -3486,6 +3549,16 @@ const routes: [string, RegExp, Handler][] = [
   ],
   ["GET", /^\/admin\/short-links$/, async (ctx) => (requireSuperAdmin(ctx), listShortLinks(ctx))],
   [
+    "POST",
+    /^\/admin\/course-urls\/backfill$/,
+    async (ctx) => {
+      const s = requireSuperAdmin(ctx);
+      const n = await backfillCourseUrls(ctx);
+      await audit(ctx.db, s.sub, "course_url.backfill", "course", "all", String(n)).run();
+      return { total: n };
+    },
+  ],
+  [
     "PUT",
     /^\/admin\/short-links$/,
     async (ctx) => {
@@ -3505,6 +3578,8 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("INSERT INTO short_links (slug, kind, value) VALUES (?, ?, ?)").bind(slug, kind, value),
         audit(ctx.db, s.sub, "short_link.set", "short_link", kind, `${value} → ${slug}`),
       ]);
+      // 中心縮寫設定好了：補上這個中心還沒有專屬網址的課程。
+      if (kind === "center") await backfillCourseUrls(ctx, centerKey(value));
       return listShortLinks(ctx);
     },
   ],

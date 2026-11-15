@@ -13,7 +13,6 @@ import { courseThemes, minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Card, Chips, DateSelect, Field, ListRow, NoticeBox, Pill } from "@/ui";
 import { showToast } from "@/ui/toast";
 import { EditSheet } from "./edit-sheet";
-import { ShortLinkRow } from "./short-link-row";
 
 /** 編輯面板的種類（每一區各自一個底部面板、各自儲存）。 */
 export type SectionKey = "basics" | "when" | "price" | "enroll" | "advanced" | "status";
@@ -154,16 +153,19 @@ const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.st
 // ---------- 基本資料：名稱、主講人、分類、系列、封面顏色 ----------
 function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { c } = useTheme();
-  const init = { title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
+  const { member } = useSession();
+  const isSuper = isSuperAdmin(member);
+  const init = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
   const [f, setF] = useState(init);
   const set = <K extends keyof typeof init>(k: K) => (v: (typeof init)[K]) => setF((x) => ({ ...x, [k]: v }));
   const rankOptions = useRankOptions();
   const categories = useApi<string[]>("/admin/categories");
-  const series = useApi<string[]>("/admin/series");
+  const series = useApi<string[]>(isSuper ? "/admin/series" : null);
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const submit = async () => {
     if (!f.title.trim()) return setError("請輸入課程名稱");
-    if (await save(f)) onClose();
+    const { series: _series, ...rest } = f;
+    if (await save(isSuper ? f : rest)) onClose();
   };
   return (
     <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
@@ -177,8 +179,13 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
           <MultiChips options={categories.data} value={f.category} onChange={set("category")} />
         </View>
       ) : null}
-      <Field label="系列（同系列的課合併成一張卡、顯示梯次；不填＝不合併）" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
-      {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "不合併" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
+      <Check label="短影音專輯（章節與影音教材在「單元」頁歸類為短影音）" value={f.isShorts} onChange={set("isShorts")} />
+      {isSuper ? (
+        <>
+          <Field label="系列（同系列的課合併成一張卡、顯示在「相同系列」）" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
+          {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
+        </>
+      ) : null}
       <Label>封面顏色（沒有 EDM 時的文字封面）</Label>
       <View style={styles.chips}>
         {Object.keys(courseThemes).map((t) => (
@@ -311,10 +318,44 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
 }
 
 // ---------- 進階設定：指導／主辦單位、顯示選項、課程介紹、短網址、最後修改 ----------
+/** 主辦單位：預設收起（只顯示目前的主辦），要改再按「展開」。主辦單位含某個中心＝中心課程（出現在該中心頁）。 */
+function HostUnitBlock({ isHq, value, fixed, options, counts, onChange }: { isHq: boolean; value: string; fixed: string; options: string[]; counts: Record<string, number>; onChange: (v: string) => void }) {
+  const { c } = useTheme();
+  const [open, setOpen] = useState(false);
+  const summary = (value || HQ_UNIT).split(/[、,，]+/).map((x) => (x === HQ_UNIT ? x : centerTitle(x))).join("、");
+  if (!isHq) return <NoticeBox text={`主辦單位固定為「${fixed}」，由系統帶入。`} />;
+  return (
+    <View style={{ gap: space.sm }}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel="主辦單位" onPress={() => setOpen((o) => !o)} style={[styles.hostRow, { borderColor: c.border, backgroundColor: c.surface }]}>
+        <View style={{ flex: 1 }}>
+          <AppText variant="caption" tone="muted">
+            主辦單位（會公開顯示）
+          </AppText>
+          <AppText variant="body" numberOfLines={2}>
+            {summary}
+          </AppText>
+        </View>
+        <AppText variant="callout" tone="accent">
+          {open ? "收起" : "展開"}
+        </AppText>
+        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={c.textMuted} />
+      </Pressable>
+      {open ? (
+        <>
+          <MultiChips options={options} value={value} counts={counts} onChange={onChange} />
+          <AppText variant="caption" tone="muted">
+            含某個中心＝中心課程，只出現在該中心頁；只有寰宇總部＝一般課程。管理權限與「中心」篩選以第一個中心為準。
+          </AppText>
+        </>
+      ) : null}
+    </View>
+  );
+}
+
 function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isHq = member?.role === "admin";
-  const init = { centerCourse: course.centerCourse, guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
+  const init = { guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
   const [f, setF] = useState(init);
   const centers = useApi<string[]>(isHq ? "/centers" : null);
   const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
@@ -323,43 +364,20 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const submit = async () => {
     const body: Record<string, unknown> = { ...f };
     if (!isHq) delete body.hostUnit; // 中心的人不能改主辦中心
-    if (!isHq) delete body.centerCourse; // 中心課程由系統固定，中心的人不能改
     if (await save(body)) onClose();
   };
   return (
     <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
-      {isHq ? (
-        <Check label="中心課程（只在「寰宇教育中心」頁出現，不在「全部課程」出現）" value={f.centerCourse} onChange={(v) => setF((x) => ({ ...x, centerCourse: v }))} />
-      ) : (
-        <Check label="中心課程（各中心建立的課程固定是中心課程）" value disabled onChange={() => undefined} />
-      )}
-      {isHq ? <Check label="指導單位：寰宇總部（會公開顯示）" value={f.guidanceUnit === HQ_UNIT} onChange={(v) => setF((x) => ({ ...x, guidanceUnit: v ? HQ_UNIT : "" }))} /> : null}
+      {isHq ? <Check label="指導單位：寰宇總部（會公開顯示，不建議勾選）" value={f.guidanceUnit === HQ_UNIT} onChange={(v) => setF((x) => ({ ...x, guidanceUnit: v ? HQ_UNIT : "" }))} /> : null}
       {f.guidanceUnit === HQ_UNIT ? <NoticeBox text="由寰宇總部指導的課程，只能使用總部的審核群組。" /> : null}
-      <Label>主辦單位（會公開顯示；管理權限與「中心」篩選以第一個中心為準）</Label>
-      {isHq ? <MultiChips options={[HQ_UNIT, ...(centers.data ?? [])]} value={f.hostUnit} counts={hostCounts} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} /> : <NoticeBox text={`主辦單位固定為「${course.hostUnit || member?.center || ""}」；只有總部可以改到別的中心。`} />}
+      <HostUnitBlock isHq={isHq} value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} options={[HQ_UNIT, ...(centers.data ?? [])]} counts={hostCounts} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
-      <Check label="不顯示在首頁推薦" value={f.hideFromHome} onChange={(v) => setF((x) => ({ ...x, hideFromHome: v }))} />
+      <Check label="不顯示在首頁推薦（不建議勾選）" value={f.hideFromHome} onChange={(v) => setF((x) => ({ ...x, hideFromHome: v }))} />
       <Field label="課程介紹（內部參考，課程頁不顯示）" value={f.description} onChange={(v) => setF((x) => ({ ...x, description: v }))} multiline placeholder="課程內容、上課時間、適合對象……" />
-      {isSuperAdmin(member) ? <CourseShortLinks course={course} /> : null}
       <AppText variant="caption" tone="muted">
         {course.admin?.editedAt ? `最後修改：${course.admin.editedByName || "（未記錄）"}　${dateTime(course.admin.editedAt)}` : "最後修改：（還沒有紀錄）"}
       </AppText>
     </EditSheet>
-  );
-}
-
-/** 這門課的分類、系列短網址（只有超級管理員）。 */
-function CourseShortLinks({ course }: { course: CourseDetail }) {
-  const links = useApi<{ kind: "category" | "series" | "center"; value: string; slug: string | null }[]>("/admin/short-links");
-  const mine = (links.data ?? []).filter((i) => (i.kind === "series" && i.value === course.series) || (i.kind === "category" && course.category.split("、").includes(i.value)));
-  if (!mine.length) return null;
-  return (
-    <View style={{ gap: space.sm }}>
-      <Label>短網址（只有超級管理員能改）</Label>
-      {mine.map((i) => (
-        <ShortLinkRow key={`${i.kind}:${i.value}`} item={i} onChanged={links.reload} />
-      ))}
-    </View>
   );
 }
 
@@ -486,6 +504,7 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
 }
 
 const styles = StyleSheet.create({
+  hostRow: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm },
   check: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   catChip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: minTouch - 4, paddingHorizontal: space.md, borderWidth: 1.5, borderRadius: radius.pill },

@@ -8,9 +8,8 @@ import { CenterEdm } from "@/features/admin/center-edm";
 import { CenterNameField } from "@/features/admin/center-name-field";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewCourseSheet } from "@/features/course-edit/new-course";
-import { ShortLinkRow } from "@/features/course-edit/short-link-row";
 import { centerTitle } from "@/features/format";
-import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
+import { canCreateCourse, canManageCourses } from "@/lib/roles";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { CourseRow } from "./course-row";
@@ -19,7 +18,7 @@ import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterTile } from "./center-tile";
-import { SpeakerToggle } from "./speaker-toggle";
+import { UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { ModeFlash } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
@@ -34,7 +33,8 @@ import { AppText, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Sel
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
-const SPEAKER_KEY = "hglobal:learn:speaker-only";
+const UNIT_FILTER_KEY = "hglobal:learn:unit-filter";
+const OLD_SPEAKER_KEY = "hglobal:learn:speaker-only";
 const GAP = space.md;
 
 /**
@@ -112,14 +112,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       .then((v) => (v === "chapter" || v === "series" || v === "center") && !initialCenter && setMode(v))
       .catch(() => undefined);
   }, []);
-  // 「單元」模式的「只顯示主講人」：記住上次的選擇。
-  const [speakerOnly, setSpeakerOnly] = useState(false);
+  // 「單元」模式的三選一篩選（只看主講／隱藏短影音／只看短影音）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
+  const [unitFilter, setUnitFilter] = useState<UnitFilterValue>("all");
   useEffect(() => {
-    AsyncStorage.getItem(SPEAKER_KEY).then((v) => v === "1" && setSpeakerOnly(true)).catch(() => undefined);
+    AsyncStorage.multiGet([UNIT_FILTER_KEY, OLD_SPEAKER_KEY])
+      .then(([[, v], [, old]]) => setUnitFilter(v === "speaker" || v === "noshorts" || v === "shorts" ? v : old === "1" ? "speaker" : "all"))
+      .catch(() => undefined);
   }, []);
-  const pickSpeakerOnly = (v: boolean) => {
-    setSpeakerOnly(v);
-    AsyncStorage.setItem(SPEAKER_KEY, v ? "1" : "0").catch(() => undefined);
+  const pickUnitFilter = (v: UnitFilterValue) => {
+    setUnitFilter(v);
+    AsyncStorage.setItem(UNIT_FILTER_KEY, v).catch(() => undefined);
   };
   const [flashTick, setFlashTick] = useState(0);
   const pickMode = (m: CourseViewMode) => {
@@ -249,12 +251,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     for (const l of searchData.data?.lessons ?? []) {
       const co = byId.get(l.courseId);
       if (!co) continue;
-      if (hit ? !hit.has(l.id) : !!co.centerCourse || !inCategory(co) || !inCenter(co)) continue;
-      if (speakerOnly && !l.isSpeaker) continue;
+      if (hit ? !hit.has(l.id) : !inCategory(co) || !inCenter(co)) continue; // 單元頁顯示全部課程（含中心課程）
+      if (!unitFilterPass(unitFilter, l)) continue;
       out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [chapterMode, courses, searchData.data, searchIndex, q, category, activeCenter, member, shuffleSeed, speakerOnly]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chapterMode, courses, searchData.data, searchIndex, q, category, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
   const cols = flat ? 3 : boxW >= 520 ? 3 : 2; // 中心頁的直式 EDM 卡一列三張
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
@@ -291,7 +293,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         />
       ) : null}
     </View>
-    {chapterMode ? <SpeakerToggle value={speakerOnly} onChange={pickSpeakerOnly} /> : null}
+    {chapterMode ? <UnitFilter value={unitFilter} onChange={pickUnitFilter} /> : null}
     {terms.length ? (
       <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
         {terms.map((t) => (
@@ -423,13 +425,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     ) : null}
     <ModeFlash mode={mode} tick={flashTick} />
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
-    {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} defaultCenterCourse={mode === "center"} /> : null}
+    {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
         <CenterNameField key={activeCenter} center={activeCenter} />
         <CenterEdm center={activeCenter} art={art} onChanged={centerArt.reload} />
-        {/* 英文縮寫網址：所有能編輯的人都看得到，只有最高權限管理員能修改 */}
-        <ShortLinkRow key={shortLink?.slug ?? "none"} item={{ kind: "center", value: activeCenter, slug: shortLink?.slug ?? null }} onChanged={links.reload} readOnly={!isSuperAdmin(member)} />
       </EditSheet>
     ) : null}
     </View>

@@ -94,7 +94,7 @@ export function ShortLinkRow({ item, onChanged, readOnly = false }: { item: Shor
 
 const styles = StyleSheet.create({
   inputRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
-  input: { flex: 1, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },
+  input: { flex: 1, minWidth: 0, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },
   btnRow: { flexDirection: "row", alignItems: "center", gap: space.sm, flexWrap: "wrap" },
   shareBtn: { width: minTouch, height: minTouch, borderWidth: 1, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
 });
