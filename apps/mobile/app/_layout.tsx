@@ -12,6 +12,7 @@ import { MiniAudioBar } from "@/features/player/audio-bar";
 import { PlayerLayer } from "@/features/player/player-layer";
 import { SwitchSheet } from "@/features/player/switch-sheet";
 import { installNoPageZoom } from "@/lib/no-page-zoom";
+import { installWebPullRefresh } from "@/lib/web-pull-refresh";
 import { SessionProvider } from "@/state/session";
 import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
@@ -78,6 +79,7 @@ function StatusBarCover() {
 export default function RootLayout() {
   const { scheme, c } = useTheme();
   useEffect(() => installNoPageZoom(), []);
+  useEffect(() => installWebPullRefresh(), []);
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,
