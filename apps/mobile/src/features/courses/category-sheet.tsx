@@ -1,0 +1,154 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import type { CourseSummary } from "@/api/client";
+import { useTheme } from "@/theme/theme";
+import { minTouch, radius, space } from "@/theme/tokens";
+import { AppText, Button } from "@/ui";
+import { BottomSheet } from "@/ui/bottom-sheet";
+
+/** 「未分類」的內部代碼（沒有任何分類的課程）。 */
+export const NONE = "__none__";
+/** 把課程的分類（用「、」分隔）拆成陣列。 */
+export const courseCats = (x: { category: string }) => x.category.split("、").map((v) => v.trim()).filter(Boolean);
+export const catLabel = (v: string) => (v === NONE ? "未分類" : v);
+
+/** 課程是否同時符合所選的每一個分類（多個＝交集）；沒選＝全部符合；「未分類」只能單獨選。 */
+export function matchesCats(x: { category: string }, sel: string[]): boolean {
+  if (!sel.length) return true;
+  if (sel[0] === NONE) return !courseCats(x).length;
+  const mine = courseCats(x);
+  return sel.every((s) => mine.includes(s));
+}
+
+export type CatBadge = { text: string; tone: "accent" | "warn" | "new" };
+
+/**
+ * 分類篩選（逐步縮小）：點分類框從下方彈出。已選的分類深綠；沒選的分類後面的數字＝「再加上它之後剩幾門」，
+ * 加上去會變成 0 門的分類灰色虛線、不能點；不勾＝只看原本那個分類；勾兩個以上＝同時有這些分類。
+ */
+export function CategorySheet({ courses, names, picked, badgesOf, onApply, onClose }: { courses: CourseSummary[]; names: string[]; picked: string[]; badgesOf: (name: string) => CatBadge[]; onApply: (sel: string[]) => void; onClose: () => void }) {
+  const { c } = useTheme();
+  const [sel, setSel] = useState<string[]>(picked);
+  const count = (s: string[]) => courses.filter((x) => matchesCats(x, s)).length;
+  const total = count(sel);
+  const toggle = (name: string) => setSel((cur) => (cur.includes(name) ? cur.filter((v) => v !== name) : name === NONE ? [NONE] : [...cur, name]));
+  const title = sel.length ? `已選：${sel.map(catLabel).join("＋")}（${total} 門）` : "選擇分類";
+  return (
+    <BottomSheet onClose={onClose}>
+      <AppText variant="headline" numberOfLines={2}>
+        {title}
+      </AppText>
+      <AppText variant="caption" tone="muted">
+        {sel.length ? "想再縮小？點選「同時也有」的分類（數字＝加上後剩幾門）" : "點選分類；選兩個以上＝同時有這些分類（數字＝剩幾門）"}
+      </AppText>
+      <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={styles.wrap}>
+        {names.map((name) => {
+          const on = sel.includes(name);
+          const left = on ? count(sel) : name === NONE ? (sel.length ? 0 : count([NONE])) : sel[0] === NONE ? 0 : count([...sel, name]);
+          const dead = !on && left === 0;
+          const badges = badgesOf(name);
+          return (
+            <Pressable
+              key={name}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on, disabled: dead }}
+              accessibilityLabel={`${catLabel(name)}，${left} 門`}
+              disabled={dead}
+              onPress={() => toggle(name)}
+              style={[styles.chip, { backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : dead ? c.border : c.border, borderStyle: dead ? "dashed" : "solid" }]}
+            >
+              {on ? <Ionicons name="checkmark" size={18} color={c.textOnAccent} /> : null}
+              <AppText variant="callout" style={{ color: on ? c.textOnAccent : dead ? c.textMuted : c.text, fontWeight: on ? "700" : "500", opacity: dead ? 0.6 : 1 }}>
+                {catLabel(name)}
+              </AppText>
+              <AppText variant="caption" style={{ color: on ? c.textOnAccent : c.textMuted, opacity: dead ? 0.6 : 1 }}>
+                {left}
+              </AppText>
+              {badges.map((b) => (
+                <View key={b.text} style={[styles.badge, { backgroundColor: b.tone === "warn" ? c.warning : b.tone === "new" ? "#E5484D" : on ? "rgba(255,255,255,0.28)" : c.accentSoft }]}>
+                  <AppText variant="caption" style={{ color: b.tone === "accent" && !on ? c.accentText : "#fff", fontWeight: "700", fontSize: 11, lineHeight: 14 }}>
+                    {b.text}
+                  </AppText>
+                </View>
+              ))}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+      <AppText variant="caption" tone="muted">
+        不勾＝不篩選；勾兩個以上＝同時有這些分類。
+      </AppText>
+      <View style={styles.actions}>
+        {sel.length ? <Button variant="secondary" label="清除" onPress={() => setSel([])} /> : null}
+        <View style={{ flex: 1 }}>
+          <Button
+            label={sel.length ? `顯示 ${total} 門課程` : `顯示全部 ${total} 門`}
+            onPress={() => {
+              onApply(sel);
+              onClose();
+            }}
+            fullWidth
+          />
+        </View>
+      </View>
+    </BottomSheet>
+  );
+}
+
+/**
+ * 分類篩選框（放在上方工具列）：沒篩選＝白底「分類 ⌄」；篩選中＝深綠實心白字「培訓＋美容」＋圓形 ✕（一鍵清除）。
+ */
+export function CategoryFilterBox({ picked, onOpen, onClear }: { picked: string[]; onOpen: () => void; onClear: () => void }) {
+  const { c } = useTheme();
+  if (!picked.length)
+    return (
+      <Pressable accessibilityRole="button" accessibilityLabel="分類篩選" onPress={onOpen} style={[styles.box, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <AppText variant="body" numberOfLines={1} style={{ flex: 1, color: c.textMuted }}>
+          分類
+        </AppText>
+        <Ionicons name="chevron-down" size={18} color={c.textMuted} />
+      </Pressable>
+    );
+  return (
+    <View style={[styles.box, { backgroundColor: c.accent, borderColor: c.accent }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`分類篩選中：${picked.map(catLabel).join("、")}，點一下更改`} onPress={onOpen} style={styles.main}>
+        <AppText variant="body" numberOfLines={1} style={{ color: c.textOnAccent, fontWeight: "700" }}>
+          {picked.map(catLabel).join("＋")}
+        </AppText>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="清除分類篩選" onPress={onClear} hitSlop={8} style={styles.clear}>
+        <Ionicons name="close" size={16} color={c.textOnAccent} />
+      </Pressable>
+    </View>
+  );
+}
+
+/** 篩選中的說明列（放在上方工具列下方）：「培訓 ＋ 美容　共 2 門　再縮小」。 */
+export function CategoryHintBar({ picked, total, onRefine }: { picked: string[]; total: number; onRefine: () => void }) {
+  const { c } = useTheme();
+  return (
+    <View style={[styles.hint, { backgroundColor: c.accentSoft }]}>
+      <AppText variant="callout" numberOfLines={1} style={{ flex: 1, color: c.accentText }}>
+        {picked.map(catLabel).join(" ＋ ")}　共 {total} 門
+      </AppText>
+      <Pressable accessibilityRole="button" accessibilityLabel="再縮小分類" onPress={onRefine} hitSlop={8} style={styles.refine}>
+        <AppText variant="callout" style={{ color: c.accentText, fontWeight: "700", textDecorationLine: "underline" }}>
+          再縮小
+        </AppText>
+      </Pressable>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, paddingVertical: space.xs },
+  chip: { minHeight: minTouch - 4, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1.5 },
+  badge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999 },
+  actions: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  box: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm, flexDirection: "row", alignItems: "center", gap: space.xs },
+  main: { flex: 1, minHeight: minTouch - 2, justifyContent: "center", paddingLeft: space.xs },
+  clear: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.28)", alignItems: "center", justifyContent: "center" },
+  hint: { flexDirection: "row", alignItems: "center", gap: space.md, paddingHorizontal: space.lg, minHeight: 40, marginTop: space.sm, borderRadius: radius.md },
+  refine: { minHeight: minTouch, justifyContent: "center" },
+});

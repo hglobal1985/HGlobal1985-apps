@@ -13,6 +13,7 @@ import { CourseCard } from "./course-card";
 import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
+import { CategoryFilterBox, CategoryHintBar, CategorySheet, NONE, courseCats as cats, matchesCats, type CatBadge } from "./category-sheet";
 import { CenterTile } from "./center-tile";
 import { ModeFlash } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
@@ -28,9 +29,6 @@ import { AppText, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Scr
 
 const ALL = "";
 const HIDDEN_CATEGORY = "地區教育中心";
-/** 「未分類」：沒有任何分類的課程（讓下拉選單的數字與「全部分類」對得上）。 */
-const NONE = "__none__";
-const cats = (x: { category: string }) => x.category.split("、").map((v) => v.trim()).filter(Boolean);
 const MODE_KEY = "hglobal:learn:course-view-mode";
 const GAP = space.md;
 
@@ -45,11 +43,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const manager = canManageCourses(member);
   const adminList = useApi<CourseSummary[]>(manager ? "/admin/courses" : null);
   const centerArt = useApi<CenterArt[]>("/center-art");
-  const [category, setCategory] = useState(initialCategory || ALL);
+  // 已選的分類（可複選；多個＝同時有這些分類）。空陣列＝全部分類。
+  const [selCats, setSelCats] = useState<string[]>(initialCategory ? initialCategory.split("、").filter(Boolean) : []);
+  const category = selCats.join("、");
+  const [catOpen, setCatOpen] = useState(false);
   const [center, setCenter] = useState(initialCenter || ALL);
   const seriesFilter = series;
   useEffect(() => {
-    if (initialCategory) setCategory(initialCategory);
+    if (initialCategory) setSelCats(initialCategory.split("、").filter(Boolean));
   }, [initialCategory]);
   useEffect(() => {
     if (initialCenter) {
@@ -70,18 +71,18 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   };
   // 用下拉選了某個分類：課程呈現自動跳到「單元」（章節）模式；回到「全部分類」就恢復原本的模式。
   const [modeBeforeCat, setModeBeforeCat] = useState<CourseViewMode | null>(null);
-  const pickCategory = (v: string) => {
-    setCategory(v);
-    if (v !== ALL && mode !== "chapter") {
+  const pickCategory = (vs: string[]) => {
+    setSelCats(vs);
+    if (vs.length && mode !== "chapter") {
       setModeBeforeCat(mode);
       setMode("chapter");
       setFlashTick((t) => t + 1);
-    } else if (v === ALL && modeBeforeCat) {
+    } else if (!vs.length && modeBeforeCat) {
       setMode(modeBeforeCat);
       setModeBeforeCat(null);
       setFlashTick((t) => t + 1);
     }
-    syncUrl(v, v !== ALL ? ALL : center);
+    syncUrl(vs.join("、"), vs.length ? ALL : center);
   };
   const pickCenter = (v: string) => {
     setCenter(v);
@@ -161,6 +162,15 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     if (st.fresh) badges.push({ text: "新", tone: "new" });
     return { key: x, label: x === NONE ? "未分類" : x, hint: `${st.n} 門`, badges };
   };
+  const badgesOf = (name: string): CatBadge[] => {
+    const st = catStats.get(name);
+    if (!st) return [];
+    const out: CatBadge[] = [];
+    if (st.learning) out.push({ text: `學習中 ${st.learning}`, tone: "accent" });
+    if (manager && st.draft) out.push({ text: `未上架 ${st.draft}`, tone: "warn" });
+    if (st.fresh) out.push({ text: "新", tone: "new" });
+    return out;
+  };
   const allOption: SelectOption = {
     key: ALL,
     label: "全部分類",
@@ -178,7 +188,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }, [courses, rights, centerArt.data]);
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
   const activeCenter = mode === "center" ? center : ALL;
-  const inCategory = (x: CourseSummary) => category === ALL || (category === NONE ? !cats(x).length : cats(x).includes(category));
+  const inCategory = (x: CourseSummary) => matchesCats(x, selCats);
   // 中心清單的排序：課程數最多的排最前面（同數量依名稱）。
   const centerCounts = useMemo(
     () =>
@@ -237,7 +247,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
   // 系列單頁（顯示全部）時，分類下拉顯示這個系列所屬的分類（有多個分類就顯示「全部分類」）；改選別的分類就離開系列頁。
   const seriesCats = seriesFilter ? [...new Set(courses.filter((x) => x.series === seriesFilter).flatMap((x) => x.category.split("、")).filter(Boolean))] : [];
-  const shownCategory = seriesFilter ? (seriesCats.length === 1 ? seriesCats[0]! : ALL) : category;
+  const shownCategory = seriesCats.length === 1 ? seriesCats[0]! : ALL;
   const leaveSeries = (v: string) => {
     const slug = v === ALL ? null : links.data?.find((l) => l.kind === "category" && l.value === v)?.slug;
     if (slug) router.replace(`/${slug}`);
@@ -249,7 +259,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       {!seriesFilter ? <View style={{ width: SEARCH_ICON_W }} /> : null}
       <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end", gap: space.sm, opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
       <View style={{ flex: 1 }}>
-        <Select value={shownCategory} options={[allOption, ...categories.map(categoryOption)]} onChange={seriesFilter ? leaveSeries : pickCategory} active={!seriesFilter && category !== ALL} onClear={() => pickCategory(ALL)} />
+        {seriesFilter ? (
+          <Select value={shownCategory} options={[allOption, ...categories.map(categoryOption)]} onChange={leaveSeries} />
+        ) : (
+          <CategoryFilterBox picked={selCats} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
+        )}
       </View>
       {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
       </View>
@@ -264,6 +278,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         />
       ) : null}
     </View>
+    {!seriesFilter && selCats.length ? <CategoryHintBar picked={selCats} total={courses.filter((x) => inCategory(x) && inCenter(x)).length} onRefine={() => setCatOpen(true)} /> : null}
     {terms.length ? (
       <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
         {terms.map((t) => (
@@ -357,6 +372,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       </Pressable>
     ) : null}
     <ModeFlash mode={mode} tick={flashTick} />
+    {catOpen ? <CategorySheet courses={courses.filter(inCenter)} names={categories} picked={selCats} badgesOf={badgesOf} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`${activeCenter}的 EDM`} onClose={() => setArtOpen(false)} hideSave>
