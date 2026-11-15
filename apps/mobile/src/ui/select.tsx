@@ -7,7 +7,8 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
 
 /** short＝收起時顯示在框內的短文字（例如「11 月」），展開的選單仍顯示完整的 label。 */
-export type SelectOption = { key: string; label: string; short?: string };
+/** hint＝展開選單裡靠右顯示的小字（例如「3 門」）。 */
+export type SelectOption = { key: string; label: string; short?: string; hint?: string };
 export type SelectProps = {
   label?: string;
   value: string;
@@ -57,6 +58,11 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
                   <AppText variant="body" style={{ flex: 1, fontWeight: on ? "700" : "400", color: on ? c.accentText : c.text }}>
                     {o.label}
                   </AppText>
+                  {o.hint ? (
+                    <AppText variant="callout" tone="muted" style={{ marginRight: space.sm }}>
+                      {o.hint}
+                    </AppText>
+                  ) : null}
                   {on ? <Ionicons name="checkmark" size={22} color={c.accent} /> : null}
                 </Pressable>
               );

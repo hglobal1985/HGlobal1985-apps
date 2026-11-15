@@ -204,7 +204,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       {!seriesFilter ? <View style={{ width: SEARCH_ICON_W }} /> : null}
       <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end", gap: space.sm, opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
       <View style={{ flex: 1 }}>
-        <Select value={shownCategory} options={[{ key: ALL, label: "全部分類", short: "分類" }, ...categories.map((x) => ({ key: x, label: x }))]} onChange={seriesFilter ? leaveSeries : pickCategory} />
+        <Select value={shownCategory} options={[{ key: ALL, label: "全部分類", short: "分類", hint: `${courses.length} 門` }, ...categories.map((x) => ({ key: x, label: x, hint: `${courses.filter((y) => y.category.split("、").includes(x)).length} 門` }))]} onChange={seriesFilter ? leaveSeries : pickCategory} />
       </View>
       {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
       </View>
