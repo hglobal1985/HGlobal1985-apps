@@ -137,7 +137,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? []) : null), [needIndex, courses, searchData.data]);
   const matched = searchIndex && !seriesFilter ? matchCourses(searchIndex, q) : null;
   const terms = searchIndex && q.trim() && q !== picked ? suggestTerms(searchIndex, q) : [];
-  const list = courses.filter((x) => (matched ? matched.has(x.id) : (category === ALL || x.category.split("、").includes(category)) && inCenter(x) && (!seriesFilter || x.series === seriesFilter)));
+  // 「相同系列」模式不放地區教育中心的課程（它們在「寰宇教育中心」模式看；業主 2026-11-15）。搜尋時不受此限。
+  const hideCenterCourses = mode === "series" && !seriesFilter;
+  const list = courses.filter((x) => (matched ? matched.has(x.id) : !(hideCenterCourses && x.category.split("、").includes(HIDDEN_CATEGORY)) && (category === ALL || x.category.split("、").includes(category)) && inCenter(x) && (!seriesFilter || x.series === seriesFilter)));
   const pickTerm = (text: string) => {
     const head = q.trim().split(/\s+/).slice(0, -1).join(" ");
     const next = head ? `${head} ${text}` : text;
