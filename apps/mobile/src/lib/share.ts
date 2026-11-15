@@ -9,15 +9,19 @@ const absolute = (url: string) => {
   return /^https?:/.test(u) || typeof location === "undefined" ? u : `${location.origin}${u.startsWith("/") ? "" : "/"}${u}`;
 };
 
+/** 分享網址時，網址前面固定補上的邀請文字（業主 2026-11-15 指定的格式）。 */
+export const SHARE_INVITE = "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️ \n\n按此開啟網址 👉\n";
+
 /**
  * 分享：一律呼叫手機的系統分享選單（網頁用 Web Share、App 用系統 Share）。
- * 回傳 "shared"＝已叫出選單；"copied"＝這個瀏覽器沒有分享選單（例如電腦），已改為複製連結。
+ * 分享出去的內容＝邀請文字（SHARE_INVITE）＋網址。
+ * 回傳 "shared"＝已叫出選單；"copied"＝這個瀏覽器沒有分享選單（例如電腦），已改為複製連結（含邀請文字）。
  */
 export async function shareLink(title: string, url: string): Promise<"shared" | "copied" | "cancelled"> {
   const link = absolute(url);
   if (Platform.OS !== "web") {
     try {
-      await Share.share({ title, message: Platform.OS === "android" ? `${title}\n${link}` : title, url: link });
+      await Share.share({ title, message: `${SHARE_INVITE}${link}` });
       return "shared";
     } catch {
       return "cancelled";
@@ -25,13 +29,13 @@ export async function shareLink(title: string, url: string): Promise<"shared" | 
   }
   if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
     try {
-      await navigator.share({ title, url: link });
+      await navigator.share({ title, text: `${SHARE_INVITE}${link}` });
       return "shared";
     } catch {
       return "cancelled"; // 使用者關掉選單
     }
   }
-  await navigator.clipboard?.writeText(link).catch(() => undefined);
+  await navigator.clipboard?.writeText(`${SHARE_INVITE}${link}`).catch(() => undefined);
   return "copied";
 }
 
