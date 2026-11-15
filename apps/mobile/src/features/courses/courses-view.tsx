@@ -148,11 +148,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const catStats = useMemo(() => {
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
-    // 清單項目與順序在所有模式一致（業主 2026-11-15）：來源＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定列在最後；只有數字（堂數）隨目前模式的課程變動。
+    // 清單項目與順序在所有模式一致（業主 2026-11-15）：來源＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定列在最後；數字（堂數）也一律是全站總堂數，三個模式完全相同。
     const names = new Set([...(categoryList.data ?? []), ...courses.flatMap(cats), NONE]);
     for (const name of names) {
       if (!name) continue;
-      const mine = pool.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name)));
+      const mine = courses.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name)));
       stats.set(name, {
         n: lessonsOf(mine),
         learning: lessonsOf(mine.filter((x) => x.enrollment === "opened")),
@@ -161,7 +161,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       });
     }
     return stats;
-  }, [pool, courses, categoryList.data]);
+  }, [courses, categoryList.data]);
   // 順序：以「全部課程」的堂數由多到少（同數量依名稱），與目前是哪個模式無關，所以每個模式的清單順序都一樣；「未分類」固定最後。
   const categories = useMemo(() => {
     const total = (name: string) => lessonsOf(courses.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name))));
@@ -180,8 +180,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     key: ALL,
     label: "全部分類",
     short: "分類",
-    hint: `${lessonsOf(pool)} 堂`,
-    badges: pool.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${lessonsOf(pool.filter((x) => x.enrollment === "opened"))}`, tone: "accent" }] : [],
+    hint: `${lessonsOf(courses)} 堂`,
+    badges: courses.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${lessonsOf(courses.filter((x) => x.enrollment === "opened"))}`, tone: "accent" }] : [],
   };
   // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（業主 2026-11-15）；不混入本地資料。
   const rights = member?.courseRights;
@@ -263,7 +263,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         {seriesFilter ? (
           <Select value={shownCategory} options={[allOption, ...categories.map(categoryOption)]} onChange={leaveSeries} />
         ) : (
-          <CategoryFilterBox picked={selCats} total={lessonsOf(pool.filter((x) => inCategory(x) && inCenter(x)))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
+          <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
         )}
       </View>
       {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
@@ -409,7 +409,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       </Pressable>
     ) : null}
     <ModeFlash mode={mode} tick={flashTick} />
-    {catOpen ? <CategorySheet courses={pool.filter(inCenter)} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
+    {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} defaultCenterCourse={mode === "center"} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
