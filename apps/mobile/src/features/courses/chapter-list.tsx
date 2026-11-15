@@ -32,8 +32,8 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
             style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
           >
             <View style={styles.thumb}>
-              {lesson.coverUrl || course.coverUrl || course.edmUrl ? (
-                <Image source={{ uri: resolveUrl((lesson.coverUrl || course.coverUrl || course.edmUrl) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+              {lesson.coverUrl || course.coverUrl || course.edmUrl || lesson.ytThumb ? (
+                <Image source={{ uri: resolveUrl((lesson.coverUrl || course.coverUrl || course.edmUrl || lesson.ytThumb) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
               ) : (
                 <CourseCover theme={course.theme} label="" title={course.series || course.title} fill />
               )}

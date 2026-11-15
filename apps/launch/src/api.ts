@@ -2206,6 +2206,8 @@ const routes: [string, RegExp, Handler][] = [
           eventDate: r.eventDate,
           minutes: r.minutes,
           coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
+          // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
+          ytThumb: r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,
           completed: r.done === 1,
         })),
