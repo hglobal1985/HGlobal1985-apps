@@ -148,7 +148,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const catStats = useMemo(() => {
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
-    const names = new Set([...(categoryList.data ?? []), ...pool.flatMap(cats), ...(pool.some((x) => !cats(x).length) ? [NONE] : [])]);
+    // 清單項目與順序在所有模式一致（業主 2026-11-15）：來源＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定列在最後；只有數字（堂數）隨目前模式的課程變動。
+    const names = new Set([...(categoryList.data ?? []), ...courses.flatMap(cats), NONE]);
     for (const name of names) {
       if (!name) continue;
       const mine = pool.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name)));
@@ -160,9 +161,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       });
     }
     return stats;
-  }, [pool, categoryList.data]);
-  // 課程數最多的排最前面（同數量依名稱），與「寰宇教育中心」清單一致。
-  const categories = useMemo(() => [...catStats.keys()].sort((a, b) => Number(a === NONE) - Number(b === NONE) || catStats.get(b)!.n - catStats.get(a)!.n || a.localeCompare(b, "zh-Hant")), [catStats]);
+  }, [pool, courses, categoryList.data]);
+  // 順序：以「全部課程」的堂數由多到少（同數量依名稱），與目前是哪個模式無關，所以每個模式的清單順序都一樣；「未分類」固定最後。
+  const categories = useMemo(() => {
+    const total = (name: string) => lessonsOf(courses.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name))));
+    const weight = new Map([...catStats.keys()].map((k) => [k, total(k)]));
+    return [...catStats.keys()].sort((a, b) => Number(a === NONE) - Number(b === NONE) || weight.get(b)! - weight.get(a)! || a.localeCompare(b, "zh-Hant"));
+  }, [catStats, courses]);
   const categoryOption = (x: string): SelectOption => {
     const st = catStats.get(x)!;
     const badges: SelectBadge[] = [];
