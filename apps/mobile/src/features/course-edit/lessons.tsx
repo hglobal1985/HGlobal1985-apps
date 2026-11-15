@@ -72,6 +72,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
         rankOptions={rankOptions}
         chapterCovers={course.chapterCovers}
         courseDate={course.eventStart ?? undefined}
+        otherSpeaker={course.lessons.find((l) => !l.material && l.isSpeaker && l.id !== lesson.id)}
         onSaved={invalidate}
         onDirty={setDirty}
       />
@@ -90,6 +91,7 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
   const [rank, setRank] = useState("");
   const [job, setJob] = useState("");
   const [autoCover, setAutoCover] = useState(false);
+  const [isSpeaker, setIsSpeaker] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tName = course.teacher ?? "";
@@ -101,7 +103,7 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
     setBusy(true);
     setError(null);
     try {
-      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, eventDate: course.eventStart ?? todayStr(), autoCover });
+      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, ...(course.eventStart ? {} : { eventDate: todayStr() }), autoCover, isSpeaker });
       invalidate();
       onClose();
     } catch (e) {
@@ -120,11 +122,22 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
       </View>
       <SharerField value={sharer} onChange={setSharer} teacher={tName} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : tName), setRank(sameT ? "" : tRank), setJob(sameT ? "" : tJob))} label="新章節分享者" />
       <RankTitleRow rank={rank} title={job} onRank={setRank} onTitle={setJob} rankOptions={rankOptions} readOnly={sameT} who="新章節分享者" />
+      <SpeakerCheck value={isSpeaker} onChange={setIsSpeaker} other={course.lessons.find((l) => !l.material && l.isSpeaker)} />
       <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
         新增後再點{word}旁的鉛筆，設定影片、音檔與附件。設成 YouTube 影片後，封面就會自動用影片畫面。
       </AppText>
     </EditSheet>
+  );
+}
+
+/** 「主講人」勾選：同一門課只能有一堂（用於「全部課程 > 單元」的「只顯示主講人」）；已有別堂是主講人時，勾這一堂會轉移過來。 */
+function SpeakerCheck({ value, onChange, other }: { value: boolean; onChange: (v: boolean) => void; other?: Lesson }) {
+  return (
+    <View style={{ gap: space.xs }}>
+      <Check label="主講人（每門課只能有一堂）" value={value} onChange={onChange} />
+      {value && other ? <NoticeBox text={`目前「${other.title}」是主講人，儲存後會改成這一堂。`} /> : null}
+    </View>
   );
 }
 
@@ -172,6 +185,7 @@ function LessonEditor({
   teacherRank,
   teacherTitle,
   courseDate,
+  otherSpeaker,
   rankOptions,
   chapterCovers,
 }: {
@@ -182,6 +196,8 @@ function LessonEditor({
   prevDate?: string;
   /** 課程的活動日期（開始日；「同課程日期」勾選用，沒設定就不顯示勾選）。 */
   courseDate?: string;
+  /** 目前已被設為主講人的「另一堂」（有的話，勾選這一堂時提示會轉移）。 */
+  otherSpeaker?: Lesson;
   /** 課程主講人（姓名、獎銜、職稱；「同主講人」勾選用）。 */
   teacher: string;
   teacherRank: string;
@@ -200,10 +216,14 @@ function LessonEditor({
   const sameT = !!teacher && sharer === teacher && sharerRank === teacherRank && sharerTitle === teacherTitle;
   const [media, setMedia] = useState<MediaDraft>(() => mediaDraftOf(lesson));
   const kind = media.kind;
+  // 章節日期預設「跟著課程日期」（follow）：課程日期改了這堂跟著變；自己選了日期就不再跟著。
+  const [follow, setFollow] = useState(!!courseDate && !!lesson.dateFollows);
   const [eventDate, setEventDate] = useState(lesson.eventDate ?? "");
+  const ownDate = follow ? "" : eventDate;
   const [autoCover, setAutoCover] = useState(!!lesson.autoCover);
-  const sameAsPrev = !!prevDate && eventDate === prevDate;
-  const sameAsCourse = !!courseDate && eventDate === courseDate;
+  const [isSpeaker, setIsSpeaker] = useState(!!lesson.isSpeaker);
+  const sameAsPrev = !follow && !!prevDate && eventDate === prevDate;
+  const sameAsCourse = follow;
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: "success" | "danger" | "info"; text: string } | null>(null);
 
@@ -214,7 +234,8 @@ function LessonEditor({
     sharer !== (lesson.sharer ?? "") ||
     sharerRank !== (lesson.sharerRank ?? "") ||
     sharerTitle !== (lesson.sharerTitle ?? "") ||
-    eventDate !== (lesson.eventDate ?? "") ||
+    ownDate !== (lesson.dateFollows ? "" : lesson.eventDate ?? "") ||
+    isSpeaker !== !!lesson.isSpeaker ||
     autoCover !== !!lesson.autoCover ||
     mediaDraftDirty(media, lesson);
   useEffect(() => onDirty?.(dirty), [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -224,7 +245,7 @@ function LessonEditor({
     setBusy("save");
     setMsg(null);
     try {
-      const body: Record<string, unknown> = { title, sharer, sharerRank, sharerTitle, eventDate: eventDate || null, autoCover, ...mediaDraftBody(media) };
+      const body: Record<string, unknown> = { title, sharer, sharerRank, sharerTitle, eventDate: ownDate || null, autoCover, isSpeaker, ...mediaDraftBody(media) };
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
       setMsg({ tone: "success", text: "已儲存" });
       onSaved();
@@ -269,6 +290,7 @@ function LessonEditor({
         <SharerField value={sharer} onChange={setSharer} teacher={teacher} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : teacher), setSharerRank(sameT ? "" : teacherRank), setSharerTitle(sameT ? "" : teacherTitle))} label={`第 ${lesson.position} 堂分享者`} />
       </View>
       <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} readOnly={sameT} who={`第 ${lesson.position} 堂分享者`} />
+      <SpeakerCheck value={isSpeaker} onChange={setIsSpeaker} other={otherSpeaker} />
       {kind === "youtube" ? <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} /> : null}
       {chapterCovers ? <LessonArt lesson={lesson} onChanged={onSaved} /> : null}
       <View style={styles.dateHead}>
@@ -276,13 +298,13 @@ function LessonEditor({
           活動日期
         </AppText>
         {courseDate ? (
-          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: sameAsCourse }} accessibilityLabel="日期同課程日期" onPress={() => setEventDate(sameAsCourse ? "" : courseDate)} style={styles.sameCheck}>
+          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: sameAsCourse }} accessibilityLabel="日期同課程日期" onPress={() => (sameAsCourse ? setFollow(false) : (setFollow(true), setEventDate(courseDate)))} style={styles.sameCheck}>
             <Icon name={sameAsCourse ? "checkbox" : "square-outline"} size={28} color={sameAsCourse ? c.accent : c.textMuted} />
             <AppText variant="body">同課程日期</AppText>
           </Pressable>
         ) : null}
         {prevDate ? (
-          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: sameAsPrev }} accessibilityLabel="日期同上一堂" onPress={() => setEventDate(sameAsPrev ? "" : prevDate)} style={styles.sameCheck}>
+          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: sameAsPrev }} accessibilityLabel="日期同上一堂" onPress={() => (setFollow(false), setEventDate(sameAsPrev ? "" : prevDate))} style={styles.sameCheck}>
             <Icon name={sameAsPrev ? "checkbox" : "square-outline"} size={28} color={sameAsPrev ? c.accent : c.textMuted} />
             <AppText variant="body">同上</AppText>
           </Pressable>
@@ -290,7 +312,7 @@ function LessonEditor({
       </View>
       {sameAsPrev || sameAsCourse ? (
         <AppText variant="body" tone="muted">
-          {eventDate.replace(/-/g, "/")}（{sameAsCourse ? "同課程日期" : "與上一堂相同"}）
+          {(sameAsCourse ? courseDate ?? "" : eventDate).replace(/-/g, "/")}（{sameAsCourse ? "同課程日期" : "與上一堂相同"}）
         </AppText>
       ) : (
         <DateSelect value={eventDate} onChange={setEventDate} />

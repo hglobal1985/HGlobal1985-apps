@@ -66,7 +66,7 @@ function MaterialSheet({ course, lesson, onClose }: { course: CourseDetail; less
       if (!lessonId) {
         // 新增：先建立教材，再依序送出影音設定、音檔與附件（任何一步失敗，教材已建立，可按「新增」重試未完成的部分）。
         const before = new Set(course.lessons.map((l) => l.id));
-        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: person?.rank ?? "", sharerTitle: person?.title ?? "", eventDate: course.eventStart ?? todayStr(), kind: "material" });
+        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: person?.rank ?? "", sharerTitle: person?.title ?? "", ...(course.eventStart ? {} : { eventDate: todayStr() }), kind: "material" });
         lessonId = detail.lessons.find((l) => !before.has(l.id))?.id;
         if (!lessonId) throw Error("新增失敗，請重新整理後再試");
         setCreatedId(lessonId);

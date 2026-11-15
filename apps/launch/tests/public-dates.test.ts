@@ -72,5 +72,5 @@ test("活動日期：課程與每一則章節都可設定、清除，格式錯�
   assert.equal(await first(), "2026-12-05");
   assert.equal((await call("PATCH", `/admin/lessons/${lid}`, { token: admin, body: { eventDate: "12/05" } })).status, 400);
   assert.equal((await call("PATCH", `/admin/lessons/${lid}`, { token: admin, body: { eventDate: null } })).status, 200);
-  assert.equal(await first(), null);
+  assert.equal(await first(), "2026-12-05", "清除＝改回跟著課程日期");
 });

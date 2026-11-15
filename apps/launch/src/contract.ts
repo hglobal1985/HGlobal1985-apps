@@ -202,6 +202,10 @@ export type Lesson = {
   posterUrl?: string | null;
   /** 勾了「自動使用 YouTube 影片畫面當封面」。 */
   autoCover?: boolean;
+  /** 章節日期是否「跟著課程日期」（沒有自己設定日期）；eventDate 已是算好的實際日期。 */
+  dateFollows?: boolean;
+  /** 主講人章節（同一門課最多一堂，只有章節有）：「單元」頁的「只顯示主講人」只列這一堂。 */
+  isSpeaker?: boolean;
   /** 只有管理員會拿到（編輯影片來源用）。 */
   media?: { type: MediaType; ref: string | null };
 };

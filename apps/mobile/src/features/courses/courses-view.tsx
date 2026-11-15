@@ -19,6 +19,7 @@ import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterTile } from "./center-tile";
+import { SpeakerToggle } from "./speaker-toggle";
 import { ModeFlash } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
@@ -33,6 +34,7 @@ import { AppText, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Sel
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
+const SPEAKER_KEY = "hglobal:learn:speaker-only";
 const GAP = space.md;
 
 /**
@@ -110,6 +112,15 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       .then((v) => (v === "chapter" || v === "series" || v === "center") && !initialCenter && setMode(v))
       .catch(() => undefined);
   }, []);
+  // 「單元」模式的「只顯示主講人」：記住上次的選擇。
+  const [speakerOnly, setSpeakerOnly] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(SPEAKER_KEY).then((v) => v === "1" && setSpeakerOnly(true)).catch(() => undefined);
+  }, []);
+  const pickSpeakerOnly = (v: boolean) => {
+    setSpeakerOnly(v);
+    AsyncStorage.setItem(SPEAKER_KEY, v ? "1" : "0").catch(() => undefined);
+  };
   const [flashTick, setFlashTick] = useState(0);
   const pickMode = (m: CourseViewMode) => {
     // 已在中心模式又按一次中心鈕＝回到中心清單。
@@ -239,10 +250,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       const co = byId.get(l.courseId);
       if (!co) continue;
       if (hit ? !hit.has(l.id) : !!co.centerCourse || !inCategory(co) || !inCenter(co)) continue;
+      if (speakerOnly && !l.isSpeaker) continue;
       out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [chapterMode, courses, searchData.data, searchIndex, q, category, activeCenter, member, shuffleSeed]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chapterMode, courses, searchData.data, searchIndex, q, category, activeCenter, member, shuffleSeed, speakerOnly]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
   const cols = flat ? 3 : boxW >= 520 ? 3 : 2; // 中心頁的直式 EDM 卡一列三張
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
@@ -279,6 +291,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         />
       ) : null}
     </View>
+    {chapterMode ? <SpeakerToggle value={speakerOnly} onChange={pickSpeakerOnly} /> : null}
     {terms.length ? (
       <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
         {terms.map((t) => (

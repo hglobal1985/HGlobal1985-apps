@@ -593,9 +593,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
     ctx.db
-      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full FROM lessons WHERE course_id = ? ORDER BY position")
+      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker FROM lessons WHERE course_id = ? ORDER BY position")
       .bind(id)
-      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string; is_full: number }>(),
+      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string; is_full: number; is_speaker: number }>(),
     s ? ctx.db.prepare("SELECT lesson_id FROM lesson_progress WHERE member_sub = ? AND course_id = ?").bind(s.sub, id).all<{ lesson_id: string }>() : Promise.resolve({ results: [] as { lesson_id: string }[] }),
   ]);
   // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
@@ -626,7 +626,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       kind: l.media_type === "audio" ? ("audio" as const) : ("video" as const),
       start: l.start_seconds,
       end: l.end_seconds,
-      eventDate: l.event_date,
+      // 章節日期空白＝跟著課程日期（課程日期改了章節跟著變）；dateFollows 給編輯畫面判斷。
+      eventDate: l.event_date ?? row.event_start,
+      dateFollows: l.event_date === null,
+      ...(l.kind === "chapter" ? { isSpeaker: l.is_speaker === 1 } : {}),
       sharer: l.sharer,
       sharerRank: l.sharer_rank,
       sharerRankName: rankMap.get(l.sharer_rank)?.name ?? "",
@@ -1552,7 +1555,7 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const vals = [id, (max?.m ?? 0) + 1, status, admin.sub, admin.name.slice(0, 60), iso(), ...rest.map(([, v]) => v)];
   await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO courses (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...vals),
-    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, event_date) VALUES (?, ?, 1, '第 1 堂', 0, 'demo', ?)").bind(`${id}-${randomId(6)}`, id, (sets.find(([c]) => c === "event_start")?.[1] as string | null | undefined) ?? null),
+    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type) VALUES (?, ?, 1, '第 1 堂', 0, 'demo')").bind(`${id}-${randomId(6)}`, id), // 章節日期留空＝跟著課程日期
     audit(ctx.db, admin.sub, "course.create", "course", id, String(body.title ?? "")),
   ]);
   return courseDetail(ctx, id);
@@ -1757,14 +1760,21 @@ const seconds = (v: unknown): number | null | undefined => {
 
 /** 修改章節：名稱、影片來源（示範／YouTube／Mux）、時間軸區間。音檔由上傳流程設定。 */
 async function updateLesson(ctx: Ctx, id: string, admin: Session) {
-  const body = await readJson<{ eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; autoCover?: unknown }>(ctx.req);
+  const body = await readJson<{ isSpeaker?: unknown; eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; autoCover?: unknown }>(ctx.req);
   if (body.mediaType === "mux" && admin.role !== "admin") fail(403, "forbidden", "Mux 影片由總部管理，請改用 YouTube 或音檔，或請總部協助");
   const cur = await ctx.db
-    .prepare("SELECT media_type, media_ref, start_seconds, end_seconds FROM lessons WHERE id = ?")
+    .prepare("SELECT course_id, kind, media_type, media_ref, start_seconds, end_seconds FROM lessons WHERE id = ?")
     .bind(id)
-    .first<{ media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null }>();
+    .first<{ course_id: string; kind: string; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null }>();
   if (!cur) return fail(404, "not_found", "找不到這個章節");
   const sets: [string, unknown][] = [];
+  // 主講人：同一門課只能有一堂；勾新的這堂時，原本那堂自動取消（轉移）。教材不能當主講人。
+  const clearSpeaker: D1PreparedStatement[] = [];
+  if (body.isSpeaker !== undefined) {
+    if (body.isSpeaker === true && cur.kind !== "chapter") fail(400, "speaker_chapter_only", "只有章節可以設為主講人");
+    if (body.isSpeaker === true) clearSpeaker.push(ctx.db.prepare("UPDATE lessons SET is_speaker = 0 WHERE course_id = ? AND is_speaker = 1 AND id <> ?").bind(cur.course_id, id));
+    sets.push(["is_speaker", body.isSpeaker === true ? 1 : 0]);
+  }
   const title = text(body.title, 120);
   if (title !== undefined) {
     if (!title) fail(400, "title_required", "請輸入章節名稱");
@@ -1810,6 +1820,7 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
   else if (minutes !== undefined) sets.push(["duration_minutes", minutes]);
   if (!sets.length) fail(400, "nothing_to_update", "沒有要更新的欄位");
   await ctx.db.batch([
+    ...clearSpeaker,
     ctx.db.prepare(`UPDATE lessons SET ${sets.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`).bind(...sets.map(([, v]) => v), id),
     audit(ctx.db, admin.sub, "lesson.update", "lesson", id, sets.map(([c]) => c).join(",")),
   ]);
@@ -2212,10 +2223,10 @@ const routes: [string, RegExp, Handler][] = [
       const sub = ctx.session?.sub ?? "";
       const { results } = await ctx.db
         .prepare(
-          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, l.event_date AS eventDate, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND l.kind = 'chapter' ORDER BY l.course_id, l.position",
+          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND l.kind = 'chapter' ORDER BY l.course_id, l.position",
         )
         .bind(sub)
-        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
+        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
       return {
         lessons: results.map((r) => ({
           id: r.id,
@@ -2226,6 +2237,7 @@ const routes: [string, RegExp, Handler][] = [
           sharerRankName: rankMap.get(r.sharerRank)?.name ?? "",
           sharerTitle: r.sharerTitle,
           eventDate: r.eventDate,
+          isSpeaker: r.isSpeaker === 1,
           minutes: r.minutes,
           coverUrl: r.autoCover === 1 && r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
           // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
@@ -3657,7 +3669,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/courses\/([\w-]+)\/lessons$/,
     async (ctx, [courseId]) => {
       const admin = await requireCourseManager(ctx, courseId);
-      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown }>(ctx.req);
+      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown }>(ctx.req);
       const kind = body.kind === "material" ? "material" : "chapter";
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
@@ -3672,9 +3684,11 @@ const routes: [string, RegExp, Handler][] = [
       const id = `${courseId}-${randomId(6)}`;
       // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
       const full = kind === "material" ? await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>() : null;
+      const speaker = kind === "chapter" && body.isSpeaker === true;
       await ctx.db.batch([
+        ...(speaker ? [ctx.db.prepare("UPDATE lessons SET is_speaker = 0 WHERE course_id = ?").bind(courseId)] : []),
         ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?)").bind(id, courseId, full ? full.position : course.maxpos + 1, title, sharer, sharerRank, sharerTitle, eventDate, body.autoCover === true ? 1 : 0, kind),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?)").bind(id, courseId, full ? full.position : course.maxpos + 1, title, sharer, sharerRank, sharerTitle, eventDate, body.autoCover === true ? 1 : 0, kind, speaker ? 1 : 0),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);
       return courseDetail(ctx, courseId);
