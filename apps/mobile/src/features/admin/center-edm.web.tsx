@@ -11,11 +11,12 @@ import { COVER_MAX_SIDE, EDM_MAX_SIDE, cropCompress, loadImage, loadImageUrl, ty
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect };
 
-/** 預設的 16:9 封面裁切框：置中偏上、盡量大。 */
+/** 預設的 16:9 封面裁切框：水平垂直置中、盡量大。 */
 function defaultCover(img: HTMLImageElement): Rect {
   const w = Math.min(img.naturalWidth, (img.naturalHeight * 16) / 9);
   const h = (w * 9) / 16;
-  return { x: Math.round((img.naturalWidth - w) / 2), y: 0, w: Math.round(w), h: Math.round(h) };
+  // 垂直置中：一般照片與海報的主角多半在中間（業主 2026-11-15）。
+  return { x: Math.round((img.naturalWidth - w) / 2), y: Math.max(0, Math.round((img.naturalHeight - h) / 2)), w: Math.round(w), h: Math.round(h) };
 }
 /** 以封面框（占 EDM 寬高的比例）還原成像素。 */
 function rectFrom(img: HTMLImageElement, r: { x: number; y: number; w: number }): Rect {

@@ -12,11 +12,17 @@ export function EdmCropper({ src, imgW, imgH, aspect, value, onChange }: { src: 
   const wrap = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState({ w: 320, h: 320 });
   const drag = useRef<Drag | null>(null);
-  const maxW = 420;
   const maxH = 460;
+  // 寬度不能超過手機畫面（面板左右各留邊），否則右邊的把手會被切掉、拉不到。
   useEffect(() => {
-    const s = Math.min(maxW / imgW, maxH / imgH, 1);
-    setView({ w: Math.round(imgW * s), h: Math.round(imgH * s) });
+    const fit = () => {
+      const maxW = Math.min(420, Math.max(220, window.innerWidth - 56));
+      const s = Math.min(maxW / imgW, maxH / imgH, 1);
+      setView({ w: Math.round(imgW * s), h: Math.round(imgH * s) });
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
   }, [imgW, imgH]);
   const k = view.w / imgW; // 原圖像素 → 畫面像素
   const box = { x: value.x * k, y: value.y * k, w: value.w * k, h: value.h * k };
@@ -58,17 +64,20 @@ export function EdmCropper({ src, imgW, imgH, aspect, value, onChange }: { src: 
   };
   const end = () => (drag.current = null);
 
+  // 四角把手：放在框的內側（不會被圖片邊緣切掉），觸控範圍 40px、看得到的圓點 24px。
   const handle = (kind: "nw" | "ne" | "sw" | "se", style: React.CSSProperties) => (
-    <div onPointerDown={start(kind)} style={{ position: "absolute", width: 22, height: 22, background: "#fff", border: "2px solid #2F5D3A", borderRadius: 11, touchAction: "none", cursor: kind === "nw" || kind === "se" ? "nwse-resize" : "nesw-resize", ...style }} />
+    <div onPointerDown={start(kind)} style={{ position: "absolute", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", touchAction: "none", cursor: kind === "nw" || kind === "se" ? "nwse-resize" : "nesw-resize", ...style }}>
+      <div style={{ width: 24, height: 24, background: "#fff", border: "3px solid #2F5D3A", borderRadius: 12, boxShadow: "0 1px 4px rgba(0,0,0,.5)" }} />
+    </div>
   );
   return (
     <div ref={wrap} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{ position: "relative", width: view.w, height: view.h, overflow: "hidden", userSelect: "none", touchAction: "none", background: "#000", borderRadius: 8, margin: "0 auto" }}>
       <img src={src} alt="" draggable={false} style={{ width: view.w, height: view.h, display: "block" }} />
-      <div onPointerDown={start("move")} style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, boxShadow: "0 0 0 9999px rgba(0,0,0,0.5)", border: "2px solid #fff", cursor: "move", touchAction: "none" }}>
-        {handle("nw", { left: -11, top: -11 })}
-        {handle("ne", { right: -11, top: -11 })}
-        {handle("sw", { left: -11, bottom: -11 })}
-        {handle("se", { right: -11, bottom: -11 })}
+      <div onPointerDown={start("move")} style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, boxShadow: "0 0 0 9999px rgba(0,0,0,0.62)", border: "3px solid #fff", outline: "1px solid #2F5D3A", cursor: "move", touchAction: "none" }}>
+        {handle("nw", { left: 0, top: 0 })}
+        {handle("ne", { right: 0, top: 0 })}
+        {handle("sw", { left: 0, bottom: 0 })}
+        {handle("se", { right: 0, bottom: 0 })}
       </div>
     </div>
   );
