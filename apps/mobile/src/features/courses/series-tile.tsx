@@ -42,13 +42,15 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const height = Math.round((width * 9) / 16); // 16:9
   // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
   const inSeries = !flat && !!rep.series;
-  const edm = inSeries ? rep.seriesEdmUrl : rep.edmUrl;
+  // 平鋪（flat）：用「封面」（你指定裁切位置後的 16:9 縮圖，與課程卡、清單相同）；沒有封面才退回 EDM。
+  const cropped = flat && !!rep.coverUrl;
+  const edm = flat ? rep.coverUrl || rep.edmUrl : inSeries ? rep.seriesEdmUrl : rep.edmUrl;
   const ribbons = ribbonsFor(rep, member, config);
   const open = () => (group.sessions.length > 1 || inSeries ? setSheet(true) : router.push(`/course/${rep.id}`));
   return (
     <View style={{ width }}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? rep.series : rep.title}，瀏覽細節`} onPress={open} style={[styles.art, { width, height, backgroundColor: c.surfaceMuted }]}>
-        {edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
+        {edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         {/* 管理者才看得到的未上架課程：左下角標「未上架」（學員的清單裡不會有這些課）。 */}
