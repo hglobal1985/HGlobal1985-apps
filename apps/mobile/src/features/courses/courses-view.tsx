@@ -27,6 +27,7 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Select } from "@/ui";
 
 const ALL = "";
+const HIDDEN_CATEGORY = "地區教育中心";
 const MODE_KEY = "hglobal:learn:course-view-mode";
 const GAP = space.md;
 
@@ -116,7 +117,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     return [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
   }, [data, adminList.data]);
   const courses = useMemo(() => sortCourses(merged, member, config.sortGroups), [merged, member, config.sortGroups]);
-  const categories = useMemo(() => [...new Set(courses.flatMap((x) => x.category.split("、")).filter(Boolean))], [courses]);
+  // 「地區教育中心」不放進分類下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
+  const categories = useMemo(() => [...new Set(courses.flatMap((x) => x.category.split("、")).filter((x) => x && x !== HIDDEN_CATEGORY))], [courses]);
   // 中心：課程的主辦中心（名稱都是會員中心清單裡的）；管理者另外加上自己能管的中心（還沒有課程也能先上傳 EDM）。
   const rights = member?.courseRights;
   const centers = useMemo(() => {
