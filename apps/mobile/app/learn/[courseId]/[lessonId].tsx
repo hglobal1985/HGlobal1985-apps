@@ -1,7 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { saveLastLesson } from "@/lib/last-lesson";
-import { Platform, StyleSheet, View } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { api, type CourseDetail, type Playback } from "@/api/client";
 import { AttachmentList } from "@/features/attachments";
 import { PageHeader } from "@/features/page-header";
@@ -14,13 +15,15 @@ import { PlayerSlot } from "@/features/player/player-slot";
 import { usePlayer } from "@/features/player/use-player";
 import { PlayerControls } from "@/features/player/player-controls";
 import { useApi, useSession } from "@/state/session";
-import { space } from "@/theme/tokens";
+import { useTheme } from "@/theme/theme";
+import { minTouch, space } from "@/theme/tokens";
 import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen } from "@/ui";
 
 export default function LessonScreen() {
   const { courseId, lessonId } = useLocalSearchParams<{ courseId: string; lessonId: string }>();
   const { invalidate, ready, member } = useSession();
   const course = useApi<CourseDetail>(`/courses/${courseId}`);
+  const { c: theme } = useTheme();
   const [playback, setPlayback] = useState<Playback | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
   const player = usePlayer();
@@ -150,7 +153,16 @@ export default function LessonScreen() {
         </View>
       ) : null}
     <Screen header={false} tight gap={space.sm}>
-      <PageHeader title={c.title} shareTitle={`${c.title}｜${lesson.title}`} path={`/learn/${c.id}/${lesson.id}`} />
+      <PageHeader title={c.title} shareTitle={`${c.title}｜${lesson.title}`} path={`/learn/${c.id}/${lesson.id}`}
+        extra={
+          c.can?.edit || c.can?.remove || c.can?.restore ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="編輯這門課程" onPress={() => router.push({ pathname: "/course/[id]", params: { id: c.id, edit: "1" } })} hitSlop={8} style={styles.editBtn}>
+              <Ionicons name="create-outline" size={22} color={theme.accent} />
+              <Text style={{ color: theme.accent, fontSize: 17, fontWeight: "600" }}>編輯</Text>
+            </Pressable>
+          ) : null
+        }
+      />
       {legacyYoutube && playback ? (
         <LessonPlayer playback={playback} onSegmentEnd={() => setLegacyDone(true)} />
       ) : playError ? (
@@ -235,4 +247,5 @@ export default function LessonScreen() {
 const styles = StyleSheet.create({
   titleRow: { flexDirection: "row", alignItems: "flex-end", gap: space.sm },
   row: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
+  editBtn: { minWidth: minTouch, height: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 },
 });
