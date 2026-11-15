@@ -42,10 +42,11 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const { config } = useUiConfig();
   const [sheet, setSheet] = useState(false);
   const rep = group.nearest;
-  const height = Math.round((width * 9) / 16); // 16:9
+  // 平鋪（flat，中心頁）＝直式 9:16；其餘維持橫式 16:9。
+  const height = flat ? Math.round((width * 16) / 9) : Math.round((width * 9) / 16);
   // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
   const inSeries = !flat && !!rep.series;
-  // 平鋪（flat，中心頁）：統一用直式 EDM 放進 16:9 視窗，停在管理員設定的預設位置（與課程頁上方 EDM 一致）；沒有 EDM 才退回封面。
+  // 平鋪（flat，中心頁）：統一用直式 9:16 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始）；沒有 EDM 才退回封面。
   const cropped = flat && !rep.edmUrl && !!rep.coverUrl;
   const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesEdmUrl : rep.edmUrl;
   const ribbons = ribbonsFor(rep, member, config);
