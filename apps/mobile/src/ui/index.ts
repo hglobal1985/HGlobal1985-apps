@@ -17,7 +17,7 @@ export { HomeRailsSkeleton, SkeletonBlock } from "./skeleton";
 export { Field } from "./field";
 export { BottomBar } from "./bottom-bar";
 export { BrandTitle } from "./brand-title";
-export { Select, type SelectOption } from "./select";
+export { Select, type SelectBadge, type SelectOption } from "./select";
 export { DateSelect, todayStr } from "./date-select";
 export { CornerRibbon } from "./corner-ribbon";
 export { StageFrame } from "./stage-frame";

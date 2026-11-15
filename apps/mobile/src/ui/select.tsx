@@ -8,7 +8,8 @@ import { AppText } from "./text";
 
 /** short＝收起時顯示在框內的短文字（例如「11 月」），展開的選單仍顯示完整的 label。 */
 /** hint＝展開選單裡靠右顯示的小字（例如「3 門」）。 */
-export type SelectOption = { key: string; label: string; short?: string; hint?: string };
+export type SelectBadge = { text: string; tone: "accent" | "warn" | "new" };
+export type SelectOption = { key: string; label: string; short?: string; hint?: string; /** 靠右的小色塊標籤（例如「學習中 2」「未上架 1」「新」）。 */ badges?: SelectBadge[] };
 export type SelectProps = {
   label?: string;
   value: string;
@@ -58,6 +59,13 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
                   <AppText variant="body" style={{ flex: 1, fontWeight: on ? "700" : "400", color: on ? c.accentText : c.text }}>
                     {o.label}
                   </AppText>
+                  {o.badges?.map((b) => (
+                    <View key={b.text} style={[styles.badge, { backgroundColor: b.tone === "warn" ? c.warning : b.tone === "new" ? "#E5484D" : c.accentSoft }]}>
+                      <AppText variant="caption" style={{ color: b.tone === "accent" ? c.accentText : "#fff", fontWeight: "700" }}>
+                        {b.text}
+                      </AppText>
+                    </View>
+                  ))}
                   {o.hint ? (
                     <AppText variant="callout" tone="muted" style={{ marginRight: space.sm }}>
                       {o.hint}
@@ -76,6 +84,7 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
 
 const ITEM_H = minTouch + 4;
 const styles = StyleSheet.create({
+  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, marginRight: 6 },
   wrap: { gap: 4, flex: 1, minWidth: 0 },
   box: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm, flexDirection: "row", alignItems: "center", gap: space.xs },
   item: { minHeight: minTouch + 4, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", borderBottomWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm },

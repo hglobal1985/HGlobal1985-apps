@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, RequestError, type CourseDetail, type Rank, type ReviewGroup } from "@/api/client";
+import { api, HQ_UNIT, RequestError, type CourseDetail, type CourseSummary, type Rank, type ReviewGroup } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmSheet } from "@/features/confirm";
 import { dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -64,6 +64,13 @@ export function useCourseSave(course: CourseDetail, onSaved: (d: CourseDetail) =
   return { save, busy, error, setError };
 }
 
+/** 各主辦單位已有幾門課（一門課可有多個主辦單位，每個各算一次）。 */
+export function countByHost(list: { hostUnit: string }[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const x of list) for (const h of x.hostUnit.split(/[、,，]+/).map((v) => v.trim()).filter(Boolean)) out[h] = (out[h] ?? 0) + 1;
+  return out;
+}
+
 /** 勾選框（整列可點、觸控夠大）。 */
 export function Check({ label, value, onChange, disabled }: { label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   const { c } = useTheme();
@@ -108,7 +115,7 @@ export function AutoCoverCheck({ course, onChanged }: { course: CourseDetail; on
 }
 
 /** 可複選的圓角選項（分類、主辦單位）。值是「、」分隔文字。 */
-function MultiChips({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+function MultiChips({ options, value, onChange, counts }: { options: string[]; value: string; onChange: (v: string) => void; /** 各選項已有幾門課（顯示在名稱後面）。 */ counts?: Record<string, number> }) {
   const { c } = useTheme();
   const cur = value.split(/[、,，]+/).map((v) => v.trim()).filter(Boolean);
   return (
@@ -125,7 +132,7 @@ function MultiChips({ options, value, onChange }: { options: string[]; value: st
           >
             <Ionicons name={on ? "checkbox" : "square-outline"} size={20} color={on ? c.accent : c.textMuted} />
             <AppText variant="callout" style={{ color: on ? c.accentText : c.text, fontWeight: on ? "700" : "400" }}>
-              {x}
+              {counts ? `${x}（${counts[x] ?? 0}）` : x}
             </AppText>
           </Pressable>
         );
@@ -310,6 +317,8 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const init = { guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, showFull: course.showFull, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
   const [f, setF] = useState(init);
   const centers = useApi<string[]>(isHq ? "/centers" : null);
+  const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
+  const hostCounts = countByHost(allCourses.data ?? []);
   const { save, busy, error } = useCourseSave(course, onSaved);
   const submit = async () => {
     const body: Record<string, unknown> = { ...f };
@@ -321,7 +330,7 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
       {isHq ? <Check label="指導單位：寰宇總部（會公開顯示）" value={f.guidanceUnit === HQ_UNIT} onChange={(v) => setF((x) => ({ ...x, guidanceUnit: v ? HQ_UNIT : "" }))} /> : null}
       {f.guidanceUnit === HQ_UNIT ? <NoticeBox text="由寰宇總部指導的課程，只能使用總部的審核群組。" /> : null}
       <Label>主辦單位（會公開顯示；管理權限與「中心」篩選以第一個中心為準）</Label>
-      {isHq ? <MultiChips options={[HQ_UNIT, ...(centers.data ?? [])]} value={f.hostUnit} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} /> : <NoticeBox text={`主辦單位固定為「${course.hostUnit || member?.center || ""}」；只有總部可以改到別的中心。`} />}
+      {isHq ? <MultiChips options={[HQ_UNIT, ...(centers.data ?? [])]} value={f.hostUnit} counts={hostCounts} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} /> : <NoticeBox text={`主辦單位固定為「${course.hostUnit || member?.center || ""}」；只有總部可以改到別的中心。`} />}
       <Check label="顯示「完整版」區塊（同一支影片切成多堂時）" value={f.showFull} onChange={(v) => setF((x) => ({ ...x, showFull: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
       <Check label="不顯示在首頁推薦" value={f.hideFromHome} onChange={(v) => setF((x) => ({ ...x, hideFromHome: v }))} />

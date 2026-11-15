@@ -24,7 +24,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Select } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Select, type SelectBadge, type SelectOption } from "@/ui";
 
 const ALL = "";
 const HIDDEN_CATEGORY = "地區教育中心";
@@ -120,10 +120,40 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   // 分類下拉＝「關鍵字管理」的分類清單（同步，沒有課程使用的分類也要列出）；載入前先用課程上出現過的分類。
   // 「地區教育中心」不放進下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
   const categoryList = useApi<string[]>("/categories");
-  const categories = useMemo(() => {
-    const fromCourses = courses.flatMap((x) => x.category.split("、"));
-    return [...new Set([...(categoryList.data ?? []), ...fromCourses])].filter((x) => x && x !== HIDDEN_CATEGORY).sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  // 每個分類的統計：課程數、我「學習中」（已開通）幾門、未上架幾門（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
+  const catStats = useMemo(() => {
+    const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
+    const names = new Set([...(categoryList.data ?? []), ...courses.flatMap((x) => x.category.split("、"))]);
+    for (const name of names) {
+      if (!name || name === HIDDEN_CATEGORY) continue;
+      const mine = courses.filter((x) => x.category.split("、").includes(name));
+      stats.set(name, {
+        n: mine.length,
+        learning: mine.filter((x) => x.enrollment === "opened").length,
+        draft: mine.filter((x) => x.status === "draft").length,
+        fresh: mine.some((x) => x.createdAt && Date.parse(x.createdAt) >= weekAgo),
+      });
+    }
+    return stats;
   }, [courses, categoryList.data]);
+  // 課程數最多的排最前面（同數量依名稱），與「寰宇教育中心」清單一致。
+  const categories = useMemo(() => [...catStats.keys()].sort((a, b) => catStats.get(b)!.n - catStats.get(a)!.n || a.localeCompare(b, "zh-Hant")), [catStats]);
+  const categoryOption = (x: string): SelectOption => {
+    const st = catStats.get(x)!;
+    const badges: SelectBadge[] = [];
+    if (st.learning) badges.push({ text: `學習中 ${st.learning}`, tone: "accent" });
+    if (manager && st.draft) badges.push({ text: `未上架 ${st.draft}`, tone: "warn" });
+    if (st.fresh) badges.push({ text: "新", tone: "new" });
+    return { key: x, label: x, hint: `${st.n} 門`, badges };
+  };
+  const allOption: SelectOption = {
+    key: ALL,
+    label: "全部分類",
+    short: "分類",
+    hint: `${courses.length} 門`,
+    badges: courses.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${courses.filter((x) => x.enrollment === "opened").length}`, tone: "accent" }] : [],
+  };
   // 中心：課程的主辦中心（名稱都是會員中心清單裡的）；管理者另外加上自己能管的中心（還沒有課程也能先上傳 EDM）。
   const rights = member?.courseRights;
   const centers = useMemo(() => {
@@ -204,7 +234,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       {!seriesFilter ? <View style={{ width: SEARCH_ICON_W }} /> : null}
       <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end", gap: space.sm, opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
       <View style={{ flex: 1 }}>
-        <Select value={shownCategory} options={[{ key: ALL, label: "全部分類", short: "分類", hint: `${courses.length} 門` }, ...categories.map((x) => ({ key: x, label: x, hint: `${courses.filter((y) => y.category.split("、").includes(x)).length} 門` }))]} onChange={seriesFilter ? leaveSeries : pickCategory} />
+        <Select value={shownCategory} options={[allOption, ...categories.map(categoryOption)]} onChange={seriesFilter ? leaveSeries : pickCategory} />
       </View>
       {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
       </View>

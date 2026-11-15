@@ -1,9 +1,9 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { api, HQ_UNIT, type CourseDetail } from "@/api/client";
+import { api, HQ_UNIT, type CourseDetail, type CourseSummary } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { AppText, Chips, Field, NoticeBox } from "@/ui";
-import { Check } from "./course-sections";
+import { Check, countByHost } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
 /**
@@ -16,6 +16,8 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
   const isHq = member?.role === "admin";
   const centers = useApi<string[]>(isHq ? "/centers" : null);
   const series = useApi<string[]>("/admin/series");
+  const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
+  const hostCounts = countByHost(allCourses.data ?? []);
   const [title, setTitle] = useState("");
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [seriesName, setSeriesName] = useState("");
@@ -46,7 +48,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
         主辦中心
       </AppText>
       {isHq ? (
-        <Chips options={[HQ_UNIT, ...(centers.data ?? [])].map((x) => ({ key: x, label: x }))} value={host} onChange={setHost} />
+        <Chips options={[HQ_UNIT, ...(centers.data ?? [])].map((x) => ({ key: x, label: `${x}（${hostCounts[x] ?? 0}）` }))} value={host} onChange={setHost} />
       ) : (
         <NoticeBox text={`主辦中心固定為「${host}」。`} />
       )}
