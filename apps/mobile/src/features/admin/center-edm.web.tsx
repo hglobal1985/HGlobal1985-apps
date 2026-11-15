@@ -134,19 +134,19 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
         </>
       ) : (
         <>
-          <AppText variant="headline">封面與預設停留位置（橫式 16:9，比例固定）</AppText>
+          <AppText variant="headline">指定封面：拖曳裁切框</AppText>
           <AppText variant="callout" tone="muted">
-            拖曳框內移動位置，拖四個角調整大小。框的上緣就是進入中心頁時一開始停留的位置。
+            拖曳框內移動位置，拖四個角調整大小（橫式 16:9，比例固定）。框內就是中心卡片的縮圖，框的上緣就是進入中心頁時一開始停留的位置。調整好請按「儲存封面」。
           </AppText>
+          <View style={styles.buttons}>
+            <Button label="儲存封面" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
+            <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
+          </View>
           <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} />
           <AppText variant="callout" tone="muted">
             封面預覽
           </AppText>
           {preview ? <img src={preview} alt="封面預覽" style={{ width: "100%", maxWidth: 320, aspectRatio: "16 / 9", borderRadius: 8, display: "block" }} /> : <AppText>產生預覽中…</AppText>}
-          <View style={styles.buttons}>
-            <Button label="儲存" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
-            <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
-          </View>
         </>
       )}
       {msg ? <AppText variant="caption">{msg}</AppText> : null}
