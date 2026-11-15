@@ -18,7 +18,7 @@ import { SeriesTile } from "./series-tile";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterHero } from "./center-hero";
 import { CenterTile } from "./center-tile";
-import { UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
+import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { ModeFlash } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
@@ -112,11 +112,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       .then((v) => (v === "chapter" || v === "series" || v === "center") && !initialCenter && setMode(v))
       .catch(() => undefined);
   }, []);
-  // 「單元」模式的三選一篩選（只看主講／隱藏短影音／只看短影音）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
+  // 「單元」模式的兩顆眼睛篩選（只看主講／只看短影音；開短影音時主講強制關閉）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
   const [unitFilter, setUnitFilter] = useState<UnitFilterValue>("all");
   useEffect(() => {
     AsyncStorage.multiGet([UNIT_FILTER_KEY, OLD_SPEAKER_KEY])
-      .then(([[, v], [, old]]) => setUnitFilter(v === "speaker" || v === "noshorts" || v === "shorts" ? v : old === "1" ? "speaker" : "all"))
+      .then(([[, v], [, old]]) => setUnitFilter(v ? parseUnitFilter(v) : old === "1" ? "speaker" : "all"))
       .catch(() => undefined);
   }, []);
   const pickUnitFilter = (v: UnitFilterValue) => {
