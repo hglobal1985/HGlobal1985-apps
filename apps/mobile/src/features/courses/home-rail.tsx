@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Image, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays, hostLine, placeText } from "@/features/format";
+import { useCenterNames } from "@/state/center-names";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, CourseCover, Icon, type IconName } from "@/ui";
@@ -44,6 +45,7 @@ function Slide({ course, w, h }: { course: CourseSummary; w: number; h: number }
  * 下方顯示目前這門課的名稱、主辦單位、日期、金額，點圖或名稱進入課程。
  */
 export function HomeRail({ title, icon, tone, note, courses, empty, progress }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean }) {
+  useCenterNames();
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [page, setPage] = useState(0);

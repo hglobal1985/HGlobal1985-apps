@@ -5,12 +5,14 @@ import { BackHandler, Platform, Pressable, StyleSheet, View } from "react-native
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { CenterArt, CourseSummary } from "@/api/client";
 import { CenterEdm } from "@/features/admin/center-edm";
+import { CenterNameField } from "@/features/admin/center-name-field";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { ShortLinkRow } from "@/features/course-edit/short-link-row";
 import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { HeaderShare } from "@/features/share-button";
+import { useCenterNames } from "@/state/center-names";
 import { CourseRow } from "./course-row";
 import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
@@ -41,6 +43,7 @@ const GAP = space.md;
 export function CoursesView({ initialCategory = "", initialCenter = "", series = "", inStack = false }: { initialCategory?: string; initialCenter?: string; series?: string; inStack?: boolean }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
   const { member } = useSession();
+  useCenterNames(); // 中心名稱有更新時重新畫
   const manager = canManageCourses(member);
   const adminList = useApi<CourseSummary[]>(manager ? "/admin/courses" : null);
   const centerArt = useApi<CenterArt[]>("/center-art");
@@ -353,7 +356,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         {showArchived ? (
           <Card style={{ paddingVertical: 0 }}>
             {archived.map((x) => (
-              <ListRow key={x.id} icon="archive-outline" title={x.title} subtitle={[x.hostCenter, x.eventStart ?? ""].filter(Boolean).join("・")} onPress={() => router.push(`/course/${x.id}`)} />
+              <ListRow key={x.id} icon="archive-outline" title={x.title} subtitle={[x.hostCenter ? centerTitle(x.hostCenter) : "", x.eventStart ?? ""].filter(Boolean).join("・")} onPress={() => router.push(`/course/${x.id}`)} />
             ))}
           </Card>
         ) : null}
@@ -383,7 +386,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
           {data && !groups.length && !(mode === "center" && center === ALL) ? <EmptyState icon="library-outline" title={matched ? "找不到符合的課程" : "沒有符合條件的課程"} /> : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
-              ? centerCounts.map(({ name, count }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} count={count} width={tileW} onPress={() => pickCenter(name)} />)
+              ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {tileW && !(mode === "center" && center === ALL) ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
           </View>
@@ -404,9 +407,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     {catOpen ? <CategorySheet courses={pool.filter(inCenter)} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
-      <EditSheet title={`${activeCenter}的 EDM`} onClose={() => setArtOpen(false)} hideSave>
+      <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
+        <CenterNameField key={activeCenter} center={activeCenter} />
         <CenterEdm center={activeCenter} art={art} onChanged={centerArt.reload} />
-        {isSuperAdmin(member) ? <ShortLinkRow key={shortLink?.slug ?? "none"} item={{ kind: "center", value: activeCenter, slug: shortLink?.slug ?? null }} onChanged={links.reload} /> : null}
+        {/* 英文縮寫網址：所有能編輯的人都看得到，只有最高權限管理員能修改 */}
+        <ShortLinkRow key={shortLink?.slug ?? "none"} item={{ kind: "center", value: activeCenter, slug: shortLink?.slug ?? null }} onChanged={links.reload} readOnly={!isSuperAdmin(member)} />
       </EditSheet>
     ) : null}
     </View>

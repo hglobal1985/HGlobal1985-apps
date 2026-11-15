@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, HQ_UNIT, type CourseDetail, type CourseSummary } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { AppText, Chips, Field, NoticeBox } from "@/ui";
+import { centerTitle } from "@/features/format";
 import { Check, countByHost } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
@@ -49,7 +50,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
         主辦中心
       </AppText>
       {isHq ? (
-        <Chips options={[HQ_UNIT, ...(centers.data ?? [])].map((x) => ({ key: x, label: `${x}（${hostCounts[x] ?? 0}）` }))} value={host} onChange={setHost} />
+        <Chips options={[HQ_UNIT, ...(centers.data ?? [])].map((x) => ({ key: x, label: `${x === HQ_UNIT ? x : centerTitle(x)}（${hostCounts[x] ?? 0}）` }))} value={host} onChange={setHost} />
       ) : (
         <NoticeBox text={`主辦中心固定為「${host}」。`} />
       )}

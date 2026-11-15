@@ -63,8 +63,21 @@ export function eventDays(start: string | null | undefined, end?: string | null)
 /** 單位名稱不顯示教育中心的數字代碼：「飛登 013」→「飛登」。 */
 export const cleanUnit = (u: string): string => u.replace(/\s*\d+\s*$/, "").trim();
 
-/** 中心的標題名稱（與分享預覽標題「XX教育中心 | 寰宇行動大學」的名稱部分完全相同）：去掉數字代碼、結尾補「教育中心」。「南京 062」→「南京教育中心」、「台北中心」→「台北教育中心」。後端同一份規則在 apps/launch/src/og.ts 的 centerShareName。 */
+let customCenterNames: Record<string, string> = {};
+const centerKeyOf = (l: string) => l.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+/** 載入教育中心的自訂名稱（由 state/center-names.tsx 的 CenterNamesProvider 設定）。 */
+export const setCenterNames = (m: Record<string, string>) => {
+  customCenterNames = m;
+};
+
+/**
+ * 全站唯一的「教育中心名稱」來源：有自訂名稱（編輯中心頁設定）就用自訂；沒有就用預設格式「去掉數字代碼＋教育中心」
+ * （「南京 062」→「南京教育中心」、「台北中心」→「台北教育中心」，與分享預覽標題的名稱部分一致，後端規則在 apps/launch/src/og.ts）。
+ * 所有顯示中心名稱的地方一律用它。
+ */
 export function centerTitle(label: string): string {
+  const custom = customCenterNames[centerKeyOf(label)];
+  if (custom) return custom;
   const base = label.replace(/\s*\d+\s*$/, "").replace(/教育中心$|中心$/, "").trim();
   return `${base || label}教育中心`;
 }
@@ -83,7 +96,7 @@ export function teacherLine(c: { teacher: string; teacherRankName: string; teach
 
 /** 只有主辦單位的顯示：「台中主辦」（首頁區塊用，不含指導單位）。 */
 export function hostLine(c: { hostUnit: string }): string {
-  const hosts = c.hostUnit.split(/[、,，;；\n]+/).map(cleanUnit).filter(Boolean);
+  const hosts = c.hostUnit.split(/[、,，;；\n]+/).map((x) => x.trim()).filter(Boolean).map((x) => (x === "寰宇總部" ? x : centerTitle(x)));
   return hosts.length ? `${hosts.join("、")}主辦` : "";
 }
 

@@ -1,4 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams, type Href } from "expo-router";
+import { centerTitle } from "@/features/format";
 import { useCallback, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { confirmAsk } from "@/features/confirm";
@@ -82,7 +83,7 @@ export default function MeScreen() {
           <MemberHeader member={member} />
           <View style={[styles.row, { justifyContent: "center" }]}>
             {member.titles.length ? member.titles.map((t) => <Pill key={t} label={t} />) : <Pill label={member.role === "admin" ? "管理員" : "學員"} />}
-            {member.center ? <Pill label={member.center} tone="accent" /> : null}
+            {member.center ? <Pill label={centerTitle(member.center)} tone="accent" /> : null}
             {member.demo ? <Pill label="測試帳號" tone="warning" /> : null}
           </View>
         </View>

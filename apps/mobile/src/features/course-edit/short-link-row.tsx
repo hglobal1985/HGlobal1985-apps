@@ -16,7 +16,7 @@ const host = () => (typeof location !== "undefined" ? location.host : "learn.hgl
  * 一個分類／系列／中心的短網址（只有超級管理員）：輸入英文縮寫、儲存、分享、清除。
  * 課程頁「進階設定」與全部課程頁的中心 EDM 編輯都用這一列，網址是「網域/縮寫」（全站共用，不能重複）。
  */
-export function ShortLinkRow({ item, onChanged }: { item: ShortLinkItem; onChanged: () => void }) {
+export function ShortLinkRow({ item, onChanged, readOnly = false }: { item: ShortLinkItem; onChanged: () => void; /** 只能看、不能改（只有最高權限管理員能修改縮寫網址）。 */ readOnly?: boolean }) {
   const { c } = useTheme();
   const [draft, setDraft] = useState(item.slug ?? "");
   const [busy, setBusy] = useState(false);
@@ -61,19 +61,25 @@ export function ShortLinkRow({ item, onChanged }: { item: ShortLinkItem; onChang
           placeholderTextColor={c.textMuted}
           autoCapitalize="none"
           autoCorrect={false}
+          editable={!readOnly}
           maxLength={30}
           accessibilityLabel={`${item.value} 的短網址縮寫`}
-          style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
+          style={[styles.input, type.body, { color: readOnly ? c.textMuted : c.text, borderColor: c.border, backgroundColor: readOnly ? c.surfaceMuted : c.surface }]}
         />
       </View>
+      {readOnly ? (
+        <AppText variant="caption" tone="muted">
+          只有最高權限管理員可以修改英文縮寫網址。
+        </AppText>
+      ) : null}
       <View style={styles.btnRow}>
-        <Button label="儲存縮寫" icon="checkmark-outline" disabled={busy || !dirty || !value} loading={busy} onPress={() => run(() => api("PUT", "/admin/short-links", { kind: item.kind, value: item.value, slug: value }), `已儲存：${host()}/${value}`)} />
+        {readOnly ? null : <Button label="儲存縮寫" icon="checkmark-outline" disabled={busy || !dirty || !value} loading={busy} onPress={() => run(() => api("PUT", "/admin/short-links", { kind: item.kind, value: item.value, slug: value }), `已儲存：${host()}/${value}`)} />}
         {item.slug && !dirty ? (
           <>
             <Pressable accessibilityRole="button" accessibilityLabel={`分享 ${item.value} 的短網址`} onPress={share} style={[styles.shareBtn, { borderColor: c.border }]}>
               <ShareIcon size={22} color={c.text} />
             </Pressable>
-            <Button variant="ghost" label="清除" disabled={busy} onPress={clear} />
+            {readOnly ? null : <Button variant="ghost" label="清除" disabled={busy} onPress={clear} />}
           </>
         ) : null}
       </View>

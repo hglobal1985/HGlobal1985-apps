@@ -34,7 +34,7 @@ import {
   type Rank,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
-import { centerMembers, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { centerMembers, centralAddJobTitle, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { evaluateAchievements } from "./achievements.ts";
@@ -1452,6 +1452,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   for (const [k, col, max] of [["subtitle", "subtitle", 200], ["teacher", "teacher", 60], ["teacherTitle", "teacher_title", 50], ["description", "description", 5000]] as const) {
     const v = text(body[k], max);
     if (v !== undefined) sets.push([col, v]);
+    if (k === "teacherTitle" && v) await noteJobTitle(ctx, v);
   }
   const teacherRank = text(body.teacherRank, 40);
   if (teacherRank !== undefined) {
@@ -1603,6 +1604,30 @@ async function assertCentralRank(ctx: Ctx, code: string): Promise<void> {
   if (!code || !s || s.kind !== "central") return;
   const list = await rankOptionList(s.token);
   if (list.length && !list.some((o) => o.value === code)) fail(400, "invalid_rank", "獎銜不在會員中心的選單內");
+}
+
+/**
+ * 新職稱同步到中央（業主 2026-11-15）：儲存課程主講人／章節分享者的職稱時，若中央詞庫還沒有這個詞，就放進待送清單並嘗試送出。
+ * 失敗、中央還沒開放「新增職稱」都不影響課程儲存，之後再儲存時自動補送。
+ */
+async function noteJobTitle(ctx: Ctx, value: string | undefined): Promise<void> {
+  const v = (value ?? "").trim();
+  try {
+    const s = ctx.session;
+    if (v && s && s.kind === "central") {
+      const known = await centralSuggest(s.token, "job_title", v);
+      if (!known.some((x) => x.trim().toLowerCase() === v.toLowerCase())) await ctx.db.prepare("INSERT OR IGNORE INTO job_title_outbox (value) VALUES (?)").bind(v).run();
+    }
+    const { results } = await ctx.db.prepare("SELECT value FROM job_title_outbox WHERE tries < 30 ORDER BY created_at LIMIT 5").all<{ value: string }>();
+    for (const r of results) {
+      const out = await centralAddJobTitle(ctx.env.CENTRAL_SERVICE_SECRET, r.value);
+      if (out === "ok") await ctx.db.prepare("DELETE FROM job_title_outbox WHERE value = ?").bind(r.value).run();
+      else if (out === "retry") await ctx.db.prepare("UPDATE job_title_outbox SET tries = tries + 1 WHERE value = ?").bind(r.value).run();
+      else break; // 中央還沒開放：不用一直試
+    }
+  } catch {
+    /* 不影響儲存 */
+  }
 }
 
 async function assertCentralCenters(ctx: Ctx, labels: string[]): Promise<void> {
@@ -1789,6 +1814,7 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
   if (sharer !== undefined) sets.push(["sharer", sharer]);
   const sharerTitle = text(body.sharerTitle, 50);
   if (sharerTitle !== undefined) sets.push(["sharer_title", sharerTitle]);
+  if (sharerTitle) await noteJobTitle(ctx, sharerTitle);
   const sharerRank = text(body.sharerRank, 40);
   if (sharerRank !== undefined) {
     await assertCentralRank(ctx, sharerRank);
@@ -3325,6 +3351,37 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/center-names$/,
+    async (ctx): Promise<Record<string, string>> => {
+      // 教育中心的自訂顯示名稱（沒有設定的中心不在裡面，前端用預設格式）。登入會員都能讀。
+      requireMember(ctx);
+      const { results } = await ctx.db.prepare("SELECT center_key, display_name FROM center_names").all<{ center_key: string; display_name: string }>();
+      return Object.fromEntries(results.map((r) => [r.center_key, r.display_name]));
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/center-name$/,
+    async (ctx) => {
+      // 自訂教育中心的顯示名稱（權限同中心 EDM）。空白＝還原預設。整個行動大學顯示中心名稱的地方都會跟著變。
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const body = await readJson<{ name?: unknown }>(ctx.req);
+      const name = typeof body.name === "string" ? body.name.trim().slice(0, 30) : "";
+      if (!name) {
+        await ctx.db.batch([ctx.db.prepare("DELETE FROM center_names WHERE center_key = ?").bind(center.key), audit(ctx.db, s.sub, "center.name_reset", "center", center.key)]);
+      } else {
+        await ctx.db.batch([
+          ctx.db
+            .prepare("INSERT INTO center_names (center_key, center_label, display_name) VALUES (?, ?, ?) ON CONFLICT(center_key) DO UPDATE SET display_name = excluded.display_name, center_label = excluded.center_label, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+            .bind(center.key, center.label, name),
+          audit(ctx.db, s.sub, "center.name_set", "center", center.key, name),
+        ]);
+      }
+      return { ok: true };
+    },
+  ],
+  [
     "PUT",
     /^\/admin\/center-art\/cover$/,
     async (ctx) => {
@@ -3645,6 +3702,7 @@ const routes: [string, RegExp, Handler][] = [
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
       const sharerRank = typeof body.sharerRank === "string" ? body.sharerRank.trim().slice(0, 40) : "";
       await assertCentralRank(ctx, sharerRank);
+      if (sharerTitle) await noteJobTitle(ctx, sharerTitle);
       const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
       if (!title) fail(400, "title_required", `請輸入${kind === "material" ? "教材" : "章節"}名稱`);
       const eventDate = body.eventDate === undefined ? null : dayOrNull(body.eventDate);

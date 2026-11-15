@@ -3,7 +3,8 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { CourseSummary } from "@/api/client";
-import { eventDays, hostLine, placeText, plainDate } from "@/features/format";
+import { centerTitle, eventDays, hostLine, placeText, plainDate } from "@/features/format";
+import { useCenterNames } from "@/state/center-names";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { ribbonsFor } from "./ribbons";
@@ -15,6 +16,7 @@ import { AppText, Card, CornerRibbon, CourseCover, Pill } from "@/ui";
 
 export function CourseCard({ course, siblings = [], footer, onPress, onPickSibling, onHide }: { course: CourseSummary; siblings?: CourseSummary[]; footer?: React.ReactNode; onPress?: () => void; onPickSibling?: (c: CourseSummary) => void; onHide?: () => void }) {
   const { c } = useTheme();
+  useCenterNames();
   const [sheet, setSheet] = useState(false);
   const { member } = useSession();
   // 緞帶：左上角＝資格或狀態、右上角＝日期倒數；文字與顏色由超級管理員在「課程排序與條件」設定。
@@ -36,7 +38,7 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
           {hostLine(course) ? (
             course.hostCenter ? (
               // 點「XX主辦」：到全部課程並選好該中心，看同中心的其他課。
-              <Pressable accessibilityRole="link" accessibilityLabel={`看${course.hostCenter}的所有課程`} hitSlop={6} onPress={() => router.push({ pathname: "/courses", params: { center: course.hostCenter } })}>
+              <Pressable accessibilityRole="link" accessibilityLabel={`看${centerTitle(course.hostCenter)}的所有課程`} hitSlop={6} onPress={() => router.push({ pathname: "/courses", params: { center: course.hostCenter } })}>
                 <Pill label={hostLine(course)} tone="accent" />
               </Pressable>
             ) : (

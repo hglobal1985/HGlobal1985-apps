@@ -1,7 +1,8 @@
 import { router } from "expo-router";
 import { Image, Pressable, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
-import { eventDays } from "@/features/format";
+import { centerTitle, eventDays } from "@/features/format";
+import { useCenterNames } from "@/state/center-names";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
@@ -17,6 +18,7 @@ export function CourseRow({ course }: { course: CourseSummary }) {
   const { c } = useTheme();
   const { member } = useSession();
   const { config } = useUiConfig();
+  useCenterNames();
   const r = ribbonsFor(course, member, config);
   const rb = r.left ?? r.right;
   const date = course.eventStart ? eventDays(course.eventStart, course.eventEnd) : "";
@@ -31,7 +33,7 @@ export function CourseRow({ course }: { course: CourseSummary }) {
           {date || course.title}
         </AppText>
         <AppText variant="caption" tone="muted" numberOfLines={1}>
-          {date ? course.title : course.hostCenter}
+          {date ? course.title : course.hostCenter ? centerTitle(course.hostCenter) : ""}
         </AppText>
         {rb ? (
           <View style={[styles.chip, { backgroundColor: rb.bg }]}>

@@ -423,6 +423,30 @@ export async function centralSuggest(token: string, pool: "education_system" | "
   return (b?.suggestions ?? []).filter((x): x is string => typeof x === "string").slice(0, q.trim() ? 50 : 100);
 }
 
+/**
+ * 把新職稱送到中央的職稱詞庫（服務對服務憑證，不用會員個人登入）：POST /v1/vocab/suggestions {pool:"job_title", value}。
+ * 需求說明見 docs/central-request-job-title.md；中央還沒提供這支 API 時（404／405／501）回 "unsupported"，之後再補送。
+ * "ok"＝中央已收下（含已存在）；"retry"＝暫時失敗，稍後再送。永遠不丟例外。
+ */
+export async function centralAddJobTitle(secret: string | undefined, value: string): Promise<"ok" | "retry" | "unsupported"> {
+  if (!secret) return "unsupported";
+  try {
+    const token = await serviceToken(secret);
+    if (!token) return "retry";
+    const res = await centralFetch(`${CENTRAL}/v1/vocab/suggestions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify({ pool: "job_title", value }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) return "ok";
+    if (res.status === 404 || res.status === 405 || res.status === 501) return "unsupported";
+    return "retry";
+  } catch {
+    return "retry";
+  }
+}
+
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
 
 /** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由業主在中央後台勾選，不在程式內宣稱）。 */

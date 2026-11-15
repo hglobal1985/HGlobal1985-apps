@@ -1,3 +1,4 @@
+import { centerKey } from "./central.ts";
 import type { D1Database } from "./d1.ts";
 
 const SITE = "寰宇行動大學";
@@ -30,6 +31,12 @@ export function centerShareName(label: string): string {
   return `${base || label}教育中心`;
 }
 
+/** 分享標題用的中心名稱：有自訂名稱就用自訂，沒有用預設格式。 */
+export async function centerDisplayName(db: D1Database, label: string): Promise<string> {
+  const r = await db.prepare("SELECT display_name AS n FROM center_names WHERE center_key = ?").bind(centerKey(label)).first<{ n: string }>().catch(() => null);
+  return r?.n?.trim() || centerShareName(label);
+}
+
 /** 短網址的分享預覽：標題「{名稱} | 寰宇行動大學」（中心的名稱是「{名稱去掉數字代碼}教育中心」），說明是隨機一句學習金句（設定頁編輯的那份）。找不到短網址回 null。 */
 export async function shortLinkMeta(db: D1Database, slug: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
   const row = await db.prepare("SELECT kind, value FROM short_links WHERE slug = ?").bind(slug).first<{ kind: string; value: string }>();
@@ -43,5 +50,5 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
         ? await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM center_art WHERE center_label = ?").bind(row.value).first<{ k: string; v: number }>().catch(() => null)
         : null;
   const image = art?.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(art.k)}&v=${art.v}` : `${origin}/icon-512.png`;
-  return { title: `${row.kind === "center" ? centerShareName(row.value) : row.value} | ${SITE}`, description: q?.body?.trim() || SITE, url: `${origin}/${slug}`, image };
+  return { title: `${row.kind === "center" ? await centerDisplayName(db, row.value) : row.value} | ${SITE}`, description: q?.body?.trim() || SITE, url: `${origin}/${slug}`, image };
 }

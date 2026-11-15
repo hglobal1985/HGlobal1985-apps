@@ -4,6 +4,7 @@ import { api, resolveUrl, type CourseEditor, type EditorCandidate } from "@/api/
 import { confirmSheet } from "@/features/confirm";
 import { Check } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { centerTitle } from "@/features/format";
 import { canManageEditors } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -48,7 +49,7 @@ export default function EditorsScreen() {
     }
   };
   const remove = async (e: CourseEditor) => {
-    if (!(await confirmSheet({ title: "移除小編", message: `確定取消「${e.name || "這位會員"}」在${e.center}的小編身分？會寄通知給對方；他新增過的課程仍會保留。`, confirmLabel: "移除", cancelLabel: "先不要", danger: true }))) return;
+    if (!(await confirmSheet({ title: "移除小編", message: `確定取消「${e.name || "這位會員"}」在${centerTitle(e.center)}的小編身分？會寄通知給對方；他新增過的課程仍會保留。`, confirmLabel: "移除", cancelLabel: "先不要", danger: true }))) return;
     setBusy(e.memberId);
     try {
       await api("DELETE", `/admin/editors/${e.memberId}?center=${encodeURIComponent(e.center)}`);
@@ -77,7 +78,7 @@ export default function EditorsScreen() {
             <View style={{ flex: 1 }}>
               <AppText variant="headline">{e.name || "（對方登入後顯示姓名）"}</AppText>
               <AppText variant="caption" tone="muted">
-                {e.center}
+                {centerTitle(e.center)}
               </AppText>
             </View>
             <Button variant="ghost" label="移除" disabled={busy === e.memberId} onPress={() => remove(e)} />

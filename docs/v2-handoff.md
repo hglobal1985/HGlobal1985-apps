@@ -484,3 +484,8 @@
   - **中心**：全部課程「分類」旁加「中心」下拉（課程的主辦中心，CourseSummary.hostCenter/hostCenterKey）；選了中心先顯示中心 EDM（center_art 表；GET /center-art，PUT/DELETE /admin/center-art?center=；總部任何中心、會長音控與有「修改別人」的小編改自己中心）；網址同步成中心短網址（short_links 新增 kind=center，只有超級管理員能設，在中心 EDM 編輯面板）。分類＋中心同時選用 /courses?center=…&category=…。課程卡「XX主辦」可點，跳到全部課程並選好該中心。分享預覽：系列、中心有 EDM 就用 EDM。
   - 測試：後端 102 項（新增 tests/editors.test.ts；封存規則改寫 admin.test、center-courses.test）。本機 390px 截圖檢查：全部課程（中心下拉、未上架標示、新增課程）、課程頁編輯模式與各面板、章節面板、小編管理與名單、設定頁。**正式站實測（洛杉磯中心音控、業主本人當小編）與 App 實機尚未驗證。**
   - 部署前資料庫還原點（D1 Time Travel，2026-11-15）：000001b6-00000002-00005124-46aebaa0d24e019b794604667e83678c
+
+- 2026-11-15（夜）章節與教材、職稱關連詞、教育中心名稱：
+  - **其他教材**：`lessons.kind`（chapter／material，migration 0049）。教材與章節同款操作（新增、編輯、移動、複製、刪除），但**不計入**章節堂數、學習進度、成就、單元模式、搜尋索引；顯示序號章節與教材各自從 1 起（API 回傳的 `position` 是各組序號，資料庫的 position 仍是整門課共用且不重複）。學員端「其他教材」區塊＝系統自動產生的完整版（最前面）＋有內容的教材。`POST /admin/lessons/:id/duplicate` 複製一堂（音檔不共用）；排序 API 一次只排一組。
+  - **職稱**：`features/admin/suggest-input.tsx`（輸入一個字就跳出下拉關連詞，最多 50 筆）取代膠囊。新增職稱同步中央：`central.ts` 的 `centralAddJobTitle`＋待送清單 `job_title_outbox`（migration 0050）；**中央的 `POST /v1/vocab/suggestions` 尚未提供**（需求說明 `docs/central-request-job-title.md` 待業主轉交），目前只會累積待送、不報錯，中央完成後儲存課程／章節時自動補送。
+  - **教育中心名稱**：`center_names` 表（migration 0051）、`GET /center-names`、`PUT /admin/center-name`；前端 `features/format.ts` 的 `centerTitle()` 是全站唯一來源（自訂名稱優先，預設「去掉數字代碼＋教育中心」），`state/center-names.tsx` 載入。只是顯示別名，不改中央中心清單與代碼。英文縮寫網址在中心編輯面板所有人看得到、只有超級管理員能改。

@@ -12,6 +12,7 @@ import { PlayerLayer } from "@/features/player/player-layer";
 import { SwitchSheet } from "@/features/player/switch-sheet";
 import { installNoPageZoom } from "@/lib/no-page-zoom";
 import { installWebPullRefresh } from "@/lib/web-pull-refresh";
+import { CenterNamesProvider } from "@/state/center-names";
 import { SessionProvider } from "@/state/session";
 import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
@@ -85,6 +86,7 @@ export default function RootLayout() {
       <AppGate>
       <SessionProvider>
         <UiConfigProvider>
+        <CenterNamesProvider>
         <ThemeProvider value={navTheme}>
           <StatusBar style={scheme === "dark" ? "light" : "dark"} />
           <View style={{ flex: 1, backgroundColor: c.background }}>
@@ -102,6 +104,7 @@ export default function RootLayout() {
           <StatusBarCover />
           </View>
         </ThemeProvider>
+        </CenterNamesProvider>
         </UiConfigProvider>
       </SessionProvider>
       </AppGate>

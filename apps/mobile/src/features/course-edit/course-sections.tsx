@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, HQ_UNIT, RequestError, type CourseDetail, type CourseSummary, type Rank, type ReviewGroup } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmSheet } from "@/features/confirm";
-import { dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
+import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -132,7 +132,7 @@ function MultiChips({ options, value, onChange, counts }: { options: string[]; v
           >
             <Ionicons name={on ? "checkbox" : "square-outline"} size={20} color={on ? c.accent : c.textMuted} />
             <AppText variant="callout" style={{ color: on ? c.accentText : c.text, fontWeight: on ? "700" : "400" }}>
-              {counts ? `${x}（${counts[x] ?? 0}）` : x}
+              {counts ? `${x === HQ_UNIT ? x : centerTitle(x)}（${counts[x] ?? 0}）` : x}
             </AppText>
           </Pressable>
         );
