@@ -76,7 +76,8 @@ export type CourseEditor = {
 export type EditorCandidate = { memberId: string; name: string; avatarUrl: string | null; signedIn: boolean; already: boolean };
 
 /** 中心 EDM（全部課程頁選了中心才顯示）。 */
-export type CenterArt = { centerKey: string; center: string; edmUrl: string };
+/** 中心 EDM：edmUrl 整張海報；coverUrl 裁切後的 16:9 封面（中心卡縮圖）；coverRect／edmViewY＝裁切框與預設停留位置（同步）。 */
+export type CenterArt = { centerKey: string; center: string; edmUrl: string; coverUrl: string | null; coverRect: { x: number; y: number; w: number } | null; edmViewY: number };
 
 export type EnrollmentState = "opened" | "pending" | null;
 

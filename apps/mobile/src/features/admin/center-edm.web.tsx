@@ -1,32 +1,100 @@
-import { useRef, useState } from "react";
-import { Image, StyleSheet, View } from "react-native";
-import { api, resolveUrl } from "@/api/client";
+import { useEffect, useRef, useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { api, resolveUrl, type CenterArt } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
-import { radius, space } from "@/theme/tokens";
+import { space } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
 import { showToast } from "@/ui/toast";
-import { EDM_MAX_SIDE, cropCompress, loadImage } from "./image-tools";
+import { EdmCropper } from "./edm-cropper.web";
+import { COVER_MAX_SIDE, EDM_MAX_SIDE, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
+type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect };
+
+/** 預設的 16:9 封面裁切框：置中偏上、盡量大。 */
+function defaultCover(img: HTMLImageElement): Rect {
+  const w = Math.min(img.naturalWidth, (img.naturalHeight * 16) / 9);
+  const h = (w * 9) / 16;
+  return { x: Math.round((img.naturalWidth - w) / 2), y: 0, w: Math.round(w), h: Math.round(h) };
+}
+/** 以封面框（占 EDM 寬高的比例）還原成像素。 */
+function rectFrom(img: HTMLImageElement, r: { x: number; y: number; w: number }): Rect {
+  const w = Math.round(r.w * img.naturalWidth);
+  const h = Math.round((w * 9) / 16);
+  return { x: Math.round(r.x * img.naturalWidth), y: Math.min(Math.round(r.y * img.naturalHeight), Math.max(0, img.naturalHeight - h)), w, h };
+}
 
 /**
- * 中心 EDM（網頁版）：整張海報上傳（瀏覽器內壓縮，不保留原檔），在「全部課程」選了這個中心時顯示，
- * 與課程頁的 EDM 一樣可以上下拖曳、點一下放大。
+ * 中心 EDM（網頁版）：上傳整張海報後，自己拖曳裁切一個 16:9 的「封面」。
+ * 這個框同時決定兩處：中心清單的卡片縮圖，以及進入中心頁時 EDM 一開始停留的位置（＝框的上緣）；兩者永遠同步，做法與課程 EDM 相同。
+ * 圖片在瀏覽器內壓縮，不保留原始檔案。
  */
-export function CenterEdm({ center, edmUrl, onChanged }: { center: string; edmUrl?: string | null; onChanged: () => void }) {
+export function CenterEdm({ center, art, onChanged }: { center: string; art?: CenterArt | null; onChanged: () => void }) {
   const input = useRef<HTMLInputElement | null>(null);
+  const [job, setJob] = useState<Job | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const q = `?center=${encodeURIComponent(center)}`;
+
+  useEffect(() => {
+    if (!job) return setPreview(null);
+    let dead = false;
+    const t = setTimeout(async () => {
+      try {
+        const blob = await cropCompress(job.img, job.cover, 640, 0.75);
+        if (!dead) setPreview(URL.createObjectURL(blob));
+      } catch {
+        /* 預覽失敗不影響儲存 */
+      }
+    }, 200);
+    return () => {
+      dead = true;
+      clearTimeout(t);
+    };
+  }, [job?.img, job?.cover]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
     setBusy(true);
-    setMsg("上傳中…");
+    setMsg("讀取圖片中…");
     try {
       const img = await loadImage(file);
-      await api("PUT", `/admin/center-art${q}`, await cropCompress(img, null, EDM_MAX_SIDE, 0.9));
+      setJob({ img, src: img.src, isNew: true, cover: defaultCover(img) });
+      setMsg(null);
+    } catch (err) {
+      setMsg((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  /** 不換圖，只重新調整目前 EDM 的封面與預設位置。 */
+  const adjust = async () => {
+    if (!art) return;
+    setBusy(true);
+    setMsg("讀取 EDM 中…");
+    try {
+      const img = await loadImageUrl(resolveUrl(art.edmUrl));
+      const cover = art.coverRect ? rectFrom(img, art.coverRect) : { ...defaultCover(img), y: Math.min(Math.round(art.edmViewY * img.naturalHeight), Math.max(0, img.naturalHeight - defaultCover(img).h)) };
+      setJob({ img, src: img.src, isNew: false, cover });
+      setMsg(null);
+    } catch (err) {
+      setMsg((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = async () => {
+    if (!job) return;
+    setBusy(true);
+    setMsg("處理並上傳中…");
+    try {
+      if (job.isNew) await api("PUT", `/admin/center-art${q}`, await cropCompress(job.img, null, EDM_MAX_SIDE, 0.9));
+      await api("PUT", `/admin/center-art/cover${q}`, await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.88));
+      await api("PATCH", `/admin/center-art${q}`, { coverRect: { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
+      setJob(null);
       setMsg(null);
       showToast("已更新中心 EDM");
       onChanged();
@@ -37,7 +105,7 @@ export function CenterEdm({ center, edmUrl, onChanged }: { center: string; edmUr
     }
   };
   const remove = async () => {
-    if (!(await confirmSheet({ title: "移除中心 EDM", message: `移除後，全部課程選「${center}」時就不顯示 EDM。`, confirmLabel: "移除", cancelLabel: "先不要", danger: true }))) return;
+    if (!(await confirmSheet({ title: "移除中心 EDM", message: `移除後，「${center}」就不顯示 EDM。`, confirmLabel: "移除", cancelLabel: "先不要", danger: true }))) return;
     setBusy(true);
     try {
       await api("DELETE", `/admin/center-art${q}`);
@@ -50,14 +118,37 @@ export function CenterEdm({ center, edmUrl, onChanged }: { center: string; edmUr
   };
   return (
     <View style={styles.wrap}>
-      {edmUrl ? <Image source={{ uri: resolveUrl(edmUrl) }} style={styles.thumb} resizeMode="cover" accessibilityLabel={`${center} EDM`} /> : null}
-      <AppText variant="caption" tone="muted">
-        可選 JPG、PNG、WebP、HEIC，上傳時自動壓縮。
-      </AppText>
-      <View style={styles.buttons}>
-        <Button label={edmUrl ? "更換 EDM" : "上傳 EDM"} icon="image-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} />
-        {edmUrl ? <Button variant="ghost" label="移除 EDM" disabled={busy} onPress={remove} /> : null}
-      </View>
+      {!job ? (
+        <>
+          {art ? (
+            <img src={resolveUrl(art.coverUrl ?? art.edmUrl)} alt={`${center} EDM`} style={{ width: "100%", maxWidth: 320, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: 8, display: "block" }} />
+          ) : null}
+          <AppText variant="caption" tone="muted">
+            上傳後可以自己拖曳裁切 16:9 的封面：框內就是中心卡片的縮圖，也是進入中心頁時一開始看到的位置。可選 JPG、PNG、WebP、HEIC，上傳時自動壓縮。
+          </AppText>
+          <View style={styles.buttons}>
+            <Button label={art ? "更換 EDM" : "上傳 EDM"} icon="image-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} />
+            {art ? <Button variant="secondary" label="調整裁切位置" icon="crop-outline" disabled={busy} onPress={adjust} /> : null}
+            {art ? <Button variant="ghost" label="移除 EDM" disabled={busy} onPress={remove} /> : null}
+          </View>
+        </>
+      ) : (
+        <>
+          <AppText variant="headline">封面與預設停留位置（橫式 16:9，比例固定）</AppText>
+          <AppText variant="callout" tone="muted">
+            拖曳框內移動位置，拖四個角調整大小。框的上緣就是進入中心頁時一開始停留的位置。
+          </AppText>
+          <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} />
+          <AppText variant="callout" tone="muted">
+            封面預覽
+          </AppText>
+          {preview ? <img src={preview} alt="封面預覽" style={{ width: "100%", maxWidth: 320, aspectRatio: "16 / 9", borderRadius: 8, display: "block" }} /> : <AppText>產生預覽中…</AppText>}
+          <View style={styles.buttons}>
+            <Button label="儲存" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
+            <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
+          </View>
+        </>
+      )}
       {msg ? <AppText variant="caption">{msg}</AppText> : null}
       <input ref={input} type="file" accept={FILE_ACCEPT} onChange={pick} style={{ display: "none" }} />
     </View>
@@ -65,7 +156,6 @@ export function CenterEdm({ center, edmUrl, onChanged }: { center: string; edmUr
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.sm, alignItems: "flex-start" },
-  thumb: { width: 120, height: 170, borderRadius: radius.sm },
+  wrap: { gap: space.sm, alignItems: "stretch" },
   buttons: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
 });

@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BackHandler, Platform, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import type { CenterArt, CourseSummary } from "@/api/client";
 import { CenterEdm } from "@/features/admin/center-edm";
@@ -9,7 +9,8 @@ import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { ShortLinkRow } from "@/features/course-edit/short-link-row";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
-import { CourseCard } from "./course-card";
+import { CourseRow } from "./course-row";
+import { CenterTopBar } from "./center-top-bar";
 import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
@@ -59,14 +60,17 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }, [initialCenter]);
   // 網頁：網址列跟著篩選變：只選分類或只選中心＝該短網址（有設定才換）；兩個都選＝/courses?center=…&category=…；都沒選＝/courses。
   const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
-  const syncUrl = (cat: string, cen: string) => {
-    if (Platform.OS !== "web" || typeof window === "undefined" || seriesFilter) return;
+  const urlFor = (cat: string, cen: string) => {
     const slugOf = (kind: string, v: string) => links.data?.find((l) => l.kind === kind && l.value === v)?.slug;
     let url = "/courses";
     if (cat !== ALL && cen !== ALL) url = `/courses?center=${encodeURIComponent(cen)}&category=${encodeURIComponent(cat)}`;
     else if (cen !== ALL) url = slugOf("center", cen) ? `/${slugOf("center", cen)}` : `/courses?center=${encodeURIComponent(cen)}`;
     else if (cat !== ALL) url = slugOf("category", cat) ? `/${slugOf("category", cat)}` : `/courses?category=${encodeURIComponent(cat)}`;
-    window.history.replaceState(window.history.state, "", url);
+    return url;
+  };
+  const syncUrl = (cat: string, cen: string) => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || seriesFilter) return;
+    window.history.replaceState(window.history.state, "", urlFor(cat, cen));
   };
   // 用下拉選了某個分類：課程呈現自動跳到「單元」（章節）模式；回到「全部分類」就恢復原本的模式。
   const [modeBeforeCat, setModeBeforeCat] = useState<CourseViewMode | null>(null);
@@ -293,15 +297,47 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         {loading && !data ? <LoadingView /> : null}
         {data && !all.length ? <EmptyState icon="library-outline" title="這個系列目前沒有課程" /> : null}
         {all.map((x) => (
-          <CourseCard key={x.id} course={x} />
+          <CourseRow key={x.id} course={x} />
         ))}
       </Screen>
     );
   }
+  // 中心專屬頁：網頁進入時多記一筆瀏覽紀錄，瀏覽器／手機的「返回」＝回到中心清單；Android 實體返回鍵同理。
+  const pushedRef = useRef(false);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (activeCenter !== ALL && !pushedRef.current) {
+      // 先把目前這一筆紀錄的網址還原成沒選中心的樣子，再另外記一筆「中心頁」：返回時才不會又被網址帶回中心頁。
+      const here = window.location.href;
+      window.history.replaceState(window.history.state, "", urlFor(category, ALL));
+      window.history.pushState({ hgCenter: 1 }, "", here);
+      pushedRef.current = true;
+    } else if (activeCenter === ALL) pushedRef.current = false;
+  }, [activeCenter]);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const onPop = () => {
+      if (pushedRef.current) {
+        pushedRef.current = false;
+        pickCenter(ALL);
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+  const backFromCenter = () => {
+    if (Platform.OS === "web" && pushedRef.current && typeof window !== "undefined") window.history.back();
+    else pickCenter(ALL);
+  };
+  useEffect(() => {
+    if (Platform.OS === "web" || activeCenter === ALL) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => (pickCenter(ALL), true));
+    return () => sub.remove();
+  }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
   const centerHead =
     activeCenter !== ALL ? (
       <View style={{ gap: space.sm }}>
-        {art ? <EdmImageStage url={art.edmUrl} title={center} /> : null}
+        {art ? <EdmImageStage url={art.edmUrl} title={center} viewY={art.edmViewY} /> : null}
         {canEditArt ? <Button variant="secondary" label={art ? "編輯中心 EDM" : "上傳中心 EDM"} icon="create-outline" onPress={() => setArtOpen(true)} fullWidth /> : null}
       </View>
     ) : null;
@@ -326,7 +362,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const shortLink = activeCenter !== ALL ? links.data?.find((l) => l.kind === "center" && l.value === activeCenter) : undefined;
   return (
     <View style={{ flex: 1 }}>
-    <Screen header={!inStack} top={filterRow}>
+    <Screen header={!inStack} top={activeCenter !== ALL ? <CenterTopBar title={activeCenter} onBack={backFromCenter} /> : filterRow}>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {centerHead}
@@ -341,7 +377,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
           {data && !groups.length && !(mode === "center" && center === ALL) ? <EmptyState icon="library-outline" title={matched ? "找不到符合的課程" : "沒有符合條件的課程"} /> : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
-              ? centerCounts.map(({ name, count }) => <CenterTile key={name} name={name} edmUrl={centerArt.data?.find((a) => a.center === name)?.edmUrl} count={count} width={tileW} onPress={() => pickCenter(name)} />)
+              ? centerCounts.map(({ name, count }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} count={count} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {tileW && !(mode === "center" && center === ALL) ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
           </View>
@@ -363,7 +399,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`${activeCenter}的 EDM`} onClose={() => setArtOpen(false)} hideSave>
-        <CenterEdm center={activeCenter} edmUrl={art?.edmUrl} onChanged={centerArt.reload} />
+        <CenterEdm center={activeCenter} art={art} onChanged={centerArt.reload} />
         {isSuperAdmin(member) ? <ShortLinkRow key={shortLink?.slug ?? "none"} item={{ kind: "center", value: activeCenter, slug: shortLink?.slug ?? null }} onChanged={links.reload} /> : null}
       </EditSheet>
     ) : null}

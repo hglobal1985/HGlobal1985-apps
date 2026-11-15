@@ -2985,7 +2985,7 @@ const routes: [string, RegExp, Handler][] = [
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
       if (!bucket || !/^(edm|cover|series|center|lesson)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ?").bind(key, key, key, key, key, key).first();
+      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ?").bind(key, key, key, key, key, key, key).first();
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       return new Response(obj.body, {
@@ -3281,8 +3281,17 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/center-art$/,
     async (ctx): Promise<CenterArt[]> => {
-      const { results } = await ctx.db.prepare("SELECT center_key, center_label, edm_key, art_version FROM center_art ORDER BY center_label").all<{ center_key: string; center_label: string; edm_key: string; art_version: number }>();
-      return results.map((r) => ({ centerKey: r.center_key, center: r.center_label, edmUrl: pubUrl(r.edm_key, r.art_version) }));
+      const { results } = await ctx.db
+        .prepare("SELECT center_key, center_label, edm_key, art_version, cover_key, cover_rect, edm_view_y FROM center_art ORDER BY center_label")
+        .all<{ center_key: string; center_label: string; edm_key: string; art_version: number; cover_key: string | null; cover_rect: string | null; edm_view_y: number }>();
+      return results.map((r) => ({
+        centerKey: r.center_key,
+        center: r.center_label,
+        edmUrl: pubUrl(r.edm_key, r.art_version),
+        coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null,
+        coverRect: parseCoverRect(r.cover_rect),
+        edmViewY: r.edm_view_y,
+      }));
     },
   ],
   [
@@ -3300,7 +3309,7 @@ const routes: [string, RegExp, Handler][] = [
       await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
       await ctx.db.batch([
         ctx.db
-          .prepare("INSERT INTO center_art (center_key, center_label, edm_key) VALUES (?, ?, ?) ON CONFLICT(center_key) DO UPDATE SET edm_key = excluded.edm_key, center_label = excluded.center_label, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+          .prepare("INSERT INTO center_art (center_key, center_label, edm_key) VALUES (?, ?, ?) ON CONFLICT(center_key) DO UPDATE SET edm_key = excluded.edm_key, center_label = excluded.center_label, cover_rect = NULL, edm_view_y = 0, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
           .bind(center.key, center.label, key),
         audit(ctx.db, s.sub, "center.edm_upload", "center", center.key, key),
       ]);
@@ -3309,13 +3318,53 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "PUT",
+    /^\/admin\/center-art\/cover$/,
+    async (ctx) => {
+      // 中心卡用的 16:9 封面：管理者在瀏覽器從中心 EDM 裁切、壓縮後上傳（先要有中心 EDM）。
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const old = await ctx.db.prepare("SELECT cover_key AS k FROM center_art WHERE center_key = ?").bind(center.key).first<{ k: string | null }>();
+      if (!old) fail(409, "no_edm", "請先上傳中心 EDM");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      if (!data.byteLength || data.byteLength > 3 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 3MB 以內（上傳時會自動壓縮）");
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      const key = `center/${crypto.randomUUID().slice(0, 8)}/cover-${crypto.randomUUID()}.${img.ext}`;
+      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE center_art SET cover_key = ?, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE center_key = ?").bind(key, center.key),
+        audit(ctx.db, s.sub, "center.cover_upload", "center", center.key, key),
+      ]);
+      if (old?.k) await bucket.delete(old.k).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/center-art$/,
+    async (ctx) => {
+      // 封面框（占 EDM 寬高的比例）與預設停留位置永遠同步：預設位置＝封面框上緣。
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const body = await readJson<{ coverRect?: unknown }>(ctx.req);
+      const r = body.coverRect as Partial<CoverRect> | null | undefined;
+      const ok = !!r && [r.x, r.y, r.w].every((n) => typeof n === "number" && Number.isFinite(n)) && r.w! > 0 && r.w! <= 1 && r.x! >= 0 && r.x! + r.w! <= 1.0001 && r.y! >= 0 && r.y! <= 1;
+      if (!ok) fail(400, "invalid_cover_rect", "封面裁切範圍不正確");
+      const rect = { x: Math.round(r!.x! * 10000) / 10000, y: Math.round(r!.y! * 10000) / 10000, w: Math.round(r!.w! * 10000) / 10000 };
+      const res = await ctx.db.prepare("UPDATE center_art SET cover_rect = ?, edm_view_y = ?, art_version = art_version + 1 WHERE center_key = ?").bind(JSON.stringify(rect), rect.y, center.key).run();
+      if (!res.meta?.changes) fail(409, "no_edm", "請先上傳中心 EDM");
+      await ctx.db.batch([audit(ctx.db, s.sub, "center.cover_rect", "center", center.key, JSON.stringify(rect))]);
+      return { ok: true };
+    },
+  ],
+  [
     "DELETE",
     /^\/admin\/center-art$/,
     async (ctx) => {
       const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
-      const old = await ctx.db.prepare("SELECT edm_key AS k FROM center_art WHERE center_key = ?").bind(center.key).first<{ k: string }>();
+      const old = await ctx.db.prepare("SELECT edm_key AS k, cover_key AS c FROM center_art WHERE center_key = ?").bind(center.key).first<{ k: string; c: string | null }>();
       await ctx.db.batch([ctx.db.prepare("DELETE FROM center_art WHERE center_key = ?").bind(center.key), audit(ctx.db, s.sub, "center.edm_remove", "center", center.key)]);
       if (old?.k) await ctx.env.MEDIA?.delete(old.k).catch(() => undefined);
+      if (old?.c) await ctx.env.MEDIA?.delete(old.c).catch(() => undefined);
       return { ok: true };
     },
   ],

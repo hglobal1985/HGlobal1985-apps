@@ -82,7 +82,8 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
   );
 }
 
-const styles = StyleSheet.create({
+/** 窄列的共用樣式（單元模式的章節列、系列頁的課程列共用，改一處兩邊一致）。 */
+export const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: space.sm, borderWidth: 1, borderRadius: radius.md, padding: space.sm, marginBottom: space.sm },
   thumb: { width: 96, aspectRatio: 16 / 9, borderRadius: radius.sm, overflow: "hidden", backgroundColor: "#00000010", alignSelf: "flex-start" },
   mid: { flex: 1, minWidth: 0, gap: 2 },

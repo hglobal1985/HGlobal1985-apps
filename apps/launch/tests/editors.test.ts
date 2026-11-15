@@ -163,3 +163,10 @@ test("中心 EDM：總部任何中心、會長自己中心、小編要有「修�
   assert.equal((await call("PUT", "/admin/short-links", { token: admin, body: { kind: "center", value: "台北中心", slug: "taipei" } })).status, 200);
   assert.deepEqual((await call("GET", "/short-links/taipei")).data, { kind: "center", value: "台北中心" });
 });
+
+test("中心 EDM 裁切：封面框與預設位置同步，沒有 EDM 時不能設定", async () => {
+  const { call, login } = setup();
+  const admin = await login("demo-admin");
+  const noEdm = await call("PATCH", "/admin/center-art?center=台北中心", { token: admin, body: { coverRect: { x: 0, y: 0.2, w: 1 } } });
+  assert.equal(noEdm.status, 409);
+});
