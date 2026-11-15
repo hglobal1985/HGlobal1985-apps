@@ -1,0 +1,56 @@
+import { router } from "expo-router";
+import type { ViewStyle } from "react-native";
+import type { CourseDetail } from "@/api/client";
+import { eventDays, sharerLine } from "@/features/format";
+import { AppText, Card, ListRow } from "@/ui";
+
+/**
+ * 章節清單（學員看到的樣子）：課程介紹頁與中心頁「點課程彈出的選單」共用同一個元件，
+ * 格式永遠一致；要改章節的呈現只改這裡。
+ */
+export function ChapterList({ course, style }: { course: CourseDetail; style?: ViewStyle }) {
+  const anyReady = course.lessons.some((l) => l.ready);
+  return (
+    <Card style={{ paddingVertical: 0, ...style }}>
+      {course.lessons.length === 0 || !anyReady ? (
+        <ListRow icon="hourglass-outline" title="敬請期待" subtitle="課程內容準備中" />
+      ) : (
+        course.lessons
+          .filter((l) => !l.full)
+          .map((lesson) => {
+            const soon = !lesson.ready;
+            return (
+              <ListRow
+                key={lesson.id}
+                icon={soon ? "hourglass-outline" : lesson.completed ? "checkmark-circle" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
+                title={`${lesson.position}. ${lesson.title}`}
+                subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : "", lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
+                right={lesson.eventDate ? <AppText variant="callout" tone="muted">{eventDays(lesson.eventDate, null)}</AppText> : undefined}
+                dense
+                onPress={lesson.locked || soon ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
+              />
+            );
+          })
+      )}
+    </Card>
+  );
+}
+
+/** 「完整版」區塊的清單（同一支影片被切成多堂時才有）。 */
+export function FullVersionList({ course }: { course: CourseDetail }) {
+  const full = course.lessons.filter((l) => l.full);
+  if (!full.length) return null;
+  return (
+    <Card style={{ paddingVertical: 0 }}>
+      {full.map((lesson) => (
+        <ListRow
+          key={lesson.id}
+          icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
+          title={lesson.title}
+          subtitle={[sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : ""].filter(Boolean).join(" · ") || undefined}
+          onPress={lesson.locked ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
+        />
+      ))}
+    </Card>
+  );
+}

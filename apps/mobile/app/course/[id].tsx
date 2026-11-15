@@ -6,6 +6,7 @@ import { api, type CourseDetail, type Lesson, type Order } from "@/api/client";
 import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { EdmStage } from "@/features/courses/edm-viewer";
+import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { EdmManager } from "@/features/admin/edm-manager";
 import { AutoCoverCheck, SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
@@ -113,7 +114,6 @@ export default function CourseDetailScreen() {
   };
 
   // 還不能看（尚未報名、不符資格…）：整個章節區蓋一層灰色遮罩加大鎖頭，章節完全不能點。
-  const anyReady = course.lessons.some((l) => l.ready);
   const noAccess = course.lessons.length === 0 ? course.enrollment !== "opened" && !course.isPublic && !course.admin : course.lessons.every((l) => l.locked);
   const allLocked = noAccess;
   const lockedText = course.priceTba ? "費用尚未公布，暫不開放" : member && !course.eligible ? "獎銜不符，目前無法報名" : "報名後才能觀看";
@@ -242,26 +242,7 @@ export default function CourseDetailScreen() {
         {editing && canEditContent ? null : (
         <Section title="課程章節">
           <View>
-          <Card style={{ paddingVertical: 0, ...(allLocked ? { minHeight: 230 } : {}) }}>
-            {course.lessons.length === 0 || !anyReady ? (
-              <ListRow icon="hourglass-outline" title="敬請期待" subtitle="課程內容準備中" />
-            ) : (
-              course.lessons.filter((l) => !l.full).map((lesson) => {
-                const soon = !lesson.ready;
-                return (
-                  <ListRow
-                    key={lesson.id}
-                    icon={soon ? "hourglass-outline" : lesson.completed ? "checkmark-circle" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-                    title={`${lesson.position}. ${lesson.title}`}
-                    subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : "", lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
-                    right={lesson.eventDate ? <AppText variant="callout" tone="muted">{eventDays(lesson.eventDate, null)}</AppText> : undefined}
-                    dense
-                    onPress={lesson.locked || soon ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
-                  />
-                );
-              })
-            )}
-          </Card>
+          <ChapterList course={course} style={allLocked ? { minHeight: 230 } : undefined} />
           {allLocked ? (
             <View style={styles.mask} accessibilityRole="alert" accessibilityLabel={lockedText}>
               <Ionicons name="lock-closed" size={48} color="#fff" />
@@ -280,19 +261,7 @@ export default function CourseDetailScreen() {
         )}
         {course.lessons.some((l) => l.full) ? (
           <Section title="完整版(含主持/串場/影片)">
-            <Card style={{ paddingVertical: 0 }}>
-              {course.lessons
-                .filter((l) => l.full)
-                .map((lesson) => (
-                  <ListRow
-                    key={lesson.id}
-                    icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-                    title={lesson.title}
-                    subtitle={[sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : ""].filter(Boolean).join(" · ") || undefined}
-                    onPress={lesson.locked ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
-                  />
-                ))}
-            </Card>
+            <FullVersionList course={course} />
           </Section>
         ) : null}
         {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}
