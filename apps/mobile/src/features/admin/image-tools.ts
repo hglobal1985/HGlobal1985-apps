@@ -70,8 +70,8 @@ export async function cropCompress(img: HTMLImageElement, crop: Rect | null, max
   return toBlob(c, quality);
 }
 
-/** 背景模糊強度：把照片縮到 1/N 再放大回來（N 越大越模糊）。數字越大越模糊：6＝輕度、12＝中度（業主 2026-11-15 要求再提高）。不依賴 ctx.filter，iOS Safari 也能用。 */
-export const BG_BLUR_DOWNSCALE = 12;
+/** 背景模糊強度：把照片縮到 1/N 再放大回來（N 越大越模糊）。數字越大越模糊：6＝輕度、12＝中度、18＝偏重（業主 2026-11-15 指定 18）。不依賴 ctx.filter，iOS Safari 也能用。 */
+export const BG_BLUR_DOWNSCALE = 18;
 
 /** 照片比 16:9 窄多少：回傳「裁成 16:9 會切掉上下幾 %」（照片比 16:9 寬或一樣寬回 0）。 */
 export function cutPercentFor16x9(img: { naturalWidth: number; naturalHeight: number }): number {
