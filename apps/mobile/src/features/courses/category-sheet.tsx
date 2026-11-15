@@ -11,6 +11,8 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 export const NONE = "__none__";
 /** 把課程的分類（用「、」分隔）拆成陣列。 */
 export const courseCats = (x: { category: string }) => x.category.split("、").map((v) => v.trim()).filter(Boolean);
+/** 課程清單裡的章節（堂）總數。 */
+export const lessonsOf = (list: { lessonCount: number }[]) => list.reduce((n, x) => n + x.lessonCount, 0);
 export const catLabel = (v: string) => (v === NONE ? "未分類" : v);
 
 /** 課程是否同時符合所選的每一個分類（多個＝交集）；沒選＝全部符合；「未分類」只能單獨選。 */
@@ -34,8 +36,10 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
   const { c } = useTheme();
   const [sel, setSel] = useState<string[]>(picked);
   const [w, setW] = useState(0);
-  const count = (s: string[]) => courses.filter((x) => matchesCats(x, s)).length;
+  // 數字＝符合的課程裡的章節（堂）總數，不是課程數。
+  const count = (s: string[]) => courses.filter((x) => matchesCats(x, s)).reduce((n, x) => n + x.lessonCount, 0);
   const total = count(sel);
+  const hasCourses = (s: string[]) => courses.some((x) => matchesCats(x, s));
   // 沒有確認鈕：每點一下就立刻套用到後面的清單；點面板外面的灰色區域關閉。
   const change = (next: string[]) => {
     setSel(next);
@@ -54,7 +58,7 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
           ? names.map((name) => {
               const on = sel.includes(name);
               const left = on ? count(sel) : name === NONE ? (sel.length ? 0 : count([NONE])) : sel[0] === NONE ? 0 : count([...sel, name]);
-              const dead = !on && left === 0;
+              const dead = !on && !(name === NONE ? (sel.length ? false : hasCourses([NONE])) : sel[0] === NONE ? false : hasCourses([...sel, name]));
               return (
                 <Pressable
                   key={name}

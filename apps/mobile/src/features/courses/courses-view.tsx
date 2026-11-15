@@ -13,7 +13,7 @@ import { CourseCard } from "./course-card";
 import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
-import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, matchesCats } from "./category-sheet";
+import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterTile } from "./center-tile";
 import { ModeFlash } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
@@ -144,7 +144,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       if (!name || name === HIDDEN_CATEGORY) continue;
       const mine = courses.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name)));
       stats.set(name, {
-        n: mine.length,
+        n: lessonsOf(mine),
         learning: mine.filter((x) => x.enrollment === "opened").length,
         draft: mine.filter((x) => x.status === "draft").length,
         fresh: mine.some((x) => x.createdAt && Date.parse(x.createdAt) >= weekAgo),
@@ -166,7 +166,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     key: ALL,
     label: "全部分類",
     short: "分類",
-    hint: `${courses.length} 堂`,
+    hint: `${lessonsOf(courses)} 堂`,
     badges: courses.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${courses.filter((x) => x.enrollment === "opened").length}`, tone: "accent" }] : [],
   };
   // 中心：課程的主辦中心（名稱都是會員中心清單裡的）；管理者另外加上自己能管的中心（還沒有課程也能先上傳 EDM）。
@@ -184,7 +184,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const centerCounts = useMemo(
     () =>
       centers
-        .map((name) => ({ name, count: courses.filter((x) => x.hostCenter === name && inCategory(x)).length }))
+        .map((name) => ({ name, count: lessonsOf(courses.filter((x) => x.hostCenter === name && inCategory(x))) }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
     [centers, courses, category],
   );
@@ -253,7 +253,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         {seriesFilter ? (
           <Select value={shownCategory} options={[allOption, ...categories.map(categoryOption)]} onChange={leaveSeries} />
         ) : (
-          <CategoryFilterBox picked={selCats} total={courses.filter((x) => inCategory(x) && inCenter(x)).length} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
+          <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter((x) => inCategory(x) && inCenter(x)))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
         )}
       </View>
       {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
