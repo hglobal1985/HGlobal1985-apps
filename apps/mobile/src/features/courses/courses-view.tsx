@@ -144,7 +144,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   // 分類下拉＝「關鍵字管理」的分類清單（同步，沒有課程使用的分類也要列出）；載入前先用課程上出現過的分類。
   // 「地區教育中心」不放進下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
   const categoryList = useApi<string[]>("/categories");
-  // 每個分類的統計：課程數、我「學習中」（已開通）幾堂、未上架幾堂（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
+  // 每個分類的統計（數字一律是章節＝堂數，不是課程數；業主 2026-11-15）：全部幾堂、我「學習中」（已開通）幾堂、未上架幾堂（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
   const catStats = useMemo(() => {
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
@@ -155,8 +155,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       const mine = pool.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name)));
       stats.set(name, {
         n: lessonsOf(mine),
-        learning: mine.filter((x) => x.enrollment === "opened").length,
-        draft: mine.filter((x) => x.status === "draft").length,
+        learning: lessonsOf(mine.filter((x) => x.enrollment === "opened")),
+        draft: lessonsOf(mine.filter((x) => x.status === "draft")),
         fresh: mine.some((x) => x.createdAt && Date.parse(x.createdAt) >= weekAgo),
       });
     }
@@ -181,7 +181,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     label: "全部分類",
     short: "分類",
     hint: `${lessonsOf(pool)} 堂`,
-    badges: pool.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${pool.filter((x) => x.enrollment === "opened").length}`, tone: "accent" }] : [],
+    badges: pool.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${lessonsOf(pool.filter((x) => x.enrollment === "opened"))}`, tone: "accent" }] : [],
   };
   // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（業主 2026-11-15）；不混入本地資料。
   const rights = member?.courseRights;
