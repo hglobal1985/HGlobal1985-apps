@@ -9,15 +9,14 @@ import { AppText, Card, ListRow } from "@/ui";
  * 格式永遠一致；要改章節的呈現只改這裡。
  */
 export function ChapterList({ course, style }: { course: CourseDetail; style?: ViewStyle }) {
-  const anyReady = course.lessons.some((l) => l.ready);
+  const chapters = course.lessons.filter((l) => !l.full && !l.material);
+  const anyReady = chapters.some((l) => l.ready);
   return (
     <Card style={{ paddingVertical: 0, ...style }}>
-      {course.lessons.length === 0 || !anyReady ? (
+      {chapters.length === 0 || !anyReady ? (
         <ListRow icon="hourglass-outline" title="敬請期待" subtitle="課程內容準備中" />
       ) : (
-        course.lessons
-          .filter((l) => !l.full)
-          .map((lesson) => {
+        chapters.map((lesson) => {
             const soon = !lesson.ready;
             return (
               <ListRow
@@ -36,9 +35,9 @@ export function ChapterList({ course, style }: { course: CourseDetail; style?: V
   );
 }
 
-/** 「完整版」區塊的清單（同一支影片被切成多堂時才有）。 */
+/** 「其他教材」區塊的清單：系統自動產生的「完整版」（同一支影片被切成多堂時才有，排在最前面）＋管理者上傳的教材。 */
 export function FullVersionList({ course }: { course: CourseDetail }) {
-  const full = course.lessons.filter((l) => l.full);
+  const full = [...course.lessons.filter((l) => l.full), ...course.lessons.filter((l) => l.material && (l.ready || !!course.can?.edit))];
   if (!full.length) return null;
   return (
     <Card style={{ paddingVertical: 0 }}>

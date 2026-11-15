@@ -126,9 +126,11 @@ export default function LessonScreen() {
   }, [finished, member?.sub, curLesson?.id, curLesson?.completed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!c) return <Screen header={false}>{course.loading ? <LoadingView /> : <ErrorView message={course.error ?? "找不到課程"} onRetry={course.reload} />}</Screen>;
-  const index = c.lessons.findIndex((l) => l.id === lessonId);
-  const lesson = c.lessons[index];
-  const next = c.lessons[index + 1];
+  // 下一堂只在「課程章節」裡找（其他教材與完整版不接在章節後面）。
+  const chapterList = c.lessons.filter((l) => !l.full && !l.material);
+  const lesson = c.lessons.find((l) => l.id === lessonId);
+  const index = chapterList.findIndex((l) => l.id === lessonId);
+  const next = index >= 0 ? chapterList[index + 1] : undefined;
   if (!lesson) return <Screen header={false}><ErrorView message="找不到這個章節" /></Screen>;
 
   const engineError = track && player.track?.key === track.key ? player.error : null;
@@ -193,7 +195,7 @@ export default function LessonScreen() {
       ) : null}
       <View>
         <Card style={{ paddingVertical: 0 }}>
-          {c.lessons.filter((l) => !l.full).map((l) => (
+          {chapterList.map((l) => (
             <ListRow
               key={l.id}
               icon={l.completed ? "checkmark-circle" : l.id === lesson.id ? "play-circle" : "play-circle-outline"}
@@ -210,12 +212,11 @@ export default function LessonScreen() {
           ))}
         </Card>
       </View>
-      {c.lessons.some((l) => l.full) ? (
+      {c.lessons.some((l) => l.full || (l.material && l.ready)) ? (
         <View style={{ gap: space.xs }}>
-          <AppText variant="headline">完整版(含主持/串場/影片)</AppText>
+          <AppText variant="headline">其他教材</AppText>
           <Card style={{ paddingVertical: 0 }}>
-            {c.lessons
-              .filter((l) => l.full)
+            {[...c.lessons.filter((l) => l.full), ...c.lessons.filter((l) => l.material && l.ready)]
               .map((l) => (
                 <ListRow
                   key={l.id}

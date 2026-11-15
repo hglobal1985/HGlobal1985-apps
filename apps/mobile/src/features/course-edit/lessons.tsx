@@ -11,7 +11,8 @@ import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, DateSelect, Icon, NoticeBox, Pill, todayStr, type SelectOption } from "@/ui";
+import { eventDays, sharerLine } from "@/features/format";
+import { AppText, Button, Card, DateSelect, Icon, NoticeBox, Pill, todayStr, type SelectOption } from "@/ui";
 import { Check } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
@@ -75,11 +76,11 @@ export function useYoutubeLengthFix(course: CourseDetail | null | undefined, ena
 export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
   const { member, invalidate } = useSession();
   const rankOptions = useRankOptions();
-  const lessons = course.lessons.filter((l) => !l.full);
+  const lessons = course.lessons.filter((l) => !l.full && !!l.material === !!lesson.material);
   const i = lessons.findIndex((l) => l.id === lesson.id);
   const [dirty, setDirty] = useState(false);
   return (
-    <EditSheet title={`第 ${lesson.position} 堂：${lesson.title}`} onClose={onClose} dirty={dirty} hideSave>
+    <EditSheet title={lesson.material ? `教材 ${lesson.position}：${lesson.title}` : `第 ${lesson.position} 堂：${lesson.title}`} onClose={onClose} dirty={dirty} hideSave>
       <LessonEditor
         key={`${lesson.id}:${lesson.media?.type}:${lesson.media?.ref}:${lesson.coverUrl}:${lesson.posterUrl}:${lesson.minutes}`}
         lesson={lesson}
@@ -98,8 +99,9 @@ export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail;
   );
 }
 
-/** 新增章節（名稱、分享者），從下方彈出。 */
-export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onClose: () => void }) {
+/** 新增章節或教材（名稱、分享者），從下方彈出；kind＝material 時是「其他教材」。 */
+export function NewLessonSheet({ course, onClose, kind = "chapter" }: { course: CourseDetail; onClose: () => void; kind?: "chapter" | "material" }) {
+  const word = kind === "material" ? "教材" : "章節";
   const { c } = useTheme();
   const { invalidate } = useSession();
   const rankOptions = useRankOptions();
@@ -115,11 +117,11 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
   const tJob = course.teacherTitle ?? "";
   const sameT = !!tName && sharer === tName && rank === tRank && job === tJob;
   const submit = async () => {
-    if (!title.trim()) return setError("請輸入章節名稱");
+    if (!title.trim()) return setError(`請輸入${word}名稱`);
     setBusy(true);
     setError(null);
     try {
-      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, eventDate: course.eventStart ?? todayStr(), autoCover });
+      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, eventDate: course.eventStart ?? todayStr(), autoCover, kind });
       invalidate();
       onClose();
     } catch (e) {
@@ -129,18 +131,18 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
     }
   };
   return (
-    <EditSheet title="新增章節" onClose={onClose} onSave={submit} saveLabel="新增" dirty={!!title || !!sharer} busy={busy} error={error}>
+    <EditSheet title={`新增${word}`} onClose={onClose} onSave={submit} saveLabel="新增" dirty={!!title || !!sharer} busy={busy} error={error}>
       <View style={{ gap: space.xs }}>
         <AppText variant="callout" tone="muted">
-          章節名稱
+          {word}名稱
         </AppText>
-        <TextInput value={title} onChangeText={setTitle} placeholder="例如：第 2 段 Q&A" placeholderTextColor={c.textMuted} accessibilityLabel="新章節名稱" style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
+        <TextInput value={title} onChangeText={setTitle} placeholder={kind === "material" ? "例如：課程講義 PDF" : "例如：第 2 段 Q&A"} placeholderTextColor={c.textMuted} accessibilityLabel={`新${word}名稱`} style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
       </View>
       <SharerField value={sharer} onChange={setSharer} teacher={tName} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : tName), setRank(sameT ? "" : tRank), setJob(sameT ? "" : tJob))} label="新章節分享者" />
       <RankTitleRow rank={rank} title={job} onRank={setRank} onTitle={setJob} rankOptions={rankOptions} readOnly={sameT} who="新章節分享者" />
       <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
-        新增後再點章節旁的鉛筆，設定影片、音檔與附件。章節設成 YouTube 影片後，封面就會自動用影片畫面。
+        新增後再點{word}旁的鉛筆，設定影片、音檔與附件。設成 YouTube 影片後，封面就會自動用影片畫面。
       </AppText>
     </EditSheet>
   );
@@ -460,12 +462,38 @@ function LessonEditor({
   );
 }
 
-export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "arrow-up" | "arrow-down" | "trash-outline" | "create-outline"; label: string; onPress?: () => void; disabled?: boolean; danger?: boolean }) {
+/** 課程頁編輯模式的章節／教材清單（同一個元件，兩組共用）：每列＝名稱（點了編輯）＋小按鈕 ↑ ↓ 複製 編輯 刪除（32px，讓名稱有空間）。 */
+export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, busy }: { group: Lesson[]; word: string; onEdit: (l: Lesson) => void; onMove: (from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; busy: boolean }) {
+  const { c } = useTheme();
+  return (
+    <Card style={{ paddingVertical: 0 }}>
+      {group.map((lesson, i) => (
+        <View key={lesson.id} style={[styles.lessonRow, { borderBottomColor: c.border }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`編輯${word} ${lesson.position}`} onPress={() => onEdit(lesson)} style={styles.lessonMain}>
+            <AppText variant="body" numberOfLines={2}>
+              {lesson.position}. {lesson.title}
+            </AppText>
+            <AppText variant="caption" tone="muted" numberOfLines={1}>
+              {[lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : "", lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
+            </AppText>
+          </Pressable>
+          <IconButton icon="arrow-up" label="上移" onPress={i > 0 ? () => onMove(i, i - 1) : undefined} disabled={busy} />
+          <IconButton icon="arrow-down" label="下移" onPress={i < group.length - 1 ? () => onMove(i, i + 1) : undefined} disabled={busy} />
+          <IconButton icon="copy-outline" label={`複製${word} ${lesson.position}`} onPress={() => onCopy(lesson)} disabled={busy} />
+          <IconButton icon="create-outline" label={`編輯${word} ${lesson.position}`} onPress={() => onEdit(lesson)} disabled={busy} />
+          <IconButton icon="trash-outline" label={`刪除${word} ${lesson.position}`} onPress={() => onDelete(lesson)} disabled={busy} danger />
+        </View>
+      ))}
+    </Card>
+  );
+}
+
+export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "arrow-up" | "arrow-down" | "trash-outline" | "create-outline" | "copy-outline"; label: string; onPress?: () => void; disabled?: boolean; danger?: boolean }) {
   const { c } = useTheme();
   const off = disabled || !onPress;
   return (
     <Pressable onPress={onPress} disabled={off} accessibilityRole="button" accessibilityLabel={label} style={[styles.iconBtn, { borderColor: c.border, opacity: off ? 0.35 : 1 }]}>
-      <Icon name={icon} size={18} color={danger ? c.danger : c.text} />
+      <Icon name={icon} size={16} color={danger ? c.danger : c.text} />
     </Pressable>
   );
 }
@@ -481,5 +509,7 @@ const styles = StyleSheet.create({
   timeRow: { flexDirection: "row", alignItems: "center", gap: space.sm, flexWrap: "wrap" },
   timeCell: { flexDirection: "row", alignItems: "center", gap: 4 },
   timeInput: { width: 56, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, textAlign: "center" },
-  iconBtn: { width: minTouch - 4, height: minTouch - 4, borderRadius: radius.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  iconBtn: { width: 32, height: 32, borderRadius: radius.sm, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  lessonRow: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: space.xs, borderBottomWidth: StyleSheet.hairlineWidth },
+  lessonMain: { flex: 1, minWidth: 0, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm },
 });

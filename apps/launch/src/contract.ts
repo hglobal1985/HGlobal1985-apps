@@ -197,6 +197,8 @@ export type Lesson = {
   locked: boolean;
   /** 「完整版」（同一支影片被裁成多段時自動多出的整支播放區塊），不列入章節總數與學習進度。 */
   full?: boolean;
+  /** 「其他教材」（不計入章節堂數與學習進度）。序號 position 與章節各自從 1 開始。 */
+  material?: boolean;
   /** 章節自己的封面：橫式 16:9（清單縮圖）與直式；沒設定為 null（改用課程封面）。 */
   coverUrl?: string | null;
   posterUrl?: string | null;

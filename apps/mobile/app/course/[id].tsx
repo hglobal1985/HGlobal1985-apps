@@ -10,9 +10,9 @@ import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { EdmManager } from "@/features/admin/edm-manager";
 import { AutoCoverCheck, SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
-import { IconButton, LessonSheet, NewLessonSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
+import { EditLessonRows, LessonSheet, NewLessonSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
-import { eventDays, sharerLine, teacherLine } from "@/features/format";
+import { teacherLine } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
@@ -43,7 +43,7 @@ export default function CourseDetailScreen() {
     if (edit === "1" && manages) setMode("edit");
   }, [edit, manages]);
   const editing = manages && mode === "edit";
-  const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | null>(null);
+  const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | "newMaterial" | null>(null);
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
   const detecting = useYoutubeLengthFix(course, editing && Platform.OS === "web");
@@ -125,9 +125,10 @@ export default function CourseDetailScreen() {
   const stickyNotice = registerNode && !registerIsAction ? registerNode : null;
   const needRank = member && !course.eligible ? `限${course.minRank.name}獎銜以上報名${course.allowPresident ? "（會長也可報名）" : ""}` : null;
 
-  const lessons = course.lessons.filter((l) => !l.full);
-  const moveLesson = async (from: number, to: number) => {
-    const ids = lessons.map((l) => l.id);
+  const lessons = course.lessons.filter((l) => !l.full && !l.material);
+  const materials = course.lessons.filter((l) => l.material);
+  const moveLesson = async (group: Lesson[], from: number, to: number) => {
+    const ids = group.map((l) => l.id);
     const [x] = ids.splice(from, 1);
     ids.splice(to, 0, x!);
     setLessonBusy(true);
@@ -140,8 +141,20 @@ export default function CourseDetailScreen() {
       setLessonBusy(false);
     }
   };
+  const duplicateLesson = async (l: Lesson) => {
+    setLessonBusy(true);
+    try {
+      await api("POST", `/admin/lessons/${l.id}/duplicate`);
+      invalidate();
+    } catch (e) {
+      setMessage({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setLessonBusy(false);
+    }
+  };
   const deleteLesson = async (l: Lesson) => {
-    if (!(await confirmAsk("刪除章節", `確定刪除「${l.title}」？這一堂的音檔與附件會一併刪除。`, "刪除"))) return;
+    const what = l.material ? "教材" : "章節";
+    if (!(await confirmAsk(`刪除${what}`, `確定刪除「${l.title}」？這一${l.material ? "份" : "堂"}的音檔與附件會一併刪除。`, "刪除"))) return;
     setLessonBusy(true);
     try {
       await api("DELETE", `/admin/lessons/${l.id}`);
@@ -213,28 +226,18 @@ export default function CourseDetailScreen() {
         ) : null}
 
         {editing && canEditContent ? (
-          <Section title="課程章節">
-            <Card style={{ paddingVertical: 0 }}>
-              {lessons.map((lesson, i) => (
-                <View key={lesson.id} style={[styles.lessonRow, { borderBottomColor: c.border }]}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`編輯第 ${lesson.position} 堂`} onPress={() => setLessonSheet(lesson)} style={styles.lessonMain}>
-                    <AppText variant="body" numberOfLines={2}>
-                      {lesson.position}. {lesson.title}
-                    </AppText>
-                    <AppText variant="caption" tone="muted" numberOfLines={1}>
-                      {[lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : "", lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
-                    </AppText>
-                  </Pressable>
-                  <IconButton icon="arrow-up" label="上移" onPress={i > 0 ? () => moveLesson(i, i - 1) : undefined} disabled={lessonBusy} />
-                  <IconButton icon="arrow-down" label="下移" onPress={i < lessons.length - 1 ? () => moveLesson(i, i + 1) : undefined} disabled={lessonBusy} />
-                  <IconButton icon="create-outline" label={`編輯第 ${lesson.position} 堂`} onPress={() => setLessonSheet(lesson)} disabled={lessonBusy} />
-                  <IconButton icon="trash-outline" label={`刪除第 ${lesson.position} 堂`} onPress={() => deleteLesson(lesson)} disabled={lessonBusy} danger />
-                </View>
-              ))}
-            </Card>
-            <Button variant="secondary" label="新增章節" icon="add" onPress={() => setSheet("newLesson")} fullWidth />
-            <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段。" />
-          </Section>
+          <>
+            <Section title="課程章節">
+              <EditLessonRows group={lessons} word="章節" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(lessons, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} />
+              <Button variant="secondary" label="新增章節" icon="add" onPress={() => setSheet("newLesson")} fullWidth />
+              <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段。" />
+            </Section>
+            <Section title="其他教材">
+              {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
+              <Button variant="secondary" label="新增教材" icon="add" onPress={() => setSheet("newMaterial")} fullWidth />
+              <NoticeBox text="講義、錄音、補充影片等教材放這裡：操作與章節相同，但不計入章節堂數與學習進度。系統自動產生的「完整版」也會出現在這一區的最前面。" />
+            </Section>
+          </>
         ) : null}
         {editing && canEditContent ? null : (
         <Section title="課程章節">
@@ -256,8 +259,8 @@ export default function CourseDetailScreen() {
           </View>
         </Section>
         )}
-        {course.lessons.some((l) => l.full) ? (
-          <Section title="完整版(含主持/串場/影片)">
+        {!(editing && canEditContent) && course.lessons.some((l) => l.full || l.material) ? (
+          <Section title="其他教材">
             <FullVersionList course={course} />
           </Section>
         ) : null}
@@ -268,8 +271,8 @@ export default function CourseDetailScreen() {
           <AutoCoverCheck course={course} onChanged={invalidate} />
           <EdmManager course={course} onChanged={invalidate} />
         </EditSheet>
-      ) : sheet === "newLesson" ? (
-        <NewLessonSheet course={course} onClose={() => setSheet(null)} />
+      ) : sheet === "newLesson" || sheet === "newMaterial" ? (
+        <NewLessonSheet course={course} kind={sheet === "newMaterial" ? "material" : "chapter"} onClose={() => setSheet(null)} />
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}

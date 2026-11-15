@@ -344,9 +344,9 @@ type CourseRow = {
 };
 
 const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.show_full, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
-  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
-  (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id) AS total_minutes,
-  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.duration_minutes = 0) AS zero_minute_lessons
+  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS lesson_count,
+  (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS total_minutes,
+  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter' AND l.duration_minutes = 0) AS zero_minute_lessons
   FROM courses c`;
 
 async function memberCourseState(db: D1Database, sub: string | undefined) {
@@ -355,10 +355,10 @@ async function memberCourseState(db: D1Database, sub: string | undefined) {
   const [e, p, d, st, w, last] = await db.batch([
     db.prepare("SELECT course_id, hidden FROM enrollments WHERE member_sub = ?").bind(sub),
     db.prepare("SELECT i.course_id, i.order_id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.member_sub = ? AND o.status = 'pending' ORDER BY o.created_at").bind(sub),
-    db.prepare("SELECT p.course_id AS course_id, COUNT(*) AS n, COALESCE(SUM(l.duration_minutes), 0) AS m FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id WHERE p.member_sub = ? GROUP BY p.course_id").bind(sub),
+    db.prepare("SELECT p.course_id AS course_id, COUNT(*) AS n, COALESCE(SUM(l.duration_minutes), 0) AS m FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id AND l.kind = 'chapter' WHERE p.member_sub = ? GROUP BY p.course_id").bind(sub),
     db.prepare("SELECT course_id, hidden FROM learning_started WHERE member_sub = ?").bind(sub),
     // 還沒看完的章節：播放到哪（比例）× 該章長度，讓進度條隨播放前進。
-    db.prepare("SELECT w.course_id AS course_id, SUM(w.ratio * l.duration_minutes) AS m, SUM(w.ratio) AS n FROM lesson_watch w JOIN lessons l ON l.id = w.lesson_id LEFT JOIN lesson_progress p ON p.lesson_id = w.lesson_id AND p.member_sub = w.member_sub WHERE w.member_sub = ? AND p.lesson_id IS NULL GROUP BY w.course_id").bind(sub),
+    db.prepare("SELECT w.course_id AS course_id, SUM(w.ratio * l.duration_minutes) AS m, SUM(w.ratio) AS n FROM lesson_watch w JOIN lessons l ON l.id = w.lesson_id AND l.kind = 'chapter' LEFT JOIN lesson_progress p ON p.lesson_id = w.lesson_id AND p.member_sub = w.member_sub WHERE w.member_sub = ? AND p.lesson_id IS NULL GROUP BY w.course_id").bind(sub),
     // 最近一次學習時間：播放紀錄、完成章節、開始學習三者取最新。
     db.prepare("SELECT course_id, MAX(t) AS t FROM (SELECT course_id, updated_at AS t FROM lesson_watch WHERE member_sub = ? UNION ALL SELECT course_id, completed_at FROM lesson_progress WHERE member_sub = ? UNION ALL SELECT course_id, created_at FROM learning_started WHERE member_sub = ?) GROUP BY course_id").bind(sub, sub, sub),
   ]);
@@ -627,15 +627,20 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
     ctx.db
-      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover FROM lessons WHERE course_id = ? ORDER BY position")
+      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind FROM lessons WHERE course_id = ? ORDER BY position")
       .bind(id)
-      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number }>(),
+      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string }>(),
     s ? ctx.db.prepare("SELECT lesson_id FROM lesson_progress WHERE member_sub = ? AND course_id = ?").bind(s.sub, id).all<{ lesson_id: string }>() : Promise.resolve({ results: [] as { lesson_id: string }[] }),
   ]);
   // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
   const archivedForMe = row.status === "archived" && (state.enrolled.has(id) || state.pending.has(id) || state.started.has(id));
   if (row.status !== "published" && !manages && !archivedForMe) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
+  const groupPos = new Map<string, number>();
+  {
+    const n = { chapter: 0, material: 0 };
+    for (const l of lessons.results) groupPos.set(l.id, ++n[l.kind === "material" ? "material" : "chapter"]);
+  }
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
   const admin = manages;
@@ -645,7 +650,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     description: row.description ?? "",
     lessons: [...lessons.results.map((l) => ({
       id: l.id,
-      position: l.position,
+      // 顯示用序號：章節與教材各自從 1 開始編號（資料庫裡的 position 是整門課共用、不重複的排序）。
+      position: groupPos.get(l.id)!,
+      material: l.kind === "material",
       title: l.title,
       minutes: l.duration_minutes,
       completed: completed.has(l.id),
@@ -667,7 +674,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       locked: !admin && !(state.enrolled.has(id) || row.is_public === 1 || watchFree),
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
       ...(admin ? { media: { type: l.media_type, ref: l.media_ref } } : {}),
-    })), ...fullVersions(lessons.results, state, id, row, admin, watchFree)],
+    })), ...fullVersions(lessons.results.filter((l) => l.kind === "chapter"), state, id, row, admin, watchFree)],
     ...(admin
       ? {
           admin: {
@@ -1693,9 +1700,9 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const row = await ctx.db.prepare("SELECT * FROM courses WHERE id = ?").bind(id).first<Record<string, unknown>>();
   if (!row) return fail(404, "not_found", "找不到這門課程");
   const { results: lessons } = await ctx.db
-    .prepare("SELECT title, sharer, sharer_rank, sharer_title, position, duration_minutes, media_type, media_ref, start_seconds, end_seconds FROM lessons WHERE course_id = ? ORDER BY position")
+    .prepare("SELECT title, sharer, sharer_rank, sharer_title, position, duration_minutes, media_type, media_ref, start_seconds, end_seconds, kind FROM lessons WHERE course_id = ? ORDER BY position")
     .bind(id)
-    .all<{ title: string; sharer: string; sharer_rank: string; sharer_title: string; position: number; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null }>();
+    .all<{ title: string; sharer: string; sharer_rank: string; sharer_title: string; position: number; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; kind: string }>();
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
@@ -1707,8 +1714,8 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
     ...lessons.map((l) => {
       const audio = l.media_type === "audio"; // 音檔是這門課自己的檔案，不共用
       return ctx.db
-        .prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-        .bind(`${newId}-${randomId(6)}`, newId, l.position, l.title, l.sharer, l.sharer_rank, l.sharer_title, audio ? 0 : l.duration_minutes, audio ? "demo" : l.media_type, audio ? null : l.media_ref, audio ? null : l.start_seconds, audio ? null : l.end_seconds);
+        .prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(`${newId}-${randomId(6)}`, newId, l.position, l.title, l.sharer, l.sharer_rank, l.sharer_title, audio ? 0 : l.duration_minutes, audio ? "demo" : l.media_type, audio ? null : l.media_ref, audio ? null : l.start_seconds, audio ? null : l.end_seconds, l.kind);
     }),
     audit(ctx.db, admin.sub, "course.duplicate", "course", newId, id),
   ];
@@ -2220,7 +2227,7 @@ const routes: [string, RegExp, Handler][] = [
       const sub = ctx.session?.sub ?? "";
       const { results } = await ctx.db
         .prepare(
-          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, l.event_date AS eventDate, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' ORDER BY l.course_id, l.position",
+          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, l.event_date AS eventDate, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND l.kind = 'chapter' ORDER BY l.course_id, l.position",
         )
         .bind(sub)
         .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
@@ -3632,22 +3639,48 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/courses\/([\w-]+)\/lessons$/,
     async (ctx, [courseId]) => {
       const admin = await requireCourseManager(ctx, courseId);
-      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown }>(ctx.req);
+      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown }>(ctx.req);
+      const kind = body.kind === "material" ? "material" : "chapter";
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
       const sharerRank = typeof body.sharerRank === "string" ? body.sharerRank.trim().slice(0, 40) : "";
       await assertCentralRank(ctx, sharerRank);
       const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
-      if (!title) fail(400, "title_required", "請輸入章節名稱");
+      if (!title) fail(400, "title_required", `請輸入${kind === "material" ? "教材" : "章節"}名稱`);
       const eventDate = body.eventDate === undefined ? null : dayOrNull(body.eventDate);
       const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;
       await ctx.db.batch([
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?)").bind(id, courseId, course.maxpos + 1, title, sharer, sharerRank, sharerTitle, eventDate, body.autoCover === true ? 1 : 0),
-        audit(ctx.db, admin.sub, "lesson.create", "lesson", id, title),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?)").bind(id, courseId, course.maxpos + 1, title, sharer, sharerRank, sharerTitle, eventDate, body.autoCover === true ? 1 : 0, kind),
+        audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);
       return courseDetail(ctx, courseId);
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/lessons\/([\w-]+)\/duplicate$/,
+    async (ctx, [id]) => {
+      // 複製一堂（章節或教材）：插在原本那堂後面。影片來源（YouTube／Mux）用同一支；音檔是這堂自己的檔案，不共用（複製後請重新上傳）。
+      const admin = await requireLessonManager(ctx, id);
+      const l = await ctx.db
+        .prepare("SELECT course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, auto_cover, kind FROM lessons WHERE id = ?")
+        .bind(id)
+        .first<{ course_id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; auto_cover: number; kind: string }>();
+      if (!l) return fail(404, "not_found", "找不到這一堂");
+      const audio = l.media_type === "audio";
+      const newId = `${l.course_id}-${randomId(6)}`;
+      const after = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND position > ? ORDER BY position DESC").bind(l.course_id, l.position).all<{ id: string; position: number }>();
+      await ctx.db.batch([
+        // 後面的往後挪一格（由大到小，避開 UNIQUE(course_id, position)），再把複製的放在原本那堂的下一格。
+        ...after.results.map((r) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(r.position + 1, r.id)),
+        ctx.db
+          .prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(newId, l.course_id, l.position + 1, `${l.title}（複製）`.slice(0, 120), l.sharer, l.sharer_rank, l.sharer_title, audio ? 0 : l.duration_minutes, audio ? "demo" : l.media_type, audio ? null : l.media_ref, audio ? null : l.start_seconds, audio ? null : l.end_seconds, l.event_date, l.auto_cover, l.kind),
+        audit(ctx.db, admin.sub, "lesson.duplicate", "lesson", newId, id),
+      ]);
+      return courseDetail(ctx, l.course_id);
     },
   ],
   [
@@ -3657,13 +3690,17 @@ const routes: [string, RegExp, Handler][] = [
       const admin = await requireCourseManager(ctx, courseId);
       const body = await readJson<{ ids?: unknown }>(ctx.req);
       const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
-      const current = await ctx.db.prepare("SELECT id FROM lessons WHERE course_id = ?").bind(courseId).all<{ id: string }>();
-      const set = new Set(current.results.map((r) => r.id));
-      if (ids.length !== set.size || new Set(ids).size !== ids.length || ids.some((i) => !set.has(i))) fail(400, "invalid_order", "章節順序不正確，請重新整理後再試");
+      // 章節與教材各自排序：傳進來的 ids 必須剛好是同一組（章節或教材）的全部；排好後放回這一組原本佔用的順位，另一組不動。
+      const current = await ctx.db.prepare("SELECT id, kind, position FROM lessons WHERE course_id = ?").bind(courseId).all<{ id: string; kind: string; position: number }>();
+      const byId = new Map(current.results.map((r) => [r.id, r]));
+      const first = ids.length ? byId.get(ids[0]!) : undefined;
+      const group = current.results.filter((r) => r.kind === (first?.kind ?? "chapter"));
+      if (!first || ids.length !== group.length || new Set(ids).size !== ids.length || ids.some((i) => byId.get(i)?.kind !== first.kind)) fail(400, "invalid_order", "順序不正確，請重新整理後再試");
+      const slots = group.map((r) => r.position).sort((x, y) => x - y);
       // 先移到負數避開 UNIQUE(course_id, position)，再寫入新順序。
       await ctx.db.batch([
-        ctx.db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId),
-        ...ids.map((id, i) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id)),
+        ctx.db.prepare(`UPDATE lessons SET position = -position WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids),
+        ...ids.map((id, i) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(slots[i]!, id)),
         audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId),
       ]);
       return courseDetail(ctx, courseId);
