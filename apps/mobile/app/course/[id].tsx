@@ -7,7 +7,7 @@ import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { EdmStage } from "@/features/courses/edm-viewer";
 import { EdmManager } from "@/features/admin/edm-manager";
-import { SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
+import { AutoCoverCheck, SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { IconButton, LessonSheet, NewLessonSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
@@ -299,6 +299,7 @@ export default function CourseDetailScreen() {
       </Screen>
       {sheet === "art" ? (
         <EditSheet title="EDM 與封面" onClose={() => setSheet(null)} hideSave>
+          <AutoCoverCheck course={course} onChanged={invalidate} />
           <EdmManager course={course} onChanged={invalidate} />
         </EditSheet>
       ) : sheet === "newLesson" ? (

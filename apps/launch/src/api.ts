@@ -324,6 +324,9 @@ type CourseRow = {
   is_online: number;
   show_full: number;
   chapter_covers: number;
+  auto_cover: number;
+  /** 第一支 YouTube 章節的影片代碼（臨時封面用）。 */
+  yt_ref: string | null;
   cover_key: string | null;
   edm_view_y: number;
   cover_rect: string | null;
@@ -338,7 +341,7 @@ type CourseRow = {
   zero_minute_lessons: number;
 };
 
-const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.show_full, c.chapter_covers, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at,
+const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.show_full, c.chapter_covers, c.auto_cover, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.duration_minutes = 0) AS zero_minute_lessons
@@ -380,6 +383,22 @@ const byPresident = (s: Session | null, c: { allow_president: number }) => c.all
 const inFreeWindow = (row: { free_from: string | null; free_until: string | null }, now = iso()) =>
   !!(row.free_from || row.free_until) && (!row.free_from || row.free_from <= now) && (!row.free_until || now < row.free_until);
 
+/** 課程的 EDM／封面網址（含 YouTube 縮圖的自動與臨時封面）。 */
+function courseArt(row: CourseRow) {
+  const thumb = row.yt_ref ? ytThumbUrl(row.yt_ref) : null;
+  const forced = row.auto_cover === 1 && !!thumb;
+  const none = !row.edm_key && !row.cover_key && !!thumb;
+  if (forced || none) return { edmUrl: thumb, coverUrl: thumb, edmViewY: 0, coverRect: null };
+  return {
+    edmUrl: row.edm_key ? pubUrl(row.edm_key, row.art_version) : null,
+    coverUrl: row.cover_key ? pubUrl(row.cover_key, row.art_version) : null,
+    edmViewY: row.edm_view_y,
+    coverRect: parseCoverRect(row.cover_rect),
+  };
+}
+/** YouTube 影片縮圖（16:9、沒有黑邊）。 */
+const ytThumbUrl = (id: string) => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+
 function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: MemberState, eligibility: Map<string, boolean>): CourseSummary {
   const minRank = rankMap.get(row.min_rank_code) ?? { code: row.min_rank_code, name: row.min_rank_code, order: 9999 };
   const freeNow = row.price_twd > 0 && inFreeWindow(row);
@@ -404,10 +423,9 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     freeUntil: freeNow ? row.free_until : null,
     minRank,
     theme: row.theme,
-    edmUrl: row.edm_key ? pubUrl(row.edm_key, row.art_version) : null,
-    coverUrl: row.cover_key ? pubUrl(row.cover_key, row.art_version) : null,
-    edmViewY: row.edm_view_y,
-    coverRect: parseCoverRect(row.cover_rect),
+    // 封面：勾了「自動使用 YouTube 畫面」＝一律用第一支 YouTube 影片的縮圖；沒勾但完全沒有 EDM 與封面＝臨時用縮圖。
+    ...courseArt(row),
+    autoCover: row.auto_cover === 1,
     hostCenter: hostCenterOf(row.host_unit),
     hostCenterKey: row.host_center_key,
     status: row.status,
@@ -605,9 +623,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
     ctx.db
-      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version FROM lessons WHERE course_id = ? ORDER BY position")
+      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover FROM lessons WHERE course_id = ? ORDER BY position")
       .bind(id)
-      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number }>(),
+      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number }>(),
     s ? ctx.db.prepare("SELECT lesson_id FROM lesson_progress WHERE member_sub = ? AND course_id = ?").bind(s.sub, id).all<{ lesson_id: string }>() : Promise.resolve({ results: [] as { lesson_id: string }[] }),
   ]);
   // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
@@ -635,8 +653,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       sharerRank: l.sharer_rank,
       sharerRankName: rankMap.get(l.sharer_rank)?.name ?? "",
       sharerTitle: l.sharer_title,
-      coverUrl: l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
-      posterUrl: l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
+      // 章節封面：勾了「自動使用 YouTube 畫面」＝影片縮圖；沒勾但沒上傳封面＝臨時用縮圖（非 YouTube 章節維持 null＝用課程封面）。
+      coverUrl: l.media_type === "youtube" && l.media_ref && (l.auto_cover === 1 || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
+      posterUrl: l.media_type === "youtube" && l.media_ref && (l.auto_cover === 1 || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
+      autoCover: l.auto_cover === 1,
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0,
       // 完全公開的課程：任何人（含訪客與會員）都可以看章節，不需要報名。
@@ -1453,6 +1473,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   if (body.isOnline !== undefined) sets.push(["is_online", body.isOnline === true ? 1 : 0]);
   if (body.showFull !== undefined) sets.push(["show_full", body.showFull === true ? 1 : 0]);
   if (body.chapterCovers !== undefined) sets.push(["chapter_covers", body.chapterCovers === true ? 1 : 0]);
+  if (body.autoCover !== undefined) sets.push(["auto_cover", body.autoCover === true ? 1 : 0]);
   if (body.earlyBird !== undefined) {
     if (body.earlyBird === true) {
       const price = Number(body.earlyPriceTwd);
@@ -1670,7 +1691,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "show_full", "chapter_covers"];
+  const keep = ["subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "show_full", "chapter_covers", "auto_cover"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
@@ -1735,7 +1756,7 @@ const seconds = (v: unknown): number | null | undefined => {
 
 /** 修改章節：名稱、影片來源（示範／YouTube／Mux）、時間軸區間。音檔由上傳流程設定。 */
 async function updateLesson(ctx: Ctx, id: string, admin: Session) {
-  const body = await readJson<{ eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown }>(ctx.req);
+  const body = await readJson<{ eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; autoCover?: unknown }>(ctx.req);
   if (body.mediaType === "mux" && admin.role !== "admin") fail(403, "forbidden", "Mux 影片由總部管理，請改用 YouTube 或音檔，或請總部協助");
   const cur = await ctx.db
     .prepare("SELECT media_type, media_ref, start_seconds, end_seconds FROM lessons WHERE id = ?")
@@ -1748,6 +1769,7 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
     if (!title) fail(400, "title_required", "請輸入章節名稱");
     sets.push(["title", title]);
   }
+  if (body.autoCover !== undefined) sets.push(["auto_cover", body.autoCover === true ? 1 : 0]);
   const sharer = text(body.sharer, 60);
   if (sharer !== undefined) sets.push(["sharer", sharer]);
   const sharerTitle = text(body.sharerTitle, 50);
@@ -2190,10 +2212,10 @@ const routes: [string, RegExp, Handler][] = [
       const sub = ctx.session?.sub ?? "";
       const { results } = await ctx.db
         .prepare(
-          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, l.event_date AS eventDate, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' ORDER BY l.course_id, l.position",
+          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, l.event_date AS eventDate, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' ORDER BY l.course_id, l.position",
         )
         .bind(sub)
-        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; done: number | null }>();
+        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
       return {
         lessons: results.map((r) => ({
           id: r.id,
@@ -2205,7 +2227,7 @@ const routes: [string, RegExp, Handler][] = [
           sharerTitle: r.sharerTitle,
           eventDate: r.eventDate,
           minutes: r.minutes,
-          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
+          coverUrl: r.autoCover === 1 && r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
           // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
           ytThumb: r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,
@@ -3551,7 +3573,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/courses\/([\w-]+)\/lessons$/,
     async (ctx, [courseId]) => {
       const admin = await requireCourseManager(ctx, courseId);
-      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown }>(ctx.req);
+      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown }>(ctx.req);
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
       const sharerRank = typeof body.sharerRank === "string" ? body.sharerRank.trim().slice(0, 40) : "";
@@ -3563,7 +3585,7 @@ const routes: [string, RegExp, Handler][] = [
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;
       await ctx.db.batch([
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?)").bind(id, courseId, course.maxpos + 1, title, sharer, sharerRank, sharerTitle, eventDate),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?)").bind(id, courseId, course.maxpos + 1, title, sharer, sharerRank, sharerTitle, eventDate, body.autoCover === true ? 1 : 0),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, title),
       ]);
       return courseDetail(ctx, courseId);

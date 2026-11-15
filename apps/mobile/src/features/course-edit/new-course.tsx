@@ -3,6 +3,7 @@ import { useState } from "react";
 import { api, HQ_UNIT, type CourseDetail } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { AppText, Chips, Field, NoticeBox } from "@/ui";
+import { Check } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
 /**
@@ -18,6 +19,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
   const [title, setTitle] = useState("");
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [seriesName, setSeriesName] = useState("");
+  const [autoCover, setAutoCover] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
@@ -25,7 +27,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { title: title.trim(), series: seriesName.trim() };
+      const body: Record<string, unknown> = { title: title.trim(), series: seriesName.trim(), autoCover };
       if (isHq) Object.assign(body, { hostUnit: host, guidanceUnit: HQ_UNIT });
       const d = await api<CourseDetail>("POST", "/admin/courses", body);
       invalidate();
@@ -50,6 +52,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
       )}
       <Field label="系列（選填；同系列的課合併成一張卡）" value={seriesName} onChange={setSeriesName} placeholder="不填＝不合併" />
       {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "不合併" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={seriesName} onChange={setSeriesName} /> : null}
+      <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
         建立後是「未上架」，學員看不到；在課程頁補好資料再上架。
       </AppText>

@@ -12,6 +12,7 @@ import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, DateSelect, Icon, NoticeBox, Pill, todayStr, type SelectOption } from "@/ui";
+import { Check } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
 const kinds: { key: MediaType; label: string }[] = [
@@ -106,6 +107,7 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
   const [sharer, setSharer] = useState("");
   const [rank, setRank] = useState("");
   const [job, setJob] = useState("");
+  const [autoCover, setAutoCover] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const tName = course.teacher ?? "";
@@ -117,7 +119,7 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
     setBusy(true);
     setError(null);
     try {
-      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, eventDate: course.eventStart ?? todayStr() });
+      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, eventDate: course.eventStart ?? todayStr(), autoCover });
       invalidate();
       onClose();
     } catch (e) {
@@ -136,8 +138,9 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
       </View>
       <SharerField value={sharer} onChange={setSharer} teacher={tName} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : tName), setRank(sameT ? "" : tRank), setJob(sameT ? "" : tJob))} label="新章節分享者" />
       <RankTitleRow rank={rank} title={job} onRank={setRank} onTitle={setJob} rankOptions={rankOptions} readOnly={sameT} who="新章節分享者" />
+      <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
-        新增後再點章節旁的鉛筆，設定影片、音檔與附件。
+        新增後再點章節旁的鉛筆，設定影片、音檔與附件。章節設成 YouTube 影片後，封面就會自動用影片畫面。
       </AppText>
     </EditSheet>
   );
@@ -248,6 +251,7 @@ function LessonEditor({
   const [start, setStart] = useState(toHms(lesson.start));
   const [end, setEnd] = useState(toHms(lesson.end));
   const [eventDate, setEventDate] = useState(lesson.eventDate ?? "");
+  const [autoCover, setAutoCover] = useState(!!lesson.autoCover);
   const sameAsPrev = !!prevDate && eventDate === prevDate;
   const sameAsCourse = !!courseDate && eventDate === courseDate;
   const [busy, setBusy] = useState<string | null>(null);
@@ -265,6 +269,7 @@ function LessonEditor({
     sharerRank !== (lesson.sharerRank ?? "") ||
     sharerTitle !== (lesson.sharerTitle ?? "") ||
     eventDate !== (lesson.eventDate ?? "") ||
+    autoCover !== !!lesson.autoCover ||
     (kind !== currentKind && (kind === "demo" || kind === "youtube")) ||
     (kind === "youtube" && ref !== (lesson.media?.type === "youtube" ? lesson.media.ref ?? "" : "")) ||
     JSON.stringify(start) !== JSON.stringify(toHms(lesson.start)) ||
@@ -276,7 +281,7 @@ function LessonEditor({
     setBusy("save");
     setMsg(null);
     try {
-      const body: Record<string, unknown> = { title, sharer, sharerRank, sharerTitle, startSeconds: s, endSeconds: e, eventDate: eventDate || null };
+      const body: Record<string, unknown> = { title, sharer, sharerRank, sharerTitle, startSeconds: s, endSeconds: e, eventDate: eventDate || null, autoCover };
       if (kind === "demo" || kind === "youtube") body.mediaType = kind;
       if (kind === "youtube") body.mediaRef = ref;
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
@@ -339,6 +344,7 @@ function LessonEditor({
         <SharerField value={sharer} onChange={setSharer} teacher={teacher} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : teacher), setSharerRank(sameT ? "" : teacherRank), setSharerTitle(sameT ? "" : teacherTitle))} label={`第 ${lesson.position} 堂分享者`} />
       </View>
       <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} readOnly={sameT} who={`第 ${lesson.position} 堂分享者`} />
+      {kind === "youtube" ? <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} /> : null}
       {chapterCovers ? <LessonArt lesson={lesson} onChanged={onSaved} /> : null}
       <View style={styles.dateHead}>
         <AppText variant="callout" style={{ flex: 1 }}>

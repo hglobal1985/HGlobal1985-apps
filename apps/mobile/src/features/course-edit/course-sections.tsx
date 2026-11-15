@@ -77,6 +77,36 @@ export function Check({ label, value, onChange, disabled }: { label: string; val
   );
 }
 
+/** 「EDM 與封面」面板裡的勾選：勾了就一律用第一支 YouTube 影片的畫面當封面（立刻儲存）；沒勾但完全沒有封面時，系統也會臨時用 YouTube 畫面。 */
+export function AutoCoverCheck({ course, onChanged }: { course: CourseDetail; onChanged: () => void }) {
+  const [on, setOn] = useState(course.autoCover);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const toggle = async (v: boolean) => {
+    setOn(v);
+    setBusy(true);
+    setErr(null);
+    try {
+      await api("PATCH", `/admin/courses/${course.id}`, { autoCover: v });
+      onChanged();
+    } catch (e) {
+      setOn(!v);
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View style={{ gap: space.xs }}>
+      <Check label="自動抓取 YouTube 影片畫面當封面" value={on} onChange={toggle} disabled={busy} />
+      <AppText variant="caption" tone="muted">
+        勾選後，這門課的封面與 EDM 一律用第一支 YouTube 章節的影片畫面（不用上傳）。沒勾、而且沒有上傳任何封面時，系統也會先用 YouTube 畫面頂著。
+      </AppText>
+      {err ? <NoticeBox tone="danger" text={err} /> : null}
+    </View>
+  );
+}
+
 /** 可複選的圓角選項（分類、主辦單位）。值是「、」分隔文字。 */
 function MultiChips({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
   const { c } = useTheme();
