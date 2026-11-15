@@ -144,7 +144,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     setQ(next);
     setPicked(next);
   };
-  const groups = useMemo(() => orderGroups(groupBySeries(list, courses), config.seriesOrder ?? []), [list, courses, config.seriesOrder]);
+  // 選了某個中心：該中心的課程一門一張平鋪，同系列也不合併（業主 2026-11-15）。
+  const flat = mode === "center" && center !== ALL;
+  const groups = useMemo(
+    () => (flat ? list.map((x) => ({ key: `c:${x.id}`, nearest: x, sessions: [x] })) : orderGroups(groupBySeries(list, courses), config.seriesOrder ?? [])),
+    [flat, list, courses, config.seriesOrder],
+  );
   // 章節模式：符合條件的章節，不分組、不顯示系列標題，順序隨機（每次打開頁面、切到章節模式就重新洗牌；
   // 同一次瀏覽中打字搜尋、換分類時，相對順序保持不變，畫面不會跳動）。
   const [shuffleSeed, setShuffleSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
@@ -282,7 +287,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
             {tileW && mode === "center" && center === ALL
               ? centers.map((name) => <CenterTile key={name} name={name} edmUrl={centerArt.data?.find((a) => a.center === name)?.edmUrl} count={courses.filter((x) => x.hostCenter === name && (category === ALL || x.category.split("、").includes(category))).length} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
-            {tileW && !(mode === "center" && center === ALL) ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} />) : null}
+            {tileW && !(mode === "center" && center === ALL) ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
           </View>
         </>
       )}

@@ -30,16 +30,18 @@ function TopFill({ uri, w, h }: { uri: string; w: number; h: number }) {
 /**
  * 「全部課程」的小卡片：只有 EDM（整張封面可點，點了從下方彈出梯次選單；封面上不放任何文字）。
  * 有系列＝顯示系列的專屬 EDM，沒上傳就用系列名稱當大標題；沒有系列＝顯示課程自己的 EDM（沒有就用課程名稱）。
+ * flat（中心模式選了某中心時）：所有課程平鋪，同系列也不合併。
  * 緞帶仍然顯示，文字以日期最近的那一梯為準。不顯示任何課程資訊欄位。
  */
-export function SeriesTile({ group, width }: { group: SeriesGroup; width: number }) {
+export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup; width: number; flat?: boolean }) {
   const { c } = useTheme();
   const { member } = useSession();
   const { config } = useUiConfig();
   const [sheet, setSheet] = useState(false);
   const rep = group.nearest;
   const height = Math.round((width * 9) / 16); // 16:9
-  const inSeries = !!rep.series;
+  // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
+  const inSeries = !flat && !!rep.series;
   const edm = inSeries ? rep.seriesEdmUrl : rep.edmUrl;
   const ribbons = ribbonsFor(rep, member, config);
   const open = () => (group.sessions.length > 1 || inSeries ? setSheet(true) : router.push(`/course/${rep.id}`));
