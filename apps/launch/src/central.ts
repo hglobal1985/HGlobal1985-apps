@@ -420,7 +420,7 @@ export async function centralSuggest(token: string, pool: "education_system" | "
   const res = await callCentral(token, `/v1/vocab/suggestions?pool=${pool}&q=${encodeURIComponent(q.slice(0, 30))}`);
   if (!res?.ok) return [];
   const b = (await res.json().catch(() => null)) as { suggestions?: unknown[] } | null;
-  return (b?.suggestions ?? []).filter((x): x is string => typeof x === "string").slice(0, q.trim() ? 12 : 100);
+  return (b?.suggestions ?? []).filter((x): x is string => typeof x === "string").slice(0, q.trim() ? 50 : 100);
 }
 
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
