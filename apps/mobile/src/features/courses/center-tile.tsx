@@ -1,35 +1,52 @@
 import { Image, Pressable, StyleSheet, View } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { resolveUrl } from "@/api/client";
 import { centerTitle } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
-import { useTheme } from "@/theme/theme";
-import { radius, space } from "@/theme/tokens";
 import { AppText } from "@/ui";
 
-/** 「寰宇教育中心」清單的小卡片：中心 EDM 的 16:9 封面（沒上傳就用淡色底加中心名稱當封面），卡片正下方是放大的中心名稱（統一格式「XX中心」、置中，不顯示編號與堂數）；整張可點。 */
+/**
+ * 「寰宇教育中心」清單的卡片：整張 16:10 的圖，中心名稱（統一格式「XX中心」）用白字壓在左下角的暗色漸層上，名稱只出現一次；
+ * 有上傳 EDM 就用照片，沒有就用品牌綠色漸層底，兩種長得一樣。整張可點。
+ */
 export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edmUrl?: string | null; width: number; onPress: () => void }) {
-  const { c } = useTheme();
   useCenterNames();
   const title = centerTitle(name);
-  const height = Math.round((width * 9) / 16);
+  const height = Math.round((width * 10) / 16);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={{ width }}>
-      <View style={[styles.art, { width, height, backgroundColor: c.accentSoft }]}>
-        {edmUrl ? (
-          <Image source={{ uri: resolveUrl(edmUrl) }} style={{ width, height }} resizeMode="cover" />
-        ) : (
-          <AppText variant="headline" style={{ color: c.accentText, textAlign: "center", paddingHorizontal: space.sm }}>
-            {title}
-          </AppText>
-        )}
+    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={[styles.card, { width, height }]}>
+      {edmUrl ? (
+        <Image source={{ uri: resolveUrl(edmUrl) }} style={{ width, height }} resizeMode="cover" />
+      ) : (
+        <Gradient id="brand" from="#2F5D3A" to="#4C8A5B" fromOpacity={1} toOpacity={1} diagonal />
+      )}
+      <Gradient id="shade" from="#000000" to="#000000" fromOpacity={0} toOpacity={0.62} startY={0.38} />
+      <View style={styles.label} pointerEvents="none">
+        <AppText numberOfLines={2} style={styles.name}>
+          {title}
+        </AppText>
       </View>
-      <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontSize: 18, lineHeight: 24, textAlign: "center" }}>
-        {title}
-      </AppText>
     </Pressable>
   );
 }
 
+/** 鋪滿整張卡的漸層（react-native-svg，網頁與 App 都支援）。 */
+function Gradient({ id, from, to, fromOpacity, toOpacity, diagonal = false, startY = 0 }: { id: string; from: string; to: string; fromOpacity: number; toOpacity: number; diagonal?: boolean; startY?: number }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
+      <Defs>
+        <LinearGradient id={id} x1={diagonal ? "0" : "0"} y1={diagonal ? "0" : String(startY)} x2={diagonal ? "1" : "0"} y2="1">
+          <Stop offset="0" stopColor={from} stopOpacity={fromOpacity} />
+          <Stop offset="1" stopColor={to} stopOpacity={toOpacity} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
-  art: { borderRadius: radius.md, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  card: { borderRadius: 16, overflow: "hidden", backgroundColor: "#2F5D3A" },
+  label: { position: "absolute", left: 12, right: 12, bottom: 10 },
+  name: { color: "#FFFFFF", fontSize: 16, lineHeight: 22, fontWeight: "600", letterSpacing: 0.5 },
 });
