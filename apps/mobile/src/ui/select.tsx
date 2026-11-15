@@ -17,10 +17,13 @@ export type SelectProps = {
   onChange: (key: string) => void;
   /** 選項裡沒有符合 value 時顯示的文字。 */
   placeholder?: string;
+  /** 篩選中：框變深綠實心白字，右邊出現 ✕（點了呼叫 onClear 清除篩選）。 */
+  active?: boolean;
+  onClear?: () => void;
 };
 
 /** 下拉選單（App 與網頁一律用這個）：點開後從畫面下方彈出選項面板（不使用瀏覽器或系統內建的選單），目前選的項目打勾，開啟時自動捲到該項。 */
-export function Select({ label, value, options, onChange, placeholder = "請選擇" }: SelectProps) {
+export function Select({ label, value, options, onChange, placeholder = "請選擇", active = false, onClear }: SelectProps) {
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
   const scroller = useRef<ElementRef<typeof ScrollView>>(null);
@@ -33,12 +36,25 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
           {label}
         </AppText>
       ) : null}
+      {active && onClear ? (
+        <View style={[styles.box, { backgroundColor: c.accent, borderColor: c.accent }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${label ?? current?.label ?? "篩選"}（篩選中，點一下更換）`} onPress={() => setOpen(true)} style={styles.activeMain}>
+            <AppText variant="body" numberOfLines={1} style={{ color: c.textOnAccent, fontWeight: "700" }}>
+              {current?.short ?? current?.label ?? placeholder}
+            </AppText>
+          </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="清除篩選" onPress={onClear} hitSlop={8} style={styles.clear}>
+            <Ionicons name="close" size={16} color={c.textOnAccent} />
+          </Pressable>
+        </View>
+      ) : (
       <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setOpen(true)} style={[styles.box, { backgroundColor: c.surface, borderColor: c.border }]}>
         <AppText variant="body" numberOfLines={1} style={{ flex: 1, color: current ? c.text : c.textMuted }}>
           {current?.short ?? current?.label ?? placeholder}
         </AppText>
         <Ionicons name="chevron-down" size={18} color={c.textMuted} />
       </Pressable>
+      )}
       {open ? (
         <BottomSheet onClose={() => setOpen(false)}>
           {label ? <AppText variant="headline">{label}</AppText> : null}
@@ -84,6 +100,8 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
 
 const ITEM_H = minTouch + 4;
 const styles = StyleSheet.create({
+  activeMain: { flex: 1, minHeight: minTouch - 2, justifyContent: "center", paddingLeft: space.xs },
+  clear: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(255,255,255,0.28)", alignItems: "center", justifyContent: "center" },
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, marginRight: 6 },
   wrap: { gap: 4, flex: 1, minWidth: 0 },
   box: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm, flexDirection: "row", alignItems: "center", gap: space.xs },
