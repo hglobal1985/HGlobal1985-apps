@@ -314,7 +314,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
 function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isHq = member?.role === "admin";
-  const init = { guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, showFull: course.showFull, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
+  const init = { centerCourse: course.centerCourse, guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, showFull: course.showFull, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
   const [f, setF] = useState(init);
   const centers = useApi<string[]>(isHq ? "/centers" : null);
   const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
@@ -323,10 +323,16 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const submit = async () => {
     const body: Record<string, unknown> = { ...f };
     if (!isHq) delete body.hostUnit; // 中心的人不能改主辦中心
+    if (!isHq) delete body.centerCourse; // 中心課程由系統固定，中心的人不能改
     if (await save(body)) onClose();
   };
   return (
     <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+      {isHq ? (
+        <Check label="中心課程（只在「寰宇教育中心」頁出現，不在「全部課程」出現）" value={f.centerCourse} onChange={(v) => setF((x) => ({ ...x, centerCourse: v }))} />
+      ) : (
+        <Check label="中心課程（各中心建立的課程固定是中心課程）" value disabled onChange={() => undefined} />
+      )}
       {isHq ? <Check label="指導單位：寰宇總部（會公開顯示）" value={f.guidanceUnit === HQ_UNIT} onChange={(v) => setF((x) => ({ ...x, guidanceUnit: v ? HQ_UNIT : "" }))} /> : null}
       {f.guidanceUnit === HQ_UNIT ? <NoticeBox text="由寰宇總部指導的課程，只能使用總部的審核群組。" /> : null}
       <Label>主辦單位（會公開顯示；管理權限與「中心」篩選以第一個中心為準）</Label>

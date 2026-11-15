@@ -22,6 +22,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [seriesName, setSeriesName] = useState("");
   const [autoCover, setAutoCover] = useState(false);
+  const [centerCourse, setCenterCourse] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
@@ -29,7 +30,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { title: title.trim(), series: seriesName.trim(), autoCover };
+      const body: Record<string, unknown> = { title: title.trim(), series: seriesName.trim(), autoCover, ...(isHq ? { centerCourse } : {}) };
       if (isHq) Object.assign(body, { hostUnit: host, guidanceUnit: HQ_UNIT });
       const d = await api<CourseDetail>("POST", "/admin/courses", body);
       invalidate();
@@ -54,6 +55,11 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
       )}
       <Field label="系列（選填；同系列的課合併成一張卡）" value={seriesName} onChange={setSeriesName} placeholder="不填＝不合併" />
       {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "不合併" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={seriesName} onChange={setSeriesName} /> : null}
+      {isHq ? (
+        <Check label="中心課程（只在「寰宇教育中心」頁出現，不在「全部課程」出現）" value={centerCourse} onChange={setCenterCourse} />
+      ) : (
+        <Check label="中心課程（各中心建立的課程固定是中心課程）" value disabled onChange={() => undefined} />
+      )}
       <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
         建立後是「未上架」，學員看不到；在課程頁補好資料再上架。

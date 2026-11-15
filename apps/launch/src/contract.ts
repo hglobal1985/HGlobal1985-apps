@@ -129,6 +129,8 @@ export type CourseSummary = {
   chapterCovers: boolean;
   /** 勾了「自動使用 YouTube 影片畫面當封面」。 */
   autoCover: boolean;
+  /** 中心課程：只在「寰宇教育中心」頁出現，不在「全部課程」出現。 */
+  centerCourse: boolean;
   /** 課程建立時間（ISO）；「分類」選單的「新」標籤用。 */
   createdAt: string;
   /** 付費課程（原價大於 0；限時免費、早鳥、鑽石免費仍算）。學習中的課程卡用來顯示「付費課程」標籤（不寫金額）。 */
