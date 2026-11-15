@@ -3,10 +3,11 @@ import { api, resolveUrl, type CourseDetail } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { AppText, Button, Card, NoticeBox, Section } from "@/ui";
 import { EdmCropper } from "./edm-cropper.web";
-import { EDM_MAX_SIDE, COVER_MAX_SIDE, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
+import { EDM_MAX_SIDE, COVER_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 import { locateCover } from "./cover-match.web";
 
-type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect };
+type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode };
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 
 /** 預設的 16:9 封面裁切框：水平垂直置中、盡量大。 */
@@ -44,7 +45,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
     let dead = false;
     const t = setTimeout(async () => {
       try {
-        const blob = await cropCompress(job.img, job.cover, 640, 0.75);
+        const blob = job.mode === "contain" ? await composeContain(job.img, 640, 0.75) : await cropCompress(job.img, job.cover, 640, 0.75);
         if (dead) return;
         url = URL.createObjectURL(blob);
         setPreview(url);
@@ -56,7 +57,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
       dead = true;
       clearTimeout(t);
     };
-  }, [job?.img, job?.cover]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [job?.img, job?.cover, job?.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,7 +67,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
     setMsg({ tone: "info", text: "讀取圖片中…" });
     try {
       const img = await loadImage(file);
-      setJob({ img, src: img.src, isNew: true, cover: defaultCover(img) });
+      setJob({ img, src: img.src, isNew: true, cover: defaultCover(img), mode: defaultCoverMode(img) });
       setMsg(null);
     } catch (err) {
       setMsg({ tone: "danger", text: (err as Error).message });
@@ -92,7 +93,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
         const d = defaultCover(img);
         cover = { ...d, y: Math.min(Math.round(course.edmViewY * img.naturalHeight), Math.max(0, img.naturalHeight - d.h)) };
       }
-      setJob({ img, src: img.src, isNew: false, cover });
+      setJob({ img, src: img.src, isNew: false, cover, mode: "crop" });
       setMsg(null);
     } catch (err) {
       setMsg({ tone: "danger", text: (err as Error).message });
@@ -107,9 +108,10 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
     setMsg({ tone: "info", text: "處理並上傳中…" });
     try {
       if (job.isNew) await api("PUT", `/admin/courses/${course.id}/edm`, await cropCompress(job.img, null, EDM_MAX_SIDE, 0.9));
-      await api("PUT", `/admin/courses/${course.id}/cover`, await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.88));
+      const contain = job.mode === "contain"; // 完整顯示：整張照片＋淡模糊背景的合成圖，預設位置固定在最上緣
+      await api("PUT", `/admin/courses/${course.id}/cover`, contain ? await composeContain(job.img, COVER_MAX_SIDE, 0.88) : await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.88));
       // 封面框（占圖片寬高的比例）一併存起來；後端用它算出「預設停留位置＝封面框上緣」，兩者永遠同步。
-      await api("PATCH", `/admin/courses/${course.id}`, { coverRect: { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
+      await api("PATCH", `/admin/courses/${course.id}`, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
       setJob(null);
       setMsg({ tone: "success", text: "已儲存" });
       onChanged();
@@ -172,7 +174,8 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
             <AppText variant="callout" tone="muted">
               拖曳框內移動位置，拖四個角調整大小。框的上緣就是課程介紹頁一進來停留的位置。
             </AppText>
-            <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} />
+            <CoverModePicker mode={job.mode} img={job.img} onChange={(mode) => setJob({ ...job, mode })} />
+            {job.mode === "crop" ? <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} /> : null}
             <AppText variant="callout" tone="muted">
               封面預覽
             </AppText>

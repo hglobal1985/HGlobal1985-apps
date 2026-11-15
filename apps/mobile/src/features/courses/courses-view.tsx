@@ -8,6 +8,7 @@ import { CenterEdm } from "@/features/admin/center-edm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { ShortLinkRow } from "@/features/course-edit/short-link-row";
+import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { HeaderShare } from "@/features/share-button";
 import { CourseRow } from "./course-row";
@@ -361,11 +362,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const shortLink = activeCenter !== ALL ? links.data?.find((l) => l.kind === "center" && l.value === activeCenter) : undefined;
   return (
     <View style={{ flex: 1 }}>
-    <Screen header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={activeCenter} onBack={backFromCenter} right={
+    <Screen header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={centerTitle(activeCenter)} onBack={backFromCenter} right={
             <>
               {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心 EDM" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
               {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
-              <HeaderShare title={activeCenter} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
+              <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
           } /> : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}

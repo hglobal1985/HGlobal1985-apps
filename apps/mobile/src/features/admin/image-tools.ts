@@ -69,3 +69,49 @@ export async function cropCompress(img: HTMLImageElement, crop: Rect | null, max
   ctx.drawImage(img, src.x, src.y, src.w, src.h, 0, 0, c.width, c.height);
   return toBlob(c, quality);
 }
+
+/** 背景模糊強度：把照片縮到 1/N 再放大回來（N 越大越模糊）。6＝輕度模糊，仍看得出是同一張照片的人物與場景。不依賴 ctx.filter，iOS Safari 也能用。 */
+export const BG_BLUR_DOWNSCALE = 6;
+
+/** 照片比 16:9 窄多少：回傳「裁成 16:9 會切掉上下幾 %」（照片比 16:9 寬或一樣寬回 0）。 */
+export function cutPercentFor16x9(img: { naturalWidth: number; naturalHeight: number }): number {
+  const kept = ((img.naturalWidth / img.naturalHeight) * 9) / 16; // 裁成 16:9 後保留的高度比例
+  return kept >= 1 ? 0 : Math.round((1 - kept) * 100);
+}
+
+/**
+ * 「完整顯示」封面：16:9 畫布，整張照片等比縮小放在正中間（完全不裁切），
+ * 背景用同一張照片鋪滿再輕度模糊、略微變暗，讓前景突出又保留照片的氛圍。
+ */
+export async function composeContain(img: HTMLImageElement, maxSide: number, quality = 0.88): Promise<Blob> {
+  const W = Math.min(maxSide, 1280);
+  const H = Math.round((W * 9) / 16);
+  const { c, ctx } = canvasOf(W, H);
+  // 背景：cover 鋪滿 → 縮小再放大＝輕度模糊
+  const cover = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const bw = img.naturalWidth * cover;
+  const bh = img.naturalHeight * cover;
+  const small = document.createElement("canvas");
+  small.width = Math.max(2, Math.round(W / BG_BLUR_DOWNSCALE));
+  small.height = Math.max(2, Math.round(H / BG_BLUR_DOWNSCALE));
+  const sctx = small.getContext("2d")!;
+  sctx.imageSmoothingQuality = "high";
+  sctx.drawImage(img, (small.width - (bw * small.width) / W) / 2, (small.height - (bh * small.height) / H) / 2, (bw * small.width) / W, (bh * small.height) / H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(small, 0, 0, W, H);
+  ctx.fillStyle = "rgba(0,0,0,0.14)";
+  ctx.fillRect(0, 0, W, H);
+  // 前景：contain 置中，邊緣極淡陰影
+  const fit = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+  const fw = Math.round(img.naturalWidth * fit);
+  const fh = Math.round(img.naturalHeight * fit);
+  const fx = Math.round((W - fw) / 2);
+  const fy = Math.round((H - fh) / 2);
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = Math.round(W / 60);
+  ctx.drawImage(img, fx, fy, fw, fh);
+  ctx.restore();
+  return toBlob(c, quality);
+}

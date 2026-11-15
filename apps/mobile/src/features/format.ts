@@ -63,6 +63,12 @@ export function eventDays(start: string | null | undefined, end?: string | null)
 /** 單位名稱不顯示教育中心的數字代碼：「飛登 013」→「飛登」。 */
 export const cleanUnit = (u: string): string => u.replace(/\s*\d+\s*$/, "").trim();
 
+/** 中心的標題名稱（與分享預覽標題「XX教育中心 | 寰宇行動大學」的名稱部分完全相同）：去掉數字代碼、結尾補「教育中心」。「南京 062」→「南京教育中心」、「台北中心」→「台北教育中心」。後端同一份規則在 apps/launch/src/og.ts 的 centerShareName。 */
+export function centerTitle(label: string): string {
+  const base = label.replace(/\s*\d+\s*$/, "").replace(/教育中心$|中心$/, "").trim();
+  return `${base || label}教育中心`;
+}
+
 /** 章節的分享者顯示：「分享者：李講師 白金 經理」（姓名、獎銜、職稱，沒填的略過；三者都沒填回空字串）。 */
 export function sharerLine(l: { sharer: string; sharerRankName: string; sharerTitle: string }): string {
   const t = [l.sharer, l.sharerRankName, l.sharerTitle].map((x) => x.trim()).filter(Boolean).join(" ");

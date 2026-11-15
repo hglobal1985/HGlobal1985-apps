@@ -6,10 +6,11 @@ import { space } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
 import { showToast } from "@/ui/toast";
 import { EdmCropper } from "./edm-cropper.web";
-import { COVER_MAX_SIDE, EDM_MAX_SIDE, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
+import { COVER_MAX_SIDE, EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
-type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect };
+type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode };
 
 /** 預設的 16:9 封面裁切框：水平垂直置中、盡量大。 */
 function defaultCover(img: HTMLImageElement): Rect {
@@ -43,7 +44,7 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
     let dead = false;
     const t = setTimeout(async () => {
       try {
-        const blob = await cropCompress(job.img, job.cover, 640, 0.75);
+        const blob = job.mode === "contain" ? await composeContain(job.img, 640, 0.75) : await cropCompress(job.img, job.cover, 640, 0.75);
         if (!dead) setPreview(URL.createObjectURL(blob));
       } catch {
         /* 預覽失敗不影響儲存 */
@@ -53,7 +54,7 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
       dead = true;
       clearTimeout(t);
     };
-  }, [job?.img, job?.cover]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [job?.img, job?.cover, job?.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -63,7 +64,7 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
     setMsg("讀取圖片中…");
     try {
       const img = await loadImage(file);
-      setJob({ img, src: img.src, isNew: true, cover: defaultCover(img) });
+      setJob({ img, src: img.src, isNew: true, cover: defaultCover(img), mode: defaultCoverMode(img) });
       setMsg(null);
     } catch (err) {
       setMsg((err as Error).message);
@@ -79,7 +80,7 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
     try {
       const img = await loadImageUrl(resolveUrl(art.edmUrl));
       const cover = art.coverRect ? rectFrom(img, art.coverRect) : { ...defaultCover(img), y: Math.min(Math.round(art.edmViewY * img.naturalHeight), Math.max(0, img.naturalHeight - defaultCover(img).h)) };
-      setJob({ img, src: img.src, isNew: false, cover });
+      setJob({ img, src: img.src, isNew: false, cover, mode: "crop" });
       setMsg(null);
     } catch (err) {
       setMsg((err as Error).message);
@@ -93,8 +94,10 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
     setMsg("處理並上傳中…");
     try {
       if (job.isNew) await api("PUT", `/admin/center-art${q}`, await cropCompress(job.img, null, EDM_MAX_SIDE, 0.9));
-      await api("PUT", `/admin/center-art/cover${q}`, await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.88));
-      await api("PATCH", `/admin/center-art${q}`, { coverRect: { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
+      // 完整顯示：封面是「整張照片＋淡模糊背景」合成圖，預設停留位置固定在最上緣。
+      const contain = job.mode === "contain";
+      await api("PUT", `/admin/center-art/cover${q}`, contain ? await composeContain(job.img, COVER_MAX_SIDE, 0.88) : await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.88));
+      await api("PATCH", `/admin/center-art${q}`, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
       setJob(null);
       setMsg(null);
       showToast("已更新中心 EDM");
@@ -135,15 +138,16 @@ export function CenterEdm({ center, art, onChanged }: { center: string; art?: Ce
         </>
       ) : (
         <>
-          <AppText variant="headline">指定封面：拖曳裁切框</AppText>
+          <AppText variant="headline">指定封面</AppText>
+          <CoverModePicker mode={job.mode} img={job.img} onChange={(mode) => setJob({ ...job, mode })} />
           <AppText variant="callout" tone="muted">
-            拖曳框內移動位置，拖四個角調整大小（橫式 16:9，比例固定）。框內就是中心卡片的縮圖，框的上緣就是進入中心頁時一開始停留的位置。調整好請按「儲存封面」。
+            {job.mode === "contain" ? "整張照片都會保留，放在中間，背景用同一張照片輕度模糊補滿。確認預覽後請按「儲存封面」。" : "拖曳框內移動位置，拖四個角調整大小（橫式 16:9，比例固定）。框內就是中心卡片的縮圖，框的上緣就是進入中心頁時一開始停留的位置。調整好請按「儲存封面」。"}
           </AppText>
           <View style={styles.buttons}>
             <Button label="儲存封面" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
             <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
           </View>
-          <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} />
+          {job.mode === "crop" ? <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} /> : null}
           <AppText variant="callout" tone="muted">
             封面預覽
           </AppText>
