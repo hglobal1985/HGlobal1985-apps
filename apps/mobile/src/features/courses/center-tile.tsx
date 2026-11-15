@@ -9,7 +9,7 @@ export function CenterTile({ name, edmUrl, count, width, onPress }: { name: stri
   const { c } = useTheme();
   const height = Math.round((width * 9) / 16);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${name}，${count} 堂`} onPress={onPress} style={{ width }}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${name}，${count} 堂`} onPress={onPress} style={{ width, opacity: count ? 1 : 0.6 }}>
       <View style={[styles.art, { width, height, backgroundColor: c.accentSoft }]}>
         {edmUrl ? (
           <Image source={{ uri: resolveUrl(edmUrl) }} style={{ width, height }} resizeMode="cover" />

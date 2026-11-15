@@ -170,14 +170,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     hint: `${lessonsOf(pool)} 堂`,
     badges: pool.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${pool.filter((x) => x.enrollment === "opened").length}`, tone: "accent" }] : [],
   };
-  // 中心：課程的主辦中心（名稱都是會員中心清單裡的）；管理者另外加上自己能管的中心（還沒有課程也能先上傳 EDM）。
+  // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（業主 2026-11-15）；不混入本地資料。
   const rights = member?.courseRights;
-  const centers = useMemo(() => {
-    const set = new Set(courses.filter((x) => x.centerCourse).map((x) => x.hostCenter).filter(Boolean));
-    if (rights?.center) set.add(rights.center);
-    if (rights?.all) for (const a of centerArt.data ?? []) set.add(a.center);
-    return [...set].sort((a, b) => a.localeCompare(b, "zh-Hant"));
-  }, [courses, rights, centerArt.data]);
+  const centerList = useApi<string[]>(member ? "/centers" : null);
+  const centers = centerList.data ?? [];
+  const normCenter = (v: string) => v.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
   const activeCenter = mode === "center" ? center : ALL;
   const inCategory = (x: CourseSummary) => matchesCats(x, selCats);
@@ -185,14 +182,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const centerCounts = useMemo(
     () =>
       centers
-        .map((name) => ({ name, count: lessonsOf(courses.filter((x) => x.centerCourse && x.hostCenter === name && inCategory(x))) }))
+        .map((name) => ({ name, count: lessonsOf(courses.filter((x) => x.centerCourse && normCenter(x.hostCenter) === normCenter(name) && inCategory(x))) }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
-    [centers, courses, category],
+    [centers, courses, category], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const art = activeCenter !== ALL ? centerArt.data?.find((a) => a.center === activeCenter) : undefined;
   const canEditArt = activeCenter !== ALL && !!rights && (rights.all || (rights.center === activeCenter && (rights.manageEditors || !!rights.editor?.editOthers)));
-  const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || x.hostCenter === activeCenter));
-  const inCenter = (x: CourseSummary) => activeCenter === ALL || x.hostCenter === activeCenter;
+  const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter)));
+  const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
   const needIndex = wantIndex || chapterMode;
   const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? []) : null), [needIndex, courses, searchData.data]);
   const matched = searchIndex && !seriesFilter ? matchCourses(searchIndex, q) : null;
