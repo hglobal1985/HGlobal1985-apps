@@ -98,7 +98,6 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
   const tName = course.teacher ?? "";
   const tRank = course.teacherRank ?? "";
   const tJob = course.teacherTitle ?? "";
-  const sameT = !!tName && sharer === tName && rank === tRank && job === tJob;
   const submit = async () => {
     if (!isSpeaker && !title.trim()) return setError(`請輸入${word}名稱`);
     setBusy(true);
@@ -126,8 +125,8 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
         </AppText>
         <TextInput value={title} onChangeText={setTitle} placeholder="例如：第 2 段 Q&A" placeholderTextColor={c.textMuted} accessibilityLabel={`新${word}名稱`} style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
       </View>
-      <SharerField value={sharer} onChange={setSharer} teacher={tName} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : tName), setRank(sameT ? "" : tRank), setJob(sameT ? "" : tJob))} label="新章節分享者" />
-      <RankTitleRow rank={rank} title={job} onRank={setRank} onTitle={setJob} rankOptions={rankOptions} readOnly={sameT} who="新章節分享者" />
+      <SharerField value={sharer} onChange={setSharer} label="新章節分享者" />
+      <RankTitleRow rank={rank} title={job} onRank={setRank} onTitle={setJob} rankOptions={rankOptions} who="新章節分享者" />
         </>
       )}
       <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
@@ -155,36 +154,22 @@ function SpeakerCheck({ value, onChange, other }: { value: boolean; onChange: (v
   );
 }
 
-/** 分享者欄位：右側「同主講人」勾選（課程有填主講人才出現）；勾選＝分享者就是主講人，輸入框收起來。 */
-function SharerField({ value, onChange, teacher, same, onToggleSame, label }: { value: string; onChange: (v: string) => void; teacher: string; same: boolean; onToggleSame: () => void; label: string }) {
+/** 分享者欄位（輸入姓名；選填）。 */
+function SharerField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
   const { c } = useTheme();
   return (
     <View style={{ flex: 2, gap: space.xs }}>
       <AppText variant="callout" tone="muted">
         分享者
       </AppText>
-      {same ? (
-        <View style={[styles.input, { justifyContent: "center", borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
-          <AppText variant="body" tone="muted" numberOfLines={1}>
-            {teacher}
-          </AppText>
-        </View>
-      ) : (
-        <TextInput
-          value={value}
-          onChangeText={onChange}
-          placeholder="選填"
-          placeholderTextColor={c.textMuted}
-          accessibilityLabel={label}
-          style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
-        />
-      )}
-      {teacher ? (
-        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: same }} accessibilityLabel="分享者同主講人" onPress={onToggleSame} style={styles.sharerCheck}>
-          <Icon name={same ? "checkbox" : "square-outline"} size={28} color={same ? c.accent : c.textMuted} />
-          <AppText variant="callout">同主講人</AppText>
-        </Pressable>
-      ) : null}
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder="選填"
+        placeholderTextColor={c.textMuted}
+        accessibilityLabel={label}
+        style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
+      />
     </View>
   );
 }
@@ -229,7 +214,6 @@ function LessonEditor({
   const [sharer, setSharer] = useState(lesson.sharer ?? "");
   const [sharerRank, setSharerRank] = useState(lesson.sharerRank ?? "");
   const [sharerTitle, setSharerTitle] = useState(lesson.sharerTitle ?? "");
-  const sameT = !!teacher && sharer === teacher && sharerRank === teacherRank && sharerTitle === teacherTitle;
   const [media, setMedia] = useState<MediaDraft>(() => mediaDraftOf(lesson));
   const kind = media.kind;
   // 章節日期預設「跟著課程日期」（follow）：課程日期改了這堂跟著變；自己選了日期就不再跟著。
@@ -305,9 +289,9 @@ function LessonEditor({
             style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
           />
         </View>
-        <SharerField value={sharer} onChange={setSharer} teacher={teacher} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : teacher), setSharerRank(sameT ? "" : teacherRank), setSharerTitle(sameT ? "" : teacherTitle))} label={`第 ${lesson.position} 堂分享者`} />
+        <SharerField value={sharer} onChange={setSharer} label={`第 ${lesson.position} 堂分享者`} />
       </View>
-      <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} readOnly={sameT} who={`第 ${lesson.position} 堂分享者`} />
+      <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} who={`第 ${lesson.position} 堂分享者`} />
         </>
       )}
       {kind === "youtube" ? <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} /> : null}
@@ -393,7 +377,6 @@ export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "
 
 const styles = StyleSheet.create({
   twoCol: { flexDirection: "row", gap: space.sm },
-  sharerCheck: { flexDirection: "row", alignItems: "center", gap: space.xs, minHeight: minTouch },
   dateHead: { flexDirection: "row", alignItems: "center" },
   sameCheck: { flexDirection: "row", alignItems: "center", gap: space.xs, minHeight: minTouch, paddingLeft: space.sm },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },

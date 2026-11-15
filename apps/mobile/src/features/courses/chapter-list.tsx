@@ -7,6 +7,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, CourseCover } from "@/ui";
 import type { SearchLesson } from "./course-search";
+import { SpeakerMark } from "./speaker-mark";
 
 export type ChapterItem = { lesson: SearchLesson; course: CourseSummary; locked: boolean };
 
@@ -39,9 +40,12 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
               )}
             </View>
             <View style={styles.mid}>
-              <AppText variant="callout" style={{ fontWeight: "800" }} numberOfLines={2}>
-                {lesson.title}
-              </AppText>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                {lesson.isSpeaker ? <SpeakerMark size={16} /> : null}
+                <AppText variant="callout" style={{ fontWeight: "800", flexShrink: 1 }} numberOfLines={2}>
+                  {lesson.title}
+                </AppText>
+              </View>
               {who ? (
                 <AppText variant="caption" tone="muted" numberOfLines={1}>
                   {who}

@@ -271,6 +271,7 @@ export async function purgeMember(db: D1Database, sub: string, actor: string, ac
     db.prepare("DELETE FROM comment_reports WHERE reporter_sub = ?").bind(sub),
     db.prepare("DELETE FROM lesson_progress WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM learning_started WHERE member_sub = ?").bind(sub),
+    db.prepare("DELETE FROM center_views WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM lesson_watch WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM enrollments WHERE member_sub = ?").bind(sub),
     // 審核員／窗口收到的「有新的報名待審核」等通知連到這位會員的報名紀錄，報名紀錄刪除前先清掉，免得點了找不到。
@@ -2271,6 +2272,32 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/short-links$/,
     async (ctx) => (await ctx.db.prepare("SELECT kind, value, slug FROM short_links ORDER BY kind, slug").all<{ kind: string; value: string; slug: string }>()).results,
+  ],
+  [
+    "POST",
+    /^\/center-views$/,
+    async (ctx) => {
+      // 中心專屬頁瀏覽計數：同一位會員同一天同一中心只算一次；回傳累計人次。
+      const s = requireMember(ctx);
+      const body = await readJson<{ center?: unknown }>(ctx.req);
+      const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
+      if (!label) fail(400, "invalid_center", "請指定中心");
+      const key = centerKey(label);
+      const day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10); // 台灣時間的日期
+      await ctx.db.prepare("INSERT OR IGNORE INTO center_views (center_key, member_sub, day) VALUES (?, ?, ?)").bind(key, s.sub, day).run();
+      const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_views WHERE center_key = ?").bind(key).first<{ n: number }>();
+      return { total: n?.n ?? 0 };
+    },
+  ],
+  [
+    "GET",
+    /^\/center-views$/,
+    async (ctx) => {
+      requireMember(ctx);
+      const label = (ctx.url.searchParams.get("center") ?? "").trim();
+      const n = label ? await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_views WHERE center_key = ?").bind(centerKey(label)).first<{ n: number }>() : null;
+      return { total: n?.n ?? 0 };
+    },
   ],
   [
     "GET",

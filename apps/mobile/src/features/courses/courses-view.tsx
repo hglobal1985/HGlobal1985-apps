@@ -1,9 +1,9 @@
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BackHandler, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Animated, BackHandler, Platform, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import type { CenterArt, CourseSummary } from "@/api/client";
+import { api, type CenterArt, type CourseSummary } from "@/api/client";
 import { CenterEdm } from "@/features/admin/center-edm";
 import { CenterNameField } from "@/features/admin/center-name-field";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
@@ -13,10 +13,10 @@ import { canCreateCourse, canManageCourses } from "@/lib/roles";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { CourseRow } from "./course-row";
-import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
+import { CenterHero } from "./center-hero";
 import { CenterTile } from "./center-tile";
 import { UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { ModeFlash } from "./mode-flash";
@@ -153,7 +153,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }, [data, adminList.data]);
   const courses = useMemo(() => sortCourses(merged, member, config.sortGroups), [merged, member, config.sortGroups]);
   // 兩頁內容互不重複（業主 2026-11-15）：「寰宇教育中心」頁只有「中心課程」，「相同系列」「單元」只有一般課程。
-  const pool = useMemo(() => courses.filter((x) => (mode === "center") === !!x.centerCourse), [courses, mode]);
+  // 「寰宇教育中心」頁＝主辦單位含中心的課程；「相同系列」「單元」＝總部主辦的課程，加上所有有指定「系列」標籤的課程（不論主辦單位）。
+  const pool = useMemo(() => courses.filter((x) => (mode === "center" ? !!x.centerCourse : !x.centerCourse || !!x.series?.trim())), [courses, mode]);
   // 分類下拉＝「關鍵字管理」的分類清單（同步，沒有課程使用的分類也要列出）；載入前先用課程上出現過的分類。
   // 「地區教育中心」不放進下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
   const categoryList = useApi<string[]>("/categories");
@@ -358,12 +359,19 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     const sub = BackHandler.addEventListener("hardwareBackPress", () => (pickCenter(ALL), true));
     return () => sub.remove();
   }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
-  const centerHead =
-    activeCenter !== ALL ? (
-      <View style={{ gap: space.sm }}>
-        {art ? <EdmImageStage url={art.edmUrl} title={center} viewY={art.edmViewY} /> : null}
-      </View>
-    ) : null;
+  // 中心頁上方的照片：透明小標籤「N 門課・N 章節・N 瀏覽」；往上滑時縮成窄橫幅（CenterHero）。
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [centerViews, setCenterViews] = useState<number | null>(null);
+  useEffect(() => {
+    if (activeCenter === ALL || !member) return;
+    setCenterViews(null);
+    api<{ total: number }>("POST", "/center-views", { center: activeCenter })
+      .then((r) => setCenterViews(r.total))
+      .catch(() => undefined);
+  }, [activeCenter, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
+  const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
+  const centerHero =
+    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} /> : undefined;
   const archivedBlock =
     manager && archived.length ? (
       <View style={{ gap: space.sm }}>
@@ -391,10 +399,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
               {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
-          } /> : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+          } /> : undefined} hero={centerHero} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
-      {centerHead}
       {chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingView /> : null}

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Animated, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
@@ -36,6 +36,8 @@ export function Screen({
   footer,
   top,
   topBar,
+  hero,
+  scrollY,
 }: {
   title?: string;
   subtitle?: string;
@@ -52,6 +54,10 @@ export function Screen({
   top?: ReactNode;
   /** 最上方的返回工具列（TopBar）：滿版、不受頁面左右留白影響，放在 top 功能列之前。 */
   topBar?: ReactNode;
+  /** 固定在上方功能列之下、捲動區之上的滿版區塊（例如中心頁的照片）；搭配 scrollY 讓它隨捲動縮放。 */
+  hero?: ReactNode;
+  /** 提供時，頁面捲動位移會寫進這個 Animated.Value（hero 內插縮放用）。 */
+  scrollY?: Animated.Value;
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -62,12 +68,14 @@ export function Screen({
     <FooterSlot.Provider value={setSlot}>
     <View style={{ flex: 1 }}>
     {topBar ? <View style={{ zIndex: 6 }}>{topBar}</View> : null}
+    {hero}
     {top ? (
       <View style={[styles.top, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
         <View style={styles.topInner}>{top}</View>
       </View>
     ) : null}
-    <ScrollView
+    <Scroller
+      scrollY={scrollY}
       refreshControl={refreshControl}
       style={{ flex: 1, backgroundColor: c.background }}
       contentContainerStyle={[
@@ -96,7 +104,7 @@ export function Screen({
         ) : null}
         {children}
       </View>
-    </ScrollView>
+    </Scroller>
     {bar ? (
       <View style={[styles.footer, { backgroundColor: c.surface, borderTopColor: c.border }]}>
         <View style={styles.footerInner}>{bar}</View>
@@ -104,6 +112,16 @@ export function Screen({
     ) : null}
     </View>
     </FooterSlot.Provider>
+  );
+}
+
+/** 有 scrollY 就用 Animated.ScrollView 把捲動位移寫進去，否則就是一般的 ScrollView。 */
+function Scroller({ scrollY, children, ...rest }: { scrollY?: Animated.Value } & React.ComponentProps<typeof ScrollView>) {
+  if (!scrollY) return <ScrollView {...rest}>{children}</ScrollView>;
+  return (
+    <Animated.ScrollView {...(rest as object)} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}>
+      {children}
+    </Animated.ScrollView>
   );
 }
 

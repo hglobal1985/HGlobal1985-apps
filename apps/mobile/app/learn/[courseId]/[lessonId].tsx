@@ -15,6 +15,7 @@ import { usePlayer } from "@/features/player/use-player";
 import { PlayerControls } from "@/features/player/player-controls";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
+import { SpeakerMark } from "@/features/courses/speaker-mark";
 import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, TopBarButton } from "@/ui";
 
 export default function LessonScreen() {
@@ -203,7 +204,7 @@ export default function LessonScreen() {
               subtitle={l.id === lesson.id ? "正在觀看" : [sharerLine(l), l.minutes ? `約 ${l.minutes} 分鐘` : ""].filter(Boolean).join(" · ") || undefined}
               highlight={l.id === lesson.id}
               dense
-              right={l.eventDate ? <AppText variant="callout" tone="muted">{eventDays(l.eventDate, null)}</AppText> : undefined}
+              right={l.isSpeaker || l.eventDate ? <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>{l.isSpeaker ? <SpeakerMark /> : null}{l.eventDate ? <AppText variant="callout" tone="muted">{eventDays(l.eventDate, null)}</AppText> : null}</View> : undefined}
               onPress={l.id === lesson.id || l.locked ? undefined : () => {
                 engine.expectSwitch();
                 router.replace(`/learn/${c.id}/${l.id}`);

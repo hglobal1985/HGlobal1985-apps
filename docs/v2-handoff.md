@@ -505,3 +505,8 @@
   ⑤**課程專屬網址** `/中心縮寫/英譯姓名-001`：courses.url_name（唯一索引 host_center_key＋url_name）；src/romanize.ts（中文 pinyin-pro、韓文 RR、日文假名 Hepburn；日文漢字用中文讀音）；編號三位數、同中心同姓名依序、一旦產生固定、換主辦中心才重新產生；課程存檔／中心縮寫設定時自動產生；摘要 `shortPath`；路由 `app/[slug]/[name].tsx`（GET /short-links/:slug/:name）；分享預覽 og.ts courseUrlMeta。缺主講人或中心沒縮寫＝沒有（用 /course/編號）。
   ⑥首頁推薦只列『我的中心』（總部主辦的人人算）。測試 tests/center-course.test.ts（後端共 116 項）。本機手機寬度驗證；iOS／Android 實機未驗證。
 - 2026-11-16 **修正：中心短網址重新整理後出現兩條上方工具列**：`short-link-screen.tsx` 在中心短網址（kind=center）不再放 PageHeader（改 `headerShown:false`），因為中心頁（CoursesView）自己有 TopBar（返回／標題／編輯／分享）；分類、系列短網址仍用 PageHeader。
+- 2026-11-16 **中心頁照片改版（方案 A→上滑變 D）、瀏覽計數、找回「相同系列」課程、主講人標記**（業主指示）：
+  ①`courses/center-hero.tsx`：中心頁上方照片＝滿版 16:10、不放名稱（上方工具列已有）、左下透明標籤『N 門課・N 章節・N 瀏覽』、右上放大鈕；往上滑時依捲動位移內插縮成窄橫幅（高 112、左右 16、圓角 16），回頂端再展開；沒照片用品牌綠漸層。`Screen` 新增 `hero`、`scrollY`（Animated.Value）參數。
+  ②瀏覽計數：migration 0055 `center_views`（同人同天同中心只算一次，台灣時間）；POST／GET `/center-views`；進中心頁時記一次，上線後從 0 起算；會員刪除時一併清除。
+  ③**修正『相同系列』頁消失課程**：11-16 我把中心課程一律排除，與業主說的『有指定系列標籤就顯示在系列分頁』不一致。現在 pool＝中心頁：主辦含中心的課程；相同系列／單元：總部主辦的課程＋所有有系列標籤的課程（不論主辦）。待業主決定：美國洛杉磯中心 3 門課的系列欄位預設帶入『美國洛杉磯中心』（假系列），會在系列頁多一張卡，建議清空。
+  ④章節編輯／新增章節拿掉分享者下方的『同主講人』勾選（SharerField 只剩姓名輸入）；主講人章節在章節清單（課程頁、上課頁章節、單元頁）標麥克風圖示（`courses/speaker-mark.tsx`）。測試後端共 117 項。

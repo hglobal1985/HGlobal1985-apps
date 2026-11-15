@@ -113,7 +113,7 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
  * 站內小視窗：視窗大小剛好貼合圖片（沒有標題、沒有多餘留白），放大縮小、下載、分享按鈕都疊在圖片上。
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
-function EdmLightbox({ uri, title, onClose }: { uri: string; title: string; onClose: () => void }) {
+export function EdmLightbox({ uri, title, onClose }: { uri: string; title: string; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const [scale, setScale] = useState(1);
