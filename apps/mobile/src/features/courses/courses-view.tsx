@@ -129,6 +129,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }, [courses, rights, centerArt.data]);
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
   const activeCenter = mode === "center" ? center : ALL;
+  // 中心清單的排序：課程數最多的排最前面（同數量依名稱）。
+  const centerCounts = useMemo(
+    () =>
+      centers
+        .map((name) => ({ name, count: courses.filter((x) => x.hostCenter === name && (category === ALL || x.category.split("、").includes(category))).length }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
+    [centers, courses, category],
+  );
   const art = activeCenter !== ALL ? centerArt.data?.find((a) => a.center === activeCenter) : undefined;
   const canEditArt = activeCenter !== ALL && !!rights && (rights.all || (rights.center === activeCenter && (rights.manageEditors || !!rights.editor?.editOthers)));
   const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || x.hostCenter === activeCenter));
@@ -287,7 +295,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
           {data && !groups.length && !(mode === "center" && center === ALL) ? <EmptyState icon="library-outline" title={matched ? "找不到符合的課程" : "沒有符合條件的課程"} /> : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
-              ? centers.map((name) => <CenterTile key={name} name={name} edmUrl={centerArt.data?.find((a) => a.center === name)?.edmUrl} count={courses.filter((x) => x.hostCenter === name && (category === ALL || x.category.split("、").includes(category))).length} width={tileW} onPress={() => pickCenter(name)} />)
+              ? centerCounts.map(({ name, count }) => <CenterTile key={name} name={name} edmUrl={centerArt.data?.find((a) => a.center === name)?.edmUrl} count={count} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {tileW && !(mode === "center" && center === ALL) ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
           </View>
