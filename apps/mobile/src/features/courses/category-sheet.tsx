@@ -81,7 +81,7 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
 }
 
 /**
- * 分類篩選框（放在上方工具列）：沒篩選＝白底「分類 ⌄」；篩選中＝深綠實心白字「數量總計=N堂」＋圓形 ✕（一鍵清除）。
+ * 分類篩選框（放在上方工具列）：沒篩選＝白底「分類 ⌄」；篩選中＝深綠實心白字「N堂」＋圓形 ✕（一鍵清除）。
  */
 export function CategoryFilterBox({ picked, total, onOpen, onClear }: { picked: string[]; /** 符合的數量（堂）。 */ total: number; onOpen: () => void; onClear: () => void }) {
   const { c } = useTheme();
@@ -98,7 +98,7 @@ export function CategoryFilterBox({ picked, total, onOpen, onClear }: { picked: 
     <View style={[styles.box, { backgroundColor: c.accent, borderColor: c.accent }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={`分類篩選中：${picked.map(catLabel).join("、")}，點一下更改`} onPress={onOpen} style={styles.main}>
         <AppText variant="body" numberOfLines={1} style={{ color: c.textOnAccent, fontWeight: "700" }}>
-          數量總計={total}堂
+          {total}堂
         </AppText>
       </Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="清除分類篩選" onPress={onClear} hitSlop={8} style={styles.clear}>
