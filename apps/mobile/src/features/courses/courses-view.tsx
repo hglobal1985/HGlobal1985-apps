@@ -13,7 +13,7 @@ import { CourseCard } from "./course-card";
 import { EdmImageStage } from "./edm-viewer";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
-import { CategoryFilterBox, CategoryHintBar, CategorySheet, NONE, courseCats as cats, matchesCats, type CatBadge } from "./category-sheet";
+import { CategoryFilterBox, CategoryHintBar, CategorySheet, NONE, courseCats as cats, matchesCats } from "./category-sheet";
 import { CenterTile } from "./center-tile";
 import { ModeFlash } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
@@ -161,15 +161,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     if (manager && st.draft) badges.push({ text: `未上架 ${st.draft}`, tone: "warn" });
     if (st.fresh) badges.push({ text: "新", tone: "new" });
     return { key: x, label: x === NONE ? "未分類" : x, hint: `${st.n} 門`, badges };
-  };
-  const badgesOf = (name: string): CatBadge[] => {
-    const st = catStats.get(name);
-    if (!st) return [];
-    const out: CatBadge[] = [];
-    if (st.learning) out.push({ text: `學習中 ${st.learning}`, tone: "accent" });
-    if (manager && st.draft) out.push({ text: `未上架 ${st.draft}`, tone: "warn" });
-    if (st.fresh) out.push({ text: "新", tone: "new" });
-    return out;
   };
   const allOption: SelectOption = {
     key: ALL,
@@ -372,7 +363,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       </Pressable>
     ) : null}
     <ModeFlash mode={mode} tick={flashTick} />
-    {catOpen ? <CategorySheet courses={courses.filter(inCenter)} names={categories} picked={selCats} badgesOf={badgesOf} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
+    {catOpen ? <CategorySheet courses={courses.filter(inCenter)} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`${activeCenter}的 EDM`} onClose={() => setArtOpen(false)} hideSave>

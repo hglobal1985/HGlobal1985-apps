@@ -21,66 +21,59 @@ export function matchesCats(x: { category: string }, sel: string[]): boolean {
   return sel.every((s) => mine.includes(s));
 }
 
-export type CatBadge = { text: string; tone: "accent" | "warn" | "new" };
+const COLS = 3;
+const GAP = space.sm;
 
 /**
  * 分類篩選（逐步縮小）：點分類框從下方彈出。已選的分類深綠；沒選的分類後面的數字＝「再加上它之後剩幾門」，
- * 加上去會變成 0 門的分類灰色虛線、不能點；不勾＝只看原本那個分類；勾兩個以上＝同時有這些分類。
+ * 加上去會變成 0 門的分類灰色虛線、不能點；不勾＝不篩選；勾兩個以上＝同時有這些分類。
+ * 版面：一列固定三個、每個標籤固定大小（勾選前後尺寸、位置完全不變）。
  */
-export function CategorySheet({ courses, names, picked, badgesOf, onApply, onClose }: { courses: CourseSummary[]; names: string[]; picked: string[]; badgesOf: (name: string) => CatBadge[]; onApply: (sel: string[]) => void; onClose: () => void }) {
+export function CategorySheet({ courses, names, picked, onApply, onClose }: { courses: CourseSummary[]; names: string[]; picked: string[]; onApply: (sel: string[]) => void; onClose: () => void }) {
   const { c } = useTheme();
   const [sel, setSel] = useState<string[]>(picked);
+  const [w, setW] = useState(0);
   const count = (s: string[]) => courses.filter((x) => matchesCats(x, s)).length;
   const total = count(sel);
   const toggle = (name: string) => setSel((cur) => (cur.includes(name) ? cur.filter((v) => v !== name) : name === NONE ? [NONE] : [...cur, name]));
   const title = sel.length ? `已選：${sel.map(catLabel).join("＋")}（${total} 門）` : "選擇分類";
+  const cell = w ? Math.floor((w - GAP * (COLS - 1)) / COLS) : 0;
   return (
     <BottomSheet onClose={onClose}>
       <AppText variant="headline" numberOfLines={2}>
         {title}
       </AppText>
-      <AppText variant="caption" tone="muted">
-        {sel.length ? "想再縮小？點選「同時也有」的分類（數字＝加上後剩幾門）" : "點選分類；選兩個以上＝同時有這些分類（數字＝剩幾門）"}
-      </AppText>
-      <ScrollView style={{ maxHeight: 340 }} contentContainerStyle={styles.wrap}>
-        {names.map((name) => {
-          const on = sel.includes(name);
-          const left = on ? count(sel) : name === NONE ? (sel.length ? 0 : count([NONE])) : sel[0] === NONE ? 0 : count([...sel, name]);
-          const dead = !on && left === 0;
-          const badges = badgesOf(name);
-          return (
-            <Pressable
-              key={name}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: on, disabled: dead }}
-              accessibilityLabel={`${catLabel(name)}，${left} 門`}
-              disabled={dead}
-              onPress={() => toggle(name)}
-              style={[styles.chip, { backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : dead ? c.border : c.border, borderStyle: dead ? "dashed" : "solid" }]}
-            >
-              {on ? <Ionicons name="checkmark" size={18} color={c.textOnAccent} /> : null}
-              <AppText variant="callout" style={{ color: on ? c.textOnAccent : dead ? c.textMuted : c.text, fontWeight: on ? "700" : "500", opacity: dead ? 0.6 : 1 }}>
-                {catLabel(name)}
-              </AppText>
-              <AppText variant="caption" style={{ color: on ? c.textOnAccent : c.textMuted, opacity: dead ? 0.6 : 1 }}>
-                {left}
-              </AppText>
-              {badges.map((b) => (
-                <View key={b.text} style={[styles.badge, { backgroundColor: b.tone === "warn" ? c.warning : b.tone === "new" ? "#E5484D" : on ? "rgba(255,255,255,0.28)" : c.accentSoft }]}>
-                  <AppText variant="caption" style={{ color: b.tone === "accent" && !on ? c.accentText : "#fff", fontWeight: "700", fontSize: 11, lineHeight: 14 }}>
-                    {b.text}
+      <ScrollView style={{ maxHeight: 360 }} contentContainerStyle={styles.wrap} onLayout={(e) => setW(Math.floor(e.nativeEvent.layout.width))}>
+        {cell
+          ? names.map((name) => {
+              const on = sel.includes(name);
+              const left = on ? count(sel) : name === NONE ? (sel.length ? 0 : count([NONE])) : sel[0] === NONE ? 0 : count([...sel, name]);
+              const dead = !on && left === 0;
+              return (
+                <Pressable
+                  key={name}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on, disabled: dead }}
+                  accessibilityLabel={`${catLabel(name)}，${left} 門`}
+                  disabled={dead}
+                  onPress={() => toggle(name)}
+                  style={[styles.chip, { width: cell, backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : c.border, borderStyle: dead ? "dashed" : "solid" }]}
+                >
+                  <AppText variant="callout" numberOfLines={1} style={{ flexShrink: 1, fontWeight: "600", color: on ? c.textOnAccent : dead ? c.textMuted : c.text, opacity: dead ? 0.6 : 1 }}>
+                    {catLabel(name)}
                   </AppText>
-                </View>
-              ))}
-            </Pressable>
-          );
-        })}
+                  <AppText variant="caption" style={{ color: on ? c.textOnAccent : c.textMuted, opacity: dead ? 0.6 : 1 }}>
+                    {left}
+                  </AppText>
+                </Pressable>
+              );
+            })
+          : null}
       </ScrollView>
-      <AppText variant="caption" tone="muted">
-        不勾＝不篩選；勾兩個以上＝同時有這些分類。
-      </AppText>
       <View style={styles.actions}>
-        {sel.length ? <Button variant="secondary" label="清除" onPress={() => setSel([])} /> : null}
+        <View style={sel.length ? undefined : { opacity: 0.45 }} pointerEvents={sel.length ? "auto" : "none"}>
+          <Button variant="secondary" label="清除" onPress={() => setSel([])} />
+        </View>
         <View style={{ flex: 1 }}>
           <Button
             label={sel.length ? `顯示 ${total} 門課程` : `顯示全部 ${total} 門`}
@@ -142,9 +135,8 @@ export function CategoryHintBar({ picked, total, onRefine }: { picked: string[];
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, paddingVertical: space.xs },
-  chip: { minHeight: minTouch - 4, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1.5 },
-  badge: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999 },
+  wrap: { flexDirection: "row", flexWrap: "wrap", gap: GAP, paddingVertical: space.xs },
+  chip: { height: minTouch, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm, borderRadius: radius.pill, borderWidth: 1.5 },
   actions: { flexDirection: "row", alignItems: "center", gap: space.sm },
   box: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm, flexDirection: "row", alignItems: "center", gap: space.xs },
   main: { flex: 1, minHeight: minTouch - 2, justifyContent: "center", paddingLeft: space.xs },
