@@ -73,6 +73,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
         chapterCovers={course.chapterCovers}
         courseDate={course.eventStart ?? undefined}
         otherSpeaker={course.lessons.find((l) => !l.material && l.isSpeaker && l.id !== lesson.id)}
+        courseTitle={course.title}
         onSaved={invalidate}
         onDirty={setDirty}
       />
@@ -99,11 +100,11 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
   const tJob = course.teacherTitle ?? "";
   const sameT = !!tName && sharer === tName && rank === tRank && job === tJob;
   const submit = async () => {
-    if (!title.trim()) return setError(`請輸入${word}名稱`);
+    if (!isSpeaker && !title.trim()) return setError(`請輸入${word}名稱`);
     setBusy(true);
     setError(null);
     try {
-      await api("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: rank, sharerTitle: job, ...(course.eventStart ? {} : { eventDate: todayStr() }), autoCover, isSpeaker });
+      await api("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title, sharer, sharerRank: rank, sharerTitle: job }), ...(course.eventStart ? {} : { eventDate: todayStr() }), autoCover, isSpeaker });
       invalidate();
       onClose();
     } catch (e) {
@@ -114,6 +115,11 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
   };
   return (
     <EditSheet title={`新增${word}`} onClose={onClose} onSave={submit} saveLabel="新增" dirty={!!title || !!sharer} busy={busy} error={error}>
+      <SpeakerCheck value={isSpeaker} onChange={setIsSpeaker} other={course.lessons.find((l) => !l.material && l.isSpeaker)} />
+      {isSpeaker ? (
+        <SpeakerApplied course={{ title: course.title, teacher: tName, teacherRank: tRank, teacherTitle: tJob }} />
+      ) : (
+        <>
       <View style={{ gap: space.xs }}>
         <AppText variant="callout" tone="muted">
           {word}名稱
@@ -122,12 +128,20 @@ export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onCl
       </View>
       <SharerField value={sharer} onChange={setSharer} teacher={tName} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : tName), setRank(sameT ? "" : tRank), setJob(sameT ? "" : tJob))} label="新章節分享者" />
       <RankTitleRow rank={rank} title={job} onRank={setRank} onTitle={setJob} rankOptions={rankOptions} readOnly={sameT} who="新章節分享者" />
-      <SpeakerCheck value={isSpeaker} onChange={setIsSpeaker} other={course.lessons.find((l) => !l.material && l.isSpeaker)} />
+        </>
+      )}
       <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
         新增後再點{word}旁的鉛筆，設定影片、音檔與附件。設成 YouTube 影片後，封面就會自動用影片畫面。
       </AppText>
     </EditSheet>
+  );
+}
+
+/** 勾了主講人：名稱、分享者、獎銜、職稱欄位隱藏，直接套用課程基本資料（伺服器也會強制同步），這裡只顯示套用結果。 */
+function SpeakerApplied({ course }: { course: { title: string; teacher: string; teacherRank: string; teacherTitle: string } }) {
+  return (
+    <NoticeBox text={`章節名稱、分享者、獎銜、職稱直接套用課程基本資料：${[course.title, course.teacher, course.teacherTitle].filter(Boolean).join("・")}`} />
   );
 }
 
@@ -186,6 +200,7 @@ function LessonEditor({
   teacherTitle,
   courseDate,
   otherSpeaker,
+  courseTitle,
   rankOptions,
   chapterCovers,
 }: {
@@ -198,6 +213,7 @@ function LessonEditor({
   courseDate?: string;
   /** 目前已被設為主講人的「另一堂」（有的話，勾選這一堂時提示會轉移）。 */
   otherSpeaker?: Lesson;
+  courseTitle: string;
   /** 課程主講人（姓名、獎銜、職稱；「同主講人」勾選用）。 */
   teacher: string;
   teacherRank: string;
@@ -230,10 +246,7 @@ function LessonEditor({
   const rangeError = mediaDraftError(media);
   const currentKind = lesson.media?.type ?? "demo";
   const dirty =
-    title !== lesson.title ||
-    sharer !== (lesson.sharer ?? "") ||
-    sharerRank !== (lesson.sharerRank ?? "") ||
-    sharerTitle !== (lesson.sharerTitle ?? "") ||
+    (!isSpeaker && (title !== lesson.title || sharer !== (lesson.sharer ?? "") || sharerRank !== (lesson.sharerRank ?? "") || sharerTitle !== (lesson.sharerTitle ?? ""))) ||
     ownDate !== (lesson.dateFollows ? "" : lesson.eventDate ?? "") ||
     isSpeaker !== !!lesson.isSpeaker ||
     autoCover !== !!lesson.autoCover ||
@@ -245,7 +258,7 @@ function LessonEditor({
     setBusy("save");
     setMsg(null);
     try {
-      const body: Record<string, unknown> = { title, sharer, sharerRank, sharerTitle, eventDate: ownDate || null, autoCover, isSpeaker, ...mediaDraftBody(media) };
+      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, autoCover, isSpeaker, ...mediaDraftBody(media) };
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
       setMsg({ tone: "success", text: "已儲存" });
       onSaved();
@@ -275,6 +288,11 @@ function LessonEditor({
         </AppText>
         <Pill label={mediaKindLabel(currentKind)} />
       </View>
+      <SpeakerCheck value={isSpeaker} onChange={setIsSpeaker} other={otherSpeaker} />
+      {isSpeaker ? (
+        <SpeakerApplied course={{ title: courseTitle, teacher, teacherRank, teacherTitle }} />
+      ) : (
+        <>
       <View style={styles.twoCol}>
         <View style={{ flex: 3, gap: space.xs }}>
           <AppText variant="callout" tone="muted">
@@ -290,7 +308,8 @@ function LessonEditor({
         <SharerField value={sharer} onChange={setSharer} teacher={teacher} same={sameT} onToggleSame={() => (setSharer(sameT ? "" : teacher), setSharerRank(sameT ? "" : teacherRank), setSharerTitle(sameT ? "" : teacherTitle))} label={`第 ${lesson.position} 堂分享者`} />
       </View>
       <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} readOnly={sameT} who={`第 ${lesson.position} 堂分享者`} />
-      <SpeakerCheck value={isSpeaker} onChange={setIsSpeaker} other={otherSpeaker} />
+        </>
+      )}
       {kind === "youtube" ? <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} /> : null}
       {chapterCovers ? <LessonArt lesson={lesson} onChanged={onSaved} /> : null}
       <View style={styles.dateHead}>
