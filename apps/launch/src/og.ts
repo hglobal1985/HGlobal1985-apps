@@ -24,7 +24,13 @@ export function withShareMeta(html: string, m: { title: string; description: str
   return stripped.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`).replace("</head>", `${tags}</head>`);
 }
 
-/** 短網址的分享預覽：標題「{名稱} | 寰宇行動大學」，說明是隨機一句學習金句（設定頁編輯的那份）。找不到短網址回 null。 */
+/** 中心的分享標題名稱：去掉數字代碼，結尾補上「教育中心」（已經以「中心」結尾的先去掉，避免重複）。例：「南京 062」→「南京教育中心」、「美國洛杉磯」→「美國洛杉磯教育中心」、「台北中心」→「台北教育中心」。 */
+export function centerShareName(label: string): string {
+  const base = label.replace(/\s*\d+\s*$/, "").replace(/教育中心$|中心$/, "").trim();
+  return `${base || label}教育中心`;
+}
+
+/** 短網址的分享預覽：標題「{名稱} | 寰宇行動大學」（中心的名稱是「{名稱去掉數字代碼}教育中心」），說明是隨機一句學習金句（設定頁編輯的那份）。找不到短網址回 null。 */
 export async function shortLinkMeta(db: D1Database, slug: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
   const row = await db.prepare("SELECT kind, value FROM short_links WHERE slug = ?").bind(slug).first<{ kind: string; value: string }>();
   if (!row) return null;
@@ -37,5 +43,5 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
         ? await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM center_art WHERE center_label = ?").bind(row.value).first<{ k: string; v: number }>().catch(() => null)
         : null;
   const image = art?.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(art.k)}&v=${art.v}` : `${origin}/icon-512.png`;
-  return { title: `${row.value} | ${SITE}`, description: q?.body?.trim() || SITE, url: `${origin}/${slug}`, image };
+  return { title: `${row.kind === "center" ? centerShareName(row.value) : row.value} | ${SITE}`, description: q?.body?.trim() || SITE, url: `${origin}/${slug}`, image };
 }

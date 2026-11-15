@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Env } from "../src/d1.ts";
-import { withShareMeta } from "../src/og.ts";
+import { centerShareName, withShareMeta } from "../src/og.ts";
 import { createWorker } from "../src/worker.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
@@ -31,4 +31,17 @@ test("分享預覽：短網址標題＝名稱 | 寰宇行動大學，說明＝�
   await db.prepare("DELETE FROM quotes").run();
   assert.match(await get("/us"), /property="og:description" content="寰宇行動大學"/);
   assert.equal(withShareMeta("<head></head>", { title: "a", description: "b", url: "u", image: "i" }).includes('content="b"'), true);
+});
+
+test("中心分享標題：去掉數字代碼，結尾是「教育中心」", async () => {
+  assert.equal(centerShareName("南京 062"), "南京教育中心");
+  assert.equal(centerShareName("美國洛杉磯"), "美國洛杉磯教育中心");
+  assert.equal(centerShareName("飛登蓁分享 443"), "飛登蓁分享教育中心");
+  assert.equal(centerShareName("台北中心"), "台北教育中心");
+  assert.equal(centerShareName("高雄教育中心"), "高雄教育中心");
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  await db.prepare("INSERT INTO short_links (slug, kind, value) VALUES ('nj', 'center', '南京 062')").run();
+  const page = await (await createWorker(files).fetch(new Request("https://learn.test/nj"), env)).text();
+  assert.match(page, /property="og:title" content="南京教育中心 \| 寰宇行動大學"/);
 });
