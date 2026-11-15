@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { useRef, type ReactNode } from "react";
+import { Modal, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -8,14 +8,25 @@ import { radius, space } from "@/theme/tokens";
  * 底部彈出面板的外框（從螢幕下方向上滑出、背後半透明、點外面等於取消）。
  * 「確認視窗」「改播詢問」等所有從下方彈出的面板都用它，樣式只在這裡改一次。
  */
-export function BottomSheet({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+export function BottomSheet({ onClose, children, swipeToClose = false }: { onClose: () => void; children: ReactNode; /** 在面板或背景上往上、往下滑動一小段＝關閉（分類篩選用：滑動等於確定套用）。 */ swipeToClose?: boolean }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
+      onPanResponderRelease: (_e, g) => {
+        if (Math.abs(g.dy) > 40) closeRef.current();
+      },
+    }),
+  ).current;
+  const swipe = swipeToClose ? pan.panHandlers : {};
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.backdrop}>
+      <View style={styles.backdrop} {...swipe}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="關閉" onPress={onClose} />
-        <View style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: space.lg + insets.bottom }]} accessibilityViewIsModal>
+        <View style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: space.lg + insets.bottom }]} accessibilityViewIsModal {...swipe}>
           <View style={[styles.handle, { backgroundColor: c.border }]} />
           {children}
         </View>

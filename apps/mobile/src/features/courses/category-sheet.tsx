@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { CourseSummary } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button } from "@/ui";
+import { AppText } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
 
 /** 「未分類」的內部代碼（沒有任何分類的課程）。 */
@@ -27,6 +27,7 @@ const GAP = space.sm;
 /**
  * 分類篩選（逐步縮小）：點分類框從下方彈出。已選的分類深綠；沒選的分類後面的數字＝「再加上它之後剩幾門」，
  * 加上去會變成 0 門的分類灰色虛線、不能點；不勾＝不篩選；勾兩個以上＝同時有這些分類。
+ * 沒有確認鈕：點選即時套用；點空白處、或在面板上上滑／下滑＝確定並關閉。
  * 版面：一列固定三個、每個標籤固定大小（勾選前後尺寸、位置完全不變）。
  */
 export function CategorySheet({ courses, names, picked, onApply, onClose }: { courses: CourseSummary[]; names: string[]; picked: string[]; onApply: (sel: string[]) => void; onClose: () => void }) {
@@ -44,7 +45,7 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
   const title = sel.length ? `已選：${sel.map(catLabel).join("＋")}（${total} 門）` : "選擇分類";
   const cell = w ? Math.floor((w - GAP * (COLS - 1)) / COLS) : 0;
   return (
-    <BottomSheet onClose={onClose}>
+    <BottomSheet onClose={onClose} swipeToClose>
       <AppText variant="headline" numberOfLines={2}>
         {title}
       </AppText>
@@ -64,10 +65,10 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
                   onPress={() => toggle(name)}
                   style={[styles.chip, { width: cell, backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : c.border, borderStyle: dead ? "dashed" : "solid" }]}
                 >
-                  <AppText variant="callout" numberOfLines={1} style={{ flexShrink: 1, fontWeight: "600", color: on ? c.textOnAccent : dead ? c.textMuted : c.text, opacity: dead ? 0.6 : 1 }}>
+                  <AppText variant="callout" numberOfLines={1} style={{ flexShrink: 1, fontWeight: "600", color: on ? c.textOnAccent : dead ? c.textMuted : c.text, opacity: dead ? 0.35 : 1 }}>
                     {catLabel(name)}
                   </AppText>
-                  <AppText variant="caption" style={{ color: on ? c.textOnAccent : c.textMuted, opacity: dead ? 0.6 : 1 }}>
+                  <AppText variant="caption" style={{ color: on ? c.textOnAccent : c.textMuted, opacity: dead ? 0.35 : 1 }}>
                     {left}
                   </AppText>
                 </Pressable>
@@ -75,9 +76,6 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
             })
           : null}
       </ScrollView>
-      <View style={sel.length ? undefined : { opacity: 0.45 }} pointerEvents={sel.length ? "auto" : "none"}>
-        <Button variant="secondary" label="清除" onPress={() => change([])} fullWidth />
-      </View>
     </BottomSheet>
   );
 }
