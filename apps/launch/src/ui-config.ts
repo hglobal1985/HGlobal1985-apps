@@ -1,5 +1,5 @@
 /** 超級管理員可調整的畫面設定：存在 ui_settings 一筆 JSON；讀取時和預設值合併，缺的欄位自動補上。 */
-import { DEFAULT_UI_CONFIG, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUPS, STATS_ROLE_OPTIONS, type RibbonColor, type SortGroup, type UiConfig } from "./contract.ts";
+import { DEFAULT_APP_SETTINGS, DEFAULT_UI_CONFIG, type AppSettings, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUPS, STATS_ROLE_OPTIONS, type RibbonColor, type SortGroup, type UiConfig } from "./contract.ts";
 import type { D1Database } from "./d1.ts";
 
 const KEY = "ui_config";
@@ -30,7 +30,35 @@ export function normalizeConfig(raw: unknown): UiConfig {
   const roles = Array.isArray(r.statsRoles) ? (r.statsRoles as unknown[]).filter((x): x is string => STATS_ROLE_OPTIONS.some((o) => o.key === x)) : [];
   // 系列手動排序：只收「s:」「c:」開頭的字串，去重、限長、最多 1000 筆。
   const so = Array.isArray(r.seriesOrder) ? (r.seriesOrder as unknown[]).filter((x): x is string => typeof x === "string" && /^[sc]:.{1,120}$/.test(x)) : [];
-  return { sortGroups, seriesOrder: [...new Set(so)].slice(0, 1000), ribbons, statsRoles: [...new Set(roles)] };
+  return { sortGroups, seriesOrder: [...new Set(so)].slice(0, 1000), ribbons, statsRoles: [...new Set(roles)], app: normalizeApp(r.app) };
+}
+
+/** 整理 APP 數值設定：數字夾在合理範圍（四捨五入成整數）、選項不合法退回預設、缺的欄位用預設補。 */
+export function normalizeApp(raw: unknown): AppSettings {
+  const d = DEFAULT_APP_SETTINGS;
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const rr = (r.rec && typeof r.rec === "object" ? r.rec : {}) as Record<string, unknown>;
+  const num = (v: unknown, def: number, min: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : def);
+  const bool = (v: unknown, def: boolean) => (typeof v === "boolean" ? v : def);
+  return {
+    homeLeftSec: num(r.homeLeftSec, d.homeLeftSec, 0, 60),
+    homeRightSec: num(r.homeRightSec, d.homeRightSec, 0, 60),
+    homePauseSec: num(r.homePauseSec, d.homePauseSec, 0, 120),
+    tickerSec: num(r.tickerSec, d.tickerSec, 2, 60),
+    tickerPauseSec: num(r.tickerPauseSec, d.tickerPauseSec, 0, 120),
+    rec: {
+      scope: rr.scope === "all" || rr.scope === "myCenter" ? rr.scope : d.rec.scope,
+      includeHq: bool(rr.includeHq, d.rec.includeHq),
+      onlyEligible: bool(rr.onlyEligible, d.rec.onlyEligible),
+      hideEnded: bool(rr.hideEnded, d.rec.hideEnded),
+      collapseSeries: bool(rr.collapseSeries, d.rec.collapseSeries),
+      order: rr.order === "soonest" || rr.order === "newest" || rr.order === "list" ? rr.order : d.rec.order,
+      max: num(rr.max, d.rec.max, 0, 50),
+    },
+    freshDays: num(r.freshDays, d.freshDays, 1, 90),
+    switchCountdownSec: num(r.switchCountdownSec, d.switchCountdownSec, 5, 60),
+    blurStrength: num(r.blurStrength, d.blurStrength, 4, 40),
+  };
 }
 
 export async function loadConfig(db: D1Database): Promise<UiConfig> {

@@ -4,7 +4,10 @@ import type { Track } from "./engine.types";
 export type SwitchPrompt = { from: Track; to: Track; resolve: (ok: boolean) => void };
 
 /** 沒有操作時，倒數幾秒後視同「同意改播」。 */
-export const SWITCH_COUNTDOWN_SECONDS = 15;
+let switchSeconds = 15;
+export const switchCountdownSeconds = () => switchSeconds;
+/** 由「設定 > APP 數值設定」帶入（UiConfigProvider 載入設定時呼叫）。 */
+export const setSwitchCountdownSeconds = (n: number) => void (switchSeconds = n);
 
 let current: SwitchPrompt | null = null;
 const listeners = new Set<() => void>();

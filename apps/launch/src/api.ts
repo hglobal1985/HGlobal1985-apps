@@ -2365,7 +2365,8 @@ const routes: [string, RegExp, Handler][] = [
       const body = await readJson<Record<string, unknown>>(ctx.req);
       // 只更新有傳的欄位，其餘保留目前設定。
       const cur = await loadConfig(ctx.db);
-      const next = normalizeConfig({ ...cur, ...body, ribbons: { ...cur.ribbons, ...((body.ribbons as object) ?? {}) } });
+      const bodyApp = (body.app && typeof body.app === "object" ? body.app : {}) as { rec?: object };
+      const next = normalizeConfig({ ...cur, ...body, ribbons: { ...cur.ribbons, ...((body.ribbons as object) ?? {}) }, app: { ...cur.app, ...bodyApp, rec: { ...cur.app.rec, ...(bodyApp.rec ?? {}) } } });
       await saveConfig(ctx.db, next);
       await audit(ctx.db, s.sub, "ui_config.update", "ui_config", "ui_config", Object.keys(body).join(",")).run();
       return next;

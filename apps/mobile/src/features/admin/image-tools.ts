@@ -71,7 +71,9 @@ export async function cropCompress(img: HTMLImageElement, crop: Rect | null, max
 }
 
 /** 背景模糊強度：把照片縮到 1/N 再放大回來（N 越大越模糊）。數字越大越模糊：6＝輕度、12＝中度、18＝偏重（業主 2026-11-15 指定 18）。不依賴 ctx.filter，iOS Safari 也能用。 */
-export const BG_BLUR_DOWNSCALE = 18;
+let bgBlurDownscale = 18;
+/** 由「設定 > APP 數值設定」帶入（UiConfigProvider 載入設定時呼叫）。 */
+export const setBgBlurDownscale = (n: number) => void (bgBlurDownscale = n);
 
 /** 照片比 16:9 窄多少：回傳「裁成 16:9 會切掉上下幾 %」（照片比 16:9 寬或一樣寬回 0）。 */
 export function cutPercentFor16x9(img: { naturalWidth: number; naturalHeight: number }): number {
@@ -92,8 +94,8 @@ export async function composeContain(img: HTMLImageElement, maxSide: number, qua
   const bw = img.naturalWidth * cover;
   const bh = img.naturalHeight * cover;
   const small = document.createElement("canvas");
-  small.width = Math.max(2, Math.round(W / BG_BLUR_DOWNSCALE));
-  small.height = Math.max(2, Math.round(H / BG_BLUR_DOWNSCALE));
+  small.width = Math.max(2, Math.round(W / bgBlurDownscale));
+  small.height = Math.max(2, Math.round(H / bgBlurDownscale));
   const sctx = small.getContext("2d")!;
   sctx.imageSmoothingQuality = "high";
   sctx.drawImage(img, (small.width - (bw * small.width) / W) / 2, (small.height - (bh * small.height) / H) / 2, (bw * small.width) / W, (bh * small.height) / H);

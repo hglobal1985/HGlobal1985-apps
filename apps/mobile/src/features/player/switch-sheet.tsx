@@ -4,7 +4,7 @@ import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
-import { SWITCH_COUNTDOWN_SECONDS, switchPromptStore, type SwitchPrompt } from "./switch-prompt";
+import { switchCountdownSeconds, switchPromptStore, type SwitchPrompt } from "./switch-prompt";
 
 /**
  * 底部彈出面板：已有課程正在播放時，又要播另一堂，詢問要不要中斷。
@@ -18,7 +18,7 @@ export function SwitchSheet() {
 
 function Sheet({ prompt }: { prompt: SwitchPrompt }) {
   const { c } = useTheme();
-  const [left, setLeft] = useState(SWITCH_COUNTDOWN_SECONDS);
+  const [left, setLeft] = useState(switchCountdownSeconds);
 
   useEffect(() => {
     const id = setInterval(() => setLeft((n) => n - 1), 1000);
@@ -32,7 +32,7 @@ function Sheet({ prompt }: { prompt: SwitchPrompt }) {
     <BottomSheet onClose={() => prompt.resolve(false)}>
           <AppText variant="title">是否更換播放？</AppText>
           <View style={[styles.bar, { backgroundColor: c.border }]}>
-            <View style={{ height: 4, width: `${Math.max(0, left) * (100 / SWITCH_COUNTDOWN_SECONDS)}%`, backgroundColor: c.accent, borderRadius: 2 }} />
+            <View style={{ height: 4, width: `${Math.max(0, left) * (100 / switchCountdownSeconds())}%`, backgroundColor: c.accent, borderRadius: 2 }} />
           </View>
           <View style={styles.buttons}>
             <View style={{ flexShrink: 0 }}>

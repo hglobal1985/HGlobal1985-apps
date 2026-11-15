@@ -6,14 +6,14 @@ import { Icon } from "./icon";
 import { AppText } from "./text";
 
 const ROW = 48; // 每則公告一格的高度（最多兩行字）
-const EVERY = 4000; // 自動輪播間隔
-const PAUSE = 8000; // 手指滑過之後暫停自動輪播的時間
+const DEFAULT_EVERY = 4000; // 自動輪播間隔（預設；實際由「設定 > APP 數值設定」帶入）
+const DEFAULT_PAUSE = 8000; // 手指滑過之後暫停自動輪播的時間（預設）
 
 /**
  * 首頁跑馬燈：多則公告自動上下滾動輪流播放，也可以用手指上下滑動快速查看。
  * 只有一則時不捲動。接在最後多放一份第一則，捲到底後無縫跳回第一則。
  */
-export function Ticker({ items, onClose }: { items: string[]; onClose?: () => void }) {
+export function Ticker({ items, onClose, everyMs = DEFAULT_EVERY, pauseMs = DEFAULT_PAUSE }: { items: string[]; onClose?: () => void; everyMs?: number; pauseMs?: number }) {
   const { c } = useTheme();
   const ref = useRef<ScrollViewInstance | null>(null);
   const index = useRef(0);
@@ -36,9 +36,9 @@ export function Ticker({ items, onClose }: { items: string[]; onClose?: () => vo
       const next = index.current + 1;
       goto(next, true);
       if (next >= items.length) setTimeout(() => goto(0, false), 600); // 到了複製的第一則：動畫結束後無縫跳回
-    }, EVERY);
+    }, everyMs);
     return () => clearInterval(t);
-  }, [items.join("\u0001")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [items.join("\u0001"), everyMs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settle = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -61,10 +61,10 @@ export function Ticker({ items, onClose }: { items: string[]; onClose?: () => vo
         decelerationRate="fast"
         disableIntervalMomentum
         nestedScrollEnabled
-        onScrollBeginDrag={() => (pausedUntil.current = Date.now() + PAUSE)}
+        onScrollBeginDrag={() => (pausedUntil.current = Date.now() + pauseMs)}
         onMomentumScrollEnd={settle}
         onScrollEndDrag={(e) => {
-          pausedUntil.current = Date.now() + PAUSE;
+          pausedUntil.current = Date.now() + pauseMs;
           if (!e.nativeEvent.velocity?.y) settle(e);
         }}
         scrollEventThrottle={32}

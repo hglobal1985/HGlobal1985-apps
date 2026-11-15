@@ -507,6 +507,55 @@ export type UiConfig = {
   ribbons: Record<RibbonKey, { label: string; color: RibbonColor; enabled: boolean }>;
   /** 除了超級管理員、總部秘書之外，哪些職務可以看「統計分析」（職務代碼：president、sound、course、reviewer）。 */
   statsRoles: string[];
+  /** APP 數值設定（超級管理員在「設定 > APP 數值設定」調整）：首頁推薦規則、輪播秒數、其他全站數值。 */
+  app: AppSettings;
+};
+
+/** 首頁「推薦課程」的規則。 */
+export type RecommendRules = {
+  /** myCenter＝只推薦我的中心（總部主辦的另依 includeHq）；all＝不分中心。 */
+  scope: "myCenter" | "all";
+  /** 「我的中心」範圍下，是否也納入只有總部主辦（沒有中心）的課程。 */
+  includeHq: boolean;
+  /** 只推薦符合我獎銜資格的課程。 */
+  onlyEligible: boolean;
+  /** 不推薦已結束的課程（活動日已過）。 */
+  hideEnded: boolean;
+  /** 同系列的課只推薦最近的一場。 */
+  collapseSeries: boolean;
+  /** 排序：list＝照「全部課程」的排序；soonest＝日期最近的在前；newest＝最新建立的在前。 */
+  order: "list" | "soonest" | "newest";
+  /** 最多推薦幾門（0＝不限）。 */
+  max: number;
+};
+export type AppSettings = {
+  /** 首頁左邊「繼續學習」自動輪播間隔（秒；0＝不自動輪播）。 */
+  homeLeftSec: number;
+  /** 首頁右邊「推薦課程」自動輪播間隔（秒；0＝不自動輪播）。 */
+  homeRightSec: number;
+  /** 手指滑過首頁區塊後，暫停自動輪播多久（秒）。 */
+  homePauseSec: number;
+  /** 首頁公告跑馬燈換下一則的間隔（秒）與手指滑過後的暫停（秒）。 */
+  tickerSec: number;
+  tickerPauseSec: number;
+  rec: RecommendRules;
+  /** 課程「新」標籤：建立幾天內算新。 */
+  freshDays: number;
+  /** 已有課程播放中又要播另一堂時，自動同意改播前的倒數秒數。 */
+  switchCountdownSec: number;
+  /** 圖片「完整顯示」合成封面時的背景模糊強度（數字越大越模糊）。 */
+  blurStrength: number;
+};
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  homeLeftSec: 5,
+  homeRightSec: 5,
+  homePauseSec: 8,
+  tickerSec: 4,
+  tickerPauseSec: 8,
+  rec: { scope: "myCenter", includeHq: true, onlyEligible: true, hideEnded: false, collapseSeries: true, order: "list", max: 0 },
+  freshDays: 7,
+  switchCountdownSec: 15,
+  blurStrength: 18,
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },
@@ -530,6 +579,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
     ended: { label: "已結束", color: "muted", enabled: true },
   },
   statsRoles: [],
+  app: DEFAULT_APP_SETTINGS,
 };
 
 // ---------- 統計分析（Mux）----------

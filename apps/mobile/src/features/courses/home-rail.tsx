@@ -44,7 +44,7 @@ function Slide({ course, w, h }: { course: CourseSummary; w: number; h: number }
  * 首頁的一個區塊（左或右）：標題與備註置中；海報（EDM）區塊填滿剩下的高度，手指在區塊內左右滑動切換；
  * 下方顯示目前這門課的名稱、主辦單位、日期、金額，點圖或名稱進入課程。
  */
-export function HomeRail({ title, icon, tone, note, courses, empty, progress }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean }) {
+export function HomeRail({ title, icon, tone, note, courses, empty, progress, autoSec = 0, pauseSec = 8 }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean; /** 自動輪播間隔（秒；0＝不自動輪播）。 */ autoSec?: number; /** 手指滑過後暫停自動輪播的秒數。 */ pauseSec?: number }) {
   useCenterNames();
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -52,6 +52,9 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress }: 
   const cur = courses[Math.min(page, Math.max(0, courses.length - 1))];
   const x = useRef(new Animated.Value(0)).current;
   const live = useRef({ page: 0, w: 0, n: 0 });
+  const pausedUntil = useRef(0);
+  const livePause = useRef(pauseSec);
+  livePause.current = pauseSec;
   live.current = { page, w: box.w, n: courses.length };
   const slideTo = (i: number) => {
     const { w } = live.current;
@@ -70,6 +73,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress }: 
     return PanResponder.create({
       onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.2,
       onPanResponderGrant: () => {
+        pausedUntil.current = Date.now() + 60 * 60 * 1000; // 手指按著時不自動換
         x.stopAnimation((v) => (start = v));
       },
       onPanResponderMove: (_e, g) => {
@@ -88,12 +92,29 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress }: 
         let next = p;
         if (g.dx < -w * 0.18 || g.vx < -0.4) next = p + 1;
         else if (g.dx > w * 0.18 || g.vx > 0.4) next = p - 1;
+        pausedUntil.current = Date.now() + livePause.current * 1000;
         slideTo(Math.max(0, Math.min(n - 1, next)));
       },
-      onPanResponderTerminate: () => slideTo(live.current.page),
+      onPanResponderTerminate: () => {
+        pausedUntil.current = Date.now() + livePause.current * 1000;
+        slideTo(live.current.page);
+      },
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  const goTo = (i: number) => slideTo(i);
+  // 自動輪播（秒數由「設定 > APP 數值設定」控制；0＝關閉；手指滑過後暫停一段時間）。
+  useEffect(() => {
+    if (!autoSec || courses.length < 2) return;
+    const t = setInterval(() => {
+      if (Date.now() < pausedUntil.current) return;
+      const { page: p, n } = live.current;
+      slideTo((p + 1) % n);
+    }, autoSec * 1000);
+    return () => clearInterval(t);
+  }, [autoSec, courses.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  const goTo = (i: number) => {
+    pausedUntil.current = Date.now() + livePause.current * 1000;
+    slideTo(i);
+  };
   const [bg, fg] = tone === "green" ? [c.accentSoft, c.accentText] : [c.warningSoft, c.warning];
   return (
     <View style={styles.col}>

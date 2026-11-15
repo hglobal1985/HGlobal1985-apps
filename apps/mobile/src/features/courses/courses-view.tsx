@@ -160,7 +160,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const categoryList = useApi<string[]>("/categories");
   // 每個分類的統計（數字一律是章節＝堂數，不是課程數；業主 2026-11-15）：全部幾堂、我「學習中」（已開通）幾堂、未上架幾堂（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
   const catStats = useMemo(() => {
-    const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const weekAgo = Date.now() - config.app.freshDays * 24 * 3600 * 1000; // 「新」標籤：幾天內建立（設定 > APP 數值設定）
     const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
     // 清單項目與順序在所有模式一致（業主 2026-11-15）：來源＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定列在最後；數字（堂數）也一律是全站總堂數，三個模式完全相同。
     const names = new Set([...(categoryList.data ?? []), ...courses.flatMap(cats), NONE]);
@@ -175,7 +175,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       });
     }
     return stats;
-  }, [courses, categoryList.data]);
+  }, [courses, categoryList.data, config.app.freshDays]);
   // 順序：以「全部課程」的堂數由多到少（同數量依名稱），與目前是哪個模式無關，所以每個模式的清單順序都一樣；「未分類」固定最後。
   const categories = useMemo(() => {
     const total = (name: string) => lessonsOf(courses.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name))));

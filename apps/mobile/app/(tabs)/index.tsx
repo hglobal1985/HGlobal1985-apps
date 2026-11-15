@@ -8,6 +8,7 @@ import { ProfilePrompt } from "@/features/profile-prompt";
 import { HomeRail } from "@/features/courses/home-rail";
 import { collapseSeries } from "@/features/courses/sort";
 import { useApi, useSession } from "@/state/session";
+import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { usePullRefresh } from "@/ui/pull-refresh";
@@ -45,6 +46,7 @@ export default function HomeScreen() {
         .catch(() => undefined);
     }, []),
   );
+  const { config } = useUiConfig();
   const notices = useApi<Announcement[]>("/announcements", { early: true });
   const courses = data ?? [];
   const mine = courses
@@ -52,16 +54,33 @@ export default function HomeScreen() {
     .filter((x) => (x.enrollment === "opened" || x.started) && !x.hiddenFromLearning)
     .sort((a, b) => Number(b.completedLessons < b.lessonCount) - Number(a.completedLessons < a.lessonCount));
   // 會員：符合獎銜、尚未報名的課程；訪客：完全公開的課程。
-  // 會員只推薦「我的中心」的課程（總部主辦的人人都算）：主辦單位沒有任何中心，或主辦的任一中心＝會員自己的中心。
+  // 推薦課程的規則由「設定 > APP 數值設定」控制：範圍（我的中心／全部）、是否納入總部主辦、獎銜資格、已結束、同系列只推最近一場、排序、上限。
+  const rules = config.app.rec;
   const norm = (v: string) => v.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
   const myCenter = norm(member?.center ?? "");
-  const sameCenter = (x: CourseSummary) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const inScope = (x: CourseSummary) => {
+    if (rules.scope === "all") return true;
     const hosts = x.hostUnit.split(/[、,，]+/).map((h) => h.trim()).filter((h) => h && h !== HQ_UNIT);
-    return !hosts.length || (!!myCenter && hosts.some((h) => norm(h) === myCenter));
+    return hosts.length ? !!myCenter && hosts.some((h) => norm(h) === myCenter) : rules.includeHq;
   };
-  const recommendedAll = courses.filter((x) => x.status === "published" && x.enrollment !== "opened" && !x.started && !x.hideFromHome && (member ? x.eligible && !x.isPublic && sameCenter(x) : x.isPublic));
-  // 同系列的課只推薦最近的一場。
-  const recommended = collapseSeries(recommendedAll, recommendedAll).map((e) => e.course);
+  const recommendedAll = courses.filter(
+    (x) =>
+      x.status === "published" &&
+      x.enrollment !== "opened" &&
+      !x.started &&
+      !x.hideFromHome &&
+      (member ? (!rules.onlyEligible || x.eligible) && !x.isPublic && inScope(x) : x.isPublic) &&
+      !(rules.hideEnded && (x.eventEnd ?? x.eventStart ?? "9999") < today),
+  );
+  const ordered =
+    rules.order === "soonest"
+      ? [...recommendedAll].sort((a, b) => (a.eventStart ?? "9999-12-31").localeCompare(b.eventStart ?? "9999-12-31"))
+      : rules.order === "newest"
+        ? [...recommendedAll].sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""))
+        : recommendedAll;
+  const collapsed = rules.collapseSeries ? collapseSeries(ordered, ordered).map((e) => e.course) : ordered;
+  const recommended = rules.max > 0 ? collapsed.slice(0, rules.max) : collapsed;
   return (
     <>
     {promptOpen && member ? <ProfilePrompt onClose={() => setPromptOpen(false)} initial={member.profileForm ?? null} /> : null}
@@ -77,7 +96,7 @@ export default function HomeScreen() {
             </View>
           )}
         </View>
-        {noticeClosed ? null : <Ticker items={(notices.data ?? []).map((n) => n.text)} onClose={() => setNoticeClosed(true)} />}
+        {noticeClosed ? null : <Ticker items={(notices.data ?? []).map((n) => n.text)} everyMs={config.app.tickerSec * 1000} pauseMs={config.app.tickerPauseSec * 1000} onClose={() => setNoticeClosed(true)} />}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {!data && !error ? <HomeRailsSkeleton /> : null}
         {data ? (
@@ -88,6 +107,8 @@ export default function HomeScreen() {
               icon="book-outline"
               tone="green"
               courses={mine}
+              autoSec={config.app.homeLeftSec}
+              pauseSec={config.app.homePauseSec}
               note={quote ?? undefined}
               progress
               empty={
@@ -109,7 +130,9 @@ export default function HomeScreen() {
               icon="sparkles-outline"
               tone="orange"
               courses={recommended}
-              note="顯示您中心、您可報名的課程"
+              autoSec={config.app.homeRightSec}
+              pauseSec={config.app.homePauseSec}
+              note={rules.scope === "all" ? "顯示您可報名的課程" : "顯示您中心、您可報名的課程"}
               empty={
                 <AppText variant="callout" tone="muted" style={{ textAlign: "center" }}>
                   {member ? "目前沒有符合你獎銜、尚未報名的課程。" : "目前沒有公開的課程，登入後顯示您可報名的課程。"}

@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, DEFAULT_UI_CONFIG, type UiConfig } from "@/api/client";
+import { api, DEFAULT_APP_SETTINGS, DEFAULT_UI_CONFIG, type UiConfig } from "@/api/client";
+import { setBgBlurDownscale } from "@/features/admin/image-tools";
+import { setSwitchCountdownSeconds } from "@/features/player/switch-prompt";
 import { useSession } from "./session";
 
 const Ctx = createContext<{ config: UiConfig; reload: () => void }>({ config: DEFAULT_UI_CONFIG, reload: () => undefined });
@@ -14,7 +16,13 @@ export function UiConfigProvider({ children }: { children: ReactNode }) {
   const [tick, setTick] = useState(0);
   useEffect(() => {
     api<UiConfig>("GET", "/ui-config")
-      .then((c) => c && Array.isArray(c.sortGroups) && setConfig({ ...DEFAULT_UI_CONFIG, ...c }))
+      .then((c) => {
+        if (!c || !Array.isArray(c.sortGroups)) return;
+        const app = { ...DEFAULT_APP_SETTINGS, ...(c.app ?? {}), rec: { ...DEFAULT_APP_SETTINGS.rec, ...(c.app?.rec ?? {}) } };
+        setBgBlurDownscale(app.blurStrength);
+        setSwitchCountdownSeconds(app.switchCountdownSec);
+        setConfig({ ...DEFAULT_UI_CONFIG, ...c, app });
+      })
       .catch(() => undefined);
   }, [version, tick]);
   const value = useMemo(() => ({ config, reload: () => setTick((n) => n + 1) }), [config]);
