@@ -286,11 +286,9 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
     if (!isHq) delete body.hostUnit; // 中心的人不能改主辦中心
     if (await save(body)) onClose();
   };
-  const guidance = isHq ? [HQ_UNIT, ...(course.hostCenter ? [course.hostCenter] : [])] : [member?.center ?? ""];
   return (
     <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
-      <Label>指導單位（會公開顯示）</Label>
-      <Chips options={[...[...new Set(guidance)].filter(Boolean).map((x) => ({ key: x, label: x })), { key: "", label: "不顯示" }]} value={f.guidanceUnit} onChange={(v) => setF((x) => ({ ...x, guidanceUnit: v }))} />
+      {isHq ? <Check label="指導單位：寰宇總部（會公開顯示）" value={f.guidanceUnit === HQ_UNIT} onChange={(v) => setF((x) => ({ ...x, guidanceUnit: v ? HQ_UNIT : "" }))} /> : null}
       {f.guidanceUnit === HQ_UNIT ? <NoticeBox text="由寰宇總部指導的課程，只能使用總部的審核群組。" /> : null}
       <Label>主辦單位（會公開顯示；管理權限與「中心」篩選以第一個中心為準）</Label>
       {isHq ? <MultiChips options={[HQ_UNIT, ...(centers.data ?? [])]} value={f.hostUnit} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} /> : <NoticeBox text={`主辦單位固定為「${course.hostUnit || member?.center || ""}」；只有總部可以改到別的中心。`} />}
