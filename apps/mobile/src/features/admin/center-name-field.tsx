@@ -9,7 +9,7 @@ import { AppText, Button } from "@/ui";
 import { showToast } from "@/ui/toast";
 
 /**
- * 教育中心名稱（編輯中心頁）：自訂這個中心在整個行動大學顯示的名稱；留空儲存＝還原預設「去掉數字代碼＋教育中心」。
+ * 教育中心名稱（編輯中心頁）：自訂這個中心在整個行動大學顯示的名稱；留空儲存＝還原預設「去掉數字代碼＋中心」。
  * 只是顯示名稱，不會改中央會員系統的中心清單與中心代碼。
  */
 export function CenterNameField({ center }: { center: string }) {

@@ -71,15 +71,15 @@ export const setCenterNames = (m: Record<string, string>) => {
 };
 
 /**
- * 全站唯一的「教育中心名稱」來源：有自訂名稱（編輯中心頁設定）就用自訂；沒有就用預設格式「去掉數字代碼＋教育中心」
- * （「南京 062」→「南京教育中心」、「台北中心」→「台北教育中心」，與分享預覽標題的名稱部分一致，後端規則在 apps/launch/src/og.ts）。
+ * 全站唯一的「教育中心名稱」來源：有自訂名稱（編輯中心頁設定）就用自訂；沒有就用預設格式「去掉數字代碼＋中心」
+ * （「南京 062」→「南京中心」、「美國洛杉磯」→「美國洛杉磯中心」、「台北中心」→「台北中心」，與分享預覽標題的名稱部分一致，後端規則在 apps/launch/src/og.ts；業主 2026-11-15 指定預設改為 XX中心）。
  * 所有顯示中心名稱的地方一律用它。
  */
 export function centerTitle(label: string): string {
   const custom = customCenterNames[centerKeyOf(label)];
   if (custom) return custom;
   const base = label.replace(/\s*\d+\s*$/, "").replace(/教育中心$|中心$/, "").trim();
-  return `${base || label}教育中心`;
+  return `${base || label}中心`;
 }
 
 /** 章節的分享者顯示：「分享者：李講師 白金 經理」（姓名、獎銜、職稱，沒填的略過；三者都沒填回空字串）。 */

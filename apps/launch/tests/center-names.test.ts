@@ -33,5 +33,5 @@ test("教育中心自訂名稱：權限、讀取、還原預設、分享標題�
   assert.equal((await call("PUT", "/admin/center-name?center=台中中心", admin, { name: "中部教育中心" })).status, 200);
   assert.equal((await call("PUT", "/admin/center-name?center=台北中心", admin, { name: "  " })).status, 200);
   assert.deepEqual((await call<Record<string, string>>("GET", "/center-names", student)).data, { 台中中心: "中部教育中心" });
-  assert.match(await (await w.fetch(new Request("https://learn.test/tp"), env)).text(), /property="og:title" content="台北教育中心 \| 寰宇行動大學"/);
+  assert.match(await (await w.fetch(new Request("https://learn.test/tp"), env)).text(), /property="og:title" content="台北中心 \| 寰宇行動大學"/);
 });

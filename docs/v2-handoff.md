@@ -488,4 +488,4 @@
 - 2026-11-15（夜）章節與教材、職稱關連詞、教育中心名稱：
   - **其他教材**：`lessons.kind`（chapter／material，migration 0049）。教材與章節同款操作（新增、編輯、移動、複製、刪除），但**不計入**章節堂數、學習進度、成就、單元模式、搜尋索引；顯示序號章節與教材各自從 1 起（API 回傳的 `position` 是各組序號，資料庫的 position 仍是整門課共用且不重複）。學員端「其他教材」區塊＝系統自動產生的完整版（最前面）＋有內容的教材。`POST /admin/lessons/:id/duplicate` 複製一堂（音檔不共用）；排序 API 一次只排一組。
   - **職稱**：`features/admin/suggest-input.tsx`（輸入一個字就跳出下拉關連詞，最多 50 筆）取代膠囊。新增職稱同步中央：`central.ts` 的 `centralAddJobTitle`＋待送清單 `job_title_outbox`（migration 0050）；**中央的 `POST /v1/vocab/suggestions` 尚未提供**（需求說明 `docs/central-request-job-title.md` 待業主轉交），目前只會累積待送、不報錯，中央完成後儲存課程／章節時自動補送。
-  - **教育中心名稱**：`center_names` 表（migration 0051）、`GET /center-names`、`PUT /admin/center-name`；前端 `features/format.ts` 的 `centerTitle()` 是全站唯一來源（自訂名稱優先，預設「去掉數字代碼＋教育中心」），`state/center-names.tsx` 載入。只是顯示別名，不改中央中心清單與代碼。英文縮寫網址在中心編輯面板所有人看得到、只有超級管理員能改。
+  - **教育中心名稱**：`center_names` 表（migration 0051）、`GET /center-names`、`PUT /admin/center-name`；前端 `features/format.ts` 的 `centerTitle()` 是全站唯一來源（自訂名稱優先，預設「去掉數字代碼＋中心」），`state/center-names.tsx` 載入。只是顯示別名，不改中央中心清單與代碼。英文縮寫網址在中心編輯面板所有人看得到、只有超級管理員能改。

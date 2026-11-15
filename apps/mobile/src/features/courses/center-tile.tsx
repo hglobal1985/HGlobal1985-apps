@@ -6,7 +6,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText } from "@/ui";
 
-/** 「寰宇教育中心」清單的小卡片：中心 EDM 的 16:9 封面（沒上傳就用淡色底加中心名稱當封面），卡片正下方是放大的中心名稱（統一格式「XX教育中心」，不顯示編號與堂數）；整張可點。 */
+/** 「寰宇教育中心」清單的小卡片：中心 EDM 的 16:9 封面（沒上傳就用淡色底加中心名稱當封面），卡片正下方是放大的中心名稱（統一格式「XX中心」、置中，不顯示編號與堂數）；整張可點。 */
 export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edmUrl?: string | null; width: number; onPress: () => void }) {
   const { c } = useTheme();
   useCenterNames();
@@ -23,7 +23,7 @@ export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edm
           </AppText>
         )}
       </View>
-      <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontSize: 18, lineHeight: 24 }}>
+      <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontSize: 18, lineHeight: 24, textAlign: "center" }}>
         {title}
       </AppText>
     </Pressable>
