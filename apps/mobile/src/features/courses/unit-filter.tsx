@@ -5,43 +5,62 @@ import { AppText, Icon } from "@/ui";
 
 /**
  * 「單元」模式的篩選：兩顆「眼睛」按鈕（業主 2026-11-16 定案）。
- * - 「只看主講」：開＝只列主講人章節；關＝全部都看。
- * - 「只看短影音」：開＝只列短影音專輯的章節與影音教材；關＝全部都看。
- * 開啟＝眼睛張開、深綠底；關閉＝眼睛劃斜線、灰色；開啟「只看短影音」時「只看主講」強制關閉、變淡灰色且不能按。
- * 關閉「只看短影音」不影響（之後仍可打開「只看主講」，但不會自動恢復原本開著的主講）。
+ * 「短影音」按鈕每按一下循環三種狀態：
+ *   灰色「短影音開關」（沒篩選，全部顯示）→ 綠色「只看短影音」→ 斜線「不看短影音」→ 回到灰色。
+ * 「主講」按鈕兩種狀態：灰色「全部顯示」↔ 綠色「只看主講」。
+ * 開「只看短影音」時，主講按鈕強制關閉、變淡灰色不能按；其他狀態不受影響（主講被強制關閉後不會自動恢復）。
+ * 值的寫法：主講開才加上 speaker；短影音狀態 shorts（只看）／noshorts（不看）。
  */
-export type UnitFilterValue = "all" | "speaker" | "shorts";
+export type UnitFilterValue = "all" | "speaker" | "shorts" | "noshorts" | "speaker_noshorts";
+type ShortsMode = "off" | "only" | "hide";
+
+const shortsOf = (v: UnitFilterValue): ShortsMode => (v === "shorts" ? "only" : v === "noshorts" || v === "speaker_noshorts" ? "hide" : "off");
+const speakerOf = (v: UnitFilterValue) => v === "speaker" || v === "speaker_noshorts";
+const compose = (shorts: ShortsMode, speaker: boolean): UnitFilterValue => (shorts === "only" ? "shorts" : shorts === "hide" ? (speaker ? "speaker_noshorts" : "noshorts") : speaker ? "speaker" : "all");
 
 /** 單元清單套用篩選。 */
-export const unitFilterPass = (f: UnitFilterValue, l: { isSpeaker?: boolean; isShorts?: boolean }) => (f === "speaker" ? !!l.isSpeaker : f === "shorts" ? !!l.isShorts : true);
+export const unitFilterPass = (f: UnitFilterValue, l: { isSpeaker?: boolean; isShorts?: boolean }) => {
+  const shorts = shortsOf(f);
+  if (speakerOf(f) && !l.isSpeaker) return false;
+  return shorts === "only" ? !!l.isShorts : shorts === "hide" ? !l.isShorts : true;
+};
 
-/** 讀取已存的選擇（舊版的「隱藏短影音」已取消，視為全部）。 */
-export const parseUnitFilter = (v: string | null | undefined): UnitFilterValue => (v === "speaker" || v === "shorts" ? v : "all");
+/** 讀取已存的選擇（不認得的值視為全部）。 */
+export const parseUnitFilter = (v: string | null | undefined): UnitFilterValue => (v === "speaker" || v === "shorts" || v === "noshorts" || v === "speaker_noshorts" ? v : "all");
 
 export function UnitFilter({ value, onChange }: { value: UnitFilterValue; onChange: (v: UnitFilterValue) => void }) {
+  const shorts = shortsOf(value);
+  const speaker = speakerOf(value);
+  const nextShorts: ShortsMode = shorts === "off" ? "only" : shorts === "only" ? "hide" : "off";
   return (
     <View style={styles.row}>
-      <EyeButton label="只看短影音" state={value === "shorts" ? "on" : "off"} onPress={() => onChange(value === "shorts" ? "all" : "shorts")} />
-      <EyeButton label="只看主講" state={value === "shorts" ? "disabled" : value === "speaker" ? "on" : "off"} onPress={() => onChange(value === "speaker" ? "all" : "speaker")} />
+      <FilterButton
+        kind={shorts === "only" ? "on" : shorts === "hide" ? "hide" : "off"}
+        label={shorts === "only" ? "只看短影音" : shorts === "hide" ? "不看短影音" : "短影音開關"}
+        onPress={() => onChange(compose(nextShorts, nextShorts === "only" ? false : speaker))} // 開「只看短影音」＝主講強制關閉
+      />
+      <FilterButton kind={shorts === "only" ? "disabled" : speaker ? "on" : "off"} label={speaker ? "只看主講" : "全部顯示"} onPress={() => onChange(compose(shorts, !speaker))} />
     </View>
   );
 }
 
-function EyeButton({ label, state, onPress }: { label: string; state: "on" | "off" | "disabled"; onPress: () => void }) {
+/** on＝綠色眼睛張開；off＝灰色眼睛（不劃線）；hide＝眼睛劃斜線（不看）；disabled＝更淡的灰色、不能按。 */
+function FilterButton({ label, kind, onPress }: { label: string; kind: "on" | "off" | "hide" | "disabled"; onPress: () => void }) {
   const { c } = useTheme();
-  const on = state === "on";
-  const disabled = state === "disabled";
-  const fg = on ? c.textOnAccent : disabled ? c.border : c.textMuted;
+  const on = kind === "on";
+  const disabled = kind === "disabled";
+  const hide = kind === "hide";
+  const fg = on ? c.textOnAccent : hide ? c.accentText : disabled ? c.border : c.textMuted;
   return (
     <Pressable
-      accessibilityRole="switch"
-      accessibilityState={{ checked: on, disabled }}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on || hide, disabled }}
       accessibilityLabel={label}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.item, { backgroundColor: on ? c.accent : disabled ? c.surfaceMuted : c.surface, borderColor: on ? c.accent : disabled ? c.surfaceMuted : c.border }]}
+      style={[styles.item, { backgroundColor: on ? c.accent : hide ? c.accentSoft : disabled ? c.surfaceMuted : c.surface, borderColor: on ? c.accent : hide ? c.accent : disabled ? c.surfaceMuted : c.border }]}
     >
-      <Icon name={on ? "eye" : "eye-off"} size={22} color={fg} />
+      <Icon name={hide ? "eye-off" : "eye"} size={22} color={fg} />
       <AppText variant="callout" numberOfLines={1} style={{ color: fg, fontWeight: "700" }}>
         {label}
       </AppText>
