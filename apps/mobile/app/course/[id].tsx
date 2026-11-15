@@ -295,7 +295,7 @@ export default function CourseDetailScreen() {
             </Card>
           </Section>
         ) : null}
-        {member ? <CommentBoard courseId={course.id} /> : null}
+        {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}
       </Screen>
       {sheet === "art" ? (
         <EditSheet title="EDM 與封面" onClose={() => setSheet(null)} hideSave>

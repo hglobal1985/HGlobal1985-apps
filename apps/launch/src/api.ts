@@ -1870,7 +1870,8 @@ const toComment = (r: CommentRow, s: Session): CourseComment => ({
 async function requireCourseForComments(ctx: Ctx, courseId: string): Promise<Session> {
   const s = requireMember(ctx);
   const c = await ctx.db.prepare("SELECT status FROM courses WHERE id = ?").bind(courseId).first<{ status: string }>();
-  if (!c || (c.status !== "published" && s.role !== "admin")) fail(404, "not_found", "找不到這門課程");
+  // 未上架的課程不開放留言；下架封存的課程，已報名的學員照常可以看與留言。
+  if (!c || (c.status === "draft" && s.role !== "admin")) fail(404, "not_found", "找不到這門課程");
   return s;
 }
 
