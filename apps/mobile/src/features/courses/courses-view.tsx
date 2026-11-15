@@ -117,8 +117,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     return [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
   }, [data, adminList.data]);
   const courses = useMemo(() => sortCourses(merged, member, config.sortGroups), [merged, member, config.sortGroups]);
-  // 「地區教育中心」不放進分類下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
-  const categories = useMemo(() => [...new Set(courses.flatMap((x) => x.category.split("、")).filter((x) => x && x !== HIDDEN_CATEGORY))], [courses]);
+  // 分類下拉＝「關鍵字管理」的分類清單（同步，沒有課程使用的分類也要列出）；載入前先用課程上出現過的分類。
+  // 「地區教育中心」不放進下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
+  const categoryList = useApi<string[]>("/categories");
+  const categories = useMemo(() => {
+    const fromCourses = courses.flatMap((x) => x.category.split("、"));
+    return [...new Set([...(categoryList.data ?? []), ...fromCourses])].filter((x) => x && x !== HIDDEN_CATEGORY).sort((a, b) => a.localeCompare(b, "zh-Hant"));
+  }, [courses, categoryList.data]);
   // 中心：課程的主辦中心（名稱都是會員中心清單裡的）；管理者另外加上自己能管的中心（還沒有課程也能先上傳 EDM）。
   const rights = member?.courseRights;
   const centers = useMemo(() => {

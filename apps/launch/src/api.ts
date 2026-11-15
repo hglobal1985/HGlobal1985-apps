@@ -2236,6 +2236,8 @@ const routes: [string, RegExp, Handler][] = [
       };
     },
   ],
+  // 全部課程的「分類」下拉：與「關鍵字管理」的分類清單同步（含目前沒有課程使用的分類）。
+  ["GET", /^\/categories$/, async (ctx) => keywordChoices(ctx, "category", null)],
   ["GET", /^\/ui-config$/, async (ctx) => loadConfig(ctx.db)],
   [
     "PUT",
