@@ -49,7 +49,7 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
   const title = sel.length ? `已選：${sel.map(catLabel).join("＋")}（${total} 堂）` : "選擇分類";
   const cell = w ? Math.floor((w - GAP * (COLS - 1)) / COLS) : 0;
   return (
-    <BottomSheet onClose={onClose} swipeToClose>
+    <BottomSheet onClose={onClose} swipeUpClose>
       <AppText variant="headline" numberOfLines={2}>
         {title}
       </AppText>
