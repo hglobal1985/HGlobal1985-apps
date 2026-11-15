@@ -28,6 +28,9 @@ import { AppText, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Scr
 
 const ALL = "";
 const HIDDEN_CATEGORY = "地區教育中心";
+/** 「未分類」：沒有任何分類的課程（讓下拉選單的數字與「全部分類」對得上）。 */
+const NONE = "__none__";
+const cats = (x: { category: string }) => x.category.split("、").map((v) => v.trim()).filter(Boolean);
 const MODE_KEY = "hglobal:learn:course-view-mode";
 const GAP = space.md;
 
@@ -65,9 +68,20 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     else if (cat !== ALL) url = slugOf("category", cat) ? `/${slugOf("category", cat)}` : `/courses?category=${encodeURIComponent(cat)}`;
     window.history.replaceState(window.history.state, "", url);
   };
+  // 用下拉選了某個分類：課程呈現自動跳到「單元」（章節）模式；回到「全部分類」就恢復原本的模式。
+  const [modeBeforeCat, setModeBeforeCat] = useState<CourseViewMode | null>(null);
   const pickCategory = (v: string) => {
     setCategory(v);
-    syncUrl(v, center);
+    if (v !== ALL && mode !== "chapter") {
+      setModeBeforeCat(mode);
+      setMode("chapter");
+      setFlashTick((t) => t + 1);
+    } else if (v === ALL && modeBeforeCat) {
+      setMode(modeBeforeCat);
+      setModeBeforeCat(null);
+      setFlashTick((t) => t + 1);
+    }
+    syncUrl(v, v !== ALL ? ALL : center);
   };
   const pickCenter = (v: string) => {
     setCenter(v);
@@ -124,10 +138,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const catStats = useMemo(() => {
     const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
     const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
-    const names = new Set([...(categoryList.data ?? []), ...courses.flatMap((x) => x.category.split("、"))]);
+    const names = new Set([...(categoryList.data ?? []), ...courses.flatMap(cats), ...(courses.some((x) => !cats(x).length) ? [NONE] : [])]);
     for (const name of names) {
       if (!name || name === HIDDEN_CATEGORY) continue;
-      const mine = courses.filter((x) => x.category.split("、").includes(name));
+      const mine = courses.filter((x) => (name === NONE ? !cats(x).length : cats(x).includes(name)));
       stats.set(name, {
         n: mine.length,
         learning: mine.filter((x) => x.enrollment === "opened").length,
@@ -138,14 +152,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     return stats;
   }, [courses, categoryList.data]);
   // 課程數最多的排最前面（同數量依名稱），與「寰宇教育中心」清單一致。
-  const categories = useMemo(() => [...catStats.keys()].sort((a, b) => catStats.get(b)!.n - catStats.get(a)!.n || a.localeCompare(b, "zh-Hant")), [catStats]);
+  const categories = useMemo(() => [...catStats.keys()].sort((a, b) => Number(a === NONE) - Number(b === NONE) || catStats.get(b)!.n - catStats.get(a)!.n || a.localeCompare(b, "zh-Hant")), [catStats]);
   const categoryOption = (x: string): SelectOption => {
     const st = catStats.get(x)!;
     const badges: SelectBadge[] = [];
     if (st.learning) badges.push({ text: `學習中 ${st.learning}`, tone: "accent" });
     if (manager && st.draft) badges.push({ text: `未上架 ${st.draft}`, tone: "warn" });
     if (st.fresh) badges.push({ text: "新", tone: "new" });
-    return { key: x, label: x, hint: `${st.n} 門`, badges };
+    return { key: x, label: x === NONE ? "未分類" : x, hint: `${st.n} 門`, badges };
   };
   const allOption: SelectOption = {
     key: ALL,
@@ -164,11 +178,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }, [courses, rights, centerArt.data]);
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
   const activeCenter = mode === "center" ? center : ALL;
+  const inCategory = (x: CourseSummary) => category === ALL || (category === NONE ? !cats(x).length : cats(x).includes(category));
   // 中心清單的排序：課程數最多的排最前面（同數量依名稱）。
   const centerCounts = useMemo(
     () =>
       centers
-        .map((name) => ({ name, count: courses.filter((x) => x.hostCenter === name && (category === ALL || x.category.split("、").includes(category))).length }))
+        .map((name) => ({ name, count: courses.filter((x) => x.hostCenter === name && inCategory(x)).length }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
     [centers, courses, category],
   );
@@ -182,7 +197,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const terms = searchIndex && q.trim() && q !== picked ? suggestTerms(searchIndex, q) : [];
   // 「相同系列」模式不放地區教育中心的課程（它們在「寰宇教育中心」模式看；業主 2026-11-15）。搜尋時不受此限。
   const hideCenterCourses = mode === "series" && !seriesFilter;
-  const list = courses.filter((x) => (matched ? matched.has(x.id) : !(hideCenterCourses && x.category.split("、").includes(HIDDEN_CATEGORY)) && (category === ALL || x.category.split("、").includes(category)) && inCenter(x) && (!seriesFilter || x.series === seriesFilter)));
+  const list = courses.filter((x) => (matched ? matched.has(x.id) : !(hideCenterCourses && x.category.split("、").includes(HIDDEN_CATEGORY)) && inCategory(x) && inCenter(x) && (!seriesFilter || x.series === seriesFilter)));
   const pickTerm = (text: string) => {
     const head = q.trim().split(/\s+/).slice(0, -1).join(" ");
     const next = head ? `${head} ${text}` : text;
@@ -212,7 +227,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     for (const l of searchData.data?.lessons ?? []) {
       const co = byId.get(l.courseId);
       if (!co) continue;
-      if (hit ? !hit.has(l.id) : (category !== ALL && !co.category.split("、").includes(category)) || !inCenter(co)) continue;
+      if (hit ? !hit.has(l.id) : !inCategory(co) || !inCenter(co)) continue;
       out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
