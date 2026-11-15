@@ -425,10 +425,12 @@ export async function centralSuggest(token: string, pool: "education_system" | "
 
 /**
  * 把新職稱送到中央的職稱詞庫（服務對服務憑證，不用會員個人登入）：POST /v1/vocab/suggestions {pool:"job_title", value}。
- * 需求說明見 docs/central-request-job-title.md；中央還沒提供這支 API 時（404／405／501）回 "unsupported"，之後再補送。
- * "ok"＝中央已收下（含已存在）；"retry"＝暫時失敗，稍後再送。永遠不丟例外。
+ * 中央已開放（串接指令版本 2026-11-15.5）：200 回 {pool, value, created}；新詞是「待核可」，業主在中央後台核可後才出現在別人的建議；
+ * 只開放 job_title（其他詞庫 403）；value 去空白、最長 50 字；每個 App 每分鐘 30 次、待核可上限 200（429）。
+ * 回傳：「ok」＝中央已收下（含已存在）；「rejected」＝400／403，內容本身有問題，不重送；
+ * 「retry」＝401／429／5xx／逾時，暫存稍後重送；「unsupported」＝404／405／501（中央沒有這支 API），之後再補送。永遠不丟例外。
  */
-export async function centralAddJobTitle(secret: string | undefined, value: string): Promise<"ok" | "retry" | "unsupported"> {
+export async function centralAddJobTitle(secret: string | undefined, value: string): Promise<"ok" | "retry" | "unsupported" | "rejected"> {
   if (!secret) return "unsupported";
   try {
     const token = await serviceToken(secret);
@@ -441,6 +443,7 @@ export async function centralAddJobTitle(secret: string | undefined, value: stri
     });
     if (res.ok) return "ok";
     if (res.status === 404 || res.status === 405 || res.status === 501) return "unsupported";
+    if (res.status === 400 || res.status === 403) return "rejected"; // 空白、過長或不是 job_title：重送也沒用
     return "retry";
   } catch {
     return "retry";

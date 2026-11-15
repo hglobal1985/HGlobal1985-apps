@@ -16,6 +16,14 @@ test("新增職稱送中央：成功／中央尚未開放／暫時失敗；沒�
   assert.equal(await centralAddJobTitle("secret", "區域經理"), "unsupported");
   setCentralFetch(fake(503));
   assert.equal(await centralAddJobTitle("secret", "區域經理"), "retry");
+  for (const st of [401, 429]) {
+    setCentralFetch(fake(st));
+    assert.equal(await centralAddJobTitle("secret", "區域經理"), "retry", `${st} 暫存重送`);
+  }
+  for (const st of [400, 403]) {
+    setCentralFetch(fake(st));
+    assert.equal(await centralAddJobTitle("secret", "區域經理"), "rejected", `${st} 不重送`);
+  }
   assert.equal(await centralAddJobTitle(undefined, "區域經理"), "unsupported");
   setCentralFetch(async () => {
     throw new Error("network");

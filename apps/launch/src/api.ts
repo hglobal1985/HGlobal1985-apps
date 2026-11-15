@@ -1633,7 +1633,7 @@ async function noteJobTitle(ctx: Ctx, value: string | undefined): Promise<void> 
     const { results } = await ctx.db.prepare("SELECT value FROM job_title_outbox WHERE tries < 30 ORDER BY created_at LIMIT 5").all<{ value: string }>();
     for (const r of results) {
       const out = await centralAddJobTitle(ctx.env.CENTRAL_SERVICE_SECRET, r.value);
-      if (out === "ok") await ctx.db.prepare("DELETE FROM job_title_outbox WHERE value = ?").bind(r.value).run();
+      if (out === "ok" || out === "rejected") await ctx.db.prepare("DELETE FROM job_title_outbox WHERE value = ?").bind(r.value).run(); // 被中央退回（400／403）的不重送
       else if (out === "retry") await ctx.db.prepare("UPDATE job_title_outbox SET tries = tries + 1 WHERE value = ?").bind(r.value).run();
       else break; // 中央還沒開放：不用一直試
     }
