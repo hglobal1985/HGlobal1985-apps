@@ -127,7 +127,7 @@ export default function LessonScreen() {
 
   if (!c) return <Screen header={false}>{course.loading ? <LoadingView /> : <ErrorView message={course.error ?? "找不到課程"} onRetry={course.reload} />}</Screen>;
   // 下一堂只在「課程章節」裡找（其他教材與完整版不接在章節後面）。
-  const chapterList = c.lessons.filter((l) => !l.full && !l.material);
+  const chapterList = c.lessons.filter((l) => !l.material);
   const lesson = c.lessons.find((l) => l.id === lessonId);
   const index = chapterList.findIndex((l) => l.id === lessonId);
   const next = index >= 0 ? chapterList[index + 1] : undefined;
@@ -212,11 +212,11 @@ export default function LessonScreen() {
           ))}
         </Card>
       </View>
-      {c.lessons.some((l) => l.full || (l.material && l.ready)) ? (
+      {c.lessons.some((l) => l.material && l.ready) ? (
         <View style={{ gap: space.xs }}>
           <AppText variant="headline">其他教材</AppText>
           <Card style={{ paddingVertical: 0 }}>
-            {[...c.lessons.filter((l) => l.full), ...c.lessons.filter((l) => l.material && l.ready)]
+            {c.lessons.filter((l) => l.material && l.ready)
               .map((l) => (
                 <ListRow
                   key={l.id}

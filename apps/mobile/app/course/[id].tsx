@@ -10,6 +10,8 @@ import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { EdmManager } from "@/features/admin/edm-manager";
 import { AutoCoverCheck, SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
+import { Check } from "@/features/course-edit/course-sections";
 import { EditLessonRows, LessonSheet, NewLessonSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
 import { teacherLine } from "@/features/format";
@@ -125,10 +127,10 @@ export default function CourseDetailScreen() {
   const stickyNotice = registerNode && !registerIsAction ? registerNode : null;
   const needRank = member && !course.eligible ? `限${course.minRank.name}獎銜以上報名${course.allowPresident ? "（會長也可報名）" : ""}` : null;
 
-  const lessons = course.lessons.filter((l) => !l.full && !l.material);
+  const lessons = course.lessons.filter((l) => !l.material);
   const materials = course.lessons.filter((l) => l.material);
   const moveLesson = async (group: Lesson[], from: number, to: number) => {
-    const ids = group.map((l) => l.id);
+    const ids = group.filter((l) => !l.full).map((l) => l.id); // 「完整版課程影片」固定在最後，不參與排序
     const [x] = ids.splice(from, 1);
     ids.splice(to, 0, x!);
     setLessonBusy(true);
@@ -155,6 +157,31 @@ export default function CourseDetailScreen() {
   const deleteLesson = async (l: Lesson) => {
     const what = l.material ? "教材" : "章節";
     if (!(await confirmAsk(`刪除${what}`, `確定刪除「${l.title}」？這一${l.material ? "份" : "堂"}的音檔與附件會一併刪除。`, "刪除"))) return;
+    setLessonBusy(true);
+    try {
+      await api("DELETE", `/admin/lessons/${l.id}`);
+      invalidate();
+    } catch (e) {
+      setMessage({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setLessonBusy(false);
+    }
+  };
+  const fullRow = materials.find((l) => l.full);
+  const toggleFull = async (on: boolean) => {
+    if (!on && fullRow) return deleteFull(fullRow);
+    setLessonBusy(true);
+    try {
+      await api("POST", `/admin/courses/${course.id}/full-version`);
+      invalidate();
+    } catch (e) {
+      setMessage({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setLessonBusy(false);
+    }
+  };
+  const deleteFull = async (l: Lesson) => {
+    if (!(await confirmAsk("取消完整版課程影片", "確定移除「完整版課程影片」這一列？已設定的影片來源與秒數會一併清除。", "移除"))) return;
     setLessonBusy(true);
     try {
       await api("DELETE", `/admin/lessons/${l.id}`);
@@ -234,8 +261,8 @@ export default function CourseDetailScreen() {
             </Section>
             <Section title="其他教材">
               {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
+              <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />
               <Button variant="secondary" label="新增教材" icon="add" onPress={() => setSheet("newMaterial")} fullWidth />
-              <NoticeBox text="講義、錄音、補充影片等教材放這裡：操作與章節相同，但不計入章節堂數與學習進度。系統自動產生的「完整版」也會出現在這一區的最前面。" />
             </Section>
           </>
         ) : null}
@@ -259,7 +286,7 @@ export default function CourseDetailScreen() {
           </View>
         </Section>
         )}
-        {!(editing && canEditContent) && course.lessons.some((l) => l.full || l.material) ? (
+        {!(editing && canEditContent) && course.lessons.some((l) => l.material) ? (
           <Section title="其他教材">
             <FullVersionList course={course} />
           </Section>
@@ -272,7 +299,7 @@ export default function CourseDetailScreen() {
           <EdmManager course={course} onChanged={invalidate} />
         </EditSheet>
       ) : sheet === "newLesson" || sheet === "newMaterial" ? (
-        <NewLessonSheet course={course} kind={sheet === "newMaterial" ? "material" : "chapter"} onClose={() => setSheet(null)} />
+        sheet === "newMaterial" ? <NewMaterialSheet course={course} onClose={() => setSheet(null)} /> : <NewLessonSheet course={course} onClose={() => setSheet(null)} />
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}

@@ -314,7 +314,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
 function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isHq = member?.role === "admin";
-  const init = { centerCourse: course.centerCourse, guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, showFull: course.showFull, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
+  const init = { centerCourse: course.centerCourse, guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
   const [f, setF] = useState(init);
   const centers = useApi<string[]>(isHq ? "/centers" : null);
   const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
@@ -337,7 +337,6 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
       {f.guidanceUnit === HQ_UNIT ? <NoticeBox text="由寰宇總部指導的課程，只能使用總部的審核群組。" /> : null}
       <Label>主辦單位（會公開顯示；管理權限與「中心」篩選以第一個中心為準）</Label>
       {isHq ? <MultiChips options={[HQ_UNIT, ...(centers.data ?? [])]} value={f.hostUnit} counts={hostCounts} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} /> : <NoticeBox text={`主辦單位固定為「${course.hostUnit || member?.center || ""}」；只有總部可以改到別的中心。`} />}
-      <Check label="顯示「完整版」區塊（同一支影片切成多堂時）" value={f.showFull} onChange={(v) => setF((x) => ({ ...x, showFull: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
       <Check label="不顯示在首頁推薦" value={f.hideFromHome} onChange={(v) => setF((x) => ({ ...x, hideFromHome: v }))} />
       <Field label="課程介紹（內部參考，課程頁不顯示）" value={f.description} onChange={(v) => setF((x) => ({ ...x, description: v }))} multiline placeholder="課程內容、上課時間、適合對象……" />

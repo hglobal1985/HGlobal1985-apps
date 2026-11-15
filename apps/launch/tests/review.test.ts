@@ -263,7 +263,7 @@ test("學習進度百分比：每堂都有長度依長度算，有一堂沒長�
   assert.equal(await pct(), 50, "第 2 堂沒有長度：改依章節數 1／2");
 });
 
-test("完整版影片：同一支影片裁成多堂時，清單最後自動多一個整支播放的選項（學員看得到、管理員編輯清單不加、不計入進度）", async () => {
+test("完整版課程影片：手動勾選新增一列（自動帶入章節共用影片）、永遠在教材最後、不能複製／排序、不計入進度、可刪除", async () => {
   const { call, login } = setup();
   const [admin, student] = await Promise.all(["demo-admin", "demo-student"].map(login));
   const c = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "裁切課", priceTwd: 0, status: "published" } })).data;
@@ -273,22 +273,27 @@ test("完整版影片：同一支影片裁成多堂時，清單最後自動多�
     await call("PATCH", `/admin/lessons/${id}`, { token: admin, body: { mediaType: "youtube", mediaRef: "dQw4w9WgXcQ", startSeconds: start, endSeconds: end, minutes: 10 } });
   }
   await call("POST", "/orders", { token: student, body: { courseIds: [c.id] } });
+  assert.equal((await call<CourseDetail>("GET", `/courses/${c.id}`, { token: student })).data.lessons.length, 2, "沒勾選就沒有完整版");
+  assert.equal((await call("POST", `/admin/courses/${c.id}/full-version`, { token: student })).status, 403, "學員不能新增");
+  const made = (await call<CourseDetail>("POST", `/admin/courses/${c.id}/full-version`, { token: admin })).data;
+  assert.equal((await call<CourseDetail>("POST", `/admin/courses/${c.id}/full-version`, { token: admin })).data.lessons.length, 3, "重複勾選不會多一列");
+  const fullId = made.lessons.find((l) => l.full)!.id;
   const detail = (await call<CourseDetail>("GET", `/courses/${c.id}`, { token: student })).data;
-  assert.equal(detail.lessons.length, 3);
-  const full = detail.lessons[2]!;
-  assert.deepEqual([full.title, full.start, full.end, full.minutes, full.locked, full.completed], ["完整版(含主持/串場/影片)", null, null, 20, false, false]);
+  const full = detail.lessons.find((l) => l.full)!;
+  assert.deepEqual([full.title, full.material, full.start, full.end, full.minutes, full.locked], ["完整版課程影片", true, null, null, 20, false]);
   assert.equal(detail.lessonCount, 2, "完整版不算章節總數");
-  const pb = (await call<{ kind: string; videoId: string; start: number | null; end: number | null }>("GET", `/courses/${c.id}/lessons/${full.id}/playback`, { token: student })).data;
+  const pb = (await call<{ kind: string; videoId: string; start: number | null; end: number | null }>("GET", `/courses/${c.id}/lessons/${fullId}/playback`, { token: student })).data;
   assert.deepEqual([pb.kind, pb.videoId, pb.start, pb.end], ["youtube", "dQw4w9WgXcQ", null, null], "整支播放，沒有起訖時間");
-  const seg = (await call<{ start: number | null; end: number | null }>("GET", `/courses/${c.id}/lessons/${l2}/playback`, { token: student })).data;
-  assert.deepEqual([seg.start, seg.end], [600, 1200]);
-  assert.equal((await call("POST", `/courses/${c.id}/lessons/${full.id}/complete`, { token: student })).status, 200);
+  assert.equal((await call("POST", `/courses/${c.id}/lessons/${fullId}/complete`, { token: student })).status, 200);
   assert.equal((await call<CourseDetail>("GET", `/courses/${c.id}`, { token: student })).data.completedLessons, 0, "不計入進度");
-  await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { showFull: false } });
-  assert.equal((await call<CourseDetail>("GET", `/courses/${c.id}`, { token: student })).data.lessons.length, 2, "關掉「顯示完整版」就沒有");
-  await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { showFull: true } });
-  const adminLessons = (await call<CourseDetail>("GET", `/courses/${c.id}`, { token: admin })).data.lessons;
-  assert.deepEqual([adminLessons.length, adminLessons.filter((l) => l.full).length], [3, 1], "管理員也看得到完整版（編輯清單由前端濾掉）");
+  // 之後新增的教材排在完整版前面；完整版永遠最後，不能複製、不能被排序。
+  const after = (await call<CourseDetail>("POST", `/admin/courses/${c.id}/lessons`, { token: admin, body: { title: "講義", kind: "material" } })).data;
+  assert.deepEqual(after.lessons.filter((l) => l.material).map((l) => l.title), ["講義", "完整版課程影片"]);
+  assert.equal((await call("POST", `/admin/lessons/${fullId}/duplicate`, { token: admin })).status, 400);
+  assert.equal((await call("POST", `/admin/courses/${c.id}/lessons/order`, { token: admin, body: { ids: [fullId] } })).status, 400);
+  // 取消勾選＝刪除那一列
+  assert.equal((await call("DELETE", `/admin/lessons/${fullId}`, { token: admin })).status, 200);
+  assert.equal((await call<CourseDetail>("GET", `/courses/${c.id}`, { token: admin })).data.lessons.some((l) => l.full), false);
 });
 
 test("回報繳費方式：四種方式各自的必填欄位、只有本人能回報、紀錄留在明細、通知審核人員", async () => {

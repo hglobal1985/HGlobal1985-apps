@@ -17,16 +17,24 @@ function audioDuration(file: Blob): Promise<number | null> {
   });
 }
 
-/** 選擇音檔並分段上傳到 R2（learn bucket），完成後該章節改為音檔。onProgress 回報 0～1。 */
-export async function pickAndUploadAudio(lessonId: string, onProgress: (p: number) => void): Promise<"done" | "cancelled"> {
+export type PickedAudio = { file: Blob; name: string; contentType: string };
+
+/** 只選檔（還沒上傳）：新增教材時先暫存，按「新增」後才上傳。取消回傳 null。 */
+export async function pickAudio(): Promise<PickedAudio | null> {
   const picked = await DocumentPicker.getDocumentAsync({ type: "audio/*", copyToCacheDirectory: true, multiple: false });
-  if (picked.canceled || !picked.assets?.length) return "cancelled";
+  if (picked.canceled || !picked.assets?.length) return null;
   const asset = picked.assets[0];
   const file: Blob = asset.file ?? (await (await fetch(asset.uri)).blob());
   const contentType = asset.mimeType || file.type || "audio/mpeg";
   if (!contentType.startsWith("audio/")) throw Error("請選擇音訊檔（例如 MP3、M4A）");
+  return { file, name: asset.name, contentType };
+}
+
+/** 把選好的音檔分段上傳到 R2（learn bucket），完成後該堂改為音檔。onProgress 回報 0～1。 */
+export async function uploadPickedAudio(lessonId: string, audio: PickedAudio, onProgress: (p: number) => void): Promise<void> {
+  const { file, name, contentType } = audio;
   const size = file.size;
-  const { key, uploadId } = await api<{ key: string; uploadId: string }>("POST", `/admin/lessons/${lessonId}/audio/start`, { fileName: asset.name, contentType, size });
+  const { key, uploadId } = await api<{ key: string; uploadId: string }>("POST", `/admin/lessons/${lessonId}/audio/start`, { fileName: name, contentType, size });
   const parts: { partNumber: number; etag: string }[] = [];
   const total = Math.max(1, Math.ceil(size / CHUNK));
   for (let i = 0; i < total; i++) {
@@ -36,5 +44,12 @@ export async function pickAndUploadAudio(lessonId: string, onProgress: (p: numbe
     onProgress((i + 1) / total);
   }
   await api("POST", `/admin/lessons/${lessonId}/audio/complete`, { key, uploadId, parts, durationSeconds: await audioDuration(file) });
+}
+
+/** 選擇音檔並分段上傳（舊用法：選完馬上傳）。 */
+export async function pickAndUploadAudio(lessonId: string, onProgress: (p: number) => void): Promise<"done" | "cancelled"> {
+  const audio = await pickAudio();
+  if (!audio) return "cancelled";
+  await uploadPickedAudio(lessonId, audio, onProgress);
   return "done";
 }

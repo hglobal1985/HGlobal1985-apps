@@ -9,7 +9,7 @@ import { AppText, Card, ListRow } from "@/ui";
  * 格式永遠一致；要改章節的呈現只改這裡。
  */
 export function ChapterList({ course, style }: { course: CourseDetail; style?: ViewStyle }) {
-  const chapters = course.lessons.filter((l) => !l.full && !l.material);
+  const chapters = course.lessons.filter((l) => !l.material);
   const anyReady = chapters.some((l) => l.ready);
   return (
     <Card style={{ paddingVertical: 0, ...style }}>
@@ -35,9 +35,9 @@ export function ChapterList({ course, style }: { course: CourseDetail; style?: V
   );
 }
 
-/** 「其他教材」區塊的清單：系統自動產生的「完整版」（同一支影片被切成多堂時才有，排在最前面）＋管理者上傳的教材。 */
+/** 「其他教材」區塊的清單：管理者新增的教材；「完整版課程影片」固定排在最後一列。 */
 export function FullVersionList({ course }: { course: CourseDetail }) {
-  const full = [...course.lessons.filter((l) => l.full), ...course.lessons.filter((l) => l.material && (l.ready || !!course.can?.edit))];
+  const full = course.lessons.filter((l) => l.material && (l.ready || !!course.can?.edit));
   if (!full.length) return null;
   return (
     <Card style={{ paddingVertical: 0 }}>
