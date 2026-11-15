@@ -7,11 +7,11 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, space } from "@/theme/tokens";
 import { AppText, ErrorView, LoadingView } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
-import { ChapterList, FullVersionList } from "./lesson-list";
+import { ChapterList } from "./lesson-list";
 
 /**
  * 中心頁點某一門課：從下方彈出這門課的章節（與課程介紹頁的章節清單是同一個元件 ChapterList，內容格式一致），
- * 右上角「查看詳細介紹」進入課程介紹頁。
+ * 右上角「查看詳細介紹」進入課程介紹頁。選單一律不顯示「完整版」。
  */
 export function CourseLessonsSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
   const { c } = useTheme();
@@ -45,7 +45,6 @@ export function CourseLessonsSheet({ course, onClose }: { course: CourseSummary;
         {data ? (
           <>
             <ChapterList course={data} />
-            <FullVersionList course={data} />
           </>
         ) : null}
       </ScrollView>
