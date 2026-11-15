@@ -255,12 +255,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     activeCenter !== ALL ? (
       <View style={{ gap: space.sm }}>
         {art ? <EdmImageStage url={art.edmUrl} title={center} /> : null}
-        <Pressable accessibilityRole="button" accessibilityLabel="回到中心清單" onPress={() => pickCenter(ALL)} style={[styles.back, { borderColor: c.border }]}>
-          <Ionicons name="chevron-back" size={20} color={c.accent} />
-          <AppText variant="body" style={{ color: c.accent, fontWeight: "700" }}>
-            全部中心
-          </AppText>
-        </Pressable>
         {canEditArt ? <Button variant="secondary" label={art ? "編輯中心 EDM" : "上傳中心 EDM"} icon="create-outline" onPress={() => setArtOpen(true)} fullWidth /> : null}
       </View>
     ) : null;
@@ -334,7 +328,6 @@ const styles = StyleSheet.create({
   term: { minHeight: 44, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", gap: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   kind: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }, filters: { flexDirection: "row", alignItems: "flex-end", gap: space.sm },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP, rowGap: space.lg },
-  back: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", minHeight: minTouch, paddingRight: space.md },
   archHead: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, paddingHorizontal: space.md, borderWidth: 1, borderStyle: "dashed", borderRadius: radius.md },
   fab: { position: "absolute", right: space.lg, bottom: space.lg, flexDirection: "row", alignItems: "center", gap: 6, minHeight: 52, paddingHorizontal: space.lg, borderRadius: radius.pill, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
 });
