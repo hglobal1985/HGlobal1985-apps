@@ -19,12 +19,17 @@ export function showFlash(content: FlashContent): void {
   listeners.forEach((l) => l());
 }
 
-/** 所有提醒視窗固定同一個寬高（業主 2026-11-16：比原本 3 倍版再縮小 50％）；文字依字數自動換行、自動縮小；點一下立刻關閉。 */
+/**
+ * 所有提醒視窗固定同一個寬高（業主 2026-11-16：比原本 3 倍版再縮小 50％；之後再把整體縮成 80%：寬度不變、高度 230→184，圖示與文字一起縮成 80%）；
+ * 文字依字數自動換行、自動縮小；點一下立刻關閉。
+ */
 export const FLASH_W = 190;
-export const FLASH_H = 230;
-/** 依字數挑字級（網頁不支援自動縮小字體，所以用字數判斷）。 */
-const titleSize = (t: string) => (t.length <= 4 ? 28 : t.length <= 8 ? 22 : t.length <= 14 ? 17 : 14);
-const bodySize = (t: string) => (t.length <= 12 ? 16 : t.length <= 24 ? 14 : t.length <= 40 ? 12 : 11);
+export const FLASH_H = 184;
+/** 圖示區高度（原本 64 的 80%）；呼叫端的圖示請用 FLASH_ICON 當尺寸。 */
+export const FLASH_ICON = 51;
+/** 依字數挑字級（網頁不支援自動縮小字體，所以用字數判斷）；都是原本的 80%。 */
+const titleSize = (t: string) => (t.length <= 4 ? 22 : t.length <= 8 ? 18 : t.length <= 14 ? 14 : 11);
+const bodySize = (t: string) => (t.length <= 12 ? 13 : t.length <= 24 ? 11 : t.length <= 40 ? 10 : 9);
 
 function dismiss() {
   current = null;
@@ -81,7 +86,7 @@ export function FlashHost() {
 const styles = StyleSheet.create({
   wrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "flex-start", zIndex: 3500 },
   box: { height: FLASH_H, paddingHorizontal: space.sm, borderRadius: radius.lg, borderWidth: 2, alignItems: "center", justifyContent: "center", gap: space.sm, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
-  icon: { height: 64, alignItems: "center", justifyContent: "center" },
+  icon: { height: FLASH_ICON, alignItems: "center", justifyContent: "center" },
   title: { fontWeight: "800", textAlign: "center" },
   body: { fontWeight: "600", textAlign: "center" },
 });

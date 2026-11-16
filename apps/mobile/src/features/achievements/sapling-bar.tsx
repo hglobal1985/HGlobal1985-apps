@@ -6,6 +6,7 @@ import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, SaplingIcon, showFlash } from "@/ui";
+import { FLASH_ICON } from "@/ui/flash-notice";
 import { conditionText } from "./text";
 
 /**
@@ -23,7 +24,7 @@ export function SaplingBar({ saplings }: { saplings: number }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`小樹苗 ${saplings} 棵`}
-          onPress={() => showFlash({ icon: <SaplingIcon size={64} />, title: `小樹苗 ${saplings} 棵`, body: "每學完一堂課就長出一棵小樹苗", holdMs: 1800 })}
+          onPress={() => showFlash({ icon: <SaplingIcon size={FLASH_ICON} />, title: `小樹苗 ${saplings} 棵`, body: "每學完一堂課就長出一棵小樹苗", holdMs: 1800 })}
           style={tile}
         >
           <SaplingIcon size={44} />
@@ -66,5 +67,5 @@ const styles = StyleSheet.create({
   icons: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, justifyContent: "center" },
   badge: { width: minTouch, height: minTouch, borderRadius: minTouch / 2, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   badgeText: { fontSize: 26, lineHeight: 32 },
-  emoji: { fontSize: 50, lineHeight: 60 },
+  emoji: { fontSize: 40, lineHeight: 48 }, // 全螢幕提醒裡的成就圖示（80% 尺寸）
 });
