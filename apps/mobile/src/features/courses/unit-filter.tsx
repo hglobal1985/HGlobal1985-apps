@@ -4,7 +4,7 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 
 /**
- * 「單元」模式的篩選：三個勾選，強制排成同一排、不換行（業主 2026-11-16 定案，取代原本的三顆眼睛按鈕）。
+ * 「單元」模式的篩選：三個勾選（由左到右：主講人、總結、短影音），強制排成同一排、不換行（業主 2026-11-16 定案，取代原本的三顆眼睛按鈕）。
  * - 主講人：只顯示主講人章節。
  * - 總結：只顯示「總結與銷售課程」章節。可與主講人同時勾選（兩者都勾＝兩種章節都顯示）。
  * - 短影音：只顯示短影音，其餘不顯示；不能和另外兩個同時存在（勾短影音會取消另外兩個，勾另外兩個會取消短影音）。
@@ -39,8 +39,8 @@ export function UnitFilter({ value, onChange }: { value: UnitFilterValue; onChan
   return (
     <View style={styles.row}>
       <CheckItem label="主講人" checked={u.speaker} onPress={() => onChange(compose({ speaker: !u.speaker, summary: u.summary, shorts: false }))} />
-      <CheckItem label="短影音" checked={u.shorts} onPress={() => onChange(compose(u.shorts ? { speaker: false, summary: false, shorts: false } : { speaker: false, summary: false, shorts: true }))} />
       <CheckItem label="總結" checked={u.summary} onPress={() => onChange(compose({ speaker: u.speaker, summary: !u.summary, shorts: false }))} />
+      <CheckItem label="短影音" checked={u.shorts} onPress={() => onChange(compose(u.shorts ? { speaker: false, summary: false, shorts: false } : { speaker: false, summary: false, shorts: true }))} />
     </View>
   );
 }
