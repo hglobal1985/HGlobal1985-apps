@@ -38,6 +38,14 @@ export async function centerDisplayName(db: D1Database, label: string): Promise<
   return r?.n?.trim() || centerShareName(label);
 }
 
+/** 中心的分享標題：「彰化中心（地址）」；沒有設定地址就只有「彰化中心」（業主 2026-11-16）。 */
+export async function centerShareTitle(db: D1Database, label: string): Promise<string> {
+  const name = await centerDisplayName(db, label);
+  const a = await db.prepare("SELECT address AS a FROM center_info WHERE center_key = ?").bind(centerKey(label)).first<{ a: string }>().catch(() => null);
+  const address = a?.a?.trim();
+  return address ? `${name}（${address}）` : name;
+}
+
 /** 短網址的分享預覽：標題「{名稱} | 寰宇行動大學」（中心的名稱是「{名稱去掉數字代碼}教育中心」），說明是隨機一句學習金句（設定頁編輯的那份）。找不到短網址回 null。 */
 export async function shortLinkMeta(db: D1Database, slug: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
   const row = await db.prepare("SELECT kind, value FROM short_links WHERE slug = ?").bind(slug).first<{ kind: string; value: string }>();
@@ -51,7 +59,7 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
         ? await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM center_art WHERE center_label = ?").bind(row.value).first<{ k: string; v: number }>().catch(() => null)
         : null;
   const image = art?.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(art.k)}&v=${art.v}` : `${origin}/icon-512.png`;
-  return { title: `${row.kind === "center" ? await centerDisplayName(db, row.value) : row.value} | ${SITE}`, description: q?.body?.trim() || SITE, url: `${origin}/${slug}`, image };
+  return { title: `${row.kind === "center" ? await centerShareTitle(db, row.value) : row.value} | ${SITE}`, description: q?.body?.trim() || SITE, url: `${origin}/${slug}`, image };
 }
 
 /** 課程專屬網址（/中心縮寫/英譯姓名-編號）的分享預覽：標題「{課程名稱} | 寰宇行動大學」，圖用課程封面（沒有就用 EDM、再沒有用網站圖示）。找不到回 null。 */
@@ -93,7 +101,7 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
     const center = clip(url.searchParams.get("center"));
     const category = clip(url.searchParams.get("category"));
     if (!center && !category) return null;
-    const name = center ? await centerDisplayName(db, center) : "";
+    const name = center ? await centerShareTitle(db, center) : "";
     const art = center ? await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM center_art WHERE center_key = ?").bind(centerKey(center)).first<{ k: string; v: number }>().catch(() => null) : null;
     return { title: `${[name, category].filter(Boolean).join("・")} | ${SITE}`, description: (await randomQuote(db)) || SITE, url: `${origin}${path}${url.search}`, image: pubImage(origin, art?.k, art?.v) };
   }

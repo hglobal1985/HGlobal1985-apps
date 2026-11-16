@@ -1,6 +1,6 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, BackHandler, Platform, Pressable, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, type CenterArt, type CourseSummary } from "@/api/client";
@@ -331,6 +331,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }
   // 中心專屬頁：網頁進入時多記一筆瀏覽紀錄，瀏覽器／手機的「返回」＝回到中心清單；Android 實體返回鍵同理。
   const pushedRef = useRef(false);
+  const centerUrlRef = useRef(""); // 記下「中心頁」那一筆紀錄的網址
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     if (activeCenter !== ALL && !pushedRef.current) {
@@ -338,16 +339,24 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       const here = window.location.href;
       window.history.replaceState(window.history.state, "", urlFor(category, ALL));
       window.history.pushState({ hgCenter: 1 }, "", here);
+      centerUrlRef.current = new URL(here).pathname + new URL(here).search;
       pushedRef.current = true;
     } else if (activeCenter === ALL) pushedRef.current = false;
   }, [activeCenter]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     const onPop = () => {
-      if (pushedRef.current) {
-        pushedRef.current = false;
-        pickCenter(ALL);
+      if (!pushedRef.current) return;
+      // 退回到「中心頁」那一筆紀錄（網址還是中心頁的網址，例如從課程頁、上課頁按返回回來）＝還在中心頁，維持目前的中心；
+      // 退回到它下面那一筆（網址是沒選中心的清單）才是真的離開中心頁，回到中心清單。
+      // 用網址判斷（不用 history.state，因為導覽套件會改寫紀錄的 state）。
+      if (window.location.pathname + window.location.search === centerUrlRef.current) {
+        // 導覽套件稍後會把網址改回 /courses；等它改完再把網址還原成這個中心。
+        setTimeout(() => syncUrl(category, center), 120);
+        return;
       }
+      pushedRef.current = false;
+      pickCenter(ALL);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -356,11 +365,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     if (Platform.OS === "web" && pushedRef.current && typeof window !== "undefined") window.history.back();
     else pickCenter(ALL);
   };
-  useEffect(() => {
-    if (Platform.OS === "web" || activeCenter === ALL) return;
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => (pickCenter(ALL), true));
-    return () => sub.remove();
-  }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Android 實體返回鍵：只在這個畫面是目前畫面（焦點）、而且選了中心時才攔截；課程頁蓋在上面時不攔，讓它正常返回。
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === "web" || activeCenter === ALL) return;
+      const sub = BackHandler.addEventListener("hardwareBackPress", () => (pickCenter(ALL), true));
+      return () => sub.remove();
+    }, [activeCenter]), // eslint-disable-line react-hooks/exhaustive-deps
+  );
   // 中心頁上方的照片：透明小標籤「N 門課・N 章節・N 瀏覽」；往上滑時縮成窄橫幅（CenterHero）。
   const scrollY = useRef(new Animated.Value(0)).current;
   const [centerViews, setCenterViews] = useState<number | null>(null);

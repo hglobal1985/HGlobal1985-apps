@@ -69,3 +69,16 @@ test("分享預覽：沒設短網址的中心／分類／系列、已上架課�
   assert.equal(await get("/course/nope"), html);
   assert.equal(await get("/courses"), html, "沒有參數的 /courses 維持預設");
 });
+
+test("中心分享標題：有地址＝「彰化中心（地址） | 寰宇行動大學」，沒有地址就省略；短網址與 /courses?center= 一致", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  await db.prepare("INSERT INTO short_links (slug, kind, value) VALUES ('ch', 'center', '彰化 151')").run();
+  const w = createWorker(files);
+  const title = async (path: string) => /property="og:title" content="([^"]*)"/.exec(await (await w.fetch(new Request(`https://learn.test${path}`), env)).text())?.[1];
+  assert.equal(await title("/ch"), "彰化中心 | 寰宇行動大學", "沒有地址");
+  await db.prepare("INSERT INTO center_info (center_key, center_label, address) VALUES ('彰化 151', '彰化 151', '彰化市中山路 1 號')").run();
+  assert.equal(await title("/ch"), "彰化中心（彰化市中山路 1 號） | 寰宇行動大學", "短網址");
+  assert.equal(await title("/courses?center=%E5%BD%B0%E5%8C%96%20151"), "彰化中心（彰化市中山路 1 號） | 寰宇行動大學", "沒設短網址的網址");
+  assert.equal(await title("/courses?center=%E5%BD%B0%E5%8C%96%20151&category=%E6%96%B0%E4%BA%BA"), "彰化中心（彰化市中山路 1 號）・新人 | 寰宇行動大學", "中心＋分類");
+});
