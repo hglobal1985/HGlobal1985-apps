@@ -3,6 +3,7 @@ import { Linking, Pressable, type ViewStyle } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/attachments";
 import { minutesText, sharerLine } from "@/features/format";
+import { engine } from "@/features/player/engine";
 import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
@@ -42,7 +43,7 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
                 dense
                 compact
                 right={chapters.length >= 2 && !soon ? <ChapterShare course={course} lesson={lesson} /> : undefined}
-                onPress={lesson.locked || soon || playingId === lesson.id ? undefined : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))}
+                onPress={lesson.locked || soon ? undefined : playingId === lesson.id ? () => engine.toggle() : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))} // 正在播放的這一列再點一下＝暫停／繼續播放
               />
             );
           })
@@ -79,9 +80,11 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
                 ? link.linkUrl
                   ? () => void Linking.openURL(link.linkUrl!).catch(() => showToast("無法開啟連結"))
                   : undefined
-                : lesson.locked || playingId === lesson.id
+                : lesson.locked
                   ? undefined
-                  : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))
+                  : playingId === lesson.id
+                    ? () => engine.toggle()
+                    : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))
             }
           />
         );
@@ -97,8 +100,8 @@ function RowShare({ label, onShare }: { label: string; onShare: () => Promise<"s
     if ((await onShare()) === "copied") showToast("已複製連結");
   };
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={6} style={({ pressed }) => [{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
-      <ShareIcon size={24} color={c.accent} />
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={6} style={({ pressed }) => [{ width: 34, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
+      <ShareIcon size={22} color={c.accent} />
     </Pressable>
   );
 }

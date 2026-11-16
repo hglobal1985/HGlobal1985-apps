@@ -36,7 +36,7 @@ export function PlayerControls() {
           {remainingText(total - at)}
         </AppText>
         {/* 倍數播放：每按一次跳一檔（1 → 1.2 → 1.5 → 1.8 → 2 → 1）；正常速度顯示加速圖示，加速中改顯示目前倍數。 */}
-        <Pressable accessibilityRole="button" accessibilityLabel={`播放速度，目前 ${s.rate} 倍，點一下切換`} onPress={() => engine.cycleRate()} style={styles.btn}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`播放速度，目前 ${s.rate} 倍，點一下切換`} onPress={() => engine.cycleRate()} style={styles.btnTight}>
           {s.rate === 1 ? (
             <Ionicons name="speedometer-outline" size={22} color={c.text} />
           ) : (
@@ -54,7 +54,7 @@ export function PlayerControls() {
           </Pressable>
         ) : null}
         {t.mode !== "audio" && engine.canFullscreen() ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="全螢幕" onPress={() => engine.toggleFullscreen()} style={styles.btn}>
+          <Pressable accessibilityRole="button" accessibilityLabel="全螢幕" onPress={() => engine.toggleFullscreen()} style={styles.btnTight}>
             <Ionicons name="expand" size={20} color={c.text} />
           </Pressable>
         ) : null}
@@ -68,6 +68,8 @@ const styles = StyleSheet.create({
   // 時間軸是主角：外距與按鈕間距都壓到最小，讓時間軸盡可能拉長（按鈕寬 36、高 44，圖示之間幾乎貼在一起）。
   box: { flexDirection: "row", alignItems: "center", paddingHorizontal: 2, minHeight: minTouch, width: "100%", maxWidth: maxContentWidth },
   btn: { width: 36, height: minTouch, alignItems: "center", justifyContent: "center" },
+  // 倍速與全螢幕兩顆貼得更近（寬度壓到 30、倍速文字不加寬），讓時間軸更長。
+  btnTight: { minWidth: 30, height: minTouch, alignItems: "center", justifyContent: "center" },
   bar: { flex: 1, minWidth: 0 },
   pipLabel: { fontSize: 10, lineHeight: 12 },
   time: { textAlign: "right", fontVariant: ["tabular-nums"], paddingRight: 2 },

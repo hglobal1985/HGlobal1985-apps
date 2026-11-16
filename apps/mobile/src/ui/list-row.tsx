@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
-import { minTouch, space } from "@/theme/tokens";
+import { minTouch, radius, space } from "@/theme/tokens";
 import { Icon, type IconName } from "./icon";
 import { NowPlayingIcon } from "./now-playing-icon";
 import { AppText } from "./text";
@@ -45,10 +45,10 @@ export function ListRow({
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
-      style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, compact && { gap: space.sm, minHeight: 0, paddingVertical: 3 }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, marginHorizontal: compact ? -space.sm : -space.lg, paddingHorizontal: compact ? space.sm : space.lg }, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, compact && { gap: 4, minHeight: 0, paddingVertical: 3 }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, borderRadius: radius.md, marginHorizontal: compact ? -space.sm : -space.lg, paddingHorizontal: compact ? space.sm : space.lg }, pressed && { opacity: 0.7 }]}
     >
       {note !== undefined ? (
-        <View style={{ width: 48, alignItems: "center", gap: 0 }}>
+        <View style={{ width: 42, alignItems: "center", gap: 0 }}>
           {playing ? <NowPlayingIcon /> : leading ?? (icon ? <Icon name={icon} size={36} color={c.textMuted} /> : null)}
           {note ? (
             <AppText variant="caption" tone="muted" numberOfLines={1} style={{ fontSize: 11, lineHeight: 12 }}>

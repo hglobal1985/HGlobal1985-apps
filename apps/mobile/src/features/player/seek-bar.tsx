@@ -3,7 +3,7 @@ import { PanResponder, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 
 /**
- * 時間軸細條：點一下跳到該位置，手指按住左右拖曳可連續調整（觸控區高 44px，單手好操作）。
+ * 時間軸細條：點一下跳到該位置，手指按住左右拖曳可連續調整（觸控區高 48px、圓點直徑 26，手指好抓）。
  * value、max 單位相同（秒）；放開手指才真正跳轉。
  */
 export function SeekBar({ value, max, onSeek, onTouch }: { value: number; max: number; onSeek: (v: number) => void; onTouch?: () => void }) {
@@ -49,8 +49,8 @@ export function SeekBar({ value, max, onSeek, onTouch }: { value: number; max: n
 }
 
 const styles = StyleSheet.create({
-  touch: { height: 44, justifyContent: "center", marginHorizontal: 9 },
+  touch: { height: 48, justifyContent: "center", marginHorizontal: 13 },
   track: { height: 6, borderRadius: 3, overflow: "hidden" },
   fill: { height: 6, borderRadius: 3 },
-  thumb: { position: "absolute", width: 18, height: 18, borderRadius: 9, marginLeft: -9, borderWidth: 2 },
+  thumb: { position: "absolute", width: 26, height: 26, borderRadius: 13, marginLeft: -13, borderWidth: 3 },
 });
