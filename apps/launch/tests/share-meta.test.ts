@@ -91,3 +91,18 @@ test("中心分享預覽：標題只有中心名稱；說明＝「📍 地址」
   await db.prepare("DELETE FROM quotes").run();
   assert.equal((await meta("/ch")).desc, "📍 彰化市中山路 1 號", "沒有金句：只有地址");
 });
+
+test("分享預覽：縮寫照設定的大小寫顯示（og:url）、輸入不分大小寫；總部課程 /hq/…", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  await db.prepare("INSERT INTO short_links (slug, kind, value) VALUES ('NJ', 'center', '南京 062')").run();
+  await db.prepare("INSERT INTO courses (id, title, status, host_center_key, url_name) VALUES ('a1', '中心課', 'published', '南京 062', 'wang-xiaoming-001'), ('h1', '總部課', 'published', NULL, 'wang-likai-001')").run();
+  const w = createWorker(files);
+  const meta = async (path: string) => {
+    const page = await (await w.fetch(new Request(`https://learn.test${path}`), env)).text();
+    return { title: /property="og:title" content="([^"]*)"/.exec(page)?.[1], url: /property="og:url" content="([^"]*)"/.exec(page)?.[1] };
+  };
+  assert.deepEqual(await meta("/nj"), { title: "南京中心 | 寰宇行動大學", url: "https://learn.test/NJ" }, "短網址：輸入小寫，顯示設定的大小寫");
+  assert.deepEqual(await meta("/NJ/Wang-Xiaoming-001"), { title: "中心課 | 寰宇行動大學", url: "https://learn.test/NJ/wang-xiaoming-001" }, "中心課程網址");
+  assert.deepEqual(await meta("/HQ/wang-likai-001"), { title: "總部課 | 寰宇行動大學", url: "https://learn.test/hq/wang-likai-001" }, "總部課程網址");
+});

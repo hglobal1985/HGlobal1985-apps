@@ -68,6 +68,22 @@ test("課程專屬網址：中心縮寫＋英譯主講人-編號；同一主講�
   assert.equal((await call<CourseDetail>("GET", `/courses/${c2.id}`, admin)).data.shortPath, null, "換到沒有縮寫的中心＝沒有網址");
 });
 
+test("課程專屬網址：縮寫照設定的大小寫顯示、輸入不分大小寫；總部（沒有主辦中心）課程用 hq", async () => {
+  const { call, login } = setup();
+  const admin = await login("demo-admin");
+  await call("PUT", "/admin/short-links", admin, { kind: "center", value: "南京 062", slug: "NJ" });
+  const mk = async (title: string, teacher: string, hostUnit: string) => (await call<CourseDetail>("POST", "/admin/courses", admin, { title, teacher, hostUnit, status: "published" })).data;
+  const a = await mk("中心課", "王小明", "南京 062");
+  const h1 = await mk("總部課一", "王儷凱", "寰宇總部");
+  const h2 = await mk("總部課二", "王儷凱", "寰宇總部");
+  assert.equal(a.shortPath, "NJ/wang-xiaoming-001", "照設定的大小寫顯示");
+  assert.equal(h1.shortPath, "hq/wang-likai-001", "總部課程用 hq");
+  assert.equal(h2.shortPath, "hq/wang-likai-002", "總部同一主講人依序編號");
+  for (const path of ["NJ/wang-xiaoming-001", "nj/wang-xiaoming-001", "Nj/WANG-XIAOMING-001"]) assert.equal((await call<{ courseId: string }>("GET", `/short-links/${path}`)).data.courseId, a.id, path);
+  for (const path of ["hq/wang-likai-002", "HQ/Wang-Likai-002"]) assert.equal((await call<{ courseId: string }>("GET", `/short-links/${path}`)).data.courseId, h2.id, path);
+  assert.equal((await call("GET", "/short-links/hq/wang-likai-099")).status, 404);
+});
+
 test("短影音專輯：勾選存得住；單元索引納入短影音專輯的影音教材、不含非影音", async () => {
   const { call, login } = setup();
   const admin = await login("demo-admin");

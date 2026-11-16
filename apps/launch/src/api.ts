@@ -1,4 +1,4 @@
-import { RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
+import { HQ_SLUG, RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
 import { romanizeName } from "./romanize.ts";
 import {
   DEMO_MEMBERS,
@@ -433,7 +433,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     // 中心課程＝主辦單位含某個中心（自動，不再手動勾選）；只有總部主辦的是一般課程。
     centerCourse: row.host_center_key != null,
     isShorts: row.is_shorts === 1,
-    shortPath: row.host_center_key && row.url_name && ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null,
+    shortPath: row.url_name ? (row.host_center_key ? (ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null) : `${HQ_SLUG}/${row.url_name}`) : null,
     createdAt: row.created_at,
     hostCenter: hostCenterOf(row.host_unit),
     hostCenterKey: row.host_center_key,
@@ -598,11 +598,15 @@ async function centerSlugMap(db: D1Database): Promise<Map<string, string>> {
 async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
   try {
     const c = await ctx.db.prepare("SELECT teacher, host_center_key, url_name FROM courses WHERE id = ?").bind(courseId).first<{ teacher: string | null; host_center_key: string | null; url_name: string | null }>();
-    if (!c || c.url_name || !c.teacher?.trim() || !c.host_center_key) return;
-    if (!(await centerSlugMap(ctx.db)).has(c.host_center_key)) return;
+    if (!c || c.url_name || !c.teacher?.trim()) return;
+    // 有主辦中心：要用中心的縮寫（中心還沒設定縮寫就先不產生）；沒有主辦中心（總部）：用保留縮寫 hq。
+    if (c.host_center_key && !(await centerSlugMap(ctx.db)).has(c.host_center_key)) return;
     const base = romanizeName(c.teacher);
     if (!base) return;
-    const used = await ctx.db.prepare("SELECT url_name FROM courses WHERE host_center_key = ? AND url_name LIKE ? ESCAPE '\\'").bind(c.host_center_key, `${base.replace(/[%_\\]/g, "")}-%`).all<{ url_name: string }>();
+    const like = `${base.replace(/[%_\\]/g, "")}-%`;
+    const used = c.host_center_key
+      ? await ctx.db.prepare("SELECT url_name FROM courses WHERE host_center_key = ? AND url_name LIKE ? ESCAPE '\\'").bind(c.host_center_key, like).all<{ url_name: string }>()
+      : await ctx.db.prepare("SELECT url_name FROM courses WHERE host_center_key IS NULL AND url_name LIKE ? ESCAPE '\\'").bind(like).all<{ url_name: string }>();
     let max = 0;
     for (const r of used.results) {
       const m = /-(\d+)$/.exec(r.url_name);
@@ -617,7 +621,7 @@ async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
 /** 補齊全站（或某個主辦中心）還沒有專屬網址的課程，依建立時間編號。 */
 async function backfillCourseUrls(ctx: Ctx, centerKeyOnly?: string): Promise<number> {
   const { results } = await ctx.db
-    .prepare(`SELECT id FROM courses WHERE url_name IS NULL AND teacher <> '' AND host_center_key IS NOT NULL${centerKeyOnly ? " AND host_center_key = ?" : ""} ORDER BY created_at, id`)
+    .prepare(`SELECT id FROM courses WHERE url_name IS NULL AND teacher <> ''${centerKeyOnly ? " AND host_center_key = ?" : ""} ORDER BY created_at, id`)
     .bind(...(centerKeyOnly ? [centerKeyOnly] : []))
     .all<{ id: string }>();
   for (const r of results) await ensureCourseUrl(ctx, r.id);
@@ -2314,19 +2318,23 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
-    /^\/short-links\/([a-z0-9-]{2,30})\/([a-z0-9-]{3,80})$/,
+    /^\/short-links\/([A-Za-z0-9-]{2,30})\/([A-Za-z0-9-]{3,80})$/,
     async (ctx, [slug, name]) => {
-      // 課程專屬網址：中心縮寫 + 英譯姓名-編號 → 課程編號。
-      const row = await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? AND kind = 'center'").bind(slug).first<{ value: string }>();
-      const course = row ? await ctx.db.prepare("SELECT id FROM courses WHERE host_center_key = ? AND url_name = ?").bind(centerKey(row.value), name).first<{ id: string }>() : null;
+      // 課程專屬網址：中心縮寫（或總部 hq）+ 英譯姓名-編號 → 課程編號。網址不分大小寫。
+      const row = slug.toLowerCase() === HQ_SLUG ? { value: "" } : await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ value: string }>();
+      const course = row
+        ? row.value
+          ? await ctx.db.prepare("SELECT id FROM courses WHERE host_center_key = ? AND url_name = ? COLLATE NOCASE").bind(centerKey(row.value), name).first<{ id: string }>()
+          : await ctx.db.prepare("SELECT id FROM courses WHERE host_center_key IS NULL AND url_name = ? COLLATE NOCASE").bind(name).first<{ id: string }>()
+        : null;
       return course ? { courseId: course.id } : fail(404, "not_found", "找不到這個網址");
     },
   ],
   [
     "GET",
-    /^\/short-links\/([a-z0-9-]{2,30})$/,
+    /^\/short-links\/([A-Za-z0-9-]{2,30})$/,
     async (ctx, [slug]) => {
-      const row = await ctx.db.prepare("SELECT kind, value FROM short_links WHERE slug = ?").bind(slug).first<{ kind: string; value: string }>();
+      const row = await ctx.db.prepare("SELECT kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ kind: string; value: string }>();
       return row ?? fail(404, "not_found", "找不到這個短網址");
     },
   ],
@@ -3641,10 +3649,10 @@ const routes: [string, RegExp, Handler][] = [
       if (kind === "location") fail(400, "invalid_kind", "只有分類、系列與中心可以設定短網址");
       const value = keywordText(body.value);
       if (kind === "center") await assertCentralCenters(ctx, [value]);
-      const slug = typeof body.slug === "string" ? body.slug.trim().toLowerCase() : "";
-      if (RESERVED_SLUGS.has(slug)) fail(400, "reserved_slug", `「${slug}」是網站頁面名稱，請換一個縮寫`);
-      if (!SLUG_RE.test(slug)) fail(400, "invalid_slug", "縮寫只能用小寫英文字母、數字與連字號（-），長度 2～30 字");
-      const taken = await ctx.db.prepare("SELECT kind, value FROM short_links WHERE slug = ?").bind(slug).first<{ kind: string; value: string }>();
+      const slug = typeof body.slug === "string" ? body.slug.trim() : ""; // 照輸入的大小寫保存與顯示；比對時不分大小寫
+      if (RESERVED_SLUGS.has(slug.toLowerCase())) fail(400, "reserved_slug", `「${slug}」是網站頁面名稱，請換一個縮寫`);
+      if (!SLUG_RE.test(slug)) fail(400, "invalid_slug", "縮寫只能用英文字母（大小寫都可以）、數字與連字號（-），長度 2～30 字");
+      const taken = await ctx.db.prepare("SELECT kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ kind: string; value: string }>();
       if (taken && !(taken.kind === kind && taken.value === value)) fail(409, "slug_taken", `「${slug}」已被「${taken.value}」使用`);
       await ctx.db.batch([
         ctx.db.prepare("DELETE FROM short_links WHERE kind = ? AND value = ?").bind(kind, value),

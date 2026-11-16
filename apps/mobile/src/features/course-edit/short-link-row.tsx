@@ -21,7 +21,7 @@ export function ShortLinkRow({ item, onChanged, readOnly = false }: { item: Shor
   const [draft, setDraft] = useState(item.slug ?? "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const value = draft.trim().toLowerCase();
+  const value = draft.trim(); // 照輸入的大小寫保存與顯示（網址輸入時不分大小寫）
   const dirty = value !== (item.slug ?? "");
   const run = async (fn: () => Promise<unknown>, ok: string) => {
     setBusy(true);

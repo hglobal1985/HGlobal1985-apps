@@ -1,6 +1,6 @@
 import { centerKey } from "./central.ts";
 import type { D1Database } from "./d1.ts";
-import { RESERVED_SLUGS } from "./short-links.ts";
+import { HQ_SLUG, RESERVED_SLUGS } from "./short-links.ts";
 
 const SITE = "寰宇行動大學";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -50,7 +50,7 @@ export const centerDescription = (address: string, quote: string) => [address ? 
 
 /** 短網址的分享預覽：標題「{名稱} | 寰宇行動大學」，說明是隨機一句學習金句（設定頁編輯的那份）；中心另外在金句前加「📍 地址」一行。找不到短網址回 null。 */
 export async function shortLinkMeta(db: D1Database, slug: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
-  const row = await db.prepare("SELECT kind, value FROM short_links WHERE slug = ?").bind(slug).first<{ kind: string; value: string }>();
+  const row = await db.prepare("SELECT slug, kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ slug: string; kind: string; value: string }>();
   if (!row) return null;
   const q = await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null);
   // 預覽圖：系列有上傳 EDM 就用 EDM；中心優先用「裁切好的 16:9 封面」（業主指定的位置），沒有封面才用整張 EDM；都沒有用網站圖示。
@@ -63,21 +63,24 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
   const image = art?.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(art.k)}&v=${art.v}` : `${origin}/icon-512.png`;
   const center = row.kind === "center" ? await centerShareParts(db, row.value) : null;
   const quote = q?.body?.trim() ?? "";
-  return { title: `${center ? center.name : row.value} | ${SITE}`, description: center ? centerDescription(center.address, quote) : quote || SITE, url: `${origin}/${slug}`, image };
+  return { title: `${center ? center.name : row.value} | ${SITE}`, description: center ? centerDescription(center.address, quote) : quote || SITE, url: `${origin}/${row.slug}`, image };
 }
 
 /** 課程專屬網址（/中心縮寫/英譯姓名-編號）的分享預覽：標題「{課程名稱} | 寰宇行動大學」，圖用課程封面（沒有就用 EDM、再沒有用網站圖示）。找不到回 null。 */
 export async function courseUrlMeta(db: D1Database, slug: string, name: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
-  const center = await db.prepare("SELECT value FROM short_links WHERE slug = ? AND kind = 'center'").bind(slug).first<{ value: string }>();
-  if (!center) return null;
-  const c = await db
-    .prepare("SELECT title, subtitle, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE host_center_key = ? AND url_name = ? AND status = 'published'")
-    .bind(centerKey(center.value), name)
-    .first<{ title: string; subtitle: string | null; k: string | null; v: number }>();
+  // 中心縮寫（照設定的大小寫顯示、輸入不分大小寫）或總部的 hq。
+  const hq = slug.toLowerCase() === HQ_SLUG;
+  const center = hq ? null : await db.prepare("SELECT slug, value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ slug: string; value: string }>();
+  if (!hq && !center) return null;
+  const cols = "SELECT id, title, subtitle, url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
+  const c = await (center
+    ? db.prepare(`${cols} host_center_key = ? AND url_name = ? COLLATE NOCASE AND status = 'published'`).bind(centerKey(center.value), name)
+    : db.prepare(`${cols} host_center_key IS NULL AND url_name = ? COLLATE NOCASE AND status = 'published'`).bind(name)
+  ).first<{ title: string; subtitle: string | null; n: string; k: string | null; v: number }>();
   if (!c) return null;
   const q = await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null);
   const image = c.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(c.k)}&v=${c.v}` : `${origin}/icon-512.png`;
-  return { title: `${c.title} | ${SITE}`, description: c.subtitle?.trim() || q?.body?.trim() || SITE, url: `${origin}/${slug}/${name}`, image };
+  return { title: `${c.title} | ${SITE}`, description: c.subtitle?.trim() || q?.body?.trim() || SITE, url: `${origin}/${center ? center.slug : HQ_SLUG}/${c.n}`, image };
 }
 
 type ShareMeta = { title: string; description: string; url: string; image: string };
@@ -96,10 +99,11 @@ const randomQuote = async (db: D1Database) => (await db.prepare("SELECT body FRO
 export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareMeta | null> {
   const origin = url.origin;
   const path = url.pathname;
-  const short = /^\/([a-z0-9-]{2,30})$/.exec(path);
-  if (short && !RESERVED_SLUGS.has(short[1]!)) return shortLinkMeta(db, short[1]!, origin);
-  const courseUrl = /^\/([a-z0-9-]{2,30})\/([a-z0-9-]{3,80})$/.exec(path);
-  if (courseUrl && !RESERVED_SLUGS.has(courseUrl[1]!) && courseUrl[1] !== "series") return courseUrlMeta(db, courseUrl[1]!, courseUrl[2]!, origin);
+  const short = /^\/([A-Za-z0-9-]{2,30})$/.exec(path);
+  if (short && !RESERVED_SLUGS.has(short[1]!.toLowerCase())) return shortLinkMeta(db, short[1]!, origin);
+  const courseUrl = /^\/([A-Za-z0-9-]{2,30})\/([A-Za-z0-9-]{3,80})$/.exec(path);
+  const first = courseUrl?.[1]?.toLowerCase() ?? "";
+  if (courseUrl && (first === HQ_SLUG || !RESERVED_SLUGS.has(first)) && first !== "series") return courseUrlMeta(db, courseUrl[1]!, courseUrl[2]!, origin);
 
   if (path === "/courses") {
     const center = clip(url.searchParams.get("center"));

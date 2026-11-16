@@ -9,7 +9,7 @@ import { Check, countByHost } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
 /**
- * 「＋新增課程」：只填名稱、主辦中心、系列（可不選），建立成未上架的草稿後，
+ * 「＋新增課程」：只填名稱、主講人姓名（必填）、主辦中心、系列（可不選），建立成未上架的草稿後，
  * 直接進入該課程介紹頁的編輯模式，其餘欄位在頁面上一區一區補（手機不用一口氣填完一大張表）。
  * 總部可以選主辦中心；中心的會長、音控、小編固定是自己的中心。
  */
@@ -22,6 +22,7 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
   const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
   const hostCounts = countByHost(allCourses.data ?? []);
   const [title, setTitle] = useState("");
+  const [teacher, setTeacher] = useState("");
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [seriesName, setSeriesName] = useState("");
   const [autoCover, setAutoCover] = useState(false);
@@ -29,10 +30,11 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
     if (!title.trim()) return setError("請輸入課程名稱");
+    if (!teacher.trim()) return setError("請輸入主講人姓名（課程專屬網址要用）");
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { title: title.trim(), autoCover, ...(isSuper ? { series: seriesName.trim() } : {}) };
+      const body: Record<string, unknown> = { title: title.trim(), teacher: teacher.trim(), autoCover, ...(isSuper ? { series: seriesName.trim() } : {}) };
       if (isHq) Object.assign(body, { hostUnit: host }); // 指導單位預設不勾（不建議勾選），建好後要的話到進階設定勾
       const d = await api<CourseDetail>("POST", "/admin/courses", body);
       invalidate();
@@ -45,8 +47,9 @@ export function NewCourseSheet({ onClose, defaultCenter }: { onClose: () => void
     }
   };
   return (
-    <EditSheet title="新增課程" onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!title.trim()} busy={busy} error={error}>
+    <EditSheet title="新增課程" onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!title.trim() || !!teacher.trim()} busy={busy} error={error}>
       <Field label="課程名稱（必填）" value={title} onChange={setTitle} placeholder="例如：翡翠達標班" />
+      <Field label="主講人姓名（必填；課程專屬網址會用英譯姓名）" value={teacher} onChange={setTeacher} placeholder="例如：王小明" />
       <AppText variant="callout" tone="muted">
         主辦中心
       </AppText>

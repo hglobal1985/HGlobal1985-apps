@@ -11,7 +11,7 @@ import { AppText } from "./text";
 type IconName = ComponentProps<typeof Ionicons>["name"];
 /** 短網址（/縮寫）：單層路徑且不是網站固定頁面。 */
 const FIXED = new Set(["/me", "/learning", "/notices", "/achievements", "/orders", "/courses", "/admin", "/settings", "/auth"]);
-const isShortLink = (p: string) => /^\/[a-z0-9-]{2,30}$/.test(p) && !FIXED.has(p);
+const isShortLink = (p: string) => /^\/[a-z0-9-]{2,30}$/i.test(p) && !FIXED.has(p);
 const tabs: { href: Href; title: string; icon: IconName; active: IconName; match: (p: string) => boolean }[] = [
   { href: "/", title: "首頁", icon: "home-outline", active: "home", match: (p) => p === "/" },
   { href: "/courses", title: "全部課程", icon: "library-outline", active: "library", match: (p) => p === "/courses" || p.startsWith("/course/") || p.startsWith("/series/") || isShortLink(p) },

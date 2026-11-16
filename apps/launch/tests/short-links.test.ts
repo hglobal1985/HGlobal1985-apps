@@ -43,9 +43,11 @@ test("短網址：設定、重複、格式、改名跟著走、刪除，並可�
 
   const ok = await call<Item[]>("PUT", "/admin/short-links", admin, { kind: "category", value: "營養", slug: "Nutrition" });
   assert.equal(ok.status, 200);
-  assert.equal(ok.data.find((x) => x.value === "營養")?.slug, "nutrition");
+  assert.equal(ok.data.find((x) => x.value === "營養")?.slug, "Nutrition", "照輸入的大小寫保存與顯示");
   // 同一個縮寫不能給別的項目；同一項目可以改縮寫
-  assert.equal((await call("PUT", "/admin/short-links", admin, { kind: "series", value: "新手系列", slug: "nutrition" })).status, 409);
+  assert.equal((await call("PUT", "/admin/short-links", admin, { kind: "series", value: "新手系列", slug: "nutrition" })).status, 409, "重複判斷不分大小寫");
+  assert.equal((await call("PUT", "/admin/short-links", admin, { kind: "series", value: "新手系列", slug: "HQ" })).status, 400, "hq 是總部保留縮寫");
+  assert.deepEqual(await resolve("NUTRITION"), { kind: "category", value: "營養" }, "輸入不分大小寫");
   await call("PUT", "/admin/short-links", admin, { kind: "category", value: "營養", slug: "nutri" });
   await call("PUT", "/admin/short-links", admin, { kind: "series", value: "新手系列", slug: "newbie" });
 
