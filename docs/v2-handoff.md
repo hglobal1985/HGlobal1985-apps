@@ -614,3 +614,10 @@
 - **設計系統頁面**「寰宇行動大學設計系統」（https://claude.ai/artifact/RjQ7W2sAfARSkhgjKF5RRU）：從正式版程式碼整理出色票（淺色／深色、課程封面六主題、緞帶、儲存按鈕）、字級、間距、圓角、尺寸、陰影、品牌細字型、logo／App 圖示／小樹苗，以及 21 個共用元件的說明與網頁靜態預覽。另一個帳號的舊設計系統頁面（11-11 版，中央與行動大學混合、深色值自行配色）業主指示不再參照。
 - **業主指示：所有設計改用行動大學程式實際使用的設計作為統一規範**：`docs/hglobal-color-standard.md`、`docs/hglobal-tokens.json` 升級為 2.0（鍵名改成與 tokens.ts 一致、深色主綠 #cee49f → #2f8a5b 等，差異與 1.0 鍵名對照寫在檔案內）；CLAUDE.md 新增「統一設計規範」一節。App 畫面本身沒有改（本來就是這組色），只改了程式註解，所以沒有重新部署。
 - 中央會員系統要跟進 2.0 時，把 `docs/central-request-design-standard-2.md` 的內容貼給中央會員 AI。
+
+## 2026-11-16（再續）：系列封面修正、瀏覽次數、新增教材兩種模式、素材清單
+- **系列頁照片不顯示**：`GET /media/pub` 的白名單只認 `series_art.edm_key`，漏了 `cover_key`，7 個系列的封面圖全部 404。已補上（測試會實際讀封面圖）。
+- **瀏覽次數**：migration 0060 新增 `page_views(kind, key, total)`（帶入舊的累計人次）；`POST /center-views`、`/series-views` 每次 +1。舊的 center_views／series_views 表保留未刪。
+- **新增教材**：`features/course-edit/add-material-fab.tsx`（往上展開兩個選項）；`NewCourseSheet list`。
+- **素材清單**：migration 0061 `courses.is_list`；建立時 `isList: true`（公開、免費、不建第 1 堂）；清單不能新增章節／完整版（400）；`POST /admin/courses/:id/materials`、`PUT /admin/lessons/:id/material` 在清單中把 YouTube 存成 `media_type='youtube'`。課程卡、課程列、課程頁、編輯面板依 `isList` 隱藏主講人、日期、地點、費用、章節。測試 tests/course-list.test.ts（後端共 134 項）。
+- **資料轉移**：0061 把系列「美力之星」（1 門 11 段）、「認識寰宇」（4 門 35 段）轉成清單：章節改成教材，影片、學習紀錄、課程專屬網址都保留；主講人、地點資料留在資料庫只是不顯示。
