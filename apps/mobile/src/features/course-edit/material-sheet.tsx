@@ -1,83 +1,167 @@
-import { useState } from "react";
-import { TextInput, View } from "react-native";
-import { api, type CourseDetail, type Lesson } from "@/api/client";
-import { commitMediaDraft, commitStagedAttachments, emptyMediaDraft, FileUploadModule, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, useStagedAttachments, type MediaDraft } from "@/features/uploads";
+import * as Clipboard from "expo-clipboard";
+import { useEffect, useRef, useState } from "react";
+import { Pressable, TextInput, View } from "react-native";
+import { api, classifyLink, parseHttpsUrl, type CourseDetail, type Lesson } from "@/api/client";
+import { TYPE_INFO } from "@/features/attachments";
+import { commitMediaDraft, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Select, todayStr, type SelectOption } from "@/ui";
+import { AppText, Icon } from "@/ui";
+import { BrandIcon } from "@/ui/brand-icon";
 import { EditSheet } from "./edit-sheet";
 
 /**
- * 「其他教材」的新增與編輯面板（獨立於章節面板，兩者互不影響）：
- * 教材名稱、分享者（下拉：同課程章節的分享者）、影音上傳模組、檔案上傳模組——一個頁面就能全部完成。
- * 「完整版課程影片」那一列只顯示影音上傳模組（設定來源與開頭／結束秒數）。
+ * 「其他教材」的新增與編輯面板（業主 2026-11-16 改版）：只有三個東西——
+ * ① 外部連結（旁邊有「貼上」鈕）② 教材名稱（貼上連結後自動抓取網頁標題填入，可自行修改）③ 檔案類型（依連結自動判斷，顯示官方 Logo）。
+ * 不再有影音上傳、音檔、附件等舊功能。「完整版課程影片」那一列另有影音設定（FullVersionSheet），不受影響。
  */
-const NONE = "__none";
-
-type Person = { name: string; rank: string; title: string };
-
-/** 同課程的人選：課程主講人＋各章節分享者（去重）。選到時連同獎銜、職稱一起存（畫面不顯示）。 */
-function peopleOf(course: CourseDetail): Person[] {
-  const list: Person[] = [];
-  const add = (name: string | null | undefined, rank: string | null | undefined, title: string | null | undefined) => {
-    const n = (name ?? "").trim();
-    if (n && !list.some((p) => p.name === n)) list.push({ name: n, rank: rank ?? "", title: title ?? "" });
-  };
-  add(course.teacher, course.teacherRank, course.teacherTitle);
-  for (const l of course.lessons) if (!l.material) add(l.sharer, l.sharerRank, l.sharerTitle);
-  return list;
-}
-
 export function NewMaterialSheet({ course, onClose }: { course: CourseDetail; onClose: () => void }) {
-  return <MaterialSheet course={course} onClose={onClose} />;
+  return <LinkMaterialSheet course={course} onClose={onClose} />;
 }
 
 export function EditMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
-  return <MaterialSheet course={course} lesson={lesson} onClose={onClose} />;
+  if (lesson.full) return <FullVersionSheet lesson={lesson} onClose={onClose} />;
+  return <LinkMaterialSheet course={course} lesson={lesson} onClose={onClose} />;
 }
 
-function MaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
+type Fetch = "idle" | "loading" | "done" | "none";
+
+function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
   const { c } = useTheme();
-  const { member, invalidate } = useSession();
-  const people = peopleOf(course);
-  const isFull = !!lesson?.full;
+  const { invalidate } = useSession();
+  const [url, setUrl] = useState(lesson?.linkUrl ?? "");
   const [title, setTitle] = useState(lesson?.title ?? "");
-  const [sharer, setSharer] = useState(lesson?.sharer ?? "");
-  const [media, setMedia] = useState<MediaDraft>(() => (lesson ? mediaDraftOf(lesson) : emptyMediaDraft()));
-  const staged = useStagedAttachments();
-  const [createdId, setCreatedId] = useState<string | null>(null);
+  const lastAuto = useRef<string>(lesson?.title ?? ""); // 最近一次自動填入的名稱：名稱還是這個（或空白）時，換連結才會自動換名稱；自己改過的不會被蓋掉
+  const [fetching, setFetching] = useState<Fetch>("idle");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const options: SelectOption[] = [{ key: NONE, label: "不指定" }, ...people.map((p) => ({ key: p.name, label: p.name })), ...(sharer && !people.some((p) => p.name === sharer) ? [{ key: sharer, label: sharer }] : [])];
-  const person = people.find((p) => p.name === sharer);
-  const dirty = !!createdId || (lesson ? title !== lesson.title || sharer !== (lesson.sharer ?? "") || mediaDraftDirty(media, lesson) : !!title || !!sharer || mediaDraftDirty(media) || staged.items.length > 0);
-  const id = lesson?.id ?? createdId ?? undefined;
+  const parsed = parseHttpsUrl(url);
+  const fileType = parsed ? classifyLink(parsed) : null;
+  const dirty = lesson ? url !== (lesson.linkUrl ?? "") || title !== lesson.title : !!url.trim() || !!title.trim();
+
+  // 連結一變（貼上或手動輸入，停下來 0.6 秒後），請伺服器代為讀取網頁標題。
+  useEffect(() => {
+    if (!parsed || parsed.toString() === (lesson?.linkUrl ?? "")) return setFetching("idle");
+    let alive = true;
+    setFetching("loading");
+    const t = setTimeout(() => {
+      api<{ title: string | null; defaultTitle: string }>("GET", `/admin/link-title?url=${encodeURIComponent(parsed.toString())}`)
+        .then((r) => {
+          if (!alive) return;
+          const name = r.title ?? r.defaultTitle;
+          setTitle((cur) => {
+            if (cur.trim() && cur !== lastAuto.current) return cur; // 已經自己改過名稱：不蓋掉
+            lastAuto.current = name;
+            return name;
+          });
+          setFetching(r.title ? "done" : "none");
+        })
+        .catch(() => alive && setFetching("none"));
+    }, 600);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [url]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const paste = async () => {
+    setError(null);
+    try {
+      const text = (await Clipboard.getStringAsync()).trim();
+      if (!text) return setError("剪貼簿裡沒有內容，請先複製連結");
+      setUrl(text);
+    } catch {
+      setError("無法讀取剪貼簿，請長按輸入框手動貼上");
+    }
+  };
 
   const submit = async () => {
-    if (!isFull && !title.trim()) return setError("請輸入教材名稱");
+    if (!parsed) return setError("請貼上 https 開頭的外部連結");
+    setBusy(true);
+    setError(null);
+    try {
+      if (lesson) await api("PUT", `/admin/lessons/${lesson.id}/material`, { url: parsed.toString(), title });
+      else await api("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title });
+      invalidate();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const input = [{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, bodyFont, { color: c.text, borderColor: c.border, backgroundColor: c.surface }];
+  const info = fileType ? TYPE_INFO[fileType] : null;
+  return (
+    <EditSheet title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
+      <View style={{ gap: space.xs }}>
+        <AppText variant="callout" tone="muted">
+          外部連結
+        </AppText>
+        <View style={{ flexDirection: "row", gap: space.sm, alignItems: "center" }}>
+          <TextInput
+            value={url}
+            onChangeText={setUrl}
+            placeholder="https://…"
+            placeholderTextColor={c.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            keyboardType="url"
+            accessibilityLabel="外部連結"
+            style={[...input, { flex: 1 }]}
+          />
+          <Pressable accessibilityRole="button" accessibilityLabel="貼上剪貼簿的連結" onPress={paste} style={({ pressed }) => [{ minHeight: minTouch, paddingHorizontal: space.md, borderRadius: radius.md, backgroundColor: c.accent, flexDirection: "row", alignItems: "center", gap: 6 }, pressed && { opacity: 0.8 }]}>
+            <Icon name="clipboard-outline" size={20} color={c.textOnAccent} />
+            <AppText variant="callout" style={{ color: c.textOnAccent, fontWeight: "700" }}>
+              貼上
+            </AppText>
+          </Pressable>
+        </View>
+        {url.trim() && !parsed ? (
+          <AppText variant="caption" tone="danger">
+            連結要以 https:// 開頭
+          </AppText>
+        ) : null}
+      </View>
+      <View style={{ gap: space.xs }}>
+        <AppText variant="callout" tone="muted">
+          教材名稱
+        </AppText>
+        <TextInput value={title} onChangeText={setTitle} placeholder={fetching === "loading" ? "正在抓取名稱…" : "貼上連結後自動填入"} placeholderTextColor={c.textMuted} accessibilityLabel="教材名稱" maxLength={80} style={input} />
+        <AppText variant="caption" tone="muted">
+          {fetching === "loading" ? "正在讀取連結的標題…" : fetching === "done" ? "已自動填入連結的標題，可以直接修改。" : fetching === "none" ? "抓不到這個連結的標題，已先填入類型名稱，請自行修改。" : "名稱空白時，儲存會自動用連結的標題。"}
+        </AppText>
+      </View>
+      <View style={{ gap: space.xs }}>
+        <AppText variant="callout" tone="muted">
+          檔案類型
+        </AppText>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: minTouch }}>
+          {fileType ? <BrandIcon type={fileType} fallback={info!.icon as never} size={36} /> : <Icon name="link-outline" size={36} color={c.textMuted} />}
+          <AppText variant="body">{info ? info.label : "貼上連結後自動判斷"}</AppText>
+        </View>
+      </View>
+    </EditSheet>
+  );
+}
+
+/** 「完整版課程影片」那一列：只設定影音來源與開頭／結束秒數（維持原樣）。 */
+function FullVersionSheet({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
+  const { member, invalidate } = useSession();
+  const [media, setMedia] = useState<MediaDraft>(() => mediaDraftOf(lesson));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
     const bad = mediaDraftError(media);
     if (bad) return setError(bad);
     setBusy(true);
     setError(null);
     try {
-      let lessonId = id;
-      if (!lessonId) {
-        // 新增：先建立教材，再依序送出影音設定、音檔與附件（任何一步失敗，教材已建立，可按「新增」重試未完成的部分）。
-        const before = new Set(course.lessons.map((l) => l.id));
-        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { title, sharer, sharerRank: person?.rank ?? "", sharerTitle: person?.title ?? "", ...(course.eventStart ? {} : { eventDate: todayStr() }), kind: "material" });
-        lessonId = detail.lessons.find((l) => !before.has(l.id))?.id;
-        if (!lessonId) throw Error("新增失敗，請重新整理後再試");
-        setCreatedId(lessonId);
-      } else if (lesson) {
-        await api("PATCH", `/admin/lessons/${lessonId}`, { ...(isFull ? {} : { title, sharer, sharerRank: person?.rank ?? lesson.sharerRank ?? "", sharerTitle: person?.title ?? lesson.sharerTitle ?? "" }), ...mediaDraftBody(media) });
-      }
-      if (!lesson) {
-        if (mediaDraftDirty(media)) await api("PATCH", `/admin/lessons/${lessonId}`, mediaDraftBody(media));
-        await commitMediaDraft(lessonId, media);
-        await commitStagedAttachments(lessonId, staged.items, (done) => staged.setItems((x) => x.filter((i) => i.id !== done)));
-      }
+      await api("PATCH", `/admin/lessons/${lesson.id}`, mediaDraftBody(media));
+      await commitMediaDraft(lesson.id, media);
       invalidate();
       onClose();
     } catch (e) {
@@ -87,22 +171,11 @@ function MaterialSheet({ course, lesson, onClose }: { course: CourseDetail; less
       setBusy(false);
     }
   };
-
   return (
-    <EditSheet title={lesson ? (isFull ? lesson.title : `教材 ${lesson.position}：${lesson.title}`) : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
-      {isFull ? null : (
-        <>
-          <View style={{ gap: space.xs }}>
-            <AppText variant="callout" tone="muted">
-              教材名稱
-            </AppText>
-            <TextInput value={title} onChangeText={setTitle} accessibilityLabel="教材名稱" style={[{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
-          </View>
-          <Select label="分享者" value={sharer || NONE} options={options} onChange={(k) => setSharer(k === NONE ? "" : k)} />
-        </>
-      )}
-      <MediaUploadModule draft={media} onChange={setMedia} allowMux={member?.role === "admin"} lesson={lesson} lessonId={id} onUploaded={invalidate} showHint={false} />
-      {isFull ? null : <FileUploadModule lessonId={id} staged={staged} showHint={false} />}
+    <EditSheet title={lesson.title} onClose={onClose} onSave={submit} saveLabel="儲存" dirty={mediaDraftDirty(media, lesson)} busy={busy} error={error}>
+      <MediaUploadModule draft={media} onChange={setMedia} allowMux={member?.role === "admin"} lesson={lesson} lessonId={lesson.id} onUploaded={invalidate} showHint={false} />
     </EditSheet>
   );
 }
+
+const bodyFont = type.body;

@@ -99,7 +99,8 @@ export default function ShareDefaultsScreen() {
         <Card>
           {input("一般分享的文字", "分享中心、分類、系列等頁面時，放在網址前面的文字", s.inviteText, (v) => set("inviteText", v), { multiline: true })}
           {input("單堂課程分享的文字", "可用 {主講人}、{職稱}、{課程名稱}，送出時會換成實際的內容（沒填職稱的課程，{職稱} 會自動省略；有職稱時姓名與職稱中間自動空一格）", s.courseText, (v) => set("courseText", v), { multiline: true })}
-          {input("網址前的引導文字", "自成一行，放在文字與網址中間", s.linkLead, (v) => set("linkLead", v))}
+          {input("其他教材分享的文字", "課程頁「其他教材」每一列右側的分享鈕：可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}；分享出去的網址是教材的外部連結本身", s.materialText, (v) => set("materialText", v), { multiline: true })}
+          {input("網址前的引導文字", "自成一行，放在文字與網址中間（一般分享、單堂課程、其他教材都用）", s.linkLead, (v) => set("linkLead", v))}
         </Card>
       </Section>
 
@@ -143,6 +144,12 @@ export default function ShareDefaultsScreen() {
           </AppText>
           <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
             <AppText variant="body">{shareMessage(s, sampleUrl, { teacher: "王小明", teacherTitle: "區域經理", title: "翡翠達標班" })}</AppText>
+          </View>
+          <AppText variant="callout" tone="muted">
+            其他教材的分享文字（教材「簡報講義」、課程「翡翠達標班」）
+          </AppText>
+          <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
+            <AppText variant="body">{shareMessage(s, "https://www.canva.com/design/abc/view", { teacher: "王小明", teacherTitle: "區域經理", title: "翡翠達標班" }, { title: "簡報講義" })}</AppText>
           </View>
           <AppText variant="callout" tone="muted">
             一般分享的文字

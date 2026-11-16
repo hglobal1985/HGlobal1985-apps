@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, type CourseDetail, type Lesson } from "@/api/client";
 import { LessonArt } from "@/features/admin/lesson-art";
+import { TYPE_INFO } from "@/features/attachments";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { commitMediaDraft, commitStagedAttachments, emptyMediaDraft, FileUploadModule, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, mediaKindLabel, useStagedAttachments, type MediaDraft } from "@/features/uploads";
 import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
@@ -326,7 +327,7 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
               {lesson.full ? lesson.title : `${lesson.position}. ${lesson.title}`}
             </AppText>
             <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {[lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), minutesText(lesson.minutes), lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
+              {[lesson.linkType ? TYPE_INFO[lesson.linkType].label : lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), minutesText(lesson.minutes), lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
             </AppText>
           </Pressable>
           {lesson.full ? null : (

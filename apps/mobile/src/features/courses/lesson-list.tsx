@@ -1,10 +1,15 @@
 import { router } from "expo-router";
-import type { ViewStyle } from "react-native";
-import type { CourseDetail } from "@/api/client";
+import { Linking, Pressable, type ViewStyle } from "react-native";
+import type { CourseDetail, Lesson } from "@/api/client";
+import { TYPE_INFO } from "@/features/attachments";
 import { minutesText, sharerLine } from "@/features/format";
 import { lessonHref } from "@/lib/lesson-href";
+import { shareLink } from "@/lib/share";
+import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { Card, ListRow } from "@/ui";
+import { Card, ListRow, ShareIcon } from "@/ui";
+import { BrandIcon } from "@/ui/brand-icon";
+import { showToast } from "@/ui/toast";
 import { SpeakerLead } from "./speaker-mark";
 
 /**
@@ -44,25 +49,55 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
   );
 }
 
-/** 「其他教材」區塊的清單：管理者新增的教材；「完整版課程影片」固定排在最後一列。 */
+/**
+ * 「其他教材」區塊的清單：外部連結教材（業主 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
+ * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
+ */
 export function FullVersionList({ course, playingId, onPlay }: { course: CourseDetail } & LessonPlayProps) {
   const full = course.lessons.filter((l) => l.material && (l.ready || !!course.can?.edit));
   if (!full.length) return null;
   return (
     <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-      {full.map((lesson) => (
-        <ListRow
-          key={lesson.id}
-          icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-          compact
-          playing={playingId === lesson.id}
-          highlight={playingId === lesson.id}
-          note={minutesText(lesson.minutes)}
-          title={lesson.title}
-          subtitle={sharerLine(lesson) || undefined}
-          onPress={lesson.locked || playingId === lesson.id ? undefined : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))}
-        />
-      ))}
+      {full.map((lesson) => {
+        const link = lesson.linkType && !lesson.full ? lesson : null;
+        return (
+          <ListRow
+            key={lesson.id}
+            icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
+            leading={link ? <BrandIcon type={link.linkType!} fallback={TYPE_INFO[link.linkType!].icon as never} size={36} /> : undefined}
+            compact
+            playing={!link && playingId === lesson.id}
+            highlight={!link && playingId === lesson.id}
+            note=""
+            title={lesson.title}
+            subtitle={link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson) || undefined}
+            right={link?.linkUrl ? <MaterialShare course={course} lesson={link} /> : undefined}
+            onPress={
+              link
+                ? link.linkUrl
+                  ? () => void Linking.openURL(link.linkUrl!).catch(() => showToast("無法開啟連結"))
+                  : undefined
+                : lesson.locked || playingId === lesson.id
+                  ? undefined
+                  : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))
+            }
+          />
+        );
+      })}
     </Card>
+  );
+}
+
+/** 教材最右側的「分享」鈕：系統分享選單，分享出去的是外部連結本身（文字範本見「設定 > 分享預設值」的教材分享文字）。 */
+function MaterialShare({ course, lesson }: { course: CourseDetail; lesson: Lesson }) {
+  const { c } = useTheme();
+  const share = async () => {
+    const r = await shareLink(lesson.title, lesson.linkUrl!, { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }, { title: lesson.title });
+    if (r === "copied") showToast("已複製連結");
+  };
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`分享教材：${lesson.title}`} onPress={share} hitSlop={6} style={({ pressed }) => [{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
+      <ShareIcon size={24} color={c.accent} />
+    </Pressable>
   );
 }

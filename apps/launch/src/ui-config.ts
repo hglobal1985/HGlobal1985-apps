@@ -61,6 +61,7 @@ export function normalizeShare(raw: unknown): ShareSettings {
     showQuote: typeof r.showQuote === "boolean" ? r.showQuote : d.showQuote,
     hqName: str(r.hqName, d.hqName, 30),
     fallbackDescription: str(r.fallbackDescription, d.fallbackDescription, 100, true),
+    materialText: str(r.materialText, d.materialText, 300),
   };
 }
 

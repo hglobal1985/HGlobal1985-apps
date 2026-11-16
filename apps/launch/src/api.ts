@@ -37,6 +37,7 @@ import { flushEmails } from "./email.ts";
 import { centerMembers, centralAddJobTitle, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
+import { fetchLinkTitle } from "./link-title.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
@@ -657,6 +658,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const archivedForMe = row.status === "archived" && (state.enrolled.has(id) || state.pending.has(id) || state.started.has(id));
   if (row.status !== "published" && !manages && !archivedForMe) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
+  // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
+  const linkRows = await ctx.db.prepare("SELECT lesson_id, att_type, link_url FROM lesson_attachments WHERE course_id = ? AND kind = 'link' ORDER BY created_at").bind(id).all<{ lesson_id: string; att_type: AttachmentType; link_url: string }>();
+  const linkOf = new Map<string, { type: AttachmentType; url: string }>();
+  for (const r of linkRows.results) if (!linkOf.has(r.lesson_id)) linkOf.set(r.lesson_id, { type: r.att_type, url: r.link_url });
   const groupPos = new Map<string, number>();
   {
     const n = { chapter: 0, material: 0 };
@@ -666,6 +671,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
   const admin = manages;
+  const lockedAll = !admin && !(state.enrolled.has(id) || row.is_public === 1 || watchFree);
   return {
     ...summaryNow,
     ...(manages ? { can } : {}),
@@ -695,9 +701,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       posterUrl: l.media_type === "youtube" && l.media_ref && (l.auto_cover === 1 || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
       autoCover: l.auto_cover === 1,
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
-      ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0,
+      ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
       // 完全公開的課程：任何人（含訪客與會員）都可以看章節，不需要報名。
-      locked: !admin && !(state.enrolled.has(id) || row.is_public === 1 || watchFree),
+      locked: lockedAll,
+      ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...(lockedAll ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
       ...(admin ? { media: { type: l.media_type, ref: l.media_ref } } : {}),
     }))],
@@ -2869,6 +2876,66 @@ const routes: [string, RegExp, Handler][] = [
       await ctx.db.batch([ctx.db.prepare("DELETE FROM lesson_attachments WHERE id = ?").bind(id), audit(ctx.db, admin.sub, "lesson.attachment_delete", "lesson", row.lesson_id, id)]);
       if (row.r2_key) await ctx.env.MEDIA?.delete(row.r2_key).catch(() => undefined);
       return { ok: true };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/link-title$/,
+    async (ctx) => {
+      // 貼上教材連結時，由伺服器代為讀取網頁標題（瀏覽器直接讀會被網站的跨網域限制擋住）。只有管理者可用，避免被當成公開的網頁代理。
+      const s = requireMember(ctx);
+      if (s.role !== "admin" && !(await rightsOf(ctx)).any) return fail(403, "forbidden", "只有課程管理者可以使用");
+      const u = parseHttpsUrl(ctx.url.searchParams.get("url"));
+      if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
+      const type = classifyLink(u);
+      return { type, title: await fetchLinkTitle(u), defaultTitle: LINK_DEFAULT_TITLE[type] };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/courses\/([\w-]+)\/materials$/,
+    async (ctx, [courseId]) => {
+      // 新增「其他教材」：只有外部連結與名稱（名稱空白＝自動抓取，抓不到用類型的預設名稱）。教材與連結一次建立。
+      const admin = await requireCourseManager(ctx, courseId);
+      const body = await readJson<{ url?: unknown; title?: unknown }>(ctx.req);
+      const u = parseHttpsUrl(body.url);
+      if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
+      const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
+      const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
+      if (!course) return fail(404, "not_found", "找不到這門課程");
+      const id = `${courseId}-${randomId(6)}`;
+      // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
+      const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+      const attId = crypto.randomUUID();
+      await ctx.db.batch([
+        ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title),
+        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, courseId, title, u.toString(), classifyLink(u), admin.sub),
+        audit(ctx.db, admin.sub, "material.create", "lesson", id, `${classifyLink(u)}:${title}`),
+      ]);
+      return courseDetail(ctx, courseId);
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/lessons\/([\w-]+)\/material$/,
+    async (ctx, [id]) => {
+      // 修改「其他教材」：名稱與外部連結（連結換了就取代舊的；舊教材的影音、音檔、附件設定不再編輯，保留在系統裡）。
+      const admin = await requireLessonManager(ctx, id);
+      const lesson = await ctx.db.prepare("SELECT course_id, kind, is_full FROM lessons WHERE id = ?").bind(id).first<{ course_id: string; kind: string; is_full: number }>();
+      if (!lesson) return fail(404, "not_found", "找不到這個教材");
+      if (lesson.kind !== "material" || lesson.is_full === 1) return fail(400, "not_link_material", "這一列不是外部連結教材");
+      const body = await readJson<{ url?: unknown; title?: unknown }>(ctx.req);
+      const u = parseHttpsUrl(body.url);
+      if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
+      const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(title, id),
+        ctx.db.prepare("DELETE FROM lesson_attachments WHERE lesson_id = ? AND kind = 'link'").bind(id),
+        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(crypto.randomUUID(), id, lesson.course_id, title, u.toString(), classifyLink(u), admin.sub),
+        audit(ctx.db, admin.sub, "material.update", "lesson", id, `${classifyLink(u)}:${title}`),
+      ]);
+      return courseDetail(ctx, lesson.course_id);
     },
   ],
   [

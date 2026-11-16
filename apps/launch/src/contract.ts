@@ -214,6 +214,9 @@ export type Lesson = {
   isSpeaker?: boolean;
   /** 總結與銷售課程（每門課最多一堂，與主講人互斥；用於「全部課程 > 單元」篩選）。 */
   isSummary?: boolean;
+  /** 其他教材的外部連結：類型（畫面用官方 Logo）與網址。網址只給有權限看的人（鎖定的課程不給）；沒有連結（舊教材、完整版）沒有這兩個欄位。 */
+  linkType?: AttachmentType;
+  linkUrl?: string;
   /** 只有管理員會拿到（編輯影片來源用）。 */
   media?: { type: MediaType; ref: string | null };
 };
@@ -535,6 +538,8 @@ export type ShareSettings = {
   hqName: string;
   /** 沒有地址也沒有金句時，備註顯示的文字（空白＝用 siteName）。 */
   fallbackDescription: string;
+  /** 分享「其他教材」（外部連結）的文字範本，可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}；後面接 linkLead 與外部連結網址。 */
+  materialText: string;
 };
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   inviteText: "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️",
@@ -547,13 +552,15 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   showQuote: true,
   hqName: "寰宇總部",
   fallbackDescription: "",
+  materialText: "我推薦你看這份教材：{教材名稱}（{課程名稱}）",
 };
 
 /** 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 就用課程範本（{主講人}、{職稱}、{課程名稱} 換成實際內容）。 */
-export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }): string {
+export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }): string {
   // {職稱}：有職稱就在前面補一個空白再接職稱（「王小明 區域經理」），沒填就整個省略（不留多餘空白）。
   const title = (course?.teacherTitle ?? "").trim();
-  const lead = course ? s.courseText.replaceAll("{主講人}", course.teacher.trim() || "老師").replaceAll("{職稱}", title ? ` ${title}` : "").replaceAll("{課程名稱}", course.title) : s.inviteText;
+  const fill = (t: string) => t.replaceAll("{主講人}", (course?.teacher ?? "").trim() || "老師").replaceAll("{職稱}", title ? ` ${title}` : "").replaceAll("{課程名稱}", course?.title ?? "");
+  const lead = material ? fill(s.materialText).replaceAll("{教材名稱}", material.title) : course ? fill(s.courseText) : s.inviteText;
   return `${lead}\n\n${s.linkLead}\n${url}`;
 }
 
