@@ -1,21 +1,47 @@
 {
-  "$schema_note": "寰宇生態系固定配色（Design Tokens）。來源：寰宇 logo（深綠、橄欖、橘、黃、鮭粉）。所有 App 一律使用這份色值，不可自行新增或改色。版本 1.0（2026-11-13）。",
-  "version": "1.0",
+  "$schema_note": "寰宇生態系統一配色（Design Tokens）版本 2.0（2026-11-16，業主指示）：以「寰宇行動大學」App 實際使用的色值為全生態系統一設計規範（取代 1.0）。來源：apps/mobile/src/theme/tokens.ts。所有 App 一律使用這份色值，不可自行新增或改色。",
+  "version": "2.0",
   "logoPalette": { "green": "#0c603c", "olive": "#486c48", "orange": "#cc6c0c", "yellow": "#f2dc27", "salmon": "#f0a884" },
+  "brandFlow": {
+    "note": "首頁品牌標題字色沿 logo 色系流動用的色階（App 圖示、品牌標題專用，不是介面色）。",
+    "light": ["#0c603c", "#486c48", "#cc6c0c", "#a86408", "#486c48", "#0c603c"],
+    "dark": ["#cee49f", "#8fae78", "#f0a050", "#f2c063", "#8fae78", "#cee49f"]
+  },
   "gradients": { "topBar": "linear-gradient(90deg, #cc6c0c, #f2dc27 55%, #f0a884)" },
   "light": {
-    "bg": "#f8f6ef", "card": "#ffffff", "fg": "#1d2a22", "muted": "#5d6b62", "line": "#e2dfd2",
-    "green": "#0c603c", "greenDark": "#094a2e", "greenSoft": "#e7f1ea", "olive": "#486c48",
-    "orange": "#cc6c0c", "orangeSoft": "#fdf0e3", "warn": "#a86408",
-    "danger": "#b3261e", "dangerSoft": "#fbeae8", "ok": "#1b7a43",
-    "onGreen": "#ffffff", "borderWarn": "#e6c48c", "borderBad": "#e8b4af", "credit": "#cfd2c9"
+    "background": "#f8f6ef", "surface": "#ffffff", "surfaceMuted": "#f0eee3", "border": "#e2dfd2",
+    "text": "#1d2a22", "textMuted": "#5d6b62", "textOnAccent": "#ffffff",
+    "accent": "#0c603c", "accentSoft": "#e7f1ea", "accentText": "#0c603c",
+    "warning": "#a86408", "warningSoft": "#fdf0e3",
+    "danger": "#b3261e", "dangerSoft": "#fbeae8",
+    "success": "#1b7a43", "successSoft": "#e7f1ea",
+    "tabBar": "#ffffff", "bright": "#ffd43b", "onBright": "#5a3b00"
   },
   "dark": {
-    "bg": "#121515", "card": "#1c2020", "fg": "#eeefeb", "muted": "#a6adab", "line": "#343b38",
-    "green": "#cee49f", "greenDark": "#e6f3c4", "greenSoft": "#2c3622", "olive": "#8fae78",
-    "orange": "#f0a050", "orangeSoft": "#3a2e17", "warn": "#f2c063",
-    "danger": "#f2b8b5", "dangerSoft": "#3c1e1c", "ok": "#9bd39e",
-    "onGreen": "#172016", "borderWarn": "#6b5424", "borderBad": "#7a3b37", "credit": "#3d4441"
+    "background": "#121515", "surface": "#1c2020", "surfaceMuted": "#252a29", "border": "#343b38",
+    "text": "#eeefeb", "textMuted": "#a6adab", "textOnAccent": "#ffffff",
+    "accent": "#2f8a5b", "accentSoft": "#1d3226", "accentText": "#5db383",
+    "warning": "#f2c063", "warningSoft": "#3a2e17",
+    "danger": "#f2b8b5", "dangerSoft": "#3c1e1c",
+    "success": "#4fa774", "successSoft": "#1b3022",
+    "tabBar": "#171b1b", "bright": "#f5c518", "onBright": "#2a1d00"
   },
-  "appIcon": { "background": "#0c603c → #094a2e（深綠漸層圓角方形）", "rule": "每個 App 的圖示以主綠為底、奶油色主體圖形、搭配金黃／橘／鮭粉點綴；圖示網址提供給中央登記（icon_url）。" }
+  "ribbons": {
+    "note": "課程卡角落緞帶可選的顏色（淺色、深色模式相同）。",
+    "green": { "bg": "#0c603c", "fg": "#ffffff" }, "greenDark": { "bg": "#094a2e", "fg": "#ffffff" },
+    "olive": { "bg": "#486c48", "fg": "#ffffff" }, "orange": { "bg": "#cc6c0c", "fg": "#ffffff" },
+    "warn": { "bg": "#a86408", "fg": "#ffffff" }, "yellow": { "bg": "#f2dc27", "fg": "#1d2a22" },
+    "salmon": { "bg": "#f0a884", "fg": "#1d2a22" }, "danger": { "bg": "#b3261e", "fg": "#ffffff" },
+    "ok": { "bg": "#1b7a43", "fg": "#ffffff" }, "muted": { "bg": "#5d6b62", "fg": "#ffffff" }
+  },
+  "saveButton": {
+    "note": "資料編輯視窗頂端的「儲存」按鈕：金黃底、深色字、細框。",
+    "light": { "bg": "#f2dc27", "fg": "#1d2a22", "border": "#e6c48c" },
+    "dark": { "bg": "#f2dc27", "fg": "#172016", "border": "#6b5424" }
+  },
+  "appIcon": { "background": "#0c603c → #094a2e（深綠漸層圓角方形）", "rule": "每個 App 的圖示以主綠為底、奶油色主體圖形、搭配金黃／橘／鮭粉點綴；圖示網址提供給中央登記（icon_url）。" },
+  "migrationFrom1_0": {
+    "note": "1.0 的鍵名對照 2.0：bg→background、card→surface、fg→text、muted→textMuted、line→border、green→accent、greenSoft→accentSoft、onGreen→textOnAccent、orangeSoft→warningSoft、warn→warning、ok→success。1.0 的 greenDark、olive、orange、borderWarn、borderBad、credit 不再是介面色（olive、orange 回到 logoPalette；greenDark 只用在緞帶與 App 圖示；borderWarn 只用在儲存按鈕外框）。",
+    "darkChanged": { "accent": "#cee49f → #2f8a5b", "accentText": "（新增）#5db383", "accentSoft": "#2c3622 → #1d3226", "textOnAccent": "#172016 → #ffffff", "success": "#9bd39e → #4fa774" }
+  }
 }

@@ -6,7 +6,7 @@ import { space } from "@/theme/tokens";
 
 /** 寰宇 logo 的色系：深綠 → 橄欖 → 橘 → 金黃 → 鮭粉 → 回到深綠。淺色模式用較深的色階、深色模式用較亮的色階。 */
 const LIGHT = ["#0c603c", "#486c48", "#cc6c0c", "#a86408", "#486c48", "#0c603c"]; // 規範色：主綠、橄欖、橘、警示橘褐
-const DARK = ["#cee49f", "#8fae78", "#f0a050", "#f2c063", "#8fae78", "#cee49f"]; // 規範深色模式色階
+const DARK = ["#cee49f", "#8fae78", "#f0a050", "#f2c063", "#8fae78", "#cee49f"]; // 品牌標題專用的深色模式流動色階（規範 2.0 的 brandFlow，不是介面色）
 const TEXT = "寰宇行動大學";
 const STEPS = 48; // 動畫取樣點數（越多越平順）
 /** 標題用極細字體：Noto Sans TC Thin（SIL OFL 授權），只含標題這 6 個字（約 3KB），網頁與 App 都內建，不依賴手機系統字型。 */

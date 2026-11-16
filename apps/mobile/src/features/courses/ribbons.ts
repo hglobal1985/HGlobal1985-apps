@@ -3,7 +3,7 @@ import { todayStr } from "@/ui/date-select";
 import { startOf } from "./sort";
 
 /**
- * 緞帶色表：只能用《寰宇生態系固定配色規範》的色（色碼出自 docs/hglobal-tokens.json）。
+ * 緞帶色表：《寰宇生態系統一設計規範 2.0》的緞帶色（docs/hglobal-tokens.json 的 ribbons，與這裡一致）。
  * fg＝緞帶上文字的顏色（黃、鮭粉底用深色字，其餘白字）。
  */
 export const RIBBON_COLORS: Record<RibbonColor, { name: string; bg: string; fg: string }> = {

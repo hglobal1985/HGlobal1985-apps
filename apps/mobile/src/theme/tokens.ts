@@ -5,7 +5,7 @@
 export type ColorScheme = "light" | "dark";
 
 const palettes = {
-  // 色值一律取自《寰宇生態系配色規範》（docs/hglobal-color-standard.md，與中央會員視覺規範 1.0／1.5 相同）；不要自行新增色碼。
+  // 這份色值就是《寰宇生態系統一設計規範 2.0》的正本（業主 2026-11-16：全生態系改用行動大學實際使用的設計；docs/hglobal-color-standard.md、docs/hglobal-tokens.json 與它一致）；不要自行新增色碼。
   light: {
     background: "#F8F6EF",
     surface: "#FFFFFF",

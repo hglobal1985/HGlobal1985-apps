@@ -18,6 +18,11 @@
 - 正式站已關閉測試身分登入（`DEMO_LOGIN: off`）；測試請用本機（`wrangler.local.jsonc`，不提交）。
 - 不在對話、程式或 repo 放任何金鑰；機密由業主在 Cloudflare 後台設定。
 
+## 統一設計規範（業主永久指示，2026-11-16）
+- **所有設計一律以「行動大學程式實際使用的設計」為全生態系統一設計規範**（《寰宇生態系統一設計規範 2.0》，取代 1.0）。正本＝`apps/mobile/src/theme/tokens.ts`；文件＝`docs/hglobal-color-standard.md`、`docs/hglobal-tokens.json`；完整設計系統頁面＝「寰宇行動大學設計系統」https://claude.ai/artifact/RjQ7W2sAfARSkhgjKF5RRU 。
+- 改任何色值、字級、間距、圓角時，三處（tokens.ts、兩份 docs、設計系統頁面）要一起更新；中央會員系統要跟進時，替業主寫好可貼給中央 AI 的指令（`docs/central-request-design-standard-2.md`）。
+- 舊的 1.0 規範與另一個帳號的舊設計系統頁面都不再參照。
+
 ## 資料正本規則（業主永久指示，2026-11-14，違反視為嚴重錯誤）
 - **「中心」清單只以中央會員系統為準**（`GET /v1/vocab/suggestions?pool=education_center`）。行動大學**不可自行新增**中心名稱，也**不可把本地資料（報名紀錄、審核群組、課程…）裡出現過的名稱混進中心清單**。
 - 後端：`/centers` 只回中央清單（`centerList`，查不到用最近一次成功的，失敗不快取）；任何要存「中心」的欄位（主辦單位、審核群組負責中心與成員中心）一律用 `assertCentralCenters` 驗證必須在中央清單內。新增任何會用到中心／獎銜／職務等「中央定義」的欄位時，也要照這個做法，不可在行動大學另建一份。
