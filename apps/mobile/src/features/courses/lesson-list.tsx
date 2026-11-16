@@ -12,6 +12,7 @@ import { Card, ListRow, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { showToast } from "@/ui/toast";
 import { SpeakerLead } from "./speaker-mark";
+import { SummaryLead } from "./summary-mark";
 
 /**
  * 章節清單（學員看到的樣子）：課程介紹頁與中心頁「點課程彈出的選單」共用同一個元件，
@@ -34,8 +35,9 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
               <ListRow
                 key={lesson.id}
                 icon={soon ? "hourglass-outline" : lesson.completed ? "checkmark-circle" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-                leading={lesson.isSpeaker && !soon && !lesson.completed && !lesson.locked ? <SpeakerLead /> : undefined}
+                leading={!soon && !lesson.completed && !lesson.locked ? (lesson.isSpeaker ? <SpeakerLead /> : lesson.isSummary ? <SummaryLead /> : undefined) : undefined}
                 playing={playingId === lesson.id}
+                playingLesson={lesson.id}
                 highlight={playingId === lesson.id}
                 note={minutesText(lesson.minutes)}
                 title={`${lesson.position}. ${lesson.title}`}
@@ -70,6 +72,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
             leading={link ? <BrandIcon type={link.linkType!} fallback={TYPE_INFO[link.linkType!].icon as never} size={36} /> : undefined}
             compact
             playing={!link && playingId === lesson.id}
+            playingLesson={lesson.id}
             highlight={!link && playingId === lesson.id}
             note=""
             title={lesson.title}

@@ -19,6 +19,7 @@ export function ListRow({
   dense,
   compact,
   playing,
+  playingLesson,
 }: {
   icon?: IconName;
   /** 自訂的前置圖示（取代 icon），例如章節清單的主講人學士帽。 */
@@ -38,6 +39,8 @@ export function ListRow({
   compact?: boolean;
   /** 正在播放這一列：前置圖示固定是會動的實心三角形（優先於 icon／leading）。 */
   playing?: boolean;
+  /** 這一列的章節編號：讓圖示只認「播放器目前播的就是這一堂」的狀態（換章節的空檔不會誤用上一堂的播放／暫停狀態）。 */
+  playingLesson?: string;
 }) {
   const { c } = useTheme();
   return (
@@ -49,7 +52,7 @@ export function ListRow({
     >
       {note !== undefined ? (
         <View style={{ width: 42, alignItems: "center", gap: 0 }}>
-          {playing ? <NowPlayingIcon /> : leading ?? (icon ? <Icon name={icon} size={36} color={c.textMuted} /> : null)}
+          {playing ? <NowPlayingIcon lessonId={playingLesson} /> : leading ?? (icon ? <Icon name={icon} size={36} color={c.textMuted} /> : null)}
           {note ? (
             <AppText variant="caption" tone="muted" numberOfLines={1} style={{ fontSize: 11, lineHeight: 12 }}>
               {note}
