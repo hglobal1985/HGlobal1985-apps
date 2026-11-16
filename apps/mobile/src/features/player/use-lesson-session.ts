@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import { api, type CourseDetail, type Playback } from "@/api/client";
 import { saveLastLesson } from "@/lib/last-lesson";
 import { useSession } from "@/state/session";
+import { useUiConfig } from "@/state/ui-config";
 import { engine } from "./engine";
 import { buildTrack } from "./engine.types";
 import { usePlayer } from "./use-player";
@@ -16,6 +17,10 @@ import { usePlayer } from "./use-player";
  */
 export function useLessonSession(c: CourseDetail | null | undefined, lessonId: string | null, reload: () => void, onSwitch: (courseId: string, lessonId: string) => void) {
   const { invalidate, ready, member } = useSession();
+  // 學習紀錄的三個數字由超級管理員在「設定 > APP 數值設定」調整。
+  const { learnStartPct, learnDonePct, watchReportSec } = useUiConfig().config.app;
+  const startAt = learnStartPct / 100;
+  const doneAt = learnDonePct / 100;
   const [playback, setPlayback] = useState<Playback | null>(null);
   const [playError, setPlayError] = useState<string | null>(null);
   const player = usePlayer();
@@ -67,15 +72,15 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   // 沒有「完成」按鈕了：這一堂播放到結尾，自動記錄完成。
   const autoDone = useRef<string | null>(null);
   const curLesson = lessonRow;
-  // 播放超過 95% 就算完成（有設定起訖時間的章節，以那一段為準）；播到結尾也算。
+  // 播放超過 learnDonePct（預設 95%）就算完成（有設定起訖時間的章節，以那一段為準）；播到結尾也算。
   const here = !!track && player.track?.key === track.key;
   const segStart = curLesson?.start ?? 0;
   const segEnd = curLesson?.end ?? player.duration;
   const segLen = segEnd - segStart;
-  const watched = here && segLen > 0 && (player.position - segStart) / segLen >= 0.95;
+  const watched = here && segLen > 0 && (player.position - segStart) / segLen >= doneAt;
   const finished = legacyYoutube ? legacyDone : here && (player.segmentEnded || watched);
-  // 播放超過 1%：通知後端把這門課納入「學習中」（不論免費或付費、有沒有報名紀錄；每一堂每次進入頁面只回報一次）。
-  const started = here && segLen > 0 && (player.position - segStart) / segLen >= 0.01;
+  // 播放超過 learnStartPct（預設 1%）：通知後端把這門課納入「學習中」（不論免費或付費、有沒有報名紀錄；每一堂每次進入頁面只回報一次）。
+  const started = here && segLen > 0 && (player.position - segStart) / segLen >= startAt;
   const startedSent = useRef<string | null>(null);
   useEffect(() => {
     if (!c || !curLesson || !member || !started || startedSent.current === curLesson.id) return;
@@ -95,7 +100,7 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
     if (!c || !curLesson || !member || ratio < 0.01) return;
     const w = watchSent.current;
     if (w.lesson !== curLesson.id) Object.assign(w, { lesson: curLesson.id, ratio: 0, at: 0 });
-    if (ratio - w.ratio < 0.01 || Date.now() - w.at < 10000) return;
+    if (ratio - w.ratio < 0.01 || Date.now() - w.at < watchReportSec * 1000) return;
     Object.assign(w, { ratio, at: Date.now() });
     api("POST", `/courses/${c.id}/lessons/${curLesson.id}/watch`, { ratio }).catch(() => undefined);
   }, [ratio, member?.sub, curLesson?.id]); // eslint-disable-line react-hooks/exhaustive-deps

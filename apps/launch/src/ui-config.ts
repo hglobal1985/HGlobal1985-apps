@@ -64,6 +64,14 @@ export function normalizeShare(raw: unknown): ShareSettings {
   };
 }
 
+/** 學習紀錄的兩個比例：開始 1～50%、完成 50～100%；完成必須大於開始（否則自動調成開始＋1），避免設錯後永遠無法完成。 */
+function learnPct(r: Record<string, unknown>, d: AppSettings): { learnStartPct: number; learnDonePct: number } {
+  const n = (v: unknown, def: number, min: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : def);
+  const start = n(r.learnStartPct, d.learnStartPct, 1, 50);
+  const done = Math.max(n(r.learnDonePct, d.learnDonePct, 50, 100), start + 1);
+  return { learnStartPct: start, learnDonePct: done };
+}
+
 /** 整理 APP 數值設定：數字夾在合理範圍（四捨五入成整數）、選項不合法退回預設、缺的欄位用預設補。 */
 export function normalizeApp(raw: unknown): AppSettings {
   const d = DEFAULT_APP_SETTINGS;
@@ -89,6 +97,8 @@ export function normalizeApp(raw: unknown): AppSettings {
     freshDays: num(r.freshDays, d.freshDays, 1, 90),
     switchCountdownSec: num(r.switchCountdownSec, d.switchCountdownSec, 5, 60),
     blurStrength: num(r.blurStrength, d.blurStrength, 4, 40),
+    ...learnPct(r, d),
+    watchReportSec: num(r.watchReportSec, d.watchReportSec, 5, 120),
   };
 }
 

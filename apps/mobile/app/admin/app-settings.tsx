@@ -12,7 +12,7 @@ type App = UiConfig["app"];
 
 /**
  * 設定 > APP 數值設定（只有超級管理員）：把整個 APP 會用到的數值與規則集中在這一頁調整——
- * ① 首頁「推薦課程」的規則 ② 首頁兩個區塊與公告跑馬燈的自動輪播秒數 ③ 其他全站數值（「新」標籤天數、改播倒數、圖片背景模糊強度）。
+ * ① 首頁「推薦課程」的規則 ② 首頁兩個區塊與公告跑馬燈的自動輪播秒數 ③ 其他全站數值（「新」標籤天數、改播倒數、圖片背景模糊強度）④ 學習紀錄（開始學習、自動完成的播放比例、進度回報間隔）。
  * 存檔後所有人重新開啟 APP 就會套用；新增任何新的全站數值，也一律放在這一頁（contract.ts AppSettings）。
  */
 export default function AppSettingsScreen() {
@@ -132,6 +132,17 @@ export default function AppSettingsScreen() {
           {stepper("課程「新」標籤", "課程建立幾天內，分類下拉顯示「新」", app.freshDays, 1, 90, (v) => set("freshDays", v), " 天")}
           {stepper("改播另一堂的倒數", "正在播放時又點另一堂：幾秒沒操作就自動同意改播", app.switchCountdownSec, 5, 60, (v) => set("switchCountdownSec", v))}
           {stepper("圖片「完整顯示」背景模糊", "合成封面時背景的模糊強度，數字越大越模糊（建議 12～24）", app.blurStrength, 4, 40, (v) => set("blurStrength", v), "")}
+        </Card>
+      </Section>
+
+      <Section title="④ 學習紀錄">
+        <Card>
+          {stepper("開始學習的播放比例", "播放超過這個比例，這門課就列入學員的「學習中」（已開通的課程本來就會列入）", app.learnStartPct, 1, 50, (v) => set("learnStartPct", v), "%")}
+          {stepper("自動完成的播放比例", "播放超過這個比例（或播到結尾），自動標記這一堂完成；一定要大於上面的比例", app.learnDonePct, 50, 100, (v) => set("learnDonePct", v), "%")}
+          {stepper("進度回報的最短間隔", "播放進度每前進 1%、且距離上次回報超過幾秒，才回報一次（影響「學習中」進度條更新的頻率）", app.watchReportSec, 5, 120, (v) => set("watchReportSec", v))}
+          <AppText variant="caption" tone="muted">
+            只影響之後的播放，已經記錄的進度不會重算。
+          </AppText>
         </Card>
       </Section>
 

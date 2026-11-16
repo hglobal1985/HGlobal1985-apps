@@ -28,3 +28,14 @@ test("APP 數值設定：只有超級管理員能改、可只改部分欄位（�
   assert.deepEqual([r2.data.app.homeLeftSec, r2.data.app.homeRightSec, r2.data.app.rec.scope, r2.data.app.rec.max], [9, 0, "all", 5], "只改部分欄位，其餘保留");
   assert.equal((await call<UiConfig>("GET", "/ui-config")).data.app.homeLeftSec, 9, "公開讀取（未登入也能抓）");
 });
+
+test("APP 數值設定：學習紀錄三項的預設值、夾範圍，完成比例一定大於開始比例", () => {
+  const d = normalizeApp(undefined);
+  assert.deepEqual([d.learnStartPct, d.learnDonePct, d.watchReportSec], [1, 95, 10], "預設值維持原本寫死的數字");
+  const hi = normalizeApp({ learnStartPct: 999, learnDonePct: 10, watchReportSec: 1 });
+  assert.deepEqual([hi.learnStartPct, hi.learnDonePct, hi.watchReportSec], [50, 51, 5], "夾範圍；完成不得小於等於開始");
+  const lo = normalizeApp({ learnStartPct: 0, learnDonePct: 500, watchReportSec: 9999 });
+  assert.deepEqual([lo.learnStartPct, lo.learnDonePct, lo.watchReportSec], [1, 100, 120]);
+  const eq = normalizeApp({ learnStartPct: 60, learnDonePct: 50 });
+  assert.deepEqual([eq.learnStartPct, eq.learnDonePct], [50, 51], "開始最多 50%，完成至少比開始多 1");
+});

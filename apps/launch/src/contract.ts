@@ -591,6 +591,12 @@ export type AppSettings = {
   switchCountdownSec: number;
   /** 圖片「完整顯示」合成封面時的背景模糊強度（數字越大越模糊）。 */
   blurStrength: number;
+  /** 學習紀錄：播放超過這個比例（%）就算「開始學習」（課程列入「學習中」）。 */
+  learnStartPct: number;
+  /** 學習紀錄：播放超過這個比例（%）（或播到結尾）自動標記這一堂完成。 */
+  learnDonePct: number;
+  /** 學習紀錄：播放進度每次回報的最短間隔（秒）。 */
+  watchReportSec: number;
 };
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   homeLeftSec: 5,
@@ -602,6 +608,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   freshDays: 7,
   switchCountdownSec: 15,
   blurStrength: 18,
+  learnStartPct: 1,
+  learnDonePct: 95,
+  watchReportSec: 10,
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },
