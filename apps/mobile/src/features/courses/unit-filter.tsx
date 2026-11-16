@@ -55,8 +55,8 @@ function CheckItem({ label, checked, onPress }: { label: string; checked: boolea
       onPress={onPress}
       style={[styles.item, { backgroundColor: checked ? c.accentSoft : c.surface, borderColor: checked ? c.accent : c.border }]}
     >
-      <Icon name={checked ? "checkbox" : "square-outline"} size={26} color={checked ? c.accent : c.textMuted} />
-      <AppText variant="callout" numberOfLines={1} style={{ color: checked ? c.accentText : c.text, fontWeight: "700", flexShrink: 1 }}>
+      <Icon name={checked ? "checkbox" : "square-outline"} size={24} color={checked ? c.accent : c.textMuted} />
+      <AppText variant="callout" style={{ color: checked ? c.accentText : c.text, fontWeight: "700", flexShrink: 0 }}>
         {label}
       </AppText>
     </Pressable>
@@ -64,7 +64,8 @@ function CheckItem({ label, checked, onPress }: { label: string; checked: boolea
 }
 
 const styles = StyleSheet.create({
-  // 強制同一排、不換行：三個等寬，各自單行。
-  row: { flexDirection: "row", flexWrap: "nowrap", gap: space.sm, paddingTop: space.xs },
-  item: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm },
+  // 強制同一排、不換行；文字與勾選框貼近邊框（內距 4、間距 4），文字一律完整顯示、不縮小字體、不用「…」。
+  // 各項先依內容寬度，剩下的空間平均分配（flexBasis auto + flexGrow）。
+  row: { flexDirection: "row", flexWrap: "nowrap", gap: 6, paddingTop: space.xs },
+  item: { flexGrow: 1, flexShrink: 1, flexBasis: "auto", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: 4 },
 });

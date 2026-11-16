@@ -201,9 +201,10 @@ export default function LessonScreen() {
               key={l.id}
               icon={l.completed ? "checkmark-circle" : l.id === lesson.id ? "play-circle" : "play-circle-outline"}
               leading={l.isSpeaker && !l.completed ? <SpeakerLead /> : undefined}
+              playing={l.id === lesson.id}
               note={minutesText(l.minutes)}
               title={`${l.position}. ${l.title}`}
-              subtitle={l.id === lesson.id ? "正在觀看" : sharerLine(l) || undefined}
+              subtitle={sharerLine(l) || undefined}
               highlight={l.id === lesson.id}
               dense
               compact
@@ -224,9 +225,10 @@ export default function LessonScreen() {
                 <ListRow
                   key={l.id}
                   icon={l.id === lesson.id ? "play-circle" : "play-circle-outline"}
+                  playing={l.id === lesson.id}
                   note={minutesText(l.minutes)}
                   title={l.title}
-                  subtitle={l.id === lesson.id ? "正在觀看" : sharerLine(l) || undefined}
+                  subtitle={sharerLine(l) || undefined}
                   highlight={l.id === lesson.id}
                   dense
                   compact

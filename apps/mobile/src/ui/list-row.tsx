@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { minTouch, space } from "@/theme/tokens";
 import { Icon, type IconName } from "./icon";
+import { NowPlayingIcon } from "./now-playing-icon";
 import { AppText } from "./text";
 
 export function ListRow({
@@ -17,6 +18,7 @@ export function ListRow({
   highlight,
   dense,
   compact,
+  playing,
 }: {
   icon?: IconName;
   /** 自訂的前置圖示（取代 icon），例如章節清單的主講人學士帽。 */
@@ -34,6 +36,8 @@ export function ListRow({
   dense?: boolean;
   /** 章節清單的精簡版：不顯示右側「>」、標題只佔一行（太長用「…」）、文字更靠近邊框（外層 Card 的左右內距請用 space.sm）。 */
   compact?: boolean;
+  /** 正在播放這一列：前置圖示固定是會動的實心三角形（優先於 icon／leading）。 */
+  playing?: boolean;
 }) {
   const { c } = useTheme();
   return (
@@ -41,13 +45,13 @@ export function ListRow({
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
-      style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, compact && { gap: space.sm }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, marginHorizontal: compact ? -space.sm : -space.lg, paddingHorizontal: compact ? space.sm : space.lg }, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, compact && { gap: space.sm, minHeight: 0, paddingVertical: 3 }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, marginHorizontal: compact ? -space.sm : -space.lg, paddingHorizontal: compact ? space.sm : space.lg }, pressed && { opacity: 0.7 }]}
     >
       {note !== undefined ? (
-        <View style={{ width: 48, alignItems: "center", gap: 2 }}>
-          {leading ?? (icon ? <Icon name={icon} size={36} color={c.textMuted} /> : null)}
+        <View style={{ width: 48, alignItems: "center", gap: 0 }}>
+          {playing ? <NowPlayingIcon /> : leading ?? (icon ? <Icon name={icon} size={36} color={c.textMuted} /> : null)}
           {note ? (
-            <AppText variant="caption" tone="muted" numberOfLines={1} style={{ fontSize: 11, lineHeight: 14 }}>
+            <AppText variant="caption" tone="muted" numberOfLines={1} style={{ fontSize: 11, lineHeight: 12 }}>
               {note}
             </AppText>
           ) : null}
