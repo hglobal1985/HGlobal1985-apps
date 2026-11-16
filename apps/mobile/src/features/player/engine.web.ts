@@ -1,6 +1,6 @@
 import { resolveUrl } from "@/api/client";
 import { embeddedCover } from "./audio-cover";
-import { EMPTY, nextRate, segmentOf, type Snapshot, type Track } from "./engine.types";
+import { EMPTY, nextRate, segmentOf, type Snapshot, type Track, resumeOf } from "./engine.types";
 import { askSwitch } from "./switch-prompt";
 
 /**
@@ -452,7 +452,7 @@ export const engine = {
     intent = false; // 等真的開始播放（play 事件）才算「想播放」
     emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: t.mode !== "youtube", error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork, loadId: snap.loadId + 1 });
     if (t.mode !== "youtube") {
-      attach(element(), t, segmentOf(t).start, true, (h) => (hlsVideo = h));
+      attach(element(), t, resumeOf(t), true, (h) => (hlsVideo = h));
       applyRate();
       setupSession(t);
     } else if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;

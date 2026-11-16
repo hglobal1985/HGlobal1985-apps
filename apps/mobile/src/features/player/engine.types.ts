@@ -65,6 +65,8 @@ export function buildTrack(p: Playback, meta: { courseId: string; lessonId: stri
 
 /** 這一堂的時間軸區間（秒）。 */
 export const segmentOf = (t: Track): { start: number; end: number | null } => ({ start: t.playback.start ?? 0, end: t.playback.end ?? null });
+/** 開始播放的秒數：有續播記憶（resumeAt）就從那裡接著播，否則從這一堂的起點。 */
+export const resumeOf = (t: Track): number => t.playback.resumeAt ?? segmentOf(t).start;
 
 /** 倒數剩餘時間：-12:34（整個網站的播放時間顯示一律用這個）。 */
 export const remainingText = (sec: number): string => `-${formatClock(Math.ceil(Math.max(0, sec)))}`;

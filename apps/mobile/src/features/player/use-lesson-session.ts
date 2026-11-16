@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { api, type CourseDetail, type Playback } from "@/api/client";
 import { saveLastLesson } from "@/lib/last-lesson";
+import { showToast } from "@/ui/toast";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { engine } from "./engine";
@@ -63,7 +64,13 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
     let alive = true;
     engine.request(track).then((ok) => {
       if (!alive) return;
-      if (ok) return setClaimed(track.key);
+      if (ok) {
+        setClaimed(track.key);
+        // 續播記憶：告訴學員是從上次的位置接著播（業主 2026-11-17）。
+        const r = track.playback.resumeAt;
+        if (r != null) showToast(`從上次看到的 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
+        return;
+      }
       const cur = engine.getSnapshot().track;
       if (cur) onSwitch(cur.courseId, cur.lessonId);
     });
@@ -99,25 +106,32 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   const ratio = here && segLen > 0 ? Math.min(1, Math.max(0, (player.position - segStart) / segLen)) : 0;
   const ratioByLesson = useRef<Record<string, number>>({}); // 每一堂目前播放到哪（離開時補送用；換堂時不會被新的一堂蓋掉）
   if (curLesson && ratio > (ratioByLesson.current[curLesson.id] ?? 0)) ratioByLesson.current[curLesson.id] = ratio;
-  const watchSent = useRef({ lesson: "", ratio: 0, at: 0 });
+  // 續播記憶：每一堂「最後播放到第幾秒」（倒轉重看也照實記錄；離開時補送）。
+  const posByLesson = useRef<Record<string, number>>({});
+  if (curLesson && here && player.position > 0) posByLesson.current[curLesson.id] = player.position;
+  const watchSent = useRef({ lesson: "", ratio: 0, pos: 0, at: 0 });
   useEffect(() => {
     if (!c || !curLesson || !member || ratio < 0.01) return;
     const w = watchSent.current;
-    if (w.lesson !== curLesson.id) Object.assign(w, { lesson: curLesson.id, ratio: 0, at: 0 });
-    if (ratio - w.ratio < 0.01 || Date.now() - w.at < watchReportSec * 1000) return;
-    Object.assign(w, { ratio, at: Date.now() });
-    api("POST", `/courses/${c.id}/lessons/${curLesson.id}/watch`, { ratio }).catch(() => undefined);
-  }, [ratio, member?.sub, curLesson?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (w.lesson !== curLesson.id) Object.assign(w, { lesson: curLesson.id, ratio: 0, pos: 0, at: 0 });
+    const pos = player.position;
+    const moved = ratio - w.ratio >= 0.01 || Math.abs(pos - w.pos) >= 15;
+    if (!moved || Date.now() - w.at < watchReportSec * 1000) return;
+    Object.assign(w, { ratio: Math.max(w.ratio, ratio), pos, at: Date.now() });
+    api("POST", `/courses/${c.id}/lessons/${curLesson.id}/watch`, { ratio, position: pos }).catch(() => undefined);
+  }, [ratio, Math.floor(player.position / 5), member?.sub, curLesson?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const cid = c?.id;
     const lessonKey = curLesson?.id;
     return () => {
       const w = watchSent.current;
       const last = lessonKey ? (ratioByLesson.current[lessonKey] ?? 0) : 0;
-      if (!cid || !lessonKey || !member || last < 0.01 || (w.lesson === lessonKey && last - w.ratio < 0.005)) return;
+      const pos = lessonKey ? posByLesson.current[lessonKey] : undefined;
+      if (!cid || !lessonKey || !member || last < 0.01 || (w.lesson === lessonKey && last - w.ratio < 0.005 && (pos == null || Math.abs(pos - w.pos) < 3))) return;
       w.lesson = lessonKey;
       w.ratio = last;
-      api("POST", `/courses/${cid}/lessons/${lessonKey}/watch`, { ratio: last })
+      if (pos != null) w.pos = pos;
+      api("POST", `/courses/${cid}/lessons/${lessonKey}/watch`, { ratio: last, ...(pos != null ? { position: pos } : {}) })
         .then(() => invalidate())
         .catch(() => undefined);
     };
@@ -136,4 +150,13 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   const engineError = track && player.track?.key === track.key ? player.error : null;
   const pinned = !!track && claimed === track.key;
   return { playback, track, pinned, playError, engineError, legacyYoutube, onLegacyEnd: () => setLegacyDone(true) };
+}
+
+/** 秒數 → 12:34 或 1:02:03。 */
+function clock(sec: number): string {
+  const t = Math.max(0, Math.floor(sec));
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  const ss = String(t % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
 }

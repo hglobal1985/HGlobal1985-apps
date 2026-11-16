@@ -135,6 +135,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="chatbubble-ellipses-outline" title="編輯學習金句" subtitle="首頁「繼續學習」下方的金句" onPress={() => router.push("/admin/quotes")} /> : null}
             {member.role === "admin" ? <ListRow icon="megaphone-outline" title="跑馬燈公告" subtitle="首頁公告：自動輪播、排序、停用" onPress={() => router.push("/admin/announcements")} /> : null}
             {isWeb && member.reviewer ? <ListRow icon="receipt-outline" title="報名審核" subtitle="確認繳費後開通、匯出對帳報表" onPress={() => router.push("/admin/orders")} /> : null}
+            {member.reviewer ? <ListRow icon="bar-chart-outline" title="報名與營收報表" subtitle="依中心、課程、月份統計報名與繳費金額，可匯出 Excel" onPress={() => router.push("/admin/report")} /> : null}
             {isWeb && (member.role === "admin" || member.titles.includes("會長") || member.titles.includes("音控")) ? (
               <ListRow icon="people-outline" title="審核群組" subtitle="指定各中心的報名窗口、收費窗口、審核員" onPress={() => router.push("/admin/review-groups")} />
             ) : null}

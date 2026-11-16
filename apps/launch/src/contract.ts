@@ -329,7 +329,8 @@ export type ReviewGroup = {
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string };
 
 /** demo 的 url 可能是相對路徑（以 API 網域為準），App 端以 resolveUrl 轉成完整網址。hls 為 Mux 簽名播放網址。 */
-type Segment = { start: number | null; end: number | null };
+/** resumeAt＝續播起點（影片本身的秒數；這一堂還沒看完、上次停在中間才有）。 */
+type Segment = { start: number | null; end: number | null; resumeAt?: number };
 export type Playback = Segment &
   ({ kind: "demo"; url: string; label: string } | { kind: "youtube"; videoId: string } | { kind: "hls"; url: string } | { kind: "audio"; url: string });
 
@@ -531,6 +532,11 @@ export type UiConfig = {
  * - LINE 等分享預覽卡片：標題＝「名稱＋titleSeparator＋siteName」；備註＝「addressIcon 地址」換行再接一句隨機學習金句（可各自關閉）。
  *   單堂課程的預覽卡片與它主辦的中心一致（標題、備註都用該中心的）；總部主辦的課程用 hqName，沒有地址。
  */
+/** 報名與營收報表（設定 > 報名與營收報表）。 */
+export type ReportBy = "center" | "course" | "month";
+export type ReportRow = { key: string; label: string; registrations: number; opened: number; pending: number; rejected: number; free: number; amountTwd: number };
+export type RegistrationReport = { from: string; to: string; by: ReportBy; rows: ReportRow[]; total: ReportRow };
+
 /** 課程審核窗口可以指定的身份：主辦中心的會長、音控、小編。 */
 export const REVIEW_ROLES = ["president", "sound", "editor"] as const;
 export type ReviewRole = (typeof REVIEW_ROLES)[number];

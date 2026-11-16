@@ -43,6 +43,7 @@ function AppStack() {
             <Stack.Screen name="learn/[courseId]/[lessonId]" options={{ title: "上課" }} />
             <Stack.Screen name="admin/list-rules" options={{ title: "課程排序與條件" }} />
             <Stack.Screen name="admin/stats" options={{ title: "統計分析" }} />
+            <Stack.Screen name="admin/report" options={{ title: "報名與營收報表" }} />
             <Stack.Screen name="admin/keywords" options={{ title: "關鍵字管理" }} />
             <Stack.Screen name="admin/short-links" options={{ title: "短網址" }} />
             <Stack.Screen name="admin/app-settings" options={{ title: "APP 數值設定" }} />

@@ -121,7 +121,9 @@ export function Screen({
 }
 
 /** 有 scrollY 就用 Animated.ScrollView 把捲動位移寫進去，否則就是一般的 ScrollView。 */
-function Scroller({ scrollY, children, ...rest }: { scrollY?: Animated.Value } & React.ComponentProps<typeof ScrollView>) {
+function Scroller({ scrollY, children, ...props }: { scrollY?: Animated.Value } & React.ComponentProps<typeof ScrollView>) {
+  // 網頁：頁面主要捲動區固定預留捲軸位置（lib/stable-scrollbar.ts 只認這個標記，避免外層每一層都多留一條捲軸寬度）。
+  const rest = { ...props, ...({ dataSet: { stableGutter: "" } } as object) };
   if (!scrollY) return <ScrollView {...rest}>{children}</ScrollView>;
   return (
     <Animated.ScrollView {...(rest as object)} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}>

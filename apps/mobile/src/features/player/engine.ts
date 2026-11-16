@@ -1,6 +1,6 @@
 import { createVideoPlayer, type VideoPlayer, type VideoView } from "expo-video";
 import { resolveUrl } from "@/api/client";
-import { EMPTY, nextRate, segmentOf, type Snapshot, type Track } from "./engine.types";
+import { EMPTY, nextRate, segmentOf, type Snapshot, type Track, resumeOf } from "./engine.types";
 import { askSwitch } from "./switch-prompt";
 
 /**
@@ -131,8 +131,8 @@ export const engine = {
     } else player.replace(src);
     player.playbackRate = userRate;
     emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork, loadId: snap.loadId + 1 });
-    const { start } = segmentOf(t);
-    if (start) player.currentTime = start;
+    const begin = resumeOf(t); // 續播記憶：有上次的位置就從那裡接著播
+    if (begin) player.currentTime = begin;
     player.play();
   },
   play: () => player?.play(),

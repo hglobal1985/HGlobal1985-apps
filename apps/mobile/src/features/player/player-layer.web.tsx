@@ -313,7 +313,9 @@ export function PlayerLayer() {
   const ctlStyle: CSSProperties = { opacity: ctl ? 1 : 0, pointerEvents: ctl ? "auto" : "none", transition: "opacity 0.2s" };
   if (typeof document === "undefined") return null;
   const yt = t?.mode === "youtube" && t.playback.kind === "youtube" ? t.playback : null;
-  const range = yt ? `${yt.start ? `&start=${yt.start}` : ""}${yt.end ? `&end=${yt.end}` : ""}` : "";
+  // 起點：有續播記憶（resumeAt）就從那一秒接著播，否則從這一堂的起點（YouTube 只接受整數秒）。
+  const ytBegin = yt ? Math.floor(yt.resumeAt ?? yt.start ?? 0) : 0;
+  const range = yt ? `${ytBegin ? `&start=${ytBegin}` : ""}${yt.end ? `&end=${yt.end}` : ""}` : "";
   const art = s.artworkUrl ? (/^(https?:|blob:|data:)/.test(s.artworkUrl) ? s.artworkUrl : s.artworkUrl) : "/icon-512.png";
   return createPortal(
     <div ref={boxRef} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>

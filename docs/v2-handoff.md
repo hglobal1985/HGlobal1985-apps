@@ -640,3 +640,9 @@
 - 2026-11-17：迷你播放器按鈕改實心黑底（player-layer.web.tsx `btn`）；影片「可拖曳或放大縮小」提示 3.5 秒→1 秒；下拉重新整理排除帶 `data-no-pull-refresh` 的區塊（課程 EDM 拖曳 `EdmPan`、EDM 放大視窗、影片放大拖曳層、迷你播放器），本機以觸控模擬驗證：EDM 上拖曳不重新整理、其他地方照常。
 - 2026-11-17：素材清單裡的影片縮圖一律用 YouTube 縮圖（`courseDetail` 的 lesson coverUrl／posterUrl、`/search-index` 的 coverUrl 依 `is_list` 判斷）；一般課程維持「章節封面 → 課程上傳封面 → YouTube」。測試 course-list.test.ts。
 - 2026-11-17：梯次排序改為「離今天近的在上、遠的在下」（`nearestFirst`，取代原本的 `farToNear` 由遠到近）。本機驗證系列頁順序 2026/11/8 → 2027/2/14 → … → 2027/11/14 → 2025/10/1。
+
+## 2026-11-17：續播記憶、報名與營收報表、捲軸預留範圍修正
+- migration 0063：`lesson_watch.position_sec`；推播用 `push_subscriptions`、`notifications.pushed`（舊通知標為已推）、`course_reminders`。
+- 續播：`/watch` 多收 `position`（最後位置，倒轉也照記）；`/playback` 回 `resumeAt`（`resumePoint()`）；App 端 `resumeOf()` 給 HTML 媒體、App 播放器與 YouTube iframe 的 start；`use-lesson-session` 每 15 秒位置變化或 1% 進度回報、離開時補送。測試 tests/resume.test.ts。
+- 報表：`registrationReport()`／`registrationReportCsv()`；測試 tests/report.test.ts。
+- 修正：`scrollbar-gutter` 原本套在所有元素，造成電腦版每層外框各多留捲軸寬（內容窄約 60px）；改成只套 `Screen` 的捲動區（`data-stable-gutter`），閃爍檢查仍 0。

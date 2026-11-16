@@ -35,6 +35,9 @@ import {
   REVIEW_ROLES,
   type ReviewDesk,
   type ReviewRole,
+  type RegistrationReport,
+  type ReportBy,
+  type ReportRow,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { centerMembers, centralAddJobTitle, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
@@ -605,6 +608,18 @@ async function centerSlugMap(db: D1Database): Promise<Map<string, string>> {
  * 課程專屬網址：learn.hglobal1985.com/中心縮寫/英譯主講人-1。條件：有主講人、主辦中心已設定短網址；一旦產生就固定。
  * 編號＝同一主辦中心＋同一英譯姓名已有的最大編號 + 1（從 1 開始，不補零，需要時自然增加位數）。
  */
+/** 續播的起點秒數：登入者這一堂還沒看完、上次停在區間中間才回傳；否則 null（從頭播）。 */
+async function resumePoint(ctx: Ctx, lessonId: string, start: number, end: number | null): Promise<number | null> {
+  const s = ctx.session;
+  if (!s) return null;
+  const done = await ctx.db.prepare("SELECT 1 AS ok FROM lesson_progress WHERE member_sub = ? AND lesson_id = ?").bind(s.sub, lessonId).first();
+  if (done) return null;
+  const w = await ctx.db.prepare("SELECT position_sec FROM lesson_watch WHERE member_sub = ? AND lesson_id = ?").bind(s.sub, lessonId).first<{ position_sec: number | null }>();
+  const p = w?.position_sec;
+  if (p == null || p < start + 5 || (end != null && p > end - 10)) return null;
+  return p;
+}
+
 /** 這門課是不是「素材清單」（沒有章節，只有其他教材）。 */
 async function isListCourse(ctx: Ctx, courseId: string): Promise<boolean> {
   return (await ctx.db.prepare("SELECT is_list FROM courses WHERE id = ?").bind(courseId).first<{ is_list: number }>())?.is_list === 1;
@@ -1427,6 +1442,67 @@ async function reviewCsv(ctx: Ctx): Promise<Response> {
   await audit(ctx.db, ctx.session!.sub, "order.export", "report", "csv", String(orders.length)).run();
   return new Response("﻿" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n"), {
     headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="registrations-${iso().slice(0, 10)}.csv"`, "cache-control": "no-store" },
+  });
+}
+
+/**
+ * 報名與營收報表（業主 2026-11-17）：指定期間（台灣日期，含頭尾）的報名，依中心／課程／月份加總；看得到的範圍與報名審核相同（總部全部、會長自己中心…）。
+ * 免費報名也算在報名數裡；「繳費金額」＝已開通（未撤銷）的付費報名，有實收金額用實收，沒有用應繳。
+ */
+async function registrationReport(ctx: Ctx): Promise<RegistrationReport> {
+  const s = requireMember(ctx);
+  const scope = await reviewScope(ctx, s);
+  if (!hasScope(scope)) fail(403, "forbidden", "需要審核權限");
+  const q = ctx.url.searchParams;
+  const day = (v: string | null, d: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : d);
+  const today = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+  const from = day(q.get("from"), `${today.slice(0, 8)}01`);
+  const to = day(q.get("to"), today);
+  if (from > to) fail(400, "invalid_range", "開始日期不能晚於結束日期");
+  const by: ReportBy = q.get("by") === "course" || q.get("by") === "month" ? (q.get("by") as ReportBy) : "center";
+  // 台灣日期 → UTC 時間範圍
+  const fromUtc = new Date(Date.parse(`${from}T00:00:00+08:00`)).toISOString();
+  const toUtc = new Date(Date.parse(`${to}T00:00:00+08:00`) + 24 * 3600 * 1000).toISOString();
+  const w = scopeSql(scope);
+  const { results } = await ctx.db
+    .prepare(`SELECT o.id, o.status, o.deferred, o.revoked_at, o.center_label, o.created_at, o.paid_twd, o.total_twd, i.course_id, i.title_snapshot, i.price_twd FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.created_at >= ? AND o.created_at < ? AND ${w.sql} ORDER BY o.created_at`)
+    .bind(fromUtc, toUtc, ...w.args)
+    .all<{ id: string; status: string; deferred: number; revoked_at: string | null; center_label: string; created_at: string; paid_twd: number | null; total_twd: number; course_id: string; title_snapshot: string; price_twd: number }>();
+  const groups = new Map<string, ReportRow>();
+  const total: ReportRow = { key: "total", label: "合計", registrations: 0, opened: 0, pending: 0, rejected: 0, free: 0, amountTwd: 0 };
+  for (const r of results) {
+    const twMonth = new Date(Date.parse(r.created_at) + 8 * 3600 * 1000).toISOString().slice(0, 7);
+    const [key, label] = by === "course" ? [r.course_id, r.title_snapshot] : by === "month" ? [twMonth, `${twMonth.slice(0, 4)} 年 ${Number(twMonth.slice(5))} 月`] : [r.center_label || "", r.center_label || "（沒有中心）"];
+    const g = groups.get(key) ?? { key, label, registrations: 0, opened: 0, pending: 0, rejected: 0, free: 0, amountTwd: 0 };
+    const opened = r.status === "opened" && !r.revoked_at;
+    // 一筆報名有多門課時，實收依各課定價比例分攤（目前一筆只有一門課，等於實收本身）。
+    const share = r.total_twd > 0 ? r.price_twd / r.total_twd : 0;
+    const amount = opened && r.price_twd > 0 ? Math.round((r.paid_twd ?? r.total_twd) * share) : 0;
+    for (const x of [g, total]) {
+      x.registrations++;
+      if (opened) x.opened++;
+      else if (r.status === "pending") x.pending++;
+      else x.rejected++;
+      if (r.price_twd === 0) x.free++;
+      x.amountTwd += amount;
+    }
+    groups.set(key, g);
+  }
+  const rows = [...groups.values()].sort((a, b) => (by === "month" ? a.key.localeCompare(b.key) : b.registrations - a.registrations || b.amountTwd - a.amountTwd || a.label.localeCompare(b.label)));
+  return { from, to, by, rows, total };
+}
+
+async function registrationReportCsv(ctx: Ctx): Promise<Response> {
+  const r = await registrationReport(ctx);
+  const head = r.by === "course" ? "課程" : r.by === "month" ? "月份" : "中心";
+  const lines = [
+    [`報名與營收報表（${r.from} ～ ${r.to}）`],
+    [head, "報名數", "已開通", "待審核", "已退回／撤銷", "免費報名", "繳費金額（元）"],
+    ...[...r.rows, r.total].map((x) => [x.label, x.registrations, x.opened, x.pending, x.rejected, x.free, x.amountTwd]),
+  ];
+  await audit(ctx.db, ctx.session!.sub, "report.export", "report", r.by, `${r.from}~${r.to}`).run();
+  return new Response("\ufeff" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n"), {
+    headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="report-${r.from}-${r.to}.csv"`, "cache-control": "no-store" },
   });
 }
 
@@ -2313,15 +2389,18 @@ const routes: [string, RegExp, Handler][] = [
     /^\/courses\/([\w-]+)\/lessons\/([\w-]+)\/watch$/,
     async (ctx, [courseId, lessonId]) => {
       const s = requireMember(ctx);
-      const body = await readJson<{ ratio?: unknown }>(ctx.req);
+      const body = await readJson<{ ratio?: unknown; position?: unknown }>(ctx.req);
       const ratio = Number(body.ratio);
       if (!Number.isFinite(ratio) || ratio < 0) fail(400, "invalid_ratio", "播放進度不正確");
+      const pos = Number(body.position);
+      const position = Number.isFinite(pos) && pos >= 0 && pos < 24 * 3600 ? Math.round(pos * 10) / 10 : null;
       await lessonOf(ctx, courseId, lessonId); // 找不到章節時會丟錯
       if (!(await canWatch(ctx, courseId))) fail(403, "not_enrolled", "請先報名並通過審核");
       // 只會往前（取最大值），不會因為倒轉重看而退步。
       await ctx.db
-        .prepare("INSERT INTO lesson_watch (member_sub, lesson_id, course_id, ratio) VALUES (?, ?, ?, ?) ON CONFLICT(member_sub, lesson_id) DO UPDATE SET ratio = MAX(ratio, excluded.ratio), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
-        .bind(s.sub, lessonId, courseId, Math.min(1, ratio))
+        // ratio 只會往前（取最大值）；position_sec 是「最後播放到哪」（續播用，倒轉重看也照實記錄）。
+        .prepare("INSERT INTO lesson_watch (member_sub, lesson_id, course_id, ratio, position_sec) VALUES (?, ?, ?, ?, ?) ON CONFLICT(member_sub, lesson_id) DO UPDATE SET ratio = MAX(ratio, excluded.ratio), position_sec = COALESCE(excluded.position_sec, position_sec), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+        .bind(s.sub, lessonId, courseId, Math.min(1, ratio), position)
         .run();
       return { ok: true };
     },
@@ -2350,7 +2429,9 @@ const routes: [string, RegExp, Handler][] = [
       const lesson = await lessonOf(ctx, courseId, lessonId);
       if (!(await canWatch(ctx, courseId))) fail(ctx.session ? 403 : 401, ctx.session ? "not_enrolled" : "unauthenticated", ctx.session ? "請先報名並通過審核" : "請先登入");
       await ensureFreeEnrollment(ctx, courseId);
-      const seg = { start: lesson.start_seconds, end: lesson.end_seconds };
+      // 續播記憶（業主 2026-11-17）：還沒看完的這一堂，從上次播放到的秒數接著播（離起點不到 5 秒、離結尾不到 10 秒就從頭）。
+      const resumeAt = await resumePoint(ctx, lessonId, lesson.start_seconds ?? 0, lesson.end_seconds);
+      const seg = { start: lesson.start_seconds, end: lesson.end_seconds, ...(resumeAt != null ? { resumeAt } : {}) };
       if (lesson.media_type === "youtube" && lesson.media_ref) return { kind: "youtube", videoId: lesson.media_ref, ...seg };
       if (lesson.media_type === "mux" && lesson.media_ref) {
         const url = await muxPlaybackUrl(ctx.env, lesson.media_ref);
@@ -2620,6 +2701,8 @@ const routes: [string, RegExp, Handler][] = [
   ],
   ["GET", /^\/admin\/orders$/, async (ctx) => hydrateOrders(ctx.db, (await reviewList(ctx)).rows.slice(0, 300))],
   ["GET", /^\/admin\/orders\.csv$/, async (ctx) => reviewCsv(ctx)],
+  ["GET", /^\/admin\/reports\/registrations$/, async (ctx) => registrationReport(ctx)],
+  ["GET", /^\/admin\/reports\/registrations\.csv$/, async (ctx) => registrationReportCsv(ctx)],
   ["POST", /^\/admin\/orders\/([\w-]+)\/review$/, async (ctx, [id]) => reviewOrder(ctx, id, await readJson(ctx.req))],
   [
     "GET",
