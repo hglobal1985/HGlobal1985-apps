@@ -28,4 +28,9 @@ test("YouTube 章節：沒有上傳封面時自動用影片縮圖（不再有「
   assert.equal(d.data.edmUrl, thumb);
   assert.equal(d.data.lessons[0]!.coverUrl, thumb);
   assert.equal(d.data.lessons[0]!.autoCover, false);
+  // 「單元」檢視的索引：章節沒有自己的封面時 coverUrl 留空（畫面改用課程手動上傳的封面），YouTube 縮圖另外放在 ytThumb 當最後備案（業主 2026-11-17）。
+  await call("PATCH", `/admin/courses/${id}`, token, { status: "published" });
+  const idx = (await call<{ lessons: { id: string; coverUrl: string | null; ytThumb: string | null }[] }>("GET", "/search-index", token)).data.lessons.find((x) => x.id === lessonId)!;
+  assert.equal(idx.coverUrl, null, "不可用 YouTube 縮圖蓋掉課程手動上傳的封面");
+  assert.equal(idx.ytThumb, thumb);
 });

@@ -2444,8 +2444,9 @@ const routes: [string, RegExp, Handler][] = [
           isShorts: r.isShorts === 1,
           isMaterial: r.lessonKind === "material",
           minutes: r.minutes,
-          // 有上傳章節封面就用上傳的，沒有就用 YouTube 縮圖（業主 2026-11-16：不再有「自動抓取」勾選）。
-          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
+          // 只給章節自己上傳的封面；沒有就留空，畫面依序改用「課程手動上傳的封面／EDM」→ 最後才用這一堂的 YouTube 縮圖（ytThumb）。
+          // 業主 2026-11-17：手動上傳的封面一律優先，不可被 YouTube 縮圖蓋掉。
+          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
           // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
           ytThumb: r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,
