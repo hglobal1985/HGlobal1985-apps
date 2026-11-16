@@ -119,7 +119,7 @@ function ChapterShare({ course, lesson }: { course: CourseDetail; lesson: Lesson
   return (
     <RowShare
       label={`分享章節：${lesson.title}`}
-      onShare={() => shareLink(lesson.title, lessonShareHref(course, lesson.id), { teacher: course.teacher ?? "", title: course.title }, undefined, { sharer: lesson.sharer ?? "", sharerTitle: lesson.sharerTitle ?? "", title: lesson.title })}
+      onShare={() => shareLink(lesson.title, lessonShareHref(course, lesson.position), { teacher: course.teacher ?? "", title: course.title }, undefined, { sharer: lesson.sharer ?? "", sharerTitle: lesson.sharerTitle ?? "", title: lesson.title })}
     />
   );
 }

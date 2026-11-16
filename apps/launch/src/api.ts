@@ -1,5 +1,5 @@
 import { HQ_SLUG, RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
-import { romanizeName } from "./romanize.ts";
+import { romanizeName, urlNameVariants } from "./romanize.ts";
 import {
   DEMO_MEMBERS,
   HQ_UNIT,
@@ -595,8 +595,8 @@ async function centerSlugMap(db: D1Database): Promise<Map<string, string>> {
 }
 
 /**
- * 課程專屬網址：learn.hglobal1985.com/中心縮寫/英譯主講人-001。條件：有主講人、主辦中心已設定短網址；一旦產生就固定。
- * 編號＝同一主辦中心＋同一英譯姓名已有的最大編號 + 1（三位數，超過 999 自動變四位）。
+ * 課程專屬網址：learn.hglobal1985.com/中心縮寫/英譯主講人-1。條件：有主講人、主辦中心已設定短網址；一旦產生就固定。
+ * 編號＝同一主辦中心＋同一英譯姓名已有的最大編號 + 1（從 1 開始，不補零，需要時自然增加位數）。
  */
 async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
   try {
@@ -615,7 +615,7 @@ async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
       const m = /-(\d+)$/.exec(r.url_name);
       if (m && r.url_name.slice(0, -m[0].length) === base) max = Math.max(max, Number(m[1]));
     }
-    await ctx.db.prepare("UPDATE courses SET url_name = ? WHERE id = ? AND url_name IS NULL").bind(`${base}-${String(max + 1).padStart(3, "0")}`, courseId).run();
+    await ctx.db.prepare("UPDATE courses SET url_name = ? WHERE id = ? AND url_name IS NULL").bind(`${base}-${max + 1}`, courseId).run();
   } catch {
     /* 不影響儲存 */
   }
@@ -623,6 +623,21 @@ async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
 
 /** 補齊全站（或某個主辦中心）還沒有專屬網址的課程，依建立時間編號。 */
 async function backfillCourseUrls(ctx: Ctx, centerKeyOnly?: string): Promise<number> {
+  // 把舊的補零編號（-001）改成不補零（-1）；撞名就略過。
+  try {
+    const old = await ctx.db.prepare("SELECT id, url_name FROM courses WHERE url_name GLOB '*-0[0-9]*'").all<{ id: string; url_name: string }>();
+    for (const r of old.results) {
+      const m = /^(.*-)(\d+)$/.exec(r.url_name);
+      if (!m) continue;
+      try {
+        await ctx.db.prepare("UPDATE courses SET url_name = ? WHERE id = ?").bind(`${m[1]}${Number(m[2])}`, r.id).run();
+      } catch {
+        /* 撞名略過 */
+      }
+    }
+  } catch {
+    /* 不影響補網址 */
+  }
   const { results } = await ctx.db
     .prepare(`SELECT id FROM courses WHERE url_name IS NULL AND teacher <> ''${centerKeyOnly ? " AND host_center_key = ?" : ""} ORDER BY created_at, id`)
     .bind(...(centerKeyOnly ? [centerKeyOnly] : []))
@@ -2313,8 +2328,8 @@ const routes: [string, RegExp, Handler][] = [
       const row = slug.toLowerCase() === HQ_SLUG ? { value: "" } : await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ value: string }>();
       const course = row
         ? row.value
-          ? await ctx.db.prepare("SELECT id FROM courses WHERE host_center_key = ? AND url_name = ? COLLATE NOCASE").bind(centerKey(row.value), name).first<{ id: string }>()
-          : await ctx.db.prepare("SELECT id FROM courses WHERE host_center_key IS NULL AND url_name = ? COLLATE NOCASE").bind(name).first<{ id: string }>()
+          ? await ctx.db.prepare(`SELECT id FROM courses WHERE host_center_key = ? AND url_name COLLATE NOCASE IN (${urlNameVariants(name).map(() => "?").join(",")})`).bind(centerKey(row.value), ...urlNameVariants(name)).first<{ id: string }>()
+          : await ctx.db.prepare(`SELECT id FROM courses WHERE host_center_key IS NULL AND url_name COLLATE NOCASE IN (${urlNameVariants(name).map(() => "?").join(",")})`).bind(...urlNameVariants(name)).first<{ id: string }>()
         : null;
       return course ? { courseId: course.id } : fail(404, "not_found", "找不到這個網址");
     },

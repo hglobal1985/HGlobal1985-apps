@@ -54,14 +54,14 @@ test("課程專屬網址：中心縮寫＋英譯主講人-編號；同一主講�
   const c2 = await mk("第二場", "王小明");
   const other = await mk("別人", "李華");
   const noTeacher = await mk("沒有主講人", "");
-  assert.equal((await call<CourseDetail>("GET", `/courses/${c0.id}`, admin)).data.shortPath, "nj/wang-xiaoming-001", "設定縮寫後自動補上，依建立順序編號");
-  assert.equal((await call<CourseDetail>("GET", `/courses/${c1.id}`, admin)).data.shortPath, "nj/wang-xiaoming-002");
-  assert.equal(c2.shortPath, "nj/wang-xiaoming-003");
-  assert.equal(other.shortPath, "nj/li-hua-001");
+  assert.equal((await call<CourseDetail>("GET", `/courses/${c0.id}`, admin)).data.shortPath, "nj/wang-xiaoming-1", "設定縮寫後自動補上，依建立順序編號");
+  assert.equal((await call<CourseDetail>("GET", `/courses/${c1.id}`, admin)).data.shortPath, "nj/wang-xiaoming-2");
+  assert.equal(c2.shortPath, "nj/wang-xiaoming-3");
+  assert.equal(other.shortPath, "nj/li-hua-1");
   assert.equal(noTeacher.shortPath, null);
   await call("PATCH", `/admin/courses/${c1.id}`, admin, { teacher: "別人" });
-  assert.equal((await call<CourseDetail>("GET", `/courses/${c1.id}`, admin)).data.shortPath, "nj/wang-xiaoming-002", "改主講人不會改網址");
-  const found = await call<{ courseId: string }>("GET", "/short-links/nj/wang-xiaoming-002");
+  assert.equal((await call<CourseDetail>("GET", `/courses/${c1.id}`, admin)).data.shortPath, "nj/wang-xiaoming-2", "改主講人不會改網址");
+  const found = await call<{ courseId: string }>("GET", "/short-links/nj/wang-xiaoming-2");
   assert.equal(found.data.courseId, c1.id);
   assert.equal((await call("GET", "/short-links/nj/wang-xiaoming-099")).status, 404);
   await call("PATCH", `/admin/courses/${c2.id}`, admin, { hostUnit: "台北 001" });
@@ -76,11 +76,13 @@ test("課程專屬網址：縮寫照設定的大小寫顯示、輸入不分大�
   const a = await mk("中心課", "王小明", "南京 062");
   const h1 = await mk("總部課一", "王儷凱", "寰宇總部");
   const h2 = await mk("總部課二", "王儷凱", "寰宇總部");
-  assert.equal(a.shortPath, "NJ/wang-xiaoming-001", "照設定的大小寫顯示");
-  assert.equal(h1.shortPath, "hq/wang-likai-001", "總部課程用 hq");
-  assert.equal(h2.shortPath, "hq/wang-likai-002", "總部同一主講人依序編號");
-  for (const path of ["NJ/wang-xiaoming-001", "nj/wang-xiaoming-001", "Nj/WANG-XIAOMING-001"]) assert.equal((await call<{ courseId: string }>("GET", `/short-links/${path}`)).data.courseId, a.id, path);
-  for (const path of ["hq/wang-likai-002", "HQ/Wang-Likai-002"]) assert.equal((await call<{ courseId: string }>("GET", `/short-links/${path}`)).data.courseId, h2.id, path);
+  assert.equal(a.shortPath, "NJ/wang-xiaoming-1", "照設定的大小寫顯示");
+  assert.equal(h1.shortPath, "hq/wang-likai-1", "總部課程用 hq");
+  assert.equal(h2.shortPath, "hq/wang-likai-2", "總部同一主講人依序編號");
+  for (const path of ["NJ/wang-xiaoming-1", "nj/wang-xiaoming-1", "Nj/WANG-XIAOMING-1"]) assert.equal((await call<{ courseId: string }>("GET", `/short-links/${path}`)).data.courseId, a.id, path);
+  for (const path of ["hq/wang-likai-2", "HQ/Wang-Likai-002"]) assert.equal((await call<{ courseId: string }>("GET", `/short-links/${path}`)).data.courseId, h2.id, path);
+  // 舊的補零網址仍可開（相容已分享出去的連結）。
+  assert.equal((await call<{ courseId: string }>("GET", "/short-links/nj/wang-xiaoming-001")).data.courseId, a.id, "舊網址 -001");
   assert.equal((await call("GET", "/short-links/hq/wang-likai-099")).status, 404);
 });
 

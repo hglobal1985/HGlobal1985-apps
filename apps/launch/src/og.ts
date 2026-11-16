@@ -1,6 +1,7 @@
 import { centerKey } from "./central.ts";
 import type { D1Database } from "./d1.ts";
 import { DEFAULT_SHARE_SETTINGS, type ShareSettings } from "./contract.ts";
+import { urlNameVariants } from "./romanize.ts";
 import { HQ_SLUG, RESERVED_SLUGS } from "./short-links.ts";
 import { loadConfig } from "./ui-config.ts";
 
@@ -98,10 +99,11 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
   const hq = slug.toLowerCase() === HQ_SLUG;
   const center = hq ? null : await db.prepare("SELECT slug, value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ slug: string; value: string }>();
   if (!hq && !center) return null;
+  const vs = urlNameVariants(name);
   const cols = "SELECT url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
   const c = await (center
-    ? db.prepare(`${cols} host_center_key = ? AND url_name = ? COLLATE NOCASE AND status = 'published'`).bind(centerKey(center.value), name)
-    : db.prepare(`${cols} host_center_key IS NULL AND url_name = ? COLLATE NOCASE AND status = 'published'`).bind(name)
+    ? db.prepare(`${cols} host_center_key = ? AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published'`).bind(centerKey(center.value), ...vs)
+    : db.prepare(`${cols} host_center_key IS NULL AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published'`).bind(...vs)
   ).first<{ n: string; k: string | null; v: number }>();
   if (!c) return null;
   const S = await shareCfg(db);

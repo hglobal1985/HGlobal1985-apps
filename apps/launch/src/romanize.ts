@@ -129,3 +129,11 @@ function kanaToRomaji(text: string): string {
   }
   return out;
 }
+
+/** 課程專屬網址名稱的可接受寫法：原樣、去掉前導 0（-001→-1）、補成三位數（-1→-001，相容舊網址）。 */
+export function urlNameVariants(name: string): string[] {
+  const m = /^(.*-)(\d+)$/.exec(name);
+  if (!m) return [name];
+  const n = String(Number(m[2]));
+  return [...new Set([name, `${m[1]}${n}`, `${m[1]}${n.padStart(3, "0")}`])];
+}

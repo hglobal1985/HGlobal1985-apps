@@ -36,12 +36,18 @@ const isWeb = Platform.OS === "web";
  * 點章節＝原地播放（業主 2026-11-16）：上方的 EDM 換成播放器（同一個位置），章節清單不動；網址的 ?lesson=章節編號 記住播放哪一堂，舊的 /learn/… 網址會轉到這裡。
  */
 export default function CourseRoute() {
-  const { id, edit, lesson } = useLocalSearchParams<{ id: string; edit?: string; lesson?: string }>();
-  return <CourseDetailScreen id={id} edit={edit} lesson={lesson} />;
+  const params = useLocalSearchParams<{ id: string; edit?: string; lesson?: string }>();
+  return <CourseDetailScreen id={params.id} edit={params.edit} lesson={params.lesson} chapter={chapterFromParams(params)} />;
 }
 
 /** 課程介紹頁本體（/course/編號 與課程專屬網址 /中心縮寫/英譯姓名-編號 共用）。 */
-export function CourseDetailScreen({ id, edit, lesson }: { id: string; edit?: string; lesson?: string }) {
+/** 網址 ?2（只有數字、沒有值的參數）＝第 2 章；回傳章節編號。 */
+export function chapterFromParams(params: Record<string, unknown>): number | undefined {
+  const k = Object.keys(params).find((x) => /^\d{1,3}$/.test(x));
+  return k ? Number(k) : undefined;
+}
+
+export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; edit?: string; lesson?: string; chapter?: number }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
@@ -66,6 +72,11 @@ export function CourseDetailScreen({ id, edit, lesson }: { id: string; edit?: st
   useEffect(() => {
     if (lesson) setPlayingId(lesson);
   }, [lesson]);
+  // 網址 ?N：播放第 N 章（章節清單前面顯示的編號）；章節資料載入後才找得到。
+  const chapterLesson = chapter && course ? course.lessons.find((l) => !l.material && l.position === chapter)?.id : undefined;
+  useEffect(() => {
+    if (chapterLesson) setPlayingId(chapterLesson);
+  }, [chapterLesson]);
   const session = useLessonSession(course, editing ? null : playingId, reload, (cid, lid) => (cid === course?.id ? setPlayingId(lid) : router.replace(lessonHref(cid, lid) as never)));
   // 換章節的空檔（新的播放授權還沒回來）繼續顯示上一個播放器，避免畫面閃回 EDM。
   const lastStage = useRef<{ key: string; audio: boolean } | null>(null);
@@ -79,7 +90,6 @@ export function CourseDetailScreen({ id, edit, lesson }: { id: string; edit?: st
   const playLesson_ = (lid: string) => {
     engine.expectSwitch();
     setPlayingId(lid);
-    router.setParams({ lesson: lid });
   };
 
   // 課程介紹頁需登入：未登入導向登入，完成後回到這一頁。「完全公開」的課程例外，訪客直接看得到。
@@ -232,7 +242,7 @@ export function CourseDetailScreen({ id, edit, lesson }: { id: string; edit?: st
     <View style={{ flex: 1 }}>
       <PageHeader
         title={course.title}
-        path={`${course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}${playLesson ? `?lesson=${playLesson.id}` : ""}`}
+        path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
         course={{ teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
         extra={
           manages && mode === "view" ? (
