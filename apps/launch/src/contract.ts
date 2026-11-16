@@ -139,6 +139,8 @@ export type CourseSummary = {
   centerCourse: boolean;
   /** 短影音專輯：這門課的章節與影音教材在「單元」頁歸類為短影音。 */
   isShorts: boolean;
+  /** 素材清單（業主 2026-11-16）：只有「其他教材」，沒有章節、時間地點、費用、主講人；影片教材在 App 內播放並計入學習進度。 */
+  isList: boolean;
   /** 課程專屬網址路徑（中心縮寫/英譯姓名-編號）；缺資料時為 null，用 /course/編號。 */
   shortPath: string | null;
   /** 課程建立時間（ISO）；「分類」選單的「新」標籤用。 */

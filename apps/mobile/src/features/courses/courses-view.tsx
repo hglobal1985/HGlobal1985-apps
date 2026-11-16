@@ -8,6 +8,7 @@ import { CenterEdm } from "@/features/admin/center-edm";
 import { CenterAddressField } from "@/features/admin/center-address-field";
 import { CenterNameField } from "@/features/admin/center-name-field";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { AddMaterialFab, type AddKind } from "@/features/course-edit/add-material-fab";
 import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses } from "@/lib/roles";
@@ -39,7 +40,7 @@ const GAP = space.md;
 /**
  * 全部課程清單。initialCategory／initialCenter／series 由網址（短網址、?category=、?center=、?series=）帶入。
  * 「中心」下拉：選了中心，下方先顯示該中心的 EDM（有上傳才有），只列該中心主辦的課程。
- * 管理者（總部、會長、音控、小編）另外看得到自己能管的「未上架」課程（標示未上架）、最下面可展開「已封存」、右下角「＋新增課程」。
+ * 管理者（總部、會長、音控、小編）另外看得到自己能管的「未上架」課程（標示未上架）、最下面可展開「已封存」、右下角「＋新增教材」（往上展開：新增課程／新增清單）。
  */
 export function CoursesView({ initialCategory = "", initialCenter = "", inStack = false }: { initialCategory?: string; initialCenter?: string; inStack?: boolean }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
@@ -96,7 +97,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     setCenter(v);
     syncUrl(category, v);
   };
-  const [newOpen, setNewOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState<AddKind | null>(null);
   const [artOpen, setArtOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [boxW, setBoxW] = useState(0);
@@ -400,15 +401,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {canCreateCourse(member) ? <View style={{ height: 64 }} /> : null}
     </Screen>
     {canCreateCourse(member) ? (
-      <Pressable accessibilityRole="button" accessibilityLabel="新增課程" onPress={() => setNewOpen(true)} style={[styles.fab, { backgroundColor: c.accent }]}>
-        <Ionicons name="add" size={26} color={c.textOnAccent} />
-        <AppText variant="headline" style={{ color: c.textOnAccent }}>
-          新增課程
-        </AppText>
-      </Pressable>
+      <AddMaterialFab onPick={setNewOpen} />
     ) : null}
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
-    {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
+    {newOpen ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
         <CenterNameField key={activeCenter} center={activeCenter} />
@@ -426,5 +422,5 @@ const styles = StyleSheet.create({
   kind: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }, filters: { flexDirection: "row", alignItems: "flex-end", gap: space.sm },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP, rowGap: space.lg },
   archHead: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, paddingHorizontal: space.md, borderWidth: 1, borderStyle: "dashed", borderRadius: radius.md },
-  fab: { position: "absolute", right: space.lg, bottom: space.lg, flexDirection: "row", alignItems: "center", gap: 6, minHeight: 52, paddingHorizontal: space.lg, borderRadius: radius.pill, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 6 },
+
 });

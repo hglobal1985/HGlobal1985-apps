@@ -31,7 +31,9 @@ type Fetch = "idle" | "loading" | "done" | "none";
 function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
-  const [url, setUrl] = useState(lesson?.linkUrl ?? "");
+  // 素材清單的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
+  const baseLink = lesson?.linkUrl ?? (course.isList && lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
+  const [url, setUrl] = useState(baseLink);
   const [title, setTitle] = useState(lesson?.title ?? "");
   const lastAuto = useRef<string>(lesson?.title ?? ""); // 最近一次自動填入的名稱：名稱還是這個（或空白）時，換連結才會自動換名稱；自己改過的不會被蓋掉
   const [fetching, setFetching] = useState<Fetch>("idle");
@@ -40,11 +42,11 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
 
   const parsed = parseHttpsUrl(url);
   const fileType = parsed ? classifyLink(parsed) : null;
-  const dirty = lesson ? url !== (lesson.linkUrl ?? "") || title !== lesson.title : !!url.trim() || !!title.trim();
+  const dirty = lesson ? url !== baseLink || title !== lesson.title : !!url.trim() || !!title.trim();
 
   // 連結一變（貼上或手動輸入，停下來 0.6 秒後），請伺服器代為讀取網頁標題。
   useEffect(() => {
-    if (!parsed || parsed.toString() === (lesson?.linkUrl ?? "")) return setFetching("idle");
+    if (!parsed || parsed.toString() === baseLink) return setFetching("idle");
     let alive = true;
     setFetching("loading");
     const t = setTimeout(() => {
@@ -142,8 +144,13 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
         </AppText>
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: minTouch }}>
           {fileType ? <BrandIcon type={fileType} fallback={info!.icon as never} size={36} /> : <Icon name="link-outline" size={36} color={c.textMuted} />}
-          <AppText variant="body">{info ? info.label : "貼上連結後自動判斷"}</AppText>
+          <AppText variant="body">{info ? `${info.label}${course.isList && fileType === "youtube" ? "（在 App 內播放）" : ""}` : "貼上連結後自動判斷"}</AppText>
         </View>
+        {course.isList ? (
+          <AppText variant="caption" tone="muted">
+            YouTube 影片會在 App 內播放並記錄學習進度；其他連結（簡報、PDF、雲端檔案…）點了開啟外部網頁。
+          </AppText>
+        ) : null}
       </View>
     </EditSheet>
   );

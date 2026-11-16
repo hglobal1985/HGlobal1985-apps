@@ -243,7 +243,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
       <PageHeader
         title={course.title}
         path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
-        course={{ teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
+        course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
         extra={
           manages && mode === "view" ? (
             <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => setMode("edit")} />
@@ -317,19 +317,22 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
 
         {editing && canEditContent ? (
           <>
-            <Section title="課程章節">
-              <EditLessonRows group={lessons} word="章節" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(lessons, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} />
-              <Button variant="secondary" label="新增章節" icon="add" onPress={() => setSheet("newLesson")} fullWidth />
-              <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段。" />
-            </Section>
-            <Section title="其他教材">
+            {course.isList ? null : (
+              <Section title="課程章節">
+                <EditLessonRows group={lessons} word="章節" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(lessons, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} />
+                <Button variant="secondary" label="新增章節" icon="add" onPress={() => setSheet("newLesson")} fullWidth />
+                <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段。" />
+              </Section>
+            )}
+            {/* 素材清單（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
+            <Section title={course.isList ? "" : "其他教材"}>
               {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
-              <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />
+              {course.isList ? null : <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
               <Button variant="secondary" label="新增教材" icon="add" onPress={() => setSheet("newMaterial")} fullWidth />
             </Section>
           </>
         ) : null}
-        {editing && canEditContent ? null : (
+        {(editing && canEditContent) || course.isList ? null : (
           <View>
           <ChapterList course={course} style={allLocked ? { minHeight: 230 } : undefined} playingId={editing ? null : playingId} onPlay={playLesson_} />
           {allLocked ? (
@@ -348,7 +351,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
           </View>
         )}
         {!(editing && canEditContent) && course.lessons.some((l) => l.material) ? (
-          <Section title="其他教材">
+          <Section title={course.isList ? "" : "其他教材"}>
             <FullVersionList course={course} playingId={editing ? null : playingId} onPlay={playLesson_} />
           </Section>
         ) : null}

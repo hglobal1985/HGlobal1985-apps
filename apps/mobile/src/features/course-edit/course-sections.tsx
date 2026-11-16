@@ -163,15 +163,20 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const series = useApi<string[]>(isSuper ? "/admin/series" : null);
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const submit = async () => {
-    if (!f.title.trim()) return setError("請輸入課程名稱");
+    if (!f.title.trim()) return setError(course.isList ? "請輸入素材清單名稱" : "請輸入課程名稱");
     const { series: _series, ...rest } = f;
     if (await save(isSuper ? f : rest)) onClose();
   };
   return (
     <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
-      <Field label="課程名稱（必填）" value={f.title} onChange={set("title")} placeholder="例如：翡翠達標班" />
-      <Field label="主講人" value={f.teacher} onChange={set("teacher")} placeholder="例如：王大明（選填）" />
-      <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
+      <Field label={course.isList ? "素材清單名稱（必填）" : "課程名稱（必填）"} value={f.title} onChange={set("title")} placeholder={course.isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
+      {/* 素材清單沒有主講人、職稱、獎銜（業主 2026-11-16）。 */}
+      {course.isList ? null : (
+        <>
+          <Field label="主講人" value={f.teacher} onChange={set("teacher")} placeholder="例如：王大明（選填）" />
+          <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
+        </>
+      )}
       <Field label="分類（可複選，多個用「、」分開）" value={f.category} onChange={set("category")} placeholder="例如：達標班、會議" />
       {categories.data?.length ? (
         <View style={{ gap: space.xs }}>
@@ -493,9 +498,10 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
   const statusText = course.status === "published" ? "上架中" : course.status === "archived" ? "已下架封存" : "未上架";
   return (
     <Card style={{ paddingVertical: 0 }}>
-      <ListRow icon="create-outline" title="基本資料" subtitle={[course.title, course.teacher && `主講 ${course.teacher}`, course.category, course.series && `系列 ${course.series}`].filter(Boolean).join("・")} onPress={() => onOpen("basics")} />
-      <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />
-      <ListRow icon="pricetag-outline" title="費用" subtitle={priceText} onPress={() => onOpen("price")} />
+      <ListRow icon="create-outline" title="基本資料" subtitle={[course.title, !course.isList && course.teacher && `主講 ${course.teacher}`, course.category, course.series && `系列 ${course.series}`].filter(Boolean).join("・")} onPress={() => onOpen("basics")} />
+      {/* 素材清單沒有時間地點與費用（一律公開免費）。 */}
+      {course.isList ? null : <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />}
+      {course.isList ? null : <ListRow icon="pricetag-outline" title="費用" subtitle={priceText} onPress={() => onOpen("price")} />}
       <ListRow icon="people-outline" title="報名與資格" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}${course.isPublic ? "・完全公開" : ""}`} onPress={() => onOpen("enroll")} />
       <ListRow icon="options-outline" title="進階設定" subtitle={`主辦：${course.hostUnit || "未設定"}${course.admin?.editedAt ? `・最後修改 ${course.admin.editedByName}` : ""}`} onPress={() => onOpen("advanced")} />
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />

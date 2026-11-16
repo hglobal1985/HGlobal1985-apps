@@ -23,7 +23,7 @@ export function CourseRow({ course }: { course: CourseSummary }) {
   useCenterNames();
   const r = ribbonsFor(course, member, config);
   const rb = r.left ?? r.right;
-  const date = course.eventStart ? eventDays(course.eventStart, course.eventEnd) : "";
+  const date = course.eventStart && !course.isList ? eventDays(course.eventStart, course.eventEnd) : "";
   const img = course.coverUrl || course.edmUrl;
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${date} ${course.title}`} onPress={() => router.push(`/course/${course.id}`)} style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -45,7 +45,7 @@ export function CourseRow({ course }: { course: CourseSummary }) {
           </View>
         ) : null}
       </View>
-      <RowShare label={`分享：${course.title}`} onShare={() => shareLink(course.title, course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`, { teacher: course.teacher, teacherTitle: course.teacherTitle, title: course.title })} />
+      <RowShare label={`分享：${course.title}`} onShare={() => shareLink(course.title, course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`, course.isList ? undefined : { teacher: course.teacher, teacherTitle: course.teacherTitle, title: course.title })} />
     </Pressable>
   );
 }

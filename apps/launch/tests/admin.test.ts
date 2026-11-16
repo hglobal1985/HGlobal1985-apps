@@ -378,9 +378,9 @@ test("系列專屬 EDM：只有超級管理員上傳、課程摘要帶網址、�
   assert.equal([...r2.objects.keys()].filter((k) => k.startsWith("series/")).length, 0);
 });
 
-test("系列封面（比照中心）：先有 EDM 才能上傳封面、裁切框存進去、/series-art 帶出；瀏覽人次同人同日只算一次；刪除一併清檔", async () => {
+test("系列封面（比照中心）：先有 EDM 才能上傳封面、裁切框存進去、/series-art 帶出、封面圖讀得到；瀏覽次數每進入一次 +1；刪除一併清檔", async () => {
   const r2 = fakeR2();
-  const { call, login } = setup({ MEDIA: r2, MEDIA_URL_SECRET: "s" });
+  const { call, raw, login } = setup({ MEDIA: r2, MEDIA_URL_SECRET: "s" });
   const [admin, student] = await Promise.all(["demo-admin", "demo-student"].map(login));
   const jpeg = (n: number) => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...Array.from({ length: n + 10 }, (_, i) => i % 256)]);
   const q = `?series=${encodeURIComponent("封面系列")}`;
@@ -392,12 +392,13 @@ test("系列封面（比照中心）：先有 EDM 才能上傳封面、裁切框
   assert.equal((await call("PATCH", `/admin/series/edm${q}`, { token: admin, body: { coverRect: { x: 0, y: 0.2, w: 2 } } })).status, 400);
   const art = (await call<{ series: string; coverUrl: string | null; edmViewY: number }[]>("GET", "/series-art", { token: student })).data.find((x) => x.series === "封面系列")!;
   assert.ok(art.coverUrl);
+  assert.equal((await raw("GET", art.coverUrl.replace("/api/v2", ""), { token: student })).status, 200, "系列封面圖要能讀到");
   assert.equal(art.edmViewY, 0.2);
   const v1 = await call<{ total: number }>("POST", "/series-views", { token: student, body: { series: "封面系列" } });
   const v2 = await call<{ total: number }>("POST", "/series-views", { token: student, body: { series: "封面系列" } });
   assert.equal(v1.data.total, 1);
-  assert.equal(v2.data.total, 1, "同一人同一天只算一次");
-  assert.equal((await call<{ total: number }>("POST", "/series-views", { token: admin, body: { series: "封面系列" } })).data.total, 2);
+  assert.equal(v2.data.total, 2, "每進入一次就 +1（同一人也算）");
+  assert.equal((await call<{ total: number }>("POST", "/series-views", { token: admin, body: { series: "封面系列" } })).data.total, 3);
   await call("DELETE", `/admin/series/edm${q}`, { token: admin });
   assert.equal([...r2.objects.keys()].filter((k) => k.startsWith("series/")).length, 0, "EDM 與封面都清掉");
 });

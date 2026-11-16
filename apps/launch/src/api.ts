@@ -307,6 +307,7 @@ type CourseRow = {
   host_unit: string;
   host_center_key: string | null;
   is_shorts: number;
+  is_list: number;
   url_name: string | null;
   free_from: string | null;
   free_until: string | null;
@@ -348,10 +349,10 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.url_name, c.is_shorts, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
-  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS lesson_count,
-  (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS total_minutes,
-  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter' AND l.duration_minutes = 0) AS zero_minute_lessons,
+const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
+  (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
+  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND ((l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id))) AS material_count
   FROM courses c`;
 
@@ -361,10 +362,10 @@ async function memberCourseState(db: D1Database, sub: string | undefined) {
   const [e, p, d, st, w, last] = await db.batch([
     db.prepare("SELECT course_id, hidden FROM enrollments WHERE member_sub = ?").bind(sub),
     db.prepare("SELECT i.course_id, i.order_id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.member_sub = ? AND o.status = 'pending' ORDER BY o.created_at").bind(sub),
-    db.prepare("SELECT p.course_id AS course_id, COUNT(*) AS n, COALESCE(SUM(l.duration_minutes), 0) AS m FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id AND l.kind = 'chapter' WHERE p.member_sub = ? GROUP BY p.course_id").bind(sub),
+    db.prepare("SELECT p.course_id AS course_id, COUNT(*) AS n, COALESCE(SUM(l.duration_minutes), 0) AS m FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) WHERE p.member_sub = ? GROUP BY p.course_id").bind(sub),
     db.prepare("SELECT course_id, hidden FROM learning_started WHERE member_sub = ?").bind(sub),
     // 還沒看完的章節：播放到哪（比例）× 該章長度，讓進度條隨播放前進。
-    db.prepare("SELECT w.course_id AS course_id, SUM(w.ratio * l.duration_minutes) AS m, SUM(w.ratio) AS n FROM lesson_watch w JOIN lessons l ON l.id = w.lesson_id AND l.kind = 'chapter' LEFT JOIN lesson_progress p ON p.lesson_id = w.lesson_id AND p.member_sub = w.member_sub WHERE w.member_sub = ? AND p.lesson_id IS NULL GROUP BY w.course_id").bind(sub),
+    db.prepare("SELECT w.course_id AS course_id, SUM(w.ratio * l.duration_minutes) AS m, SUM(w.ratio) AS n FROM lesson_watch w JOIN lessons l ON l.id = w.lesson_id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) LEFT JOIN lesson_progress p ON p.lesson_id = w.lesson_id AND p.member_sub = w.member_sub WHERE w.member_sub = ? AND p.lesson_id IS NULL GROUP BY w.course_id").bind(sub),
     // 最近一次學習時間：播放紀錄、完成章節、開始學習三者取最新。
     db.prepare("SELECT course_id, MAX(t) AS t FROM (SELECT course_id, updated_at AS t FROM lesson_watch WHERE member_sub = ? UNION ALL SELECT course_id, completed_at FROM lesson_progress WHERE member_sub = ? UNION ALL SELECT course_id, created_at FROM learning_started WHERE member_sub = ?) GROUP BY course_id").bind(sub, sub, sub),
   ]);
@@ -437,6 +438,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     // 中心課程＝主辦單位含某個中心（自動，不再手動勾選）；只有總部主辦的是一般課程。
     centerCourse: row.host_center_key != null,
     isShorts: row.is_shorts === 1,
+    isList: row.is_list === 1,
     shortPath: row.url_name ? (row.host_center_key ? (ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null) : `${HQ_SLUG}/${row.url_name}`) : null,
     createdAt: row.created_at,
     hostCenter: hostCenterOf(row.host_unit),
@@ -600,6 +602,11 @@ async function centerSlugMap(db: D1Database): Promise<Map<string, string>> {
  * 課程專屬網址：learn.hglobal1985.com/中心縮寫/英譯主講人-1。條件：有主講人、主辦中心已設定短網址；一旦產生就固定。
  * 編號＝同一主辦中心＋同一英譯姓名已有的最大編號 + 1（從 1 開始，不補零，需要時自然增加位數）。
  */
+/** 這門課是不是「素材清單」（沒有章節，只有其他教材）。 */
+async function isListCourse(ctx: Ctx, courseId: string): Promise<boolean> {
+  return (await ctx.db.prepare("SELECT is_list FROM courses WHERE id = ?").bind(courseId).first<{ is_list: number }>())?.is_list === 1;
+}
+
 async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
   try {
     const c = await ctx.db.prepare("SELECT teacher, host_center_key, url_name FROM courses WHERE id = ?").bind(courseId).first<{ teacher: string | null; host_center_key: string | null; url_name: string | null }>();
@@ -825,6 +832,11 @@ async function courseDeleteImpact(db: D1Database, id: string): Promise<CourseDel
 }
 
 /** 公開圖片（封面、EDM）的網址；版本號讓更新後瀏覽器改抓新圖。 */
+/** 頁面瀏覽次數 +1 並回傳累計（中心頁、系列頁共用；業主 2026-11-16：每進入一次就算一次，不分是否同一人）。 */
+async function bumpView(db: D1Database, kind: "center" | "series", key: string): Promise<number> {
+  const row = await db.prepare("INSERT INTO page_views (kind, key, total) VALUES (?, ?, 1) ON CONFLICT(kind, key) DO UPDATE SET total = total + 1 RETURNING total").bind(kind, key).first<{ total: number }>();
+  return row?.total ?? 0;
+}
 const pubUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 const cleanAnnouncement = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, 120) : "");
 const ART_TYPES = new Set(["president", "sound"]);
@@ -1461,6 +1473,8 @@ function parseCoverRect(raw: string | null): CoverRect | null {
 async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: boolean, who: Session) {
   const centerOnly = who.role !== "admin"; // 會長、音控：主辦單位固定是自己的中心，不能自稱總部指導，審核群組只能用自己中心的
   const sets: [string, unknown][] = [];
+  // 素材清單（只在建立時決定）：完全公開、免費，沒有主講人與章節。
+  if (creating && body.isList === true) sets.push(["is_list", 1], ["is_public", 1], ["price_twd", 0]);
   const t = text(body.title, 120);
   if (t !== undefined) {
     if (!t) fail(400, "title_required", "請輸入課程名稱");
@@ -1607,9 +1621,11 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const rest = sets.filter(([c]) => c !== "status");
   const cols = ["id", "sort_order", "status", "created_by_sub", "edited_by_name", "edited_at", ...rest.map(([c]) => c)];
   const vals = [id, (max?.m ?? 0) + 1, status, admin.sub, admin.name.slice(0, 60), iso(), ...rest.map(([, v]) => v)];
+  const isList = sets.some(([c, v]) => c === "is_list" && v === 1);
   await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO courses (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...vals),
-    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type) VALUES (?, ?, 1, '第 1 堂', 0, 'demo')").bind(`${id}-${randomId(6)}`, id), // 章節日期留空＝跟著課程日期
+    // 一般課程先放一堂空白章節（章節日期留空＝跟著課程日期）；素材清單沒有章節。
+    ...(isList ? [] : [ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type) VALUES (?, ?, 1, '第 1 堂', 0, 'demo')").bind(`${id}-${randomId(6)}`, id)]),
     audit(ctx.db, admin.sub, "course.create", "course", id, String(body.title ?? "")),
   ]);
   await ensureCourseUrl(ctx, id);
@@ -2300,16 +2316,13 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/center-views$/,
     async (ctx) => {
-      // 中心專屬頁瀏覽計數：同一位會員同一天同一中心只算一次；回傳累計人次。
-      const s = requireMember(ctx);
+      // 中心專屬頁瀏覽計數：每進入一次就 +1（業主 2026-11-16：不分是否同一人）；回傳累計次數。
+      requireMember(ctx);
       const body = await readJson<{ center?: unknown }>(ctx.req);
       const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
       if (!label) fail(400, "invalid_center", "請指定中心");
       const key = centerKey(label);
-      const day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10); // 台灣時間的日期
-      await ctx.db.prepare("INSERT OR IGNORE INTO center_views (center_key, member_sub, day) VALUES (?, ?, ?)").bind(key, s.sub, day).run();
-      const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_views WHERE center_key = ?").bind(key).first<{ n: number }>();
-      return { total: n?.n ?? 0 };
+      return { total: await bumpView(ctx.db, "center", key) };
     },
   ],
   [
@@ -2318,7 +2331,7 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       requireMember(ctx);
       const label = (ctx.url.searchParams.get("center") ?? "").trim();
-      const n = label ? await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_views WHERE center_key = ?").bind(centerKey(label)).first<{ n: number }>() : null;
+      const n = label ? await ctx.db.prepare("SELECT total AS n FROM page_views WHERE kind = 'center' AND key = ?").bind(centerKey(label)).first<{ n: number }>() : null;
       return { total: n?.n ?? 0 };
     },
   ],
@@ -2852,16 +2865,18 @@ const routes: [string, RegExp, Handler][] = [
       const u = parseHttpsUrl(body.url);
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
-      const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
+      const course = await ctx.db.prepare("SELECT c.is_list, (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number; is_list: number }>();
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;
+      // 素材清單貼 YouTube 影片：存成影片來源，在 App 內原地播放（計入學習進度）；其他連結照常開外部網頁。
+      const yt = course.is_list === 1 ? youtubeId(u.toString()) : null;
       // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
       const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
       const attId = crypto.randomUUID();
       await ctx.db.batch([
         ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title),
-        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, courseId, title, u.toString(), classifyLink(u), admin.sub),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, ?, ?, NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title, yt ? "youtube" : "demo", yt),
+        ...(yt ? [] : [ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, courseId, title, u.toString(), classifyLink(u), admin.sub)]),
         audit(ctx.db, admin.sub, "material.create", "lesson", id, `${classifyLink(u)}:${title}`),
       ]);
       return courseDetail(ctx, courseId);
@@ -2873,17 +2888,22 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [id]) => {
       // 修改「其他教材」：名稱與外部連結（連結換了就取代舊的；舊教材的影音、音檔、附件設定不再編輯，保留在系統裡）。
       const admin = await requireLessonManager(ctx, id);
-      const lesson = await ctx.db.prepare("SELECT course_id, kind, is_full FROM lessons WHERE id = ?").bind(id).first<{ course_id: string; kind: string; is_full: number }>();
+      const lesson = await ctx.db.prepare("SELECT l.course_id, l.kind, l.is_full, l.media_type, l.media_ref, c.is_list FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ?").bind(id).first<{ course_id: string; kind: string; is_full: number; media_type: string; media_ref: string | null; is_list: number }>();
       if (!lesson) return fail(404, "not_found", "找不到這個教材");
       if (lesson.kind !== "material" || lesson.is_full === 1) return fail(400, "not_link_material", "這一列不是外部連結教材");
       const body = await readJson<{ url?: unknown; title?: unknown }>(ctx.req);
       const u = parseHttpsUrl(body.url);
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
+      // 素材清單：YouTube 影片存成影片來源（App 內播放；同一支影片保留原本的分鐘數與區間），其他連結存成外部連結。
+      const yt = lesson.is_list === 1 ? youtubeId(u.toString()) : null;
+      const sameVideo = !!yt && lesson.media_type === "youtube" && lesson.media_ref === yt;
       await ctx.db.batch([
         ctx.db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(title, id),
+        ...(yt && !sameVideo ? [ctx.db.prepare("UPDATE lessons SET media_type = 'youtube', media_ref = ?, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(yt, id)] : []),
+        ...(!yt && lesson.is_list === 1 && lesson.media_type !== "demo" ? [ctx.db.prepare("UPDATE lessons SET media_type = 'demo', media_ref = NULL, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(id)] : []),
         ctx.db.prepare("DELETE FROM lesson_attachments WHERE lesson_id = ? AND kind = 'link'").bind(id),
-        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(crypto.randomUUID(), id, lesson.course_id, title, u.toString(), classifyLink(u), admin.sub),
+        ...(yt ? [] : [ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(crypto.randomUUID(), id, lesson.course_id, title, u.toString(), classifyLink(u), admin.sub)]),
         audit(ctx.db, admin.sub, "material.update", "lesson", id, `${classifyLink(u)}:${title}`),
       ]);
       return courseDetail(ctx, lesson.course_id);
@@ -3094,7 +3114,7 @@ const routes: [string, RegExp, Handler][] = [
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
       if (!bucket || !/^(edm|cover|series|center|lesson)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ?").bind(key, key, key, key, key, key, key).first();
+      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ?").bind(key, key, key, key, key, key, key, key).first();
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       return new Response(obj.body, {
@@ -3671,7 +3691,7 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("DELETE FROM keywords WHERE kind = ? AND value = ?").bind(kind, from),
         ctx.db.prepare("INSERT OR IGNORE INTO keywords (kind, value) VALUES (?, ?)").bind(kind, to),
         ...(kind === "category" || kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE short_links SET value = ? WHERE kind = ? AND value = ?").bind(to, kind, from)] : []),
-        ...(kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE series_art SET series = ? WHERE series = ?").bind(to, from)] : []),
+        ...(kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE series_art SET series = ? WHERE series = ?").bind(to, from), ctx.db.prepare("UPDATE OR REPLACE page_views SET key = ? WHERE kind = 'series' AND key = ?").bind(to, from)] : []),
         audit(ctx.db, s.sub, "keyword.rename", "keyword", kind, `${from} → ${to}`),
       ]);
       return listKeywords(ctx);
@@ -3787,15 +3807,12 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/series-views$/,
     async (ctx) => {
-      // 系列頁瀏覽計數：同一位會員同一天同一系列只算一次；回傳累計人次（與中心頁相同規則）。
-      const s = requireMember(ctx);
+      // 系列頁瀏覽計數：每進入一次就 +1（與中心頁相同規則）；回傳累計次數。
+      requireMember(ctx);
       const body = await readJson<{ series?: unknown }>(ctx.req);
       const name = typeof body.series === "string" ? body.series.trim().slice(0, 60) : "";
       if (!name) fail(400, "invalid_series", "請指定系列");
-      const day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
-      await ctx.db.prepare("INSERT OR IGNORE INTO series_views (series, member_sub, day) VALUES (?, ?, ?)").bind(name, s.sub, day).run();
-      const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM series_views WHERE series = ?").bind(name).first<{ n: number }>();
-      return { total: n?.n ?? 0 };
+      return { total: await bumpView(ctx.db, "series", name) };
     },
   ],
   [
@@ -3871,6 +3888,7 @@ const routes: [string, RegExp, Handler][] = [
       const admin = await requireCourseManager(ctx, courseId);
       const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown }>(ctx.req);
       const kind = body.kind === "material" ? "material" : "chapter";
+      if (kind === "chapter" && (await isListCourse(ctx, courseId))) fail(400, "list_no_chapter", "素材清單沒有章節，請用「新增教材」");
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
       const sharerRank = typeof body.sharerRank === "string" ? body.sharerRank.trim().slice(0, 40) : "";
@@ -3905,6 +3923,7 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [courseId]) => {
       // 勾選「完整版課程影片」：在教材最後新增一列；章節都用同一支影片時自動帶入（秒數留空＝播整支）。已存在就直接回傳。
       const admin = await requireCourseManager(ctx, courseId);
+      if (await isListCourse(ctx, courseId)) fail(400, "list_no_full", "素材清單沒有完整版課程影片");
       if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這門課程");
       if (!(await ctx.db.prepare("SELECT 1 AS ok FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first())) {
         const chapters = await ctx.db

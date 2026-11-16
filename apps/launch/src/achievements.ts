@@ -13,7 +13,7 @@ const one = async (db: D1Database, sql: string, ...args: unknown[]) => Number((a
 const courseDone = (db: D1Database, sub: string, courseId: string) =>
   one(
     db,
-    "SELECT CASE WHEN (SELECT COUNT(*) FROM lessons WHERE course_id = ?1 AND kind = 'chapter') > 0 AND (SELECT COUNT(*) FROM lesson_progress WHERE member_sub = ?2 AND course_id = ?1 AND lesson_id IN (SELECT id FROM lessons WHERE kind = 'chapter')) >= (SELECT COUNT(*) FROM lessons WHERE course_id = ?1 AND kind = 'chapter') THEN 1 ELSE 0 END AS n",
+    "SELECT CASE WHEN (SELECT COUNT(*) FROM lessons WHERE course_id = ?1 AND (kind = 'chapter' OR (kind = 'material' AND is_full = 0 AND media_ref IS NOT NULL AND media_type <> 'demo' AND course_id IN (SELECT id FROM courses WHERE is_list = 1)))) > 0 AND (SELECT COUNT(*) FROM lesson_progress WHERE member_sub = ?2 AND course_id = ?1 AND lesson_id IN (SELECT id FROM lessons WHERE (kind = 'chapter' OR (kind = 'material' AND is_full = 0 AND media_ref IS NOT NULL AND media_type <> 'demo' AND course_id IN (SELECT id FROM courses WHERE is_list = 1))))) >= (SELECT COUNT(*) FROM lessons WHERE course_id = ?1 AND (kind = 'chapter' OR (kind = 'material' AND is_full = 0 AND media_ref IS NOT NULL AND media_type <> 'demo' AND course_id IN (SELECT id FROM courses WHERE is_list = 1)))) THEN 1 ELSE 0 END AS n",
     courseId,
     sub,
   );
@@ -21,7 +21,7 @@ const courseDone = (db: D1Database, sub: string, courseId: string) =>
 async function current(db: D1Database, sub: string, d: Def): Promise<number> {
   switch (d.condition_type) {
     case "lessons_completed":
-      return one(db, "SELECT COUNT(*) AS n FROM lesson_progress WHERE member_sub = ? AND lesson_id IN (SELECT id FROM lessons WHERE kind = 'chapter')", sub);
+      return one(db, "SELECT COUNT(*) AS n FROM lesson_progress WHERE member_sub = ? AND lesson_id IN (SELECT id FROM lessons WHERE (kind = 'chapter' OR (kind = 'material' AND is_full = 0 AND media_ref IS NOT NULL AND media_type <> 'demo' AND course_id IN (SELECT id FROM courses WHERE is_list = 1))))", sub);
     case "courses_enrolled":
       return one(db, "SELECT COUNT(DISTINCT course_id) AS n FROM enrollments WHERE member_sub = ?", sub);
     case "learning_days":
@@ -32,8 +32,8 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
       return one(
         db,
         `SELECT COUNT(*) AS n FROM (SELECT e.course_id FROM enrollments e WHERE e.member_sub = ?1 GROUP BY e.course_id
-           HAVING (SELECT COUNT(*) FROM lessons l WHERE l.course_id = e.course_id AND l.kind = 'chapter') > 0
-              AND (SELECT COUNT(*) FROM lesson_progress p WHERE p.member_sub = ?1 AND p.course_id = e.course_id AND p.lesson_id IN (SELECT id FROM lessons WHERE kind = 'chapter')) >= (SELECT COUNT(*) FROM lessons l WHERE l.course_id = e.course_id AND l.kind = 'chapter'))`,
+           HAVING (SELECT COUNT(*) FROM lessons l WHERE l.course_id = e.course_id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) > 0
+              AND (SELECT COUNT(*) FROM lesson_progress p WHERE p.member_sub = ?1 AND p.course_id = e.course_id AND p.lesson_id IN (SELECT id FROM lessons WHERE (kind = 'chapter' OR (kind = 'material' AND is_full = 0 AND media_ref IS NOT NULL AND media_type <> 'demo' AND course_id IN (SELECT id FROM courses WHERE is_list = 1))))) >= (SELECT COUNT(*) FROM lessons l WHERE l.course_id = e.course_id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))))`,
         sub,
       );
     case "course_completed":

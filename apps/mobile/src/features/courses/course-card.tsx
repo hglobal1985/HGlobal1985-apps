@@ -34,7 +34,8 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
           左邊最多三個標籤＝主講人姓名、主辦、價格（或已開通等狀態），日期靠右在同一列。 */}
       <View style={styles.infoRow}>
         <View style={styles.meta}>
-          {course.teacher.trim() ? <Pill label={course.teacher.trim()} /> : null}
+          {/* 素材清單沒有主講人、費用、日期與地點（業主 2026-11-16），只留主辦。 */}
+          {course.teacher.trim() && !course.isList ? <Pill label={course.teacher.trim()} /> : null}
           {hostLine(course) ? (
             course.hostCenter ? (
               // 點「XX主辦」：到全部課程並選好該中心，看同中心的其他課。
@@ -45,15 +46,15 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
               <Pill label={hostLine(course)} tone="accent" />
             )
           ) : null}
-          <CoursePriceTag course={course} />
+          {course.isList ? null : <CoursePriceTag course={course} />}
         </View>
-        {course.eventStart ? (
+        {course.eventStart && !course.isList ? (
           <AppText variant="callout" tone="muted" style={styles.date}>
             {eventDays(course.eventStart, course.eventEnd)}
           </AppText>
         ) : null}
       </View>
-      {placeText(course) ? (
+      {placeText(course) && !course.isList ? (
         <AppText variant="caption" tone="muted" numberOfLines={1}>
           地點：{placeText(course)}
         </AppText>
