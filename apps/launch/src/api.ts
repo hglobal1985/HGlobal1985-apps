@@ -343,12 +343,14 @@ type CourseRow = {
   lesson_count: number;
   total_minutes: number;
   zero_minute_lessons: number;
+  material_count: number;
 };
 
 const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.url_name, c.is_shorts, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter') AS total_minutes,
-  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter' AND l.duration_minutes = 0) AS zero_minute_lessons
+  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND l.kind = 'chapter' AND l.duration_minutes = 0) AS zero_minute_lessons,
+  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND ((l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id))) AS material_count
   FROM courses c`;
 
 async function memberCourseState(db: D1Database, sub: string | undefined) {
@@ -461,6 +463,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     isOnline: row.is_online === 1,
     chapterCovers: row.chapter_covers === 1,
     lessonCount: row.lesson_count,
+    hasMaterial: row.material_count > 0,
     totalMinutes: row.total_minutes,
     eligible: eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row),
     allowPresident: row.allow_president === 1,

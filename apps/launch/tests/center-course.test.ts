@@ -84,6 +84,23 @@ test("課程專屬網址：縮寫照設定的大小寫顯示、輸入不分大�
   assert.equal((await call("GET", "/short-links/hq/wang-likai-099")).status, 404);
 });
 
+test("有上傳教材（hasMaterial）：任何一堂設了影音來源或有附件才算；沒有的不算（中心清單排序只計算這樣的課程）", async () => {
+  const { call, login } = setup();
+  const admin = await login("demo-admin");
+  const mk = async (title: string) => (await call<CourseDetail>("POST", "/admin/courses", admin, { title, teacher: "王小明", hostUnit: "南京 062", status: "published" })).data;
+  const has = async (id: string) => (await call<CourseDetail>("GET", `/courses/${id}`, admin)).data.hasMaterial;
+  const empty = await mk("沒教材");
+  const video = await mk("有影片");
+  const file = await mk("有附件");
+  assert.deepEqual([await has(empty.id), await has(video.id), await has(file.id)], [false, false, false], "新課程只有空的示範章節");
+  await call("PATCH", `/admin/lessons/${video.lessons[0]!.id}`, admin, { mediaType: "youtube", mediaRef: "dQw4w9WgXcQ" });
+  assert.equal(await has(video.id), true, "章節設了 YouTube");
+  const added = await call("POST", `/admin/lessons/${file.lessons[0]!.id}/links`, admin, { url: "https://www.canva.com/design/x", title: "簡報" });
+  assert.equal(added.status, 200);
+  assert.equal(await has(file.id), true, "章節有附件");
+  assert.equal(await has(empty.id), false);
+});
+
 test("短影音專輯：勾選存得住；單元索引納入短影音專輯的影音教材、不含非影音", async () => {
   const { call, login } = setup();
   const admin = await login("demo-admin");

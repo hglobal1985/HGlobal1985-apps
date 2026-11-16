@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, BackHandler, Platform, Pressable, StyleSheet, View } from "react-native";
+import { Animated, BackHandler, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, type CenterArt, type CourseSummary } from "@/api/client";
 import { CenterEdm } from "@/features/admin/center-edm";
@@ -17,7 +17,7 @@ import { CourseRow } from "./course-row";
 import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
-import { CenterHero } from "./center-hero";
+import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { ModeFlash } from "./mode-flash";
@@ -207,11 +207,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
   const activeCenter = mode === "center" ? center : ALL;
   const inCategory = (x: CourseSummary) => matchesCats(x, selCats);
-  // 中心清單的排序：課程數最多的排最前面（同數量依名稱）。
+  // 中心清單的排序（業主 2026-11-16）：依「課程數」由多到少，但只計算「有上傳教材」的課程（影音來源或附件）；同數量依名稱。
   const centerCounts = useMemo(
     () =>
       centers
-        .map((name) => ({ name, count: lessonsOf(courses.filter((x) => x.centerCourse && normCenter(x.hostCenter) === normCenter(name) && inCategory(x))) }))
+        .map((name) => ({ name, count: courses.filter((x) => x.centerCourse && x.hasMaterial && normCenter(x.hostCenter) === normCenter(name) && inCategory(x)).length }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
     [centers, courses, category], // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -385,7 +385,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }, [activeCenter, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
   const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} address={centerInfo.data?.[normCenter(activeCenter)]} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} /> : undefined;
+  const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
+  const { width: winWidth } = useWindowDimensions();
   const archivedBlock =
     manager && archived.length ? (
       <View style={{ gap: space.sm }}>
@@ -413,7 +415,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
               {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
-          } /> : undefined} hero={centerHero} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+          } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+      {centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {chapterMode ? (

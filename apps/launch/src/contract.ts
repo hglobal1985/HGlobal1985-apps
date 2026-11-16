@@ -98,6 +98,8 @@ export type CourseSummary = {
   theme: string;
   status: "draft" | "published" | "archived";
   lessonCount: number;
+  /** 有上傳教材：任何一堂（章節或其他教材）設了影音來源，或有附件。「寰宇教育中心」清單的排序只算這樣的課程。 */
+  hasMaterial: boolean;
   totalMinutes: number;
   eligible: boolean;
   /** 會長不受獎銜限制也可報名。 */

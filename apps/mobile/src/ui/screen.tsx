@@ -37,6 +37,7 @@ export function Screen({
   top,
   topBar,
   hero,
+  heroHeight = 0,
   scrollY,
 }: {
   title?: string;
@@ -56,6 +57,8 @@ export function Screen({
   topBar?: ReactNode;
   /** 固定在上方功能列之下、捲動區之上的滿版區塊（例如中心頁的照片）；搭配 scrollY 讓它隨捲動縮放。 */
   hero?: ReactNode;
+  /** hero 完全展開時的高度：捲動內容最上方會墊出同樣高的空間（hero 是蓋在捲動區上面的浮動層，不改變捲動區大小，避免課程少時來回閃動）。 */
+  heroHeight?: number;
   /** 提供時，頁面捲動位移會寫進這個 Animated.Value（hero 內插縮放用）。 */
   scrollY?: Animated.Value;
 }) {
@@ -68,19 +71,20 @@ export function Screen({
     <FooterSlot.Provider value={setSlot}>
     <View style={{ flex: 1 }}>
     {topBar ? <View style={{ zIndex: 6 }}>{topBar}</View> : null}
-    {hero}
     {top ? (
       <View style={[styles.top, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
         <View style={styles.topInner}>{top}</View>
       </View>
     ) : null}
+    <View style={{ flex: 1 }}>
+    {hero ? <View style={[styles.heroLayer, { backgroundColor: c.background }]}>{hero}</View> : null}
     <Scroller
       scrollY={scrollY}
       refreshControl={refreshControl}
       style={{ flex: 1, backgroundColor: c.background }}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: top ? space.md : (header ? insets.top : 0) + (tight ? space.xs : space.lg), paddingBottom: space.xxl },
+        { paddingTop: (top ? space.md : (header ? insets.top : 0) + (tight ? space.xs : space.lg)) + (hero ? heroHeight : 0), paddingBottom: space.xxl },
       ]}
       contentInsetAdjustmentBehavior="automatic"
     >
@@ -105,6 +109,7 @@ export function Screen({
         {children}
       </View>
     </Scroller>
+    </View>
     {bar ? (
       <View style={[styles.footer, { backgroundColor: c.surface, borderTopColor: c.border }]}>
         <View style={styles.footerInner}>{bar}</View>
@@ -127,6 +132,7 @@ function Scroller({ scrollY, children, ...rest }: { scrollY?: Animated.Value } &
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: space.lg, alignItems: "center" },
+  heroLayer: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 4 },
   inner: { width: "100%", maxWidth: maxContentWidth, gap: space.lg },
   top: { alignItems: "center", paddingHorizontal: space.lg, paddingBottom: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 5, elevation: 3, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
   topInner: { width: "100%", maxWidth: maxContentWidth },
