@@ -48,6 +48,7 @@ function AppStack() {
             <Stack.Screen name="admin/ai-models" options={{ title: "AI 模型" }} />
             <Stack.Screen name="achievements" options={{ title: "學習成就" }} />
             <Stack.Screen name="admin/achievements" options={{ title: "學習成就徽章設定" }} />
+            <Stack.Screen name="comments/[courseId]" options={{ title: "留言板" }} />
             <Stack.Screen name="orders/index" options={{ title: "訂單紀錄" }} />
             <Stack.Screen name="orders/[id]" options={{ title: "報名明細" }} />
             <Stack.Screen name="admin/orders/index" options={{ title: "報名審核" }} />
