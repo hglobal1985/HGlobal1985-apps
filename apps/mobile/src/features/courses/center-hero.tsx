@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { Animated, Image, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Animated, Image, Linking, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { resolveUrl, type CenterArt } from "@/api/client";
+import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { EdmLightbox } from "./edm-viewer";
@@ -15,8 +16,11 @@ const SIDE = 16;
  * 往上滑時平順縮成窄橫幅（方案 D：高度 112、左右留白、圓角），往下滑回頂端再展開。沒有上傳照片就用品牌綠色漸層底。
  * scrollY 是頁面捲動位移（Screen 的 scrollY），高度、留白、圓角都用它內插，不會讓整頁重新繪製。
  */
-export function CenterHero({ art, scrollY, courses, lessons, views, title }: { art?: CenterArt; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
+export function CenterHero({ art, scrollY, courses, lessons, views, title, address }: { art?: CenterArt; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string; /** 中心地址（有設定才顯示在照片下方，往上滑時跟著照片收合消失）。 */ address?: string }) {
+  const { c } = useTheme();
   const { width: winW } = useWindowDimensions();
+  const [addrH, setAddrH] = useState(0);
+  useEffect(() => setAddrH(0), [address]); // 地址變了就重新量高度
   const [open, setOpen] = useState(false);
   const w = Math.min(winW, maxContentWidth);
   const full = Math.round((w * 10) / 16);
@@ -24,6 +28,7 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title }: { a
   const at = (a: number, b: number) => scrollY.interpolate({ inputRange: [0, range], outputRange: [a, b], extrapolate: "clamp" });
   const url = art ? art.coverUrl ?? art.edmUrl : null;
   return (
+    <View>
     <Animated.View style={[styles.box, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
       {url ? (
         <Image source={{ uri: resolveUrl(url) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -59,6 +64,34 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title }: { a
       ) : null}
       {open && art ? <EdmLightbox uri={art.edmUrl} title={title} onClose={() => setOpen(false)} /> : null}
     </Animated.View>
+    {address ? (
+      // 地址列：在照片正下方；往上滑時高度與透明度一起縮到 0（比照片更早消失，不佔位）。
+      <Animated.View
+        style={{
+          overflow: "hidden",
+          height: addrH ? scrollY.interpolate({ inputRange: [0, range * 0.7], outputRange: [addrH, 0], extrapolate: "clamp" }) : undefined,
+          opacity: scrollY.interpolate({ inputRange: [0, range * 0.5], outputRange: [1, 0], extrapolate: "clamp" }),
+        }}
+      >
+        <View style={addrH ? styles.addrAbs : undefined} onLayout={(e) => !addrH && setAddrH(Math.round(e.nativeEvent.layout.height))}>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={`中心地址：${address}，開啟地圖`}
+            onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`).catch(() => undefined)}
+            style={[styles.addr, { backgroundColor: c.accentSoft, borderColor: c.border }]}
+          >
+            <View style={[styles.pin, { backgroundColor: c.accent }]}>
+              <Icon name="location" size={16} color={c.textOnAccent} />
+            </View>
+            <AppText variant="callout" style={{ flex: 1, color: c.accentText, fontWeight: "600" }} numberOfLines={2}>
+              {address}
+            </AppText>
+            <Icon name="chevron-forward" size={18} color={c.accentText} />
+          </Pressable>
+        </View>
+      </Animated.View>
+    ) : null}
+    </View>
   );
 }
 
@@ -73,6 +106,9 @@ function Chip({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
+  addrAbs: { position: "absolute", left: 0, right: 0, top: 0 },
+  addr: { flexDirection: "row", alignItems: "center", gap: space.sm, marginHorizontal: SIDE, marginTop: space.sm, marginBottom: space.xs, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: 14, borderWidth: 1 },
+  pin: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   box: { overflow: "hidden", backgroundColor: "#2F5D3A", alignSelf: "stretch" },
   chips: { position: "absolute", left: 12, bottom: 10, flexDirection: "row", gap: 6 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.22)" },

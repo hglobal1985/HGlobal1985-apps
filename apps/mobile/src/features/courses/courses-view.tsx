@@ -373,7 +373,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   }, [activeCenter, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
   const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} address={centerInfo.data?.[normCenter(activeCenter)]} /> : undefined;
   const archivedBlock =
     manager && archived.length ? (
       <View style={{ gap: space.sm }}>
