@@ -82,10 +82,9 @@ export function centerTitle(label: string): string {
   return `${base || label}中心`;
 }
 
-/** 章節的分享者顯示：「分享者：李講師 白金 經理」（姓名、獎銜、職稱，沒填的略過；三者都沒填回空字串）。 */
+/** 章節的分享者顯示：「李講師﹒白金﹒經理」（姓名、獎銜、職稱用「﹒」連接，不加「分享者：」標題；沒填的略過；三者都沒填回空字串。業主 2026-11-16 全站統一）。 */
 export function sharerLine(l: { sharer: string; sharerRankName: string; sharerTitle: string }): string {
-  const t = [l.sharer, l.sharerRankName, l.sharerTitle].map((x) => x.trim()).filter(Boolean).join(" ");
-  return t ? `分享者：${t}` : "";
+  return [l.sharer, l.sharerRankName, l.sharerTitle].map((x) => x.trim()).filter(Boolean).join("﹒");
 }
 
 /** 課程的主講人顯示：「主講人：王老師 白金 經理」（姓名、獎銜、職稱，沒填的略過；都沒填回空字串）。 */

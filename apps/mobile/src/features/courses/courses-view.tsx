@@ -114,7 +114,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       .then((v) => (v === "chapter" || v === "series" || v === "center") && !initialCenter && setMode(v))
       .catch(() => undefined);
   }, []);
-  // 「單元」模式的兩顆眼睛篩選（只看主講／只看短影音；開短影音時主講強制關閉）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
+  // 「單元」模式的三顆眼睛篩選（短影音／主講／總結與銷售；只看短影音或只看總結與銷售時主講強制關閉）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
   const [unitFilter, setUnitFilter] = useState<UnitFilterValue>("all");
   useEffect(() => {
     AsyncStorage.multiGet([UNIT_FILTER_KEY, OLD_SPEAKER_KEY])

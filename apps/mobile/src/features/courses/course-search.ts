@@ -1,7 +1,7 @@
 import type { CourseSummary } from "@/api/client";
 
 /** 搜尋索引（後端 GET /search-index）裡每一堂章節的資料。 */
-export type SearchLesson = { id: string; courseId: string; position: number; title: string; sharer: string; sharerRankName: string; sharerTitle: string; eventDate: string | null; /** 主講人章節（每門課最多一堂）。 */ isSpeaker?: boolean; /** 所屬課程是「短影音專輯」。 */ isShorts?: boolean; /** 其他教材（只有短影音專輯的影音教材會出現在索引）。 */ isMaterial?: boolean; minutes: number; ready: boolean; completed: boolean; /** 章節自己的橫式封面（沒設定為 null＝用課程封面）。 */ coverUrl: string | null; /** YouTube 影片縮圖（沒有任何封面時的臨時封面）。 */ ytThumb?: string | null };
+export type SearchLesson = { id: string; courseId: string; position: number; title: string; sharer: string; sharerRankName: string; sharerTitle: string; eventDate: string | null; /** 主講人章節（每門課最多一堂）。 */ isSpeaker?: boolean; /** 總結與銷售課程（每門課最多一堂，與主講人互斥）。 */ isSummary?: boolean; /** 所屬課程是「短影音專輯」。 */ isShorts?: boolean; /** 其他教材（只有短影音專輯的影音教材會出現在索引）。 */ isMaterial?: boolean; minutes: number; ready: boolean; completed: boolean; /** 章節自己的橫式封面（沒設定為 null＝用課程封面）。 */ coverUrl: string | null; /** YouTube 影片縮圖（沒有任何封面時的臨時封面）。 */ ytThumb?: string | null };
 /** 關聯詞（輸入時列出的建議）：種類＋文字。 */
 export type SearchTerm = { kind: "系列" | "課程" | "主講人" | "獎銜" | "職稱" | "章節" | "日期"; text: string };
 export type SearchIndex = { haystack: Map<string, string>; /** 章節模式用：每一堂自己的搜尋文字（含所屬課程的主講人、系列、日期）。 */ lessonHay: Map<string, string>; terms: SearchTerm[] };

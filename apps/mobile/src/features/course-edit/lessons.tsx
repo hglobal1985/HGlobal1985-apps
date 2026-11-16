@@ -68,6 +68,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   const idx = lesson ? chapters.findIndex((l) => l.id === lesson.id) : chapters.length;
   const prevDate = idx > 0 ? chapters[idx - 1]?.eventDate ?? undefined : undefined;
   const otherSpeaker = course.lessons.find((l) => !l.material && l.isSpeaker && l.id !== lesson?.id);
+  const otherSummary = course.lessons.find((l) => !l.material && l.isSummary && l.id !== lesson?.id);
   const courseDate = course.eventStart ?? undefined;
   const allowMux = member?.role === "admin";
 
@@ -83,6 +84,10 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   const ownDate = follow ? "" : eventDate;
   const [autoCover, setAutoCover] = useState(!!lesson?.autoCover);
   const [isSpeaker, setIsSpeaker] = useState(!!lesson?.isSpeaker);
+  const [isSummary, setIsSummary] = useState(!!lesson?.isSummary);
+  // 主講人與「總結與銷售課程」互斥：勾一個，另一個自動取消。
+  const pickSpeaker = (v: boolean) => (setIsSpeaker(v), v && setIsSummary(false));
+  const pickSummary = (v: boolean) => (setIsSummary(v), v && setIsSpeaker(false));
   const sameAsPrev = !follow && !!prevDate && eventDate === prevDate;
   const sameAsCourse = follow;
   const staged = useStagedAttachments();
@@ -104,9 +109,10 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
     ? (!isSpeaker && (title !== lesson.title || sharer !== (lesson.sharer ?? "") || sharerRank !== (lesson.sharerRank ?? "") || sharerTitle !== (lesson.sharerTitle ?? ""))) ||
       ownDate !== (lesson.dateFollows ? "" : lesson.eventDate ?? "") ||
       isSpeaker !== !!lesson.isSpeaker ||
+      isSummary !== !!lesson.isSummary ||
       autoCover !== !!lesson.autoCover ||
       mediaDraftDirty(media, lesson)
-    : !!createdId || !!title || !!sharer || !!sharerRank || !!sharerTitle || isSpeaker || autoCover || mediaDraftDirty(media) || staged.items.length > 0;
+    : !!createdId || !!title || !!sharer || !!sharerRank || !!sharerTitle || isSpeaker || isSummary || autoCover || mediaDraftDirty(media) || staged.items.length > 0;
 
   const save = async () => {
     if (!lesson) return;
@@ -114,7 +120,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
     setBusy("save");
     setMsg(null);
     try {
-      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, autoCover, isSpeaker, ...mediaDraftBody(media) };
+      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, autoCover, isSpeaker, isSummary, ...mediaDraftBody(media) };
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
       setMsg({ tone: "success", text: "已儲存" });
       invalidate();
@@ -136,7 +142,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       let lessonId = createdId ?? undefined;
       if (!lessonId) {
         const before = new Set(course.lessons.map((l) => l.id));
-        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title, sharer, sharerRank, sharerTitle }), ...(ownDate ? { eventDate: ownDate } : {}), autoCover, isSpeaker });
+        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title, sharer, sharerRank, sharerTitle }), ...(ownDate ? { eventDate: ownDate } : {}), autoCover, isSpeaker, isSummary });
         lessonId = detail.lessons.find((l) => !before.has(l.id))?.id;
         if (!lessonId) throw Error("新增失敗，請重新整理後再試");
         setCreatedId(lessonId);
@@ -190,7 +196,8 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
           <Pill label={mediaKindLabel(currentKind)} />
         </View>
       ) : null}
-      <SpeakerCheck value={isSpeaker} onChange={setIsSpeaker} other={otherSpeaker} />
+      <SpeakerCheck value={isSpeaker} onChange={pickSpeaker} other={otherSpeaker} />
+      <SummaryCheck value={isSummary} onChange={pickSummary} other={otherSummary} />
       {isSpeaker ? (
         <SpeakerApplied course={{ title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "" }} />
       ) : (
@@ -260,9 +267,9 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
 
 /** 勾了主講人：名稱、分享者、獎銜、職稱欄位隱藏，直接套用課程基本資料（伺服器也會強制同步），這裡只顯示套用結果。 */
 function SpeakerApplied({ course }: { course: { title: string; teacher: string; teacherRank: string; teacherTitle: string } }) {
-  return (
-    <NoticeBox text={`章節名稱、分享者、獎銜、職稱直接套用課程基本資料：${[course.title, course.teacher, course.teacherTitle].filter(Boolean).join("・")}`} />
-  );
+  // 課程基本資料沒填主講人時，章節就沒有名字、獎銜、職稱可以顯示：直接提醒去填。
+  if (!course.teacher.trim()) return <NoticeBox tone="danger" text="課程基本資料還沒填「主講人」，所以這一堂不會顯示名字、獎銜、職稱。請先到課程的「基本資料」填寫主講人，章節會自動同步。" />;
+  return <NoticeBox text={`章節名稱、分享者、獎銜、職稱直接套用課程基本資料：${[course.title, course.teacher, course.teacherTitle].filter(Boolean).join("・")}`} />;
 }
 
 /** 「主講人」勾選：同一門課只能有一堂（用於「全部課程 > 單元」的「只顯示主講人」）；已有別堂是主講人時，勾這一堂會轉移過來。 */
@@ -271,6 +278,16 @@ function SpeakerCheck({ value, onChange, other }: { value: boolean; onChange: (v
     <View style={{ gap: space.xs }}>
       <Check label="主講人（每門課只能有一堂）" value={value} onChange={onChange} />
       {value && other ? <NoticeBox text={`目前「${other.title}」是主講人，儲存後會改成這一堂。`} /> : null}
+    </View>
+  );
+}
+
+/** 「總結與銷售課程」勾選：同一門課只能有一堂（用於「全部課程 > 單元」篩選）、與主講人互斥；已有別堂勾了，勾這一堂會轉移過來。 */
+function SummaryCheck({ value, onChange, other }: { value: boolean; onChange: (v: boolean) => void; other?: Lesson }) {
+  return (
+    <View style={{ gap: space.xs }}>
+      <Check label="總結與銷售課程（每門課只能有一堂）" value={value} onChange={onChange} />
+      {value && other ? <NoticeBox text={`目前「${other.title}」是總結與銷售課程，儲存後會改成這一堂。`} /> : null}
     </View>
   );
 }

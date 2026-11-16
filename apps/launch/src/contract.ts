@@ -210,6 +210,8 @@ export type Lesson = {
   dateFollows?: boolean;
   /** 主講人章節（同一門課最多一堂，只有章節有）：「單元」頁的「只顯示主講人」只列這一堂。 */
   isSpeaker?: boolean;
+  /** 總結與銷售課程（每門課最多一堂，與主講人互斥；用於「全部課程 > 單元」篩選）。 */
+  isSummary?: boolean;
   /** 只有管理員會拿到（編輯影片來源用）。 */
   media?: { type: MediaType; ref: string | null };
 };

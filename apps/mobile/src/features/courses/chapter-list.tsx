@@ -21,7 +21,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
   return (
     <View>
       {items.map(({ lesson, course, locked }) => {
-        const who = sharerLine({ sharer: lesson.sharer, sharerRankName: lesson.sharerRankName, sharerTitle: lesson.sharerTitle }).replace(/^分享者：/, "");
+        const who = sharerLine({ sharer: lesson.sharer, sharerRankName: lesson.sharerRankName, sharerTitle: lesson.sharerTitle });
         const date = lesson.eventDate ? eventDays(lesson.eventDate, null) : course.eventStart ? eventDays(course.eventStart, course.eventEnd) : "";
         const open = !locked && lesson.ready;
         return (

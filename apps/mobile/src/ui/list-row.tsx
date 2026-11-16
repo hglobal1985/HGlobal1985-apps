@@ -7,6 +7,7 @@ import { AppText } from "./text";
 
 export function ListRow({
   icon,
+  leading,
   title,
   subtitle,
   right,
@@ -16,6 +17,8 @@ export function ListRow({
   dense,
 }: {
   icon?: IconName;
+  /** 自訂的前置圖示（取代 icon），例如章節清單的主講人學士帽。 */
+  leading?: ReactNode;
   title: string;
   subtitle?: string;
   right?: ReactNode;
@@ -34,7 +37,7 @@ export function ListRow({
       accessibilityRole={onPress ? "button" : undefined}
       style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, marginHorizontal: -space.lg, paddingHorizontal: space.lg }, pressed && { opacity: 0.7 }]}
     >
-      {icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null}
+      {leading ?? (icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null)}
       <View style={{ flex: 1, gap: 2 }}>
         <AppText variant="headline" style={unread ? undefined : { fontWeight: "500" }}>
           {title}

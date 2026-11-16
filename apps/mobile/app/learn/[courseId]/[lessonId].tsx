@@ -15,7 +15,7 @@ import { usePlayer } from "@/features/player/use-player";
 import { PlayerControls } from "@/features/player/player-controls";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { SpeakerMark } from "@/features/courses/speaker-mark";
+import { SpeakerLead } from "@/features/courses/speaker-mark";
 import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, TopBarButton } from "@/ui";
 
 export default function LessonScreen() {
@@ -200,11 +200,12 @@ export default function LessonScreen() {
             <ListRow
               key={l.id}
               icon={l.completed ? "checkmark-circle" : l.id === lesson.id ? "play-circle" : "play-circle-outline"}
+              leading={l.isSpeaker && !l.completed ? <SpeakerLead /> : undefined}
               title={`${l.position}. ${l.title}`}
               subtitle={l.id === lesson.id ? "正在觀看" : [sharerLine(l), l.minutes ? `約 ${l.minutes} 分鐘` : ""].filter(Boolean).join(" · ") || undefined}
               highlight={l.id === lesson.id}
               dense
-              right={l.isSpeaker || l.eventDate ? <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>{l.isSpeaker ? <SpeakerMark /> : null}{l.eventDate ? <AppText variant="callout" tone="muted">{eventDays(l.eventDate, null)}</AppText> : null}</View> : undefined}
+              right={l.eventDate ? <AppText variant="callout" tone="muted">{eventDays(l.eventDate, null)}</AppText> : undefined}
               onPress={l.id === lesson.id || l.locked ? undefined : () => {
                 engine.expectSwitch();
                 router.replace(`/learn/${c.id}/${l.id}`);
