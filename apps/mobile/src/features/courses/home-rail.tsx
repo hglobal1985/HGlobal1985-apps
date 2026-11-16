@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Image, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -8,6 +7,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, CourseCover, Icon, type IconName } from "@/ui";
 import { CoursePriceTag } from "./course-card";
+import { CourseLessonsSheet } from "./course-lessons-sheet";
 import { displayName } from "./sort";
 
 /** EDM 填滿整個框（不留空白）、靠上對齊：先依寬度放大，不夠高再依高度放大；只會裁到下方與左右，不會裁到上方文字。 */
@@ -49,6 +49,8 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [page, setPage] = useState(0);
+  // 點圖或名稱：先彈出這門課的章節摘要（右上角「完整介紹」，往上拉到最高處也會進入課程介紹頁），不直接跳頁。
+  const [preview, setPreview] = useState<CourseSummary | null>(null);
   const cur = courses[Math.min(page, Math.max(0, courses.length - 1))];
   const x = useRef(new Animated.Value(0)).current;
   const live = useRef({ page: 0, w: 0, n: 0 });
@@ -133,7 +135,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
             <View style={{ width: box.w, height: box.h, overflow: "hidden", ...(Platform.OS === "web" ? ({ touchAction: "pan-y", userSelect: "none" } as object) : {}) }} {...pan.panHandlers}>
               <Animated.View style={{ flexDirection: "row", width: box.w * courses.length, height: box.h, transform: [{ translateX: x }] }}>
                 {courses.map((course) => (
-                  <Pressable key={course.id} onPress={() => router.push(`/course/${course.id}`)} accessibilityRole="button" accessibilityLabel={displayName(course)} style={{ width: box.w, height: box.h }}>
+                  <Pressable key={course.id} onPress={() => setPreview(course)} accessibilityRole="button" accessibilityLabel={displayName(course)} style={{ width: box.w, height: box.h }}>
                     <Slide course={course} w={box.w} h={box.h} />
                   </Pressable>
                 ))}
@@ -158,7 +160,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
       </View>
       {!cur ? <View style={styles.info} /> : null}
       {cur ? (
-        <Pressable onPress={() => router.push(`/course/${cur.id}`)} accessibilityRole="link" style={styles.info}>
+        <Pressable onPress={() => setPreview(cur)} accessibilityRole="link" style={styles.info}>
           {hostLine(cur) ? (
             <AppText variant="caption" tone="muted" numberOfLines={2}>
               {hostLine(cur)}
@@ -186,6 +188,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
           ) : null}
         </Pressable>
       ) : null}
+      {preview ? <CourseLessonsSheet course={preview} onClose={() => setPreview(null)} /> : null}
     </View>
   );
 }

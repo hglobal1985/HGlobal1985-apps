@@ -1,8 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, type Href } from "expo-router";
+import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { api, type Notice } from "@/api/client";
 import { dateTime, noticeTarget } from "@/features/format";
+import { NoticeSheet } from "@/features/notices/notice-sheet";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen } from "@/ui";
@@ -12,10 +14,12 @@ export default function NoticesScreen() {
   const { member, invalidate } = useSession();
   const { data, error, loading, reload } = useApi<Notice[]>(member ? "/notifications" : null);
   const unread = (data ?? []).filter((n) => !n.read).length;
+  // 點一則通知：先標為已讀並彈出摘要（完整內容），再由摘要的「前往查看」（或往上拉到最高處）進入對應頁面。
+  const [preview, setPreview] = useState<Notice | null>(null);
   const open = async (n: Notice) => {
+    setPreview(n);
     if (!n.read) await api("POST", `/notifications/${n.id}/read`).catch(() => undefined);
     invalidate();
-    router.push(noticeTarget(n.link) as Href);
   };
   const markAll = async () => {
     await api("POST", "/notifications/read-all").catch(() => undefined);
@@ -60,6 +64,9 @@ export default function NoticesScreen() {
             />
           ))}
         </Card>
+      ) : null}
+      {preview ? (
+        <NoticeSheet notice={preview} onClose={() => setPreview(null)} onOpen={preview.link ? () => router.push(noticeTarget(preview.link) as Href) : undefined} />
       ) : null}
     </Screen>
   );
