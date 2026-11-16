@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Linking, Pressable, type ViewStyle } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
-import { TYPE_INFO } from "@/features/attachments";
+import { TYPE_INFO } from "@/features/link-types";
 import { minutesText, sharerLine } from "@/features/format";
 import { engine } from "@/features/player/engine";
 import { lessonHref, lessonShareHref } from "@/lib/lesson-href";

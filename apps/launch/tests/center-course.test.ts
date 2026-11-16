@@ -91,13 +91,13 @@ test("有上傳教材（hasMaterial）：任何一堂設了影音來源或有附
   const has = async (id: string) => (await call<CourseDetail>("GET", `/courses/${id}`, admin)).data.hasMaterial;
   const empty = await mk("沒教材");
   const video = await mk("有影片");
-  const file = await mk("有附件");
+  const file = await mk("有教材連結");
   assert.deepEqual([await has(empty.id), await has(video.id), await has(file.id)], [false, false, false], "新課程只有空的示範章節");
   await call("PATCH", `/admin/lessons/${video.lessons[0]!.id}`, admin, { mediaType: "youtube", mediaRef: "dQw4w9WgXcQ" });
   assert.equal(await has(video.id), true, "章節設了 YouTube");
-  const added = await call("POST", `/admin/lessons/${file.lessons[0]!.id}/links`, admin, { url: "https://www.canva.com/design/x", title: "簡報" });
+  const added = await call("POST", `/admin/courses/${file.id}/materials`, admin, { url: "https://www.canva.com/design/x", title: "簡報" });
   assert.equal(added.status, 200);
-  assert.equal(await has(file.id), true, "章節有附件");
+  assert.equal(await has(file.id), true, "有「其他教材」連結");
   assert.equal(await has(empty.id), false);
 });
 

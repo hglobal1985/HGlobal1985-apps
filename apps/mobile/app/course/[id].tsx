@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { api, type CourseDetail, type Lesson, type Order } from "@/api/client";
-import { AttachmentList } from "@/features/attachments";
 import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { EdmStage } from "@/features/courses/edm-viewer";
@@ -273,11 +272,6 @@ export function CourseDetailScreen({ id, edit, lesson }: { id: string; edit?: st
         ) : (
           <EdmStage course={course} />
         )}
-        {playLesson && member ? (
-          <View style={{ paddingHorizontal: space.lg }}>
-            <AttachmentList courseId={course.id} lessonId={playLesson.id} />
-          </View>
-        ) : null}
         {editing && canEditContent ? (
           <Pressable accessibilityRole="button" accessibilityLabel="編輯 EDM 與封面" onPress={() => setSheet("art")} style={styles.edmEdit}>
             <Ionicons name="create-outline" size={20} color="#fff" />

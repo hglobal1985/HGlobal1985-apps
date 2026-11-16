@@ -32,25 +32,6 @@ export async function verifyAudioUrl(env: Env, url: URL): Promise<string | null>
   return diff === 0 ? key : null;
 }
 
-/** 附件教材：同樣的短效簽名網址（1 小時），鍵前綴 files/。檔名由資料表取得，不放在網址裡。 */
-export async function fileUrl(env: Env, key: string, seconds = 3600): Promise<string | null> {
-  if (!env.MEDIA || !env.MEDIA_URL_SECRET) return null;
-  const exp = Math.floor(Date.now() / 1000) + seconds;
-  return `/api/v2/media/file?k=${encodeURIComponent(key)}&e=${exp}&s=${await hmac(env.MEDIA_URL_SECRET, `${key}|${exp}`)}`;
-}
-
-export async function verifyFileUrl(env: Env, url: URL): Promise<string | null> {
-  const key = url.searchParams.get("k") ?? "";
-  const exp = Number(url.searchParams.get("e"));
-  const sig = url.searchParams.get("s") ?? "";
-  if (!env.MEDIA_URL_SECRET || !key.startsWith("files/") || !Number.isInteger(exp) || exp < Date.now() / 1000) return null;
-  const expected = await hmac(env.MEDIA_URL_SECRET, `${key}|${exp}`);
-  if (expected.length !== sig.length) return null;
-  let diff = 0;
-  for (let i = 0; i < sig.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
-  return diff === 0 ? key : null;
-}
-
 export function sniffImage(b: Uint8Array): { ext: "jpg" | "png" | "webp"; type: string } | null {
   if (b.length > 12 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { ext: "jpg", type: "image/jpeg" };
   if (b.length > 12 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return { ext: "png", type: "image/png" };

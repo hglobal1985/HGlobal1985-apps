@@ -2,7 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { api, classifyLink, parseHttpsUrl, type CourseDetail, type Lesson } from "@/api/client";
-import { TYPE_INFO } from "@/features/attachments";
+import { TYPE_INFO } from "@/features/link-types";
 import { commitMediaDraft, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";

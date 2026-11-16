@@ -1,12 +1,13 @@
 import { router } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import type { Lesson, MediaType } from "@/api/client";
 import { LessonTranscript } from "@/features/admin/lesson-transcript";
-import { pickAudio, uploadPickedAudio, type PickedAudio } from "@/features/admin/audio-upload";
+import { audioDuration, pickAudio, uploadPickedAudio, type PickedAudio } from "@/features/admin/audio-upload";
+import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, NoticeBox } from "@/ui";
+import { AppText, Button, Icon, NoticeBox } from "@/ui";
 import { formatDuration, fromHms, toHms, type Hms } from "./hms";
 
 /**
@@ -17,7 +18,8 @@ import { formatDuration, fromHms, toHms, type Hms } from "./hms";
  * - 已有教材／章節（傳 lessonId）：音檔選完立刻上傳；其他欄位由呼叫端按「儲存」時用 mediaDraftBody 送出。
  * - 新增中（沒有 lessonId）：音檔先暫存在 draft.audio，建立後呼叫 commitMediaDraft 才上傳；Mux 需要已建立的教材，所以新增時不提供。
  */
-export type MediaDraft = { kind: MediaType; ref: string; start: Hms; end: Hms; audio: PickedAudio | null };
+/** toEnd＝「到影片結尾」勾選（只是畫面用的旗標，不會存檔；勾選後結束欄位自動填入影片最後一秒）。 */
+export type MediaDraft = { kind: MediaType; ref: string; start: Hms; end: Hms; audio: PickedAudio | null; toEnd?: boolean };
 
 export const emptyMediaDraft = (): MediaDraft => ({ kind: "demo", ref: "", start: toHms(null), end: toHms(null), audio: null });
 
@@ -75,11 +77,17 @@ type ChannelCtx = {
 
 /** 匯入管道清單：新增管道＝加一項（label 是按鈕文字；staged＝新增中（還沒有教材）也能用；superAdminOnly＝只有超級管理員看得到）。 */
 const MEDIA_CHANNELS: { key: MediaType; label: string; staged: boolean; superAdminOnly?: boolean; render: (ctx: ChannelCtx) => ReactNode }[] = [
-  { key: "demo", label: "示範短片", staged: true, render: () => null },
   { key: "youtube", label: "YouTube", staged: true, render: (ctx) => <YoutubeInput {...ctx} /> },
   { key: "mux", label: "Mux", staged: false, superAdminOnly: true, render: (ctx) => <MuxInput {...ctx} /> },
   { key: "audio", label: "音檔", staged: true, render: (ctx) => <AudioInput {...ctx} /> },
 ];
+
+/** 從使用者貼的 YouTube 網址或 11 碼編號取出影片編號（取不到回 null）。 */
+function youtubeIdOf(ref: string): string | null {
+  const s = ref.trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(s)) return s;
+  return /(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([A-Za-z0-9_-]{11})/.exec(s)?.[1] ?? null;
+}
 
 export const mediaKindLabel = (k: MediaType) => MEDIA_CHANNELS.find((ch) => ch.key === k)?.label ?? "";
 
@@ -138,6 +146,33 @@ export function MediaUploadModule({
     }
   };
 
+  // 「到影片結尾」：勾選後自動偵測影片長度並填入結束欄位；來源或選好的檔案換了就重新偵測。
+  const [endNote, setEndNote] = useState<{ tone: "info" | "danger"; text: string } | null>(null);
+  useEffect(() => {
+    if (!draft.toEnd) return setEndNote(null);
+    let alive = true;
+    setEndNote({ tone: "info", text: "正在偵測影片長度…" });
+    (async () => {
+      let sec: number | null = null;
+      let approx = false;
+      if (draft.kind === "youtube" && youtubeIdOf(draft.ref)) sec = await detectYoutubeSeconds(youtubeIdOf(draft.ref)!);
+      else if (draft.kind === "audio" && draft.audio) sec = await audioDuration(draft.audio.file);
+      if (sec == null && lesson && lesson.media?.type === draft.kind && lesson.minutes > 0 && draft.kind !== "youtube") {
+        sec = lesson.minutes * 60; // 已上傳的音檔／Mux：用章節長度（分鐘）估算
+        approx = true;
+      }
+      if (!alive) return;
+      if (sec == null || sec <= 0) {
+        set({ toEnd: false });
+        return setEndNote({ tone: "danger", text: draft.kind === "youtube" ? "抓不到影片長度（手機 App 不支援偵測，請在網頁版操作，或自行輸入結束時間）" : "抓不到影片長度，請自行輸入結束時間" });
+      }
+      set({ end: toHms(Math.floor(sec)) });
+      setEndNote({ tone: "info", text: approx ? `已填入影片結尾（依章節長度 ${lesson!.minutes} 分鐘估算，不一定精確到秒）` : "已填入影片最後一秒" });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [draft.toEnd, draft.kind, draft.ref, draft.audio]); // eslint-disable-line react-hooks/exhaustive-deps
   const ctx: ChannelCtx = { draft, set, lesson, lessonId: id, busy, progress, upload };
   const channels = MEDIA_CHANNELS.filter((ch) => (id ? true : ch.staged) && (!ch.superAdminOnly || allowMux || draft.kind === ch.key));
   const active = MEDIA_CHANNELS.find((ch) => ch.key === draft.kind);
@@ -160,7 +195,16 @@ export function MediaUploadModule({
         {showHint ? "時間軸區間（選填；空白＝從頭播到結束）" : "時間軸區間"}
       </AppText>
       <TimeInput label="開始" value={draft.start} onChange={(v) => set({ start: v })} />
-      <TimeInput label="結束" value={draft.end} onChange={(v) => set({ end: v })} />
+      <TimeInput label="結束" value={draft.end} onChange={(v) => set({ end: v })} disabled={!!draft.toEnd} />
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: !!draft.toEnd }} accessibilityLabel="到影片結尾" onPress={() => set({ toEnd: !draft.toEnd })} style={styles.endCheck}>
+        <Icon name={draft.toEnd ? "checkbox" : "square-outline"} size={28} color={draft.toEnd ? c.accent : c.textMuted} />
+        <AppText variant="body">到影片結尾（自動填入影片最後一秒）</AppText>
+      </Pressable>
+      {endNote ? (
+        <AppText variant="callout" tone={endNote.tone === "danger" ? "danger" : "muted"}>
+          {endNote.text}
+        </AppText>
+      ) : null}
       {error ? (
         <AppText variant="callout" tone="danger">
           {error}
@@ -237,7 +281,7 @@ function AudioInput({ draft, lesson, lessonId, busy, progress, upload }: Channel
   );
 }
 
-function TimeInput({ label, value, onChange }: { label: string; value: Hms; onChange: (v: Hms) => void }) {
+function TimeInput({ label, value, onChange, disabled }: { label: string; value: Hms; onChange: (v: Hms) => void; disabled?: boolean }) {
   const { c } = useTheme();
   const box = (k: keyof Hms, unit: string) => (
     <View style={styles.timeCell}>
@@ -245,10 +289,11 @@ function TimeInput({ label, value, onChange }: { label: string; value: Hms; onCh
         value={value[k]}
         onChangeText={(t) => onChange({ ...value, [k]: t.replace(/\D/g, "").slice(0, 2) })}
         keyboardType="number-pad"
+        editable={!disabled}
         placeholder="0"
         placeholderTextColor={c.textMuted}
         accessibilityLabel={`${label}${unit}`}
-        style={[styles.timeInput, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
+        style={[styles.timeInput, type.body, { color: disabled ? c.textMuted : c.text, borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface }]}
       />
       <AppText variant="callout" tone="muted">
         {unit}
@@ -271,6 +316,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
   chip: { minHeight: minTouch - 8, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, justifyContent: "center" },
   input: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },
+  endCheck: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch },
   timeRow: { flexDirection: "row", alignItems: "center", gap: space.sm, flexWrap: "wrap" },
   timeCell: { flexDirection: "row", alignItems: "center", gap: 4 },
   timeInput: { width: 56, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, textAlign: "center" },

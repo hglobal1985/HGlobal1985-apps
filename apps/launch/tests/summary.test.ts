@@ -51,3 +51,29 @@ test("總結與銷售課程：每門課最多一堂（勾新的自動轉移）�
   const idx = (await call<{ lessons: { id: string; isSummary: boolean }[] }>("GET", "/search-index", token)).data.lessons.filter((l) => l.isSummary).map((l) => l.id);
   assert.deepEqual(idx, [l1]);
 });
+
+test("總結章節的名稱固定是「總結」（勾選當下與之後修改都強制）；分享者姓名建議取本系統用過的名字（只有管理者）", async () => {
+  const { call } = setup();
+  const token = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
+  const student = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-student" })).data.token;
+  const made = await call<CourseDetail>("POST", "/admin/courses", token, { title: "名稱測試", teacher: "課程主講", hostUnit: "寰宇總部", status: "published" });
+  const id = made.data.id;
+  const l1 = made.data.lessons[0]!.id;
+  const created = await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, { title: "亂填的名稱", sharer: "李華", isSummary: true });
+  const sum = created.data.lessons.find((l) => l.isSummary)!;
+  assert.equal(sum.title, "總結", "新增時勾總結 → 名稱是總結（不管填了什麼）");
+  await call("PATCH", `/admin/lessons/${l1}`, token, { title: "第一堂", sharer: "李華" });
+  await call("PATCH", `/admin/lessons/${l1}`, token, { isSummary: true, title: "又亂填" });
+  const after = (await call<CourseDetail>("GET", `/courses/${id}`, token)).data.lessons;
+  assert.equal(after.find((l) => l.id === l1)!.title, "總結", "編輯時勾總結 → 名稱改成總結");
+  assert.equal(after.find((l) => l.id === sum.id)!.title, "總結", "原本那堂雖然被轉移，名稱保留總結可再改");
+  await call("PATCH", `/admin/lessons/${l1}`, token, { title: "想改名" });
+  assert.equal((await call<CourseDetail>("GET", `/courses/${id}`, token)).data.lessons.find((l) => l.id === l1)!.title, "總結", "還是總結章節時，改名無效");
+  await call("PATCH", `/admin/lessons/${l1}`, token, { isSummary: false, title: "取消後可改名" });
+  assert.equal((await call<CourseDetail>("GET", `/courses/${id}`, token)).data.lessons.find((l) => l.id === l1)!.title, "取消後可改名");
+
+  const names = await call<string[]>("GET", "/admin/sharer-names?q=", token);
+  assert.deepEqual([names.data.includes("李華"), names.data.includes("課程主講")], [true, true], "分享者與主講人姓名都會建議");
+  assert.deepEqual((await call<string[]>("GET", "/admin/sharer-names?q=" + encodeURIComponent("李"), token)).data, ["李華"], "輸入一個字就篩選");
+  assert.equal((await call("GET", "/admin/sharer-names?q=", student)).status, 403, "學員不能用");
+});

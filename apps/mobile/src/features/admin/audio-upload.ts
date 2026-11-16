@@ -5,7 +5,7 @@ import { api } from "@/api/client";
 const CHUNK = 8 * 1024 * 1024; // R2 分段上傳：除最後一段外每段至少 5MB。
 
 /** 讀取音檔長度（秒）；只在 Web 可取得，其餘回傳 null。 */
-function audioDuration(file: Blob): Promise<number | null> {
+export function audioDuration(file: Blob): Promise<number | null> {
   if (Platform.OS !== "web") return Promise.resolve(null);
   return new Promise((resolve) => {
     const url = URL.createObjectURL(file);

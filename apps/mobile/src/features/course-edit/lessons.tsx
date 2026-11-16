@@ -2,15 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, type CourseDetail, type Lesson } from "@/api/client";
 import { LessonArt } from "@/features/admin/lesson-art";
-import { TYPE_INFO } from "@/features/attachments";
+import { TYPE_INFO } from "@/features/link-types";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
-import { commitMediaDraft, commitStagedAttachments, emptyMediaDraft, FileUploadModule, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, mediaKindLabel, useStagedAttachments, type MediaDraft } from "@/features/uploads";
+import { SuggestField, SuggestList, useSuggestions } from "@/features/admin/suggest-input";
+import { commitMediaDraft, emptyMediaDraft, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
 import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
-import { AppText, Button, Card, DateSelect, Icon, NoticeBox, Pill, todayStr } from "@/ui";
+import { AppText, Button, Card, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
 import { Check } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 import { EditMaterialSheet } from "./material-sheet";
@@ -54,20 +55,17 @@ export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail;
   return <ChapterSheet course={course} lesson={lesson} onClose={onClose} />;
 }
 
-/** 新增章節：與編輯同一個面板，名稱、分享者、日期、影音、時間軸、附件一次設定完，按「新增」後依序送出。 */
+/** 新增章節：與編輯同一個面板，名稱、分享者、日期、影音、時間軸一次設定完，按「新增」後依序送出。 */
 export function NewLessonSheet({ course, onClose }: { course: CourseDetail; onClose: () => void }) {
   return <ChapterSheet course={course} onClose={onClose} />;
 }
 
-/** 一個章節的完整設定（名稱、分享者、日期、影片／音檔、時間軸、封面、附件、逐字稿）；沒傳 lesson＝新增。 */
+/** 一個章節的完整設定（分享者、名稱、日期、影片／音檔、時間軸、封面、逐字稿）；沒傳 lesson＝新增。 */
 function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
   const { c } = useTheme();
   const { member, invalidate } = useSession();
   const rankOptions = useRankOptions();
   const isNew = !lesson;
-  const chapters = course.lessons.filter((l) => !l.material);
-  const idx = lesson ? chapters.findIndex((l) => l.id === lesson.id) : chapters.length;
-  const prevDate = idx > 0 ? chapters[idx - 1]?.eventDate ?? undefined : undefined;
   const otherSpeaker = course.lessons.find((l) => !l.material && l.isSpeaker && l.id !== lesson?.id);
   const otherSummary = course.lessons.find((l) => !l.material && l.isSummary && l.id !== lesson?.id);
   const courseDate = course.eventStart ?? undefined;
@@ -88,10 +86,17 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   const [isSummary, setIsSummary] = useState(!!lesson?.isSummary);
   // 主講人與「總結與銷售課程」互斥：勾一個，另一個自動取消。
   const pickSpeaker = (v: boolean) => (setIsSpeaker(v), v && setIsSummary(false));
-  const pickSummary = (v: boolean) => (setIsSummary(v), v && setIsSpeaker(false));
-  const sameAsPrev = !follow && !!prevDate && eventDate === prevDate;
+  // 勾「總結」：章節名稱鎖住、固定是「總結」（伺服器也會強制）。
+  const pickSummary = (v: boolean) => {
+    setIsSummary(v);
+    if (v) {
+      setIsSpeaker(false);
+      setTitle(SUMMARY_TITLE);
+    }
+  };
   const sameAsCourse = follow;
-  const staged = useStagedAttachments();
+  const [sharerFocus, setSharerFocus] = useState(false);
+  const sharerHints = useSuggestions(sharer, "sharer_name", sharerFocus);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const mediaDone = useRef(false);
   const id = lesson?.id ?? createdId ?? undefined;
@@ -113,7 +118,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       isSummary !== !!lesson.isSummary ||
       autoCover !== !!lesson.autoCover ||
       mediaDraftDirty(media, lesson)
-    : !!createdId || !!title || !!sharer || !!sharerRank || !!sharerTitle || isSpeaker || isSummary || autoCover || mediaDraftDirty(media) || staged.items.length > 0;
+    : !!createdId || !!title || !!sharer || !!sharerRank || !!sharerTitle || isSpeaker || isSummary || autoCover || mediaDraftDirty(media);
 
   const save = async () => {
     if (!lesson) return;
@@ -121,7 +126,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
     setBusy("save");
     setMsg(null);
     try {
-      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, autoCover, isSpeaker, isSummary, ...mediaDraftBody(media) };
+      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, autoCover, isSpeaker, isSummary, ...mediaDraftBody(media) };
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
       setMsg({ tone: "success", text: "已儲存" });
       invalidate();
@@ -132,9 +137,9 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
     }
   };
 
-  // 新增：先建立章節，再依序送出影音設定、音檔與附件。中途失敗時章節已建立，再按「新增」只補沒完成的部分（不會重複建立）。
+  // 新增：先建立章節，再依序送出影音設定與音檔。中途失敗時章節已建立，再按「新增」只補沒完成的部分（不會重複建立）。
   const create = async () => {
-    if (!isSpeaker && !title.trim()) return setMsg({ tone: "danger", text: "請輸入章節名稱" });
+    if (!isSpeaker && !isSummary && !title.trim()) return setMsg({ tone: "danger", text: "請輸入章節名稱" });
     if (rangeError) return setMsg({ tone: "danger", text: rangeError });
     setBusy("create");
     setMsg(null);
@@ -143,7 +148,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       let lessonId = createdId ?? undefined;
       if (!lessonId) {
         const before = new Set(course.lessons.map((l) => l.id));
-        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title, sharer, sharerRank, sharerTitle }), ...(ownDate ? { eventDate: ownDate } : {}), autoCover, isSpeaker, isSummary });
+        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), ...(ownDate ? { eventDate: ownDate } : {}), autoCover, isSpeaker, isSummary });
         lessonId = detail.lessons.find((l) => !before.has(l.id))?.id;
         if (!lessonId) throw Error("新增失敗，請重新整理後再試");
         setCreatedId(lessonId);
@@ -154,7 +159,6 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
         await commitMediaDraft(lessonId, media);
         mediaDone.current = true;
       }
-      await commitStagedAttachments(lessonId, staged.items, (done) => staged.setItems((x) => x.filter((i) => i.id !== done)));
       invalidate();
       onClose();
     } catch (e) {
@@ -189,36 +193,44 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       busy={busy === "create"}
       error={isNew && msg?.tone === "danger" ? msg.text : null}
     >
-      {lesson ? (
-        <View style={styles.row}>
-          <AppText variant="callout" tone="muted" style={{ flex: 1 }}>
-            目前內容
-          </AppText>
-          <Pill label={mediaKindLabel(currentKind)} />
+      {/* 「主講」「總結」兩個勾選同一列（業主 2026-11-16）；每門課各只能一堂、兩者互斥。 */}
+      <View style={styles.checkRow}>
+        <View style={{ flex: 1 }}>
+          <Check label="主講" value={isSpeaker} onChange={pickSpeaker} />
         </View>
-      ) : null}
-      <SpeakerCheck value={isSpeaker} onChange={pickSpeaker} other={otherSpeaker} />
-      <SummaryCheck value={isSummary} onChange={pickSummary} other={otherSummary} />
+        <View style={{ flex: 1 }}>
+          <Check label="總結" value={isSummary} onChange={pickSummary} />
+        </View>
+      </View>
+      {isSpeaker && otherSpeaker ? <NoticeBox text={`目前「${otherSpeaker.title}」是主講，儲存後會改成這一堂。`} /> : null}
+      {isSummary && otherSummary ? <NoticeBox text={`目前「${otherSummary.title}」是總結，儲存後會改成這一堂。`} /> : null}
       {isSpeaker ? (
         <SpeakerApplied course={{ title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "" }} />
       ) : (
         <>
           <View style={styles.twoCol}>
+            <View style={{ flex: 2, gap: space.xs }}>
+              <AppText variant="callout" tone="muted">
+                分享者
+              </AppText>
+              <SuggestField value={sharer} onChange={setSharer} onFocusChange={setSharerFocus} placeholder="選填，輸入一個字出現建議" accessibilityLabel={`${who}分享者`} maxLength={60} />
+            </View>
             <View style={{ flex: 3, gap: space.xs }}>
               <AppText variant="callout" tone="muted">
                 章節名稱
               </AppText>
               <TextInput
-                value={title}
+                value={isSummary ? SUMMARY_TITLE : title}
                 onChangeText={setTitle}
+                editable={!isSummary}
                 placeholder={isNew ? "例如：第 2 段 Q&A" : undefined}
                 placeholderTextColor={c.textMuted}
                 accessibilityLabel={`${who}名稱`}
-                style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
+                style={[styles.input, type.body, { color: isSummary ? c.textMuted : c.text, borderColor: c.border, backgroundColor: isSummary ? c.surfaceMuted : c.surface }]}
               />
             </View>
-            <SharerField value={sharer} onChange={setSharer} label={`${who}分享者`} />
           </View>
+          {sharerFocus ? <SuggestList list={sharerHints} q={sharer} onPick={(x) => (setSharer(x), setSharerFocus(false))} /> : null}
           <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} who={`${who}分享者`} />
         </>
       )}
@@ -234,22 +246,15 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
             <AppText variant="body">同課程日期</AppText>
           </Pressable>
         ) : null}
-        {prevDate ? (
-          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: sameAsPrev }} accessibilityLabel="日期同上一堂" onPress={() => (setFollow(false), setEventDate(sameAsPrev ? "" : prevDate))} style={styles.sameCheck}>
-            <Icon name={sameAsPrev ? "checkbox" : "square-outline"} size={28} color={sameAsPrev ? c.accent : c.textMuted} />
-            <AppText variant="body">同上</AppText>
-          </Pressable>
-        ) : null}
       </View>
-      {sameAsPrev || sameAsCourse ? (
+      {sameAsCourse ? (
         <AppText variant="body" tone="muted">
-          {(sameAsCourse ? courseDate ?? "" : eventDate).replace(/-/g, "/")}（{sameAsCourse ? "同課程日期" : "與上一堂相同"}）
+          {(courseDate ?? "").replace(/-/g, "/")}（同課程日期）
         </AppText>
       ) : (
         <DateSelect value={eventDate} onChange={setEventDate} />
       )}
       <MediaUploadModule draft={media} onChange={setMedia} allowMux={allowMux} lesson={lesson} lessonId={id} onUploaded={invalidate} onBusyChange={(b) => setBusy(b ? "upload" : null)} lengthLabel="本堂長度" />
-      <FileUploadModule lessonId={lesson?.id} staged={lesson ? undefined : staged} />
       {isNew && (allowMux || course.chapterCovers) ? (
         <AppText variant="caption" tone="muted">
           {[allowMux ? "Mux 影片" : "", course.chapterCovers ? "章節封面" : ""].filter(Boolean).join("、")}要在章節建立後，再點章節旁的鉛筆設定。
@@ -266,51 +271,14 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   );
 }
 
+/** 勾了「總結」的章節，名稱固定為這兩個字（伺服器也會強制）。 */
+const SUMMARY_TITLE = "總結";
+
 /** 勾了主講人：名稱、分享者、獎銜、職稱欄位隱藏，直接套用課程基本資料（伺服器也會強制同步），這裡只顯示套用結果。 */
 function SpeakerApplied({ course }: { course: { title: string; teacher: string; teacherRank: string; teacherTitle: string } }) {
   // 課程基本資料沒填主講人時，章節就沒有名字、獎銜、職稱可以顯示：直接提醒去填。
   if (!course.teacher.trim()) return <NoticeBox tone="danger" text="課程基本資料還沒填「主講人」，所以這一堂不會顯示名字、獎銜、職稱。請先到課程的「基本資料」填寫主講人，章節會自動同步。" />;
   return <NoticeBox text={`章節名稱、分享者、獎銜、職稱直接套用課程基本資料：${[course.title, course.teacher, course.teacherTitle].filter(Boolean).join("・")}`} />;
-}
-
-/** 「主講人」勾選：同一門課只能有一堂（用於「全部課程 > 單元」的「只顯示主講人」）；已有別堂是主講人時，勾這一堂會轉移過來。 */
-function SpeakerCheck({ value, onChange, other }: { value: boolean; onChange: (v: boolean) => void; other?: Lesson }) {
-  return (
-    <View style={{ gap: space.xs }}>
-      <Check label="主講人（每門課只能有一堂）" value={value} onChange={onChange} />
-      {value && other ? <NoticeBox text={`目前「${other.title}」是主講人，儲存後會改成這一堂。`} /> : null}
-    </View>
-  );
-}
-
-/** 「總結與銷售課程」勾選：同一門課只能有一堂（用於「全部課程 > 單元」篩選）、與主講人互斥；已有別堂勾了，勾這一堂會轉移過來。 */
-function SummaryCheck({ value, onChange, other }: { value: boolean; onChange: (v: boolean) => void; other?: Lesson }) {
-  return (
-    <View style={{ gap: space.xs }}>
-      <Check label="總結與銷售課程（每門課只能有一堂）" value={value} onChange={onChange} />
-      {value && other ? <NoticeBox text={`目前「${other.title}」是總結與銷售課程，儲存後會改成這一堂。`} /> : null}
-    </View>
-  );
-}
-
-/** 分享者欄位（輸入姓名；選填）。 */
-function SharerField({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
-  const { c } = useTheme();
-  return (
-    <View style={{ flex: 2, gap: space.xs }}>
-      <AppText variant="callout" tone="muted">
-        分享者
-      </AppText>
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder="選填"
-        placeholderTextColor={c.textMuted}
-        accessibilityLabel={label}
-        style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
-      />
-    </View>
-  );
 }
 
 /** 課程頁編輯模式的章節／教材清單（同一個元件，兩組共用）：每列＝名稱（點了編輯）＋小按鈕 ↑ ↓ 複製 編輯 刪除（32px，讓名稱有空間）。 */
@@ -357,6 +325,7 @@ export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "
 
 const styles = StyleSheet.create({
   twoCol: { flexDirection: "row", gap: space.sm },
+  checkRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   dateHead: { flexDirection: "row", alignItems: "center" },
   sameCheck: { flexDirection: "row", alignItems: "center", gap: space.xs, minHeight: minTouch, paddingLeft: space.sm },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },

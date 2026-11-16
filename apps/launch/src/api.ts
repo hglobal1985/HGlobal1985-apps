@@ -22,7 +22,6 @@ import {
   type CenterArt,
   type EditorCandidate,
   type Member,
-  type Attachment,
   type AttachmentType,
   type Announcement,
   type CourseDeleteImpact,
@@ -45,7 +44,7 @@ import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
 import { collectMuxStats } from "./mux-stats.ts";
-import { audioUrl, fileUrl, sniffImage, verifyAudioUrl, verifyFileUrl } from "./media.ts";
+import { audioUrl, sniffImage, verifyAudioUrl } from "./media.ts";
 import { checkMuxPlayback, listMuxAssets, MuxApiError, muxPlaybackUrl, muxThumbnail } from "./mux.ts";
 
 const SESSION_DAYS = 30;
@@ -841,7 +840,6 @@ async function managerVia(ctx: Ctx, sql: string, id: string, what: string): Prom
   return requireCourseManager(ctx, row.course_id);
 }
 const requireLessonManager = (ctx: Ctx, id: string) => managerVia(ctx, "SELECT course_id FROM lessons WHERE id = ?", id, "章節");
-const requireAttachmentManager = (ctx: Ctx, id: string) => managerVia(ctx, "SELECT course_id FROM lesson_attachments WHERE id = ?", id, "附件");
 /** 可以新增課程的人：總部、有中心的會長與音控、有「新增」權限的小編。 */
 async function requireCourseCreator(ctx: Ctx): Promise<Session> {
   const s = requireMember(ctx);
@@ -858,31 +856,9 @@ async function requireCourseStaff(ctx: Ctx): Promise<Session> {
 /** 記下最後修改者（章節、圖片等修改也算），顯示在編輯模式的進階設定最下方。 */
 const touchCourse = (db: D1Database, courseId: string, s: Session) => db.prepare("UPDATE courses SET edited_by_name = ?, edited_at = ? WHERE id = ?").bind(s.name.slice(0, 60), iso(), courseId);
 
-const ATTACH_TYPES: Record<string, string> = {
-  pdf: "application/pdf",
-  doc: "application/msword",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ppt: "application/vnd.ms-powerpoint",
-  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  xls: "application/vnd.ms-excel",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  csv: "text/csv",
-  txt: "text/plain",
-  zip: "application/zip",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-};
-const ATTACH_KIND: Record<string, AttachmentType> = { pdf: "pdf", doc: "word", docx: "word", ppt: "ppt", pptx: "ppt", xls: "excel", xlsx: "excel", csv: "excel", txt: "text", zip: "zip", png: "image", jpg: "image", jpeg: "image" };
-type AttachmentRow = { id: string; name: string; size: number; r2_key: string | null; kind: "file" | "link"; link_url: string | null; att_type: AttachmentType };
-const ATTACH_COLS = "id, name, size, r2_key, kind, link_url, att_type";
-async function attachmentOut(env: Env, r: AttachmentRow, withUrl: boolean): Promise<Attachment> {
-  const url = r.kind === "link" ? (r.link_url ?? undefined) : withUrl && r.r2_key ? ((await fileUrl(env, r.r2_key)) ?? undefined) : undefined;
-  return { id: r.id, name: r.name, kind: r.kind, type: r.att_type, size: r.size, url };
-}
+/** 勾了「總結與銷售課程」的章節，名稱固定為這兩個字。 */
+const SUMMARY_TITLE = "總結";
 const cleanTitle = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, 80) : "");
-const ATTACH_MAX = 50 * 1024 * 1024;
-const ATTACH_PER_LESSON = 20;
 
 /** 刪除章節／課程時一併清掉附件檔（資料列由 ON DELETE CASCADE 處理，須在刪資料前先取出鍵）。 */
 async function attachmentKeys(db: D1Database, where: "lesson_id" | "course_id", id: string): Promise<string[]> {
@@ -1911,7 +1887,10 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
   // 主講人章節的名稱、分享者、獎銜、職稱一律等於課程基本資料（不接受另外填的值）。
   const nowSpeaker = body.isSpeaker === undefined ? body.isSummary === true ? false : cur.is_speaker === 1 : body.isSpeaker === true;
   const speakerCols = ["title", "sharer", "sharer_rank", "sharer_title"];
-  const finalSets = nowSpeaker ? sets.filter(([c]) => !speakerCols.includes(c)) : sets;
+  // 「總結」章節的名稱固定就是「總結」（業主 2026-11-16）：勾選當下與之後的每次修改，伺服器都強制。
+  const nowSummary = body.isSummary === undefined ? cur.is_summary === 1 && body.isSpeaker !== true : body.isSummary === true;
+  const speakerSets = nowSpeaker ? sets.filter(([c]) => !speakerCols.includes(c)) : sets;
+  const finalSets: [string, unknown][] = nowSummary ? [...speakerSets.filter(([c]) => c !== "title"), ["title", SUMMARY_TITLE]] : speakerSets;
   await ctx.db.batch([
     ...clearSpeaker,
     ...clearSummary,
@@ -2818,64 +2797,19 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
-    /^\/courses\/([\w-]+)\/lessons\/([\w-]+)\/attachments$/,
-    async (ctx, [courseId, lessonId]) => {
-      await lessonOf(ctx, courseId, lessonId);
-      if (!(await canWatch(ctx, courseId))) fail(403, "not_enrolled", "請先報名並通過審核");
-      const { results } = await ctx.db.prepare(`SELECT ${ATTACH_COLS} FROM lesson_attachments WHERE lesson_id = ? ORDER BY created_at`).bind(lessonId).all<AttachmentRow>();
-      return Promise.all(results.map((r) => attachmentOut(ctx.env, r, true)));
-    },
-  ],
-  [
-    "GET",
-    /^\/admin\/lessons\/([\w-]+)\/attachments$/,
-    async (ctx, [id]) => {
-      await requireLessonManager(ctx, id);
-      const { results } = await ctx.db.prepare(`SELECT ${ATTACH_COLS} FROM lesson_attachments WHERE lesson_id = ? ORDER BY created_at`).bind(id).all<AttachmentRow>();
-      return Promise.all(results.map((r) => attachmentOut(ctx.env, r, false)));
-    },
-  ],
-  [
-    "PUT",
-    /^\/admin\/lessons\/([\w-]+)\/attachments$/,
-    async (ctx, [id]) => {
-      const admin = await requireLessonManager(ctx, id);
-      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "檔案儲存空間尚未啟用");
-      const lesson = await ctx.db.prepare("SELECT course_id FROM lessons WHERE id = ?").bind(id).first<{ course_id: string }>();
-      if (!lesson) return fail(404, "not_found", "找不到這個章節");
-      const name = (ctx.url.searchParams.get("name") ?? "").replace(/[\\/\u0000-\u001f]/g, "").trim().slice(0, 120);
-      const ext = (/\.([a-z0-9]{1,5})$/i.exec(name)?.[1] ?? "").toLowerCase();
-      const type = ATTACH_TYPES[ext];
-      if (!name || !type) fail(400, "invalid_file", "不支援這種檔案；可上傳 PDF、Word、PowerPoint、Excel、CSV、文字、ZIP、PNG、JPG");
-      const declared = Number(ctx.req.headers.get("content-length") ?? 0);
-      if (declared > ATTACH_MAX) fail(413, "too_large", "附件大小需在 50MB 以內");
-      const count = await ctx.db.prepare("SELECT COUNT(*) AS n FROM lesson_attachments WHERE lesson_id = ?").bind(id).first<{ n: number }>();
-      if ((count?.n ?? 0) >= ATTACH_PER_LESSON) fail(409, "too_many", `每個章節最多 ${ATTACH_PER_LESSON} 個附件`);
-      const data = await ctx.req.arrayBuffer();
-      if (!data.byteLength) fail(400, "empty_file", "檔案是空的");
-      if (data.byteLength > ATTACH_MAX) fail(413, "too_large", "附件大小需在 50MB 以內");
-      const key = `files/${id}/${crypto.randomUUID()}.${ext}`;
-      await bucket.put(key, data, { httpMetadata: { contentType: type } });
-      const attId = crypto.randomUUID();
-      const attType = ATTACH_KIND[ext] ?? "file";
-      const title = cleanTitle(ctx.url.searchParams.get("title")) || name;
-      await ctx.db.batch([
-        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, att_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?)").bind(attId, id, lesson.course_id, title, key, data.byteLength, type, attType, admin.sub),
-        audit(ctx.db, admin.sub, "lesson.attachment_add", "lesson", id, attId),
-      ]);
-      return { id: attId, name: title, kind: "file", type: attType, size: data.byteLength } satisfies Attachment;
-    },
-  ],
-  [
-    "DELETE",
-    /^\/admin\/attachments\/([\w-]+)$/,
-    async (ctx, [id]) => {
-      const admin = await requireAttachmentManager(ctx, id);
-      const row = await ctx.db.prepare("SELECT r2_key, lesson_id FROM lesson_attachments WHERE id = ?").bind(id).first<{ r2_key: string | null; lesson_id: string }>();
-      if (!row) return fail(404, "not_found", "找不到這個附件");
-      await ctx.db.batch([ctx.db.prepare("DELETE FROM lesson_attachments WHERE id = ?").bind(id), audit(ctx.db, admin.sub, "lesson.attachment_delete", "lesson", row.lesson_id, id)]);
-      if (row.r2_key) await ctx.env.MEDIA?.delete(row.r2_key).catch(() => undefined);
-      return { ok: true };
+    /^\/admin\/sharer-names$/,
+    async (ctx) => {
+      // 分享者姓名打字建議：行動大學裡已經用過的分享者與主講人姓名（去重、用得多的在前）。日後講師名單（講師資料表）建好，改由那邊提供。
+      const s = requireMember(ctx);
+      if (s.role !== "admin" && !(await rightsOf(ctx)).any) return fail(403, "forbidden", "只有課程管理者可以使用");
+      const q = (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 30);
+      const { results } = await ctx.db
+        .prepare(
+          "SELECT name, COUNT(*) AS n FROM (SELECT sharer AS name FROM lessons WHERE kind = 'chapter' AND is_speaker = 0 UNION ALL SELECT teacher AS name FROM courses) WHERE name <> '' AND instr(name, ?) > 0 GROUP BY name ORDER BY n DESC, name LIMIT 20",
+        )
+        .bind(q)
+        .all<{ name: string; n: number }>();
+      return results.map((r) => r.name);
     },
   ],
   [
@@ -2936,53 +2870,6 @@ const routes: [string, RegExp, Handler][] = [
         audit(ctx.db, admin.sub, "material.update", "lesson", id, `${classifyLink(u)}:${title}`),
       ]);
       return courseDetail(ctx, lesson.course_id);
-    },
-  ],
-  [
-    "POST",
-    /^\/admin\/lessons\/([\w-]+)\/links$/,
-    async (ctx, [id]) => {
-      const admin = await requireLessonManager(ctx, id);
-      const lesson = await ctx.db.prepare("SELECT course_id FROM lessons WHERE id = ?").bind(id).first<{ course_id: string }>();
-      if (!lesson) return fail(404, "not_found", "找不到這個章節");
-      const body = await readJson<{ url?: unknown; title?: unknown }>(ctx.req);
-      const u = parseHttpsUrl(body.url);
-      if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
-      const count = await ctx.db.prepare("SELECT COUNT(*) AS n FROM lesson_attachments WHERE lesson_id = ?").bind(id).first<{ n: number }>();
-      if ((count?.n ?? 0) >= ATTACH_PER_LESSON) return fail(409, "too_many", `每個章節最多 ${ATTACH_PER_LESSON} 個附件`);
-      const type = classifyLink(u);
-      const title = cleanTitle(body.title) || LINK_DEFAULT_TITLE[type];
-      const attId = crypto.randomUUID();
-      await ctx.db.batch([
-        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, lesson.course_id, title, u.toString(), type, admin.sub),
-        audit(ctx.db, admin.sub, "lesson.link_add", "lesson", id, attId),
-      ]);
-      return { id: attId, name: title, kind: "link", type, size: 0, url: u.toString() } satisfies Attachment;
-    },
-  ],
-  [
-    "PATCH",
-    /^\/admin\/attachments\/([\w-]+)$/,
-    async (ctx, [id]) => {
-      const admin = await requireAttachmentManager(ctx, id);
-      const row = await ctx.db.prepare("SELECT kind, lesson_id FROM lesson_attachments WHERE id = ?").bind(id).first<{ kind: string; lesson_id: string }>();
-      if (!row) return fail(404, "not_found", "找不到這個附件");
-      const body = await readJson<{ title?: unknown; url?: unknown }>(ctx.req);
-      const title = cleanTitle(body.title);
-      if (!title) return fail(400, "title_required", "請輸入顯示標題");
-      let url: URL | null = null;
-      if (body.url !== undefined) {
-        if (row.kind !== "link") return fail(400, "not_link", "只有網址附件可以修改網址");
-        url = parseHttpsUrl(body.url);
-        if (!url) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
-      }
-      await ctx.db.batch([
-        url
-          ? ctx.db.prepare("UPDATE lesson_attachments SET name = ?, link_url = ?, att_type = ? WHERE id = ?").bind(title, url.toString(), classifyLink(url), id)
-          : ctx.db.prepare("UPDATE lesson_attachments SET name = ? WHERE id = ?").bind(title, id),
-        audit(ctx.db, admin.sub, "lesson.attachment_edit", "lesson", row.lesson_id, id),
-      ]);
-      return { ok: true };
     },
   ],
   [
@@ -3322,27 +3209,6 @@ const routes: [string, RegExp, Handler][] = [
       const frame = await muxThumbnail(ctx.env, l.media_ref, t);
       if (!frame) return fail(502, "mux_frame_failed", "取得影片截圖失敗，請稍後再試");
       return new Response(frame.bytes, { headers: { "content-type": frame.type, "cache-control": "no-store" } });
-    },
-  ],
-  [
-    "GET",
-    /^\/media\/file$/,
-    async (ctx) => {
-      // 簽名網址即授權（瀏覽器下載無法帶 Authorization 標頭）；檔名取自資料表，一律以附件下載。
-      const key = await verifyFileUrl(ctx.env, ctx.url);
-      const bucket = ctx.env.MEDIA;
-      if (!key || !bucket) return new Response("Forbidden", { status: 403 });
-      const meta = await ctx.db.prepare("SELECT name, content_type FROM lesson_attachments WHERE r2_key = ?").bind(key).first<{ name: string; content_type: string }>();
-      const obj = meta ? await bucket.get(key) : null;
-      if (!meta || !obj) return new Response("Not found", { status: 404 });
-      return new Response(obj.body, {
-        headers: {
-          "content-type": meta.content_type,
-          "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(meta.name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`,
-          "x-content-type-options": "nosniff",
-          "cache-control": "private, max-age=600",
-        },
-      });
     },
   ],
   [
@@ -3918,9 +3784,9 @@ const routes: [string, RegExp, Handler][] = [
       const sharerRank = typeof body.sharerRank === "string" ? body.sharerRank.trim().slice(0, 40) : "";
       await assertCentralRank(ctx, sharerRank);
       if (sharerTitle) await noteJobTitle(ctx, sharerTitle);
-      const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
       const speakerNew = kind === "chapter" && body.isSpeaker === true;
       const summaryNew = kind === "chapter" && body.isSummary === true;
+      const title = summaryNew ? SUMMARY_TITLE : typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
       if (speakerNew && summaryNew) fail(400, "summary_speaker_exclusive", "主講人與總結與銷售課程不能同時勾選");
       if (!title && !speakerNew) fail(400, "title_required", `請輸入${kind === "material" ? "教材" : "章節"}名稱`);
       const eventDate = body.eventDate === undefined ? null : dayOrNull(body.eventDate);
