@@ -12,6 +12,7 @@ import { MiniAudioBar } from "@/features/player/audio-bar";
 import { PlayerLayer } from "@/features/player/player-layer";
 import { SwitchSheet } from "@/features/player/switch-sheet";
 import { installNoPageZoom } from "@/lib/no-page-zoom";
+import { installStableScrollbar } from "@/lib/stable-scrollbar";
 import { installWebPullRefresh } from "@/lib/web-pull-refresh";
 import { CenterNamesProvider } from "@/state/center-names";
 import { SessionProvider } from "@/state/session";
@@ -82,6 +83,7 @@ export default function RootLayout() {
   const { scheme, c } = useTheme();
   useEffect(() => installNoPageZoom(), []);
   useEffect(() => installWebPullRefresh(), []);
+  useEffect(() => installStableScrollbar(), []);
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,

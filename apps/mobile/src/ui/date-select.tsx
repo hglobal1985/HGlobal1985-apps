@@ -19,6 +19,9 @@ const daysIn = (y: number, m: number) => new Date(y, m, 0).getDate();
  * 月份加英文縮寫（例如「3 月 Mar」），避免和「日」搞混。
  * 沒有日期時顯示「設定日期（預設今天）」；新增資料時呼叫端直接給今天的日期。
  */
+/** 星期的中文（0＝日）。 */
+const WEEKDAY = ["日", "一", "二", "三", "四", "五", "六"];
+
 /** 年份最早可選到幾年前。 */
 export const YEARS_BACK = 40;
 
@@ -38,18 +41,24 @@ export function DateSelect({ label, value, onChange, clearable = true, defaultVa
   // 全站日期選擇統一（業主 2026-11-16）：年份從 5 年後到 40 年前，新的在上面。
   for (let i = Math.max(now + 5, y); i >= Math.min(now - YEARS_BACK, y); i--) years.push({ key: String(i), label: `${i} 年`, short: `${i}` });
   const months: SelectOption[] = MONTH_EN.map((en, i) => ({ key: String(i + 1), label: `${i + 1} 月 ${en}`, short: `${i + 1}月` }));
-  const days: SelectOption[] = Array.from({ length: daysIn(y, mo) }, (_, i) => ({ key: String(i + 1), label: `${i + 1} 日`, short: `${i + 1}日` }));
+  // 「日」選單帶星期（業主 2026-11-17）：23日（一）；週六、週日紅字。
+  const days: SelectOption[] = Array.from({ length: daysIn(y, mo) }, (_, i) => {
+    const wd = new Date(y, mo - 1, i + 1).getDay();
+    const text = `${i + 1}日（${WEEKDAY[wd]}）`;
+    // 收起時框比較窄（手機 390 寬），省略「日」字：23（一）；上方已有「日」標題。
+    return { key: String(i + 1), label: text, short: `${i + 1}（${WEEKDAY[wd]}）`, danger: wd === 0 || wd === 6 };
+  });
   return (
     <View style={styles.wrap}>
       {label ? <AppText variant="callout">{label}</AppText> : null}
       <View style={styles.row}>
-        <View style={{ flex: 1.15 }}>
+        <View style={{ flex: 1 }}>
           <Select label="年" value={String(y)} options={years} onChange={(v) => set(Number(v), mo, d)} />
         </View>
-        <View style={{ flex: 1.45 }}>
+        <View style={{ flex: 0.9 }}>
           <Select label="月" value={String(mo)} options={months} onChange={(v) => set(y, Number(v), d)} />
         </View>
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1.3 }}>
           <Select label="日" value={String(d)} options={days} onChange={(v) => set(y, mo, Number(v))} />
         </View>
       </View>

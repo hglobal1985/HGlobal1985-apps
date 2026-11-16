@@ -632,3 +632,7 @@
 - API：`GET /admin/courses/:id/review-desk`、`PUT …/review-roles`、`DELETE …/reviewers/:sub`、`POST …/review-invites`（回 `/review-invite/代碼`）、`GET /review-invites/:token`、`POST /review-invites/:token/accept`（一次性、24 小時；過期或被別人用掉回 410）。指定的審核人員也會收到「有新的報名待審核」通知。
 - 新增課程不建第 1 堂；`createTestDb` 預設用觸發器替測試補一堂（`firstLesson: false` 可關掉，見 tests/sqlite-d1.ts 說明），新行為由 auto-cover.test.ts 驗證。系列只限 super_admin（403 `series_super_admin_only`）。
 - 測試：tests/review-desk.test.ts（邀請、通知、刪除、過期、指定身份、系列權限）；後端共 137 項。
+
+## 2026-11-17：電腦版卡片閃爍重影、日期選單帶星期
+- 現象（業主錄影）：電腦版視窗在某些尺寸，中心頁 EDM 卡片一直在一列 3 張與 2 張之間跳動。原因＝捲軸出現／消失改變可用寬度的回饋循環。修正＝`lib/stable-scrollbar.ts` 全站 `scrollbar-gutter: stable`（根版面安裝）。本機以 Playwright 開啟捲軸、掃 300～700 寬 × 4 種高度：修正前 6 種尺寸閃爍，修正後 0。
+- `DateSelect` 的「日」：展開「23日（一）」、收起「23（一）」，週六日紅字；`Select` 新增選項屬性 `danger`。

@@ -9,7 +9,7 @@ import { AppText } from "./text";
 /** short＝收起時顯示在框內的短文字（例如「11 月」），展開的選單仍顯示完整的 label。 */
 /** hint＝展開選單裡靠右顯示的小字（例如「3 堂」）。 */
 export type SelectBadge = { text: string; tone: "accent" | "warn" | "new" };
-export type SelectOption = { key: string; label: string; short?: string; hint?: string; /** 靠右的小色塊標籤（例如「學習中 2」「未上架 1」「新」）。 */ badges?: SelectBadge[] };
+export type SelectOption = { key: string; label: string; short?: string; hint?: string; /** 靠右的小色塊標籤（例如「學習中 2」「未上架 1」「新」）。 */ badges?: SelectBadge[]; /** 紅色文字（例如日期選單裡的週六、週日）。 */ danger?: boolean };
 export type SelectProps = {
   label?: string;
   value: string;
@@ -49,7 +49,7 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
         </View>
       ) : (
       <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => setOpen(true)} style={[styles.box, { backgroundColor: c.surface, borderColor: c.border }]}>
-        <AppText variant="body" numberOfLines={1} style={{ flex: 1, color: current ? c.text : c.textMuted }}>
+        <AppText variant="body" numberOfLines={1} style={{ flex: 1, color: current ? (current.danger ? c.danger : c.text) : c.textMuted }}>
           {current?.short ?? current?.label ?? placeholder}
         </AppText>
         <Ionicons name="chevron-down" size={18} color={c.textMuted} />
@@ -72,7 +72,7 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
                   }}
                   style={[styles.item, { borderBottomColor: c.border, backgroundColor: on ? c.accentSoft : "transparent" }]}
                 >
-                  <AppText variant="body" style={{ flex: 1, fontWeight: on ? "700" : "400", color: on ? c.accentText : c.text }}>
+                  <AppText variant="body" style={{ flex: 1, fontWeight: on ? "700" : "400", color: o.danger ? c.danger : on ? c.accentText : c.text }}>
                     {o.label}
                   </AppText>
                   {o.badges?.map((b) => (
