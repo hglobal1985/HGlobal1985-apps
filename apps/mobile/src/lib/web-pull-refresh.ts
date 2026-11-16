@@ -8,7 +8,8 @@ import { Platform } from "react-native";
  */
 export function installWebPullRefresh(): () => void {
   if (Platform.OS !== "web" || typeof document === "undefined") return () => undefined;
-  const THRESHOLD = 90;
+  const THRESHOLD = 70; // 串接指令 2026-11-14.3：往下拖超過約 70 px 才觸發
+  const MIN_GAP_MS = 2000; // 連續兩次觸發至少間隔 2 秒（中央有每分鐘 120 次的讀取限制）
   let startY = 0;
   let startX = 0;
   let active = false;
@@ -67,8 +68,18 @@ export function installWebPullRefresh(): () => void {
   };
   const end = () => {
     if (active && pull >= THRESHOLD) {
-      show("更新中…", 14);
-      window.location.reload();
+      let last = 0;
+      try {
+        last = Number(sessionStorage.getItem("hg-last-pull") ?? 0);
+        sessionStorage.setItem("hg-last-pull", String(Date.now()));
+      } catch {
+        /* 沒有 sessionStorage 就不限制 */
+      }
+      if (Date.now() - last < MIN_GAP_MS) hide();
+      else {
+        show("更新中…", 14);
+        window.location.reload();
+      }
     } else hide();
     active = false;
     pull = 0;

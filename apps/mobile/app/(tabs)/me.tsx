@@ -22,7 +22,7 @@ function SiteFooter() {
   const credit = scheme === "dark" ? "#3d4441" : "#cfd2c9";
   return (
     <View style={styles.foot}>
-      <Pressable accessibilityRole="link" onPress={() => Linking.openURL("https://learn.hglobal1985.com/privacy")}>
+      <Pressable accessibilityRole="link" onPress={() => Linking.openURL("https://id.hglobal1985.com/privacy")}>
         <Text style={[styles.footText, { color: link, textDecorationLine: "underline" }]}>隱私權政策</Text>
       </Pressable>
       <Text style={[styles.footText, styles.credit, { color: credit }]}>系統設計 杜杜龍</Text>

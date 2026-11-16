@@ -194,7 +194,7 @@ export async function profileGaps(sub: string, token: string, email: string | nu
 
 /** 獎銜選項（代碼→名稱）：向中央 GET /v1/amway/field-definitions 讀取 key=rank 的 options，不寫死；快取 1 天、只放記憶體。讀不到回空 Map。 */
 export async function rankOptions(token: string): Promise<Map<string, string>> {
-  return cached("rank-options", 86_400_000, async () => {
+  return cached("rank-options", 300_000, async () => {
     const out = new Map<string, string>();
     const res = await callCentral(token, "/v1/amway/field-definitions");
     if (!res?.ok) return out;
@@ -353,7 +353,7 @@ export function forgetMember(sub: string): void {
 export type RankOption = { value: string; label: string };
 /** 獎銜選項清單（依階梯順序）；快取 1 天。 */
 export async function rankOptionList(token: string): Promise<RankOption[]> {
-  return cached("rank-option-list", 86_400_000, async () => {
+  return cached("rank-option-list", 300_000, async () => {
     const res = await callCentral(token, "/v1/amway/field-definitions");
     if (!res?.ok) return [];
     const b = (await res.json().catch(() => null)) as unknown;
@@ -380,9 +380,9 @@ export function parseRankBadges(b: unknown): Map<string, RankBadgeInfo | null> {
   return out;
 }
 
-/** 獎銜徽章清單（中央是唯一來源）；快取 1 天、只放記憶體；讀不到回 undefined（不快取，呼叫端暫用備援）。 */
+/** 獎銜徽章清單（中央是唯一來源）；快取最長 5 分鐘（串接指令 2026-11-15.5 標準 13）、只放記憶體；讀不到回 undefined（不快取，呼叫端暫用備援）。 */
 export async function rankBadges(token: string): Promise<Map<string, RankBadgeInfo | null> | undefined> {
-  return cached<Map<string, RankBadgeInfo | null> | undefined>("rank-badges", 86_400_000, async () => {
+  return cached<Map<string, RankBadgeInfo | null> | undefined>("rank-badges", 300_000, async () => {
     const res = await callCentral(token, "/v1/amway/field-definitions");
     if (!res?.ok) return undefined;
     const m = parseRankBadges(await res.json().catch(() => null));
@@ -453,7 +453,7 @@ export async function centralAddJobTitle(secret: string | undefined, value: stri
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
 
 /** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由業主在中央後台勾選，不在程式內宣稱）。 */
-export const INTEGRATED_VERSION = "2026-11-13.9";
+export const INTEGRATED_VERSION = "2026-11-15.5";
 export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile"];
 export const SIGNATURE_TOLERANCE_SECONDS = 300;
 
