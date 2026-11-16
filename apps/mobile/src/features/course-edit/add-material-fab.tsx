@@ -7,8 +7,9 @@ import { AppText } from "@/ui";
 
 export type AddKind = "course" | "list";
 
-const OPTIONS: { key: AddKind; label: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
-  { key: "list", label: "新增清單（影片／檔案）", icon: "list-outline" },
+const OPTIONS: { key: AddKind; label: string; sub?: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
+  // 業主 2026-11-16：「新增清單」一行，「(影片/檔案)」換行、字小一點。
+  { key: "list", label: "新增清單", sub: "(影片/檔案)", icon: "list-outline" },
   { key: "course", label: "新增課程", icon: "school-outline" },
 ];
 
@@ -34,9 +35,16 @@ export function AddMaterialFab({ onPick }: { onPick: (k: AddKind) => void }) {
         {open ? (
           <Animated.View style={[styles.menu, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }]}>
             {OPTIONS.map((o) => (
-              <Pressable key={o.key} accessibilityRole="button" accessibilityLabel={o.label} onPress={() => pick(o.key)} style={({ pressed }) => [styles.option, { backgroundColor: c.surface, borderColor: c.border }, pressed && { opacity: 0.8 }]}>
+              <Pressable key={o.key} accessibilityRole="button" accessibilityLabel={`${o.label}${o.sub ?? ""}`} onPress={() => pick(o.key)} style={({ pressed }) => [styles.option, { backgroundColor: c.surface, borderColor: c.border }, pressed && { opacity: 0.8 }]}>
                 <Ionicons name={o.icon} size={24} color={c.accent} />
-                <AppText variant="headline">{o.label}</AppText>
+                <View>
+                  <AppText variant="headline">{o.label}</AppText>
+                  {o.sub ? (
+                    <AppText variant="caption" tone="muted">
+                      {o.sub}
+                    </AppText>
+                  ) : null}
+                </View>
               </Pressable>
             ))}
           </Animated.View>
