@@ -94,10 +94,14 @@ export function teacherLine(c: { teacher: string; teacherRankName: string; teach
   return t ? `主講人：${t}` : "";
 }
 
-/** 只有主辦單位的顯示：「台中主辦」（首頁區塊用，不含指導單位）。 */
+/**
+ * 只有主辦單位的顯示（首頁區塊、課程資訊卡的「XX主辦」，不含指導單位）：
+ * 一個主辦＝「美國洛杉磯中心主辦」；兩個以上＝去掉各中心後面的「中心」、用「/」連接（業主 2026-11-16）：「台中/彰化/員林主辦」。
+ */
 export function hostLine(c: { hostUnit: string }): string {
   const hosts = c.hostUnit.split(/[、,，;；\n]+/).map((x) => x.trim()).filter(Boolean).map((x) => (x === "寰宇總部" ? x : centerTitle(x)));
-  return hosts.length ? `${hosts.join("、")}主辦` : "";
+  if (!hosts.length) return "";
+  return hosts.length === 1 ? `${hosts[0]}主辦` : `${hosts.map((h) => h.replace(/中心$/, "")).join("/")}主辦`;
 }
 
 /** 課程卡與首頁的地點顯示文字：線上課程不顯示（「線上課程」只在報名明細的繳費確認才出現）；勾「無」或沒填也不顯示。 */
