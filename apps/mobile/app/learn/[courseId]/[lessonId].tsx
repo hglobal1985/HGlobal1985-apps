@@ -7,7 +7,7 @@ import { AttachmentList } from "@/features/attachments";
 import { PageHeader } from "@/features/page-header";
 import { InlineAudio } from "@/features/player/audio-bar";
 import { engine } from "@/features/player/engine";
-import { eventDays, sharerLine } from "@/features/format";
+import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { buildTrack } from "@/features/player/engine.types";
 import { LessonPlayer } from "@/features/player/lesson-player";
 import { PlayerSlot } from "@/features/player/player-slot";
@@ -201,8 +201,9 @@ export default function LessonScreen() {
               key={l.id}
               icon={l.completed ? "checkmark-circle" : l.id === lesson.id ? "play-circle" : "play-circle-outline"}
               leading={l.isSpeaker && !l.completed ? <SpeakerLead /> : undefined}
+              note={minutesText(l.minutes)}
               title={`${l.position}. ${l.title}`}
-              subtitle={l.id === lesson.id ? "正在觀看" : [sharerLine(l), l.minutes ? `約 ${l.minutes} 分鐘` : ""].filter(Boolean).join(" · ") || undefined}
+              subtitle={l.id === lesson.id ? "正在觀看" : sharerLine(l) || undefined}
               highlight={l.id === lesson.id}
               dense
               right={l.eventDate ? <AppText variant="callout" tone="muted">{eventDays(l.eventDate, null)}</AppText> : undefined}
@@ -223,8 +224,9 @@ export default function LessonScreen() {
                 <ListRow
                   key={l.id}
                   icon={l.id === lesson.id ? "play-circle" : "play-circle-outline"}
+                  note={minutesText(l.minutes)}
                   title={l.title}
-                  subtitle={l.id === lesson.id ? "正在觀看" : [sharerLine(l), l.minutes ? `約 ${l.minutes} 分鐘` : ""].filter(Boolean).join(" · ") || undefined}
+                  subtitle={l.id === lesson.id ? "正在觀看" : sharerLine(l) || undefined}
                   highlight={l.id === lesson.id}
                   dense
                   onPress={l.id === lesson.id || l.locked ? undefined : () => {

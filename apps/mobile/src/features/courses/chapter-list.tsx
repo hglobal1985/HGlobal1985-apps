@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
-import { eventDays, sharerLine } from "@/features/format";
+import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, CourseCover } from "@/ui";
@@ -53,7 +53,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
               ) : null}
               <View style={styles.meta}>
                 <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {[date, lesson.minutes ? `${lesson.minutes} 分鐘` : ""].filter(Boolean).join(" · ")}
+                  {[date, minutesText(lesson.minutes)].filter(Boolean).join(" · ")}
                 </AppText>
                 <AppText variant="caption" tone="muted" numberOfLines={1} style={{ maxWidth: "45%" }}>
                   {course.title}

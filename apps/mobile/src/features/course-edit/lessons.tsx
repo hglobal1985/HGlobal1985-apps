@@ -8,7 +8,7 @@ import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { eventDays, sharerLine } from "@/features/format";
+import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { AppText, Button, Card, DateSelect, Icon, NoticeBox, Pill, todayStr } from "@/ui";
 import { Check } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
@@ -326,7 +326,7 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
               {lesson.full ? lesson.title : `${lesson.position}. ${lesson.title}`}
             </AppText>
             <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {[lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : "", lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
+              {[lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), minutesText(lesson.minutes), lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
             </AppText>
           </Pressable>
           {lesson.full ? null : (

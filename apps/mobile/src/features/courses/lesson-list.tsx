@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import type { ViewStyle } from "react-native";
 import type { CourseDetail } from "@/api/client";
-import { eventDays, sharerLine } from "@/features/format";
+import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { AppText, Card, ListRow } from "@/ui";
 import { SpeakerLead } from "./speaker-mark";
 
@@ -24,8 +24,9 @@ export function ChapterList({ course, style }: { course: CourseDetail; style?: V
                 key={lesson.id}
                 icon={soon ? "hourglass-outline" : lesson.completed ? "checkmark-circle" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
                 leading={lesson.isSpeaker && !soon && !lesson.completed && !lesson.locked ? <SpeakerLead /> : undefined}
+                note={minutesText(lesson.minutes)}
                 title={`${lesson.position}. ${lesson.title}`}
-                subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : "", lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
+                subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
                 right={lesson.eventDate ? <AppText variant="callout" tone="muted">{eventDays(lesson.eventDate, null)}</AppText> : undefined}
                 dense
                 onPress={lesson.locked || soon ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
@@ -47,8 +48,9 @@ export function FullVersionList({ course }: { course: CourseDetail }) {
         <ListRow
           key={lesson.id}
           icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
+          note={minutesText(lesson.minutes)}
           title={lesson.title}
-          subtitle={[sharerLine(lesson), lesson.minutes ? `${lesson.minutes} 分鐘` : ""].filter(Boolean).join(" · ") || undefined}
+          subtitle={sharerLine(lesson) || undefined}
           onPress={lesson.locked ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
         />
       ))}

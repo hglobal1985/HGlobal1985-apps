@@ -8,6 +8,7 @@ import { AppText } from "./text";
 export function ListRow({
   icon,
   leading,
+  note,
   title,
   subtitle,
   right,
@@ -19,6 +20,8 @@ export function ListRow({
   icon?: IconName;
   /** 自訂的前置圖示（取代 icon），例如章節清單的主講人學士帽。 */
   leading?: ReactNode;
+  /** 前置圖示正下方的小字（章節清單的「12分鐘」）；傳空字串＝不顯示文字但仍保留同寬的欄位，各列文字才會對齊。 */
+  note?: string;
   title: string;
   subtitle?: string;
   right?: ReactNode;
@@ -37,7 +40,18 @@ export function ListRow({
       accessibilityRole={onPress ? "button" : undefined}
       style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, marginHorizontal: -space.lg, paddingHorizontal: space.lg }, pressed && { opacity: 0.7 }]}
     >
-      {leading ?? (icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null)}
+      {note !== undefined ? (
+        <View style={{ width: 48, alignItems: "center", gap: 2 }}>
+          {leading ?? (icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null)}
+          {note ? (
+            <AppText variant="caption" tone="muted" numberOfLines={1} style={{ fontSize: 11, lineHeight: 14 }}>
+              {note}
+            </AppText>
+          ) : null}
+        </View>
+      ) : (
+        leading ?? (icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null)
+      )}
       <View style={{ flex: 1, gap: 2 }}>
         <AppText variant="headline" style={unread ? undefined : { fontWeight: "500" }}>
           {title}
