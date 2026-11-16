@@ -206,7 +206,6 @@ export default function LessonScreen() {
               subtitle={l.id === lesson.id ? "正在觀看" : sharerLine(l) || undefined}
               highlight={l.id === lesson.id}
               dense
-              right={l.eventDate ? <AppText variant="callout" tone="muted">{eventDays(l.eventDate, null)}</AppText> : undefined}
               onPress={l.id === lesson.id || l.locked ? undefined : () => {
                 engine.expectSwitch();
                 router.replace(`/learn/${c.id}/${l.id}`);

@@ -1,8 +1,8 @@
 import { router } from "expo-router";
 import type { ViewStyle } from "react-native";
 import type { CourseDetail } from "@/api/client";
-import { eventDays, minutesText, sharerLine } from "@/features/format";
-import { AppText, Card, ListRow } from "@/ui";
+import { minutesText, sharerLine } from "@/features/format";
+import { Card, ListRow } from "@/ui";
 import { SpeakerLead } from "./speaker-mark";
 
 /**
@@ -27,7 +27,6 @@ export function ChapterList({ course, style }: { course: CourseDetail; style?: V
                 note={minutesText(lesson.minutes)}
                 title={`${lesson.position}. ${lesson.title}`}
                 subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
-                right={lesson.eventDate ? <AppText variant="callout" tone="muted">{eventDays(lesson.eventDate, null)}</AppText> : undefined}
                 dense
                 onPress={lesson.locked || soon ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
               />

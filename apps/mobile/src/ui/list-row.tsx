@@ -42,7 +42,7 @@ export function ListRow({
     >
       {note !== undefined ? (
         <View style={{ width: 48, alignItems: "center", gap: 2 }}>
-          {leading ?? (icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null)}
+          {leading ?? (icon ? <Icon name={icon} size={36} color={c.textMuted} /> : null)}
           {note ? (
             <AppText variant="caption" tone="muted" numberOfLines={1} style={{ fontSize: 11, lineHeight: 14 }}>
               {note}

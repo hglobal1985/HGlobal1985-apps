@@ -2,10 +2,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { View } from "react-native";
 import { useTheme } from "@/theme/theme";
 
-/** 章節清單最前面的特大學士帽（取代播放圖示；外框寬度與一般圖示相同，文字對齊不變，帽子向兩側溢出）。 */
+/** 章節清單最前面的特大學士帽（取代播放圖示；大小與章節清單的播放圖示相同，都是 36）。 */
 export function SpeakerLead() {
   return (
-    <View style={{ width: 22, alignItems: "center", justifyContent: "center" }}>
+    <View style={{ alignItems: "center", justifyContent: "center" }}>
       <SpeakerMark size={36} />
     </View>
   );
