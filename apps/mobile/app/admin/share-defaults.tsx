@@ -99,6 +99,7 @@ export default function ShareDefaultsScreen() {
         <Card>
           {input("一般分享的文字", "分享中心、分類、系列等頁面時，放在網址前面的文字", s.inviteText, (v) => set("inviteText", v), { multiline: true })}
           {input("單堂課程分享的文字", "可用 {主講人}、{職稱}、{課程名稱}，送出時會換成實際的內容（沒填職稱的課程，{職稱} 會自動省略；有職稱時姓名與職稱中間自動空一格）", s.courseText, (v) => set("courseText", v), { multiline: true })}
+          {input("章節分享的文字", "課程有兩堂以上章節時，每一堂右側的分享鈕：可用 {主講人}、{職稱}、{章節名稱}、{課程名稱}。主講人、職稱、章節名稱一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不是課程的", s.chapterText, (v) => set("chapterText", v), { multiline: true })}
           {input("其他教材分享的文字", "課程頁「其他教材」每一列右側的分享鈕：可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}；分享出去的網址是教材的外部連結本身", s.materialText, (v) => set("materialText", v), { multiline: true })}
           {input("網址前的引導文字", "自成一行，放在文字與網址中間（一般分享、單堂課程、其他教材都用）", s.linkLead, (v) => set("linkLead", v))}
         </Card>
@@ -144,6 +145,12 @@ export default function ShareDefaultsScreen() {
           </AppText>
           <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
             <AppText variant="body">{shareMessage(s, sampleUrl, { teacher: "王小明", teacherTitle: "區域經理", title: "翡翠達標班" })}</AppText>
+          </View>
+          <AppText variant="callout" tone="muted">
+            章節的分享文字（章節「第 2 堂 溝通技巧」、分享者「李華」、分享者職稱「白金經理」）
+          </AppText>
+          <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
+            <AppText variant="body">{shareMessage(s, "https://learn.hglobal1985.com/136/wang-xiaoming-001?lesson=c1", { teacher: "王小明", title: "翡翠達標班" }, undefined, { sharer: "李華", sharerTitle: "白金經理", title: "第 2 堂 溝通技巧" })}</AppText>
           </View>
           <AppText variant="callout" tone="muted">
             其他教材的分享文字（教材「簡報講義」、課程「翡翠達標班」）

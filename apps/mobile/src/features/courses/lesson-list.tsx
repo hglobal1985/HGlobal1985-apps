@@ -3,7 +3,7 @@ import { Linking, Pressable, type ViewStyle } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/attachments";
 import { minutesText, sharerLine } from "@/features/format";
-import { lessonHref } from "@/lib/lesson-href";
+import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
@@ -15,6 +15,7 @@ import { SpeakerLead } from "./speaker-mark";
 /**
  * 章節清單（學員看到的樣子）：課程介紹頁與中心頁「點課程彈出的選單」共用同一個元件，
  * 格式永遠一致；要改章節的呈現只改這裡。
+ * 課程有兩堂以上章節時，每一列最右側有「分享」鈕（分享這一堂；姓名、職稱、主題取章節自己的設定，文字範本在「設定 > 分享預設值」）。
  * 課程介紹頁傳 onPlay／playingId＝點章節原地播放、正在播放那列顯示動畫三角形；沒傳（中心頁選單）＝進該課程頁並開始播放。
  */
 export type LessonPlayProps = { playingId?: string | null; onPlay?: (lessonId: string) => void };
@@ -40,6 +41,7 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
                 subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
                 dense
                 compact
+                right={chapters.length >= 2 && !soon ? <ChapterShare course={course} lesson={lesson} /> : undefined}
                 onPress={lesson.locked || soon || playingId === lesson.id ? undefined : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))}
               />
             );
@@ -88,16 +90,30 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
   );
 }
 
-/** 教材最右側的「分享」鈕：系統分享選單，分享出去的是外部連結本身（文字範本見「設定 > 分享預設值」的教材分享文字）。 */
-function MaterialShare({ course, lesson }: { course: CourseDetail; lesson: Lesson }) {
+/** 清單每列最右側的「分享」小按鈕（系統預設分享圖示）。 */
+function RowShare({ label, onShare }: { label: string; onShare: () => Promise<"shared" | "copied" | "cancelled"> }) {
   const { c } = useTheme();
-  const share = async () => {
-    const r = await shareLink(lesson.title, lesson.linkUrl!, { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }, { title: lesson.title });
-    if (r === "copied") showToast("已複製連結");
+  const press = async () => {
+    if ((await onShare()) === "copied") showToast("已複製連結");
   };
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`分享教材：${lesson.title}`} onPress={share} hitSlop={6} style={({ pressed }) => [{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={6} style={({ pressed }) => [{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
       <ShareIcon size={24} color={c.accent} />
     </Pressable>
+  );
+}
+
+/** 教材最右側的「分享」鈕：分享出去的是外部連結本身（文字範本見「設定 > 分享預設值」的教材分享文字）。 */
+function MaterialShare({ course, lesson }: { course: CourseDetail; lesson: Lesson }) {
+  return <RowShare label={`分享教材：${lesson.title}`} onShare={() => shareLink(lesson.title, lesson.linkUrl!, { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }, { title: lesson.title })} />;
+}
+
+/** 章節最右側的「分享」鈕：分享這一堂（網址帶 ?lesson=，點開直接停在這一堂）；分享者姓名、職稱、章節名稱一律取這一堂章節自己的設定，不用課程的。 */
+function ChapterShare({ course, lesson }: { course: CourseDetail; lesson: Lesson }) {
+  return (
+    <RowShare
+      label={`分享章節：${lesson.title}`}
+      onShare={() => shareLink(lesson.title, lessonShareHref(course, lesson.id), { teacher: course.teacher ?? "", title: course.title }, undefined, { sharer: lesson.sharer ?? "", sharerTitle: lesson.sharerTitle ?? "", title: lesson.title })}
+    />
   );
 }

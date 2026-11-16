@@ -84,3 +84,14 @@ test("教材分享文字：可用 {教材名稱}、{課程名稱}、{主講人}�
   const custom = { ...S, materialText: "{主講人}{職稱}的教材《{教材名稱}》" };
   assert.equal(shareMessage(custom, "u", { teacher: "王", teacherTitle: "經理", title: "T" }, { title: "N" }).split("\n")[0], "王 經理的教材《N》");
 });
+
+test("章節分享文字：姓名、職稱、章節名稱取章節自己的設定（不用課程的）；章節沒填分享者用「老師」；課程名稱取所屬課程", () => {
+  const S = DEFAULT_SHARE_SETTINGS;
+  const course = { teacher: "課程主講", teacherTitle: "課程職稱", title: "翡翠班" };
+  assert.equal(shareMessage(S, "https://u/c?lesson=1", course, undefined, { sharer: "李華", sharerTitle: "白金經理", title: "第2堂 溝通" }), "我剛聽完這場 李華 白金經理的這場精彩演講 第2堂 溝通 我就立刻想到要分享給你！\n\n按此開啟網址 👉\nhttps://u/c?lesson=1");
+  const noTitle = shareMessage(S, "u", course, undefined, { sharer: "李華", sharerTitle: "", title: "X" }).split("\n")[0];
+  assert.equal(noTitle?.includes("課程"), false, "沒填章節分享者職稱：省略，不會借用課程的職稱");
+  assert.match(shareMessage(S, "u", course, undefined, { sharer: "", title: "X" }), /這場 老師的/, "沒填分享者＝老師，不借用課程主講人");
+  const custom = { ...S, chapterText: "《{章節名稱}》出自「{課程名稱}」，講者 {主講人}{職稱}" };
+  assert.equal(shareMessage(custom, "u", course, undefined, { sharer: "李華", sharerTitle: "經理", title: "T" }).split("\n")[0], "《T》出自「翡翠班」，講者 李華 經理");
+});

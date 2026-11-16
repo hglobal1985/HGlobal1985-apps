@@ -540,6 +540,8 @@ export type ShareSettings = {
   fallbackDescription: string;
   /** 分享「其他教材」（外部連結）的文字範本，可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}；後面接 linkLead 與外部連結網址。 */
   materialText: string;
+  /** 分享單一章節的文字範本（課程有兩堂以上章節時，章節清單每列右側的分享鈕）。{主講人}、{職稱}、{章節名稱} 一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不用課程的；{課程名稱} 是所屬課程。 */
+  chapterText: string;
 };
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   inviteText: "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️",
@@ -553,14 +555,24 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   hqName: "寰宇總部",
   fallbackDescription: "",
   materialText: "我推薦你看這份教材：{教材名稱}（{課程名稱}）",
+  chapterText: "我剛聽完這場 {主講人}{職稱}的這場精彩演講 {章節名稱} 我就立刻想到要分享給你！",
 };
 
-/** 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 就用課程範本（{主講人}、{職稱}、{課程名稱} 換成實際內容）。 */
-export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }): string {
+/** 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 用課程範本；其他教材傳 material；單一章節傳 chapter（姓名、職稱、章節名稱取章節自己的設定，課程只提供課程名稱）。 */
+export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }, chapter?: { sharer: string; sharerTitle?: string; title: string }): string {
   // {職稱}：有職稱就在前面補一個空白再接職稱（「王小明 區域經理」），沒填就整個省略（不留多餘空白）。
   const title = (course?.teacherTitle ?? "").trim();
   const fill = (t: string) => t.replaceAll("{主講人}", (course?.teacher ?? "").trim() || "老師").replaceAll("{職稱}", title ? ` ${title}` : "").replaceAll("{課程名稱}", course?.title ?? "");
-  const lead = material ? fill(s.materialText).replaceAll("{教材名稱}", material.title) : course ? fill(s.courseText) : s.inviteText;
+  // 章節分享：姓名、職稱、主題都以這一堂章節的設定為準（不是課程的）。
+  const cTitle = (chapter?.sharerTitle ?? "").trim();
+  const chapterLead = chapter
+    ? s.chapterText
+        .replaceAll("{主講人}", chapter.sharer.trim() || "老師")
+        .replaceAll("{職稱}", cTitle ? ` ${cTitle}` : "")
+        .replaceAll("{章節名稱}", chapter.title)
+        .replaceAll("{課程名稱}", course?.title ?? "")
+    : null;
+  const lead = chapterLead ?? (material ? fill(s.materialText).replaceAll("{教材名稱}", material.title) : course ? fill(s.courseText) : s.inviteText);
   return `${lead}\n\n${s.linkLead}\n${url}`;
 }
 

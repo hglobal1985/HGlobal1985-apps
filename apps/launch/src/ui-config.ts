@@ -62,6 +62,7 @@ export function normalizeShare(raw: unknown): ShareSettings {
     hqName: str(r.hqName, d.hqName, 30),
     fallbackDescription: str(r.fallbackDescription, d.fallbackDescription, 100, true),
     materialText: str(r.materialText, d.materialText, 300),
+    chapterText: str(r.chapterText, d.chapterText, 300),
   };
 }
 
