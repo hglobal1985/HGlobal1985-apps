@@ -26,7 +26,8 @@ const clamp = (p: Pos, w: number, h: number): Pos => ({
   y: Math.min(window.innerHeight - h - MARGIN, Math.max(MARGIN, p.y)),
 });
 
-const btn: CSSProperties = { position: "absolute", border: 0, borderRadius: 999, background: "rgba(0,0,0,0.6)", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation", font: "700 16px sans-serif", padding: 0 };
+// 迷你播放器的按鈕：實心黑底白字（業主 2026-11-17：取消半透明）。
+const btn: CSSProperties = { position: "absolute", border: 0, borderRadius: 999, background: "#000", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation", font: "700 16px sans-serif", padding: 0 };
 
 /**
  * Web 全站播放畫面層（只有一份、永遠存在）：
@@ -157,7 +158,7 @@ export function PlayerLayer() {
   useEffect(() => {
     if (!s.hintAt) return;
     setShowHint(true);
-    const id = setTimeout(() => setShowHint(false), 3500);
+    const id = setTimeout(() => setShowHint(false), 1000); // 提示文字 1 秒後自動消失（業主 2026-11-17）
     return () => clearTimeout(id);
   }, [s.hintAt]);
 
@@ -333,7 +334,7 @@ export function PlayerLayer() {
           />
         ) : null}
       </div>
-      {canZoom ? <div ref={gesture} onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
+      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
       {canZoom && showHint ? (
         <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 999, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 12, lineHeight: "16px", fontWeight: 500, whiteSpace: "nowrap", pointerEvents: "none" }}>
           <span style={{ fontFamily: "ionicons", fontSize: 14, lineHeight: "16px" }}>{String.fromCodePoint(Number(Ionicons.glyphMap["move"]))}</span>
@@ -347,7 +348,7 @@ export function PlayerLayer() {
         </div>
       ) : null}
       {windowed ? (
-        <div style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab" }} onPointerDown={down} onPointerMove={(e) => { move(e); wakeCtl(); }} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="回到課程頁（可按住拖曳移動）">
+        <div data-no-pull-refresh="" style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab" }} onPointerDown={down} onPointerMove={(e) => { move(e); wakeCtl(); }} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="回到課程頁（可按住拖曳移動）">
           <button type="button" aria-label="關閉播放" style={{ ...btn, ...ctlStyle, top: 4, right: 4, width: 40, height: 40 }} onPointerDown={stop} onPointerUp={stop} onClick={() => !justSwitched() && engine.close()}>
             ✕
           </button>

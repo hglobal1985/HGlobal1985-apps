@@ -637,3 +637,4 @@
 - 現象（業主錄影）：電腦版視窗在某些尺寸，中心頁 EDM 卡片一直在一列 3 張與 2 張之間跳動。原因＝捲軸出現／消失改變可用寬度的回饋循環。修正＝`lib/stable-scrollbar.ts` 全站 `scrollbar-gutter: stable`（根版面安裝）。本機以 Playwright 開啟捲軸、掃 300～700 寬 × 4 種高度：修正前 6 種尺寸閃爍，修正後 0。
 - `DateSelect` 的「日」：展開「23日（一）」、收起「23（一）」，週六日紅字；`Select` 新增選項屬性 `danger`。
 - 2026-11-17 修正：「單元」檢視章節縮圖被 YouTube 縮圖蓋掉課程手動上傳的封面（上一輪刪除自動抓封面勾選時，`/search-index` 誤把 YouTube 縮圖放進 coverUrl）。改回 coverUrl 只給章節自己的封面；測試 auto-cover.test.ts 已加檢查。
+- 2026-11-17：迷你播放器按鈕改實心黑底（player-layer.web.tsx `btn`）；影片「可拖曳或放大縮小」提示 3.5 秒→1 秒；下拉重新整理排除帶 `data-no-pull-refresh` 的區塊（課程 EDM 拖曳 `EdmPan`、EDM 放大視窗、影片放大拖曳層、迷你播放器），本機以觸控模擬驗證：EDM 上拖曳不重新整理、其他地方照常。
