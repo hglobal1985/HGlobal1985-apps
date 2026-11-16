@@ -13,8 +13,6 @@ import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses } from "@/lib/roles";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
-import { CourseRow } from "./course-row";
-import { farToNear } from "./series-sheet";
 import { SeriesTile } from "./series-tile";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
@@ -30,7 +28,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, Select, TopBar, TopBarButton, type SelectBadge, type SelectOption } from "@/ui";
+import { AppText, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, TopBar, TopBarButton } from "@/ui";
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
@@ -43,7 +41,7 @@ const GAP = space.md;
  * 「中心」下拉：選了中心，下方先顯示該中心的 EDM（有上傳才有），只列該中心主辦的課程。
  * 管理者（總部、會長、音控、小編）另外看得到自己能管的「未上架」課程（標示未上架）、最下面可展開「已封存」、右下角「＋新增課程」。
  */
-export function CoursesView({ initialCategory = "", initialCenter = "", series = "", inStack = false }: { initialCategory?: string; initialCenter?: string; series?: string; inStack?: boolean }) {
+export function CoursesView({ initialCategory = "", initialCenter = "", inStack = false }: { initialCategory?: string; initialCenter?: string; inStack?: boolean }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
   const { member } = useSession();
   useCenterNames(); // 中心名稱有更新時重新畫
@@ -56,7 +54,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const category = selCats.join("、");
   const [catOpen, setCatOpen] = useState(false);
   const [center, setCenter] = useState(initialCenter || ALL);
-  const seriesFilter = series;
   useEffect(() => {
     if (initialCategory) setSelCats(initialCategory.split("、").filter(Boolean));
   }, [initialCategory]);
@@ -77,7 +74,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     return url;
   };
   const syncUrl = (cat: string, cen: string) => {
-    if (Platform.OS !== "web" || typeof window === "undefined" || seriesFilter) return;
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
     window.history.replaceState(window.history.state, "", urlFor(cat, cen));
   };
   // 用下拉選了某個分類：課程呈現自動跳到「單元」（章節）模式；回到「全部分類」就恢復原本的模式。
@@ -142,7 +139,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   };
   const [rowW, setRowW] = useState(0);
   const [wantIndex, setWantIndex] = useState(false);
-  const chapterMode = mode === "chapter" && !seriesFilter;
+  const chapterMode = mode === "chapter";
   const searchData = useApi<{ lessons: SearchLesson[] }>(wantIndex || chapterMode ? "/search-index" : null);
   const { c } = useTheme();
   const { config } = useUiConfig();
@@ -183,21 +180,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     const weight = new Map([...catStats.keys()].map((k) => [k, total(k)]));
     return [...catStats.keys()].sort((a, b) => Number(a === NONE) - Number(b === NONE) || weight.get(b)! - weight.get(a)! || a.localeCompare(b, "zh-Hant"));
   }, [catStats, courses]);
-  const categoryOption = (x: string): SelectOption => {
-    const st = catStats.get(x)!;
-    const badges: SelectBadge[] = [];
-    if (st.learning) badges.push({ text: `學習中 ${st.learning}`, tone: "accent" });
-    if (manager && st.draft) badges.push({ text: `未上架 ${st.draft}`, tone: "warn" });
-    if (st.fresh) badges.push({ text: "新", tone: "new" });
-    return { key: x, label: x === NONE ? "未分類" : x, hint: `${st.n} 堂`, badges };
-  };
-  const allOption: SelectOption = {
-    key: ALL,
-    label: "全部分類",
-    short: "分類",
-    hint: `${lessonsOf(courses)} 堂`,
-    badges: courses.some((x) => x.enrollment === "opened") ? [{ text: `學習中 ${lessonsOf(courses.filter((x) => x.enrollment === "opened"))}`, tone: "accent" }] : [],
-  };
   // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（業主 2026-11-15）；不混入本地資料。
   const rights = member?.courseRights;
   const centerList = useApi<string[]>(member ? "/centers" : null);
@@ -220,10 +202,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
   const needIndex = wantIndex || chapterMode;
   const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? []) : null), [needIndex, courses, searchData.data]);
-  const matched = searchIndex && !seriesFilter ? matchCourses(searchIndex, q) : null;
+  const matched = searchIndex ? matchCourses(searchIndex, q) : null;
   const terms = searchIndex && q.trim() && q !== picked ? suggestTerms(searchIndex, q) : [];
   // 搜尋時不受兩頁分流限制（搜得到所有課程）；其餘只看目前這一頁的課程。
-  const list = (matched ? courses : pool).filter((x) => (matched ? matched.has(x.id) : inCategory(x) && inCenter(x) && (!seriesFilter || x.series === seriesFilter)));
+  const list = (matched ? courses : pool).filter((x) => (matched ? matched.has(x.id) : inCategory(x) && inCenter(x) ));
   const pickTerm = (text: string) => {
     const head = q.trim().split(/\s+/).slice(0, -1).join(" ");
     const next = head ? `${head} ${text}` : text;
@@ -262,29 +244,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
   const cols = flat ? 3 : boxW >= 520 ? 3 : 2; // 中心頁的直式 EDM 卡一列三張
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
-  // 系列單頁（顯示全部）時，分類下拉顯示這個系列所屬的分類（有多個分類就顯示「全部分類」）；改選別的分類就離開系列頁。
-  const seriesCats = seriesFilter ? [...new Set(courses.filter((x) => x.series === seriesFilter).flatMap((x) => x.category.split("、")).filter(Boolean))] : [];
-  const shownCategory = seriesCats.length === 1 ? seriesCats[0]! : ALL;
-  const leaveSeries = (v: string) => {
-    const slug = v === ALL ? null : links.data?.find((l) => l.kind === "category" && l.value === v)?.slug;
-    if (slug) router.replace(`/${slug}`);
-    else router.replace(v === ALL ? "/courses" : { pathname: "/courses", params: { category: v } });
-  };
   const filterRow = (
     <View>
     <View style={styles.filters} onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}>
-      {!seriesFilter ? <View style={{ width: SEARCH_ICON_W }} /> : null}
+      <View style={{ width: SEARCH_ICON_W }} />
       <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end", gap: space.sm, opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
       <View style={{ flex: 1 }}>
-        {seriesFilter ? (
-          <Select value={shownCategory} options={[allOption, ...categories.map(categoryOption)]} onChange={leaveSeries} />
-        ) : (
-          <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
-        )}
+        <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
       </View>
-      {!seriesFilter ? <ViewToggle value={mode} onChange={pickMode} /> : null}
+      <ViewToggle value={mode} onChange={pickMode} />
       </View>
-      {!seriesFilter ? (
         <SearchBox
           open={searchOpen}
           onOpen={() => (setWantIndex(true), setSearchOpen(true))}
@@ -293,7 +262,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
           onChange={(v) => (setQ(v), setPicked(""))}
           rowWidth={rowW}
         />
-      ) : null}
     </View>
     {chapterMode ? <UnitFilter value={unitFilter} onChange={pickUnitFilter} /> : null}
     {terms.length ? (
@@ -314,20 +282,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     ) : null}
     </View>
   );
-  // 系列單頁：只列該系列，每一梯都展開成完整課程卡，順序與梯次選單相同（日期由遠到近）。
-  if (seriesFilter) {
-    const all = farToNear(courses.filter((x) => x.series === seriesFilter));
-    return (
-      <Screen header={!inStack} top={filterRow}>
-        {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
-        {loading && !data ? <LoadingView /> : null}
-        {data && !all.length ? <EmptyState icon="library-outline" title="這個系列目前沒有課程" /> : null}
-        {all.map((x) => (
-          <CourseRow key={x.id} course={x} />
-        ))}
-      </Screen>
-    );
-  }
   // 中心專屬頁：網頁進入時多記一筆瀏覽紀錄，瀏覽器／手機的「返回」＝回到中心清單；Android 實體返回鍵同理。
   const pushedRef = useRef(false);
   const centerUrlRef = useRef(""); // 記下「中心頁」那一筆紀錄的網址

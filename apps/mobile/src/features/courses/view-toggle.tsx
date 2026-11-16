@@ -21,9 +21,9 @@ export function ViewToggle({ value, onChange }: { value: CourseViewMode; onChang
   };
   return (
     <View style={[styles.wrap, { borderColor: c.border, backgroundColor: c.surface }]} accessibilityRole="radiogroup">
-      {item("series", "grid-outline", "相同系列")}
+      {item("series", "grid-outline", "系列")}
       {item("chapter", "list-outline", "單元")}
-      {item("center", "business-outline", "寰宇教育中心")}
+      {item("center", "business-outline", "教育中心")}
     </View>
   );
 }

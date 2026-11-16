@@ -599,3 +599,9 @@
 - **小樹苗**（業主選定第 12 號圖）：`SaplingIcon`（`ui/sapling-icon.tsx`）。章節播放超過完成門檻（預設 95%）＝已完成，清單左側改顯示小樹苗（取代灰色打勾）。「學習中」最上方 `SaplingBar`（`features/achievements/sapling-bar.tsx`）：小樹苗累計（所有課程已完成章節數加總）與「學習成就」並排一列，下方列出已解鎖成就圖示，點一下以全螢幕文字提醒顯示達成條件；設定頁的「學習成就」入口已移除（成就完整頁 `/achievements` 仍在，從學習中的成就卡進入）。
 - **全螢幕文字提醒模組** `ui/flash-notice.tsx`：`showFlash({icon, title, body, holdMs})`＋根版面的 `FlashHost`。位置靠上（螢幕高 12% 處）、尺寸為原本 3 倍（圖示 120、標題 51、說明 39）、淡入停留淡出、不擋操作。切換相同系列／單元／寰宇教育中心（`features/courses/mode-flash.tsx` 的 `flashMode`）、小樹苗、成就一律用它；要改格式只改這個檔案。
 - **Mux 匯入只有超級管理員**：前端章節與教材面板 `allowMux = isSuperAdmin(member)`；後端 `GET /admin/mux/assets` 改 `requireSuperAdmin`，章節設定 `mediaType: mux` 需要 `super_admin` 角色（總部秘書也不行）。已用 Mux 的舊章節仍可播放。
+
+## 2026-11-16（再續）：系列頁改版、封面上傳模組、小視窗調整
+- **系列頁**（`features/courses/series-page.tsx`，`/series/名稱` 與系列短網址共用）：工具列（返回、標題、超級管理員「編輯」、分享）→ 照片區（`CenterHero`，與中心頁同一個元件，封面圖＋N 門課・N 章節・N 瀏覽，可上滑縮小）→ 右上角切換「詳細清單」（`CourseRow`，每列右側有分享鈕）與「圖片 EDM」（一列三張，`SeriesTile flat`），選擇記在手機（`hglobal:learn:series-view`）。已移除上方分類篩選；`CoursesView` 不再處理系列。
+- **封面上傳模組** `features/admin/art-uploader.web.tsx`（`ArtUploader`）：中心與系列共用（`CenterEdm`、`SeriesEdm` 只是傳入網址的薄外殼）。裁切 16:9／完整顯示、預覽、調整框、移除都在這一個檔案；手機 App 只顯示「請在網頁版上傳」。課程自己的 `EdmManager`（課程頁）版面不同，尚未併入。
+- **後端**：migration 0059（`series_art` 加 `cover_key／cover_rect／edm_view_y`、新表 `series_views`）；`GET /series-art`、`PUT /admin/series/cover`、`PATCH /admin/series/edm`（裁切框）、`POST /series-views`（同人同日只算一次）。刪除系列／移除 EDM 一併清封面檔。
+- **全螢幕文字提醒（`ui/flash-notice.tsx`）**：改為比 3 倍版再縮小 50％，所有視窗固定同一個寬高（190×230），文字依字數自動挑字級、超過自動換行，點一下立即關閉。模式名稱改為「系列／單元／教育中心」。

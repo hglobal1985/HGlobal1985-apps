@@ -97,7 +97,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
 }
 
 /** 清單每列最右側的「分享」小按鈕（系統預設分享圖示）。 */
-function RowShare({ label, onShare }: { label: string; onShare: () => Promise<"shared" | "copied" | "cancelled"> }) {
+export function RowShare({ label, onShare }: { label: string; onShare: () => Promise<"shared" | "copied" | "cancelled"> }) {
   const { c } = useTheme();
   const press = async () => {
     if ((await onShare()) === "copied") showToast("已複製連結");

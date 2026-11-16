@@ -1,15 +1,9 @@
 import { useLocalSearchParams } from "expo-router";
-import { CoursesView } from "@/features/courses/courses-view";
-import { PageHeader } from "@/features/page-header";
+import { SeriesPage } from "@/features/courses/series-page";
 
-/** 系列單頁（沒有設定短網址時的網址 /series/系列名稱）：該系列全部梯次展開；上方工具列與課程頁相同（標題＋分享）。 */
-export default function SeriesPage() {
+/** 系列單頁（沒有設定短網址時的網址 /series/系列名稱）：版面在 features/courses/series-page.tsx（比照中心頁）。 */
+export default function SeriesRoute() {
   const { name } = useLocalSearchParams<{ name: string }>();
   const series = decodeURIComponent(String(name ?? ""));
-  return (
-    <>
-      <PageHeader title={series} path={`/series/${encodeURIComponent(series)}`} />
-      <CoursesView series={series} inStack />
-    </>
-  );
+  return <SeriesPage series={series} path={`/series/${encodeURIComponent(series)}`} />;
 }

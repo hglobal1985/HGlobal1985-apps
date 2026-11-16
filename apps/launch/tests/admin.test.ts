@@ -377,3 +377,27 @@ test("系列專屬 EDM：只有超級管理員上傳、課程摘要帶網址、�
   assert.equal((await call("DELETE", `/admin/series/edm?series=${encodeURIComponent("A 系列")}`, { token: admin })).status, 200);
   assert.equal([...r2.objects.keys()].filter((k) => k.startsWith("series/")).length, 0);
 });
+
+test("系列封面（比照中心）：先有 EDM 才能上傳封面、裁切框存進去、/series-art 帶出；瀏覽人次同人同日只算一次；刪除一併清檔", async () => {
+  const r2 = fakeR2();
+  const { call, login } = setup({ MEDIA: r2, MEDIA_URL_SECRET: "s" });
+  const [admin, student] = await Promise.all(["demo-admin", "demo-student"].map(login));
+  const jpeg = (n: number) => new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...Array.from({ length: n + 10 }, (_, i) => i % 256)]);
+  const q = `?series=${encodeURIComponent("封面系列")}`;
+  assert.equal((await call("PUT", `/admin/series/cover${q}`, { token: admin, bytes: jpeg(20) })).status, 409, "沒有 EDM 不能傳封面");
+  await call("PUT", `/admin/series/edm${q}`, { token: admin, bytes: jpeg(50) });
+  assert.equal((await call("PUT", `/admin/series/cover${q}`, { token: student, bytes: jpeg(20) })).status, 403);
+  assert.equal((await call("PUT", `/admin/series/cover${q}`, { token: admin, bytes: jpeg(20) })).status, 200);
+  assert.equal((await call("PATCH", `/admin/series/edm${q}`, { token: admin, body: { coverRect: { x: 0, y: 0.2, w: 1 } } })).status, 200);
+  assert.equal((await call("PATCH", `/admin/series/edm${q}`, { token: admin, body: { coverRect: { x: 0, y: 0.2, w: 2 } } })).status, 400);
+  const art = (await call<{ series: string; coverUrl: string | null; edmViewY: number }[]>("GET", "/series-art", { token: student })).data.find((x) => x.series === "封面系列")!;
+  assert.ok(art.coverUrl);
+  assert.equal(art.edmViewY, 0.2);
+  const v1 = await call<{ total: number }>("POST", "/series-views", { token: student, body: { series: "封面系列" } });
+  const v2 = await call<{ total: number }>("POST", "/series-views", { token: student, body: { series: "封面系列" } });
+  assert.equal(v1.data.total, 1);
+  assert.equal(v2.data.total, 1, "同一人同一天只算一次");
+  assert.equal((await call<{ total: number }>("POST", "/series-views", { token: admin, body: { series: "封面系列" } })).data.total, 2);
+  await call("DELETE", `/admin/series/edm${q}`, { token: admin });
+  assert.equal([...r2.objects.keys()].filter((k) => k.startsWith("series/")).length, 0, "EDM 與封面都清掉");
+});

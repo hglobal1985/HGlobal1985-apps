@@ -3,6 +3,7 @@ import { PageHeader } from "@/features/page-header";
 import { useApi } from "@/state/session";
 import { EmptyState, ErrorView, LoadingView, Screen, Button } from "@/ui";
 import { CoursesView } from "./courses-view";
+import { SeriesPage } from "./series-page";
 
 /**
  * 短網址頁（/縮寫，分類、系列或中心）：網址列維持短網址不變，內容是該分類／系列的課程清單。
@@ -28,8 +29,8 @@ export function ShortLinkScreen() {
   return (
     <>
       {/* 中心頁自己有上方工具列（返回、標題、編輯、分享），這裡不再放一條，否則重新整理後會出現兩條。 */}
-      {data.kind === "center" ? <Stack.Screen options={{ headerShown: false }} /> : <PageHeader title={data.value} path={`/${slug}`} />}
-      {data.kind === "category" ? <CoursesView initialCategory={data.value} inStack /> : data.kind === "center" ? <CoursesView initialCenter={data.value} inStack /> : <CoursesView series={data.value} inStack />}
+      {data.kind === "center" ? <Stack.Screen options={{ headerShown: false }} /> : data.kind === "series" ? null : <PageHeader title={data.value} path={`/${slug}`} />}
+      {data.kind === "category" ? <CoursesView initialCategory={data.value} inStack /> : data.kind === "center" ? <CoursesView initialCenter={data.value} inStack /> : <SeriesPage series={data.value} path={`/${slug}`} />}
     </>
   );
 }

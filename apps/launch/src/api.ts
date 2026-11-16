@@ -20,6 +20,7 @@ import {
   type CourseCan,
   type CourseEditor,
   type CenterArt,
+  type SeriesArt,
   type EditorCandidate,
   type Member,
   type AttachmentType,
@@ -272,6 +273,7 @@ export async function purgeMember(db: D1Database, sub: string, actor: string, ac
     db.prepare("DELETE FROM lesson_progress WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM learning_started WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM center_views WHERE member_sub = ?").bind(sub),
+    db.prepare("DELETE FROM series_views WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM lesson_watch WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM enrollments WHERE member_sub = ?").bind(sub),
     // 審核員／窗口收到的「有新的報名待審核」等通知連到這位會員的報名紀錄，報名紀錄刪除前先清掉，免得點了找不到。
@@ -3685,7 +3687,9 @@ const routes: [string, RegExp, Handler][] = [
       const value = keywordText(body.value);
       const col = KEYWORD_COLUMN[kind];
       const catUpdates = kind === "category" ? await rewriteCategories(ctx, (list) => joinCats(list.filter((x) => x !== value))) : [];
-      const artKey = kind === "series" ? (await ctx.db.prepare("SELECT edm_key AS k FROM series_art WHERE series = ?").bind(value).first<{ k: string }>())?.k : undefined;
+      const artRow = kind === "series" ? await ctx.db.prepare("SELECT edm_key AS k, cover_key AS c FROM series_art WHERE series = ?").bind(value).first<{ k: string; c: string | null }>() : null;
+      const artKey = artRow?.k;
+      if (artRow?.c) await ctx.env.MEDIA?.delete(artRow.c).catch(() => undefined);
       if (kind === "series") await ctx.db.prepare("DELETE FROM series_art WHERE series = ?").bind(value).run();
       if (artKey) await ctx.env.MEDIA?.delete(artKey).catch(() => undefined);
       await ctx.db.batch([
@@ -3723,14 +3727,87 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/series-art$/,
+    async (ctx): Promise<SeriesArt[]> => {
+      const { results } = await ctx.db
+        .prepare("SELECT series, edm_key, art_version, cover_key, cover_rect, edm_view_y FROM series_art ORDER BY series")
+        .all<{ series: string; edm_key: string; art_version: number; cover_key: string | null; cover_rect: string | null; edm_view_y: number }>();
+      return results.map((r) => ({
+        series: r.series,
+        edmUrl: pubUrl(r.edm_key, r.art_version),
+        coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null,
+        coverRect: parseCoverRect(r.cover_rect),
+        edmViewY: r.edm_view_y,
+      }));
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/series\/cover$/,
+    async (ctx) => {
+      // 系列頁用的 16:9 封面：與中心完全相同的做法（管理者在瀏覽器從 EDM 裁切、壓縮後上傳，先要有系列 EDM）。
+      const s = requireSuperAdmin(ctx);
+      const series = keywordText(ctx.url.searchParams.get("series"));
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const old = await ctx.db.prepare("SELECT cover_key AS k FROM series_art WHERE series = ?").bind(series).first<{ k: string | null }>();
+      if (!old) fail(409, "no_edm", "請先上傳系列 EDM");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      if (!data.byteLength || data.byteLength > 3 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 3MB 以內（上傳時會自動壓縮）");
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      const key = `series/${crypto.randomUUID().slice(0, 8)}/cover-${crypto.randomUUID()}.${img.ext}`;
+      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE series_art SET cover_key = ?, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE series = ?").bind(key, series),
+        audit(ctx.db, s.sub, "series.cover_upload", "series", series, key),
+      ]);
+      if (old?.k) await bucket.delete(old.k).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/series\/edm$/,
+    async (ctx) => {
+      // 封面框（占 EDM 寬高的比例）與預設停留位置永遠同步：預設位置＝封面框上緣。
+      const s = requireSuperAdmin(ctx);
+      const series = keywordText(ctx.url.searchParams.get("series"));
+      const body = await readJson<{ coverRect?: unknown }>(ctx.req);
+      const r = body.coverRect as Partial<CoverRect> | null | undefined;
+      const ok = !!r && [r.x, r.y, r.w].every((n) => typeof n === "number" && Number.isFinite(n)) && r.w! > 0 && r.w! <= 1 && r.x! >= 0 && r.x! + r.w! <= 1.0001 && r.y! >= 0 && r.y! <= 1;
+      if (!ok) fail(400, "invalid_cover_rect", "封面裁切範圍不正確");
+      const rect = { x: Math.round(r!.x! * 10000) / 10000, y: Math.round(r!.y! * 10000) / 10000, w: Math.round(r!.w! * 10000) / 10000 };
+      const res = await ctx.db.prepare("UPDATE series_art SET cover_rect = ?, edm_view_y = ?, art_version = art_version + 1 WHERE series = ?").bind(JSON.stringify(rect), rect.y, series).run();
+      if (!res.meta?.changes) fail(409, "no_edm", "請先上傳系列 EDM");
+      await ctx.db.batch([audit(ctx.db, s.sub, "series.cover_rect", "series", series, JSON.stringify(rect))]);
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/series-views$/,
+    async (ctx) => {
+      // 系列頁瀏覽計數：同一位會員同一天同一系列只算一次；回傳累計人次（與中心頁相同規則）。
+      const s = requireMember(ctx);
+      const body = await readJson<{ series?: unknown }>(ctx.req);
+      const name = typeof body.series === "string" ? body.series.trim().slice(0, 60) : "";
+      if (!name) fail(400, "invalid_series", "請指定系列");
+      const day = new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 10);
+      await ctx.db.prepare("INSERT OR IGNORE INTO series_views (series, member_sub, day) VALUES (?, ?, ?)").bind(name, s.sub, day).run();
+      const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM series_views WHERE series = ?").bind(name).first<{ n: number }>();
+      return { total: n?.n ?? 0 };
+    },
+  ],
+  [
     "DELETE",
     /^\/admin\/series\/edm$/,
     async (ctx) => {
       const s = requireSuperAdmin(ctx);
       const series = keywordText(ctx.url.searchParams.get("series"));
-      const old = await ctx.db.prepare("SELECT edm_key AS k FROM series_art WHERE series = ?").bind(series).first<{ k: string }>();
+      const old = await ctx.db.prepare("SELECT edm_key AS k, cover_key AS c FROM series_art WHERE series = ?").bind(series).first<{ k: string; c: string | null }>();
       await ctx.db.batch([ctx.db.prepare("DELETE FROM series_art WHERE series = ?").bind(series), audit(ctx.db, s.sub, "series.edm_remove", "series", series)]);
       if (old?.k) await ctx.env.MEDIA?.delete(old.k).catch(() => undefined);
+      if (old?.c) await ctx.env.MEDIA?.delete(old.c).catch(() => undefined);
       return { ok: true };
     },
   ],

@@ -8,6 +8,8 @@ import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { AppText, CourseCover } from "@/ui";
 import { styles } from "./chapter-list";
+import { shareLink } from "@/lib/share";
+import { RowShare } from "./lesson-list";
 import { ribbonsFor } from "./ribbons";
 
 /**
@@ -43,6 +45,7 @@ export function CourseRow({ course }: { course: CourseSummary }) {
           </View>
         ) : null}
       </View>
+      <RowShare label={`分享：${course.title}`} onShare={() => shareLink(course.title, course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`, { teacher: course.teacher, teacherTitle: course.teacherTitle, title: course.title })} />
     </Pressable>
   );
 }

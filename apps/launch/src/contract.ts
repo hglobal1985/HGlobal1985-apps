@@ -79,6 +79,9 @@ export type EditorCandidate = { memberId: string; name: string; avatarUrl: strin
 /** 中心 EDM：edmUrl 整張海報；coverUrl 裁切後的 16:9 封面（中心卡縮圖）；coverRect／edmViewY＝裁切框與預設停留位置（同步）。 */
 export type CenterArt = { centerKey: string; center: string; edmUrl: string; coverUrl: string | null; coverRect: { x: number; y: number; w: number } | null; edmViewY: number };
 
+/** 系列頁上方的照片（與中心的 CenterArt 同一套：EDM＋16:9 封面＋裁切框＋預設停留位置）。 */
+export type SeriesArt = { series: string; edmUrl: string; coverUrl: string | null; coverRect: { x: number; y: number; w: number } | null; edmViewY: number };
+
 export type EnrollmentState = "opened" | "pending" | null;
 
 export type CourseSummary = {

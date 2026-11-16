@@ -23,7 +23,7 @@ export function SaplingBar({ saplings }: { saplings: number }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`小樹苗 ${saplings} 棵`}
-          onPress={() => showFlash({ icon: <SaplingIcon size={120} />, title: `小樹苗 ${saplings} 棵`, body: "每學完一堂課就長出一棵小樹苗", holdMs: 1800 })}
+          onPress={() => showFlash({ icon: <SaplingIcon size={64} />, title: `小樹苗 ${saplings} 棵`, body: "每學完一堂課就長出一棵小樹苗", holdMs: 1800 })}
           style={tile}
         >
           <SaplingIcon size={44} />
@@ -66,5 +66,5 @@ const styles = StyleSheet.create({
   icons: { flexDirection: "row", flexWrap: "wrap", gap: space.sm, justifyContent: "center" },
   badge: { width: minTouch, height: minTouch, borderRadius: minTouch / 2, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   badgeText: { fontSize: 26, lineHeight: 32 },
-  emoji: { fontSize: 100, lineHeight: 120 },
+  emoji: { fontSize: 50, lineHeight: 60 },
 });

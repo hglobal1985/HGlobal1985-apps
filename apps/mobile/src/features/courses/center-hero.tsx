@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Animated, Image, Linking, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
-import { resolveUrl, type CenterArt } from "@/api/client";
+import { resolveUrl } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
@@ -22,7 +22,7 @@ export const centerHeroFull = (winW: number) => Math.round((Math.min(winW, maxCo
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
  */
-export function CenterHero({ art, scrollY, courses, lessons, views, title }: { art?: CenterArt; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
+export function CenterHero({ art, scrollY, courses, lessons, views, title }: { art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
   const { width: winW } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const full = centerHeroFull(winW);

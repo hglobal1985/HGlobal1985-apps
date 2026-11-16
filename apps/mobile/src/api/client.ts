@@ -31,6 +31,7 @@ export type {
   CourseEditor,
   CourseRights,
   CenterArt,
+  SeriesArt,
   EditorCandidate,
   Duty,
   OrderEvent,
