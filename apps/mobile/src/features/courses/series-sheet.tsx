@@ -4,7 +4,7 @@ import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button } from "@/ui";
+import { AppText, Button, SheetAction } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
@@ -50,18 +50,12 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
     router.push(slug ? `/${slug}` : `/series/${encodeURIComponent(showAllSeries ?? "")}`);
   };
   return (
-    <BottomSheet onClose={onClose}>
+    <BottomSheet onClose={onClose} onExpand={showAllSeries ? showAll : undefined} expandLabel="繼續上拉顯示全部">
       <View style={styles.head}>
         <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
           {title}
         </AppText>
-        {showAllSeries ? (
-          <Pressable accessibilityRole="button" accessibilityLabel={`顯示「${showAllSeries}」全部梯次`} onPress={showAll} style={[styles.showAll, { backgroundColor: c.accent }]}>
-            <AppText variant="callout" style={{ color: c.textOnAccent, fontWeight: "800" }} numberOfLines={1}>
-              顯示全部
-            </AppText>
-          </Pressable>
-        ) : null}
+        {showAllSeries ? <SheetAction label="顯示全部" accessibilityLabel={`顯示「${showAllSeries}」全部梯次`} onPress={showAll} /> : null}
       </View>
       <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ gap: 0 }}>
         {farToNear(items).map((x) => (
@@ -101,7 +95,6 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
 
 const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  showAll: { minHeight: minTouch, paddingHorizontal: space.lg, borderRadius: 999, alignItems: "center", justifyContent: "center" },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, maxWidth: 120 },
   thumb: { width: 64, height: 36, borderRadius: radius.sm },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch + 12, borderTopWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm },

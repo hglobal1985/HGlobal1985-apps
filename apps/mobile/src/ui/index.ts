@@ -4,6 +4,7 @@ export { Screen } from "./screen";
 export { Card } from "./card";
 export { Button } from "./button";
 export { Pill } from "./pill";
+export { SheetAction } from "./sheet-action";
 export { Section } from "./section";
 export { EmptyState } from "./empty-state";
 export { SandboxBanner } from "./sandbox-banner";
