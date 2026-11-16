@@ -1,12 +1,20 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { api, type CourseDetail, type Lesson, type Order } from "@/api/client";
+import { AttachmentList } from "@/features/attachments";
 import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { EdmStage } from "@/features/courses/edm-viewer";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
+import { InlineAudio } from "@/features/player/audio-bar";
+import { engine } from "@/features/player/engine";
+import { LessonPlayer } from "@/features/player/lesson-player";
+import { PlayerControls } from "@/features/player/player-controls";
+import { PlayerSlot } from "@/features/player/player-slot";
+import { useLessonSession } from "@/features/player/use-lesson-session";
+import { lessonHref } from "@/lib/lesson-href";
 import { EdmManager } from "@/features/admin/edm-manager";
 import { AutoCoverCheck, SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
@@ -14,27 +22,27 @@ import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
 import { Check } from "@/features/course-edit/course-sections";
 import { EditLessonRows, LessonSheet, NewLessonSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
-import { teacherLine } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Screen, Section, TopBarButton } from "@/ui";
+import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
 
 const isWeb = Platform.OS === "web";
 
 /**
- * 課程介紹頁：上方只有 EDM（與上課頁影片區同高、可上下拖曳、點一下放大），下面不再放任何課程說明文字，
+ * 課程介紹頁：上方只有 EDM（可上下拖曳、點一下放大），下面不再放任何課程說明文字，
  * 只有報名按鈕（依狀態）與課程章節。標題在上方導覽列。
+ * 點章節＝原地播放（業主 2026-11-16）：上方的 EDM 換成播放器（同一個位置），章節清單不動；網址的 ?lesson=章節編號 記住播放哪一堂，舊的 /learn/… 網址會轉到這裡。
  */
 export default function CourseRoute() {
-  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
-  return <CourseDetailScreen id={id} edit={edit} />;
+  const { id, edit, lesson } = useLocalSearchParams<{ id: string; edit?: string; lesson?: string }>();
+  return <CourseDetailScreen id={id} edit={edit} lesson={lesson} />;
 }
 
 /** 課程介紹頁本體（/course/編號 與課程專屬網址 /中心縮寫/英譯姓名-編號 共用）。 */
-export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) {
+export function CourseDetailScreen({ id, edit, lesson }: { id: string; edit?: string; lesson?: string }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
@@ -54,6 +62,26 @@ export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) 
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
   const detecting = useYoutubeLengthFix(course, editing && Platform.OS === "web");
+  // 原地播放：正在播放哪一堂（編輯模式不播放）。播放邏輯（授權、進度回報、自動完成…）都在 useLessonSession。
+  const [playingId, setPlayingId] = useState<string | null>(lesson ?? null);
+  useEffect(() => {
+    if (lesson) setPlayingId(lesson);
+  }, [lesson]);
+  const session = useLessonSession(course, editing ? null : playingId, reload, (cid, lid) => (cid === course?.id ? setPlayingId(lid) : router.replace(lessonHref(cid, lid) as never)));
+  // 換章節的空檔（新的播放授權還沒回來）繼續顯示上一個播放器，避免畫面閃回 EDM。
+  const lastStage = useRef<{ key: string; audio: boolean } | null>(null);
+  if (session.pinned && session.track) lastStage.current = { key: session.track.key, audio: session.track.mode === "audio" };
+  if (!playingId || editing) lastStage.current = null;
+  const playLesson = playingId && !editing ? course?.lessons.find((l) => l.id === playingId) : undefined;
+  const stage = playLesson ? (session.pinned && session.track ? { key: session.track.key, audio: session.track.mode === "audio" } : lastStage.current) : null;
+  const playLegacy = !!playLesson && session.legacyYoutube && !!session.playback;
+  const playChapters = course ? course.lessons.filter((l) => !l.material) : [];
+  const playNext = playLesson && !playLesson.material ? playChapters[playChapters.findIndex((l) => l.id === playLesson.id) + 1] : undefined;
+  const playLesson_ = (lid: string) => {
+    engine.expectSwitch();
+    setPlayingId(lid);
+    router.setParams({ lesson: lid });
+  };
 
   // 課程介紹頁需登入：未登入導向登入，完成後回到這一頁。「完全公開」的課程例外，訪客直接看得到。
   if (ready && !member && !course && !loading) return <Redirect href={{ pathname: "/me", params: { next: `/course/${id}` } }} />;
@@ -205,7 +233,7 @@ export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) 
     <View style={{ flex: 1 }}>
       <PageHeader
         title={course.title}
-        path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
+        path={`${course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}${playLesson ? `?lesson=${playLesson.id}` : ""}`}
         course={{ teacher: course.teacher ?? "", title: course.title }}
         extra={
           manages && mode === "view" ? (
@@ -229,7 +257,27 @@ export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) 
         </View>
       ) : null}
       <View>
-        <EdmStage course={course} />
+        {stage ? (
+          <View>
+            {stage.audio ? (
+              <InlineAudio trackKey={stage.key} />
+            ) : (
+              <>
+                <PlayerSlot trackKey={stage.key} />
+                <PlayerControls />
+              </>
+            )}
+          </View>
+        ) : playLegacy && session.playback ? (
+          <LessonPlayer playback={session.playback} onSegmentEnd={session.onLegacyEnd} />
+        ) : (
+          <EdmStage course={course} />
+        )}
+        {playLesson && member ? (
+          <View style={{ paddingHorizontal: space.lg }}>
+            <AttachmentList courseId={course.id} lessonId={playLesson.id} />
+          </View>
+        ) : null}
         {editing && canEditContent ? (
           <Pressable accessibilityRole="button" accessibilityLabel="編輯 EDM 與封面" onPress={() => setSheet("art")} style={styles.edmEdit}>
             <Ionicons name="create-outline" size={20} color="#fff" />
@@ -239,6 +287,17 @@ export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) 
       </View>
       <Screen header={false} footer={editing ? undefined : stickyAction}>
         {message ? <NoticeBox tone={message.tone} text={message.text} /> : null}
+        {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
+        {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
+        {session.playback?.kind === "demo" && playLesson ? <Pill label={session.playback.label} tone="warning" /> : null}
+        {playLesson && !member ? (
+          <View style={styles.row}>
+            <NoticeBox text="登入後可以記錄學習進度、下載附件教材與留言。" />
+            <Button variant="secondary" label="登入" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: lessonHref(course.id, playLesson.id) } })} />
+          </View>
+        ) : playLesson?.completed && !playNext && !playLesson.material ? (
+          <NoticeBox tone="success" text="恭喜！你已完成這門課程的最後一堂。" />
+        ) : null}
         {!editing ? stickyNotice : null}
         {manages && mode === "view" && course.status !== "published" ? <NoticeBox tone="warning" text={course.status === "archived" ? "這門課已下架封存：學員在全部課程看不到，已報名的人照常上課。" : "這門課尚未上架：只有管理者看得到。按右上「編輯」可以上架。"} /> : null}
         {editing ? (
@@ -250,12 +309,6 @@ export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) 
               </Card>
             )}
           </Section>
-        ) : null}
-
-        {teacherLine(course) ? (
-          <AppText variant="callout" tone="muted">
-            {teacherLine(course)}
-          </AppText>
         ) : null}
 
         {editing && canEditContent ? (
@@ -273,9 +326,8 @@ export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) 
           </>
         ) : null}
         {editing && canEditContent ? null : (
-        <Section title="課程章節">
           <View>
-          <ChapterList course={course} style={allLocked ? { minHeight: 230 } : undefined} />
+          <ChapterList course={course} style={allLocked ? { minHeight: 230 } : undefined} playingId={editing ? null : playingId} onPlay={playLesson_} />
           {allLocked ? (
             <View style={styles.mask} accessibilityRole="alert" accessibilityLabel={lockedText}>
               <Ionicons name="lock-closed" size={48} color="#fff" />
@@ -290,11 +342,10 @@ export function CourseDetailScreen({ id, edit }: { id: string; edit?: string }) 
             </View>
           ) : null}
           </View>
-        </Section>
         )}
         {!(editing && canEditContent) && course.lessons.some((l) => l.material) ? (
           <Section title="其他教材">
-            <FullVersionList course={course} />
+            <FullVersionList course={course} playingId={editing ? null : playingId} onPlay={playLesson_} />
           </Section>
         ) : null}
         {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}

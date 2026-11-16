@@ -1,3 +1,4 @@
+import { lessonHref } from "@/lib/lesson-href";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, View } from "react-native";
@@ -29,7 +30,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
             key={lesson.id}
             accessibilityRole="button"
             accessibilityLabel={`${lesson.title}${who ? `，${who}` : ""}`}
-            onPress={() => router.push(open ? `/learn/${course.id}/${lesson.id}` : `/course/${course.id}`)}
+            onPress={() => router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never)}
             style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
           >
             <View style={styles.thumb}>

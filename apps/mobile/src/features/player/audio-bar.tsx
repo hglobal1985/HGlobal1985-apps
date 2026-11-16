@@ -1,3 +1,4 @@
+import { lessonHref } from "@/lib/lesson-href";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
@@ -11,7 +12,7 @@ import { remainingText, segmentOf } from "./engine.types";
 import { SeekBar } from "./seek-bar";
 import { usePlayer } from "./use-player";
 
-const back = (courseId: string, lessonId: string) => router.push(`/learn/${courseId}/${lessonId}`);
+const back = (courseId: string, lessonId: string) => router.push(lessonHref(courseId, lessonId) as never);
 
 /**
  * 音檔播放控制：課程頁內嵌（完整版）與離開課程頁後的底部迷你列（compact）共用。

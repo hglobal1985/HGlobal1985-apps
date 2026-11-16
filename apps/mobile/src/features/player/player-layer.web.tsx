@@ -1,3 +1,4 @@
+import { lessonHref } from "@/lib/lesson-href";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -285,7 +286,7 @@ export function PlayerLayer() {
     if (justSwitched()) return;
     if (d.hidden && !s.collapsed) return; // 按鈕藏著時的第一下只是叫出按鈕，不要直接跳回課程頁
     if (s.collapsed) restore(); // 點一下小圓圖＝恢復原本的迷你播放器
-    else if (t) router.push(`/learn/${t.courseId}/${t.lessonId}`); // 點一下小視窗＝回到課程頁
+    else if (t) router.push(lessonHref(t.courseId, t.lessonId) as never); // 點一下小視窗＝回到課程頁
   };
   /** 縮小／恢復時，讓小圓圖貼著小視窗的右上角（手指剛按的位置附近），恢復時再貼回來。 */
   const resizeAround = (toCircle: boolean) => {

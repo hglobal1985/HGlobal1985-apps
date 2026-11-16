@@ -1,3 +1,4 @@
+import { lessonHref } from "@/lib/lesson-href";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { VideoView } from "expo-video";
@@ -75,7 +76,7 @@ export function PlayerLayer() {
         if (Math.hypot(g.dx, g.dy) < 6) {
           const sn = engine.getSnapshot();
           if (sn.collapsed) resizeRef.current(false);
-          else if (sn.track) router.push(`/learn/${sn.track.courseId}/${sn.track.lessonId}`);
+          else if (sn.track) router.push(lessonHref(sn.track.courseId, sn.track.lessonId) as never);
           return;
         }
         placeRef.current(cur.current.x + g.dx, cur.current.y + g.dy);

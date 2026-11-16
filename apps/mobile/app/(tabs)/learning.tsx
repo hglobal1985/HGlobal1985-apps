@@ -1,3 +1,4 @@
+import { lessonHref } from "@/lib/lesson-href";
 import { router } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
@@ -85,7 +86,7 @@ export default function LearningScreen() {
         <Card>
           <AppText variant="caption" tone="muted">{resume.courseTitle}</AppText>
           <AppText variant="callout" numberOfLines={2} style={{ fontWeight: "700" }}>{resume.lessonTitle}</AppText>
-          <Button label="回到剛才的學習" icon="play-circle-outline" onPress={() => router.push(`/learn/${resume.courseId}/${resume.lessonId}`)} fullWidth />
+          <Button label="回到剛才的學習" icon="play-circle-outline" onPress={() => router.push(lessonHref(resume.courseId, resume.lessonId) as never)} fullWidth />
         </Card>
       ) : null}
       {inProgress.length ? (
