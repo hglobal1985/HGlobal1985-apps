@@ -2,9 +2,14 @@ import type { Playback } from "@/api/client";
 
 export type TrackMode = "audio" | "video" | "youtube";
 
-/** 一個「正在播放或準備播放」的章節。key 相同＝同一堂，回到課程頁不會重新載入。 */
+/**
+ * 一個「正在播放或準備播放」的章節。key 相同且 fp（內容指紋）相同＝同一堂，回到課程頁不會重新載入；
+ * key 相同但 fp 不同（章節被編輯過時間軸、換了影片來源）＝要重新載入。
+ */
 export type Track = {
   key: string;
+  /** 內容指紋：來源種類＋影片編號或網址（去掉會變的簽章參數）＋起訖秒數。 */
+  fp: string;
   courseId: string;
   lessonId: string;
   title: string;
@@ -37,9 +42,11 @@ export type Snapshot = {
   switching: boolean;
   /** 目前的播放倍數（1＝正常；可切換 1.2／1.5／1.8／2）。換課、關閉播放後仍沿用。 */
   rate: number;
+  /** 每次真正載入一支影片就加 1：用來分辨「這一次載入」，避免舊的非同步回呼、舊的 iframe 訊息影響新的一堂。 */
+  loadId: number;
 };
 
-export const EMPTY: Snapshot = { track: null, playing: false, position: 0, duration: 0, loading: false, error: null, segmentEnded: false, slotKey: null, collapsed: false, artworkUrl: null, hintAt: 0, switching: false, rate: 1 };
+export const EMPTY: Snapshot = { track: null, playing: false, position: 0, duration: 0, loading: false, error: null, segmentEnded: false, slotKey: null, collapsed: false, artworkUrl: null, hintAt: 0, switching: false, rate: 1, loadId: 0 };
 
 /** 倍數播放的檔位：1 → 1.2 → 1.5 → 1.8 → 2 → 回到 1。 */
 export const RATES = [1, 1.2, 1.5, 1.8, 2] as const;
@@ -49,8 +56,11 @@ export const rateText = (r: number): string => `${r}×`;
 
 export const trackMode = (p: Playback): TrackMode => (p.kind === "youtube" ? "youtube" : p.kind === "audio" ? "audio" : "video");
 
+/** 內容指紋：同一堂的播放內容沒變就相同（Mux 的簽章網址每次都不同，所以只看網址路徑）。 */
+export const playbackFingerprint = (p: Playback): string => `${p.kind}|${p.kind === "youtube" ? p.videoId : p.url.split("?")[0]}|${p.start ?? ""}|${p.end ?? ""}`;
+
 export function buildTrack(p: Playback, meta: { courseId: string; lessonId: string; title: string; subtitle: string; artwork: string | null }): Track {
-  return { key: `${meta.courseId}:${meta.lessonId}`, ...meta, mode: trackMode(p), playback: p };
+  return { key: `${meta.courseId}:${meta.lessonId}`, fp: playbackFingerprint(p), ...meta, mode: trackMode(p), playback: p };
 }
 
 /** 這一堂的時間軸區間（秒）。 */

@@ -322,7 +322,7 @@ export function PlayerLayer() {
         <div ref={hostRef} style={{ position: "absolute", inset: 0, display: yt ? "none" : "block" }} />
         {yt ? (
           <iframe
-            key={t!.key}
+            key={`${t!.key}:${s.loadId}`}
             ref={setFrame}
             title="課程影片"
             src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt.videoId)}?controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&rel=0&modestbranding=1&autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${range}`}

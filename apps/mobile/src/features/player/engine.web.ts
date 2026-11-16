@@ -151,19 +151,33 @@ function audioElement(): HTMLAudioElement {
 
 const urlOf = (t: Track) => (t.playback.kind === "youtube" ? "" : t.playback.kind === "hls" ? t.playback.url : resolveUrl(t.playback.url));
 
+/** 每個媒體元素目前還在等的 canplay 監聽：換來源時一定要先移除，否則上一堂的起點秒數會套到新的一堂。 */
+const pendingReady = new Map<HTMLMediaElement, () => void>();
+function clearPendingReady(el: HTMLMediaElement | null) {
+  if (!el) return;
+  const f = pendingReady.get(el);
+  if (f) el.removeEventListener("canplay", f);
+  pendingReady.delete(el);
+}
+
 /** 把來源接到某個媒體元素（HLS 用 hls.js），並從 startAt 秒開始。回傳 hls 實例。 */
 function attach(el: HTMLMediaElement, t: Track, startAt: number, autoplay: boolean, keep: (h: { destroy(): void } | null) => void) {
   const url = urlOf(t);
+  const myLoad = snap.loadId; // 這一次載入的編號；之後的非同步回呼用它確認「還是這一次」
   el.defaultPlaybackRate = userRate; // 換來源時瀏覽器會回到預設倍數，所以預設值也一起設
   el.playbackRate = userRate;
+  clearPendingReady(el);
   const onReady = () => {
+    pendingReady.delete(el);
+    if (snap.loadId !== myLoad) return;
     if (startAt && el.currentTime < startAt - 1) el.currentTime = startAt;
     if (autoplay) void el.play().catch(() => undefined);
   };
+  pendingReady.set(el, onReady);
   el.addEventListener("canplay", onReady, { once: true });
   if (/\.m3u8(\?|$)/.test(url)) {
     import("hls.js").then(({ default: Hls }) => {
-      if (snap.track?.key !== t.key) return;
+      if (snap.loadId !== myLoad) return;
       if (!Hls.isSupported()) {
         if (el.canPlayType("application/vnd.apple.mpegurl")) el.src = url;
         else emit({ error: "這個瀏覽器無法播放影片，請改用最新版 Chrome、Safari 或 Edge", loading: false });
@@ -181,6 +195,7 @@ function attach(el: HTMLMediaElement, t: Track, startAt: number, autoplay: boole
 }
 
 function detach(el: HTMLMediaElement | null, which: "video" | "audio") {
+  clearPendingReady(el);
   if (which === "video") {
     hlsVideo?.destroy();
     hlsVideo = null;
@@ -312,6 +327,8 @@ function ytCaptionsOff() {
 if (typeof window !== "undefined") {
   window.addEventListener("message", (e) => {
     if (!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin) || snap.track?.mode !== "youtube") return;
+    // 只接受「目前這個 iframe」送來的訊息：換章節時舊 iframe 殘留的位置、長度、狀態不能寫進新的一堂。
+    if (!ytFrame || e.source !== ytFrame.contentWindow) return;
     let d: { event?: string; info?: { playerState?: number; currentTime?: number; duration?: number } | number };
     try {
       d = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
@@ -337,6 +354,8 @@ if (typeof window !== "undefined") {
 }
 
 let switchTimer: ReturnType<typeof setTimeout> | null = null;
+/** request() 的序號：只有最新的請求有資格真正載入。 */
+let requestSeq = 0;
 
 export const engine = {
   subscribe(l: () => void) {
@@ -418,9 +437,12 @@ export const engine = {
     if (!snap.switching) emit({ switching: true });
   },
   async request(t: Track): Promise<boolean> {
-    if (snap.track?.key === t.key) return true;
+    // 同一堂而且內容也沒變才算「已經是這一堂」；key 相同但內容不同（章節改過起訖秒數、換了影片來源）要重新載入。
+    if (snap.track?.key === t.key && snap.track.fp === t.fp) return true;
+    const mine = ++requestSeq;
     const intended = snap.switching && snap.track?.courseId === t.courseId; // 自己點的章節：直接換
     if (snap.track && snap.playing && !intended && !(await askSwitch(snap.track, t))) return false;
+    if (mine !== requestSeq) return false; // 詢問的期間又有更新的請求：這個已經過期，不能蓋掉新的
     engine.load(t);
     return true;
   },
@@ -428,7 +450,7 @@ export const engine = {
     teardownMedia();
     endedFlag = false;
     intent = false; // 等真的開始播放（play 事件）才算「想播放」
-    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: t.mode !== "youtube", error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork });
+    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: t.mode !== "youtube", error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork, loadId: snap.loadId + 1 });
     if (t.mode !== "youtube") {
       attach(element(), t, segmentOf(t).start, true, (h) => (hlsVideo = h));
       applyRate();
@@ -475,7 +497,7 @@ export const engine = {
     teardownMedia();
     endedFlag = false;
     if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
-    emit({ ...EMPTY, slotKey: snap.slotKey, rate: userRate });
+    emit({ ...EMPTY, slotKey: snap.slotKey, rate: userRate, loadId: snap.loadId + 1 }); // 編號只增不減：舊的非同步回呼一律作廢
   },
   /** 切換到下一個倍數（1 → 1.2 → 1.5 → 1.8 → 2 → 1）。 */
   cycleRate() {

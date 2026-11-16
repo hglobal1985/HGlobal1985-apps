@@ -21,7 +21,9 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   const { learnStartPct, learnDonePct, watchReportSec } = useUiConfig().config.app;
   const startAt = learnStartPct / 100;
   const doneAt = learnDonePct / 100;
-  const [playback, setPlayback] = useState<Playback | null>(null);
+  // 播放授權連同「它屬於哪一堂」一起存：換章節時，上一堂的授權絕對不能拿來組這一堂的播放軌（會變成「高亮 2、內容是 3」）。
+  const [pb, setPb] = useState<{ courseId: string; lessonId: string; data: Playback } | null>(null);
+  const playback = pb && pb.courseId === c?.id && pb.lessonId === lessonId ? pb.data : null;
   const [playError, setPlayError] = useState<string | null>(null);
   const player = usePlayer();
   // 手機 App 的 YouTube 仍在課程頁內嵌播放（WebView 無法跨頁保留）；其餘一律交給全站單一播放器。
@@ -32,13 +34,14 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
 
   // 等登入狀態載入完成再要播放授權（直接開啟連結或重新整理時）。
   useEffect(() => {
-    setPlayback(null);
+    setPb(null);
+    setClaimed(null);
     setLegacyDone(false);
     setPlayError(null);
     if (!ready || !courseId || !lessonId) return;
     let alive = true;
     api<Playback>("GET", `/courses/${courseId}/lessons/${lessonId}/playback`)
-      .then((p) => alive && setPlayback(p))
+      .then((p) => alive && setPb({ courseId, lessonId, data: p }))
       .catch((e: Error) => alive && setPlayError(e.message));
     return () => {
       alive = false;
@@ -74,8 +77,9 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   const curLesson = lessonRow;
   // 播放超過 learnDonePct（預設 95%）就算完成（有設定起訖時間的章節，以那一段為準）；播到結尾也算。
   const here = !!track && player.track?.key === track.key;
-  const segStart = curLesson?.start ?? 0;
-  const segEnd = curLesson?.end ?? player.duration;
+  // 起訖秒數只用「目前播放軌自己的授權內容」（播放器實際播的那一段），不再另外讀課程資料，避免兩份來源不一致。
+  const segStart = track?.playback.start ?? 0;
+  const segEnd = track?.playback.end ?? player.duration;
   const segLen = segEnd - segStart;
   const watched = here && segLen > 0 && (player.position - segStart) / segLen >= doneAt;
   const finished = legacyYoutube ? legacyDone : here && (player.segmentEnded || watched);
