@@ -1,5 +1,5 @@
 /** 超級管理員可調整的畫面設定：存在 ui_settings 一筆 JSON；讀取時和預設值合併，缺的欄位自動補上。 */
-import { DEFAULT_APP_SETTINGS, DEFAULT_UI_CONFIG, type AppSettings, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUPS, STATS_ROLE_OPTIONS, type RibbonColor, type SortGroup, type UiConfig } from "./contract.ts";
+import { DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, type AppSettings, type ShareSettings, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUPS, STATS_ROLE_OPTIONS, type RibbonColor, type SortGroup, type UiConfig } from "./contract.ts";
 import type { D1Database } from "./d1.ts";
 
 const KEY = "ui_config";
@@ -30,7 +30,31 @@ export function normalizeConfig(raw: unknown): UiConfig {
   const roles = Array.isArray(r.statsRoles) ? (r.statsRoles as unknown[]).filter((x): x is string => STATS_ROLE_OPTIONS.some((o) => o.key === x)) : [];
   // 系列手動排序：只收「s:」「c:」開頭的字串，去重、限長、最多 1000 筆。
   const so = Array.isArray(r.seriesOrder) ? (r.seriesOrder as unknown[]).filter((x): x is string => typeof x === "string" && /^[sc]:.{1,120}$/.test(x)) : [];
-  return { sortGroups, seriesOrder: [...new Set(so)].slice(0, 1000), ribbons, statsRoles: [...new Set(roles)], app: normalizeApp(r.app) };
+  return { sortGroups, seriesOrder: [...new Set(so)].slice(0, 1000), ribbons, statsRoles: [...new Set(roles)], app: normalizeApp(r.app), share: normalizeShare(r.share) };
+}
+
+/** 整理分享預設值：文字去頭尾空白（保留中間換行）、限制長度，空白或不合法的欄位退回預設（備註退回文字與兩個開關例外，可以是空白）。 */
+export function normalizeShare(raw: unknown): ShareSettings {
+  const d = DEFAULT_SHARE_SETTINGS;
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const str = (v: unknown, def: string, max: number, allowEmpty = false) => {
+    if (typeof v !== "string") return def;
+    const t = v.replace(/\r/g, "").trim().slice(0, max);
+    return t || allowEmpty ? t : def;
+  };
+  return {
+    inviteText: str(r.inviteText, d.inviteText, 200),
+    courseText: str(r.courseText, d.courseText, 300),
+    linkLead: str(r.linkLead, d.linkLead, 60),
+    siteName: str(r.siteName, d.siteName, 30),
+    // 分隔符號前後的空白要保留（例如「 | 」），所以不 trim。
+    titleSeparator: typeof r.titleSeparator === "string" && r.titleSeparator.length <= 10 && r.titleSeparator.trim() ? r.titleSeparator : d.titleSeparator,
+    addressIcon: str(r.addressIcon, d.addressIcon, 8, true),
+    showAddress: typeof r.showAddress === "boolean" ? r.showAddress : d.showAddress,
+    showQuote: typeof r.showQuote === "boolean" ? r.showQuote : d.showQuote,
+    hqName: str(r.hqName, d.hqName, 30),
+    fallbackDescription: str(r.fallbackDescription, d.fallbackDescription, 100, true),
+  };
 }
 
 /** 整理 APP 數值設定：數字夾在合理範圍（四捨五入成整數）、選項不合法退回預設、缺的欄位用預設補。 */

@@ -43,6 +43,7 @@ function AppStack() {
             <Stack.Screen name="admin/keywords" options={{ title: "關鍵字管理" }} />
             <Stack.Screen name="admin/short-links" options={{ title: "短網址" }} />
             <Stack.Screen name="admin/app-settings" options={{ title: "APP 數值設定" }} />
+            <Stack.Screen name="admin/share-defaults" options={{ title: "分享預設值" }} />
             <Stack.Screen name="admin/editors" options={{ title: "小編管理" }} />
             <Stack.Screen name="admin/ai-models" options={{ title: "AI 模型" }} />
             <Stack.Screen name="achievements" options={{ title: "學習成就" }} />

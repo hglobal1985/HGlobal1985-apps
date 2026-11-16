@@ -511,7 +511,47 @@ export type UiConfig = {
   statsRoles: string[];
   /** APP 數值設定（超級管理員在「設定 > APP 數值設定」調整）：首頁推薦規則、輪播秒數、其他全站數值。 */
   app: AppSettings;
+  /** 分享預設值（超級管理員在「設定 > 分享預設值」調整）：分享選單的文字、LINE 預覽卡片的標題與備註格式。 */
+  share: ShareSettings;
 };
+
+/**
+ * 分享預設值（業主 2026-11-16）：
+ * - 分享選單送出的文字：一般（中心、分類、系列…）用 inviteText；單堂課程用 courseText（可用 {主講人}、{課程名稱}）；最後接 linkLead 與網址。
+ * - LINE 等分享預覽卡片：標題＝「名稱＋titleSeparator＋siteName」；備註＝「addressIcon 地址」換行再接一句隨機學習金句（可各自關閉）。
+ *   單堂課程的預覽卡片與它主辦的中心一致（標題、備註都用該中心的）；總部主辦的課程用 hqName，沒有地址。
+ */
+export type ShareSettings = {
+  inviteText: string;
+  courseText: string;
+  linkLead: string;
+  siteName: string;
+  titleSeparator: string;
+  addressIcon: string;
+  showAddress: boolean;
+  showQuote: boolean;
+  hqName: string;
+  /** 沒有地址也沒有金句時，備註顯示的文字（空白＝用 siteName）。 */
+  fallbackDescription: string;
+};
+export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
+  inviteText: "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️",
+  courseText: "我剛聽完這場 {主講人}的這場精彩演講 {課程名稱} 我就立刻想到要分享給你！",
+  linkLead: "按此開啟網址 👉",
+  siteName: "寰宇行動大學",
+  titleSeparator: " | ",
+  addressIcon: "📍",
+  showAddress: true,
+  showQuote: true,
+  hqName: "寰宇總部",
+  fallbackDescription: "",
+};
+
+/** 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 就用課程範本（{主講人}、{課程名稱} 換成實際內容）。 */
+export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; title: string }): string {
+  const lead = course ? s.courseText.replaceAll("{主講人}", course.teacher.trim() || "老師").replaceAll("{課程名稱}", course.title) : s.inviteText;
+  return `${lead}\n\n${s.linkLead}\n${url}`;
+}
 
 /** 首頁「推薦課程」的規則。 */
 export type RecommendRules = {
@@ -582,6 +622,7 @@ export const DEFAULT_UI_CONFIG: UiConfig = {
   },
   statsRoles: [],
   app: DEFAULT_APP_SETTINGS,
+  share: DEFAULT_SHARE_SETTINGS,
 };
 
 // ---------- 統計分析（Mux）----------

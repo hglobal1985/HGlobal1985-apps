@@ -153,7 +153,7 @@ export default function LessonScreen() {
         </View>
       ) : null}
     <Screen header={false} tight gap={space.sm}>
-      <PageHeader title={c.title} shareTitle={`${c.title}｜${lesson.title}`} path={`/learn/${c.id}/${lesson.id}`}
+      <PageHeader title={c.title} shareTitle={`${c.title}｜${lesson.title}`} path={`/learn/${c.id}/${lesson.id}`} course={{ teacher: c.teacher ?? "", title: c.title }}
         extra={
           c.can?.edit || c.can?.remove || c.can?.restore ? (
             <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => router.push({ pathname: "/course/[id]", params: { id: c.id, edit: "1" } })} />

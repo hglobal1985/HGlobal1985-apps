@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, DEFAULT_APP_SETTINGS, DEFAULT_UI_CONFIG, type UiConfig } from "@/api/client";
+import { api, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, type UiConfig } from "@/api/client";
+import { setShareSettings } from "@/lib/share";
 import { setBgBlurDownscale } from "@/features/admin/image-tools";
 import { setSwitchCountdownSeconds } from "@/features/player/switch-prompt";
 import { useSession } from "./session";
@@ -21,7 +22,9 @@ export function UiConfigProvider({ children }: { children: ReactNode }) {
         const app = { ...DEFAULT_APP_SETTINGS, ...(c.app ?? {}), rec: { ...DEFAULT_APP_SETTINGS.rec, ...(c.app?.rec ?? {}) } };
         setBgBlurDownscale(app.blurStrength);
         setSwitchCountdownSeconds(app.switchCountdownSec);
-        setConfig({ ...DEFAULT_UI_CONFIG, ...c, app });
+        const share = { ...DEFAULT_SHARE_SETTINGS, ...(c.share ?? {}) };
+        setShareSettings(share);
+        setConfig({ ...DEFAULT_UI_CONFIG, ...c, app, share });
       })
       .catch(() => undefined);
   }, [version, tick]);

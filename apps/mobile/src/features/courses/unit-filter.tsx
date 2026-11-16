@@ -4,85 +4,59 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 
 /**
- * 「單元」模式的篩選：三顆「眼睛」按鈕（業主 2026-11-16 定案）。
- * 「短影音」「總結與銷售」兩顆每按一下循環三種狀態：
- *   灰色「…開關」（沒篩選，全部顯示）→ 綠色「只看…」→ 斜線「不看…」→ 回到灰色。
- * 「主講」按鈕兩種狀態：灰色「全部顯示」↔ 綠色「只看主講」。
- * 互斥規則：開「只看短影音」或「只看總結與銷售」時，主講按鈕強制關閉、變淡灰色不能按（強制關閉後不會自動恢復）；
- * 主講開著時，總結與銷售按鈕跳過「只看」直接到「不看」（主講與總結與銷售是不同堂，同時只看會永遠是空的）。
- * 值的寫法（存在手機本機）：用「+」連接 speaker／shorts／noshorts／summary／nosummary；都沒有＝all。舊版的五個值仍然讀得懂。
+ * 「單元」模式的篩選：三個勾選，強制排成同一排、不換行（業主 2026-11-16 定案，取代原本的三顆眼睛按鈕）。
+ * - 主講人：只顯示主講人章節。
+ * - 總結：只顯示「總結與銷售課程」章節。可與主講人同時勾選（兩者都勾＝兩種章節都顯示）。
+ * - 短影音：只顯示短影音，其餘不顯示；不能和另外兩個同時存在（勾短影音會取消另外兩個，勾另外兩個會取消短影音）。
+ * 都沒勾＝全部顯示。值（存在手機本機）用「+」連接：speaker、summary、shorts；都沒有＝all。舊版的值讀得懂（舊的「不看…」忽略）。
  */
 export type UnitFilterValue = string;
-type Tri = "off" | "only" | "hide";
-type Unit = { shorts: Tri; speaker: boolean; summary: Tri };
+type Unit = { speaker: boolean; summary: boolean; shorts: boolean };
 
 const parse = (v: string | null | undefined): Unit => {
   const set = new Set((v ?? "").split(/[+_]/));
-  return { shorts: set.has("shorts") ? "only" : set.has("noshorts") ? "hide" : "off", speaker: set.has("speaker"), summary: set.has("summary") ? "only" : set.has("nosummary") ? "hide" : "off" };
+  const u = { speaker: set.has("speaker"), summary: set.has("summary"), shorts: set.has("shorts") };
+  return u.shorts ? { speaker: false, summary: false, shorts: true } : u; // 短影音不能與其他並存
 };
 const compose = (u: Unit): UnitFilterValue => {
-  const parts = [u.speaker ? "speaker" : "", u.shorts === "only" ? "shorts" : u.shorts === "hide" ? "noshorts" : "", u.summary === "only" ? "summary" : u.summary === "hide" ? "nosummary" : ""].filter(Boolean);
+  const parts = [u.speaker ? "speaker" : "", u.summary ? "summary" : "", u.shorts ? "shorts" : ""].filter(Boolean);
   return parts.length ? parts.join("+") : "all";
 };
 
-/** 單元清單套用篩選。 */
+/** 單元清單套用篩選：勾了主講人／總結＝符合其中任何一種就顯示；勾了短影音＝只顯示短影音。 */
 export const unitFilterPass = (f: UnitFilterValue, l: { isSpeaker?: boolean; isShorts?: boolean; isSummary?: boolean }) => {
   const u = parse(f);
-  if (u.speaker && !l.isSpeaker) return false;
-  if (u.shorts === "only" ? !l.isShorts : u.shorts === "hide" ? !!l.isShorts : false) return false;
-  return u.summary === "only" ? !!l.isSummary : u.summary === "hide" ? !l.isSummary : true;
+  if (u.shorts) return !!l.isShorts;
+  if (u.speaker || u.summary) return (u.speaker && !!l.isSpeaker) || (u.summary && !!l.isSummary);
+  return true;
 };
 
-/** 讀取已存的選擇（不認得的值視為全部；同時「只看」會讓主講強制關閉）。 */
-export const parseUnitFilter = (v: string | null | undefined): UnitFilterValue => {
-  const u = parse(v);
-  return compose(u.shorts === "only" || u.summary === "only" ? { ...u, speaker: false } : u);
-};
+/** 讀取已存的選擇（不認得的值視為全部）。 */
+export const parseUnitFilter = (v: string | null | undefined): UnitFilterValue => compose(parse(v));
 
 export function UnitFilter({ value, onChange }: { value: UnitFilterValue; onChange: (v: UnitFilterValue) => void }) {
   const u = parse(value);
-  const speakerOff = u.shorts === "only" || u.summary === "only";
-  const nextShorts: Tri = u.shorts === "off" ? "only" : u.shorts === "only" ? "hide" : "off";
-  const nextSummary: Tri = u.summary === "off" ? (u.speaker ? "hide" : "only") : u.summary === "only" ? "hide" : "off";
   return (
-    <View style={styles.wrap}>
-      <View style={styles.row}>
-        <FilterButton
-          kind={u.shorts === "only" ? "on" : u.shorts === "hide" ? "hide" : "off"}
-          label={u.shorts === "only" ? "只看短影音" : u.shorts === "hide" ? "不看短影音" : "短影音開關"}
-          onPress={() => onChange(compose({ ...u, shorts: nextShorts, speaker: nextShorts === "only" ? false : u.speaker }))} // 開「只看短影音」＝主講強制關閉
-        />
-        <FilterButton kind={speakerOff ? "disabled" : u.speaker ? "on" : "off"} label={u.speaker ? "只看主講" : "全部顯示"} onPress={() => onChange(compose({ ...u, speaker: !u.speaker }))} />
-      </View>
-      <View style={styles.row}>
-        <FilterButton
-          kind={u.summary === "only" ? "on" : u.summary === "hide" ? "hide" : "off"}
-          label={u.summary === "only" ? "只看總結與銷售" : u.summary === "hide" ? "不看總結與銷售" : "總結與銷售開關"}
-          onPress={() => onChange(compose({ ...u, summary: nextSummary, speaker: nextSummary === "only" ? false : u.speaker }))} // 開「只看總結與銷售」＝主講強制關閉
-        />
-      </View>
+    <View style={styles.row}>
+      <CheckItem label="主講人" checked={u.speaker} onPress={() => onChange(compose({ speaker: !u.speaker, summary: u.summary, shorts: false }))} />
+      <CheckItem label="短影音" checked={u.shorts} onPress={() => onChange(compose(u.shorts ? { speaker: false, summary: false, shorts: false } : { speaker: false, summary: false, shorts: true }))} />
+      <CheckItem label="總結" checked={u.summary} onPress={() => onChange(compose({ speaker: u.speaker, summary: !u.summary, shorts: false }))} />
     </View>
   );
 }
 
-/** on＝綠色眼睛張開；off＝灰色眼睛（不劃線）；hide＝眼睛劃斜線（不看）；disabled＝更淡的灰色、不能按。 */
-function FilterButton({ label, kind, onPress }: { label: string; kind: "on" | "off" | "hide" | "disabled"; onPress: () => void }) {
+function CheckItem({ label, checked, onPress }: { label: string; checked: boolean; onPress: () => void }) {
   const { c } = useTheme();
-  const on = kind === "on";
-  const disabled = kind === "disabled";
-  const hide = kind === "hide";
-  const fg = on ? c.textOnAccent : hide ? c.accentText : disabled ? c.border : c.textMuted;
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: on || hide, disabled }}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked }}
       accessibilityLabel={label}
-      disabled={disabled}
       onPress={onPress}
-      style={[styles.item, { backgroundColor: on ? c.accent : hide ? c.accentSoft : disabled ? c.surfaceMuted : c.surface, borderColor: on ? c.accent : hide ? c.accent : disabled ? c.surfaceMuted : c.border }]}
+      style={[styles.item, { backgroundColor: checked ? c.accentSoft : c.surface, borderColor: checked ? c.accent : c.border }]}
     >
-      <Icon name={hide ? "eye-off" : "eye"} size={22} color={fg} />
-      <AppText variant="callout" numberOfLines={1} style={{ color: fg, fontWeight: "700" }}>
+      <Icon name={checked ? "checkbox" : "square-outline"} size={26} color={checked ? c.accent : c.textMuted} />
+      <AppText variant="callout" numberOfLines={1} style={{ color: checked ? c.accentText : c.text, fontWeight: "700", flexShrink: 1 }}>
         {label}
       </AppText>
     </Pressable>
@@ -90,7 +64,7 @@ function FilterButton({ label, kind, onPress }: { label: string; kind: "on" | "o
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: space.sm, paddingTop: space.xs },
-  row: { flexDirection: "row", gap: space.sm },
-  item: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm },
+  // 強制同一排、不換行：三個等寬，各自單行。
+  row: { flexDirection: "row", flexWrap: "nowrap", gap: space.sm, paddingTop: space.xs },
+  item: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.sm },
 });

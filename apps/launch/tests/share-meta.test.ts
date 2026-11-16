@@ -52,6 +52,7 @@ test("分享預覽：沒設短網址的中心／分類／系列、已上架課�
   await db.prepare("DELETE FROM quotes").run();
   await db.prepare("INSERT INTO center_names (center_key, center_label, display_name) VALUES (?, ?, ?)").bind("員林 153", "員林 153", "員林分校").run();
   await db.prepare("INSERT INTO courses (id, title, status) VALUES ('pub1', '公開課 <b>', 'published'), ('dr1', '草稿課', 'draft')").run();
+  await db.prepare("INSERT INTO courses (id, title, status, host_unit, host_center_key) VALUES ('pub2', '員林的課', 'published', '員林 153', '員林 153')").run();
   await db.prepare("INSERT INTO lessons (id, course_id, position, title) VALUES ('l1', 'pub1', 1, '第一堂'), ('l2', 'dr1', 1, '草稿章節')").run();
   const w = createWorker(files);
   const get = async (path: string) => (await w.fetch(new Request(`https://learn.test${path}`), env)).text();
@@ -62,8 +63,9 @@ test("分享預覽：沒設短網址的中心／分類／系列、已上架課�
   assert.equal(title(await get("/courses?category=%E6%96%B0%E4%BA%BA")), "新人 | 寰宇行動大學", "分類");
   assert.equal(title(await get("/courses?center=%E5%BD%B0%E5%8C%96%20151&category=%E6%96%B0%E4%BA%BA")), "彰化中心・新人 | 寰宇行動大學", "中心＋分類");
   assert.equal(title(await get("/series/%E7%BF%A1%E7%BF%A0%E9%81%94%E6%A8%99%E7%8F%AD")), "翡翠達標班 | 寰宇行動大學", "系列");
-  assert.equal(title(await get("/course/pub1")), "公開課 &lt;b&gt; | 寰宇行動大學", "已上架課程（特殊字元跳脫）");
-  assert.equal(title(await get("/learn/pub1/l1")), "公開課 &lt;b&gt;｜第一堂 | 寰宇行動大學", "章節");
+  assert.equal(title(await get("/course/pub1")), "寰宇總部 | 寰宇行動大學", "總部主辦的課程＝總部名稱（不是課程名稱）");
+  assert.equal(title(await get("/course/pub2")), "員林分校 | 寰宇行動大學", "中心主辦的課程＝該中心的預覽卡片");
+  assert.equal(title(await get("/learn/pub1/l1")), "寰宇總部 | 寰宇行動大學", "章節也一樣");
   assert.equal(await get("/course/dr1"), html, "未上架課程不洩漏名稱");
   assert.equal(await get("/learn/dr1/l2"), html, "未上架章節不洩漏");
   assert.equal(await get("/course/nope"), html);
@@ -103,6 +105,47 @@ test("分享預覽：縮寫照設定的大小寫顯示（og:url）、輸入不�
     return { title: /property="og:title" content="([^"]*)"/.exec(page)?.[1], url: /property="og:url" content="([^"]*)"/.exec(page)?.[1] };
   };
   assert.deepEqual(await meta("/nj"), { title: "南京中心 | 寰宇行動大學", url: "https://learn.test/NJ" }, "短網址：輸入小寫，顯示設定的大小寫");
-  assert.deepEqual(await meta("/NJ/Wang-Xiaoming-001"), { title: "中心課 | 寰宇行動大學", url: "https://learn.test/NJ/wang-xiaoming-001" }, "中心課程網址");
-  assert.deepEqual(await meta("/HQ/wang-likai-001"), { title: "總部課 | 寰宇行動大學", url: "https://learn.test/hq/wang-likai-001" }, "總部課程網址");
+  assert.deepEqual(await meta("/NJ/Wang-Xiaoming-001"), { title: "南京中心 | 寰宇行動大學", url: "https://learn.test/NJ/wang-xiaoming-001" }, "中心課程網址");
+  assert.deepEqual(await meta("/HQ/wang-likai-001"), { title: "寰宇總部 | 寰宇行動大學", url: "https://learn.test/hq/wang-likai-001" }, "總部課程網址");
+});
+
+test("分享預設值：改標題格式、地址圖示、開關後，預覽卡片跟著變；單堂課程的卡片與主辦中心一致；分享文字範本帶入主講人與課程名稱", async () => {
+  const { handleApi } = await import("../src/api.ts");
+  const { shareMessage, DEFAULT_SHARE_SETTINGS } = await import("../src/contract.ts");
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  const call = async (method: string, path: string, token?: string, body?: unknown) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env);
+    return { status: res.status, data: (await res.json()) as Record<string, any> };
+  };
+  const admin = (await call("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token as string;
+  const student = (await call("POST", "/auth/demo", undefined, { sub: "demo-student" })).data.token as string;
+  await db.prepare("DELETE FROM quotes").run();
+  await db.prepare("INSERT INTO quotes (id, body, created_by) VALUES ('q1', '每天進步一點點', 'x')").run();
+  await db.prepare("INSERT INTO short_links (slug, kind, value) VALUES ('ch', 'center', '彰化 151')").run();
+  await db.prepare("INSERT INTO center_info (center_key, center_label, address) VALUES ('彰化 151', '彰化 151', '彰化市中山路 1 號')").run();
+  await db.prepare("INSERT INTO courses (id, title, status, host_unit, host_center_key) VALUES ('c1', '彰化的課', 'published', '彰化 151', '彰化 151')").run();
+  const w = createWorker(files);
+  const meta = async (path: string) => {
+    const page = await (await w.fetch(new Request(`https://learn.test${path}`), env)).text();
+    return { title: /property="og:title" content="([^"]*)"/.exec(page)?.[1], desc: /property="og:description" content="([^"]*)"/.exec(page)?.[1] };
+  };
+  const base = { title: "彰化中心 | 寰宇行動大學", desc: "📍 彰化市中山路 1 號\n每天進步一點點" };
+  assert.deepEqual(await meta("/ch"), base, "預設");
+  assert.deepEqual(await meta("/course/c1"), base, "單堂課程的卡片＝主辦中心的卡片");
+
+  assert.equal((await call("PUT", "/admin/ui-config", student, { share: { siteName: "X" } })).status, 403, "只有超級管理員能改");
+  const put = await call("PUT", "/admin/ui-config", admin, { share: { siteName: "寰宇大學", titleSeparator: "｜", addressIcon: "🏠", showQuote: false, courseText: "聽完 {課程名稱} by {主講人}" } });
+  assert.equal(put.status, 200);
+  assert.deepEqual(await meta("/ch"), { title: "彰化中心｜寰宇大學", desc: "🏠 彰化市中山路 1 號" }, "改了格式");
+  assert.deepEqual(await meta("/course/c1"), { title: "彰化中心｜寰宇大學", desc: "🏠 彰化市中山路 1 號" });
+  await call("PUT", "/admin/ui-config", admin, { share: { showAddress: false } });
+  assert.equal((await meta("/ch")).desc, "寰宇大學", "地址與金句都關閉＝備用文字（站名）");
+  await call("PUT", "/admin/ui-config", admin, { share: { siteName: "", titleSeparator: "   " } });
+  assert.equal((await meta("/ch")).title, "彰化中心 | 寰宇行動大學", "站名、分隔符號清成空白＝退回預設，不會存成空的");
+
+  const S = DEFAULT_SHARE_SETTINGS;
+  assert.equal(shareMessage(S, "https://u/x"), "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️\n\n按此開啟網址 👉\nhttps://u/x");
+  assert.equal(shareMessage(S, "https://u/y", { teacher: "王小明", title: "翡翠班" }), "我剛聽完這場 王小明的這場精彩演講 翡翠班 我就立刻想到要分享給你！\n\n按此開啟網址 👉\nhttps://u/y");
+  assert.match(shareMessage(S, "u", { teacher: "", title: "T" }), /這場 老師的這場/, "沒有主講人用「老師」");
 });

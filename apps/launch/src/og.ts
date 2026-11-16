@@ -1,6 +1,8 @@
 import { centerKey } from "./central.ts";
 import type { D1Database } from "./d1.ts";
+import { DEFAULT_SHARE_SETTINGS, type ShareSettings } from "./contract.ts";
 import { HQ_SLUG, RESERVED_SLUGS } from "./short-links.ts";
+import { loadConfig } from "./ui-config.ts";
 
 const SITE = "寰宇行動大學";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -38,21 +40,42 @@ export async function centerDisplayName(db: D1Database, label: string): Promise<
   return r?.n?.trim() || centerShareName(label);
 }
 
-/** 中心的分享內容（業主 2026-11-16）：標題只放中心名稱「彰化中心 | 寰宇行動大學」；說明＝「📍 地址」換行再接一句隨機學習金句，沒設地址就只有金句。 */
+/** 中心的分享內容（業主 2026-11-16）：名稱與地址。 */
 export async function centerShareParts(db: D1Database, label: string): Promise<{ name: string; address: string }> {
   const name = await centerDisplayName(db, label);
   const a = await db.prepare("SELECT address AS a FROM center_info WHERE center_key = ?").bind(centerKey(label)).first<{ a: string }>().catch(() => null);
   return { name, address: a?.a?.trim() ?? "" };
 }
 
-/** 中心分享預覽的說明文字：地址（前面加定位圖釘）換行學習金句；沒地址就省略那一行。 */
-export const centerDescription = (address: string, quote: string) => [address ? `📍 ${address}` : "", quote].filter(Boolean).join("\n") || SITE;
+type ShareMeta = { title: string; description: string; url: string; image: string };
 
-/** 短網址的分享預覽：標題「{名稱} | 寰宇行動大學」，說明是隨機一句學習金句（設定頁編輯的那份）；中心另外在金句前加「📍 地址」一行。找不到短網址回 null。 */
-export async function shortLinkMeta(db: D1Database, slug: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
+/** 分享預設值（設定頁「分享預設值」，超級管理員編輯）。 */
+const shareCfg = async (db: D1Database): Promise<ShareSettings> => (await loadConfig(db).catch(() => null))?.share ?? DEFAULT_SHARE_SETTINGS;
+const titleOf = (S: ShareSettings, name: string) => `${name}${S.titleSeparator}${S.siteName}`;
+const randomQuote = async (db: D1Database) => (await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null))?.body?.trim() || "";
+
+/** 預覽卡片的備註：「📍 地址」換行再接一句隨機學習金句（可在設定頁各自關閉）；兩者都沒有就用備用文字。 */
+async function describe(db: D1Database, S: ShareSettings, address = ""): Promise<string> {
+  const addr = S.showAddress && address ? `${S.addressIcon ? `${S.addressIcon} ` : ""}${address}` : "";
+  const quote = S.showQuote ? await randomQuote(db) : "";
+  return [addr, quote].filter(Boolean).join("\n") || S.fallbackDescription || S.siteName;
+}
+
+/** 中心的預覽卡片（標題與備註）；label＝null 表示總部（沒有主辦中心）。單堂課程的分享也用它主辦中心的卡片。 */
+async function centerCard(db: D1Database, S: ShareSettings, label: string | null): Promise<{ name: string; description: string }> {
+  if (!label) return { name: S.hqName, description: await describe(db, S) };
+  const p = await centerShareParts(db, label);
+  return { name: p.name, description: await describe(db, S, p.address) };
+}
+
+const clip = (v: string | null | undefined, n = 60) => (v ?? "").trim().slice(0, n);
+const pubImage = (origin: string, k: string | null | undefined, v: number | null | undefined) => (k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(k)}&v=${v ?? 0}` : `${origin}/icon-512.png`);
+
+/** 短網址的分享預覽：中心＝中心的預覽卡片；分類／系列＝標題 {名稱}＋站名、備註是隨機學習金句。找不到短網址回 null。 */
+export async function shortLinkMeta(db: D1Database, slug: string, origin: string): Promise<ShareMeta | null> {
   const row = await db.prepare("SELECT slug, kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ slug: string; kind: string; value: string }>();
   if (!row) return null;
-  const q = await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null);
+  const S = await shareCfg(db);
   // 預覽圖：系列有上傳 EDM 就用 EDM；中心優先用「裁切好的 16:9 封面」（業主指定的位置），沒有封面才用整張 EDM；都沒有用網站圖示。
   const art =
     row.kind === "series"
@@ -60,41 +83,38 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
       : row.kind === "center"
         ? await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM center_art WHERE center_label = ?").bind(row.value).first<{ k: string; v: number }>().catch(() => null)
         : null;
-  const image = art?.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(art.k)}&v=${art.v}` : `${origin}/icon-512.png`;
-  const center = row.kind === "center" ? await centerShareParts(db, row.value) : null;
-  const quote = q?.body?.trim() ?? "";
-  return { title: `${center ? center.name : row.value} | ${SITE}`, description: center ? centerDescription(center.address, quote) : quote || SITE, url: `${origin}/${row.slug}`, image };
+  const image = pubImage(origin, art?.k, art?.v);
+  const url = `${origin}/${row.slug}`;
+  if (row.kind === "center") {
+    const card = await centerCard(db, S, row.value);
+    return { title: titleOf(S, card.name), description: card.description, url, image };
+  }
+  return { title: titleOf(S, row.value), description: await describe(db, S), url, image };
 }
 
-/** 課程專屬網址（/中心縮寫/英譯姓名-編號）的分享預覽：標題「{課程名稱} | 寰宇行動大學」，圖用課程封面（沒有就用 EDM、再沒有用網站圖示）。找不到回 null。 */
-export async function courseUrlMeta(db: D1Database, slug: string, name: string, origin: string): Promise<{ title: string; description: string; url: string; image: string } | null> {
+/** 課程專屬網址（/中心縮寫或 hq/英譯姓名-編號）的分享預覽：標題與備註跟「主辦中心」的預覽卡片一致（總部主辦用總部名稱），圖用課程封面。找不到回 null。 */
+export async function courseUrlMeta(db: D1Database, slug: string, name: string, origin: string): Promise<ShareMeta | null> {
   // 中心縮寫（照設定的大小寫顯示、輸入不分大小寫）或總部的 hq。
   const hq = slug.toLowerCase() === HQ_SLUG;
   const center = hq ? null : await db.prepare("SELECT slug, value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ slug: string; value: string }>();
   if (!hq && !center) return null;
-  const cols = "SELECT id, title, subtitle, url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
+  const cols = "SELECT url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
   const c = await (center
     ? db.prepare(`${cols} host_center_key = ? AND url_name = ? COLLATE NOCASE AND status = 'published'`).bind(centerKey(center.value), name)
     : db.prepare(`${cols} host_center_key IS NULL AND url_name = ? COLLATE NOCASE AND status = 'published'`).bind(name)
-  ).first<{ title: string; subtitle: string | null; n: string; k: string | null; v: number }>();
+  ).first<{ n: string; k: string | null; v: number }>();
   if (!c) return null;
-  const q = await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null);
-  const image = c.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(c.k)}&v=${c.v}` : `${origin}/icon-512.png`;
-  return { title: `${c.title} | ${SITE}`, description: c.subtitle?.trim() || q?.body?.trim() || SITE, url: `${origin}/${center ? center.slug : HQ_SLUG}/${c.n}`, image };
+  const S = await shareCfg(db);
+  const card = await centerCard(db, S, center ? center.value : null);
+  return { title: titleOf(S, card.name), description: card.description, url: `${origin}/${center ? center.slug : HQ_SLUG}/${c.n}`, image: pubImage(origin, c.k, c.v) };
 }
-
-type ShareMeta = { title: string; description: string; url: string; image: string };
-
-const clip = (v: string | null | undefined, n = 60) => (v ?? "").trim().slice(0, n);
-const pubImage = (origin: string, k: string | null | undefined, v: number | null | undefined) => (k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(k)}&v=${v ?? 0}` : `${origin}/icon-512.png`);
-const randomQuote = async (db: D1Database) => (await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null))?.body?.trim() || "";
 
 /**
  * 分享預覽的單一入口（LINE 等不會執行 JavaScript，所以要由伺服器依網址帶出標題與圖）：
  * 所有會被分享出去的網址形狀都在這裡處理，新增網址形狀時加在這一個函式：
- *   /{縮寫}（分類／系列／中心短網址）、/{中心縮寫}/{名字-001}（課程專屬網址）、
+ *   /{縮寫}（分類／系列／中心短網址）、/{中心縮寫或hq}/{名字-001}（課程專屬網址）、
  *   /courses?center=…&category=…（沒設短網址的中心／分類）、/series/{系列名}、/course/{編號}、/learn/{課程}/{章節}。
- * 課程、章節只處理「已上架」的（未上架／封存一律用預設，避免洩漏未公開的名稱）。找不到回 null＝維持預設標籤。
+ * 課程、章節只處理「已上架」的（未上架／封存一律用預設，避免洩漏未公開的名稱）；單堂課程與章節一律用它主辦中心的預覽卡片。找不到回 null＝維持預設標籤。
  */
 export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareMeta | null> {
   const origin = url.origin;
@@ -109,10 +129,10 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
     const center = clip(url.searchParams.get("center"));
     const category = clip(url.searchParams.get("category"));
     if (!center && !category) return null;
-    const parts = center ? await centerShareParts(db, center) : null;
-    const name = parts?.name ?? "";
+    const S = await shareCfg(db);
+    const card = center ? await centerCard(db, S, center) : null;
     const art = center ? await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM center_art WHERE center_key = ?").bind(centerKey(center)).first<{ k: string; v: number }>().catch(() => null) : null;
-    return { title: `${[name, category].filter(Boolean).join("・")} | ${SITE}`, description: parts ? centerDescription(parts.address, await randomQuote(db)) : (await randomQuote(db)) || SITE, url: `${origin}${path}${url.search}`, image: pubImage(origin, art?.k, art?.v) };
+    return { title: titleOf(S, [card?.name, category].filter(Boolean).join("・")), description: card ? card.description : await describe(db, S), url: `${origin}${path}${url.search}`, image: pubImage(origin, art?.k, art?.v) };
   }
 
   const series = /^\/series\/(.+)$/.exec(path);
@@ -124,8 +144,9 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
       return null;
     }
     if (!name) return null;
+    const S = await shareCfg(db);
     const art = await db.prepare("SELECT edm_key AS k, art_version AS v FROM series_art WHERE series = ?").bind(name).first<{ k: string; v: number }>().catch(() => null);
-    return { title: `${name} | ${SITE}`, description: (await randomQuote(db)) || SITE, url: `${origin}${path}`, image: pubImage(origin, art?.k, art?.v) };
+    return { title: titleOf(S, name), description: await describe(db, S), url: `${origin}${path}`, image: pubImage(origin, art?.k, art?.v) };
   }
 
   const course = /^\/course\/([\w-]+)$/.exec(path);
@@ -133,14 +154,18 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
   const courseId = course?.[1] ?? lesson?.[1];
   if (courseId) {
     const c = await db
-      .prepare("SELECT title, subtitle, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published'")
+      .prepare("SELECT host_center_key AS hk, host_unit AS hu, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published'")
       .bind(courseId)
-      .first<{ title: string; subtitle: string | null; k: string | null; v: number }>()
+      .first<{ hk: string | null; hu: string | null; k: string | null; v: number }>()
       .catch(() => null);
     if (!c) return null;
-    const l = lesson ? await db.prepare("SELECT title FROM lessons WHERE id = ? AND course_id = ?").bind(lesson[2], courseId).first<{ title: string }>().catch(() => null) : null;
+    const l = lesson ? await db.prepare("SELECT 1 AS ok FROM lessons WHERE id = ? AND course_id = ?").bind(lesson[2], courseId).first<{ ok: number }>().catch(() => null) : null;
     if (lesson && !l) return null;
-    return { title: `${l ? `${c.title}｜${l.title}` : c.title} | ${SITE}`, description: c.subtitle?.trim() || (await randomQuote(db)) || SITE, url: `${origin}${path}`, image: pubImage(origin, c.k, c.v) };
+    const S = await shareCfg(db);
+    // 主辦中心＝主辦單位裡第一個不是總部的名稱（保留原本的大小寫與名稱）；沒有就是總部。
+    const label = c.hk ? (c.hu ?? "").split("、").map((x) => x.trim()).find((x) => x && x !== "寰宇總部") ?? c.hk : null;
+    const card = await centerCard(db, S, label);
+    return { title: titleOf(S, card.name), description: card.description, url: `${origin}${path}`, image: pubImage(origin, c.k, c.v) };
   }
   return null;
 }
