@@ -646,3 +646,10 @@
 - 續播：`/watch` 多收 `position`（最後位置，倒轉也照記）；`/playback` 回 `resumeAt`（`resumePoint()`）；App 端 `resumeOf()` 給 HTML 媒體、App 播放器與 YouTube iframe 的 start；`use-lesson-session` 每 15 秒位置變化或 1% 進度回報、離開時補送。測試 tests/resume.test.ts。
 - 報表：`registrationReport()`／`registrationReportCsv()`；測試 tests/report.test.ts。
 - 修正：`scrollbar-gutter` 原本套在所有元素，造成電腦版每層外框各多留捲軸寬（內容窄約 60px）；改成只套 `Screen` 的捲動區（`data-stable-gutter`），閃爍檢查仍 0。
+
+## 2026-11-17：手機推播通知（Web Push）
+- 後端 `src/push.ts`：VAPID（ES256 JWT）＋ RFC 8291 aes128gcm 加密，只用 Web Crypto；`flushPushes()` 推送 `notifications.pushed = 0` 的通知（個人／總部管理員／中心會長，後兩者透過 `member_contacts` 找人），404/410 自動刪除訂閱、失敗 20 次刪除；`courseReminders()` 台灣 20:00 後替明天開課的課程（素材清單除外）發提醒，`course_reminders` 防重複。
+- API：`GET /push/key`、`POST /push/subscribe`、`/push/unsubscribe`、`/push/test`。寫入請求後背景 flush；`wrangler.jsonc` 新增 cron `*/10 * * * *`（`worker.ts` 的 `scheduled`）。刪除帳號會一併刪推播訂閱。
+- 前端：`public/sw.js`（只處理 push 與點通知，不快取）、`lib/web-push.ts`、`settings/notifications.tsx` 的 `PushCard`（開關、狀態說明、測試通知；iPhone 未加入主畫面時顯示教學）。
+- 金鑰：Secret `VAPID_PRIVATE_JWK`（JWK 字串，由開發者在部署時以 wrangler 直接寫入 Cloudflare，未出現在對話或 repo）。換金鑰會讓所有裝置需要重新開啟推播。
+- 測試 tests/push.test.ts：以接收端演算法解密驗證內容、驗證 VAPID 簽章、失效裝置刪除、開課提醒時間與防重複。後端共 140 項。

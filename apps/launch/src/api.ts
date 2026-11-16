@@ -1,3 +1,4 @@
+import { flushPushes, vapidPublicKey } from "./push.ts";
 import { HQ_SLUG, RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
 import { romanizeName, urlNameVariants } from "./romanize.ts";
 import {
@@ -272,6 +273,7 @@ async function listAchievements(ctx: Ctx): Promise<AdminAchievement[]> {
 
 /** 刪除一位會員在本 App 的所有資料。 */
 export async function purgeMember(db: D1Database, sub: string, actor: string, action: string): Promise<void> {
+  await db.prepare("DELETE FROM push_subscriptions WHERE member_sub = ?").bind(sub).run();
   await db.batch([
     db.prepare("DELETE FROM course_comments WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM comment_blocks WHERE member_sub = ? OR blocked_sub = ?").bind(sub, sub),
@@ -4023,6 +4025,55 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/push\/key$/,
+    // 手機推播：瀏覽器訂閱用的公鑰；沒設定金鑰時 publicKey 為 null（畫面顯示「尚未開放」）。
+    async (ctx) => ({ publicKey: vapidPublicKey(ctx.env) }),
+  ],
+  [
+    "POST",
+    /^\/push\/subscribe$/,
+    async (ctx) => {
+      const s = requireMember(ctx);
+      const body = await readJson<{ endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } }>(ctx.req);
+      const endpoint = typeof body.endpoint === "string" ? body.endpoint : "";
+      const p256dh = typeof body.keys?.p256dh === "string" ? body.keys.p256dh : "";
+      const auth = typeof body.keys?.auth === "string" ? body.keys.auth : "";
+      let ok = false;
+      try {
+        ok = new URL(endpoint).protocol === "https:" && endpoint.length < 1000 && /^[A-Za-z0-9_-]{80,100}$/.test(p256dh) && /^[A-Za-z0-9_-]{16,30}$/.test(auth);
+      } catch {
+        ok = false;
+      }
+      if (!ok) return fail(400, "invalid_subscription", "推播訂閱資料不正確，請重新開啟推播");
+      await ctx.db
+        .prepare("INSERT INTO push_subscriptions (endpoint, member_sub, p256dh, auth, role, roles, center_key, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET member_sub = excluded.member_sub, p256dh = excluded.p256dh, auth = excluded.auth, role = excluded.role, roles = excluded.roles, center_key = excluded.center_key, user_agent = excluded.user_agent, failures = 0")
+        .bind(endpoint, s.sub, p256dh, auth, s.role, s.roles.join(","), s.center?.key ?? null, (ctx.req.headers.get("user-agent") ?? "").slice(0, 200))
+        .run();
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/push\/unsubscribe$/,
+    async (ctx) => {
+      const s = requireMember(ctx);
+      const body = await readJson<{ endpoint?: unknown }>(ctx.req);
+      if (typeof body.endpoint === "string") await ctx.db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ? AND member_sub = ?").bind(body.endpoint, s.sub).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/push\/test$/,
+    async (ctx) => {
+      // 「傳一則測試通知給我」：建立一則站內通知，送出後會自動推播到自己所有已開啟的裝置。
+      const s = requireMember(ctx);
+      await notify(ctx.db, { sub: s.sub }, "推播測試", "看到這則就代表手機推播已經開好了 🎉", "/notices").run();
+      return { ok: true };
+    },
+  ],
+  [
     "POST",
     /^\/series-views$/,
     async (ctx) => {
@@ -4254,9 +4305,14 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
   for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
   // 伺服器處理時間（含向會員中心查詢），方便在瀏覽器開發者工具的 Network → Timing 看哪一步慢。
   res.headers.set("server-timing", `app;dur=${Date.now() - started}`);
-  // 有寫入動作時，把新產生的站內通知也寄成 Email（背景處理，失敗不影響回應）。
+  // 有寫入動作時，把新產生的站內通知也寄成 Email、推播到手機（背景處理，失敗不影響回應）。
   if (req.method !== "GET" && res.status < 400 && env.EMAIL) {
     const job = flushEmails(env).catch((e) => console.error("flush emails", e instanceof Error ? e.message : "error"));
+    if (exec) exec.waitUntil(job);
+    else await job;
+  }
+  if (req.method !== "GET" && res.status < 400 && env.VAPID_PRIVATE_JWK) {
+    const job = flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));
     if (exec) exec.waitUntil(job);
     else await job;
   }

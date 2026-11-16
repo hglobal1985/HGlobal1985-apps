@@ -2,6 +2,7 @@ import { handleApi } from "./api.ts";
 import type { Env } from "./d1.ts";
 import { resolveShareMeta, withShareMeta } from "./og.ts";
 import { serveStatic, type StaticFiles } from "./site.ts";
+import { courseReminders, flushPushes } from "./push.ts";
 
 /**
  * learn.hglobal1985.com：/api/v2/* 為 API，其餘為 Expo Web 靜態檔（SPA）。
@@ -28,6 +29,15 @@ export function createWorker(staticFiles: StaticFiles) {
       res.headers.set("referrer-policy", "strict-origin-when-cross-origin");
       res.headers.set("x-frame-options", "DENY");
       return res;
+    },
+    /** 排程（每 10 分鐘）：開課前一天提醒（台灣時間 20:00 後）、補推還沒推播的通知。 */
+    async scheduled(_event: unknown, env: Env, exec?: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
+      const job = (async () => {
+        await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));
+        await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));
+      })();
+      if (exec) exec.waitUntil(job);
+      else await job;
     },
   };
 }

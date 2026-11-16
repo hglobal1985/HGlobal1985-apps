@@ -34,6 +34,8 @@ export interface R2Bucket {
 }
 export interface Env {
   DB: D1Database;
+  /** Web Push 的 VAPID 私鑰（Secret，JWK 字串）。沒設定就不推播（站內通知照常）。 */
+  VAPID_PRIVATE_JWK?: string;
   /** "on" 時開放模擬會員登入（內部測試用；上架前改為 "off"）。 */
   DEMO_LOGIN?: string;
   MUX_SIGNING_KEY_ID?: string;
