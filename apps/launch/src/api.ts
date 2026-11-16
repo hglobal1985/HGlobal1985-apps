@@ -752,8 +752,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       sharerRankName: rankMap.get(l.sharer_rank)?.name ?? "",
       sharerTitle: l.sharer_title,
       // 章節封面：勾了「自動使用 YouTube 畫面」＝影片縮圖；沒勾但沒上傳封面＝臨時用縮圖（非 YouTube 章節維持 null＝用課程封面）。
-      coverUrl: l.media_type === "youtube" && l.media_ref && (l.auto_cover === 1 || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
-      posterUrl: l.media_type === "youtube" && l.media_ref && (l.auto_cover === 1 || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
+      // 素材清單裡的影片一律用 YouTube 縮圖（業主 2026-11-17）；一般課程：有上傳章節封面用上傳的，沒有才用 YouTube 縮圖。
+      coverUrl: l.media_type === "youtube" && l.media_ref && (row.is_list === 1 || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
+      posterUrl: l.media_type === "youtube" && l.media_ref && (row.is_list === 1 || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
       autoCover: l.auto_cover === 1,
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
@@ -2425,10 +2426,10 @@ const routes: [string, RegExp, Handler][] = [
       const sub = ctx.session?.sub ?? "";
       const { results } = await ctx.db
         .prepare(
-          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.is_summary AS isSummary, c.is_shorts AS isShorts, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND (l.kind = 'chapter' OR (c.is_shorts = 1 AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position",
+          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.is_summary AS isSummary, c.is_shorts AS isShorts, c.is_list AS isList, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND (l.kind = 'chapter' OR (c.is_shorts = 1 AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position",
         )
         .bind(sub)
-        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; isSummary: number; isShorts: number; lessonKind: string; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
+        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; isSummary: number; isShorts: number; isList: number; lessonKind: string; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
       return {
         lessons: results.map((r) => ({
           id: r.id,
@@ -2446,7 +2447,8 @@ const routes: [string, RegExp, Handler][] = [
           minutes: r.minutes,
           // 只給章節自己上傳的封面；沒有就留空，畫面依序改用「課程手動上傳的封面／EDM」→ 最後才用這一堂的 YouTube 縮圖（ytThumb）。
           // 業主 2026-11-17：手動上傳的封面一律優先，不可被 YouTube 縮圖蓋掉。
-          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
+          // 素材清單裡的影片一律用 YouTube 縮圖，不用清單首頁上傳的封面（業主 2026-11-17）。
+          coverUrl: r.isList === 1 && r.mediaType === "youtube" && r.mediaRef ? ytThumbUrl(r.mediaRef) : r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
           // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
           ytThumb: r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,

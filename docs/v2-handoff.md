@@ -638,3 +638,4 @@
 - `DateSelect` 的「日」：展開「23日（一）」、收起「23（一）」，週六日紅字；`Select` 新增選項屬性 `danger`。
 - 2026-11-17 修正：「單元」檢視章節縮圖被 YouTube 縮圖蓋掉課程手動上傳的封面（上一輪刪除自動抓封面勾選時，`/search-index` 誤把 YouTube 縮圖放進 coverUrl）。改回 coverUrl 只給章節自己的封面；測試 auto-cover.test.ts 已加檢查。
 - 2026-11-17：迷你播放器按鈕改實心黑底（player-layer.web.tsx `btn`）；影片「可拖曳或放大縮小」提示 3.5 秒→1 秒；下拉重新整理排除帶 `data-no-pull-refresh` 的區塊（課程 EDM 拖曳 `EdmPan`、EDM 放大視窗、影片放大拖曳層、迷你播放器），本機以觸控模擬驗證：EDM 上拖曳不重新整理、其他地方照常。
+- 2026-11-17：素材清單裡的影片縮圖一律用 YouTube 縮圖（`courseDetail` 的 lesson coverUrl／posterUrl、`/search-index` 的 coverUrl 依 `is_list` 判斷）；一般課程維持「章節封面 → 課程上傳封面 → YouTube」。測試 course-list.test.ts。

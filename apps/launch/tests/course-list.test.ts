@@ -41,6 +41,11 @@ test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 Ap
   assert.equal((await call("POST", `/courses/${id}/lessons/${video.id}/complete`, student)).status, 200);
   const after = (await call<CourseSummary[]>("GET", "/courses", student)).data.find((c) => c.id === id)!;
   assert.equal(after.completedLessons, 0, "教材類看完不累積小樹苗（不算已完成章節）");
+  // 清單裡的影片縮圖一律用 YouTube 的（不用清單首頁上傳的封面）。
+  await call("PATCH", `/admin/courses/${id}`, admin, { isShorts: true }); // 短影音清單的影片才會出現在「單元」索引
+  const idx = (await call<{ lessons: { id: string; coverUrl: string | null }[] }>("GET", "/search-index", student)).data.lessons.find((l) => l.id === video.id)!;
+  assert.equal(idx.coverUrl, "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg");
+  assert.equal((await call<CourseDetail>("GET", `/courses/${id}`, student)).data.lessons.find((l) => l.id === video.id)!.coverUrl, "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg");
   assert.equal(after.progressPercent, 0, "教材類不計學習進度");
 
   // 影片換成一般連結、再換回 YouTube
