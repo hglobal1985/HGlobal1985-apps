@@ -362,10 +362,10 @@ async function memberCourseState(db: D1Database, sub: string | undefined) {
   const [e, p, d, st, w, last] = await db.batch([
     db.prepare("SELECT course_id, hidden FROM enrollments WHERE member_sub = ?").bind(sub),
     db.prepare("SELECT i.course_id, i.order_id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.member_sub = ? AND o.status = 'pending' ORDER BY o.created_at").bind(sub),
-    db.prepare("SELECT p.course_id AS course_id, COUNT(*) AS n, COALESCE(SUM(l.duration_minutes), 0) AS m FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) WHERE p.member_sub = ? GROUP BY p.course_id").bind(sub),
+    db.prepare("SELECT p.course_id AS course_id, COUNT(*) AS n, COALESCE(SUM(l.duration_minutes), 0) AS m FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id AND l.kind = 'chapter' WHERE p.member_sub = ? GROUP BY p.course_id").bind(sub),
     db.prepare("SELECT course_id, hidden FROM learning_started WHERE member_sub = ?").bind(sub),
     // 還沒看完的章節：播放到哪（比例）× 該章長度，讓進度條隨播放前進。
-    db.prepare("SELECT w.course_id AS course_id, SUM(w.ratio * l.duration_minutes) AS m, SUM(w.ratio) AS n FROM lesson_watch w JOIN lessons l ON l.id = w.lesson_id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) LEFT JOIN lesson_progress p ON p.lesson_id = w.lesson_id AND p.member_sub = w.member_sub WHERE w.member_sub = ? AND p.lesson_id IS NULL GROUP BY w.course_id").bind(sub),
+    db.prepare("SELECT w.course_id AS course_id, SUM(w.ratio * l.duration_minutes) AS m, SUM(w.ratio) AS n FROM lesson_watch w JOIN lessons l ON l.id = w.lesson_id AND l.kind = 'chapter' LEFT JOIN lesson_progress p ON p.lesson_id = w.lesson_id AND p.member_sub = w.member_sub WHERE w.member_sub = ? AND p.lesson_id IS NULL GROUP BY w.course_id").bind(sub),
     // 最近一次學習時間：播放紀錄、完成章節、開始學習三者取最新。
     db.prepare("SELECT course_id, MAX(t) AS t FROM (SELECT course_id, updated_at AS t FROM lesson_watch WHERE member_sub = ? UNION ALL SELECT course_id, completed_at FROM lesson_progress WHERE member_sub = ? UNION ALL SELECT course_id, created_at FROM learning_started WHERE member_sub = ?) GROUP BY course_id").bind(sub, sub, sub),
   ]);

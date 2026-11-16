@@ -59,7 +59,7 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
           地點：{placeText(course)}
         </AppText>
       ) : null}
-      {course.enrollment === "opened" || course.started ? (
+      {(course.enrollment === "opened" || course.started) && !course.isList ? (
         <View style={styles.progressRow} accessibilityLabel={`學習進度 ${course.progressPercent}%`}>
           <View style={[styles.track, { backgroundColor: c.surfaceMuted }]}>
             <View style={[styles.bar, { backgroundColor: c.accent, width: `${ratio * 100}%` }]} />

@@ -69,7 +69,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
           <ListRow
             key={lesson.id}
             icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-            leading={link ? <BrandIcon type={link.linkType!} fallback={TYPE_INFO[link.linkType!].icon as never} size={36} /> : course.isList && lesson.completed && !lesson.locked ? <SaplingIcon /> : undefined}
+            leading={link ? <BrandIcon type={link.linkType!} fallback={TYPE_INFO[link.linkType!].icon as never} size={36} /> : undefined}
             compact
             playing={!link && playingId === lesson.id}
             playingLesson={lesson.id}

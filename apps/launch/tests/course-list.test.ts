@@ -5,7 +5,7 @@ import type { CourseDetail, CourseSummary } from "../src/contract.ts";
 import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 App 內播放並計入進度；其他連結開外部；不能新增章節與完整版", async () => {
+test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 App 內播放（不累積小樹苗與學習進度）；其他連結開外部；不能新增章節與完整版", async () => {
   const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on" };
   const call = async <T,>(method: string, path: string, token?: string, body?: unknown) => {
     const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env);
@@ -40,7 +40,8 @@ test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 Ap
   assert.equal(list.lessonCount, 1, "影片教材計入堂數（連結不算）");
   assert.equal((await call("POST", `/courses/${id}/lessons/${video.id}/complete`, student)).status, 200);
   const after = (await call<CourseSummary[]>("GET", "/courses", student)).data.find((c) => c.id === id)!;
-  assert.equal(after.progressPercent, 100, "看完影片教材＝學習進度 100%");
+  assert.equal(after.completedLessons, 0, "教材類看完不累積小樹苗（不算已完成章節）");
+  assert.equal(after.progressPercent, 0, "教材類不計學習進度");
 
   // 影片換成一般連結、再換回 YouTube
   const toLink = await call<CourseDetail>("PUT", `/admin/lessons/${video.id}/material`, admin, { url: "https://example.com/a.pdf", title: "改成檔案" });
