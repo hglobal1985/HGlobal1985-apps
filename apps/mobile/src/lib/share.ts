@@ -33,7 +33,8 @@ export async function shareLink(title: string, url: string, course?: { teacher: 
   }
   if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
     try {
-      await navigator.share({ title, text: message });
+      // 只送文字：網頁分享若同時帶 title，LINE 等 App 會把它另外當成第一行貼出來（課程名稱就重複兩次）。
+      await navigator.share({ text: message });
       return "shared";
     } catch {
       return "cancelled"; // 使用者關掉選單
