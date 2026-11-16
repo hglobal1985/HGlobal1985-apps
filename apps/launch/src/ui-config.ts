@@ -65,6 +65,7 @@ export function normalizeShare(raw: unknown): ShareSettings {
     chapterText: str(r.chapterText, d.chapterText, 300),
     listText: str(r.listText, d.listText, 300),
     listItemText: str(r.listItemText, d.listItemText, 300),
+    reviewerInviteText: str(r.reviewerInviteText, d.reviewerInviteText, 300),
   };
 }
 

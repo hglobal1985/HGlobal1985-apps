@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, RequestError, type CourseDetail, type CourseSummary, type Rank, type ReviewGroup } from "@/api/client";
+import { api, HQ_UNIT, RequestError, type CourseDetail, type CourseSummary, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -13,6 +13,7 @@ import { courseThemes, minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Card, Chips, DateSelect, Field, ListRow, NoticeBox, Pill } from "@/ui";
 import { showToast } from "@/ui/toast";
 import { EditSheet } from "./edit-sheet";
+import { ReviewDeskBlock } from "./review-desk";
 
 /** 編輯面板的種類（每一區各自一個底部面板、各自儲存）。 */
 export type SectionKey = "basics" | "when" | "price" | "enroll" | "advanced" | "status";
@@ -83,36 +84,6 @@ export function Check({ label, value, onChange, disabled }: { label: string; val
   );
 }
 
-/** 「EDM 與封面」面板裡的勾選：勾了就一律用第一支 YouTube 影片的畫面當封面（立刻儲存）；沒勾但完全沒有封面時，系統也會臨時用 YouTube 畫面。 */
-export function AutoCoverCheck({ course, onChanged }: { course: CourseDetail; onChanged: () => void }) {
-  const [on, setOn] = useState(course.autoCover);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const toggle = async (v: boolean) => {
-    setOn(v);
-    setBusy(true);
-    setErr(null);
-    try {
-      await api("PATCH", `/admin/courses/${course.id}`, { autoCover: v });
-      onChanged();
-    } catch (e) {
-      setOn(!v);
-      setErr((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <View style={{ gap: space.xs }}>
-      <Check label="自動抓取 YouTube 影片畫面當封面" value={on} onChange={toggle} disabled={busy} />
-      <AppText variant="caption" tone="muted">
-        勾選後，這門課的封面與 EDM 一律用第一支 YouTube 章節的影片畫面（不用上傳）。沒勾、而且沒有上傳任何封面時，系統也會先用 YouTube 畫面頂著。
-      </AppText>
-      {err ? <NoticeBox tone="danger" text={err} /> : null}
-    </View>
-  );
-}
-
 /** 可複選的圓角選項（分類、主辦單位）。值是「、」分隔文字。 */
 function MultiChips({ options, value, onChange, counts }: { options: string[]; value: string; onChange: (v: string) => void; /** 各選項已有幾堂課（顯示在名稱後面）。 */ counts?: Record<string, number> }) {
   const { c } = useTheme();
@@ -155,7 +126,7 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { c } = useTheme();
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
+  const init = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
   const [f, setF] = useState(init);
   const set = <K extends keyof typeof init>(k: K) => (v: (typeof init)[K]) => setF((x) => ({ ...x, [k]: v }));
   const rankOptions = useRankOptions();
@@ -164,8 +135,11 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const submit = async () => {
     if (!f.title.trim()) return setError(course.isList ? "請輸入素材清單名稱" : "請輸入課程名稱");
-    const { series: _series, ...rest } = f;
-    if (await save(isSuper ? f : rest)) onClose();
+    const { series: _series, eventStart, eventEnd, ...rest } = f;
+    // 日期與「時間與地點」面板是同一份資料；素材清單沒有日期，不送。
+    const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
+    const important = !course.isList && (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
+    if (await save({ ...(isSuper ? { ...rest, series: f.series } : rest), ...dates }, { important })) onClose();
   };
   return (
     <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
@@ -175,6 +149,8 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
         <>
           <Field label="主講人" value={f.teacher} onChange={set("teacher")} placeholder="例如：王大明（選填）" />
           <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
+          <DateSelect label="活動日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
+          {f.eventStart ? <DateSelect label="結束日期（連續 2～3 天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
         </>
       )}
       <Field label="分類（可複選，多個用「、」分開）" value={f.category} onChange={set("category")} placeholder="例如：達標班、會議" />
@@ -261,7 +237,7 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save(body, { important })) onClose();
   };
   return (
-    <EditSheet title="費用" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="費用與審核" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <Label>報名費用（新台幣，0＝免費）</Label>
       <TextInput
         value={f.priceTwd}
@@ -288,24 +264,21 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
         </>
       ) : null}
       {f.priceTba ? <Pill label="費用尚未公布：課程頁顯示「費用尚未公布」，暫不開放報名" tone="warning" /> : price === 0 ? <Pill label="免費課程：報名後立即開通" tone="accent" /> : <Pill label="付費課程：報名後需審核繳費才開通" tone="warning" />}
+      <ReviewDeskBlock course={course} />
     </EditSheet>
   );
 }
 
-// ---------- 報名與資格：最低獎銜、會長、誰可以瀏覽、審核群組 ----------
+// ---------- 報名與資格：最低獎銜、會長、誰可以瀏覽（審核群組移到「費用與審核」的審核窗口） ----------
 function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
-  const { member } = useSession();
-  const isHq = member?.role === "admin";
-  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, isPublic: course.isPublic, reviewGroupId: course.admin?.reviewGroupId ?? "" };
+  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, isPublic: course.isPublic };
   const [f, setF] = useState(init);
   const ranks = useApi<Rank[]>("/ranks");
-  const groups = useApi<ReviewGroup[]>("/admin/review-groups");
   const { save, busy, error } = useCourseSave(course, onSaved);
   const paid = (course.admin?.basePriceTwd ?? 0) > 0 || course.priceTba;
   const submit = async () => {
-    if (await save({ ...f, isPublic: paid ? false : f.isPublic, reviewGroupId: f.reviewGroupId || null })) onClose();
+    if (await save({ ...f, isPublic: paid ? false : f.isPublic })) onClose();
   };
-  const groupOptions = (groups.data ?? []).filter((g) => (isHq ? course.guidanceUnit !== HQ_UNIT || g.ownerCenter === null : g.ownerCenter !== null)).map((g) => ({ key: g.id, label: g.name }));
   return (
     <EditSheet title="報名與資格" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <Label>最低獎銜（誰可以報名）</Label>
@@ -316,8 +289,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
       ) : (
         <Chips label="誰可以瀏覽" options={[{ key: "no", label: "需要登入" }, { key: "yes", label: "完全公開（訪客免登入可看）" }]} value={f.isPublic ? "yes" : "no"} onChange={(v) => setF((x) => ({ ...x, isPublic: v === "yes" }))} />
       )}
-      <Label>報名審核群組</Label>
-      <Chips options={[{ key: "", label: isHq ? "未指定（由總部審核）" : "未指定（由本中心會長與總部處理）" }, ...groupOptions]} value={f.reviewGroupId} onChange={(v) => setF((x) => ({ ...x, reviewGroupId: v }))} />
+      <NoticeBox text="審核群組與審核人員改在「費用與審核」的「審核窗口」設定。" />
     </EditSheet>
   );
 }
@@ -501,7 +473,7 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
       <ListRow icon="create-outline" title="基本資料" subtitle={[course.title, !course.isList && course.teacher && `主講 ${course.teacher}`, course.category, course.series && `系列 ${course.series}`].filter(Boolean).join("・")} onPress={() => onOpen("basics")} />
       {/* 素材清單沒有時間地點與費用（一律公開免費）。 */}
       {course.isList ? null : <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />}
-      {course.isList ? null : <ListRow icon="pricetag-outline" title="費用" subtitle={priceText} onPress={() => onOpen("price")} />}
+      {course.isList ? null : <ListRow icon="pricetag-outline" title="費用與審核" subtitle={priceText} onPress={() => onOpen("price")} />}
       <ListRow icon="people-outline" title="報名與資格" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}${course.isPublic ? "・完全公開" : ""}`} onPress={() => onOpen("enroll")} />
       <ListRow icon="options-outline" title="進階設定" subtitle={`主辦：${course.hostUnit || "未設定"}${course.admin?.editedAt ? `・最後修改 ${course.admin.editedByName}` : ""}`} onPress={() => onOpen("advanced")} />
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />

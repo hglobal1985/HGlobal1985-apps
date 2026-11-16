@@ -531,6 +531,19 @@ export type UiConfig = {
  * - LINE 等分享預覽卡片：標題＝「名稱＋titleSeparator＋siteName」；備註＝「addressIcon 地址」換行再接一句隨機學習金句（可各自關閉）。
  *   單堂課程的預覽卡片與它主辦的中心一致（標題、備註都用該中心的）；總部主辦的課程用 hqName，沒有地址。
  */
+/** 課程審核窗口可以指定的身份：主辦中心的會長、音控、小編。 */
+export const REVIEW_ROLES = ["president", "sound", "editor"] as const;
+export type ReviewRole = (typeof REVIEW_ROLES)[number];
+export const REVIEW_ROLE_LABEL: Record<ReviewRole, string> = { president: "會長", sound: "音控", editor: "小編" };
+/** 課程「費用與審核」頁的審核窗口（管理者才拿得到）。 */
+export type ReviewDesk = {
+  groupId: string | null;
+  groupName: string | null;
+  groupMembers: { name: string; center: string; duty: string }[];
+  roles: ReviewRole[];
+  members: { sub: string; name: string; addedAt: string }[];
+};
+
 export type ShareSettings = {
   inviteText: string;
   courseText: string;
@@ -551,6 +564,8 @@ export type ShareSettings = {
   listText: string;
   /** 分享素材清單裡的單一影片（每列右側的分享鈕，點開直接播放這一段）：可用 {影片名稱}、{清單名稱}。 */
   listItemText: string;
+  /** 邀請特定會員擔任課程審核人員（24 小時有效的邀請網址）：可用 {課程名稱}；後面接 linkLead 與邀請網址。 */
+  reviewerInviteText: string;
 };
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   inviteText: "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️",
@@ -567,7 +582,13 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   chapterText: "我剛聽完這場 {主講人}{職稱}的這場精彩演講 {章節名稱} 我就立刻想到要分享給你！",
   listText: "推薦你看「{清單名稱}」，裡面有好多精彩影片，一起來看吧！",
   listItemText: "我剛看完這段精彩影片「{影片名稱}」（{清單名稱}），立刻想到要分享給你！",
+  reviewerInviteText: "邀請你擔任「{課程名稱}」的報名審核人員。請在 24 小時內點開下方網址並登入寰宇行動大學，按「接受」後就能審核這門課的報名。",
 };
+
+/** 組出「邀請審核人員」的分享文字。 */
+export function reviewerInviteMessage(s: ShareSettings, url: string, courseTitle: string): string {
+  return `${s.reviewerInviteText.replaceAll("{課程名稱}", courseTitle)}\n\n${s.linkLead}\n${url}`;
+}
 
 /**
  * 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 用課程範本；其他教材傳 material；單一章節傳 chapter（姓名、職稱、章節名稱取章節自己的設定，課程只提供課程名稱）；

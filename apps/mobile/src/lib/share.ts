@@ -1,7 +1,7 @@
 import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { Platform, Share } from "react-native";
-import { DEFAULT_SHARE_SETTINGS, resolveUrl, shareMessage, type UiConfig } from "@/api/client";
+import { DEFAULT_SHARE_SETTINGS, resolveUrl, reviewerInviteMessage, shareMessage, type UiConfig } from "@/api/client";
 
 /** 絕對網址（分享與下載用）。 */
 const absolute = (url: string) => {
@@ -21,8 +21,16 @@ export const setShareSettings = (s: UiConfig["share"]) => {
  * 回傳 "shared"＝已叫出選單；"copied"＝這個瀏覽器沒有分享選單（例如電腦），已改為複製連結（含邀請文字）。
  */
 export async function shareLink(title: string, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }, chapter?: { sharer: string; sharerTitle?: string; title: string }, list?: { title: string; item?: string }): Promise<"shared" | "copied" | "cancelled"> {
-  const link = absolute(url);
-  const message = shareMessage(shareSettings, link, course, material, chapter, list);
+  return shareText(title, shareMessage(shareSettings, absolute(url), course, material, chapter, list));
+}
+
+/** 邀請特定會員擔任課程審核人員：文字範本在「設定 > 分享預設值」的 reviewerInviteText。 */
+export function shareReviewerInvite(courseTitle: string, path: string): Promise<"shared" | "copied" | "cancelled"> {
+  return shareText(`審核人員邀請：${courseTitle}`, reviewerInviteMessage(shareSettings, absolute(path), courseTitle));
+}
+
+/** 叫出系統分享選單，送出已組好的整段文字（網頁沒有分享選單時改為複製）。 */
+async function shareText(title: string, message: string): Promise<"shared" | "copied" | "cancelled"> {
   if (Platform.OS !== "web") {
     try {
       await Share.share({ title, message });

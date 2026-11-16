@@ -626,3 +626,9 @@
 - `ShareSettings` 新增 `listText`（{清單名稱}）與 `listItemText`（{影片名稱}、{清單名稱}）；`shareMessage` 第 6 個參數 `list`。清單頁右上角、課程列分享用清單範本；清單每段影片右側新增分享鈕（`ListItemShare`，網址 `?N`，開啟直接播放第 N 段）；清單裡已看完的影片顯示小樹苗。
 - 設定 > 分享預設值改成四區：一般、課程、教材、LINE 預覽卡片；預覽新增清單與清單影片的範例。後端 135 項測試。
 - **清單類別不列入學習紀錄**（業主 2026-11-16，取代前面「計入進度、小樹苗」的做法）：後端學習進度與成就只算 kind='chapter'（素材清單的影片是 material，自然不算）；`learning.tsx`、首頁繼續學習排除 `isList`；`ribbonsFor` 對清單只給「免費公開」、不給學習中／已完成／日期緞帶；`classify` 把清單歸在 public_free；清單列不顯示小樹苗。播放與「已看過」紀錄照常寫入資料庫（之後要改回計入也不會遺失）。
+
+## 2026-11-16（再續）：費用與審核、封面規則、新增課程、日期
+- migration 0062：清掉所有 `auto_cover`；`courses.review_roles`；新表 `course_reviewers`、`review_invites`（只存代碼的 SHA-256）。
+- API：`GET /admin/courses/:id/review-desk`、`PUT …/review-roles`、`DELETE …/reviewers/:sub`、`POST …/review-invites`（回 `/review-invite/代碼`）、`GET /review-invites/:token`、`POST /review-invites/:token/accept`（一次性、24 小時；過期或被別人用掉回 410）。指定的審核人員也會收到「有新的報名待審核」通知。
+- 新增課程不建第 1 堂；`createTestDb` 預設用觸發器替測試補一堂（`firstLesson: false` 可關掉，見 tests/sqlite-d1.ts 說明），新行為由 auto-cover.test.ts 驗證。系列只限 super_admin（403 `series_super_admin_only`）。
+- 測試：tests/review-desk.test.ts（邀請、通知、刪除、過期、指定身份、系列權限）；後端共 137 項。

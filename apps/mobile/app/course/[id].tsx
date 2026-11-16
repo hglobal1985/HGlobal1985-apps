@@ -15,7 +15,7 @@ import { PlayerSlot } from "@/features/player/player-slot";
 import { useLessonSession } from "@/features/player/use-lesson-session";
 import { lessonHref } from "@/lib/lesson-href";
 import { EdmManager } from "@/features/admin/edm-manager";
-import { AutoCoverCheck, SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
+import { SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
 import { Check } from "@/features/course-edit/course-sections";
@@ -361,7 +361,6 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
       </Screen>
       {sheet === "art" ? (
         <EditSheet title="EDM 與封面" onClose={() => setSheet(null)} hideSave>
-          <AutoCoverCheck course={course} onChanged={invalidate} />
           <EdmManager course={course} onChanged={invalidate} />
         </EditSheet>
       ) : sheet === "newLesson" || sheet === "newMaterial" ? (

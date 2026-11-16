@@ -77,12 +77,10 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   const [sharerRank, setSharerRank] = useState(lesson?.sharerRank ?? "");
   const [sharerTitle, setSharerTitle] = useState(lesson?.sharerTitle ?? "");
   const [media, setMedia] = useState<MediaDraft>(() => (lesson ? mediaDraftOf(lesson) : emptyMediaDraft()));
-  const kind = media.kind;
-  // 章節日期預設「跟著課程日期」（follow）：課程日期改了這堂跟著變；自己選了日期就不再跟著。新增時預設也跟課程；課程沒設日期就預設今天。
-  const [follow, setFollow] = useState(isNew ? !!courseDate : !!courseDate && !!lesson.dateFollows);
+  // 章節日期預設「同課程」（follow，業主 2026-11-16：勾選框一律顯示、預設打勾）：課程日期改了這堂跟著變；取消勾選才自己選日期。
+  const [follow, setFollow] = useState(isNew ? true : !!lesson.dateFollows);
   const [eventDate, setEventDate] = useState(lesson?.eventDate ?? courseDate ?? todayStr());
   const ownDate = follow ? "" : eventDate;
-  const [autoCover, setAutoCover] = useState(!!lesson?.autoCover);
   const [isSpeaker, setIsSpeaker] = useState(!!lesson?.isSpeaker);
   const [isSummary, setIsSummary] = useState(!!lesson?.isSummary);
   // 主講人與「總結與銷售課程」互斥：勾一個，另一個自動取消。
@@ -117,9 +115,8 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       ownDate !== (lesson.dateFollows ? "" : lesson.eventDate ?? "") ||
       isSpeaker !== !!lesson.isSpeaker ||
       isSummary !== !!lesson.isSummary ||
-      autoCover !== !!lesson.autoCover ||
       mediaDraftDirty(media, lesson)
-    : !!createdId || !!title || !!sharer || !!sharerRank || !!sharerTitle || isSpeaker || isSummary || autoCover || mediaDraftDirty(media);
+    : !!createdId || !!title || !!sharer || !!sharerRank || !!sharerTitle || isSpeaker || isSummary || mediaDraftDirty(media);
 
   const save = async () => {
     if (!lesson) return;
@@ -127,7 +124,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
     setBusy("save");
     setMsg(null);
     try {
-      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, autoCover, isSpeaker, isSummary, ...mediaDraftBody(media) };
+      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, isSpeaker, isSummary, ...mediaDraftBody(media) };
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
       setMsg({ tone: "success", text: "已儲存" });
       invalidate();
@@ -149,7 +146,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       let lessonId = createdId ?? undefined;
       if (!lessonId) {
         const before = new Set(course.lessons.map((l) => l.id));
-        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), ...(ownDate ? { eventDate: ownDate } : {}), autoCover, isSpeaker, isSummary });
+        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), ...(ownDate ? { eventDate: ownDate } : {}), isSpeaker, isSummary });
         lessonId = detail.lessons.find((l) => !before.has(l.id))?.id;
         if (!lessonId) throw Error("新增失敗，請重新整理後再試");
         setCreatedId(lessonId);
@@ -235,22 +232,19 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
           <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} who={`${who}分享者`} />
         </>
       )}
-      {kind === "youtube" ? <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} /> : null}
       {lesson && course.chapterCovers ? <LessonArt lesson={lesson} onChanged={invalidate} /> : null}
       <View style={styles.dateHead}>
         <AppText variant="callout" style={{ flex: 1 }}>
           活動日期
         </AppText>
-        {courseDate ? (
-          <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: sameAsCourse }} accessibilityLabel="日期同課程日期" onPress={() => (sameAsCourse ? setFollow(false) : (setFollow(true), setEventDate(courseDate)))} style={styles.sameCheck}>
-            <Icon name={sameAsCourse ? "checkbox" : "square-outline"} size={28} color={sameAsCourse ? c.accent : c.textMuted} />
-            <AppText variant="body">同課程日期</AppText>
-          </Pressable>
-        ) : null}
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: sameAsCourse }} accessibilityLabel="日期同課程" onPress={() => (sameAsCourse ? setFollow(false) : (setFollow(true), courseDate && setEventDate(courseDate)))} style={styles.sameCheck}>
+          <Icon name={sameAsCourse ? "checkbox" : "square-outline"} size={28} color={sameAsCourse ? c.accent : c.textMuted} />
+          <AppText variant="body">同課程</AppText>
+        </Pressable>
       </View>
       {sameAsCourse ? (
         <AppText variant="body" tone="muted">
-          {(courseDate ?? "").replace(/-/g, "/")}（同課程日期）
+          {courseDate ? `${courseDate.replace(/-/g, "/")}（同課程日期）` : "同課程日期（課程還沒設定日期；課程設定後這堂自動跟著）"}
         </AppText>
       ) : (
         <DateSelect value={eventDate} onChange={setEventDate} />

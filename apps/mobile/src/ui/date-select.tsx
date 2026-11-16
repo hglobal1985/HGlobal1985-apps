@@ -19,6 +19,9 @@ const daysIn = (y: number, m: number) => new Date(y, m, 0).getDate();
  * 月份加英文縮寫（例如「3 月 Mar」），避免和「日」搞混。
  * 沒有日期時顯示「設定日期（預設今天）」；新增資料時呼叫端直接給今天的日期。
  */
+/** 年份最早可選到幾年前。 */
+export const YEARS_BACK = 40;
+
 export function DateSelect({ label, value, onChange, clearable = true, defaultValue }: { label?: string; value: string; onChange: (v: string) => void; clearable?: boolean; defaultValue?: string }) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const now = new Date().getFullYear();
@@ -32,7 +35,8 @@ export function DateSelect({ label, value, onChange, clearable = true, defaultVa
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const set = (ny: number, nm: number, nd: number) => onChange(`${ny}-${pad(nm)}-${pad(Math.min(nd, daysIn(ny, nm)))}`);
   const years: SelectOption[] = [];
-  for (let i = Math.min(now - 1, y); i <= Math.max(now + 5, y); i++) years.push({ key: String(i), label: `${i} 年`, short: `${i}` });
+  // 全站日期選擇統一（業主 2026-11-16）：年份從 5 年後到 40 年前，新的在上面。
+  for (let i = Math.max(now + 5, y); i >= Math.min(now - YEARS_BACK, y); i--) years.push({ key: String(i), label: `${i} 年`, short: `${i}` });
   const months: SelectOption[] = MONTH_EN.map((en, i) => ({ key: String(i + 1), label: `${i + 1} 月 ${en}`, short: `${i + 1}月` }));
   const days: SelectOption[] = Array.from({ length: daysIn(y, mo) }, (_, i) => ({ key: String(i + 1), label: `${i + 1} 日`, short: `${i + 1}日` }));
   return (

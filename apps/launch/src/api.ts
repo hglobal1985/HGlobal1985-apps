@@ -32,6 +32,9 @@ import {
   type PaymentMethodKey,
   type PaymentReport,
   type Rank,
+  REVIEW_ROLES,
+  type ReviewDesk,
+  type ReviewRole,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { centerMembers, centralAddJobTitle, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
@@ -607,6 +610,35 @@ async function isListCourse(ctx: Ctx, courseId: string): Promise<boolean> {
   return (await ctx.db.prepare("SELECT is_list FROM courses WHERE id = ?").bind(courseId).first<{ is_list: number }>())?.is_list === 1;
 }
 
+/** 課程「費用與審核」的審核窗口：審核群組（成員）、指定身份、指定的會員。 */
+async function reviewDesk(ctx: Ctx, id: string): Promise<ReviewDesk> {
+  const c = await ctx.db.prepare("SELECT review_group_id, review_roles FROM courses WHERE id = ?").bind(id).first<{ review_group_id: string | null; review_roles: string }>();
+  if (!c) return fail(404, "not_found", "找不到這門課程");
+  const [g, gm, m] = await ctx.db.batch([
+    ctx.db.prepare("SELECT name FROM review_groups WHERE id = ?").bind(c.review_group_id ?? ""),
+    ctx.db.prepare("SELECT member_name, center_label, duty FROM review_group_members WHERE group_id = ? ORDER BY center_label, created_at").bind(c.review_group_id ?? ""),
+    ctx.db.prepare("SELECT member_sub, member_name, created_at FROM course_reviewers WHERE course_id = ? ORDER BY created_at").bind(id),
+  ]);
+  return {
+    groupId: c.review_group_id,
+    groupName: (g.results[0] as { name: string } | undefined)?.name ?? null,
+    groupMembers: (gm.results as { member_name: string; center_label: string; duty: string }[]).map((r) => ({ name: r.member_name, center: r.center_label, duty: r.duty })),
+    roles: c.review_roles.split(",").filter((r): r is ReviewRole => (REVIEW_ROLES as readonly string[]).includes(r)),
+    members: (m.results as { member_sub: string; member_name: string; created_at: string }[]).map((r) => ({ sub: r.member_sub, name: r.member_name, addedAt: r.created_at })),
+  };
+}
+
+type InviteRow = { course_id: string; created_by_sub: string; expires_at: string; used_by_sub: string | null; title: string };
+async function inviteOf(ctx: Ctx, token: string): Promise<InviteRow> {
+  const r = await ctx.db.prepare("SELECT i.course_id, i.created_by_sub, i.expires_at, i.used_by_sub, c.title FROM review_invites i JOIN courses c ON c.id = i.course_id WHERE i.token_hash = ?").bind(await sha256(token)).first<InviteRow>();
+  return r ?? fail(404, "invite_not_found", "找不到這個邀請，請確認網址是否完整");
+}
+/** open＝可以接受；mine＝自己已經接受過；used＝被別人用掉；expired＝超過 24 小時。 */
+function inviteState(inv: InviteRow, sub: string): "open" | "mine" | "used" | "expired" {
+  if (inv.used_by_sub) return inv.used_by_sub === sub ? "mine" : "used";
+  return inv.expires_at < iso() ? "expired" : "open";
+}
+
 async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
   try {
     const c = await ctx.db.prepare("SELECT teacher, host_center_key, url_name FROM courses WHERE id = ?").bind(courseId).first<{ teacher: string | null; host_center_key: string | null; url_name: string | null }>();
@@ -964,14 +996,34 @@ async function hydrateOrders(db: D1Database, rows: OrderRow[]): Promise<Order[]>
   }));
 }
 
-/** 這位登入者的審核範圍：all＝全站（超級管理員、秘書）；center＝會長的中心；groups＝所屬審核群組與負責的中心（''＝全部中心）。 */
-type ReviewScope = { all: boolean; center: string | null; groups: { groupId: string; centerKey: string }[] };
+/**
+ * 這位登入者的審核範圍：all＝全站（超級管理員、秘書）；center＝會長的中心；groups＝所屬審核群組與負責的中心（''＝全部中心）；
+ * courses＝課程「費用與審核」直接指定的審核人員，或指定身份（主辦中心的會長／音控／小編）取得的課程（centerKey 非空＝只限該中心學員的報名）。
+ */
+type ReviewScope = { all: boolean; center: string | null; groups: { groupId: string; centerKey: string }[]; courses: { courseId: string; centerKey: string }[] };
 async function reviewScope(ctx: Ctx, s: Session): Promise<ReviewScope> {
-  if (s.role === "admin") return { all: true, center: null, groups: [] };
-  const { results } = await ctx.db.prepare("SELECT DISTINCT group_id, center_key FROM review_group_members WHERE member_sub = ?").bind(s.sub).all<{ group_id: string; center_key: string }>();
-  return { all: false, center: s.roles.includes("president") ? (s.center?.key ?? null) : null, groups: results.map((r) => ({ groupId: r.group_id, centerKey: r.center_key })) };
+  if (s.role === "admin") return { all: true, center: null, groups: [], courses: [] };
+  const [g, direct, eds, rc] = await ctx.db.batch([
+    ctx.db.prepare("SELECT DISTINCT group_id, center_key FROM review_group_members WHERE member_sub = ?").bind(s.sub),
+    ctx.db.prepare("SELECT course_id FROM course_reviewers WHERE member_sub = ?").bind(s.sub),
+    ctx.db.prepare("SELECT center_key FROM course_editors WHERE member_sub = ?").bind(s.sub),
+    ctx.db.prepare("SELECT id, host_center_key, review_roles FROM courses WHERE review_roles <> ''"),
+  ]);
+  const courses = (direct.results as { course_id: string }[]).map((r) => ({ courseId: r.course_id, centerKey: "" }));
+  const editorCenters = (eds.results as { center_key: string }[]).map((r) => r.center_key);
+  for (const c of rc.results as { id: string; host_center_key: string | null; review_roles: string }[]) {
+    for (const role of c.review_roles.split(",")) {
+      const centers = role === "editor" ? editorCenters : (role === "president" || role === "sound") && s.roles.includes(role) && s.center ? [s.center.key] : [];
+      for (const ck of centers) {
+        if (c.host_center_key) {
+          if (c.host_center_key === ck) courses.push({ courseId: c.id, centerKey: "" });
+        } else courses.push({ courseId: c.id, centerKey: ck }); // 總部主辦的課：只審核自己中心學員的報名
+      }
+    }
+  }
+  return { all: false, center: s.roles.includes("president") ? (s.center?.key ?? null) : null, groups: (g.results as { group_id: string; center_key: string }[]).map((r) => ({ groupId: r.group_id, centerKey: r.center_key })), courses };
 }
-const hasScope = (sc: ReviewScope) => sc.all || !!sc.center || sc.groups.length > 0;
+const hasScope = (sc: ReviewScope) => sc.all || !!sc.center || sc.groups.length > 0 || sc.courses.length > 0;
 
 /** 審核範圍的 SQL 條件（套用在 orders o）。 */
 function scopeSql(sc: ReviewScope): { sql: string; args: unknown[] } {
@@ -987,6 +1039,10 @@ function scopeSql(sc: ReviewScope): { sql: string; args: unknown[] } {
       `EXISTS (SELECT 1 FROM order_items i JOIN courses c ON c.id = i.course_id WHERE i.order_id = o.id AND c.review_group_id = ?)${g.centerKey ? " AND o.center_key = ?" : ""}`,
     );
     args.push(g.groupId, ...(g.centerKey ? [g.centerKey] : []));
+  }
+  for (const c of sc.courses) {
+    parts.push(`EXISTS (SELECT 1 FROM order_items i WHERE i.order_id = o.id AND i.course_id = ?)${c.centerKey ? " AND o.center_key = ?" : ""}`);
+    args.push(c.courseId, ...(c.centerKey ? [c.centerKey] : []));
   }
   return { sql: parts.length ? `(${parts.map((p) => `(${p})`).join(" OR ")})` : "1 = 0", args };
 }
@@ -1011,16 +1067,18 @@ function event(db: D1Database, orderId: string, actor: { sub: string; name: stri
 }
 
 /** 付費報名要通知誰：同中心的群組成員＋該中心會長；非寰宇、沒有中心或該中心沒有窗口時改通知總部（秘書、超級管理員）。 */
-async function reviewerNotices(ctx: Ctx, o: { id: string; centerKey: string | null; hglobal: boolean; groupId: string | null }, title: string, body: string): Promise<D1PreparedStatement[]> {
+async function reviewerNotices(ctx: Ctx, o: { id: string; centerKey: string | null; hglobal: boolean; groupId: string | null; courseId?: string | null }, title: string, body: string): Promise<D1PreparedStatement[]> {
   const link = `/admin/orders/${o.id}`;
   const out: D1PreparedStatement[] = [];
   let desk: string[] = [];
+  // 課程直接指定的審核人員也收到通知。
+  if (o.courseId) desk.push(...(await ctx.db.prepare("SELECT member_sub FROM course_reviewers WHERE course_id = ?").bind(o.courseId).all<{ member_sub: string }>()).results.map((r) => r.member_sub));
   if (o.groupId) {
     const { results } = await ctx.db
       .prepare("SELECT DISTINCT member_sub FROM review_group_members WHERE group_id = ? AND (center_key = '' OR center_key = ?)")
       .bind(o.groupId, o.centerKey ?? "\u0000")
       .all<{ member_sub: string }>();
-    desk = results.map((r) => r.member_sub);
+    desk = [...new Set([...desk, ...results.map((r) => r.member_sub)])];
   }
   for (const sub of desk) out.push(notify(ctx.db, { sub }, title, body, link));
   if (o.hglobal && o.centerKey) out.push(notify(ctx.db, { role: "president", centerKey: o.centerKey }, title, body, link));
@@ -1034,9 +1092,9 @@ const METHOD_LABEL: Record<PaymentMethodKey, string> = { cash: "現金", linepay
 async function reportPayment(ctx: Ctx, orderId: string, body: Record<string, unknown>): Promise<Order> {
   const s = requireMember(ctx);
   const o = await ctx.db
-    .prepare("SELECT o.id, o.member_sub, o.status, o.center_key, o.hglobal, o.total_twd, (SELECT c.review_group_id FROM order_items i JOIN courses c ON c.id = i.course_id WHERE i.order_id = o.id LIMIT 1) AS group_id, (SELECT i.title_snapshot FROM order_items i WHERE i.order_id = o.id LIMIT 1) AS title FROM orders o WHERE o.id = ?")
+    .prepare("SELECT o.id, o.member_sub, o.status, o.center_key, o.hglobal, o.total_twd, (SELECT c.review_group_id FROM order_items i JOIN courses c ON c.id = i.course_id WHERE i.order_id = o.id LIMIT 1) AS group_id, (SELECT i.course_id FROM order_items i WHERE i.order_id = o.id LIMIT 1) AS course_id, (SELECT i.title_snapshot FROM order_items i WHERE i.order_id = o.id LIMIT 1) AS title FROM orders o WHERE o.id = ?")
     .bind(orderId)
-    .first<{ id: string; member_sub: string; status: string; center_key: string | null; hglobal: number; total_twd: number; group_id: string | null; title: string | null }>();
+    .first<{ id: string; member_sub: string; status: string; center_key: string | null; hglobal: number; total_twd: number; group_id: string | null; course_id: string | null; title: string | null }>();
   if (!o || o.member_sub !== s.sub) return fail(404, "not_found", "找不到這筆報名");
   if (o.status !== "pending") fail(409, "not_pending", "這筆報名不在待審核狀態，不需要回報繳費");
   const method = (["cash", "linepay", "transfer", "friend"] as const).find((m) => m === body.method) ?? fail(400, "invalid_method", "請選擇繳費方式");
@@ -1062,7 +1120,7 @@ async function reportPayment(ctx: Ctx, orderId: string, body: Record<string, unk
   await ctx.db.batch([
     ctx.db.prepare("INSERT INTO order_payments (id, order_id, method, last5, friend_name, paid_at) VALUES (?, ?, ?, ?, ?, ?)").bind(id, orderId, method, last5, friendName, paidAt),
     audit(ctx.db, s.sub, "order.payment_report", "order", orderId, detail),
-    ...(await reviewerNotices(ctx, { id: orderId, centerKey: o.center_key, hglobal: o.hglobal === 1, groupId: o.group_id }, "學員回報了繳費方式", `${o.title ?? ""}｜${detail}`)),
+    ...(await reviewerNotices(ctx, { id: orderId, centerKey: o.center_key, hglobal: o.hglobal === 1, groupId: o.group_id, courseId: o.course_id }, "學員回報了繳費方式", `${o.title ?? ""}｜${detail}`)),
   ]);
   return orderDetail(ctx, orderId);
 }
@@ -1143,7 +1201,7 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
     } else {
       statements.push(
         notify(ctx.db, { sub: s.sub }, "報名已送出，等待審核", title, `/orders/${id}`),
-        ...(await reviewerNotices(ctx, { id, centerKey: s.center?.key ?? null, hglobal: s.hglobal, groupId: c.review_group_id }, "有新的報名待審核", `${applicantLabel(legal, s.name)}｜${title}｜NT$${price.toLocaleString("en-US")}`)),
+        ...(await reviewerNotices(ctx, { id, centerKey: s.center?.key ?? null, hglobal: s.hglobal, groupId: c.review_group_id, courseId: c.id }, "有新的報名待審核", `${applicantLabel(legal, s.name)}｜${title}｜NT$${price.toLocaleString("en-US")}`)),
       );
     }
   }
@@ -1519,7 +1577,6 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   if (body.locationNone !== undefined) sets.push(["location_none", body.locationNone === true ? 1 : 0]);
   if (body.isOnline !== undefined) sets.push(["is_online", body.isOnline === true ? 1 : 0]);
   if (body.chapterCovers !== undefined) sets.push(["chapter_covers", body.chapterCovers === true ? 1 : 0]);
-  if (body.autoCover !== undefined) sets.push(["auto_cover", body.autoCover === true ? 1 : 0]);
   // 短影音專輯：勾了的課程，其章節與影音教材在「單元」頁歸類為短影音。
   if (body.isShorts !== undefined) sets.push(["is_shorts", body.isShorts === true ? 1 : 0]);
   if (body.earlyBird !== undefined) {
@@ -1534,7 +1591,11 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     } else sets.push(["early_bird", 0], ["early_price_twd", null], ["early_until", null]);
   }
   const series = text(body.series, 60);
-  if (series !== undefined) sets.push(["series", series]);
+  if (series !== undefined) {
+    // 設定「系列」只限超級管理員（業主 2026-11-16）。
+    if (!who.roles.includes("super_admin")) fail(403, "series_super_admin_only", "只有超級管理員可以設定系列");
+    sets.push(["series", series]);
+  }
   if (body.diamondFree !== undefined) sets.push(["diamond_free", body.diamondFree === true ? 1 : 0]);
   if (body.hideFromHome !== undefined) sets.push(["hide_home", body.hideFromHome === true ? 1 : 0]);
   // 封面框與預設停留位置永遠同步：有 coverRect 時，預設位置＝封面框上緣（edm_view_y 由它算出，不接受另外指定）。
@@ -1621,11 +1682,9 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const rest = sets.filter(([c]) => c !== "status");
   const cols = ["id", "sort_order", "status", "created_by_sub", "edited_by_name", "edited_at", ...rest.map(([c]) => c)];
   const vals = [id, (max?.m ?? 0) + 1, status, admin.sub, admin.name.slice(0, 60), iso(), ...rest.map(([, v]) => v)];
-  const isList = sets.some(([c, v]) => c === "is_list" && v === 1);
+  // 新增課程不預設建立第一堂章節（業主 2026-11-16），章節一律在課程頁按「新增章節」。
   await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO courses (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...vals),
-    // 一般課程先放一堂空白章節（章節日期留空＝跟著課程日期）；素材清單沒有章節。
-    ...(isList ? [] : [ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type) VALUES (?, ?, 1, '第 1 堂', 0, 'demo')").bind(`${id}-${randomId(6)}`, id)]),
     audit(ctx.db, admin.sub, "course.create", "course", id, String(body.title ?? "")),
   ]);
   await ensureCourseUrl(ctx, id);
@@ -1878,7 +1937,6 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
     if (!title) fail(400, "title_required", "請輸入章節名稱");
     sets.push(["title", title]);
   }
-  if (body.autoCover !== undefined) sets.push(["auto_cover", body.autoCover === true ? 1 : 0]);
   const sharer = text(body.sharer, 60);
   if (sharer !== undefined) sets.push(["sharer", sharer]);
   const sharerTitle = text(body.sharerTitle, 50);
@@ -2386,7 +2444,8 @@ const routes: [string, RegExp, Handler][] = [
           isShorts: r.isShorts === 1,
           isMaterial: r.lessonKind === "material",
           minutes: r.minutes,
-          coverUrl: r.autoCover === 1 && r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
+          // 有上傳章節封面就用上傳的，沒有就用 YouTube 縮圖（業主 2026-11-16：不再有「自動抓取」勾選）。
+          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
           // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
           ytThumb: r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,
@@ -3804,6 +3863,80 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/admin\/courses\/([\w-]+)\/review-desk$/,
+    async (ctx, [id]) => {
+      await requireCourseManager(ctx, id);
+      return reviewDesk(ctx, id);
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/courses\/([\w-]+)\/review-roles$/,
+    async (ctx, [id]) => {
+      // 指定身份：主辦中心的會長／音控／小編也可以審核這門課（總部主辦的課＝各中心的該身份審核自己中心學員的報名）。
+      const s = await requireCourseManager(ctx, id);
+      const body = await readJson<{ roles?: unknown }>(ctx.req);
+      const roles = Array.isArray(body.roles) ? [...new Set(body.roles.filter((r): r is ReviewRole => typeof r === "string" && (REVIEW_ROLES as readonly string[]).includes(r)))] : fail(400, "invalid_roles", "身份格式不正確");
+      await ctx.db.batch([ctx.db.prepare("UPDATE courses SET review_roles = ? WHERE id = ?").bind(roles.join(","), id), audit(ctx.db, s.sub, "course.review_roles", "course", id, roles.join(","))]);
+      return reviewDesk(ctx, id);
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/courses\/([\w-]+)\/reviewers\/([\w:.@|-]+)$/,
+    async (ctx, [id, sub]) => {
+      const s = await requireCourseManager(ctx, id);
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM course_reviewers WHERE course_id = ? AND member_sub = ?").bind(id, sub), audit(ctx.db, s.sub, "course.reviewer_remove", "course", id, sub)]);
+      return reviewDesk(ctx, id);
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/courses\/([\w-]+)\/review-invites$/,
+    async (ctx, [id]) => {
+      // 指定特定會員：產生一次性的邀請網址（24 小時內有效），用分享功能傳給對方；對方登入後打開就成為這門課的審核人員。
+      const s = await requireCourseManager(ctx, id);
+      const token = [...crypto.getRandomValues(new Uint8Array(18))].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const expiresAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+      await ctx.db.batch([
+        ctx.db.prepare("INSERT INTO review_invites (token_hash, course_id, created_by_sub, expires_at) VALUES (?, ?, ?, ?)").bind(await sha256(token), id, s.sub, expiresAt),
+        audit(ctx.db, s.sub, "course.reviewer_invite", "course", id),
+      ]);
+      return { path: `/review-invite/${token}`, expiresAt };
+    },
+  ],
+  [
+    "GET",
+    /^\/review-invites\/([a-f0-9]{36})$/,
+    async (ctx, [token]) => {
+      const s = requireMember(ctx);
+      const inv = await inviteOf(ctx, token);
+      return { courseId: inv.course_id, courseTitle: inv.title, expiresAt: inv.expires_at, state: inviteState(inv, s.sub) };
+    },
+  ],
+  [
+    "POST",
+    /^\/review-invites\/([a-f0-9]{36})\/accept$/,
+    async (ctx, [token]) => {
+      const s = requireMember(ctx);
+      const inv = await inviteOf(ctx, token);
+      const st = inviteState(inv, s.sub);
+      if (st === "expired") fail(410, "invite_expired", "這個邀請網址已超過 24 小時，請對方重新產生");
+      if (st === "used") fail(410, "invite_used", "這個邀請網址已經被別人使用過了");
+      if (st === "open") {
+        await ctx.db.batch([
+          ctx.db.prepare("UPDATE review_invites SET used_by_sub = ?, used_at = ? WHERE token_hash = ? AND used_by_sub IS NULL").bind(s.sub, iso(), await sha256(token)),
+          ctx.db.prepare("INSERT OR REPLACE INTO course_reviewers (course_id, member_sub, member_name, added_by_sub) VALUES (?, ?, ?, ?)").bind(inv.course_id, s.sub, s.name.slice(0, 60), inv.created_by_sub),
+          audit(ctx.db, s.sub, "course.reviewer_accept", "course", inv.course_id),
+          notify(ctx.db, { sub: inv.created_by_sub }, "審核人員已加入", `${s.name}｜${inv.title}`, `/course/${inv.course_id}`),
+          notify(ctx.db, { sub: s.sub }, "你已成為課程報名審核人員", inv.title, "/admin/orders"),
+        ]);
+      }
+      return { courseId: inv.course_id, courseTitle: inv.title };
+    },
+  ],
+  [
     "POST",
     /^\/series-views$/,
     async (ctx) => {
@@ -3910,7 +4043,7 @@ const routes: [string, RegExp, Handler][] = [
         ...(speaker ? [ctx.db.prepare("UPDATE lessons SET is_speaker = 0 WHERE course_id = ?").bind(courseId)] : []),
         ...(summaryNew ? [ctx.db.prepare("UPDATE lessons SET is_summary = 0 WHERE course_id = ?").bind(courseId)] : []),
         ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker, is_summary) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?, ?)").bind(id, courseId, full ? full.position : course.maxpos + 1, title || "主講人", sharer, sharerRank, sharerTitle, eventDate, body.autoCover === true ? 1 : 0, kind, speaker ? 1 : 0, summaryNew ? 1 : 0),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker, is_summary) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?, ?)").bind(id, courseId, full ? full.position : course.maxpos + 1, title || "主講人", sharer, sharerRank, sharerTitle, eventDate, 0, kind, speaker ? 1 : 0, summaryNew ? 1 : 0),
         ...(speaker ? [speakerSync(ctx.db, courseId)] : []),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);

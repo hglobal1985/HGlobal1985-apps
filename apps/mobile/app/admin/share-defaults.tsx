@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Switch, TextInput, View } from "react-native";
-import { api, DEFAULT_SHARE_SETTINGS, shareMessage, type UiConfig } from "@/api/client";
+import { api, DEFAULT_SHARE_SETTINGS, reviewerInviteMessage, shareMessage, type UiConfig } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
@@ -105,6 +105,7 @@ export default function ShareDefaultsScreen() {
       <Section title="② 課程的分享">
         <Card>
           {input("單堂課程分享的文字", "課程頁右上角與課程列的分享：可用 {主講人}、{職稱}、{課程名稱}，送出時會換成實際的內容（沒填職稱的課程，{職稱} 會自動省略；有職稱時姓名與職稱中間自動空一格）", s.courseText, (v) => set("courseText", v), { multiline: true })}
+          {input("邀請審核人員的文字", "課程「費用與審核 > 審核窗口」的「產生邀請網址並分享」：可用 {課程名稱}；後面接引導文字與 24 小時有效的邀請網址", s.reviewerInviteText, (v) => set("reviewerInviteText", v), { multiline: true })}
           {input("章節分享的文字", "課程有兩堂以上章節時，每一堂右側的分享鈕：可用 {主講人}、{職稱}、{章節名稱}、{課程名稱}。主講人、職稱、章節名稱一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不是課程的", s.chapterText, (v) => set("chapterText", v), { multiline: true })}
         </Card>
       </Section>
@@ -181,6 +182,12 @@ export default function ShareDefaultsScreen() {
           </AppText>
           <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
             <AppText variant="body">{shareMessage(s, "https://www.canva.com/design/abc/view", { teacher: "王小明", teacherTitle: "區域經理", title: "翡翠達標班" }, { title: "簡報講義" })}</AppText>
+          </View>
+          <AppText variant="callout" tone="muted">
+            邀請審核人員的文字（課程「翡翠達標班」）
+          </AppText>
+          <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
+            <AppText variant="body">{reviewerInviteMessage(s, "https://learn.hglobal1985.com/review-invite/3f9a…", "翡翠達標班")}</AppText>
           </View>
           <AppText variant="callout" tone="muted">
             一般分享的文字

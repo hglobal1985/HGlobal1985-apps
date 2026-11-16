@@ -5,7 +5,8 @@ import { useApi, useSession } from "@/state/session";
 import { AppText, Chips, Field, NoticeBox } from "@/ui";
 import { centerTitle } from "@/features/format";
 import { isSuperAdmin } from "@/lib/roles";
-import { Check, countByHost } from "./course-sections";
+import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
+import { countByHost } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 
 /**
@@ -25,7 +26,9 @@ export function NewCourseSheet({ onClose, defaultCenter, list = false }: { onClo
   const [teacher, setTeacher] = useState("");
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [seriesName, setSeriesName] = useState("");
-  const [autoCover, setAutoCover] = useState(false);
+  const [teacherRank, setTeacherRank] = useState("");
+  const [teacherTitle, setTeacherTitle] = useState("");
+  const rankOptions = useRankOptions();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
@@ -34,7 +37,7 @@ export function NewCourseSheet({ onClose, defaultCenter, list = false }: { onClo
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = { title: title.trim(), ...(list ? { isList: true } : { teacher: teacher.trim() }), autoCover, ...(isSuper ? { series: seriesName.trim() } : {}) };
+      const body: Record<string, unknown> = { title: title.trim(), ...(list ? { isList: true } : { teacher: teacher.trim(), teacherRank, teacherTitle: teacherTitle.trim() }), ...(isSuper ? { series: seriesName.trim() } : {}) };
       if (isHq) Object.assign(body, { hostUnit: host }); // 指導單位預設不勾（不建議勾選），建好後要的話到進階設定勾
       const d = await api<CourseDetail>("POST", "/admin/courses", body);
       invalidate();
@@ -49,7 +52,13 @@ export function NewCourseSheet({ onClose, defaultCenter, list = false }: { onClo
   return (
     <EditSheet title={list ? "新增清單（影片／檔案）" : "新增課程"} onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!title.trim() || !!teacher.trim()} busy={busy} error={error}>
       <Field label={list ? "素材清單名稱（必填）" : "課程名稱（必填）"} value={title} onChange={setTitle} placeholder={list ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
-      {list ? null : <Field label="主講人姓名（必填；課程專屬網址會用英譯姓名）" value={teacher} onChange={setTeacher} placeholder="例如：王小明" />}
+      {list ? null : (
+        <>
+          <Field label="主講人姓名（必填；課程專屬網址會用英譯姓名）" value={teacher} onChange={setTeacher} placeholder="例如：王小明" />
+          {/* 獎銜選單與職稱建議都來自中央會員（職稱打字時自動顯示相關詞）。 */}
+          <RankTitleRow rank={teacherRank} title={teacherTitle} onRank={setTeacherRank} onTitle={setTeacherTitle} rankOptions={rankOptions} who="主講人" />
+        </>
+      )}
       <AppText variant="callout" tone="muted">
         主辦中心
       </AppText>
@@ -64,7 +73,6 @@ export function NewCourseSheet({ onClose, defaultCenter, list = false }: { onClo
           {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={seriesName} onChange={setSeriesName} /> : null}
         </>
       ) : null}
-      <Check label="自動抓取 YouTube 影片畫面當封面" value={autoCover} onChange={setAutoCover} />
       <AppText variant="caption" tone="muted">
         {list ? "建立後是「未上架」，學員看不到；在清單頁用「新增教材」加入影片或檔案，再上架。清單一律完全公開、免費。" : "建立後是「未上架」，學員看不到；在課程頁補好資料再上架。"}
       </AppText>
