@@ -73,7 +73,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
     if (lesson) setPlayingId(lesson);
   }, [lesson]);
   // 網址 ?N：播放第 N 章（章節清單前面顯示的編號）；章節資料載入後才找得到。
-  const chapterLesson = chapter && course ? course.lessons.find((l) => !l.material && l.position === chapter)?.id : undefined;
+  // 網址 ?N：一般課程＝第 N 章；素材清單＝第 N 段影片（清單只有教材）。
+  const chapterLesson = chapter && course ? course.lessons.find((l) => (course.isList ? l.material && !l.full : !l.material) && l.position === chapter)?.id : undefined;
   useEffect(() => {
     if (chapterLesson) setPlayingId(chapterLesson);
   }, [chapterLesson]);
@@ -244,6 +245,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         title={course.title}
         path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
         course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
+        list={course.isList ? { title: course.title } : undefined}
         extra={
           manages && mode === "view" ? (
             <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => setMode("edit")} />

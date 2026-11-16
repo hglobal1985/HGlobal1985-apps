@@ -547,6 +547,10 @@ export type ShareSettings = {
   materialText: string;
   /** 分享單一章節的文字範本（課程有兩堂以上章節時，章節清單每列右側的分享鈕）。{主講人}、{職稱}、{章節名稱} 一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不用課程的；{課程名稱} 是所屬課程。 */
   chapterText: string;
+  /** 分享「素材清單」（業主 2026-11-16：教材與課程分開設定）：清單頁右上角與課程列的分享，可用 {清單名稱}。 */
+  listText: string;
+  /** 分享素材清單裡的單一影片（每列右側的分享鈕，點開直接播放這一段）：可用 {影片名稱}、{清單名稱}。 */
+  listItemText: string;
 };
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   inviteText: "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️",
@@ -561,10 +565,19 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   fallbackDescription: "",
   materialText: "我推薦你看這份教材：{教材名稱}（{課程名稱}）",
   chapterText: "我剛聽完這場 {主講人}{職稱}的這場精彩演講 {章節名稱} 我就立刻想到要分享給你！",
+  listText: "推薦你看「{清單名稱}」，裡面有好多精彩影片，一起來看吧！",
+  listItemText: "我剛看完這段精彩影片「{影片名稱}」（{清單名稱}），立刻想到要分享給你！",
 };
 
-/** 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 用課程範本；其他教材傳 material；單一章節傳 chapter（姓名、職稱、章節名稱取章節自己的設定，課程只提供課程名稱）。 */
-export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }, chapter?: { sharer: string; sharerTitle?: string; title: string }): string {
+/**
+ * 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 用課程範本；其他教材傳 material；單一章節傳 chapter（姓名、職稱、章節名稱取章節自己的設定，課程只提供課程名稱）；
+ * 素材清單傳 list（item＝清單裡某一段影片的名稱；沒有 item＝分享整個清單）。
+ */
+export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }, chapter?: { sharer: string; sharerTitle?: string; title: string }, list?: { title: string; item?: string }): string {
+  if (list && !material) {
+    const lead = list.item ? s.listItemText.replaceAll("{影片名稱}", list.item).replaceAll("{清單名稱}", list.title) : s.listText.replaceAll("{清單名稱}", list.title);
+    return `${lead}\n\n${s.linkLead}\n${url}`;
+  }
   // {職稱}：有職稱就在前面補一個空白再接職稱（「王小明 區域經理」），沒填就整個省略（不留多餘空白）。
   const title = (course?.teacherTitle ?? "").trim();
   const fill = (t: string) => t.replaceAll("{主講人}", (course?.teacher ?? "").trim() || "老師").replaceAll("{職稱}", title ? ` ${title}` : "").replaceAll("{課程名稱}", course?.title ?? "");

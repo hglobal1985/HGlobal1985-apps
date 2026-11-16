@@ -45,7 +45,7 @@ export function CourseRow({ course }: { course: CourseSummary }) {
           </View>
         ) : null}
       </View>
-      <RowShare label={`分享：${course.title}`} onShare={() => shareLink(course.title, course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`, course.isList ? undefined : { teacher: course.teacher, teacherTitle: course.teacherTitle, title: course.title })} />
+      <RowShare label={`分享：${course.title}`} onShare={() => shareLink(course.title, course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`, course.isList ? undefined : { teacher: course.teacher, teacherTitle: course.teacherTitle, title: course.title }, undefined, undefined, course.isList ? { title: course.title } : undefined)} />
     </Pressable>
   );
 }

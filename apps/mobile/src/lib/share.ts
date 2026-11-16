@@ -20,9 +20,9 @@ export const setShareSettings = (s: UiConfig["share"]) => {
  * 分享出去的內容＝文字（一般：邀請文字；單堂課程傳 course：「我剛聽完這場 {主講人}的這場精彩演講 {課程名稱}…」）＋「按此開啟網址 👉」＋網址（範本在 shareSettings）。
  * 回傳 "shared"＝已叫出選單；"copied"＝這個瀏覽器沒有分享選單（例如電腦），已改為複製連結（含邀請文字）。
  */
-export async function shareLink(title: string, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }, chapter?: { sharer: string; sharerTitle?: string; title: string }): Promise<"shared" | "copied" | "cancelled"> {
+export async function shareLink(title: string, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }, chapter?: { sharer: string; sharerTitle?: string; title: string }, list?: { title: string; item?: string }): Promise<"shared" | "copied" | "cancelled"> {
   const link = absolute(url);
-  const message = shareMessage(shareSettings, link, course, material, chapter);
+  const message = shareMessage(shareSettings, link, course, material, chapter, list);
   if (Platform.OS !== "web") {
     try {
       await Share.share({ title, message });

@@ -621,3 +621,7 @@
 - **新增教材**：`features/course-edit/add-material-fab.tsx`（往上展開兩個選項）；`NewCourseSheet list`。
 - **素材清單**：migration 0061 `courses.is_list`；建立時 `isList: true`（公開、免費、不建第 1 堂）；清單不能新增章節／完整版（400）；`POST /admin/courses/:id/materials`、`PUT /admin/lessons/:id/material` 在清單中把 YouTube 存成 `media_type='youtube'`。課程卡、課程列、課程頁、編輯面板依 `isList` 隱藏主講人、日期、地點、費用、章節。測試 tests/course-list.test.ts（後端共 134 項）。
 - **資料轉移**：0061 把系列「美力之星」（1 門 11 段）、「認識寰宇」（4 門 35 段）轉成清單：章節改成教材，影片、學習紀錄、課程專屬網址都保留；主講人、地點資料留在資料庫只是不顯示。
+
+## 2026-11-16（再續）：課程與教材的分享文字分開設定
+- `ShareSettings` 新增 `listText`（{清單名稱}）與 `listItemText`（{影片名稱}、{清單名稱}）；`shareMessage` 第 6 個參數 `list`。清單頁右上角、課程列分享用清單範本；清單每段影片右側新增分享鈕（`ListItemShare`，網址 `?N`，開啟直接播放第 N 段）；清單裡已看完的影片顯示小樹苗。
+- 設定 > 分享預設值改成四區：一般、課程、教材、LINE 預覽卡片；預覽新增清單與清單影片的範例。後端 135 項測試。

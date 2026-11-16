@@ -12,7 +12,7 @@ type Share = UiConfig["share"];
 
 /**
  * 設定 > 分享預設值（只有超級管理員）：把所有「分享」相關的文字集中在這一頁——
- * ① 分享選單送出的文字（一般分享、單堂課程分享的範本）② LINE 等分享預覽卡片的標題與備註格式（中心、單堂課程、系列、分類都用同一組）。
+ * ① 一般分享 ② 課程（單堂課程、章節）③ 教材（素材清單、清單影片、外部連結）的分享文字；④ LINE 等分享預覽卡片的標題與備註格式（中心、單堂課程、系列、分類都用同一組）。
  * 下方有即時預覽。存檔後：分享選單文字重新開啟 APP 套用；預覽卡片立刻套用（LINE 會快取舊的預覽，已分享過的網址要換新網址或等它過期）。
  * 新增任何分享相關的文字，一律放在這一頁（contract.ts ShareSettings）。
  */
@@ -95,17 +95,29 @@ export default function ShareDefaultsScreen() {
       </AppText>
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
 
-      <Section title="① 分享選單送出的文字">
+      <Section title="① 一般分享">
         <Card>
           {input("一般分享的文字", "分享中心、分類、系列等頁面時，放在網址前面的文字", s.inviteText, (v) => set("inviteText", v), { multiline: true })}
-          {input("單堂課程分享的文字", "可用 {主講人}、{職稱}、{課程名稱}，送出時會換成實際的內容（沒填職稱的課程，{職稱} 會自動省略；有職稱時姓名與職稱中間自動空一格）", s.courseText, (v) => set("courseText", v), { multiline: true })}
-          {input("章節分享的文字", "課程有兩堂以上章節時，每一堂右側的分享鈕：可用 {主講人}、{職稱}、{章節名稱}、{課程名稱}。主講人、職稱、章節名稱一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不是課程的", s.chapterText, (v) => set("chapterText", v), { multiline: true })}
-          {input("其他教材分享的文字", "課程頁「其他教材」每一列右側的分享鈕：可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}；分享出去的網址是教材的外部連結本身", s.materialText, (v) => set("materialText", v), { multiline: true })}
-          {input("網址前的引導文字", "自成一行，放在文字與網址中間（一般分享、單堂課程、其他教材都用）", s.linkLead, (v) => set("linkLead", v))}
+          {input("網址前的引導文字", "自成一行，放在文字與網址中間（所有分享都用）", s.linkLead, (v) => set("linkLead", v))}
         </Card>
       </Section>
 
-      <Section title="② LINE 預覽卡片（標題與備註）">
+      <Section title="② 課程的分享">
+        <Card>
+          {input("單堂課程分享的文字", "課程頁右上角與課程列的分享：可用 {主講人}、{職稱}、{課程名稱}，送出時會換成實際的內容（沒填職稱的課程，{職稱} 會自動省略；有職稱時姓名與職稱中間自動空一格）", s.courseText, (v) => set("courseText", v), { multiline: true })}
+          {input("章節分享的文字", "課程有兩堂以上章節時，每一堂右側的分享鈕：可用 {主講人}、{職稱}、{章節名稱}、{課程名稱}。主講人、職稱、章節名稱一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不是課程的", s.chapterText, (v) => set("chapterText", v), { multiline: true })}
+        </Card>
+      </Section>
+
+      <Section title="③ 教材的分享">
+        <Card>
+          {input("素材清單分享的文字", "「新增清單（影片／檔案）」建立的清單：清單頁右上角與清單列的分享，可用 {清單名稱}", s.listText, (v) => set("listText", v), { multiline: true })}
+          {input("清單裡單一影片分享的文字", "清單每段影片右側的分享鈕（點開直接播放這一段）：可用 {影片名稱}、{清單名稱}", s.listItemText, (v) => set("listItemText", v), { multiline: true })}
+          {input("外部連結教材分享的文字", "課程與清單裡「外部連結」（簡報、PDF、雲端檔案…）右側的分享鈕：可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}；分享出去的網址是外部連結本身", s.materialText, (v) => set("materialText", v), { multiline: true })}
+        </Card>
+      </Section>
+
+      <Section title="④ LINE 預覽卡片（標題與備註）">
         <Card>
           {input("站名", "標題最後面固定的名稱", s.siteName, (v) => set("siteName", v))}
           {input("標題的分隔符號", "名稱與站名中間，例如「 | 」（前後空白也會保留）", s.titleSeparator, (v) => set("titleSeparator", v))}
@@ -153,7 +165,19 @@ export default function ShareDefaultsScreen() {
             <AppText variant="body">{shareMessage(s, "https://learn.hglobal1985.com/136/wang-xiaoming-001?lesson=c1", { teacher: "王小明", title: "翡翠達標班" }, undefined, { sharer: "李華", sharerTitle: "白金經理", title: "第 2 堂 溝通技巧" })}</AppText>
           </View>
           <AppText variant="callout" tone="muted">
-            其他教材的分享文字（教材「簡報講義」、課程「翡翠達標班」）
+            素材清單的分享文字（清單「美力之星精彩回顧」）
+          </AppText>
+          <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
+            <AppText variant="body">{shareMessage(s, "https://learn.hglobal1985.com/course/ctp7xt2y", undefined, undefined, undefined, { title: "美力之星精彩回顧" })}</AppText>
+          </View>
+          <AppText variant="callout" tone="muted">
+            清單裡單一影片的分享文字（影片「百人走秀 改造前後」）
+          </AppText>
+          <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
+            <AppText variant="body">{shareMessage(s, "https://learn.hglobal1985.com/course/ctp7xt2y?4", undefined, undefined, undefined, { title: "美力之星精彩回顧", item: "百人走秀 改造前後" })}</AppText>
+          </View>
+          <AppText variant="callout" tone="muted">
+            外部連結教材的分享文字（教材「簡報講義」、課程「翡翠達標班」）
           </AppText>
           <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
             <AppText variant="body">{shareMessage(s, "https://www.canva.com/design/abc/view", { teacher: "王小明", teacherTitle: "區域經理", title: "翡翠達標班" }, { title: "簡報講義" })}</AppText>

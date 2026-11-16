@@ -58,3 +58,15 @@ test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 Ap
   const n = await call<CourseDetail>("POST", `/admin/courses/${normal.id}/materials`, admin, { url: "https://youtu.be/dQw4w9WgXcQ", title: "影片連結" });
   assert.ok(n.data.lessons.find((l) => l.title === "影片連結")!.linkUrl);
 });
+
+test("分享文字：素材清單與清單影片各有自己的範本（和課程分開設定），空白退回預設", async () => {
+  const { shareMessage, DEFAULT_SHARE_SETTINGS: d } = await import("../src/contract.ts");
+  const { normalizeShare } = await import("../src/ui-config.ts");
+  const url = "https://learn.test/course/c1";
+  assert.equal(shareMessage(d, url, undefined, undefined, undefined, { title: "美力之星" }), `推薦你看「美力之星」，裡面有好多精彩影片，一起來看吧！\n\n${d.linkLead}\n${url}`);
+  assert.match(shareMessage(d, `${url}?2`, undefined, undefined, undefined, { title: "美力之星", item: "首爾學習之旅回顧" }), /^我剛看完這段精彩影片「首爾學習之旅回顧」（美力之星）/);
+  const s = normalizeShare({ listText: "清單：{清單名稱}", listItemText: " " });
+  assert.equal(s.listText, "清單：{清單名稱}");
+  assert.equal(s.listItemText, d.listItemText, "空白退回預設");
+  assert.equal(shareMessage(s, url, { teacher: "王", title: "課" }), shareMessage(d, url, { teacher: "王", title: "課" }), "課程範本不受清單設定影響");
+});

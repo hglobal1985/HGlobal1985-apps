@@ -9,8 +9,8 @@ import { HeaderShare } from "./share-button";
  * 返回鍵、高度、陰影等整體樣式則在 app/_layout.tsx 的 screenOptions，全站一起連動。
  * path＝要分享的網址路徑（有短網址就傳 /縮寫）。extra＝放在分享左邊的按鈕（例如管理者的「編輯」）。
  */
-/** course＝單堂課程的分享（主講人與課程名稱會帶進分享文字範本）；其他頁面不傳。 */
-export function PageHeader({ title, path, shareTitle, extra, course }: { title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; teacherTitle?: string; title: string } }) {
+/** course＝單堂課程的分享（主講人與課程名稱會帶進分享文字範本）；list＝素材清單的分享（清單範本）；其他頁面不傳。 */
+export function PageHeader({ title, path, shareTitle, extra, course, list }: { title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; teacherTitle?: string; title: string }; list?: { title: string } }) {
   return (
     <Stack.Screen
       options={{
@@ -18,7 +18,7 @@ export function PageHeader({ title, path, shareTitle, extra, course }: { title: 
         headerRight: () => (
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {extra}
-            <HeaderShare title={shareTitle ?? title} path={path} course={course} />
+            <HeaderShare title={shareTitle ?? title} path={path} course={course} list={list} />
           </View>
         ),
       }}
