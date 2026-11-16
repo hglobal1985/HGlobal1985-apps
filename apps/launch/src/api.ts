@@ -1829,7 +1829,7 @@ const seconds = (v: unknown): number | null | undefined => {
 /** 修改章節：名稱、影片來源（示範／YouTube／Mux）、時間軸區間。音檔由上傳流程設定。 */
 async function updateLesson(ctx: Ctx, id: string, admin: Session) {
   const body = await readJson<{ isSpeaker?: unknown; isSummary?: unknown; eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; autoCover?: unknown }>(ctx.req);
-  if (body.mediaType === "mux" && admin.role !== "admin") fail(403, "forbidden", "Mux 影片由總部管理，請改用 YouTube 或音檔，或請總部協助");
+  if (body.mediaType === "mux" && !admin.roles.includes("super_admin")) fail(403, "forbidden", "Mux 影片只有超級管理員可以設定，請改用 YouTube 或音檔");
   const cur = await ctx.db
     .prepare("SELECT course_id, kind, is_speaker, is_summary, media_type, media_ref, start_seconds, end_seconds FROM lessons WHERE id = ?")
     .bind(id)
@@ -3261,7 +3261,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/admin\/mux\/assets$/,
     async (ctx) => {
-      requireAdmin(ctx);
+      requireSuperAdmin(ctx);
       const cursor = ctx.url.searchParams.get("cursor") ?? undefined;
       if (cursor && !/^[\w-]{1,200}$/.test(cursor)) fail(400, "invalid_cursor", "分頁參數不正確");
       try {

@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { loadLastLesson, type LastLesson } from "@/lib/last-lesson";
 import { StyleSheet, View } from "react-native";
 import { api, type CourseSummary } from "@/api/client";
+import { SaplingBar } from "@/features/achievements/sapling-bar";
 import { confirmSheet } from "@/features/confirm";
 import { CourseCard } from "@/features/courses/course-card";
 import { useApi, useSession } from "@/state/session";
@@ -70,6 +71,7 @@ export default function LearningScreen() {
         ) : undefined
       }
     >
+      <SaplingBar saplings={(data ?? []).reduce((n, x) => n + x.completedLessons, 0)} />
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {pending.length ? <NoticeBox tone="warning" text={`${pending.length} 堂課程等待管理員確認，開通後會通知你。`} /> : null}

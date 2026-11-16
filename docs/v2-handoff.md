@@ -594,3 +594,8 @@
 - **課程專屬網址編號**：從 1 開始、不補零（`wang-xiaoming-1`，滿 10 自然變兩位）。舊的 `-001` 網址仍可開（`urlNameVariants`，`/short-links` 與分享預覽都相容）；按「設定→短網址→為舊課程補上專屬網址」時會把已存在的 `-001` 改成 `-1`。
 - **章節分享鈕**：網址一律 `課程網址?N`（N＝章節清單前面顯示的編號 `position`）；開啟時自動播放第 N 章（`chapterFromParams`）。`?lesson=章節編號` 仍支援（舊連結）。注意：章節重新排序後，已分享的 `?N` 會指向新的第 N 章。
 - **已決定（待開發）**：影片拖曳設定開始／結束秒數＝業主挑「方案 3＋4 綜合」（影格膠卷＋固定中線，加預覽與微調按鈕）。
+
+## 2026-11-16（再續）：小樹苗、全螢幕文字提醒模組、Mux 限超級管理員
+- **小樹苗**（業主選定第 12 號圖）：`SaplingIcon`（`ui/sapling-icon.tsx`）。章節播放超過完成門檻（預設 95%）＝已完成，清單左側改顯示小樹苗（取代灰色打勾）。「學習中」最上方 `SaplingBar`（`features/achievements/sapling-bar.tsx`）：小樹苗累計（所有課程已完成章節數加總）與「學習成就」並排一列，下方列出已解鎖成就圖示，點一下以全螢幕文字提醒顯示達成條件；設定頁的「學習成就」入口已移除（成就完整頁 `/achievements` 仍在，從學習中的成就卡進入）。
+- **全螢幕文字提醒模組** `ui/flash-notice.tsx`：`showFlash({icon, title, body, holdMs})`＋根版面的 `FlashHost`。位置靠上（螢幕高 12% 處）、尺寸為原本 3 倍（圖示 120、標題 51、說明 39）、淡入停留淡出、不擋操作。切換相同系列／單元／寰宇教育中心（`features/courses/mode-flash.tsx` 的 `flashMode`）、小樹苗、成就一律用它；要改格式只改這個檔案。
+- **Mux 匯入只有超級管理員**：前端章節與教材面板 `allowMux = isSuperAdmin(member)`；後端 `GET /admin/mux/assets` 改 `requireSuperAdmin`，章節設定 `mediaType: mux` 需要 `super_admin` 角色（總部秘書也不行）。已用 Mux 的舊章節仍可播放。

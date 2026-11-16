@@ -44,6 +44,7 @@ test("各中心自行上架：會長只能管理主辦單位是自己中心的�
   // 不能用 Mux
   const lessonId = withLesson.data.lessons[0]!.id;
   assert.equal((await call("PATCH", `/admin/lessons/${lessonId}`, { token: pres, body: { mediaType: "mux", mediaRef: "abc" } })).status, 403);
+  assert.equal((await call("GET", "/admin/mux/assets", { token: pres })).status, 403, "Mux 清單只有超級管理員");
   assert.equal((await call("PATCH", `/admin/lessons/${lessonId}`, { token: pres, body: { title: "改名" } })).status, 200);
 
   // 清單只看到自己中心的課程；總部課程看不到也改不了

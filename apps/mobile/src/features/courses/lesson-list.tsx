@@ -8,7 +8,7 @@ import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { Card, ListRow, ShareIcon } from "@/ui";
+import { Card, ListRow, SaplingIcon, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { showToast } from "@/ui/toast";
 import { SpeakerLead } from "./speaker-mark";
@@ -34,8 +34,8 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
             return (
               <ListRow
                 key={lesson.id}
-                icon={soon ? "hourglass-outline" : lesson.completed ? "checkmark-circle" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-                leading={!soon && !lesson.completed && !lesson.locked ? (lesson.isSpeaker ? <SpeakerLead /> : lesson.isSummary ? <SummaryLead /> : undefined) : undefined}
+                icon={soon ? "hourglass-outline" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
+                leading={!soon && lesson.completed ? <SaplingIcon /> : !soon && !lesson.locked ? (lesson.isSpeaker ? <SpeakerLead /> : lesson.isSummary ? <SummaryLead /> : undefined) : undefined}
                 playing={playingId === lesson.id}
                 playingLesson={lesson.id}
                 highlight={playingId === lesson.id}

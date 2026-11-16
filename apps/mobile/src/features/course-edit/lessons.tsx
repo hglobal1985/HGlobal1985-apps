@@ -1,3 +1,4 @@
+import { isSuperAdmin } from "@/lib/roles";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, type CourseDetail, type Lesson } from "@/api/client";
@@ -69,7 +70,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   const otherSpeaker = course.lessons.find((l) => !l.material && l.isSpeaker && l.id !== lesson?.id);
   const otherSummary = course.lessons.find((l) => !l.material && l.isSummary && l.id !== lesson?.id);
   const courseDate = course.eventStart ?? undefined;
-  const allowMux = member?.role === "admin";
+  const allowMux = isSuperAdmin(member);
 
   const [title, setTitle] = useState(lesson?.title ?? "");
   const [sharer, setSharer] = useState(lesson?.sharer ?? "");

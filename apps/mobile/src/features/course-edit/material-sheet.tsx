@@ -1,3 +1,4 @@
+import { isSuperAdmin } from "@/lib/roles";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
@@ -173,7 +174,7 @@ function FullVersionSheet({ lesson, onClose }: { lesson: Lesson; onClose: () => 
   };
   return (
     <EditSheet title={lesson.title} onClose={onClose} onSave={submit} saveLabel="儲存" dirty={mediaDraftDirty(media, lesson)} busy={busy} error={error}>
-      <MediaUploadModule draft={media} onChange={setMedia} allowMux={member?.role === "admin"} lesson={lesson} lessonId={lesson.id} onUploaded={invalidate} showHint={false} />
+      <MediaUploadModule draft={media} onChange={setMedia} allowMux={isSuperAdmin(member)} lesson={lesson} lessonId={lesson.id} onUploaded={invalidate} showHint={false} />
     </EditSheet>
   );
 }

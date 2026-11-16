@@ -25,3 +25,5 @@ export { CornerRibbon } from "./corner-ribbon";
 export { StageFrame } from "./stage-frame";
 export { ShareIcon, isApplePlatform } from "./share-icon";
 export { ToastHost, showToast } from "./toast";
+export { FlashHost, showFlash, type FlashContent } from "./flash-notice";
+export { SaplingIcon } from "./sapling-icon";

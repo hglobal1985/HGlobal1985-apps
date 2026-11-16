@@ -20,7 +20,7 @@ import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, 
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
-import { ModeFlash } from "./mode-flash";
+import { flashMode } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
 import { buildSearchIndex, matchCourses, matchLessons, suggestTerms, type SearchLesson } from "./course-search";
@@ -87,11 +87,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     if (vs.length && mode !== "chapter") {
       setModeBeforeCat(mode);
       setMode("chapter");
-      setFlashTick((t) => t + 1);
+      flashMode("chapter", c.accent);
     } else if (!vs.length && modeBeforeCat) {
       setMode(modeBeforeCat);
+      flashMode(modeBeforeCat, c.accent);
       setModeBeforeCat(null);
-      setFlashTick((t) => t + 1);
     }
     syncUrl(vs.join("、"), vs.length ? ALL : center);
   };
@@ -125,7 +125,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     setUnitFilter(v);
     AsyncStorage.setItem(UNIT_FILTER_KEY, v).catch(() => undefined);
   };
-  const [flashTick, setFlashTick] = useState(0);
   const pickMode = (m: CourseViewMode) => {
     // 已在中心模式又按一次中心鈕＝回到中心清單。
     if (m === "center" && mode === "center" && center !== ALL) {
@@ -133,7 +132,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
       return;
     }
     setMode(m);
-    setFlashTick((t) => t + 1);
+    flashMode(m, c.accent);
     syncUrl(category, m === "center" ? center : ALL);
     if (m === "chapter") {
       setWantIndex(true);
@@ -454,7 +453,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         </AppText>
       </Pressable>
     ) : null}
-    <ModeFlash mode={mode} tick={flashTick} />
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (

@@ -5,7 +5,7 @@ import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-nati
 import { confirmAsk } from "@/features/confirm";
 import { MemberHeader } from "@/features/member-header";
 import { openAccountCenter } from "@/features/account-link";
-import type { Achievement, AppConfig, Member } from "@/api/client";
+import type { AppConfig, Member } from "@/api/client";
 import { canManageCourses, canManageEditors } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -71,8 +71,6 @@ export default function MeScreen() {
     await run("delete", deleteAccount, central ? "已刪除你在本 App 的資料並登出。請在會員中心完成帳號刪除。" : "已刪除測試帳號的資料。");
     if (central) openAccountCenter();
   };
-  const achievements = useApi<Achievement[]>(member ? "/me/achievements" : null);
-  const earned = (achievements.data ?? []).filter((a) => a.earned);
 
   return (
     <Screen>
@@ -127,17 +125,6 @@ export default function MeScreen() {
       {member && isWeb ? (
         <Card style={{ paddingVertical: 0 }}>
           <ListRow icon="document-text-outline" title="訂單紀錄" onPress={() => router.push("/orders")} />
-        </Card>
-      ) : null}
-
-      {member ? (
-        <Card style={{ paddingVertical: 0 }}>
-          <ListRow
-            icon="trophy-outline"
-            title="學習成就"
-            subtitle={achievements.data ? `已取得 ${earned.length} / ${achievements.data.length} 枚徽章${earned.length ? `　${earned.slice(0, 6).map((a) => a.icon).join(" ")}` : ""}` : "查看你的學習徽章"}
-            onPress={() => router.push("/achievements")}
-          />
         </Card>
       ) : null}
 
