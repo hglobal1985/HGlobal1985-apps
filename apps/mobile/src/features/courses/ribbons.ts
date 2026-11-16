@@ -48,7 +48,7 @@ export function dateState(c: CourseSummary): "upcoming" | "running" | "ended" | 
 export function ribbonsFor(course: CourseSummary, member: Member | null, cfg: UiConfig): { left: RibbonSpec | null; right: RibbonSpec | null } {
   const completed = course.lessonCount > 0 && course.completedLessons >= course.lessonCount;
   let left: RibbonSpec | null = null;
-  // 教材類（素材清單）不算學習紀錄：不顯示學習中／已完成，也沒有日期緞帶（業主 2026-11-16）。
+  // 清單類別（素材清單）不算學習紀錄：不顯示學習中／已完成，也沒有日期緞帶（業主 2026-11-16）。
   if (course.isList) return { left: course.isPublic ? spec(cfg, "public_free") : null, right: null };
   if (!member) left = course.isPublic ? spec(cfg, "public_free") : null;
   else if (course.enrollment === "opened") left = spec(cfg, completed ? "completed" : "learning");
@@ -65,7 +65,7 @@ export function ribbonsFor(course: CourseSummary, member: Member | null, cfg: Ui
 
 /** 這門課在「全部課程」屬於哪一個排序分組。 */
 export function classify(course: CourseSummary, member: Member | null): SortGroup {
-  if (course.isList) return "public_free"; // 教材類不歸到「已報名」
+  if (course.isList) return "public_free"; // 清單類別不歸到「已報名」
   if (course.enrollment === "pending") return "pending";
   if (course.enrollment === "opened") return "enrolled";
   if (course.isPublic) return "public_free";

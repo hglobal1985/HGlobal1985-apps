@@ -12,7 +12,7 @@ type Share = UiConfig["share"];
 
 /**
  * 設定 > 分享預設值（只有超級管理員）：把所有「分享」相關的文字集中在這一頁——
- * ① 一般分享 ② 課程（單堂課程、章節）③ 教材（素材清單、清單影片、外部連結）的分享文字；④ LINE 等分享預覽卡片的標題與備註格式（中心、單堂課程、系列、分類都用同一組）。
+ * ① 一般分享 ② 課程（單堂課程、章節）③ 清單（整個清單、清單裡的影片、外部連結）的分享文字；④ LINE 等分享預覽卡片的標題與備註格式（中心、單堂課程、系列、分類都用同一組）。
  * 下方有即時預覽。存檔後：分享選單文字重新開啟 APP 套用；預覽卡片立刻套用（LINE 會快取舊的預覽，已分享過的網址要換新網址或等它過期）。
  * 新增任何分享相關的文字，一律放在這一頁（contract.ts ShareSettings）。
  */
@@ -109,7 +109,7 @@ export default function ShareDefaultsScreen() {
         </Card>
       </Section>
 
-      <Section title="③ 教材的分享">
+      <Section title="③ 清單（影片／檔案）的分享">
         <Card>
           {input("素材清單分享的文字", "「新增清單（影片／檔案）」建立的清單：清單頁右上角與清單列的分享，可用 {清單名稱}", s.listText, (v) => set("listText", v), { multiline: true })}
           {input("清單裡單一影片分享的文字", "清單每段影片右側的分享鈕（點開直接播放這一段）：可用 {影片名稱}、{清單名稱}", s.listItemText, (v) => set("listItemText", v), { multiline: true })}

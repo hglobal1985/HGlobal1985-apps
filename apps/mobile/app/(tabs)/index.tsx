@@ -51,7 +51,7 @@ export default function HomeScreen() {
   const courses = data ?? [];
   const mine = courses
     // 與「學習中」頁同一個規則：已開通或播放超過 1% 的課程（被隱藏的不列）。
-    .filter((x) => !x.isList && (x.enrollment === "opened" || x.started) && !x.hiddenFromLearning) // 教材類（素材清單）不列入繼續學習
+    .filter((x) => !x.isList && (x.enrollment === "opened" || x.started) && !x.hiddenFromLearning) // 清單類別（素材清單）不列入繼續學習
     .sort((a, b) => Number(b.completedLessons < b.lessonCount) - Number(a.completedLessons < a.lessonCount));
   // 會員：符合獎銜、尚未報名的課程；訪客：完全公開的課程。
   // 推薦課程的規則由「設定 > APP 數值設定」控制：範圍（我的中心／全部）、是否納入總部主辦、獎銜資格、已結束、同系列只推最近一場、排序、上限。
