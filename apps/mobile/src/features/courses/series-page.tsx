@@ -15,7 +15,7 @@ import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
 import { lessonsOf } from "./category-sheet";
 import { CourseRow } from "./course-row";
-import { farToNear } from "./series-sheet";
+import { nearestFirst } from "./sort";
 import { SeriesTile } from "./series-tile";
 
 type View_ = "list" | "edm";
@@ -55,7 +55,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     const pub = (data ?? []).filter((x) => x.status === "published");
     const ids = new Set(pub.map((x) => x.id));
     const all = [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
-    return farToNear(all.filter((x) => x.series === series));
+    return nearestFirst(all.filter((x) => x.series === series));
   }, [data, adminList.data, series]);
   const art = artList.data?.find((x) => x.series === series);
   const pick = (v: View_) => {

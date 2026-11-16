@@ -83,7 +83,7 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
             <Ionicons name="close" size={22} color="#fff" />
         </Pressable>
       ) : null}
-      {sheet ? <SeriesSheet title={course.series || course.title} items={[course, ...siblings].sort((a, b) => (b.eventStart ?? "").localeCompare(a.eventStart ?? ""))} onClose={() => setSheet(false)} onPick={onPickSibling} currentId={course.id} /> : null}
+      {sheet ? <SeriesSheet title={course.series || course.title} items={[course, ...siblings]} onClose={() => setSheet(false)} onPick={onPickSibling} currentId={course.id} /> : null}
     </Card>
   );
 }

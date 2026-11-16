@@ -6,6 +6,21 @@ import { classify } from "./ribbons";
 export const startOf = (c: CourseSummary): string | null => c.eventStart;
 
 /**
+ * 同一系列的梯次清單統一排序（業主 2026-11-17 永久規則）：日期離今天越近的在上面、越遠的在下面（不分已過或未來，用相差天數比）；
+ * 相差一樣近時，還沒到的排前面；沒有日期的放最後。梯次選單、系列「顯示全部」頁、課程卡的「還有 N 個梯次」都用這一個。
+ */
+export function nearestFirst<T extends CourseSummary>(items: T[]): T[] {
+  const today = Date.parse(`${todayStr()}T00:00:00Z`);
+  const dist = (c: CourseSummary) => {
+    const d = startOf(c);
+    if (!d) return Number.POSITIVE_INFINITY;
+    const diff = Date.parse(`${d.slice(0, 10)}T00:00:00Z`) - today;
+    return Math.abs(diff) * 2 + (diff < 0 ? 1 : 0); // 一樣近時，未來的（diff ≥ 0）排前面
+  };
+  return [...items].sort((a, b) => dist(a) - dist(b));
+}
+
+/**
  * 「全部課程」排序：先依分組優先順序（由超級管理員在「課程排序與條件」設定），
  * 同一組內：還沒開始的日期由近到遠，已開始或沒有日期的由新到舊。
  */
@@ -51,7 +66,7 @@ export function collapseSeries(list: CourseSummary[], all: CourseSummary[]): Ser
   }
   return list
     .filter((c) => !c.series || best.get(c.series) === c)
-    .map((c) => ({ course: c, siblings: c.series ? all.filter((x) => x.series === c.series && x.id !== c.id).sort((a, b) => (startOf(b) ?? "").localeCompare(startOf(a) ?? "")) : [] }));
+    .map((c) => ({ course: c, siblings: c.series ? nearestFirst(all.filter((x) => x.series === c.series && x.id !== c.id)) : [] }));
 }
 
 /** 課程在卡片、封面、首頁上顯示的名稱：有系列就顯示系列名稱，沒有系列才顯示課程名稱。 */

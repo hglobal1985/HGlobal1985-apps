@@ -9,19 +9,8 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
-import { startOf } from "./sort";
+import { nearestFirst } from "./sort";
 
-/**
- * 梯次的顯示順序（梯次選單與系列「顯示全部」頁共用）：開始日期由遠到近、單一方向——最晚的在最上面，已經開過的自然在最下面；沒有日期的放最後。
- * （以前把『已結束』固定排最前面，導致 2026 → 2027/11 → 倒數到 2027/2，方向來回跳。）
- */
-export const farToNear = (items: CourseSummary[]): CourseSummary[] =>
-  [...items].sort((a, b) => {
-    const da = startOf(a) ?? "";
-    const db = startOf(b) ?? "";
-    if (!da || !db) return Number(!da) - Number(!db); // 沒有日期的排最後
-    return db.localeCompare(da);
-  });
 
 /** 狀態標籤：與課程卡左邊緞帶同步的文字與顏色；沒有左緞帶時用右邊緞帶（倒數、進行中…）。 */
 function StatusChip({ course }: { course: CourseSummary }) {
@@ -58,7 +47,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
         {showAllSeries ? <SheetAction label="顯示全部" accessibilityLabel={`顯示「${showAllSeries}」全部梯次`} onPress={showAll} /> : null}
       </View>
       <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ gap: 0 }}>
-        {farToNear(items).map((x) => (
+        {nearestFirst(items).map((x) => (
           <Pressable
             key={x.id}
             accessibilityRole="button"
