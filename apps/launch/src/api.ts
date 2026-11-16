@@ -3432,6 +3432,37 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/center-info$/,
+    async (ctx): Promise<Record<string, string>> => {
+      // 各教育中心的地址（沒有設定的中心不在裡面）。登入會員都能讀。
+      requireMember(ctx);
+      const { results } = await ctx.db.prepare("SELECT center_key, address FROM center_info WHERE address <> ''").all<{ center_key: string; address: string }>();
+      return Object.fromEntries(results.map((r) => [r.center_key, r.address]));
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/center-info$/,
+    async (ctx) => {
+      // 設定教育中心的地址（權限同中心 EDM）。空白＝清除。
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const body = await readJson<{ address?: unknown }>(ctx.req);
+      const address = typeof body.address === "string" ? body.address.trim().slice(0, 120) : "";
+      if (!address) {
+        await ctx.db.batch([ctx.db.prepare("DELETE FROM center_info WHERE center_key = ?").bind(center.key), audit(ctx.db, s.sub, "center.address_clear", "center", center.key)]);
+      } else {
+        await ctx.db.batch([
+          ctx.db
+            .prepare("INSERT INTO center_info (center_key, center_label, address) VALUES (?, ?, ?) ON CONFLICT(center_key) DO UPDATE SET address = excluded.address, center_label = excluded.center_label, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+            .bind(center.key, center.label, address),
+          audit(ctx.db, s.sub, "center.address_set", "center", center.key, address),
+        ]);
+      }
+      return { ok: true };
+    },
+  ],
+  [
+    "GET",
     /^\/center-names$/,
     async (ctx): Promise<Record<string, string>> => {
       // 教育中心的自訂顯示名稱（沒有設定的中心不在裡面，前端用預設格式）。登入會員都能讀。

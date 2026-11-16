@@ -5,6 +5,7 @@ import { Animated, BackHandler, Platform, Pressable, StyleSheet, View } from "re
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, type CenterArt, type CourseSummary } from "@/api/client";
 import { CenterEdm } from "@/features/admin/center-edm";
+import { CenterAddressField } from "@/features/admin/center-address-field";
 import { CenterNameField } from "@/features/admin/center-name-field";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewCourseSheet } from "@/features/course-edit/new-course";
@@ -49,6 +50,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
   const manager = canManageCourses(member);
   const adminList = useApi<CourseSummary[]>(manager ? "/admin/courses" : null);
   const centerArt = useApi<CenterArt[]>("/center-art");
+  const centerInfo = useApi<Record<string, string>>(member ? "/center-info" : null); // 各中心地址（中心沒有課程時的提示用）
   // 已選的分類（可複選；多個＝同時有這些分類）。空陣列＝全部分類。
   const [selCats, setSelCats] = useState<string[]>(initialCategory ? initialCategory.split("、").filter(Boolean) : []);
   const category = selCats.join("、");
@@ -410,7 +412,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
         </>
       ) : (
         <>
-          {data && !groups.length && !(mode === "center" && center === ALL) ? <EmptyState icon="library-outline" title={matched ? "找不到符合的課程" : "沒有符合條件的課程"} /> : null}
+          {data && !groups.length && !(mode === "center" && center === ALL) ? (
+            mode === "center" && !matched && !selCats.length ? (
+              // 中心頁完全沒有課程：固定提示文字（地址由中心的編輯面板設定；沒設定就不顯示地址那一行）
+              <EmptyState icon="library-outline" title="線上課程準備中" body={["線下課程週週精彩", centerInfo.data?.[normCenter(center)] ? `地址：${centerInfo.data[normCenter(center)]}` : "", "請洽中心負責人"].filter(Boolean).join("\n")} />
+            ) : (
+              <EmptyState icon="library-outline" title={matched ? "找不到符合的課程" : "沒有符合條件的課程"} />
+            )
+          ) : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
@@ -436,6 +445,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", series =
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
         <CenterNameField key={activeCenter} center={activeCenter} />
+        <CenterAddressField center={activeCenter} current={centerInfo.data?.[normCenter(activeCenter)] ?? ""} onSaved={centerInfo.reload} />
         <CenterEdm center={activeCenter} art={art} onChanged={centerArt.reload} />
       </EditSheet>
     ) : null}

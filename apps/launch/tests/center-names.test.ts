@@ -35,3 +35,20 @@ test("教育中心自訂名稱：權限、讀取、還原預設、分享標題�
   assert.deepEqual((await call<Record<string, string>>("GET", "/center-names", student)).data, { 台中中心: "中部教育中心" });
   assert.match(await (await w.fetch(new Request("https://learn.test/tp"), env)).text(), /property="og:title" content="台北中心 \| 寰宇行動大學"/);
 });
+
+test("教育中心地址：權限（同中心 EDM）、讀取、清除", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on" };
+  const call = async <T,>(method: string, path: string, token?: string, body?: unknown) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env);
+    return { status: res.status, data: (await res.json()) as T };
+  };
+  const login = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub })).data.token;
+  const [admin, president, student] = await Promise.all(["demo-admin", "demo-president", "demo-student"].map(login));
+  assert.equal((await call("PUT", "/admin/center-info?center=台北中心", student, { address: "亂改" })).status, 403);
+  assert.equal((await call("PUT", "/admin/center-info?center=台中中心", president, { address: "別人家" })).status, 403);
+  assert.equal((await call("PUT", "/admin/center-info?center=台北中心", president, { address: " 台北市中山區某某路 1 號 " })).status, 200);
+  assert.deepEqual((await call<Record<string, string>>("GET", "/center-info", student)).data, { 台北中心: "台北市中山區某某路 1 號" });
+  assert.equal((await call("GET", "/center-info")).status, 401);
+  assert.equal((await call("PUT", "/admin/center-info?center=台北中心", admin, { address: "" })).status, 200);
+  assert.deepEqual((await call<Record<string, string>>("GET", "/center-info", student)).data, {}, "空白＝清除");
+});
