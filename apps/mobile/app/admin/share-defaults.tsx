@@ -98,7 +98,7 @@ export default function ShareDefaultsScreen() {
       <Section title="① 分享選單送出的文字">
         <Card>
           {input("一般分享的文字", "分享中心、分類、系列等頁面時，放在網址前面的文字", s.inviteText, (v) => set("inviteText", v), { multiline: true })}
-          {input("單堂課程分享的文字", "可用 {主講人}、{課程名稱}，送出時會換成實際的內容", s.courseText, (v) => set("courseText", v), { multiline: true })}
+          {input("單堂課程分享的文字", "可用 {主講人}、{職稱}、{課程名稱}，送出時會換成實際的內容（沒填職稱的課程，{職稱} 會自動省略；有職稱時姓名與職稱中間自動空一格）", s.courseText, (v) => set("courseText", v), { multiline: true })}
           {input("網址前的引導文字", "自成一行，放在文字與網址中間", s.linkLead, (v) => set("linkLead", v))}
         </Card>
       </Section>
@@ -139,10 +139,10 @@ export default function ShareDefaultsScreen() {
             </AppText>
           </View>
           <AppText variant="callout" tone="muted">
-            單堂課程的分享文字（主講人「王小明」、課程「翡翠達標班」）
+            單堂課程的分享文字（主講人「王小明」、職稱「區域經理」、課程「翡翠達標班」）
           </AppText>
           <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
-            <AppText variant="body">{shareMessage(s, sampleUrl, { teacher: "王小明", title: "翡翠達標班" })}</AppText>
+            <AppText variant="body">{shareMessage(s, sampleUrl, { teacher: "王小明", teacherTitle: "區域經理", title: "翡翠達標班" })}</AppText>
           </View>
           <AppText variant="callout" tone="muted">
             一般分享的文字

@@ -538,7 +538,7 @@ export type ShareSettings = {
 };
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   inviteText: "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️",
-  courseText: "我剛聽完這場 {主講人}的這場精彩演講 {課程名稱} 我就立刻想到要分享給你！",
+  courseText: "我剛聽完這場 {主講人}{職稱}的這場精彩演講 {課程名稱} 我就立刻想到要分享給你！",
   linkLead: "按此開啟網址 👉",
   siteName: "寰宇行動大學",
   titleSeparator: " | ",
@@ -549,9 +549,11 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   fallbackDescription: "",
 };
 
-/** 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 就用課程範本（{主講人}、{課程名稱} 換成實際內容）。 */
-export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; title: string }): string {
-  const lead = course ? s.courseText.replaceAll("{主講人}", course.teacher.trim() || "老師").replaceAll("{課程名稱}", course.title) : s.inviteText;
+/** 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 就用課程範本（{主講人}、{職稱}、{課程名稱} 換成實際內容）。 */
+export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }): string {
+  // {職稱}：有職稱就在前面補一個空白再接職稱（「王小明 區域經理」），沒填就整個省略（不留多餘空白）。
+  const title = (course?.teacherTitle ?? "").trim();
+  const lead = course ? s.courseText.replaceAll("{主講人}", course.teacher.trim() || "老師").replaceAll("{職稱}", title ? ` ${title}` : "").replaceAll("{課程名稱}", course.title) : s.inviteText;
   return `${lead}\n\n${s.linkLead}\n${url}`;
 }
 

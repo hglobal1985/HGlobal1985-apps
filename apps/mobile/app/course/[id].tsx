@@ -234,7 +234,7 @@ export function CourseDetailScreen({ id, edit, lesson }: { id: string; edit?: st
       <PageHeader
         title={course.title}
         path={`${course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}${playLesson ? `?lesson=${playLesson.id}` : ""}`}
-        course={{ teacher: course.teacher ?? "", title: course.title }}
+        course={{ teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
         extra={
           manages && mode === "view" ? (
             <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => setMode("edit")} />

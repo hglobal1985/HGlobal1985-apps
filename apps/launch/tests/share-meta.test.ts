@@ -146,6 +146,18 @@ test("分享預設值：改標題格式、地址圖示、開關後，預覽卡�
 
   const S = DEFAULT_SHARE_SETTINGS;
   assert.equal(shareMessage(S, "https://u/x"), "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️\n\n按此開啟網址 👉\nhttps://u/x");
-  assert.equal(shareMessage(S, "https://u/y", { teacher: "王小明", title: "翡翠班" }), "我剛聽完這場 王小明的這場精彩演講 翡翠班 我就立刻想到要分享給你！\n\n按此開啟網址 👉\nhttps://u/y");
+  assert.equal(shareMessage(S, "https://u/y", { teacher: "王小明", title: "翡翠班" }), "我剛聽完這場 王小明的這場精彩演講 翡翠班 我就立刻想到要分享給你！\n\n按此開啟網址 👉\nhttps://u/y", "沒填職稱＝省略，不留空白");
+  assert.equal(shareMessage(S, "https://u/y", { teacher: "王小明", teacherTitle: "區域經理", title: "翡翠班" }), "我剛聽完這場 王小明 區域經理的這場精彩演講 翡翠班 我就立刻想到要分享給你！\n\n按此開啟網址 👉\nhttps://u/y", "有職稱＝姓名後空一格接職稱");
+  assert.equal(shareMessage(S, "u", { teacher: "王小明", teacherTitle: "   ", title: "T" }).includes("王小明的"), true, "職稱只有空白也當作沒填");
   assert.match(shareMessage(S, "u", { teacher: "", title: "T" }), /這場 老師的這場/, "沒有主講人用「老師」");
+});
+
+test("分享預設值：舊預設的單堂課程範本自動升級成含 {職稱} 的新預設；業主自己改過的不動", async () => {
+  const { normalizeShare } = await import("../src/ui-config.ts");
+  const { DEFAULT_SHARE_SETTINGS } = await import("../src/contract.ts");
+  const old = "我剛聽完這場 {主講人}的這場精彩演講 {課程名稱} 我就立刻想到要分享給你！";
+  assert.equal(normalizeShare({ courseText: old }).courseText, DEFAULT_SHARE_SETTINGS.courseText);
+  assert.match(DEFAULT_SHARE_SETTINGS.courseText, /\{主講人\}\{職稱\}/);
+  assert.equal(normalizeShare({ courseText: "聽完 {課程名稱} by {主講人}" }).courseText, "聽完 {課程名稱} by {主講人}");
+  assert.equal(normalizeShare({}).courseText, DEFAULT_SHARE_SETTINGS.courseText);
 });

@@ -10,7 +10,7 @@ import { HeaderShare } from "./share-button";
  * path＝要分享的網址路徑（有短網址就傳 /縮寫）。extra＝放在分享左邊的按鈕（例如管理者的「編輯」）。
  */
 /** course＝單堂課程的分享（主講人與課程名稱會帶進分享文字範本）；其他頁面不傳。 */
-export function PageHeader({ title, path, shareTitle, extra, course }: { title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; title: string } }) {
+export function PageHeader({ title, path, shareTitle, extra, course }: { title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; teacherTitle?: string; title: string } }) {
   return (
     <Stack.Screen
       options={{

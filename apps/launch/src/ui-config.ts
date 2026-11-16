@@ -33,6 +33,9 @@ export function normalizeConfig(raw: unknown): UiConfig {
   return { sortGroups, seriesOrder: [...new Set(so)].slice(0, 1000), ribbons, statsRoles: [...new Set(roles)], app: normalizeApp(r.app), share: normalizeShare(r.share) };
 }
 
+/** 2026-11-16 以前的單堂課程預設範本（沒有 {職稱}）。 */
+const OLD_COURSE_TEXT = "我剛聽完這場 {主講人}的這場精彩演講 {課程名稱} 我就立刻想到要分享給你！";
+
 /** 整理分享預設值：文字去頭尾空白（保留中間換行）、限制長度，空白或不合法的欄位退回預設（備註退回文字與兩個開關例外，可以是空白）。 */
 export function normalizeShare(raw: unknown): ShareSettings {
   const d = DEFAULT_SHARE_SETTINGS;
@@ -44,7 +47,11 @@ export function normalizeShare(raw: unknown): ShareSettings {
   };
   return {
     inviteText: str(r.inviteText, d.inviteText, 200),
-    courseText: str(r.courseText, d.courseText, 300),
+    // 舊預設範本（沒有 {職稱}，代表業主沒自己改過）自動升級成新預設；業主自己改過的文字不動。
+    courseText: (() => {
+      const t = str(r.courseText, d.courseText, 300);
+      return t === OLD_COURSE_TEXT ? d.courseText : t;
+    })(),
     linkLead: str(r.linkLead, d.linkLead, 60),
     siteName: str(r.siteName, d.siteName, 30),
     // 分隔符號前後的空白要保留（例如「 | 」），所以不 trim。
