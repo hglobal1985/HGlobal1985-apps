@@ -9,6 +9,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Icon, NoticeBox } from "@/ui";
 import { formatDuration, fromHms, toHms, type Hms } from "./hms";
+import { TimeRangePicker } from "./time-range-picker";
 
 /**
  * 【影音上傳模組】全站「設定影音來源＋時間軸區間」的唯一畫面與邏輯（章節編輯、其他教材新增／編輯都用它）。
@@ -89,6 +90,15 @@ function youtubeIdOf(ref: string): string | null {
   return /(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([A-Za-z0-9_-]{11})/.exec(s)?.[1] ?? null;
 }
 
+/** 偵測這個來源的影音長度（秒）：YouTube（網頁版）、剛選好的音檔、已上傳的音檔／Mux（用章節長度估算，approx＝true）。 */
+async function detectLength(draft: MediaDraft, lesson?: Lesson): Promise<{ sec: number | null; approx: boolean }> {
+  let sec: number | null = null;
+  if (draft.kind === "youtube" && youtubeIdOf(draft.ref)) sec = await detectYoutubeSeconds(youtubeIdOf(draft.ref)!);
+  else if (draft.kind === "audio" && draft.audio) sec = await audioDuration(draft.audio.file);
+  if (sec == null && lesson && lesson.media?.type === draft.kind && lesson.minutes > 0 && draft.kind !== "youtube") return { sec: lesson.minutes * 60, approx: true };
+  return { sec, approx: false };
+}
+
 export const mediaKindLabel = (k: MediaType) => MEDIA_CHANNELS.find((ch) => ch.key === k)?.label ?? "";
 
 export function MediaUploadModule({
@@ -153,14 +163,7 @@ export function MediaUploadModule({
     let alive = true;
     setEndNote({ tone: "info", text: "正在偵測影片長度…" });
     (async () => {
-      let sec: number | null = null;
-      let approx = false;
-      if (draft.kind === "youtube" && youtubeIdOf(draft.ref)) sec = await detectYoutubeSeconds(youtubeIdOf(draft.ref)!);
-      else if (draft.kind === "audio" && draft.audio) sec = await audioDuration(draft.audio.file);
-      if (sec == null && lesson && lesson.media?.type === draft.kind && lesson.minutes > 0 && draft.kind !== "youtube") {
-        sec = lesson.minutes * 60; // 已上傳的音檔／Mux：用章節長度（分鐘）估算
-        approx = true;
-      }
+      const { sec, approx } = await detectLength(draft, lesson);
       if (!alive) return;
       if (sec == null || sec <= 0) {
         set({ toEnd: false });
@@ -173,6 +176,19 @@ export function MediaUploadModule({
       alive = false;
     };
   }, [draft.toEnd, draft.kind, draft.ref, draft.audio]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 拖曳設定時間軸（開啟時才偵測長度）。
+  const [pickOpen, setPickOpen] = useState(false);
+  const [duration, setDuration] = useState<number | null>(null);
+  useEffect(() => {
+    if (!pickOpen) return;
+    let alive = true;
+    setDuration(null);
+    detectLength(draft, lesson).then((r) => alive && setDuration(r.sec));
+    return () => {
+      alive = false;
+    };
+  }, [pickOpen, draft.kind, draft.ref, draft.audio]); // eslint-disable-line react-hooks/exhaustive-deps
+  const canPick = (draft.kind === "youtube" && !!youtubeIdOf(draft.ref)) || draft.kind === "audio" || draft.kind === "mux";
   const ctx: ChannelCtx = { draft, set, lesson, lessonId: id, busy, progress, upload };
   const channels = MEDIA_CHANNELS.filter((ch) => (id ? true : ch.staged) && (!ch.superAdminOnly || allowMux || draft.kind === ch.key));
   const active = MEDIA_CHANNELS.find((ch) => ch.key === draft.kind);
@@ -194,6 +210,25 @@ export function MediaUploadModule({
       <AppText variant="callout" tone="muted">
         {showHint ? "時間軸區間（選填；空白＝從頭播到結束）" : "時間軸區間"}
       </AppText>
+      {canPick ? (
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: pickOpen }} onPress={() => setPickOpen(!pickOpen)} style={[styles.pickBtn, { borderColor: c.accent }]}>
+          <Icon name={pickOpen ? "chevron-up" : "film-outline"} size={22} color={c.accent} />
+          <AppText variant="callout" style={{ color: c.accentText, fontWeight: "700" }}>
+            {pickOpen ? "收起拖曳設定" : "用拖曳設定開始與結束"}
+          </AppText>
+        </Pressable>
+      ) : null}
+      {canPick && pickOpen ? (
+        <TimeRangePicker
+          kind={draft.kind}
+          ytId={draft.kind === "youtube" ? youtubeIdOf(draft.ref) : null}
+          audioFile={draft.kind === "audio" ? (draft.audio?.file ?? null) : null}
+          duration={duration}
+          start={draft.start}
+          end={draft.end}
+          onChange={(patch) => set(patch)}
+        />
+      ) : null}
       <TimeInput label="開始" value={draft.start} onChange={(v) => set({ start: v })} />
       <TimeInput label="結束" value={draft.end} onChange={(v) => set({ end: v })} disabled={!!draft.toEnd} />
       <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: !!draft.toEnd }} accessibilityLabel="到影片結尾" onPress={() => set({ toEnd: !draft.toEnd })} style={styles.endCheck}>
@@ -313,6 +348,7 @@ function TimeInput({ label, value, onChange, disabled }: { label: string; value:
 }
 
 const styles = StyleSheet.create({
+  pickBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm, minHeight: minTouch, borderWidth: 1.5, borderRadius: radius.md },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
   chip: { minHeight: minTouch - 8, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1, justifyContent: "center" },
   input: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },

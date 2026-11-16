@@ -605,3 +605,7 @@
 - **封面上傳模組** `features/admin/art-uploader.web.tsx`（`ArtUploader`）：中心與系列共用（`CenterEdm`、`SeriesEdm` 只是傳入網址的薄外殼）。裁切 16:9／完整顯示、預覽、調整框、移除都在這一個檔案；手機 App 只顯示「請在網頁版上傳」。課程自己的 `EdmManager`（課程頁）版面不同，尚未併入。
 - **後端**：migration 0059（`series_art` 加 `cover_key／cover_rect／edm_view_y`、新表 `series_views`）；`GET /series-art`、`PUT /admin/series/cover`、`PATCH /admin/series/edm`（裁切框）、`POST /series-views`（同人同日只算一次）。刪除系列／移除 EDM 一併清封面檔。
 - **全螢幕文字提醒（`ui/flash-notice.tsx`）**：改為比 3 倍版再縮小 50％，所有視窗固定同一個寬高（190×230），文字依字數自動挑字級、超過自動換行，點一下立即關閉。模式名稱改為「系列／單元／教育中心」。
+
+## 2026-11-16（再續）：影片時間軸拖曳設定（業主選定「方案 3＋4 綜合」）
+- `features/uploads/time-range-picker.tsx`（`TimeRangePicker`）：影音上傳模組的「用拖曳設定開始與結束」。畫面中央固定紅線，左右拖曳膠卷刻度移動時間；網頁版上方預覽視窗（`range-preview.web.tsx`）停在紅線那一秒（YouTube）或可試聽音檔；按「設為開始／設為結束」填入欄位；−5／−1／+1／+5 秒微調、放大縮小刻度；綠旗＝開始、橘旗＝結束、中間區段有底色。YouTube／音檔／Mux 都能用，影片長度抓不到時以 3 小時為範圍（手機 App 與 Mux 無預覽）。
+- 章節編輯與其他教材共用（只改這個模組，全站同步）。
