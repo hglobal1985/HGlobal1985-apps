@@ -16,6 +16,7 @@ export function ListRow({
   unread,
   highlight,
   dense,
+  compact,
 }: {
   icon?: IconName;
   /** 自訂的前置圖示（取代 icon），例如章節清單的主講人學士帽。 */
@@ -31,6 +32,8 @@ export function ListRow({
   highlight?: boolean;
   /** 緊湊列高（章節清單用）。 */
   dense?: boolean;
+  /** 章節清單的精簡版：不顯示右側「>」、標題只佔一行（太長用「…」）、文字更靠近邊框（外層 Card 的左右內距請用 space.sm）。 */
+  compact?: boolean;
 }) {
   const { c } = useTheme();
   return (
@@ -38,7 +41,7 @@ export function ListRow({
       onPress={onPress}
       disabled={!onPress}
       accessibilityRole={onPress ? "button" : undefined}
-      style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, marginHorizontal: -space.lg, paddingHorizontal: space.lg }, pressed && { opacity: 0.7 }]}
+      style={({ pressed }) => [styles.row, dense && { minHeight: minTouch, paddingVertical: space.sm }, compact && { gap: space.sm }, { borderBottomColor: c.border }, highlight && { backgroundColor: c.accentSoft, marginHorizontal: compact ? -space.sm : -space.lg, paddingHorizontal: compact ? space.sm : space.lg }, pressed && { opacity: 0.7 }]}
     >
       {note !== undefined ? (
         <View style={{ width: 48, alignItems: "center", gap: 2 }}>
@@ -53,7 +56,7 @@ export function ListRow({
         leading ?? (icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null)
       )}
       <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="headline" style={unread ? undefined : { fontWeight: "500" }}>
+        <AppText variant="headline" numberOfLines={compact ? 1 : undefined} style={unread ? undefined : { fontWeight: "500" }}>
           {title}
         </AppText>
         {subtitle ? (
@@ -63,7 +66,7 @@ export function ListRow({
         ) : null}
       </View>
       {unread ? <View style={[styles.dot, { backgroundColor: c.accent }]} accessibilityLabel="未讀" /> : null}
-      {right ?? (onPress ? <Icon name="chevron-forward" size={18} color={c.textMuted} /> : null)}
+      {right ?? (onPress && !compact ? <Icon name="chevron-forward" size={18} color={c.textMuted} /> : null)}
     </Pressable>
   );
 }

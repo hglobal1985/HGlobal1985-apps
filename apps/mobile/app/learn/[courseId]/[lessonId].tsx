@@ -195,7 +195,7 @@ export default function LessonScreen() {
       </View>
       ) : null}
       <View>
-        <Card style={{ paddingVertical: 0 }}>
+        <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
           {chapterList.map((l) => (
             <ListRow
               key={l.id}
@@ -206,6 +206,7 @@ export default function LessonScreen() {
               subtitle={l.id === lesson.id ? "正在觀看" : sharerLine(l) || undefined}
               highlight={l.id === lesson.id}
               dense
+              compact
               onPress={l.id === lesson.id || l.locked ? undefined : () => {
                 engine.expectSwitch();
                 router.replace(`/learn/${c.id}/${l.id}`);
@@ -217,7 +218,7 @@ export default function LessonScreen() {
       {c.lessons.some((l) => l.material && l.ready) ? (
         <View style={{ gap: space.xs }}>
           <AppText variant="headline">其他教材</AppText>
-          <Card style={{ paddingVertical: 0 }}>
+          <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
             {c.lessons.filter((l) => l.material && l.ready)
               .map((l) => (
                 <ListRow
@@ -228,6 +229,7 @@ export default function LessonScreen() {
                   subtitle={l.id === lesson.id ? "正在觀看" : sharerLine(l) || undefined}
                   highlight={l.id === lesson.id}
                   dense
+                  compact
                   onPress={l.id === lesson.id || l.locked ? undefined : () => {
                     engine.expectSwitch();
                     router.replace(`/learn/${c.id}/${l.id}`);

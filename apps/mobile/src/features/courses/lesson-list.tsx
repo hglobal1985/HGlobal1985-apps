@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import type { ViewStyle } from "react-native";
 import type { CourseDetail } from "@/api/client";
 import { minutesText, sharerLine } from "@/features/format";
+import { space } from "@/theme/tokens";
 import { Card, ListRow } from "@/ui";
 import { SpeakerLead } from "./speaker-mark";
 
@@ -13,7 +14,7 @@ export function ChapterList({ course, style }: { course: CourseDetail; style?: V
   const chapters = course.lessons.filter((l) => !l.material);
   const anyReady = chapters.some((l) => l.ready);
   return (
-    <Card style={{ paddingVertical: 0, ...style }}>
+    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm, ...style }}>
       {chapters.length === 0 || !anyReady ? (
         <ListRow icon="hourglass-outline" title="敬請期待" subtitle="課程內容準備中" />
       ) : (
@@ -28,6 +29,7 @@ export function ChapterList({ course, style }: { course: CourseDetail; style?: V
                 title={`${lesson.position}. ${lesson.title}`}
                 subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
                 dense
+                compact
                 onPress={lesson.locked || soon ? undefined : () => router.push(`/learn/${course.id}/${lesson.id}`)}
               />
             );
@@ -42,11 +44,12 @@ export function FullVersionList({ course }: { course: CourseDetail }) {
   const full = course.lessons.filter((l) => l.material && (l.ready || !!course.can?.edit));
   if (!full.length) return null;
   return (
-    <Card style={{ paddingVertical: 0 }}>
+    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
       {full.map((lesson) => (
         <ListRow
           key={lesson.id}
           icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
+          compact
           note={minutesText(lesson.minutes)}
           title={lesson.title}
           subtitle={sharerLine(lesson) || undefined}
