@@ -45,3 +45,27 @@ test("中心分享標題：去掉數字代碼，結尾是「中心」", async ()
   const page = await (await createWorker(files).fetch(new Request("https://learn.test/nj"), env)).text();
   assert.match(page, /property="og:title" content="南京中心 \| 寰宇行動大學"/);
 });
+
+test("分享預覽：沒設短網址的中心／分類／系列、已上架課程與章節都帶出標題；未上架不洩漏；特殊字元跳脫", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  await db.prepare("DELETE FROM quotes").run();
+  await db.prepare("INSERT INTO center_names (center_key, center_label, display_name) VALUES (?, ?, ?)").bind("員林 153", "員林 153", "員林分校").run();
+  await db.prepare("INSERT INTO courses (id, title, status) VALUES ('pub1', '公開課 <b>', 'published'), ('dr1', '草稿課', 'draft')").run();
+  await db.prepare("INSERT INTO lessons (id, course_id, position, title) VALUES ('l1', 'pub1', 1, '第一堂'), ('l2', 'dr1', 1, '草稿章節')").run();
+  const w = createWorker(files);
+  const get = async (path: string) => (await w.fetch(new Request(`https://learn.test${path}`), env)).text();
+  const title = (page: string) => /property="og:title" content="([^"]*)"/.exec(page)?.[1];
+
+  assert.equal(title(await get("/courses?center=%E5%BD%B0%E5%8C%96%20151")), "彰化中心 | 寰宇行動大學", "沒有短網址的中心（彰化 151）");
+  assert.equal(title(await get("/courses?center=%E5%93%A1%E6%9E%97%20153")), "員林分校 | 寰宇行動大學", "有自訂名稱的中心");
+  assert.equal(title(await get("/courses?category=%E6%96%B0%E4%BA%BA")), "新人 | 寰宇行動大學", "分類");
+  assert.equal(title(await get("/courses?center=%E5%BD%B0%E5%8C%96%20151&category=%E6%96%B0%E4%BA%BA")), "彰化中心・新人 | 寰宇行動大學", "中心＋分類");
+  assert.equal(title(await get("/series/%E7%BF%A1%E7%BF%A0%E9%81%94%E6%A8%99%E7%8F%AD")), "翡翠達標班 | 寰宇行動大學", "系列");
+  assert.equal(title(await get("/course/pub1")), "公開課 &lt;b&gt; | 寰宇行動大學", "已上架課程（特殊字元跳脫）");
+  assert.equal(title(await get("/learn/pub1/l1")), "公開課 &lt;b&gt;｜第一堂 | 寰宇行動大學", "章節");
+  assert.equal(await get("/course/dr1"), html, "未上架課程不洩漏名稱");
+  assert.equal(await get("/learn/dr1/l2"), html, "未上架章節不洩漏");
+  assert.equal(await get("/course/nope"), html);
+  assert.equal(await get("/courses"), html, "沒有參數的 /courses 維持預設");
+});

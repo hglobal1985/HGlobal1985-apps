@@ -1,5 +1,6 @@
 import { centerKey } from "./central.ts";
 import type { D1Database } from "./d1.ts";
+import { RESERVED_SLUGS } from "./short-links.ts";
 
 const SITE = "寰宇行動大學";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -65,4 +66,64 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
   const q = await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null);
   const image = c.k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(c.k)}&v=${c.v}` : `${origin}/icon-512.png`;
   return { title: `${c.title} | ${SITE}`, description: c.subtitle?.trim() || q?.body?.trim() || SITE, url: `${origin}/${slug}/${name}`, image };
+}
+
+type ShareMeta = { title: string; description: string; url: string; image: string };
+
+const clip = (v: string | null | undefined, n = 60) => (v ?? "").trim().slice(0, n);
+const pubImage = (origin: string, k: string | null | undefined, v: number | null | undefined) => (k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(k)}&v=${v ?? 0}` : `${origin}/icon-512.png`);
+const randomQuote = async (db: D1Database) => (await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null))?.body?.trim() || "";
+
+/**
+ * 分享預覽的單一入口（LINE 等不會執行 JavaScript，所以要由伺服器依網址帶出標題與圖）：
+ * 所有會被分享出去的網址形狀都在這裡處理，新增網址形狀時加在這一個函式：
+ *   /{縮寫}（分類／系列／中心短網址）、/{中心縮寫}/{名字-001}（課程專屬網址）、
+ *   /courses?center=…&category=…（沒設短網址的中心／分類）、/series/{系列名}、/course/{編號}、/learn/{課程}/{章節}。
+ * 課程、章節只處理「已上架」的（未上架／封存一律用預設，避免洩漏未公開的名稱）。找不到回 null＝維持預設標籤。
+ */
+export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareMeta | null> {
+  const origin = url.origin;
+  const path = url.pathname;
+  const short = /^\/([a-z0-9-]{2,30})$/.exec(path);
+  if (short && !RESERVED_SLUGS.has(short[1]!)) return shortLinkMeta(db, short[1]!, origin);
+  const courseUrl = /^\/([a-z0-9-]{2,30})\/([a-z0-9-]{3,80})$/.exec(path);
+  if (courseUrl && !RESERVED_SLUGS.has(courseUrl[1]!) && courseUrl[1] !== "series") return courseUrlMeta(db, courseUrl[1]!, courseUrl[2]!, origin);
+
+  if (path === "/courses") {
+    const center = clip(url.searchParams.get("center"));
+    const category = clip(url.searchParams.get("category"));
+    if (!center && !category) return null;
+    const name = center ? await centerDisplayName(db, center) : "";
+    const art = center ? await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM center_art WHERE center_key = ?").bind(centerKey(center)).first<{ k: string; v: number }>().catch(() => null) : null;
+    return { title: `${[name, category].filter(Boolean).join("・")} | ${SITE}`, description: (await randomQuote(db)) || SITE, url: `${origin}${path}${url.search}`, image: pubImage(origin, art?.k, art?.v) };
+  }
+
+  const series = /^\/series\/(.+)$/.exec(path);
+  if (series) {
+    let name = "";
+    try {
+      name = clip(decodeURIComponent(series[1]!));
+    } catch {
+      return null;
+    }
+    if (!name) return null;
+    const art = await db.prepare("SELECT edm_key AS k, art_version AS v FROM series_art WHERE series = ?").bind(name).first<{ k: string; v: number }>().catch(() => null);
+    return { title: `${name} | ${SITE}`, description: (await randomQuote(db)) || SITE, url: `${origin}${path}`, image: pubImage(origin, art?.k, art?.v) };
+  }
+
+  const course = /^\/course\/([\w-]+)$/.exec(path);
+  const lesson = /^\/learn\/([\w-]+)\/([\w-]+)$/.exec(path);
+  const courseId = course?.[1] ?? lesson?.[1];
+  if (courseId) {
+    const c = await db
+      .prepare("SELECT title, subtitle, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published'")
+      .bind(courseId)
+      .first<{ title: string; subtitle: string | null; k: string | null; v: number }>()
+      .catch(() => null);
+    if (!c) return null;
+    const l = lesson ? await db.prepare("SELECT title FROM lessons WHERE id = ? AND course_id = ?").bind(lesson[2], courseId).first<{ title: string }>().catch(() => null) : null;
+    if (lesson && !l) return null;
+    return { title: `${l ? `${c.title}｜${l.title}` : c.title} | ${SITE}`, description: c.subtitle?.trim() || (await randomQuote(db)) || SITE, url: `${origin}${path}`, image: pubImage(origin, c.k, c.v) };
+  }
+  return null;
 }

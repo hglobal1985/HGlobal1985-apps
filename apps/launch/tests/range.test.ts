@@ -27,7 +27,7 @@ test("影片支援 Range（iOS Safari 需要 206）", async () => {
 });
 
 test("App 路由回傳 index.html；缺檔 404；舊 /api 404；安全與快取標頭", async () => {
-  const page = await get("/course/lead");
+  const page = await get("/me");
   assert.equal(page.status, 200);
   assert.match(await page.text(), /<title>app<\/title>/);
   assert.equal(page.headers.get("x-content-type-options"), "nosniff");
