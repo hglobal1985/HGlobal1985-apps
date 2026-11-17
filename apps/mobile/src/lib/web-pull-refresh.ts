@@ -12,7 +12,7 @@ export function installWebPullRefresh(): () => void {
   if (Platform.OS !== "web" || typeof document === "undefined") return () => undefined;
   // 業主 2026-11-17：原本太靈敏。改成「要拉到完整距離（FULL）的一半以上」才觸發，並用小樹苗長成結綠色櫻桃的樹來顯示進度百分比。
   const FULL = 280; // 拉到 100% 所需的手指位移（px）
-  const THRESHOLD = FULL / 2; // 過半（50%）才會重新整理
+  const THRESHOLD = FULL * 0.8; // 超過 80% 才會重新整理（業主 2026-11-17 再加嚴）
   const MIN_GAP_MS = 2000; // 連續兩次觸發至少間隔 2 秒（中央有每分鐘 120 次的讀取限制）
   let startY = 0;
   let startX = 0;
@@ -83,7 +83,7 @@ export function installWebPullRefresh(): () => void {
       document.body.appendChild(bar);
     }
     const pct = Math.round(Math.min(1, progress) * 100);
-    (bar.querySelector("[data-in]") as HTMLElement).innerHTML = `${treeSvg(Math.min(1, progress))}<span>${label ?? (progress >= 0.5 ? `${pct}%　放開重新整理` : `${pct}%　再往下拉`)}</span>`;
+    (bar.querySelector("[data-in]") as HTMLElement).innerHTML = `${treeSvg(Math.min(1, progress))}<span>${label ?? (progress >= 0.8 ? `${pct}%　放開重新整理` : `${pct}%　再往下拉`)}</span>`;
     const cx = window.innerWidth / 2; // 只跟上下，左右永遠置中
     const top = Math.max(8, y - 190);
     bar.style.transform = `translate(${Math.round(cx)}px, calc(env(safe-area-inset-top, 0px) + ${Math.round(top)}px)) translateX(-50%)`;
@@ -95,9 +95,36 @@ export function installWebPullRefresh(): () => void {
     dim?.remove();
     dim = null;
   };
-  const start = (e: TouchEvent) => {
+  // ── 防「卡住」（業主 2026-11-17 回報：拉到一半卡在某個百分比，要重新整理才恢復）──
+  // 原因 1：touchmove／touchend 只聽 document。手指按下的那個元素若在拉的途中被畫面更新移除（讀取完成換版面、動畫換元件），
+  //         之後的 touchmove／touchend／touchcancel 只會送給那個已離開畫面的元素，document 收不到 → 結束動作永遠不執行，小卡與暗化一直停在畫面上。
+  //         → 改成在「手指按下的元素」本身掛 move／end／cancel（元素被移除也照收），收尾時一定卸除。
+  // 原因 2：多指（第二根手指按下）時只重設狀態、沒收起小卡；一根手指離開就誤判結束。
+  //         → 多指一律立刻收起並結束；結束事件要「所有手指都離開」才算。
+  // 原因 3：保險——小卡出現後超過 3 秒完全沒有任何觸控事件，視為事件遺失，強制收起（看門狗）。
+  let tgt: Element | null = null;
+  let lastEvt = 0;
+  let watchdog = 0;
+  const detach = () => {
+    if (tgt) {
+      tgt.removeEventListener("touchmove", move as EventListener);
+      tgt.removeEventListener("touchend", end as EventListener);
+      tgt.removeEventListener("touchcancel", end as EventListener);
+      tgt = null;
+    }
+    if (watchdog) {
+      clearInterval(watchdog);
+      watchdog = 0;
+    }
+  };
+  const reset = () => {
+    detach();
+    hide();
     active = false;
     pull = 0;
+  };
+  const start = (e: TouchEvent) => {
+    reset(); // 先清掉任何殘留（上一次沒收乾淨的小卡、監聽）
     if (e.touches.length !== 1) return;
     const t = e.target as Element | null;
     // data-no-pull-refresh：自己有上下拖曳手勢的區塊（課程 EDM 封面、影片放大拖曳）不觸發下拉重新整理（業主 2026-11-17）。
@@ -106,9 +133,19 @@ export function installWebPullRefresh(): () => void {
     startY = e.touches[0]!.clientY;
     startX = e.touches[0]!.clientX;
     active = true;
+    tgt = t;
+    lastEvt = Date.now();
+    t.addEventListener("touchmove", move as EventListener, { passive: true });
+    t.addEventListener("touchend", end as EventListener, { passive: true });
+    t.addEventListener("touchcancel", end as EventListener, { passive: true });
+    watchdog = window.setInterval(() => {
+      if (Date.now() - lastEvt > 3000) reset();
+    }, 500);
   };
-  const move = (e: TouchEvent) => {
+  function move(e: TouchEvent) {
     if (!active) return;
+    lastEvt = Date.now();
+    if (e.touches.length !== 1) return reset(); // 第二根手指：不是下拉，立刻收起
     const dy = e.touches[0]!.clientY - startY;
     const dx = Math.abs(e.touches[0]!.clientX - startX);
     if (dy <= 8 || dx > dy * 0.7) {
@@ -116,42 +153,32 @@ export function installWebPullRefresh(): () => void {
       hide();
       return;
     }
-    const t = e.target as Element | null;
-    if (t && !atTop(t)) {
-      active = false;
-      hide();
-      return;
-    }
+    if (tgt?.isConnected && !atTop(tgt)) return reset();
     pull = dy;
     show(pull / FULL, e.touches[0]!.clientY);
-  };
-  const end = () => {
-    if (active && pull >= THRESHOLD) {
-      let last = 0;
-      try {
-        last = Number(sessionStorage.getItem("hg-last-pull") ?? 0);
-        sessionStorage.setItem("hg-last-pull", String(Date.now()));
-      } catch {
-        /* 沒有 sessionStorage 就不限制 */
-      }
-      if (Date.now() - last < MIN_GAP_MS) hide();
-      else {
-        show(1, 190, "更新中…");
-        window.location.reload();
-      }
-    } else hide();
-    active = false;
-    pull = 0;
-  };
+  }
+  function end(e: TouchEvent) {
+    if (e.type === "touchend" && e.touches.length > 0) return; // 還有別的手指在畫面上，還沒結束
+    const fire = active && pull >= THRESHOLD;
+    reset();
+    if (!fire) return;
+    let last = 0;
+    try {
+      last = Number(sessionStorage.getItem("hg-last-pull") ?? 0);
+      sessionStorage.setItem("hg-last-pull", String(Date.now()));
+    } catch {
+      /* 沒有 sessionStorage 就不限制 */
+    }
+    if (Date.now() - last < MIN_GAP_MS) return;
+    show(1, 190, "更新中…");
+    window.location.reload();
+  }
+  const onHidden = () => document.visibilityState === "hidden" && reset();
   document.addEventListener("touchstart", start, { passive: true });
-  document.addEventListener("touchmove", move, { passive: true });
-  document.addEventListener("touchend", end, { passive: true });
-  document.addEventListener("touchcancel", end, { passive: true });
+  document.addEventListener("visibilitychange", onHidden);
   return () => {
     document.removeEventListener("touchstart", start);
-    document.removeEventListener("touchmove", move);
-    document.removeEventListener("touchend", end);
-    document.removeEventListener("touchcancel", end);
-    hide();
+    document.removeEventListener("visibilitychange", onHidden);
+    reset();
   };
 }
