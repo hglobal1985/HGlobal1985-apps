@@ -148,18 +148,9 @@ export function PlayerLayer() {
     }
   };
   const zUp = (e: PointerEvent<HTMLDivElement>) => {
-    const had = pointers.current.has(e.pointerId);
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinch.current = null;
-    // 點一下（沒拖曳、沒雙指）＝播放／暫停；稍等一下確認不是「點兩下」。
-    const ti = tapInfo.current;
-    if (had && e.type === "pointerup" && ti && !ti.multi && pointers.current.size === 0 && Date.now() - ti.t < 400 && Math.hypot(e.clientX - ti.x, e.clientY - ti.y) < 10 && !justSwitched()) {
-      if (tapTimer.current) clearTimeout(tapTimer.current);
-      tapTimer.current = setTimeout(() => {
-        tapTimer.current = null;
-        engine.toggle();
-      }, 300);
-    }
+    // 點一下影片不做任何事（業主永久指示 2026-11-17：播放／暫停只能用下方控制列）；點兩下仍是還原大小。
     if (pointers.current.size === 0) tapInfo.current = null;
   };
 
