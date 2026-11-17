@@ -35,6 +35,12 @@ export function inAppBrowser(): InAppInfo | null {
  */
 export function openInSystemBrowser(info: InAppInfo): "copied" | undefined {
   const u = new URL(window.location.href);
+  // 業主 2026-11-17：從內建瀏覽器改開時，主分頁（學習中、通知、設定、全部課程清單）一律改進首頁；課程頁、系列頁、中心頁這類可分享的內容頁維持原頁面。
+  if (["/learning", "/notices", "/me"].includes(u.pathname) || (u.pathname === "/courses" && !u.search)) {
+    u.pathname = "/";
+    u.search = "";
+    u.hash = "";
+  }
   if (info.app === "LINE") {
     u.searchParams.set("openExternalBrowser", "1");
     window.location.href = u.toString();
