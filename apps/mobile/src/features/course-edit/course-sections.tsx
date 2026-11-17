@@ -4,13 +4,13 @@ import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, HQ_UNIT, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type CourseSummary, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
-import { confirmSheet } from "@/features/confirm";
+import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { courseThemes, minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Card, Chips, DateSelect, Field, ListRow, NoticeBox, Pill } from "@/ui";
+import { AppText, Button, Card, Chips, DateSelect, Field, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
 import { ReviewDeskBlock } from "./review-desk";
@@ -215,6 +215,30 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
         </View>
       ) : null}
       <BasicsFields isList={course.isList} f={f} setF={setF} />
+      {/* 轉成素材（只有超級管理員、只有一般課程；業主 2026-11-17）：章節變成素材項目，課程專屬設定（費用、獎銜、報名審核、主講人、日期地點）全部捨棄。 */}
+      {isSuper && !course.isList ? (
+        <View style={{ gap: space.xs, marginTop: space.md }}>
+          <Label>轉成素材</Label>
+          <AppText variant="caption" tone="muted">
+            把這門課直接變成「素材專區」裡的素材：章節變成素材項目（影片來源保留），費用、獎銜限制、報名與審核、主講人、日期地點都會消失，素材一律免費公開、不用緞帶、不計學習進度。已有人報名的課程不能轉。
+          </AppText>
+          <Button
+            variant="secondary"
+            label="轉成素材"
+            icon="folder-open-outline"
+            onPress={async () => {
+              if (!(await confirmAsk("轉成素材", `確定把「${course.title}」轉成素材？轉換後費用、獎銜、報名與審核、主講人、日期地點都會消失，無法復原。`, "轉成素材"))) return;
+              try {
+                onSaved(await api<CourseDetail>("POST", `/admin/courses/${course.id}/convert-to-list`));
+                onClose();
+              } catch (e) {
+                setError((e as Error).message);
+              }
+            }}
+            fullWidth
+          />
+        </View>
+      ) : null}
     </EditSheet>
   );
 }

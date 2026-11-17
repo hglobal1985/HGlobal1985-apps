@@ -125,3 +125,5 @@
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
 - 部署：見 `docs/v2-handoff.md`「部署指令」。業主在 Cloudflare 後台改變數後，記得確認程式沒有被退回舊版。
+
+- **轉成素材（業主 2026-11-17）**：課程頁 › 編輯 › 基本資料最下面的「轉成素材」鈕，只有超級管理員看得到（`POST /admin/courses/:id/convert-to-list`）。一般課程變成素材（`is_list`）：章節變成素材項目（影音保留）、費用／獎銜限制／報名審核／主講人／日期地點等課程專屬設定捨棄；**已有人報名過的課程不能轉**；轉過後不能轉回。
