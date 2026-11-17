@@ -1787,6 +1787,15 @@ function checkPublicFree(price: number, isPublic: boolean, tba = false) {
   if (isPublic && price > 0) fail(400, "public_must_be_free", "「完全公開」只能用在免費課程；請先把費用改成 0");
 }
 
+/** 「所有人含訪客」「私密連結（訪客可）」時訪客無法判斷獎銜，所以獎銜限制不能用：儲存時一律改成「不限獎銜」（業主 2026-11-17）。 */
+function forceNoRankForAll(sets: [string, unknown][], cur: { view_scope: string } | null) {
+  const scope = String((sets.find(([c]) => c === "view_scope") ?? ["view_scope", cur?.view_scope ?? "all"])[1]);
+  if (scope !== "all" && scope !== "link_guest") return; // 訪客也能看的選項，沒有登入就無法判斷獎銜
+  const i = sets.findIndex(([c]) => c === "min_rank_code");
+  if (i >= 0) sets[i] = ["min_rank_code", "none"];
+  else if (sets.some(([c]) => c === "view_scope")) sets.push(["min_rank_code", "none"]);
+}
+
 /** 「完全公開（免登入可看）」由設定推算：誰可以瀏覽＝所有人，且免費、費用已公布。 */
 function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number } | null) {
   if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba"].includes(c))) return;
@@ -1802,7 +1811,8 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const sets = await courseFields(ctx, body, true, admin);
   checkPublicFree(Number(sets.find(([c]) => c === "price_twd")?.[1] ?? 0), sets.find(([c]) => c === "is_public")?.[1] === 1, sets.find(([c]) => c === "price_tba")?.[1] === 1);
   if (!sets.some(([c]) => c === "allow_president")) sets.push(["allow_president", 1]); // 新課程預設「會長不受獎銜限制也可報名」
-  if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", sets.some(([c]) => c === "is_list") ? "all" : "members"]);
+  if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", "all"]); // 新課程（含清單）預設「所有人含訪客」（業主 2026-11-17）
+  forceNoRankForAll(sets, null);
   deriveIsPublic(sets, null);
   await checkGuidanceGroup(ctx, body.guidanceUnit, body.reviewGroupId);
   const id = `c${randomId(7)}`;
@@ -2027,6 +2037,7 @@ async function updateCourse(ctx: Ctx, id: string) {
     if (body.isPublic === true) sets.push(["view_scope", "all"]);
     else if (cur.view_scope === "all") sets.push(["view_scope", "members"]);
   }
+  forceNoRankForAll(sets, cur);
   deriveIsPublic(sets, cur);
   await checkGuidanceGroup(ctx, pick("guidance_unit", cur.guidance_unit), pick("review_group_id", cur.review_group_id));
   const batchRes = await ctx.db.batch([

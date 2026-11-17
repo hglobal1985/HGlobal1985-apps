@@ -26,7 +26,13 @@ test("誰可以瀏覽：預設、六種範圍、私密連結、報名限制", as
 
   // 預設：一般課程＝所有會員；清單＝所有人
   const reg = await make({ title: "一般課" });
-  assert.equal(reg.viewScope, "members");
+  assert.equal(reg.viewScope, "all", "新課程預設「所有人含訪客」");
+  await call("PATCH", `/admin/courses/${reg.id}`, { token: admin, body: { viewScope: "members", minRankCode: "gold" } });
+  assert.equal((await call<CourseDetail>("GET", `/courses/${reg.id}`, { token: admin })).data.minRank.code, "gold");
+  // 改成「所有人含訪客」：獎銜限制自動變成不限獎銜
+  const toAll = (await call<CourseDetail>("PATCH", `/admin/courses/${reg.id}`, { token: admin, body: { viewScope: "all", minRankCode: "gold" } })).data;
+  assert.equal(toAll.minRank.code, "none");
+  await call("PATCH", `/admin/courses/${reg.id}`, { token: admin, body: { viewScope: "members" } });
   const list = await make({ title: "清單", isList: true });
   assert.equal(list.viewScope, "all");
   assert.equal(list.isPublic, true);

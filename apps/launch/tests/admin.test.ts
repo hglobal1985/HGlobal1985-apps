@@ -82,7 +82,7 @@ test("管理員新增、修改、刪除課程；新課程預設未上架；學�
   assert.equal((await call("POST", "/admin/courses", { token: admin, body: { title: " " } })).status, 400);
   const created = await call<CourseDetail>("POST", "/admin/courses", {
     token: admin,
-    body: { title: "銅章會議", subtitle: "每月一次", teacher: "寰宇總部", category: "系列課程", priceTwd: 50, minRankCode: "r15", theme: "gold", description: "介紹" },
+    body: { title: "銅章會議", subtitle: "每月一次", teacher: "寰宇總部", category: "系列課程", priceTwd: 50, minRankCode: "r15", viewScope: "members", theme: "gold", description: "介紹" },
   });
   assert.equal(created.status, 200);
   const c = created.data;

@@ -283,8 +283,11 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
 // ---------- 報名資格條件：誰能瀏覽課程、最低獎銜（預設收起）、其他（審核群組移到「費用與審核」的審核窗口） ----------
 function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
   const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, viewScope: course.viewScope };
-  const [f, setF] = useState(init);
+  const [f, setF] = useState(init.viewScope === "all" || init.viewScope === "link_guest" ? { ...init, minRankCode: "none" } : init);
   const [rankOpen, setRankOpen] = useState(false);
+  // 「所有人含訪客」：訪客無法判斷獎銜，所以獎銜限制鎖住（顯示但不能點），儲存時一律是不限獎銜（業主 2026-11-17）。
+  const locked = f.viewScope === "all" || f.viewScope === "link_guest";
+  const wasRank = (course.viewScope === "all" || course.viewScope === "link_guest") && course.minRank.code !== "none" ? course.minRank.name : null;
   const ranks = useApi<Rank[]>("/ranks");
   const { save, busy, error } = useCourseSave(course, onSaved);
   const submit = async () => {
@@ -294,24 +297,29 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
   return (
     <EditSheet title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <AppText variant="headline">誰能瀏覽課程？</AppText>
-      <Chips options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => setF((x) => ({ ...x, viewScope: v as ViewScope }))} />
+      <Chips options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => (setF((x) => ({ ...x, viewScope: v as ViewScope, ...(v === "all" || v === "link_guest" ? { minRankCode: "none" } : {}) })), (v === "all" || v === "link_guest") && setRankOpen(false))} />
       <AppText variant="caption" tone="muted">
         {f.viewScope === "link_login" || f.viewScope === "link_guest"
           ? "私密連結：不會出現在行動大學的任何清單與搜尋，只有拿到網址的人才看得到。"
           : "不在範圍內的人，這門課不會出現在清單與搜尋，也不能報名；已報名的學員照常看得到。"}
       </AppText>
-      <AppText variant="headline">最低獎銜（誰可以報名）</AppText>
-      <View style={styles.rankRow}>
+      <AppText variant="headline" style={locked ? { opacity: 0.45 } : undefined}>
+        最低獎銜（誰可以報名）
+      </AppText>
+      <View style={[styles.rankRow, locked && { opacity: 0.45 }]}>
         <AppText variant="body" style={{ flex: 1 }}>
-          {rankName}
+          {locked ? "不限獎銜" : rankName}
         </AppText>
-        <Pressable accessibilityRole="button" accessibilityLabel={rankOpen ? "收起獎銜" : "展開獎銜"} onPress={() => setRankOpen((v) => !v)} style={[styles.rankToggle, { borderColor: "#00000022" }]}>
+        <Pressable accessibilityRole="button" accessibilityState={{ disabled: locked }} accessibilityLabel={locked ? "獎銜已鎖定" : rankOpen ? "收起獎銜" : "展開獎銜"} disabled={locked} onPress={() => setRankOpen((v) => !v)} style={[styles.rankToggle, { borderColor: "#00000022" }]}>
           <AppText variant="callout" style={{ fontWeight: "700" }}>
-            {rankOpen ? "收起" : "展開"}
+            {rankOpen && !locked ? "收起" : "展開"}
           </AppText>
         </Pressable>
       </View>
-      {rankOpen ? <Chips options={(ranks.data ?? []).map((r) => ({ key: r.code, label: r.name }))} value={f.minRankCode} onChange={(v) => setF((x) => ({ ...x, minRankCode: v }))} /> : null}
+      {locked ? (
+        <NoticeBox tone="warning" text={`訪客沒有登入，無法判斷獎銜，所以選這個瀏覽範圍時，獎銜一律不限、不能設定。要限制獎銜，請先改選「所有會員」、「寰宇夥伴」、「中心會員」或「私密連結（需登入）」。${wasRank ? `這門課原本設有「${wasRank}以上」，按儲存後會改成不限獎銜。` : ""}`} />
+      ) : null}
+      {rankOpen && !locked ? <Chips options={(ranks.data ?? []).map((r) => ({ key: r.code, label: r.name }))} value={f.minRankCode} onChange={(v) => setF((x) => ({ ...x, minRankCode: v }))} /> : null}
       <AppText variant="headline">其他</AppText>
       <Check label="會長不受獎銜限制也可報名" value={f.allowPresident} onChange={(v) => setF((x) => ({ ...x, allowPresident: v }))} />
       <NoticeBox text="審核群組與審核人員改在「費用與審核」的「審核窗口」設定。" />
