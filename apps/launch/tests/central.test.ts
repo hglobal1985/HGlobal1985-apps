@@ -241,7 +241,7 @@ test("通知頁審核：中央的獎銜、中心新申請即時顯示（權限�
   assert.equal((await call("GET", "/central-reviews")).status, 401);
 });
 
-test("我的圖書館：超級管理員邀請→會員接受（網址＝會員編號）→擁有者加書架與書→訪客要密碼才看得到；密碼可失效、可只鎖單一本書", async () => {
+test("我的書櫃：超級管理員邀請→會員接受（網址＝會員編號）→擁有者加書架與書→訪客要密碼才看得到；密碼可失效、可只鎖單一本書", async () => {
   const call = setup();
   // 在假中央的個人資料裡加上會員編號
   setCentralFetch(async (url, init) => {
@@ -278,7 +278,7 @@ test("我的圖書館：超級管理員邀請→會員接受（網址＝會員�
   v = await view({ items: { [book]: t } });
   assert.equal(v.items[1]!.url, "https://docs.google.com/presentation/d/abc/edit");
   assert.equal((await view(undefined, alice)).items[1]!.url !== null, true, "擁有者永遠看得到");
-  // 整座圖書館設密碼：沒憑證只看到上鎖畫面；改密碼後舊憑證失效
+  // 整座書櫃設密碼：沒憑證只看到上鎖畫面；改密碼後舊憑證失效
   await call("PUT", "/library/mine", { token: alice, body: { password: "open", passwordDays: 1 } });
   assert.deepEqual(await view().then((x) => [x.locked, x.items.length]), [true, 0]);
   const lt = (await call<{ token: string }>("POST", "/library/view/tw9475831/unlock", { body: { password: "open" } })).data.token;

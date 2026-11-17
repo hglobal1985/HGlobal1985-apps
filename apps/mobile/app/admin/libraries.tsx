@@ -10,7 +10,7 @@ import { flashText } from "@/ui/flash-notice";
 
 type Row = { sub: string; number: string; title: string; owner: string; views: number; books: number };
 
-/** 圖書館管理（超級管理員，業主 2026-11-17）：產生「我的圖書館」邀請網址（24 小時、一次有效）、查看與移除圖書館。 */
+/** 書櫃管理（超級管理員，業主 2026-11-17）：產生「我的書櫃」邀請網址（24 小時、一次有效）、查看與移除書櫃。 */
 export default function AdminLibraries() {
   const { data, error, loading, reload } = useApi<Row[]>("/admin/libraries");
   const [invite, setInvite] = useState<string | null>(null);
@@ -32,9 +32,9 @@ export default function AdminLibraries() {
   return (
     <Screen header={false}>
       <Card>
-        <AppText variant="headline">指定圖書館擁有者</AppText>
+        <AppText variant="headline">指定書櫃擁有者</AppText>
         <AppText variant="callout" tone="muted">
-          產生一個 24 小時有效、只能一個人使用的邀請網址，傳給要擁有「我的圖書館」的會員；對方登入後按「接受」，圖書館網址就是他在會員中心的會員編號。
+          產生一個 24 小時有效、只能一個人使用的邀請網址，傳給要擁有「我的書櫃」的會員；對方登入後按「接受」，書櫃網址就是他在會員中心的會員編號。
         </AppText>
         <Button label="產生邀請網址" icon="link-outline" onPress={make} disabled={busy} fullWidth />
         {invite ? (
@@ -43,20 +43,20 @@ export default function AdminLibraries() {
           </AppText>
         ) : null}
       </Card>
-      <Section title="已建立的圖書館">
+      <Section title="已建立的書櫃">
         {loading && !data ? <LoadingView /> : null}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {data && !data.length ? <AppText variant="callout" tone="muted">還沒有人。</AppText> : null}
         {data?.length ? (
           <Card style={{ paddingVertical: 0 }}>
             {data.map((r) => (
-              <ListRow key={r.sub} icon="library-outline" title={`${r.owner}｜/${r.number}`} subtitle={`${r.title}　${r.books} 本書　${r.views} 次翻閱`} onPress={async () => { if (await confirmAsk("移除圖書館", `確定移除 ${r.owner} 的圖書館？裡面所有書架與書都會刪除，無法復原。`, "移除")) { await api("DELETE", `/admin/libraries/${r.sub}`).catch((e) => flashText((e as Error).message)); reload(); } }} />
+              <ListRow key={r.sub} icon="library-outline" title={`${r.owner}｜/${r.number}`} subtitle={`${r.title}　${r.books} 本書　${r.views} 次翻閱`} onPress={async () => { if (await confirmAsk("移除書櫃", `確定移除 ${r.owner} 的書櫃？裡面所有書架與書都會刪除，無法復原。`, "移除")) { await api("DELETE", `/admin/libraries/${r.sub}`).catch((e) => flashText((e as Error).message)); reload(); } }} />
             ))}
           </Card>
         ) : null}
         <View style={{ height: space.md }} />
         <AppText variant="caption" tone="muted">
-          點一列可以移除該圖書館。
+          點一列可以移除該書櫃。
         </AppText>
       </Section>
     </Screen>

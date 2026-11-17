@@ -20,7 +20,7 @@ import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 「我的圖書館」管理頁（設定 › 我的圖書館；業主 2026-11-17）：改名稱、設定整座圖書館的密碼（可設幾天後失效）、
+ * 「我的書櫃」管理頁（設定 › 我的書櫃；業主 2026-11-17）：改名稱、設定整座書櫃的密碼（可設幾天後失效）、
  * 新增書架（分類標題）與書（影片、簡報、PDF、連結），每本書可以單獨設密碼，調整順序、刪除。
  * 公開檢視在 /會員編號（features/library/library-view.tsx）。
  */
@@ -37,11 +37,11 @@ export function LibraryManage() {
     if (data?.library) setName(data.library.title);
   }, [data?.library?.title]); // eslint-disable-line react-hooks/exhaustive-deps
   if (loading && !data) return <Screen header={false}><LoadingView /></Screen>;
-  // 沒有圖書館鑰匙（尚未被超級管理員指定）：一樣看得到主畫面，但任何操作都只會提示「尚未解鎖圖書館鑰匙」。
+  // 沒有書櫃鑰匙（尚未被超級管理員指定）：一樣看得到主畫面，但任何操作都只會提示「尚未解鎖書櫃鑰匙」。
   const items = data?.items ?? [];
   const locked = !data?.library;
-  const lib = data?.library ?? { number: "你的會員編號", title: "我的圖書館", ownerName: "", views: 0, pwSet: false, pwExpiresAt: null, pwExpired: false };
-  const lockedTip = () => flashText("尚未解鎖圖書館鑰匙，請向超級管理員索取邀請網址");
+  const lib = data?.library ?? { number: "你的會員編號", title: "我的書櫃", ownerName: "", views: 0, pwSet: false, pwExpiresAt: null, pwExpired: false };
+  const lockedTip = () => flashText("尚未解鎖書櫃鑰匙，請向超級管理員索取邀請網址");
   const url = `learn.hglobal1985.com/${lib.number}`;
   const call = async (method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown) => {
     if (locked) return lockedTip();
@@ -69,7 +69,7 @@ export function LibraryManage() {
   return (
     <Screen header={false}>
       <Card>
-        {locked ? <NoticeBox text="你尚未解鎖圖書館鑰匙。向超級管理員索取邀請網址並接受後，這裡就能使用；下面是圖書館的主畫面預覽。" /> : null}
+        {locked ? <NoticeBox text="你尚未解鎖書櫃鑰匙。向超級管理員索取邀請網址並接受後，這裡就能使用；下面是書櫃的主畫面預覽。" /> : null}
         <AppText variant="caption" tone="muted">
           專屬網址（只有拿到網址的人才進得來，不會出現在行動大學任何地方）
         </AppText>
@@ -78,19 +78,19 @@ export function LibraryManage() {
         </AppText>
         <View style={{ flexDirection: "row", gap: space.sm }}>
           <Button variant="secondary" label="複製網址" icon="copy-outline" onPress={() => locked ? lockedTip() : void Clipboard.setStringAsync(`https://${url}`).then(() => flashText("已複製網址"))} />
-          <Button label="查看圖書館" icon="library-outline" onPress={() => (locked ? lockedTip() : router.push(`/${lib.number}` as never))} />
+          <Button label="查看書櫃" icon="library-outline" onPress={() => (locked ? lockedTip() : router.push(`/${lib.number}` as never))} />
         </View>
         <AppText variant="caption" tone="muted">
           {lib.views} 次翻閱
         </AppText>
       </Card>
 
-      <Section title="圖書館名稱">
-        <TextInput value={name} onChangeText={setName} placeholder="例如：王小明的圖書館" placeholderTextColor={c.textMuted} accessibilityLabel="圖書館名稱" maxLength={80} style={input} />
+      <Section title="書櫃名稱">
+        <TextInput value={name} onChangeText={setName} placeholder="例如：王小明的書櫃" placeholderTextColor={c.textMuted} accessibilityLabel="書櫃名稱" maxLength={80} style={input} />
         <Button variant="secondary" label="儲存名稱" onPress={() => void call("PUT", "/library/mine", { title: name })} disabled={!locked && (busy || !name.trim() || name.trim() === lib.title)} />
       </Section>
 
-      <Section title="進入密碼（整座圖書館）">
+      <Section title="進入密碼（整座書櫃）">
         <AppText variant="callout" tone={lib.pwSet ? undefined : "muted"}>
           {lib.pwSet ? (lib.pwExpired ? "目前的密碼已經失效（沒有人能用它進入，請設定新密碼，或關閉密碼）" : `已設定密碼${lib.pwExpiresAt ? `，${dateTime(lib.pwExpiresAt)} 失效` : "，不會自動失效"}`) : "沒有設定密碼：拿到網址的人都能進來。"}
         </AppText>
@@ -214,7 +214,7 @@ function ItemSheet({ kind, item, onClose, onSaved }: { kind: "shelf" | "book"; i
           {ytId ? <TimeRangePicker kind="youtube" ytId={ytId} audioFile={null} duration={vidSec} start={trim.start} end={trim.end} onChange={(p) => setTrim((x) => ({ ...x, ...p }))} /> : null}
           <AppText variant="headline">這本書的密碼（選填）</AppText>
           <AppText variant="caption" tone="muted">
-            {item?.pwSet ? (item.pwExpired ? "目前的密碼已失效。" : "目前有密碼。") : "沒有設定時，進得了圖書館的人都能開啟。"} 輸入新密碼會取代舊的。
+            {item?.pwSet ? (item.pwExpired ? "目前的密碼已失效。" : "目前有密碼。") : "沒有設定時，進得了書櫃的人都能開啟。"} 輸入新密碼會取代舊的。
           </AppText>
           <TextInput value={pw} onChangeText={(v) => { setPw(v); setClearPw(false); }} placeholder="新密碼（4～40 個字）" placeholderTextColor={c.textMuted} autoCapitalize="none" accessibilityLabel="這本書的密碼" style={input} />
           <Field label="幾天後失效（留空＝不自動失效）" value={days} onChange={(v) => setDays(v.replace(/\D/g, ""))} numeric placeholder="例如：7" />

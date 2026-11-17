@@ -121,7 +121,7 @@ export default function MeScreen() {
 
       {member && isWeb ? (
         <Card style={{ paddingVertical: 0 }}>
-          <ListRow icon="library-outline" title="我的書櫃" subtitle={myLibrary.data?.library ? "個人專屬頁面：書架、影片、簡報、連結，可設密碼" : "尚未解鎖圖書館鑰匙"} onPress={() => router.push("/library")} />
+          <ListRow icon="library-outline" title="我的書櫃" subtitle={myLibrary.data?.library ? "個人專屬頁面：書架、影片、簡報、連結，可設密碼" : "尚未解鎖書櫃鑰匙"} onPress={() => router.push("/library")} />
           <ListRow icon="document-text-outline" title="訂單紀錄" onPress={() => router.push("/orders")} />
         </Card>
       ) : null}

@@ -1732,7 +1732,7 @@ function randomId(n: number): string {
   return [...crypto.getRandomValues(new Uint8Array(n))].map((b) => a[b % a.length]).join("");
 }
 /** 活動日期：YYYY-MM-DD 或 null（清除）。 */
-// ---------- 我的圖書館（業主 2026-11-17） ----------
+// ---------- 我的書櫃（業主 2026-11-17） ----------
 type LibRow = { member_sub: string; number: string; owner_name: string; title: string; pw_hash: string | null; pw_salt: string | null; pw_expires_at: string | null; views: number };
 type LibItemRow = { id: string; kind: "shelf" | "book"; title: string; url: string | null; att_type: AttachmentType | null; event_date: string | null; start_seconds: number | null; end_seconds: number | null; pw_hash: string | null; pw_salt: string | null; pw_expires_at: string | null; position: number };
 const libOf = (db: D1Database, sub: string) => db.prepare("SELECT member_sub, number, owner_name, title, pw_hash, pw_salt, pw_expires_at, views FROM libraries WHERE member_sub = ?").bind(sub).first<LibRow>();
@@ -1752,7 +1752,7 @@ async function libraryMine(ctx: Ctx, sub: string): Promise<LibraryMine> {
   if (!lib) return { library: null, items: [] };
   return { library: { number: lib.number, title: lib.title, ownerName: lib.owner_name, views: lib.views, pwSet: !!lib.pw_hash, pwExpiresAt: lib.pw_expires_at, pwExpired: !!lib.pw_hash && !pwActive(lib.pw_expires_at) }, items: (await libItems(ctx.db, sub)).map((r) => libItemOut(r, true, true)) };
 }
-/** 圖書館密碼欄位：password 字串＝設定（可帶 passwordDays）、null＝關閉密碼、沒傳＝不動。 */
+/** 書櫃密碼欄位：password 字串＝設定（可帶 passwordDays）、null＝關閉密碼、沒傳＝不動。 */
 async function libPwSets(body: { password?: unknown; passwordDays?: unknown }): Promise<[string, unknown][]> {
   if (body.password === undefined) return [];
   if (body.password === null || body.password === "") return [["pw_hash", null], ["pw_salt", null], ["pw_expires_at", null]];
@@ -1764,7 +1764,7 @@ async function libPwSets(body: { password?: unknown; passwordDays?: unknown }): 
 async function myLibrary(ctx: Ctx): Promise<{ s: Session; lib: LibRow }> {
   const s = requireMember(ctx);
   const lib = await libOf(ctx.db, s.sub);
-  if (!lib) return fail(403, "no_library", "你還沒有「我的圖書館」");
+  if (!lib) return fail(403, "no_library", "你還沒有「我的書櫃」");
   return { s, lib };
 }
 async function libItemBody(ctx: Ctx, body: Record<string, unknown>, kind: "shelf" | "book"): Promise<[string, unknown][]> {
@@ -3074,12 +3074,12 @@ const routes: [string, RegExp, Handler][] = [
       return results.map((x): Notice => ({ id: x.id, title: x.title, body: x.body, link: x.link, read: !!x.read_at, createdAt: x.created_at, category: noticeCategory(x.title, x.link) }));
     },
   ],
-  // ---------- 我的圖書館 ----------
+  // ---------- 我的書櫃 ----------
   [
     "POST",
     /^\/admin\/library-invites$/,
     async (ctx) => {
-      // 超級管理員產生「指定圖書館擁有者」的邀請網址：24 小時、一次有效；對方登入後按接受，圖書館網址用他在會員中心的會員編號。
+      // 超級管理員產生「指定書櫃擁有者」的邀請網址：24 小時、一次有效；對方登入後按接受，書櫃網址用他在會員中心的會員編號。
       const s = requireSuperAdmin(ctx);
       const code = randomId(14);
       await ctx.db.prepare("INSERT INTO library_invites (code, created_by, expires_at) VALUES (?, ?, ?)").bind(code, s.sub, new Date(Date.now() + 24 * 3600_000).toISOString()).run();
@@ -3092,14 +3092,14 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [code]) => {
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(403, "central_only", "請用會員中心帳號登入後再接受邀請");
-      if (await libOf(ctx.db, s.sub)) return fail(409, "already_has_library", "你已經有「我的圖書館」了");
+      if (await libOf(ctx.db, s.sub)) return fail(409, "already_has_library", "你已經有「我的書櫃」了");
       const inv = await ctx.db.prepare("SELECT code, expires_at, used_by FROM library_invites WHERE code = ?").bind(code).first<{ code: string; expires_at: string; used_by: string | null }>();
       if (!inv || inv.used_by || Date.parse(inv.expires_at) < Date.now()) return fail(404, "invite_invalid", "這個邀請網址已失效或已被使用");
       const number = libraryNumber(await memberNumberOf(s.sub, s.token));
       if (!number) return fail(400, "no_member_number", "請先到會員中心填寫你的安麗會員編號，再回來接受邀請");
-      if (await ctx.db.prepare("SELECT 1 AS ok FROM libraries WHERE number = ?").bind(number).first()) return fail(409, "number_taken", "這個會員編號的圖書館已經存在（例如配偶共用同一個編號），請洽管理員");
+      if (await ctx.db.prepare("SELECT 1 AS ok FROM libraries WHERE number = ?").bind(number).first()) return fail(409, "number_taken", "這個會員編號的書櫃已經存在（例如配偶共用同一個編號），請洽管理員");
       await ctx.db.batch([
-        ctx.db.prepare("INSERT INTO libraries (member_sub, number, owner_name, title) VALUES (?, ?, ?, ?)").bind(s.sub, number, s.name, `${s.name}的圖書館`),
+        ctx.db.prepare("INSERT INTO libraries (member_sub, number, owner_name, title) VALUES (?, ?, ?, ?)").bind(s.sub, number, s.name, `${s.name}的書櫃`),
         ctx.db.prepare("UPDATE library_invites SET used_by = ? WHERE code = ? AND used_by IS NULL").bind(s.sub, code),
         audit(ctx.db, s.sub, "library.create", "library", s.sub, number),
       ]);
@@ -3134,7 +3134,7 @@ const routes: [string, RegExp, Handler][] = [
       const sets: [string, unknown][] = [];
       if (body.title !== undefined) {
         const t = cleanTitle(body.title);
-        if (!t) return fail(400, "title_required", "請輸入圖書館名稱");
+        if (!t) return fail(400, "title_required", "請輸入書櫃名稱");
         sets.push(["title", t]);
       }
       sets.push(...(await libPwSets(body)));
@@ -3196,10 +3196,10 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/library\/view\/([\w-]{3,40})$/,
     async (ctx, [raw]): Promise<LibraryView> => {
-      // 公開檢視（不用登入）：網址是 /會員編號。整座圖書館有密碼就要先解鎖（憑證 tokens.lib）；有密碼的書要各自解鎖（tokens.items[id]）。擁有者本人永遠看得到全部。
+      // 公開檢視（不用登入）：網址是 /會員編號。整座書櫃有密碼就要先解鎖（憑證 tokens.lib）；有密碼的書要各自解鎖（tokens.items[id]）。擁有者本人永遠看得到全部。
       const number = libraryNumber(raw);
       const lib = number ? await ctx.db.prepare("SELECT member_sub, number, owner_name, title, pw_hash, pw_salt, pw_expires_at, views FROM libraries WHERE number = ?").bind(number).first<LibRow>() : null;
-      if (!lib) return fail(404, "not_found", "找不到這個圖書館");
+      if (!lib) return fail(404, "not_found", "找不到這個書櫃");
       const body = await readJson<{ tokens?: { lib?: unknown; items?: Record<string, unknown> } }>(ctx.req).catch(() => ({}) as { tokens?: { lib?: unknown; items?: Record<string, unknown> } });
       const owner = ctx.session?.sub === lib.member_sub;
       const base = { number: lib.number, title: lib.title, ownerName: lib.owner_name, owner };
@@ -3218,7 +3218,7 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [raw]): Promise<LibraryUnlock> => {
       const number = libraryNumber(raw);
       const lib = number ? await libOf2(ctx.db, number) : null;
-      if (!lib) return fail(404, "not_found", "找不到這個圖書館");
+      if (!lib) return fail(404, "not_found", "找不到這個書櫃");
       const body = await readJson<{ password?: unknown; itemId?: unknown }>(ctx.req);
       const pw = typeof body.password === "string" ? body.password : "";
       let hash = lib.pw_hash, salt = lib.pw_salt, exp = lib.pw_expires_at, scope = "lib";
@@ -3228,7 +3228,7 @@ const routes: [string, RegExp, Handler][] = [
         hash = it.pw_hash; salt = it.pw_salt; exp = it.pw_expires_at; scope = body.itemId;
       }
       if (!hash || !salt) return fail(400, "no_password", "這裡沒有設定密碼");
-      if (!pwActive(exp)) return fail(403, "password_expired", "這個密碼已經失效，請向圖書館主人索取新的密碼");
+      if (!pwActive(exp)) return fail(403, "password_expired", "這個密碼已經失效，請向書櫃主人索取新的密碼");
       if (!(await checkPassword(pw, hash, salt))) return fail(403, "wrong_password", "密碼不正確");
       return makeToken(hash, scope, exp);
     },

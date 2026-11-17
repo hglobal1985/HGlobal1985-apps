@@ -1,7 +1,7 @@
 /**
- * 「我的圖書館」的純邏輯（業主 2026-11-17）：密碼雜湊與驗證、解鎖憑證、網址編號格式。不碰資料庫，方便測試。
+ * 「我的書櫃」的純邏輯（業主 2026-11-17）：密碼雜湊與驗證、解鎖憑證、網址編號格式。不碰資料庫，方便測試。
  * 密碼用 PBKDF2-SHA256（100,000 次、每個密碼自己的隨機鹽）；解鎖憑證是用「密碼雜湊」當金鑰簽的短效憑證（最長 12 小時，也不會超過密碼本身的失效時間），
- * 所以圖書館／書換了密碼或關閉密碼，舊憑證立刻全部失效；不需要另外存任何金鑰或 Session。
+ * 所以書櫃／書換了密碼或關閉密碼，舊憑證立刻全部失效；不需要另外存任何金鑰或 Session。
  */
 const enc = new TextEncoder();
 const hex = (b: ArrayBuffer) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
@@ -53,7 +53,7 @@ export async function checkToken(token: unknown, pwHash: string, scope: string, 
   return sig === (await hmac(pwHash, `${scope}|${until}`));
 }
 
-/** 圖書館網址編號：會員編號轉小寫，只留英數與短橫線；太短（少於 3 字）不能用。 */
+/** 書櫃網址編號：會員編號轉小寫，只留英數與短橫線；太短（少於 3 字）不能用。 */
 export const libraryNumber = (raw: unknown): string | null => {
   if (typeof raw !== "string") return null;
   const n = raw.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, "");

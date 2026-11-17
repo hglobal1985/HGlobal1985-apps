@@ -14,7 +14,7 @@ import { SeriesPage } from "./series-page";
  */
 export function ShortLinkScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
-  // 「我的圖書館」：網址是會員編號（含數字、至少 3 個字，例如 /tw9475831）；先當圖書館處理，找不到才當短網址（業主 2026-11-17）。
+  // 「我的書櫃」：網址是會員編號（含數字、至少 3 個字，例如 /tw9475831）；先當書櫃處理，找不到才當短網址（業主 2026-11-17）。
   if (/\d/.test(slug ?? "") && (slug ?? "").length >= 3) return <LibraryOrShort slug={slug!} />;
   return <ShortLinkInner />;
 }

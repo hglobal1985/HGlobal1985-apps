@@ -13,8 +13,8 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 「我的圖書館」公開檢視（業主 2026-11-17，版面＝方案 1 木質書架）：網址 /會員編號，不出現在行動大學任何清單與搜尋。
- * 深色木質底、黃銅名牌、每個書架（分類標題，點一下收合）上一排書脊；整座圖書館或單獨一本書都可以有密碼（可設幾天後失效）。
+ * 「我的書櫃」公開檢視（業主 2026-11-17，版面＝方案 1 木質書架）：網址 /會員編號，不出現在行動大學任何清單與搜尋。
+ * 深色木質底、黃銅名牌、每個書架（分類標題，點一下收合）上一排書脊；整座書櫃或單獨一本書都可以有密碼（可設幾天後失效）。
  * 這一頁自成一套配色，故意跟行動大學標準頁面不同；不計學習進度。
  */
 export { LIB };
@@ -34,7 +34,7 @@ export function openBook(b: LibraryItem) {
 export function LibraryScreen({ number }: { number: string }) {
   useLibraryChrome();
   useEffect(() => {
-    // 自己的圖書館從設定進來時（網址是 /library），網址列換成專屬網址 /會員編號。
+    // 自己的書櫃從設定進來時（網址是 /library），網址列換成專屬網址 /會員編號。
     if (Platform.OS === "web" && typeof window !== "undefined" && window.location.pathname !== `/${number}`) window.history.replaceState(window.history.state, "", `/${number}`);
   }, [number]);
   const [view, setView] = useState<LibraryView | null>(null);
@@ -71,7 +71,7 @@ export function LibraryScreen({ number }: { number: string }) {
   if (error && !view)
     return (
       <Page>
-        <Text style={styles.empty}>🔒 找不到這個圖書館</Text>
+        <Text style={styles.empty}>🔒 找不到這個書櫃</Text>
       </Page>
     );
   if (!view) return null;
@@ -80,7 +80,7 @@ export function LibraryScreen({ number }: { number: string }) {
 }
 
 function Page({ children, gear }: { children: React.ReactNode; gear?: () => void }) {
-  // 圖書館自成一套深色木質版面，不用行動大學的標準上方工具列；自己放一個返回鍵（沒有上一頁就回首頁）。
+  // 書櫃自成一套深色木質版面，不用行動大學的標準上方工具列；自己放一個返回鍵（沒有上一頁就回首頁）。
   return (
     <ScrollView style={{ flex: 1, backgroundColor: LIB.bg }} contentContainerStyle={styles.page}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Platform.OS === "web" ? 0 : 20 }}>
@@ -88,7 +88,7 @@ function Page({ children, gear }: { children: React.ReactNode; gear?: () => void
           <Ionicons name="chevron-back" size={28} color={LIB.brass} />
         </Pressable>
         {gear ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="圖書館設定" onPress={gear} hitSlop={10} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="書櫃設定" onPress={gear} hitSlop={10} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
             <Ionicons name="settings-outline" size={26} color={LIB.brass} />
           </Pressable>
         ) : null}
@@ -142,7 +142,7 @@ function LockedLibrary({ view, number, onUnlocked }: { view: LibraryView; number
       <Plaque title={view.title} />
       <View style={styles.lockCard}>
         <Ionicons name="lock-closed" size={36} color={LIB.brass} />
-        <Text style={styles.lockText}>{view.lockExpired ? "這座圖書館的密碼已經失效，請向圖書館主人索取新的密碼。" : "這座圖書館需要密碼才能進入"}</Text>
+        <Text style={styles.lockText}>{view.lockExpired ? "這座書櫃的密碼已經失效，請向書櫃主人索取新的密碼。" : "這座書櫃需要密碼才能進入"}</Text>
         {view.lockExpired ? null : <PasswordBox onSubmit={go} busy={busy} error={error} />}
       </View>
     </Page>
@@ -194,7 +194,7 @@ export function Shelves({ view, number, tokens, onTokens, onGear, emptyText = "�
         );
       })}
       <View style={styles.note}>
-        <Text style={styles.noteText}>🔒 這是私人圖書館：不會出現在行動大學的任何清單，只有拿到專屬網址的人才看得到。</Text>
+        <Text style={styles.noteText}>🔒 這是私人書櫃：不會出現在行動大學的任何清單，只有拿到專屬網址的人才看得到。</Text>
       </View>
       {sheet ? <BookSheet number={number} b={view.items.find((x) => x.id === sheet.id) ?? sheet} tokens={tokens} onTokens={onTokens} onClose={() => setSheet(null)} /> : null}
     </Page>

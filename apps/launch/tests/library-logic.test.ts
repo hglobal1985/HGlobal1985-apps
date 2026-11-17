@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "../src/library.ts";
 
-test("圖書館密碼：雜湊驗證、幾天後失效、解鎖憑證到期與換密碼失效、網址編號格式", async () => {
+test("書櫃密碼：雜湊驗證、幾天後失效、解鎖憑證到期與換密碼失效、網址編號格式", async () => {
   const h = await hashPassword("secret");
   assert.equal(await checkPassword("secret", h.hash, h.salt), true);
   assert.equal(await checkPassword("Secret", h.hash, h.salt), false);
