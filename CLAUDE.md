@@ -119,6 +119,8 @@
 
 - **素材標示位置（業主 2026-11-17）**：小卡右下角不再放「素材」膠囊（只留橄欖綠虛線邊框）；黃色「📂 素材」膠囊放在上拉選單（`SeriesSheet`）標題的左邊。
 
+- **素材不使用緞帶（業主 2026-11-17 永久規則）**：素材（清單類別）的小卡、課程頁封面等**任何地方都不顯示緞帶**（限時免費、學習中、已完成、日期倒數、可以報名…全部不顯示）；規則在 `ribbonsFor`（`features/courses/ribbons.ts`）一處，`course.isList` 直接回傳沒有緞帶。「課程排序與條件」的緞帶設定只影響課程。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
