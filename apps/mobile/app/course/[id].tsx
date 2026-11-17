@@ -308,9 +308,12 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
         {session.playback?.kind === "demo" && playLesson ? <Pill label={session.playback.label} tone="warning" /> : null}
         {playLesson && !member ? (
-          <View style={styles.row}>
-            <NoticeBox text="登入後可以記錄學習進度、下載附件教材與留言。" />
+          // 訪客提示：登入鈕在左、文字在右，強制同一列（業主 2026-11-17）。
+          <View style={[styles.row, { flexWrap: "nowrap", alignItems: "center" }]}>
             <Button variant="secondary" label="登入" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: lessonHref(course.id, playLesson.id) } })} />
+            <AppText variant="callout" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
+              免費註冊 更多課程+解鎖成就
+            </AppText>
           </View>
         ) : playLesson?.completed && !playNext && !playLesson.material ? (
           <NoticeBox tone="success" text="恭喜！你已完成這門課程的最後一堂。" />
