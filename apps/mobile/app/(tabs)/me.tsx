@@ -18,7 +18,7 @@ import { GuestGate, AppText, Button, Card, ListRow, LoadingView, NoticeBox, Pill
  * 只放在「設定」頁面最下方，其他頁面不顯示。尺寸與淺色模式的顏色照中央會員（14px、#5d6b62、署名 #cfd2c9）；深色模式用等比例的淡化色。
  */
 function SiteFooter() {
-  const { scheme, c } = useTheme();
+  const { scheme } = useTheme();
   const link = scheme === "dark" ? "#a6adab" : "#5d6b62";
   const credit = scheme === "dark" ? "#3d4441" : "#cfd2c9";
   return (
@@ -33,6 +33,7 @@ function SiteFooter() {
 
 export default function MeScreen() {
   const { member, ready, signInGoogle, signInDemo, signOut, deleteAccount, refreshMember } = useSession();
+  const { c } = useTheme();
   // 進入設定頁就向會員中心更新一次獎銜與資料（1 分鐘內不重複）：App 沒有重新整理鈕，這裡是最自然的更新時機。
   useFocusEffect(
     useCallback(() => {
