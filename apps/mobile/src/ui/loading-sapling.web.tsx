@@ -2,37 +2,26 @@ import { useTheme } from "@/theme/theme";
 
 /**
  * 全站「讀取中」動畫：灌溉小樹苗（業主 2026-11-17 定稿）。網頁版；iOS／Android 版在 loading-sapling.tsx（先用系統轉圈圈）。
- * 小樹苗長高、土裡探頭的蚯蚓、葉上爬的瓢蟲、遠飛近的老鷹（沒有太陽、水壺）。compact＝小區塊用的縮小版（只有小樹苗，沒有文字）。
+ * 小樹苗長高、土裡探頭的蚯蚓、葉上爬的瓢蟲（沒有太陽、水壺、老鷹）。compact＝小區塊用的縮小版（只有小樹苗，沒有文字）。
  * 要改動畫只改這個檔案（所有 LoadingView 都用它）。
  */
-const CSS = ".hgls{display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none}.hgls svg{overflow:visible}.hgls .cap{font:700 15px/1.3 -apple-system,\"PingFang TC\",\"Noto Sans TC\",sans-serif}.hgls .dots span{display:inline-block;width:5px;height:5px;border-radius:50%;margin-left:3px;background:currentColor;animation:hgls-dot .9s infinite}.hgls .dots span:nth-child(2){animation-delay:.2s}.hgls .dots span:nth-child(3){animation-delay:.4s}@keyframes hgls-dot{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-4px);opacity:1}}.hgls .grow{transform-box:fill-box;transform-origin:50% 100%}.hgls .plant{animation:hgls-grow 1.4s ease-in-out infinite}@keyframes hgls-grow{0%,25%{transform:scale(.7)}80%,100%{transform:scale(1.04)}}.hgls .worm{transform-box:fill-box;transform-origin:50% 100%;animation:hgls-worm 2.8s ease-in-out infinite}@keyframes hgls-worm{0%,6%{transform:translateY(30px) rotate(0)}18%{transform:translateY(0) rotate(0)}28%{transform:translateY(0) rotate(-9deg)}40%{transform:translateY(0) rotate(9deg)}52%{transform:translateY(0) rotate(-6deg)}64%{transform:translateY(0) rotate(5deg)}74%{transform:translateY(0) rotate(0)}88%,100%{transform:translateY(30px) rotate(0)}}.hgls .pupil{animation:hgls-look 2.8s ease-in-out infinite}@keyframes hgls-look{0%,24%{transform:translateX(0)}32%{transform:translateX(-1.4px)}48%{transform:translateX(1.4px)}60%,100%{transform:translateX(0)}}.hgls .eyeblink{transform-box:fill-box;transform-origin:center;animation:hgls-blink 2.8s infinite}@keyframes hgls-blink{0%,54%,58%,100%{transform:scaleY(1)}56%{transform:scaleY(.1)}}.hgls .lady{animation:hgls-crawl 1.8s ease-in-out infinite}@keyframes hgls-crawl{0%{transform:translate(99px,90px) rotate(-50deg)}45%{transform:translate(110px,77px) rotate(-50deg)}50%{transform:translate(110px,77px) rotate(130deg)}95%{transform:translate(99px,90px) rotate(130deg)}100%{transform:translate(99px,90px) rotate(-50deg)}}.hgls .leg{animation:hgls-leg .25s linear infinite;transform-box:fill-box;transform-origin:center}@keyframes hgls-leg{50%{transform:scaleX(.8)}}.hgls .eagle{animation:hgls-fly 2.2s cubic-bezier(.45,0,.9,.5) infinite;opacity:0}@keyframes hgls-fly{0%{transform:translate(-14px,16px) scale(.28);opacity:0}4%{opacity:1}34%{transform:translate(206px,92px) scale(3.1);opacity:1}35%,100%{transform:translate(206px,92px) scale(3.1);opacity:0}}.hgls .wing{transform-box:fill-box;transform-origin:50% 100%;animation:hgls-flap .22s ease-in-out infinite}@keyframes hgls-flap{0%,100%{transform:scaleY(1)}50%{transform:scaleY(-.5)}}@media (prefers-reduced-motion:reduce){.hgls *{animation-duration:.01ms!important;animation-iteration-count:1!important}}";
+const CSS = ".hgls{display:flex;flex-direction:column;align-items:center;gap:2px;pointer-events:none}.hgls svg{overflow:visible}.hgls .cap{font:700 15px/1.3 -apple-system,\"PingFang TC\",\"Noto Sans TC\",sans-serif}.hgls .dots span{display:inline-block;width:5px;height:5px;border-radius:50%;margin-left:3px;background:currentColor;animation:hgls-dot .8s infinite}.hgls .dots span:nth-child(2){animation-delay:.2s}.hgls .dots span:nth-child(3){animation-delay:.4s}@keyframes hgls-dot{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-4px);opacity:1}}.hgls .grow{transform-box:fill-box;transform-origin:50% 100%}.hgls .plant{animation:hgls-grow 1.2s ease-in-out infinite}@keyframes hgls-grow{0%,25%{transform:scale(.7)}80%,100%{transform:scale(1.04)}}.hgls .worm{transform-box:fill-box;transform-origin:50% 100%;animation:hgls-worm 2.4s ease-in-out infinite}@keyframes hgls-worm{0%,6%{transform:translateY(30px) rotate(0)}18%{transform:translateY(0) rotate(0)}28%{transform:translateY(0) rotate(-9deg)}40%{transform:translateY(0) rotate(9deg)}52%{transform:translateY(0) rotate(-6deg)}64%{transform:translateY(0) rotate(5deg)}74%{transform:translateY(0) rotate(0)}88%,100%{transform:translateY(30px) rotate(0)}}.hgls .pupil{animation:hgls-look 2.4s ease-in-out infinite}@keyframes hgls-look{0%,24%{transform:translateX(0)}32%{transform:translateX(-1.4px)}48%{transform:translateX(1.4px)}60%,100%{transform:translateX(0)}}.hgls .eyeblink{transform-box:fill-box;transform-origin:center;animation:hgls-blink 2.4s infinite}@keyframes hgls-blink{0%,54%,58%,100%{transform:scaleY(1)}56%{transform:scaleY(.1)}}.hgls .lady{animation:hgls-crawl 1.5s ease-in-out infinite}@keyframes hgls-crawl{0%{transform:translate(99px,90px) rotate(-50deg)}45%{transform:translate(110px,77px) rotate(-50deg)}50%{transform:translate(110px,77px) rotate(130deg)}95%{transform:translate(99px,90px) rotate(130deg)}100%{transform:translate(99px,90px) rotate(-50deg)}}.hgls .leg{animation:hgls-leg .25s linear infinite;transform-box:fill-box;transform-origin:center}@keyframes hgls-leg{50%{transform:scaleX(.8)}}@media (prefers-reduced-motion:reduce){.hgls *{animation-duration:.01ms!important;animation-iteration-count:1!important}}";
 
 export function LoadingSapling({ compact = false }: { compact?: boolean }) {
   const { c } = useTheme();
-  const size = compact ? 96 : 240;
+  const size = compact ? 88 : 200;
   const green = c.accent;
   const leaf = "#2F8A5B";
   const leaf2 = "#5DB383";
   return (
     <div className="hgls" role="status" aria-label="載入中" style={{ padding: compact ? 8 : 24, color: c.accentText }}>
       <style>{CSS}</style>
-      <svg viewBox="0 0 160 160" width={size} height={size} aria-hidden="true">
+      <svg viewBox="40 62 110 90" width={size} height={Math.round((size * 90) / 110)} aria-hidden="true">
         <defs>
           <clipPath id="hgls-wclip">
             <rect x="50" y="90" width="60" height="42" />
           </clipPath>
         </defs>
-        {compact ? null : (
-          <g className="eagle">
-            <g className="wing"><path d="M0 4 C-8 -8 -20 -8 -30 -2 C-20 -2 -10 2 0 6Z" fill="#5A3E2B" /></g>
-            <g className="wing"><path d="M0 4 C8 -8 20 -8 30 -2 C20 -2 10 2 0 6Z" fill="#5A3E2B" /></g>
-            <ellipse cx="0" cy="6" rx="8" ry="3.4" fill="#6B4A33" />
-            <circle cx="8" cy="5" r="3" fill="#fff" />
-            <path d="M10.5 5 l4 1.4 l-3.6 1.4z" fill="#F2B21D" />
-            <circle cx="9" cy="4.3" r=".7" fill="#1D2A22" />
-            <path d="M-8 6 l-6 2 l6 1z" fill="#4A3222" />
-          </g>
-        )}
         <g className="plant grow">
           <path d="M96 128 V92" stroke={green} strokeWidth="4" strokeLinecap="round" fill="none" />
           <path d="M96 100 C84 98 76 90 76 80 C88 80 96 88 96 100Z" fill={leaf} />
