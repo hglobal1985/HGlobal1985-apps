@@ -8,6 +8,7 @@ import { displayName } from "./sort";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { useSession } from "@/state/session";
+import { flashText } from "@/ui/flash-notice";
 import { useUiConfig } from "@/state/ui-config";
 import { AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle, useDimLayer } from "@/ui";
 import { ribbonsFor } from "./ribbons";
@@ -121,7 +122,6 @@ export function EdmLightbox({ uri, title, onClose }: { uri: string; title: strin
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const [scale, setScale] = useState(1);
-  const [msg, setMsg] = useState<string | null>(null);
   const [ratio, setRatio] = useState(0.7); // 寬 / 高
   const [touching, setTouching] = useState(false); // 手指或滑鼠按著圖片時，按鈕暫時消失
   const full = resolveUrl(uri);
@@ -202,13 +202,13 @@ export function EdmLightbox({ uri, title, onClose }: { uri: string; title: strin
 
   const share = async () => {
     const r = await shareImage(title, uri, `${title}.jpg`);
-    if (r === "copied") setMsg("已複製連結");
+    if (r === "copied") flashText("已複製連結");
   };
   const download = async () => {
     try {
       await downloadImage(uri, `${title}.jpg`);
     } catch {
-      setMsg("下載失敗，請稍後再試");
+      flashText("下載失敗，請稍後再試");
     }
   };
   const tool = (label: string, onPress: () => void, child: React.ReactNode, disabled?: boolean) => (
@@ -239,13 +239,6 @@ export function EdmLightbox({ uri, title, onClose }: { uri: string; title: strin
               {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
             </View>
           </View>
-          {msg ? (
-            <View style={styles.toast} pointerEvents="none">
-              <AppText variant="caption" style={{ color: "#fff" }}>
-                {msg}
-              </AppText>
-            </View>
-          ) : null}
         </View>
       </View>
     </Modal>
@@ -260,5 +253,4 @@ const styles = StyleSheet.create({
   bottom: { position: "absolute", left: 16, right: 16, bottom: 16, flexDirection: "row", alignItems: "center", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
   help: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, minHeight: 36, borderRadius: 18, backgroundColor: "#000" },
-  toast: { position: "absolute", alignSelf: "center", top: "45%", paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: "rgba(0,0,0,0.7)" },
 });

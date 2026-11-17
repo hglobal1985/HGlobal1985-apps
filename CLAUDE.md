@@ -93,6 +93,8 @@
 
 - **中心頁 EDM 卡片（業主 2026-11-17）**：中心頁（`SeriesTile` 的 `flat`）一律直式 4:3（寬 3：高 4）、一列三張；EDM 比卡片窄長就寬度填滿、從預設位置開始；**EDM 太小／太矮（比 3:4 更橫）就完整顯示不裁切，背景用同一張圖放大模糊填滿**（`TopFill` 的 `fillBlur`）。
 
+- **影片操作提示與照片放大回饋也改全螢幕提醒（業主 2026-11-17）**：「可拖曳或放大縮小，點兩下復原」改用 `zoomHintOnce()`（`features/player/zoom-hint.ts`，每次開啟網站只提醒一次，影片上不再有黑色小膠囊）；照片放大的「已複製連結」「下載失敗」改 `flashText`。仍保留的非提醒元件：上拉面板拖曳時的「放開進入…」即時提示膠囊、照片放大下方的操作說明列（常駐說明，不是回饋）。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。

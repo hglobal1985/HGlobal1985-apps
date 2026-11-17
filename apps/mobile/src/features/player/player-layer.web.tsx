@@ -1,7 +1,6 @@
 import { lessonHref } from "@/lib/lesson-href";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { createPortal } from "react-dom";
 import { inAppBrowser } from "@/lib/in-app-browser";
 import { useSession } from "@/state/session";
@@ -9,6 +8,7 @@ import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.w
 import { engine } from "./engine.web";
 import { IDENTITY, clampZoom, zoomAt, type Zoom } from "./zoom-math";
 import { usePlayer } from "./use-player";
+import { zoomHintOnce } from "./zoom-hint";
 
 const POS_KEY = "hglobal:learn:mini-pos";
 const MARGIN = 8;
@@ -48,7 +48,6 @@ export function PlayerLayer() {
   const lastTap = useRef({ t: 0, x: 0, y: 0 });
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapInfo = useRef<{ x: number; y: number; t: number; multi: boolean } | null>(null);
-  const [showHint, setShowHint] = useState(false);
   // YouTube 影片上的點擊一律擋掉（業主永久指示：不讓使用者點到 YouTube 自己的按鈕與連結，播放暫停只用下方控制列）。
   // 唯一例外：在 LINE 等 App 內建瀏覽器裡、這個播放器「第一次開始播放之前」——平台規定要使用者親手點一次影片才准播放，之後立刻恢復封鎖。
   const [everPlayed, setEverPlayed] = useState(false);
@@ -163,10 +162,8 @@ export function PlayerLayer() {
   // 操作提示：進入影片、觸摸影片、拖曳時間軸時顯示，3.5 秒沒操作就自動消失。
   useEffect(() => {
     if (!s.hintAt) return;
-    setShowHint(true);
-    const id = setTimeout(() => setShowHint(false), 1000); // 提示文字 1 秒後自動消失（業主 2026-11-17）
-    return () => clearTimeout(id);
-  }, [s.hintAt]);
+    if (canZoom) zoomHintOnce();
+  }, [s.hintAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 播放／暫停時，外框的反光流動跟著動或停。
   useEffect(() => {
@@ -359,12 +356,6 @@ export function PlayerLayer() {
       </div>
       {/* 影片上的點擊一律擋掉（只用下方控制列）；僅 App 內建瀏覽器第一次播放前放行，見上面 everPlayed 的說明。 */}
       {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} onLostPointerCapture={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", pointerEvents: yt && !s.playing && !everPlayed && inAppBrowser() ? "none" : "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
-      {canZoom && showHint ? (
-        <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 999, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 12, lineHeight: "16px", fontWeight: 500, whiteSpace: "nowrap", pointerEvents: "none" }}>
-          <span style={{ fontFamily: "ionicons", fontSize: 14, lineHeight: "16px" }}>{String.fromCodePoint(Number(Ionicons.glyphMap["move"]))}</span>
-          <span>可拖曳或放大縮小 點兩下復原</span>
-        </div>
-      ) : null}
       {circle ? (
         <div style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", background: "#000", borderRadius: "50%", overflow: "hidden" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="恢復迷你播放器（可按住拖曳移動）">
           <img src={art} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", animation: "hg-spin 8s linear infinite", animationPlayState: s.playing ? "running" : "paused", pointerEvents: "none" }} />
