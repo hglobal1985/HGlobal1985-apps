@@ -310,12 +310,30 @@ export function PlayerLayer() {
   };
   const stop = (e: PointerEvent) => e.stopPropagation();
 
+  // YouTube 的 iframe 在「連續播放 YouTube」期間固定不重建：第一次載入用網址，之後換章節用 loadVideoById 在原 iframe 內切換。
+  const ytNow = t?.mode === "youtube" && t.playback.kind === "youtube" ? t.playback : null;
+  const ytKeyNow = t ? `${t.key}:${s.loadId}` : "";
+  const ytFirst = useRef<string | null>(null);
+  if (!ytNow) ytFirst.current = null;
+  else if (ytFirst.current === null) ytFirst.current = ytKeyNow;
+  const ytShown = useRef<string | null>(null);
+  const ytSrc = useRef<string | null>(null); // iframe 網址只在第一次載入時決定，之後不再變（變了會重建、歸零播放許可）
+  useEffect(() => {
+    if (!ytNow) return void (ytShown.current = null);
+    if (ytShown.current === null) ytShown.current = ytKeyNow; // 第一次：iframe 自己用網址載入
+    else if (ytShown.current !== ytKeyNow) {
+      ytShown.current = ytKeyNow;
+      engine.loadYoutube(ytNow.videoId, Math.floor(ytNow.resumeAt ?? ytNow.start ?? 0), ytNow.end || undefined);
+    }
+  }, [ytKeyNow, ytNow?.videoId]); // eslint-disable-line react-hooks/exhaustive-deps
   const ctlStyle: CSSProperties = { opacity: ctl ? 1 : 0, pointerEvents: ctl ? "auto" : "none", transition: "opacity 0.2s" };
   if (typeof document === "undefined") return null;
   const yt = t?.mode === "youtube" && t.playback.kind === "youtube" ? t.playback : null;
   // 起點：有續播記憶（resumeAt）就從那一秒接著播，否則從這一堂的起點（YouTube 只接受整數秒）。
   const ytBegin = yt ? Math.floor(yt.resumeAt ?? yt.start ?? 0) : 0;
   const range = yt ? `${ytBegin ? `&start=${ytBegin}` : ""}${yt.end ? `&end=${yt.end}` : ""}` : "";
+  if (!yt) ytSrc.current = null;
+  else if (!ytSrc.current) ytSrc.current = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt.videoId)}?controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&rel=0&modestbranding=1&autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${range}`;
   const art = s.artworkUrl ? (/^(https?:|blob:|data:)/.test(s.artworkUrl) ? s.artworkUrl : s.artworkUrl) : "/icon-512.png";
   return createPortal(
     <div ref={boxRef} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
@@ -325,10 +343,10 @@ export function PlayerLayer() {
         <div ref={hostRef} style={{ position: "absolute", inset: 0, display: yt ? "none" : "block" }} />
         {yt ? (
           <iframe
-            key={`${t!.key}:${s.loadId}`}
+            key="yt-frame"
             ref={setFrame}
             title="課程影片"
-            src={`https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt.videoId)}?controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&rel=0&modestbranding=1&autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${range}`}
+            src={ytSrc.current ?? undefined}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
             allowFullScreen
             referrerPolicy="strict-origin-when-cross-origin"

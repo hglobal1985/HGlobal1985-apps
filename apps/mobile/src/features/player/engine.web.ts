@@ -396,6 +396,14 @@ export const engine = {
         ytCaptionsOff();
       });
   },
+  /**
+   * 換一支 YouTube 影片但沿用同一個 iframe（業主 2026-11-17）：LINE 等內建瀏覽器要使用者親手點過一次 YouTube 自己的播放鈕，
+   * 之後程式才能代按播放；重建 iframe 會讓這份許可歸零，所以換章節一律用 loadVideoById 在原 iframe 內切換。
+   */
+  loadYoutube(videoId: string, start: number, end?: number) {
+    captionsOff = false;
+    ytCommand("loadVideoById", [{ videoId, startSeconds: start, ...(end ? { endSeconds: end } : {}) }]);
+  },
   /** 全螢幕：影片畫面框（Layer）登記後，課程頁自家控制列的全螢幕鈕才可用。iPhone Safari 不支援（只有 <video> 可全螢幕）。 */
   setFullscreenTarget(el: HTMLElement | null) {
     fsTarget = el;
