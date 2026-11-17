@@ -1,3 +1,4 @@
+import { inAppBrowser } from "@/lib/in-app-browser";
 import { flashText } from "@/ui/flash-notice";
 import { resolveUrl } from "@/api/client";
 import { embeddedCover } from "./audio-cover";
@@ -489,10 +490,10 @@ export const engine = {
         emit({ loading: true });
         ytStopLoadingLater();
       }
-      // 有些內建瀏覽器（例如 LINE）不准程式代按播放：1.5 秒後還沒開始，就提示直接點影片中央的播放鈕。
+      // App 內建瀏覽器（例如 LINE）不准程式代按播放，而影片上的點擊一律封鎖：1.5 秒後還沒開始，提示改用系統瀏覽器開啟。
       const id = snap.loadId;
       setTimeout(() => {
-        if (snap.track?.mode === "youtube" && snap.loadId === id && !snap.playing && intent) flashText("請直接點一下影片中央的播放鈕");
+        if (snap.track?.mode === "youtube" && snap.loadId === id && !snap.playing && intent) inAppBrowser() && flashText("這個瀏覽器無法播放，請按上方紅色按鈕改用系統瀏覽器開啟");
       }, 1500);
     } else void active()?.play().catch(() => undefined);
   },

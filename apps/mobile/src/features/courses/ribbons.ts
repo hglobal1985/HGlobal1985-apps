@@ -54,7 +54,10 @@ export function ribbonsFor(course: CourseSummary, member: Member | null, cfg: Ui
   else if (course.enrollment === "opened") left = spec(cfg, completed ? "completed" : "learning");
   else if (course.enrollment === "pending") left = spec(cfg, "pending");
   else if (!course.eligible) left = spec(cfg, "ineligible");
-  else if (course.isPublic || course.watchFree) left = null; // 公開免費、或設定免費且符合資格的課程不用報名
+  // 公開免費的課程（登入後也一樣）顯示「公開免費」緞帶（業主 2026-11-17：改名「限時免費」後登入的人什麼緞帶都看不到，才發現登入後被省略了）；
+  // 設定免費且符合資格（watchFree）的課程不用報名，不顯示。
+  else if (course.isPublic) left = spec(cfg, "public_free");
+  else if (course.watchFree) left = null;
   else if (course.priceTba) left = spec(cfg, "price_tba");
   else left = spec(cfg, "can_register");
   const ds = dateState(course);

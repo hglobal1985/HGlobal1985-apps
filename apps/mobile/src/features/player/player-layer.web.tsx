@@ -2,7 +2,6 @@ import { lessonHref } from "@/lib/lesson-href";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
-import { inAppBrowser } from "@/lib/in-app-browser";
 import { useSession } from "@/state/session";
 import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.web";
 import { engine } from "./engine.web";
@@ -49,8 +48,7 @@ export function PlayerLayer() {
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const tapInfo = useRef<{ x: number; y: number; t: number; multi: boolean } | null>(null);
   // YouTube 影片上的點擊一律擋掉（業主永久指示：不讓使用者點到 YouTube 自己的按鈕與連結，播放暫停只用下方控制列）。
-  // 唯一例外：在 LINE 等 App 內建瀏覽器裡、這個播放器「第一次開始播放之前」——平台規定要使用者親手點一次影片才准播放，之後立刻恢復封鎖。
-  const [everPlayed, setEverPlayed] = useState(false);
+  // 業主 2026-11-17：LINE 等 App 內建瀏覽器也一律封鎖（不再有「第一次播放前放行」的例外），使用者要改用系統瀏覽器開啟才能播放（見紅色警示條）。
   // 迷你播放器的三顆按鈕：1 秒沒有觸摸就自動隱藏，再摸到迷你播放器才會再顯示。
   const [ctl, setCtl] = useState(true);
   const ctlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,12 +71,6 @@ export function PlayerLayer() {
   const windowed = floating && !s.collapsed;
 
   // 影片放大：雙指（手機）或滾輪（電腦）放大縮小，縮小不低於 100%；放大後按住拖曳查看其他區域。只用在 Mux／示範影片，在課程頁內嵌時才有。
-  useEffect(() => {
-    if (s.playing) setEverPlayed(true);
-  }, [s.playing]);
-  useEffect(() => {
-    if (t?.mode !== "youtube") setEverPlayed(false); // iframe 一換掉，平台給的播放許可就歸零
-  }, [t?.mode]);
   const canZoom = inline && (t?.mode === "video" || t?.mode === "youtube");
   const applyZoom = (z: Zoom) => {
     zoom.current = z;
@@ -355,7 +347,7 @@ export function PlayerLayer() {
         ) : null}
       </div>
       {/* 影片上的點擊一律擋掉（只用下方控制列）；僅 App 內建瀏覽器第一次播放前放行，見上面 everPlayed 的說明。 */}
-      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} onLostPointerCapture={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", pointerEvents: yt && !s.playing && !everPlayed && inAppBrowser() ? "none" : "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
+      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} onLostPointerCapture={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", pointerEvents: "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
       {circle ? (
         <div style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", background: "#000", borderRadius: "50%", overflow: "hidden" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="恢復迷你播放器（可按住拖曳移動）">
           <img src={art} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", animation: "hg-spin 8s linear infinite", animationPlayState: s.playing ? "running" : "paused", pointerEvents: "none" }} />
