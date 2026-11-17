@@ -102,14 +102,14 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
   const vs = urlNameVariants(name);
   const cols = "SELECT url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
   const c = await (center
-    ? db.prepare(`${cols} host_center_key = ? AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')`).bind(centerKey(center.value), ...vs)
-    : db.prepare(`${cols} host_center_key IS NULL AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')`).bind(...vs)
+    ? db.prepare(`${cols} host_center_key = ? AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published'`).bind(centerKey(center.value), ...vs)
+    : db.prepare(`${cols} host_center_key IS NULL AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published'`).bind(...vs)
   ).first<{ n: string; k: string | null; v: number }>();
   let hit = c;
   if (!hit) {
     // 改名前的舊網址（別名）：預覽照常給，網址用目前的新網址。
     hit = await db
-      .prepare(`SELECT c.url_name AS n, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM course_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.scope = ? AND a.url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND c.status = 'published' AND c.url_name IS NOT NULL AND c.view_scope IN ('all', 'link_guest', 'link_login')`)
+      .prepare(`SELECT c.url_name AS n, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM course_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.scope = ? AND a.url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND c.status = 'published' AND c.url_name IS NOT NULL`)
       .bind(center ? centerKey(center.value) : "", ...vs)
       .first<{ n: string; k: string | null; v: number }>()
       .catch(() => null);
@@ -165,7 +165,7 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
   const courseId = course?.[1] ?? lesson?.[1];
   if (courseId) {
     const c = await db
-      .prepare("SELECT host_center_key AS hk, host_unit AS hu, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')")
+      .prepare("SELECT host_center_key AS hk, host_unit AS hu, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published'")
       .bind(courseId)
       .first<{ hk: string | null; hu: string | null; k: string | null; v: number }>()
       .catch(() => null);
