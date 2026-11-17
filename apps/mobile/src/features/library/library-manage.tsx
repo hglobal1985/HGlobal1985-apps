@@ -35,15 +35,14 @@ export function LibraryManage() {
     if (data?.library) setName(data.library.title);
   }, [data?.library?.title]); // eslint-disable-line react-hooks/exhaustive-deps
   if (loading && !data) return <Screen header={false}><LoadingView /></Screen>;
-  if (!data?.library)
-    return (
-      <Screen header={false}>
-        <NoticeBox text="你尚未解鎖圖書館鑰匙。請向超級管理員索取邀請網址，接受後就能使用。" />
-      </Screen>
-    );
-  const lib = data.library;
+  // 沒有圖書館鑰匙（尚未被超級管理員指定）：一樣看得到主畫面，但任何操作都只會提示「尚未解鎖圖書館鑰匙」。
+  const items = data?.items ?? [];
+  const locked = !data?.library;
+  const lib = data?.library ?? { number: "你的會員編號", title: "我的圖書館", ownerName: "", views: 0, pwSet: false, pwExpiresAt: null, pwExpired: false };
+  const lockedTip = () => flashText("尚未解鎖圖書館鑰匙，請向超級管理員索取邀請網址");
   const url = `learn.hglobal1985.com/${lib.number}`;
   const call = async (method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown) => {
+    if (locked) return lockedTip();
     setBusy(true);
     try {
       await api(method, path, body);
@@ -55,18 +54,20 @@ export function LibraryManage() {
     }
   };
   const move = (i: number, j: number) => {
-    const ids = data.items.map((x) => x.id);
+    const ids = items.map((x) => x.id);
     const [x] = ids.splice(i, 1);
     ids.splice(j, 0, x!);
     void call("POST", "/library/mine/items/order", { ids });
   };
   const remove = async (it: LibraryItem) => {
+    if (locked) return lockedTip();
     if (await confirmAsk(it.kind === "shelf" ? "刪除書架" : "刪除這本書", `確定刪除「${it.title}」？`, "刪除")) void call("DELETE", `/library/mine/items/${it.id}`);
   };
   const input = [{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }];
   return (
     <Screen header={false}>
       <Card>
+        {locked ? <NoticeBox text="你尚未解鎖圖書館鑰匙。向超級管理員索取邀請網址並接受後，這裡就能使用；下面是圖書館的主畫面預覽。" /> : null}
         <AppText variant="caption" tone="muted">
           專屬網址（只有拿到網址的人才進得來，不會出現在行動大學任何地方）
         </AppText>
@@ -74,8 +75,8 @@ export function LibraryManage() {
           {url}
         </AppText>
         <View style={{ flexDirection: "row", gap: space.sm }}>
-          <Button variant="secondary" label="複製網址" icon="copy-outline" onPress={() => void Clipboard.setStringAsync(`https://${url}`).then(() => flashText("已複製網址"))} />
-          <Button label="查看圖書館" icon="library-outline" onPress={() => router.push(`/${lib.number}` as never)} />
+          <Button variant="secondary" label="複製網址" icon="copy-outline" onPress={() => locked ? lockedTip() : void Clipboard.setStringAsync(`https://${url}`).then(() => flashText("已複製網址"))} />
+          <Button label="查看圖書館" icon="library-outline" onPress={() => (locked ? lockedTip() : router.push(`/${lib.number}` as never))} />
         </View>
         <AppText variant="caption" tone="muted">
           {lib.views} 次翻閱
@@ -84,7 +85,7 @@ export function LibraryManage() {
 
       <Section title="圖書館名稱">
         <TextInput value={name} onChangeText={setName} placeholder="例如：王小明的圖書館" placeholderTextColor={c.textMuted} accessibilityLabel="圖書館名稱" maxLength={80} style={input} />
-        <Button variant="secondary" label="儲存名稱" onPress={() => void call("PUT", "/library/mine", { title: name })} disabled={busy || !name.trim() || name.trim() === lib.title} />
+        <Button variant="secondary" label="儲存名稱" onPress={() => void call("PUT", "/library/mine", { title: name })} disabled={!locked && (busy || !name.trim() || name.trim() === lib.title)} />
       </Section>
 
       <Section title="進入密碼（整座圖書館）">
@@ -94,7 +95,7 @@ export function LibraryManage() {
         <TextInput value={pw} onChangeText={setPw} placeholder="新密碼（4～40 個字）" placeholderTextColor={c.textMuted} autoCapitalize="none" accessibilityLabel="新密碼" style={input} />
         <Field label="幾天後失效（留空＝不自動失效）" value={days} onChange={(v) => setDays(v.replace(/\D/g, ""))} numeric placeholder="例如：7" />
         <View style={{ flexDirection: "row", gap: space.sm }}>
-          <Button label={lib.pwSet ? "更換密碼" : "設定密碼"} onPress={() => void call("PUT", "/library/mine", { password: pw, passwordDays: days ? Number(days) : null }).then(() => { setPw(""); setDays(""); })} disabled={busy || pw.length < 4} />
+          <Button label={lib.pwSet ? "更換密碼" : "設定密碼"} onPress={() => void call("PUT", "/library/mine", { password: pw, passwordDays: days ? Number(days) : null }).then(() => { setPw(""); setDays(""); })} disabled={!locked && (busy || pw.length < 4)} />
           {lib.pwSet ? <Button variant="secondary" label="關閉密碼" onPress={() => void call("PUT", "/library/mine", { password: null })} disabled={busy} /> : null}
         </View>
         <AppText variant="caption" tone="muted">
@@ -103,11 +104,11 @@ export function LibraryManage() {
       </Section>
 
       <Section title="書架與書">
-        {data.items.length ? (
+        {items.length ? (
           <Card style={{ paddingVertical: 0 }}>
-            {data.items.map((it, i) => (
+            {items.map((it, i) => (
               <View key={it.id} style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: space.xs, borderBottomWidth: 1, borderBottomColor: c.border }}>
-                <Pressable accessibilityRole="button" onPress={() => setSheet({ kind: it.kind, item: it })} style={{ flex: 1, minWidth: 0, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <Pressable accessibilityRole="button" onPress={() => (locked ? lockedTip() : setSheet({ kind: it.kind, item: it }))} style={{ flex: 1, minWidth: 0, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm, flexDirection: "row", alignItems: "center", gap: 10 }}>
                   {it.kind === "shelf" ? <Icon name="folder-open-outline" size={26} color={c.accent} /> : it.type ? <BrandIcon type={it.type} fallback={TYPE_INFO[it.type].icon as never} size={30} /> : null}
                   <View style={{ flex: 1 }}>
                     <AppText variant="body" numberOfLines={2} style={it.kind === "shelf" ? { fontWeight: "800" } : undefined}>
@@ -119,7 +120,7 @@ export function LibraryManage() {
                   </View>
                 </Pressable>
                 <IconButton icon="arrow-up" label="上移" onPress={i > 0 ? () => move(i, i - 1) : undefined} disabled={busy} />
-                <IconButton icon="arrow-down" label="下移" onPress={i < data.items.length - 1 ? () => move(i, i + 1) : undefined} disabled={busy} />
+                <IconButton icon="arrow-down" label="下移" onPress={i < items.length - 1 ? () => move(i, i + 1) : undefined} disabled={busy} />
                 <IconButton icon="trash-outline" label="刪除" onPress={() => void remove(it)} disabled={busy} danger />
               </View>
             ))}
@@ -129,8 +130,8 @@ export function LibraryManage() {
             還沒有內容。先新增書架（分類），再把書（影片、簡報、PDF、連結）放進去。
           </AppText>
         )}
-        <Button variant="secondary" label="新增書架" icon="folder-open-outline" onPress={() => setSheet({ kind: "shelf" })} fullWidth />
-        <Button label="新增書" icon="add" onPress={() => setSheet({ kind: "book" })} fullWidth />
+        <Button variant="secondary" label="新增書架" icon="folder-open-outline" onPress={() => (locked ? lockedTip() : setSheet({ kind: "shelf" }))} fullWidth />
+        <Button label="新增書" icon="add" onPress={() => (locked ? lockedTip() : setSheet({ kind: "book" }))} fullWidth />
       </Section>
       {sheet ? <ItemSheet kind={sheet.kind} item={sheet.item} onClose={() => setSheet(null)} onSaved={() => { setSheet(null); reload(); }} /> : null}
     </Screen>
