@@ -72,7 +72,7 @@
 
 - **訪客登入提示 `LoginPrompt`（業主 2026-11-17，全站唯一來源）**：`src/ui/login-prompt.tsx`，「免費註冊登入」鈕＋「解鎖更多功能與學習成就」，同一列置中、只有未登入才顯示，登入後回原頁。放在除了「學習中、通知、設定」以外所有頁面：首頁（取代原「前往登入」）、課程頁、系列頁、中心頁與全部課程各檢視（`CoursesView`）。新增任何公開的深層頁面都要放；要改文字、字級、按鈕只改這個檔案。
 
-- **讀取中動畫（業主 2026-11-17 定稿）**：全站一律用「灌溉小樹苗」`LoadingSapling`（`src/ui/loading-sapling.web.tsx`；`LoadingView` 內部使用，不可再用系統轉圈圈 `ActivityIndicator` 做整頁／區塊讀取）。內容（業主 2026-11-17 再改：刪太陽、刪水壺、整體加快）：小樹苗長高（1.4 秒一輪）、土裡探頭眨眼的蚯蚓（2.8 秒）、葉上來回爬的瓢蟲（1.8 秒）、約 1 秒由遠（左上小）斜飛近（右下大）的老鷹（2.2 秒一輪），文字「灌溉中…」；`compact`＝小區塊縮小版（只有小樹苗，無文字）。iOS／Android 版暫用系統轉圈圈（`loading-sapling.tsx`），App 上架前補。按鈕內的小轉圈（`Button loading`）因為太小維持原樣。要改動畫只改這一個檔案。
+- **讀取中動畫（業主 2026-11-17 定稿）**：全站一律用「灌溉小樹苗」`LoadingSapling`（`src/ui/loading-sapling.web.tsx`；`LoadingView` 內部使用，不可再用系統轉圈圈 `ActivityIndicator` 做整頁／區塊讀取）。內容（業主 2026-11-17 再改：刪太陽、刪水壺、整體加快）：小樹苗長高（1.4 秒一輪）、土裡探頭眨眼的蚯蚓（2.8 秒）、葉上來回爬的瓢蟲（1.8 秒）、約 1 秒由遠（左上小）斜飛近（右下大）的老鷹（2.2 秒一輪），文字「灌溉中…」；`compact`＝小區塊縮小版（只有小樹苗，無文字）。iOS／Android 版暫用系統轉圈圈（`loading-sapling.tsx`），App 上架前補。**還沒讀取完成以前一律用它**（業主 2026-11-17）：首頁原本的灰色骨架已刪除（`skeleton.tsx` 不再存在），改用 `LoadingView`；網頁一開啟、程式還沒載入完的瞬間，由 `apps/launch/scripts/embed-static.mjs` 在 `#root` 裡塞進簡化版「灌溉中」開機畫面（App 一掛載就取代）。新增任何會等資料的頁面都要放 `LoadingView`。按鈕內的小轉圈（`Button loading`）因為太小維持原樣。要改動畫只改這一個檔案。
 
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。

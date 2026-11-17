@@ -55,6 +55,12 @@ if (files["/index.html"]) {
   if (!out.includes("apple-mobile-web-app-status-bar-style")) out = out.replace("</head>", '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/></head>');
   // 整個畫面釘死在可視範圍（position:fixed）：Chrome 網址列伸縮、安裝到桌面的捷徑，底部選單都不會被推出畫面；也不讓整頁被拖動。
   if (!out.includes("hg-fixed")) out = out.replace("</head>", '<style id="hg-fixed">html,body{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;overflow:hidden;overscroll-behavior:none}#root{position:absolute;top:0;left:0;right:0;bottom:0;height:auto}</style></head>');
+  // 網頁一開啟、程式還沒載入完時的「灌溉小樹苗」開機畫面（業主 2026-11-17：還沒讀取完成以前一律用灌溉動畫）：放在 #root 裡，App 一掛載就被取代。
+  if (!out.includes("hg-boot")) {
+    const css = "#hg-boot{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:#F8F6EF;color:#0C603C;font:700 15px -apple-system,'PingFang TC','Noto Sans TC',sans-serif}@media (prefers-color-scheme:dark){#hg-boot{background:#121515;color:#5DB383}}#hg-boot .g{transform-box:fill-box;transform-origin:50% 100%;animation:hgb-g 1.4s ease-in-out infinite}@keyframes hgb-g{0%,25%{transform:scale(.7)}80%,100%{transform:scale(1.04)}}#hg-boot .d span{display:inline-block;width:5px;height:5px;border-radius:50%;margin-left:3px;background:currentColor;animation:hgb-d .9s infinite}#hg-boot .d span:nth-child(2){animation-delay:.15s}#hg-boot .d span:nth-child(3){animation-delay:.3s}@keyframes hgb-d{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-4px);opacity:1}}";
+    const svg = '<svg viewBox="40 60 120 90" width="150" height="112" aria-hidden="true"><g class="g"><path d="M96 128 V92" stroke="#0C603C" stroke-width="4" stroke-linecap="round" fill="none"/><path d="M96 100 C84 98 76 90 76 80 C88 80 96 88 96 100Z" fill="#2F8A5B"/><path d="M96 92 C106 90 114 82 114 72 C102 72 96 80 96 92Z" fill="#5DB383"/></g><ellipse cx="96" cy="132" rx="30" ry="8" fill="#8A6A4B"/><path d="M66 132 q30 14 60 0 v6 q-30 14 -60 0z" fill="#6E5239"/></svg>';
+    out = out.replace("</head>", `<style id="hg-boot-css">${css}</style></head>`).replace('<div id="root"></div>', `<div id="root"><div id="hg-boot" role="status" aria-label="載入中">${svg}<div>灌溉中<span class="d"><span></span><span></span><span></span></span></div></div></div>`);
+  }
   files["/index.html"].data = Buffer.from(out, "utf8").toString("base64");
 }
 if (!files["/index.html"]) throw Error("找不到 apps/mobile/dist/index.html，請先執行 npm run build:web -w @learn/mobile");

@@ -14,7 +14,6 @@ export { LoadingView, ErrorView } from "./state-views";
 export { NoticeBox } from "./notice-box";
 export { Chips } from "./chips";
 export { Ticker } from "./ticker";
-export { HomeRailsSkeleton, SkeletonBlock } from "./skeleton";
 export { Field } from "./field";
 export { TopBar, TopBarButton, TopBarShadow } from "./top-bar";
 export { BottomBar } from "./bottom-bar";
