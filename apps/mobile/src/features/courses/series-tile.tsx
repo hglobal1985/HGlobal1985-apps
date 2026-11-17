@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
@@ -14,7 +14,7 @@ import type { SeriesGroup } from "./sort";
 
 /** EDM 填滿方框、靠上對齊（先依寬度放大，不夠高再依高度放大）。 */
 /** viewY＝EDM 預設位置（0～1，與課程頁上方 EDM 舞台相同）：直式 EDM 放在 16:9 視窗裡，從這個位置開始顯示。 */
-function TopFill({ uri, w, h, viewY = 0 }: { uri: string; w: number; h: number; viewY?: number }) {
+function TopFill({ uri, w, h, viewY = 0, fillBlur = false }: { uri: string; w: number; h: number; viewY?: number; fillBlur?: boolean }) {
   const [ratio, setRatio] = useState<number | null>(null);
   useEffect(() => {
     let alive = true;
@@ -24,6 +24,16 @@ function TopFill({ uri, w, h, viewY = 0 }: { uri: string; w: number; h: number; 
     };
   }, [uri]);
   const r = ratio ?? 0.7;
+  // 圖比方框「矮胖」（高度不夠填滿）＝完整顯示（不裁切），背景用同一張圖放大模糊填滿。
+  if (fillBlur && ratio !== null && r > w / h) {
+    const ch = w / r;
+    return (
+      <>
+        <Image source={{ uri }} resizeMode="cover" blurRadius={18} style={[{ position: "absolute", top: -12, left: -12, width: w + 24, height: h + 24 }, Platform.OS === "web" ? ({ filter: "blur(18px)" } as object) : null]} accessibilityIgnoresInvertColors />
+        <Image source={{ uri }} resizeMode="contain" style={{ position: "absolute", top: (h - ch) / 2, left: 0, width: w, height: ch }} accessibilityIgnoresInvertColors />
+      </>
+    );
+  }
   const iw = Math.max(w, h * r);
   const ih = iw / r;
   const top = -Math.min(Math.max(0, ih - h), Math.max(0, viewY * ih));
@@ -42,11 +52,11 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const { config } = useUiConfig();
   const [sheet, setSheet] = useState(false);
   const rep = group.nearest;
-  // 平鋪（flat，中心頁）＝直式 9:16；其餘維持橫式 16:9。
-  const height = flat ? Math.round((width * 16) / 9) : Math.round((width * 9) / 16);
+  // 平鋪（flat，中心頁）＝直式 4:3（寬 3：高 4）；其餘維持橫式 16:9。
+  const height = flat ? Math.round((width * 4) / 3) : Math.round((width * 9) / 16);
   // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
   const inSeries = !flat && !!rep.series;
-  // 平鋪（flat，中心頁）：統一用直式 9:16 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始）；沒有 EDM 才退回封面。
+  // 平鋪（flat，中心頁）：統一用直式 4:3 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始；圖太小／太矮就完整顯示，用同一張圖模糊填滿背景）；沒有 EDM 才退回封面。
   const cropped = flat && !rep.edmUrl && !!rep.coverUrl;
   const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesEdmUrl : rep.edmUrl;
   const ribbons = ribbonsFor(rep, member, config);
@@ -55,7 +65,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   return (
     <View style={{ width }}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? rep.series : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: c.surfaceMuted }]}>
-        {edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
+        {edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         {/* 管理者才看得到的未上架課程：左下角標「未上架」（學員的清單裡不會有這些課）。 */}

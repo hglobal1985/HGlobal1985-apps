@@ -91,6 +91,8 @@
 
 - **背景暗化＋輕微模糊模組 `DimBackdrop`（業主 2026-11-17 永久指示）**：所有蓋在頁面上的彈出層共用同一組定義，集中在 `src/ui/dim-backdrop.tsx`：`DIM_ALPHA`（暗度，目前 0.6；曾試 0.75 嫌太暗，業主 2026-11-17 定 0.6）、`DIM_BLUR`（模糊，目前 3px，只有網頁版）、`dimStyle`、`DimBackdrop`。**已套用**：全螢幕文字提醒（`flash-notice`）、所有上拉面板（`BottomSheet`：確認、編輯、選單…）、照片放大（`EdmLightbox`）、個人資料視窗（`profile-prompt`）、新增教材選單背景（`add-material-fab`）。**已有彈出層開著時，全螢幕提醒不再多疊一層暗化**（彈出層元件呼叫 `useDimLayer()`，提醒用 `hasDimLayer()` 判斷），避免兩層疊成接近全黑；要調暗度或模糊只改這兩個數字；**新增任何彈出層背景都用它，不可自己寫 rgba 黑色**。iOS／Android 先只有暗化、沒有模糊（需原生模組，App 上架前補）。
 
+- **中心頁 EDM 卡片（業主 2026-11-17）**：中心頁（`SeriesTile` 的 `flat`）一律直式 4:3（寬 3：高 4）、一列三張；EDM 比卡片窄長就寬度填滿、從預設位置開始；**EDM 太小／太矮（比 3:4 更橫）就完整顯示不裁切，背景用同一張圖放大模糊填滿**（`TopFill` 的 `fillBlur`）。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
