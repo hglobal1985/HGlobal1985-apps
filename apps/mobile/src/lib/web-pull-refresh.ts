@@ -30,30 +30,31 @@ export function installWebPullRefresh(): () => void {
   };
   /** 小樹苗→長成樹→樹冠邊緣結滿綠色櫻桃（p：0～1）。全程連續成長：一開始就看得到小樹苗，不會突然變大樹；過 50%（可以放開了）開始結櫻桃，到 100% 結滿。 */
   const treeSvg = (p: number): string => {
-    const g = Math.min(1, Math.max(0.04, p) / 0.6);
-    const h = 10 + 34 * g; // 樹幹高
-    const r = 26 * Math.pow(g, 1.5); // 樹冠半徑（連續長大）
+    // 小樹苗階段拉長（0～30% 都是小樹苗慢慢長大），30%～60% 才長出樹冠變成樹。
+    const sap = Math.min(1, Math.max(0.05, p) / 0.3);
+    const cr = Math.min(1, Math.max(0, (p - 0.3) / 0.3));
+    const h = 10 + 12 * sap + 22 * cr; // 樹幹高
+    const r = 26 * Math.pow(cr, 1.3); // 樹冠半徑
     const cy = 86 - h - r * 0.35;
-    const leaf = Math.max(0, 1 - g * 2); // 小樹苗的兩片葉子，隨樹冠長大淡出
-    const sap = leaf > 0 ? `<g opacity="${leaf}"><path d="M50 ${86 - h} q-12 -2 -15 -12 q12 0 15 12 M50 ${86 - h} q12 -2 15 -12 q-12 0 -15 12" fill="#4C8A5B"/></g>` : "";
+    const leafOp = Math.max(0, 1 - cr * 1.6); // 小樹苗的兩片葉子，樹冠長出後淡出
+    const k = 0.55 + 0.45 * sap; // 葉子大小
+    const top = 86 - h;
+    const leaves = leafOp > 0 ? `<g opacity="${leafOp}"><path d="M50 ${top} q${-12 * k} -2 ${-15 * k} ${-12 * k} q${12 * k} 0 ${15 * k} ${12 * k} M50 ${top} q${12 * k} -2 ${15 * k} ${-12 * k} q${-12 * k} 0 ${-15 * k} ${12 * k}" fill="#4C8A5B"/></g>` : "";
     const crown = r > 3 ? `<circle cx="50" cy="${cy}" r="${r}" fill="#2F7A46"/><circle cx="${50 - r * 0.35}" cy="${cy - r * 0.2}" r="${r * 0.62}" fill="#3F9A5A"/>` : "";
-    // 櫻桃：掛在樹冠邊緣一圈（10 顆）加上內側幾顆；一顆一顆依序長出來。
-    const spots: [number, number][] = [];
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2 - Math.PI / 2 + 0.3;
-      spots.push([Math.cos(a) * 0.98, Math.sin(a) * 0.98]);
-    }
-    spots.push([-0.3, 0.1], [0.3, 0.2], [0, -0.25]);
+    // 櫻桃：只吊掛在樹冠邊緣（上方頂端不放），6 顆；一顆一顆依序長出來，用短梗從樹冠邊緣垂吊下來。
+    const angles = [-30, 20, 70, 110, 160, 210]; // 度，0＝右、90＝正下方；避開頂端（270）
     let cherries = "";
-    spots.forEach(([dx, dy], i) => {
-      const c = Math.min(1, Math.max(0, (p - (0.48 + i * 0.03)) / 0.2));
-      if (c <= 0) return;
-      const x = 50 + dx * r;
-      const y = cy + dy * r;
-      const rr = (3 + 4 * (p - 0.5 > 0 ? (p - 0.5) / 0.5 : 0)) * c + 0.5;
-      cherries += `<path d="M${x} ${y - rr} q2 -6 6 -7" stroke="#4E7D2F" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="${rr}" fill="#7CC043" stroke="#4E7D2F" stroke-width=".6"/><circle cx="${x - rr * 0.35}" cy="${y - rr * 0.35}" r="${rr * 0.28}" fill="#fff" opacity=".75"/>`;
+    angles.forEach((deg, i) => {
+      const c = Math.min(1, Math.max(0, (p - (0.5 + i * 0.05)) / 0.2));
+      if (c <= 0 || r < 10) return;
+      const a = (deg * Math.PI) / 180;
+      const x = 50 + Math.cos(a) * r * 0.97;
+      const y = cy + Math.sin(a) * r * 0.97;
+      const rr = (4 + 3 * Math.max(0, (p - 0.5) / 0.5)) * c;
+      const len = 7 * c;
+      cherries += `<path d="M${x} ${y} L${x} ${y + len}" stroke="#4E7D2F" stroke-width="1.4" stroke-linecap="round"/><circle cx="${x}" cy="${y + len + rr * 0.85}" r="${rr}" fill="#7CC043" stroke="#4E7D2F" stroke-width=".6"/><circle cx="${x - rr * 0.35}" cy="${y + len + rr * 0.85 - rr * 0.35}" r="${rr * 0.28}" fill="#fff" opacity=".75"/>`;
     });
-    return `<svg width="104" height="104" viewBox="0 0 100 100"><ellipse cx="50" cy="90" rx="22" ry="5" fill="#8B6B4A"/><rect x="${48 - g * 1.5}" y="${86 - h}" width="${4 + g * 3}" height="${h}" rx="2" fill="#7A5A3A"/>${crown}${sap}${cherries}</svg>`;
+    return `<svg width="104" height="104" viewBox="0 0 100 100"><ellipse cx="50" cy="90" rx="22" ry="5" fill="#8B6B4A"/><rect x="${48 - cr * 1.5}" y="${top}" width="${4 + cr * 3}" height="${h}" rx="2" fill="#7A5A3A"/>${crown}${leaves}${cherries}</svg>`;
   };
   /** 全螢幕暗化＋模糊（跟全站彈出層同一組 DIM_COLOR／DIM_BLUR），隨拉動程度漸漸變暗。 */
   const showDim = (opacity: number) => {
@@ -65,7 +66,7 @@ export function installWebPullRefresh(): () => void {
     dim.style.opacity = String(Math.min(1, Math.max(0, opacity)));
   };
   /** 小卡跟著手指：水平對齊手指、垂直在手指上方；外框是全站「流光漸層邊框」同一組樣式。 */
-  const show = (progress: number, x: number, y: number, label?: string) => {
+  const show = (progress: number, y: number, label?: string) => {
     if (!bar) {
       bar = document.createElement("div");
       bar.setAttribute("aria-live", "polite");
@@ -75,7 +76,7 @@ export function installWebPullRefresh(): () => void {
     }
     const pct = Math.round(Math.min(1, progress) * 100);
     (bar.querySelector("[data-in]") as HTMLElement).innerHTML = `${treeSvg(Math.min(1, progress))}<span>${label ?? (progress >= 0.5 ? `${pct}%　放開重新整理` : `${pct}%　再往下拉`)}</span>`;
-    const cx = Math.min(Math.max(x, 80), window.innerWidth - 80);
+    const cx = window.innerWidth / 2; // 只跟上下，左右永遠置中
     const top = Math.max(8, y - 190);
     bar.style.transform = `translate(${Math.round(cx)}px, calc(env(safe-area-inset-top, 0px) + ${Math.round(top)}px)) translateX(-50%)`;
     showDim(label ? 1 : progress / 0.5);
@@ -114,7 +115,7 @@ export function installWebPullRefresh(): () => void {
       return;
     }
     pull = dy;
-    show(pull / FULL, e.touches[0]!.clientX, e.touches[0]!.clientY);
+    show(pull / FULL, e.touches[0]!.clientY);
   };
   const end = () => {
     if (active && pull >= THRESHOLD) {
@@ -127,7 +128,7 @@ export function installWebPullRefresh(): () => void {
       }
       if (Date.now() - last < MIN_GAP_MS) hide();
       else {
-        show(1, window.innerWidth / 2, 190, "更新中…");
+        show(1, 190, "更新中…");
         window.location.reload();
       }
     } else hide();
