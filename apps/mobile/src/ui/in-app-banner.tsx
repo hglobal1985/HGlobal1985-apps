@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { inAppBrowser, openInSystemBrowser } from "@/lib/in-app-browser";
 import { useTheme } from "@/theme/theme";
 import { minTouch } from "@/theme/tokens";
@@ -31,14 +30,13 @@ export function InAppBrowserBanner() {
       </Text>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`按此改用${info.browser}瀏覽器開啟`}
+        accessibilityLabel={`按這裡用${info.browser}瀏覽器開啟寰宇行動大學`}
         onPress={() => {
           if (openInSystemBrowser(info) === "copied") flashText("已複製網址，若沒有自動跳轉，請到 Safari 貼上");
         }}
         style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}
       >
-        <Ionicons name="open-outline" size={20} color="#fff" />
-        <Text style={styles.btnText}>按此改用{info.browser}瀏覽器開啟</Text>
+        <Text style={styles.btnText}>👉按這裡開啟 寰宇行動大學👈</Text>
       </Pressable>
     </View>
     {/* 警示條下方整個 App 蓋一層 60% 暗化（業主 2026-11-17）；只是視覺提醒，不擋操作。 */}
@@ -48,7 +46,7 @@ export function InAppBrowserBanner() {
 }
 
 const styles = StyleSheet.create({
-  box: { borderTopWidth: 3, borderBottomWidth: 3, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14, alignItems: "center", gap: 2 },
+  box: { position: "relative", zIndex: 60, borderTopWidth: 3, borderBottomWidth: 3, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 14, alignItems: "center", gap: 2 },
   l1: { fontSize: 22, fontWeight: "900", textAlign: "center" },
   l2: { fontWeight: "800", textAlign: "center", marginBottom: 8 },
   btn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: minTouch + 8, paddingHorizontal: 22, borderRadius: 14, backgroundColor: RED },
