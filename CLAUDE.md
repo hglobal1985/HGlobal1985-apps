@@ -115,6 +115,8 @@
 
 - **中心清單隱藏「安麗公司」（業主 2026-11-17）**：「全部課程 › 中心」清單不列出「安麗公司」（`courses-view.tsx` 的 `HIDDEN_FROM_CENTER_LIST`），它仍在中央的中心清單裡，可以當課程的主辦單位／素材的建立單位；要隱藏其他單位就加進那個清單。
 
+- **通知頁檢視模式與中央審核（業主 2026-11-17）**：通知頁最上方四個切換「全部／審核／訂閱／留言」（`app/(tabs)/notices.tsx`；分類由後端 `noticeCategory` 依標題判斷：留言、訂閱＝中心／系列的新課程、章節、教材與廣播公告、審核＝報名審核與結果；其餘只在「全部」）。「審核」裡另外顯示**中央的獎銜、教育中心新申請**（`GET /central-reviews`、`POST /central-reviews/:id/decision`，轉呼叫中央新 API `GET /v1/eligibility/reviews`、`POST …/{id}/decision`，中央 ADR 0030，業主 2026-11-17 授權修改中央）：用會員本人 Token 即時讀取、**不保存、不寫日誌**；權限與中心範圍**全由中央判斷**（超級管理員與秘書看全部、審核員只看自己已審核中心的；沒有權限或中央沒開放＝`available:false`，整個區塊不顯示）；通過／不通過前先彈出確認面板（`features/notices/central-reviews.tsx`）。中央要在後台「平台設定」替行動大學勾選 `display_name` 才會回名單（否則 403 `field_not_allowed`）。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。

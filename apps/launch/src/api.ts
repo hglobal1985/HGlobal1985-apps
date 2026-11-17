@@ -28,6 +28,8 @@ import {
   type Announcement,
   type CourseDeleteImpact,
   type Notice,
+  type NoticeCategory,
+  type CentralReviews,
   type NotificationSettings,
   type Order,
   type PaymentMethodKey,
@@ -44,7 +46,7 @@ import {
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
-import { centerMembers, centralAddJobTitle, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { fetchLinkTitle } from "./link-title.ts";
@@ -219,6 +221,14 @@ function notify(db: D1Database, to: { sub: string } | { role: "admin" } | { role
   return db
     .prepare("INSERT INTO notifications (id, recipient_sub, recipient_role, recipient_center_key, title, body, link) VALUES (?, ?, ?, ?, ?, ?, ?)")
     .bind(crypto.randomUUID(), "sub" in to ? to.sub : null, "role" in to ? to.role : null, "centerKey" in to ? to.centerKey : null, title, body, link);
+}
+
+/** 通知分類（業主 2026-11-17）：留言、訂閱（中心／系列有新課程、章節、教材、公告）、審核（報名審核與結果、審核人員指派），其餘＝其他（只在「全部」看到）。 */
+function noticeCategory(title: string, link: string): NoticeCategory {
+  if (/留言|回覆/.test(title)) return "comment";
+  if (/有新(課程|清單|章節|教材)|廣播公告|已送出「新/.test(title)) return "subscribe";
+  if (/審核|等待|報名已|課程已開通|繳費確認|開通已撤銷|報名有|已成為課程報名/.test(title) || link.startsWith("/admin/orders")) return "review";
+  return "other";
 }
 
 /** 統計分析：超級管理員、總部秘書一定可以；其他職務要被超級管理員指定。 */
@@ -3000,7 +3010,32 @@ const routes: [string, RegExp, Handler][] = [
         .prepare(`SELECT id, title, body, link, read_at, created_at FROM notifications WHERE ${n.sql} ORDER BY created_at DESC LIMIT 100`)
         .bind(...n.args)
         .all<{ id: string; title: string; body: string; link: string; read_at: string | null; created_at: string }>();
-      return results.map((x): Notice => ({ id: x.id, title: x.title, body: x.body, link: x.link, read: !!x.read_at, createdAt: x.created_at }));
+      return results.map((x): Notice => ({ id: x.id, title: x.title, body: x.body, link: x.link, read: !!x.read_at, createdAt: x.created_at, category: noticeCategory(x.title, x.link) }));
+    },
+  ],
+  [
+    "GET",
+    /^\/central-reviews$/,
+    async (ctx): Promise<CentralReviews> => {
+      // 通知頁「審核」分類：中央的獎銜、中心新申請（即時讀取、不保存）。非中央會員或沒有權限＝available:false。
+      const s = requireMember(ctx);
+      if (s.kind !== "central") return { available: false, scope: null, reviews: [] };
+      return centralReviews(s.token);
+    },
+  ],
+  [
+    "POST",
+    /^\/central-reviews\/([\w-]{1,64})\/decision$/,
+    async (ctx, [id]) => {
+      const s = requireMember(ctx);
+      if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以審核");
+      const body = await readJson<{ decision?: unknown }>(ctx.req);
+      if (body.decision !== "approve" && body.decision !== "reject") return fail(400, "invalid_decision", "請選擇通過或不通過");
+      const code = await centralDecide(s.token, id, body.decision);
+      if (code === 200) return { ok: true };
+      if (code === 403) return fail(403, "forbidden", "這個申請不屬於您負責的中心");
+      if (code === 404) return fail(404, "not_pending", "這筆申請已被處理過，請重新整理");
+      return fail(502, "central_unavailable", "會員中心暫時無法連線，請稍後再試");
     },
   ],
   [

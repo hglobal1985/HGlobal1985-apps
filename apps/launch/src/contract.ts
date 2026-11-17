@@ -339,7 +339,14 @@ export type ReviewGroup = {
   canManage: boolean;
 };
 
-export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string };
+/** 通知分類（通知頁的檢視模式：全部／審核／訂閱／留言；業主 2026-11-17）。 */
+export type NoticeCategory = "review" | "subscribe" | "comment" | "other";
+export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string; category: NoticeCategory };
+
+/** 中央的一筆「獎銜、中心」新申請（只即時顯示，不保存）。 */
+export type CentralReview = { id: string; display_name: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
+/** available＝false：這位會員沒有審核權限、或中央暫時不可用（畫面直接不顯示審核區）。 */
+export type CentralReviews = { available: boolean; scope: "all" | "center" | null; reviews: CentralReview[] };
 
 /** demo 的 url 可能是相對路徑（以 API 網域為準），App 端以 resolveUrl 轉成完整網址。hls 為 Mux 簽名播放網址。 */
 /** resumeAt＝續播起點（影片本身的秒數；這一堂還沒看完、上次停在中間才有）。 */

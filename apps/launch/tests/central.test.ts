@@ -41,6 +41,11 @@ function fakeCentral(url: string, init?: RequestInit): Promise<Response> {
     if (sub === "m_alice") return ok({ member_id: sub, roles: [], hglobal_verified: true, center: { key: "台北中心", label: "台北中心" } });
     return ok({ member_id: sub, roles: [], hglobal_verified: false, center: null });
   }
+  if (url.endsWith("/v1/eligibility/reviews")) {
+    if (sub === "m_pres") return ok({ scope: "center", reviews: [{ id: "r1", display_name: "阿甲", field_key: "rank", field_label: "獎銜", center: "台北中心", current_value: "silver", requested_value: "gold", created_at: "2026-11-17T10:00:00+08:00" }] });
+    return Promise.resolve(new Response("{}", { status: 403 }));
+  }
+  if (/\/v1\/eligibility\/reviews\/[^/]+\/decision$/.test(url)) return Promise.resolve(new Response("{}", { status: url.includes("/other/") ? 403 : url.includes("/gone/") ? 404 : sub === "m_pres" ? 200 : 403 }));
   if (url.endsWith("/v1/eligibility/check-batch")) {
     central.eligibilityCalls++;
     const { rules } = JSON.parse(String(init?.body)) as { rules: { min_rank: string }[] };
@@ -218,4 +223,20 @@ test("中心清單以會員中心為準：不混入行動大學本地資料，�
   // 中央暫時連不上：用最近一次成功的清單，不會變成空的或混入本地資料
   central.down = true;
   assert.deepEqual((await call<string[]>("GET", "/centers", { token: bob })).data, ["台北 100", "台中 136"]);
+});
+
+test("通知頁審核：中央的獎銜、中心新申請即時顯示（權限由中央判斷）；沒有權限＝available:false；處理結果對應中央狀態碼", async () => {
+  const call = setup();
+  setCentralFetch(fakeCentral);
+  const pres = (await call<{ available: boolean; scope: string; reviews: { id: string; display_name: string }[] }>("GET", "/central-reviews", { token: token({ sub: "m_pres" }) })).data;
+  assert.equal(pres.available, true);
+  assert.equal(pres.scope, "center");
+  assert.deepEqual(pres.reviews.map((r) => [r.id, r.display_name]), [["r1", "阿甲"]]);
+  const alice = (await call<{ available: boolean; reviews: unknown[] }>("GET", "/central-reviews", { token: token({ sub: "m_alice" }) })).data;
+  assert.deepEqual(alice, { available: false, scope: null, reviews: [] });
+  assert.equal((await call("POST", "/central-reviews/r1/decision", { token: token({ sub: "m_pres" }), body: { decision: "approve" } })).status, 200);
+  assert.equal((await call("POST", "/central-reviews/r1/decision", { token: token({ sub: "m_pres" }), body: { decision: "x" } })).status, 400);
+  assert.equal((await call("POST", "/central-reviews/other/decision", { token: token({ sub: "m_pres" }), body: { decision: "approve" } })).status, 403);
+  assert.equal((await call("POST", "/central-reviews/gone/decision", { token: token({ sub: "m_pres" }), body: { decision: "reject" } })).status, 404);
+  assert.equal((await call("GET", "/central-reviews")).status, 401);
 });

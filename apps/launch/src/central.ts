@@ -6,6 +6,7 @@
  *   或列在 LEARN_ADMIN_SUBS 的會員 ID。
  * 日誌不得出現 Token、信箱、姓名。
  */
+import type { CentralReviews } from "./contract.ts";
 export const CENTRAL = "https://id.hglobal1985.com";
 export const APP_ID = "learn";
 
@@ -253,6 +254,26 @@ export async function rankEligibility(sub: string, token: string, minRanks: stri
     if (res?.ok) memo.set(`elig:${sub}:${r}`, { value: allowed, until: Date.now() + 600_000 });
   });
   return out;
+}
+
+/**
+ * 中央的「獎銜、中心」新申請審核佇列（GET /v1/eligibility/reviews，業主 2026-11-17）：用會員本人的 Token 即時讀取，
+ * 權限與中心範圍全由中央判斷（超級管理員、秘書看全部；審核員只看自己的中心）；這裡不判斷、不保存、不寫日誌。
+ * 任何失敗（沒有權限、中央尚未開放、逾時）都回 available=false，畫面就不顯示審核區。
+ */
+export async function centralReviews(token: string): Promise<CentralReviews> {
+  const none: CentralReviews = { available: false, scope: null, reviews: [] };
+  const res = await callCentral(token, "/v1/eligibility/reviews");
+  if (!res?.ok) return none;
+  const b = (await res.json().catch(() => null)) as { scope?: string; reviews?: unknown[] } | null;
+  if (!b || !Array.isArray(b.reviews)) return none;
+  return { available: true, scope: b.scope === "all" ? "all" : "center", reviews: b.reviews as CentralReviews["reviews"] };
+}
+
+/** 處理一筆申請；回傳中央的狀態碼（200 成功；403 不是你的中心；404 已被處理過）。 */
+export async function centralDecide(token: string, id: string, decision: "approve" | "reject"): Promise<number> {
+  const res = await callCentral(token, `/v1/eligibility/reviews/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify({ decision }) });
+  return res?.status ?? 503;
 }
 
 export type MemberContext = { roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
