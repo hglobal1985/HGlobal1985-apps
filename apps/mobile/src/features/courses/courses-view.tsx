@@ -186,7 +186,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   }, [catStats, courses]);
   // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（業主 2026-11-15）；不混入本地資料。
   const rights = member?.courseRights;
-  const centerList = useApi<string[]>(member ? "/centers" : null);
+  const centerList = useApi<string[]>("/centers"); // 沒登入的訪客也讀得到（最近一次成功的副本）
   const centers = centerList.data ?? [];
   const normCenter = (v: string) => v.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
@@ -394,6 +394,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             ) : (
               <EmptyState icon="library-outline" title={matched ? "找不到符合的課程" : "沒有符合條件的課程"} />
             )
+          ) : null}
+          {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (
+            <EmptyState icon="business-outline" title="暫時看不到中心清單" body="請稍後再試，或先到「全部課程」瀏覽。" />
           ) : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL

@@ -2710,11 +2710,29 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/centers$/,
     async (ctx) => {
-      const s = requireMember(ctx);
-      // 只用會員中心的清單（正本）。不混入本地資料；中央暫時查不到時，用最近一次成功的清單，還是沒有就回報錯誤。
-      if (s.kind !== "central") return ["台北中心", "台中中心", "高雄中心"];
+      // 只用會員中心的清單（正本）。不混入本地資料；中央暫時查不到時，用最近一次成功的清單（存在 central_snapshots），還是沒有就回報錯誤。
+      // 沒登入的訪客（只能看公開課程）讀的是最近一次成功的副本，所以「所有中心」清單不會是空白（業主 2026-11-17）。
+      const s = ctx.session;
+      if (s && s.kind !== "central") return ["台北中心", "台中中心", "高雄中心"];
+      const snap = await ctx.db.prepare("SELECT value FROM central_snapshots WHERE key = 'centers'").first<{ value: string }>();
+      const saved = (() => {
+        try {
+          const v = JSON.parse(snap?.value ?? "[]") as unknown;
+          return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+        } catch {
+          return [];
+        }
+      })();
+      if (!s) {
+        if (!saved.length) fail(503, "central_unavailable", "暫時無法取得中心清單，請稍後再試");
+        return saved;
+      }
       const list = await centerList(s.token);
-      if (!list.length) fail(503, "central_unavailable", "暫時無法取得會員中心的中心清單，請稍後再試");
+      if (!list.length) {
+        if (saved.length) return saved;
+        fail(503, "central_unavailable", "暫時無法取得會員中心的中心清單，請稍後再試");
+      }
+      if (JSON.stringify(list) !== JSON.stringify(saved)) await ctx.db.prepare("INSERT INTO central_snapshots (key, value) VALUES ('centers', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list)).run();
       return list;
     },
   ],
