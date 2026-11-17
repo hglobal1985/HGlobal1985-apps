@@ -323,14 +323,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
           <>
             <View>
               <EdmStage course={course} />
-              {firstPlayable || playLesson ? (
-                <View pointerEvents="box-none" style={styles.stagePlay}>
-                  {/* 按下播放後、播放器還沒出現的空檔（取播放授權中）：大播放鈕換成小瓢蟲 */}
-                  <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => firstPlayable && !playLesson && playLesson_(firstPlayable.id)} style={styles.bigPlay}>
-                    {playLesson ? <LoadingLadybug size={52} /> : <Ionicons name="play" size={34} color="#fff" style={{ marginLeft: 4 }} />}
-                  </Pressable>
-                </View>
-              ) : null}
+              {/* 影片中間不放任何按鈕（業主 2026-11-17）：播放一律從下面的控制列。 */}
             </View>
             {firstPlayable || playLesson ? (
               <View style={[styles.idleBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
@@ -437,8 +430,6 @@ function BannerButton({ label, onPress, strong }: { label: string; onPress: () =
 }
 
 const styles = StyleSheet.create({
-  stagePlay: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
-  bigPlay: { width: 72, height: 72, borderRadius: 36, backgroundColor: "rgba(12,96,60,0.92)", alignItems: "center", justifyContent: "center" },
   idleBar: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingHorizontal: 16, borderBottomWidth: 1 },
   idlePlay: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   idleTrack: { flex: 1, height: 6, borderRadius: 3 },
