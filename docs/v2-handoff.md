@@ -656,3 +656,4 @@
 - 2026-11-17：業主授權後，已產生正式站推播金鑰並以 `wrangler secret put VAPID_PRIVATE_JWK` 寫入 Cloudflare（金鑰未出現在對話或 repo）；`GET /push/key` 已回傳公鑰，推播正式啟用。
 - 2026-11-17：分享網址進來的返回鍵：`TopBar` 新增 `backTo`（`PageHeader` 經 Stack options 傳入；沒有上一頁才用）；課程頁 backTo＝主辦中心頁或 /courses；中心頁打開時墊的「上一頁」改成 `/courses?view=centers`（`CoursesView` 新增 `initialCenters`）；中心短網址頁沒有上一頁時 replace 到所有中心清單。本機以全新分頁開分享網址逐一驗證 4 種入口＋連續返回，以及 App 內正常點擊的返回不受影響。
 - 2026-11-17：修正「所有中心」清單對沒登入訪客一片空白（`/centers` 原本要求登入）：migration 0064 `central_snapshots` 存「最近一次成功」的中央中心清單副本（仍以會員中心為正本），登入者讀取時自動更新副本，訪客讀副本；沒有副本時畫面顯示「暫時看不到中心清單」而不是空白。副本要等第一位登入者打開過中心清單才會建立。測試 tests/centers-visitor.test.ts。
+- 2026-11-17：時間軸區間設定（`time-range-picker.tsx`）改版：原本「放大」按鈕（四段切換）換成獨立的放大鏡滑桿（對數連續縮放，預設最左＝完整顯示總覽）；總覽模式紅線跟著手指／點擊，放大後維持膠卷捲動（紅線固定中間）並新增「點一下膠卷跳到該位置」；修正膠卷刻度的時間文字因被 1px 寬的父層限制而看不見。本機以 Playwright 驗證點擊定位、滑桿縮放、−／＋、設為開始。

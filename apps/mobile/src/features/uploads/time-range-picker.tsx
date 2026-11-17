@@ -3,12 +3,12 @@ import { PanResponder, Pressable, StyleSheet, View } from "react-native";
 import type { MediaType } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText } from "@/ui";
+import { AppText, Icon } from "@/ui";
 import { fromHms, toHms, type Hms } from "./hms";
 import { RangePreview } from "./range-preview";
 
 const STRIP_H = 72;
-const PPS_LEVELS = [2, 6, 16, 40]; // 每秒幾個像素（越大越細）
+const ZOOM_STEP = 0.12; // 放大鏡 − ＋ 每按一下移動的滑桿比例
 const STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 300, 600, 1800, 3600];
 const clock = (s: number) => {
   const h = Math.floor(s / 3600);
@@ -24,6 +24,8 @@ const clock = (s: number) => {
  * 畫面中央有一條固定的紅線，左右拖曳下方的膠卷刻度＝移動時間；上方預覽視窗（網頁版）停在紅線那一秒；
  * 按「設為開始」「設為結束」就把紅線的時間填進欄位；−5／−1／+1／+5 秒微調（手機上不必精準拖到秒）。
  * 開始與結束的位置會以綠旗、橘旗標在膠卷上，中間的區段加底色。duration＝影片總長（秒，抓不到就先給 3 小時）。
+ * 縮放（業主 2026-11-17）：獨立的「放大鏡」滑桿專門控制時間軸縮放，預設拉到最左＝整支影片完整顯示在膠卷上（拖一下就能大範圍移動）；
+ * 往右拉逐步放大到可以精準到秒。膠卷本身可以左右拖曳，也可以直接點一下膠卷，紅線就跳到那個位置。
  */
 export function TimeRangePicker({
   kind,
@@ -49,11 +51,16 @@ export function TimeRangePicker({
   const sSec = typeof s === "number" ? s : null;
   const eSec = typeof e === "number" ? e : null;
   const [pos, setPos] = useState(sSec ?? 0);
-  const [level, setLevel] = useState(1);
+  const [zoom, setZoom] = useState(0); // 0＝完整顯示（整支影片剛好塞滿膠卷），1＝最大
   const [w, setW] = useState(320);
-  const pps = PPS_LEVELS[level]!;
-  const geo = useRef({ pos: 0, pps, total });
-  geo.current = { pos, pps, total };
+  // 每秒幾個像素：最小＝整支影片剛好塞滿膠卷；最大＝約每秒 60 像素（以對數連續變化，拉起來手感平均）。
+  const ppsMin = Math.max(0.0001, w / total);
+  const ppsMax = Math.max(60, ppsMin * 4);
+  const pps = ppsMin * Math.pow(ppsMax / ppsMin, zoom);
+  // 完整顯示（放大鏡在最左）＝總覽模式：整支影片鋪滿膠卷，紅線跟著手指（拖曳或點一下）；放大後＝膠卷捲動、紅線固定在中間。
+  const full = zoom < 0.02;
+  const geo = useRef({ pos: 0, pps, total, w, left: 0, full });
+  geo.current = { pos, pps, total, w, left: geo.current.left, full };
   const base = useRef(0);
   const clamp = (v: number) => Math.min(total, Math.max(0, v));
   const move = (v: number) => setPos(clamp(Math.round(v * 10) / 10));
@@ -62,26 +69,47 @@ export function TimeRangePicker({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => (base.current = geo.current.pos),
-      onPanResponderMove: (_, g) => setPos(Math.min(geo.current.total, Math.max(0, Math.round((base.current - g.dx / geo.current.pps) * 10) / 10))),
+      onPanResponderGrant: (e) => {
+        const gx = geo.current;
+        base.current = gx.pos;
+        gx.left = e.nativeEvent.pageX - e.nativeEvent.locationX; // 膠卷左緣的位置（算手指點在哪個時間用）
+        // 總覽模式：手指按到哪，紅線就跳到哪。
+        if (gx.full) setPos(Math.min(gx.total, Math.max(0, Math.round(((e.nativeEvent.pageX - gx.left) / gx.pps) * 10) / 10)));
+      },
+      onPanResponderMove: (e, g) => {
+        const gx = geo.current;
+        if (gx.full) setPos(Math.min(gx.total, Math.max(0, Math.round(((e.nativeEvent.pageX - gx.left) / gx.pps) * 10) / 10)));
+        else setPos(Math.min(gx.total, Math.max(0, Math.round((base.current - g.dx / gx.pps) * 10) / 10)));
+      },
+      // 放大後點一下（幾乎沒移動）＝紅線直接跳到點的位置。
+      onPanResponderRelease: (e, g) => {
+        const gx = geo.current;
+        if (gx.full || Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6) return;
+        const px = e.nativeEvent.pageX - gx.left;
+        setPos(Math.min(gx.total, Math.max(0, Math.round((gx.pos + (px - gx.w / 2) / gx.pps) * 10) / 10)));
+      },
     }),
   ).current;
   useEffect(() => {
     if (pos > total) setPos(total);
   }, [total]); // eslint-disable-line react-hooks/exhaustive-deps
   const at = Math.floor(pos);
-  const x = (t: number) => w / 2 + (t - pos) * pps;
+  const x = (t: number) => (full ? t * pps : w / 2 + (t - pos) * pps);
+  const redX = full ? pos * pps : w / 2;
   const step = STEPS.find((v) => v * pps >= 52) ?? 3600;
   const ticks = useMemo(() => {
-    const from = Math.max(0, Math.floor((pos - w / 2 / pps) / step) * step);
-    const to = Math.min(total, pos + w / 2 / pps);
+    const lo = full ? 0 : pos - w / 2 / pps;
+    const from = Math.max(0, Math.floor(lo / step) * step);
+    const to = Math.min(total, full ? total : pos + w / 2 / pps);
     const out: number[] = [];
     for (let t = from; t <= to + step; t += step) if (t <= total) out.push(t);
     return out;
-  }, [pos, pps, w, step, total]);
+  }, [pos, pps, w, step, total, full]);
   const setStart = () => onChange({ start: toHms(at), ...(eSec != null && eSec <= at ? { end: toHms(null) } : {}) });
   const setEnd = () => onChange({ end: toHms(at), toEnd: false });
   const fine = (d: number) => move(pos + d);
+  const mag = pps / ppsMin; // 放大幾倍（1＝完整顯示）
+  const magText = full ? "完整顯示（整支影片）" : `放大 ${mag < 10 ? mag.toFixed(1).replace(/\.0$/, "") : Math.round(mag)} 倍`;
   const btn = (label: string, onPress: () => void, tone: "plain" | "start" | "end" = "plain") => (
     <Pressable
       key={label}
@@ -108,35 +136,83 @@ export function TimeRangePicker({
         </AppText>
       </View>
       {/* 膠卷：左右拖曳；固定的紅線＝目前時間 */}
-      <View style={[styles.strip, { borderColor: c.border, backgroundColor: c.surface }]} onLayout={(ev) => setW(Math.max(1, ev.nativeEvent.layout.width))} accessibilityRole="adjustable" accessibilityLabel="時間軸，左右拖曳" {...pan.panHandlers}>
+      <View style={[styles.strip, { borderColor: c.border, backgroundColor: c.surface }]} onLayout={(ev) => setW(Math.max(1, ev.nativeEvent.layout.width))} accessibilityRole="adjustable" accessibilityLabel="時間軸，拖曳或點一下" {...pan.panHandlers}>
         {rangeR > rangeL ? <View pointerEvents="none" style={{ position: "absolute", left: rangeL, width: rangeR - rangeL, top: 0, bottom: 0, backgroundColor: c.accentSoft }} /> : null}
         <View pointerEvents="none" style={[styles.holes, { top: 4 }]} />
         <View pointerEvents="none" style={[styles.holes, { bottom: 4 }]} />
         {ticks.map((t) => (
-          <View key={t} pointerEvents="none" style={{ position: "absolute", left: x(t), top: 14, bottom: 14, width: 1, backgroundColor: c.border }}>
-            <AppText variant="caption" tone="muted" numberOfLines={1} style={{ position: "absolute", top: 12, left: 4, width: 64, fontSize: 11 }}>
+          // 刻度線與時間文字分開：文字放在一條 1px 寬的線裡會被切成看不見（網頁的 numberOfLines 會把寬度限制成父層的 100%）。
+          <View key={t} pointerEvents="none" style={{ position: "absolute", left: x(t), top: 14, bottom: 14, width: 64 }}>
+            <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 1, backgroundColor: c.border }} />
+            <AppText variant="caption" tone="muted" numberOfLines={1} style={{ position: "absolute", top: 12, left: 4, width: 58, fontSize: 11 }}>
               {clock(t)}
             </AppText>
           </View>
         ))}
         {sSec != null ? <Flag left={x(sSec)} color={c.accent} label="始" /> : null}
         {eSec != null ? <Flag left={x(eSec)} color={c.warning} label="終" /> : null}
-        <View pointerEvents="none" style={[styles.center, { left: w / 2 - 1, backgroundColor: c.danger }]} />
+        <View pointerEvents="none" style={[styles.center, { left: redX - 1, backgroundColor: c.danger }]} />
       </View>
+      {/* 放大鏡：專門縮放時間軸；預設最左＝完整顯示 */}
+      <View style={styles.zoomRow}>
+        <Pressable accessibilityRole="button" accessibilityLabel="縮小時間軸" onPress={() => setZoom((z) => Math.max(0, z - ZOOM_STEP))} style={styles.lens}>
+          <Icon name="search" size={22} color={c.text} />
+          <AppText style={{ fontSize: 20, lineHeight: 22, fontWeight: "800", color: c.text }}>−</AppText>
+        </Pressable>
+        <ZoomSlider value={zoom} onChange={setZoom} />
+        <Pressable accessibilityRole="button" accessibilityLabel="放大時間軸" onPress={() => setZoom((z) => Math.min(1, z + ZOOM_STEP))} style={styles.lens}>
+          <Icon name="search" size={22} color={c.text} />
+          <AppText style={{ fontSize: 20, lineHeight: 22, fontWeight: "800", color: c.text }}>+</AppText>
+        </Pressable>
+      </View>
+      <AppText variant="caption" tone="muted" style={{ textAlign: "center" }}>
+        放大鏡：{magText}
+        {full ? "，拖曳或點一下，紅線就跟著到那裡" : "（拉到最左＝完整顯示）"}
+      </AppText>
       <View style={styles.row}>
         {btn("−5秒", () => fine(-5))}
         {btn("−1秒", () => fine(-1))}
         {btn("+1秒", () => fine(1))}
         {btn("+5秒", () => fine(5))}
-        {btn(level === PPS_LEVELS.length - 1 ? "縮小" : "放大", () => setLevel((l) => (l === PPS_LEVELS.length - 1 ? 0 : l + 1)))}
       </View>
       <View style={styles.row}>
         {btn("設為開始", setStart, "start")}
         {btn("設為結束", setEnd, "end")}
       </View>
       <AppText variant="caption" tone="muted">
-        左右拖曳膠卷到想要的位置（紅線＝目前時間），再按「設為開始」或「設為結束」；綠旗是開始、橘旗是結束。
+        先在「完整顯示」大致點出位置，再用放大鏡放大、微調，讓紅線停在想要的時間，按「設為開始」或「設為結束」；綠旗是開始、橘旗是結束。
       </AppText>
+    </View>
+  );
+}
+
+/** 放大鏡滑桿：手指按住左右拖曳會即時縮放時間軸（0＝完整顯示、1＝最大）；觸控區高 48、圓點直徑 26。 */
+function ZoomSlider({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const { c } = useTheme();
+  const [width, setWidth] = useState(1);
+  const geo = useRef({ left: 0, width: 1 });
+  geo.current.width = width;
+  const cb = useRef(onChange);
+  cb.current = onChange;
+  const frac = (pageX: number) => Math.min(1, Math.max(0, (pageX - geo.current.left) / geo.current.width));
+  const responder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: (e) => {
+        geo.current.left = e.nativeEvent.pageX - e.nativeEvent.locationX;
+        cb.current(frac(e.nativeEvent.pageX));
+      },
+      onPanResponderMove: (e) => cb.current(frac(e.nativeEvent.pageX)),
+    }),
+  ).current;
+  return (
+    <View style={styles.zoomTouch} onLayout={(e) => setWidth(Math.max(1, e.nativeEvent.layout.width))} accessibilityRole="adjustable" accessibilityLabel="時間軸放大鏡，往右拉放大、往左拉縮小" accessibilityValue={{ min: 0, max: 100, now: Math.round(value * 100) }} {...responder.panHandlers}>
+      <View pointerEvents="none" style={[styles.zoomTrack, { backgroundColor: c.border }]}>
+        <View style={{ height: 6, borderRadius: 3, width: `${value * 100}%`, backgroundColor: c.accent }} />
+      </View>
+      <View pointerEvents="none" style={[styles.zoomThumb, { left: `${value * 100}%`, backgroundColor: c.accent, borderColor: c.surface }]} />
     </View>
   );
 }
@@ -160,5 +236,10 @@ const styles = StyleSheet.create({
   holes: { position: "absolute", left: 0, right: 0, height: 6, borderStyle: "dashed", borderWidth: 1.5, borderColor: "#00000033", borderRadius: 3 },
   center: { position: "absolute", top: 0, bottom: 0, width: 3, zIndex: 5 },
   row: { flexDirection: "row", gap: space.xs },
+  zoomRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
+  lens: { width: 56, height: minTouch, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 1 },
+  zoomTouch: { flex: 1, height: minTouch, justifyContent: "center", marginHorizontal: 13 },
+  zoomTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
+  zoomThumb: { position: "absolute", width: 26, height: 26, borderRadius: 13, marginLeft: -13, borderWidth: 3 },
   btn: { flex: 1, minHeight: minTouch, borderWidth: 1, borderRadius: radius.sm, alignItems: "center", justifyContent: "center", paddingHorizontal: 2 },
 });
