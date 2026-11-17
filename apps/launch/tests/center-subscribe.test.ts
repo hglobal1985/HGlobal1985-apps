@@ -49,4 +49,16 @@ test("中心訂閱（從 688 開始、可取消）與廣播公告（新增、秒
   const m2 = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "系列新課", teacher: "王小明", hostUnit: "台北中心", priceTwd: 0, series: "新系列" } })).data;
   await call("PATCH", `/admin/courses/${m2.id}`, { token: admin, body: { status: "published" } });
   assert.ok((await call<{ title: string; body: string }[]>("GET", "/notifications", { token: b })).data.some((n) => n.title.includes("新系列有新課程上架") && n.body.includes("系列新課")));
+
+  // 系列裡的課程新增章節／教材：通知系列訂閱者；30 分鐘內同類型合併；新增的人自己收到確認
+  const before = (await call<{ title: string }[]>("GET", "/notifications", { token: b })).data.filter((n) => n.title === "新系列有新章節").length;
+  assert.equal((await call("POST", `/admin/courses/${m2.id}/lessons`, { token: admin, body: { title: "第一堂" } })).status, 200);
+  assert.equal((await call("POST", `/admin/courses/${m2.id}/lessons`, { token: admin, body: { title: "第二堂" } })).status, 200);
+  const after = (await call<{ title: string; body: string }[]>("GET", "/notifications", { token: b })).data.filter((n) => n.title === "新系列有新章節");
+  assert.equal(after.length, before + 1, "30 分鐘內同一門課只通知一次");
+  const mine = (await call<{ title: string; body: string }[]>("GET", "/notifications", { token: admin })).data.filter((n) => n.title === "已送出「新章節」通知");
+  assert.equal(mine.length, 2, "新增的人每次都收到確認");
+  assert.ok(mine.some((n) => n.body.includes("通知了 1 位系列訂閱者")) && mine.some((n) => n.body.includes("已通知過")));
+  assert.equal((await call("POST", `/admin/courses/${m2.id}/materials`, { token: admin, body: { url: "https://example.com/a.pdf", title: "講義" } })).status, 200);
+  assert.ok((await call<{ title: string }[]>("GET", "/notifications", { token: b })).data.some((n) => n.title === "新系列有新教材"));
 });

@@ -95,7 +95,7 @@
 
 - **影片操作提示與照片放大回饋也改全螢幕提醒（業主 2026-11-17）**：「可拖曳或放大縮小，點兩下復原」改用 `zoomHintOnce()`（`features/player/zoom-hint.ts`，每次開啟網站只提醒一次，影片上不再有黑色小膠囊）；照片放大的「已複製連結」「下載失敗」改 `flashText`。仍保留的非提醒元件：上拉面板拖曳時的「放開進入…」即時提示膠囊、照片放大下方的操作說明列（常駐說明，不是回饋）。
 
-- **訂閱模組（業主 2026-11-17）**：中心首頁圖與系列首頁圖的訂閱鈕設計、尺寸、樣式一律統一，集中在 `features/courses/subscribe.tsx`：`SubscribeButton`（鈕本體）＋`useSubscribe(kind, name, loginNext)`（讀取、訂閱／取消、登入導向、全螢幕提醒）；`CenterHero` 的 `subscribe` 參數由它提供，中心頁與系列頁（`SeriesPage`）都用同一個。系列訂閱 API＝`/series-subscription`（沿用 `center_subscriptions` 表，鍵為 `series:系列名`），人數同樣從 688 開始；系列有新課程上架（`notifyNewCourse`）也通知系列訂閱者。要改訂閱鈕外觀只改這個檔案，不可在別處另畫。
+- **訂閱模組（業主 2026-11-17）**：中心首頁圖與系列首頁圖的訂閱鈕設計、尺寸、樣式一律統一，集中在 `features/courses/subscribe.tsx`：`SubscribeButton`（鈕本體）＋`useSubscribe(kind, name, loginNext)`（讀取、訂閱／取消、登入導向、全螢幕提醒）；`CenterHero` 的 `subscribe` 參數由它提供，中心頁與系列頁（`SeriesPage`）都用同一個。系列訂閱 API＝`/series-subscription`（沿用 `center_subscriptions` 表，鍵為 `series:系列名`），人數同樣從 688 開始；系列有新課程上架（`notifyNewCourse`）也通知系列訂閱者。要改訂閱鈕外觀只改這個檔案，不可在別處另畫。**系列內的課程或清單新增章節／教材時，也通知該系列的訂閱者**（`notifyNewContent`，業主 2026-11-17；已上架且非私密連結才通知訂閱者，同一門課同一類型 30 分鐘內只通知一次避免洗版；新增的人自己每次都收到「已送出『新章節／教材』通知」確認，含通知人數或「已合併」）。
 
 - **封面裁切框（業主 2026-11-17）**：`EdmCropper`（`features/admin/edm-cropper.web.tsx`）裁掉的部分用標準暗化色 `DIM_COLOR` 蓋住，裁切框四周是 5px 白色粗框（框貼著圖片邊緣時也完整看得到）。
 

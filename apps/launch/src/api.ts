@@ -957,6 +957,30 @@ async function notifyNewCourse(ctx: Ctx, id: string): Promise<void> {
   }
 }
 
+/**
+ * 系列裡的課程或清單新增章節／教材：通知這個系列的訂閱者（業主 2026-11-17）。已上架且非私密連結才通知訂閱者；
+ * 同一門課同一類型 30 分鐘內只通知一次（連續新增很多章節不會一直洗版）；新增的人自己一定收到一則確認（含通知人數或「已合併」）。
+ */
+async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "教材"): Promise<void> {
+  try {
+    const c = await ctx.db.prepare("SELECT title, view_scope, status, series, is_list FROM courses WHERE id = ?").bind(courseId).first<{ title: string; view_scope: string; status: string; series: string | null; is_list: number }>();
+    if (!c || c.status !== "published") return;
+    const me = ctx.session?.sub ?? null;
+    const link = `/course/${courseId}`;
+    const title = `${c.series || c.title}有新${what}`;
+    let sent = 0;
+    let merged = false;
+    if (c.series && !isPrivate(c.view_scope)) {
+      const recent = await ctx.db.prepare("SELECT 1 AS ok FROM notifications WHERE link = ? AND title = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') LIMIT 1").bind(link, title).first();
+      if (recent) merged = true;
+      else sent = await notifySubscribers(ctx.db, seriesSubKey(c.series), title, `${c.title.slice(0, 80)}（${c.is_list === 1 ? "清單" : "課程"}）`, link, me);
+    }
+    if (me) await notify(ctx.db, { sub: me }, `已送出「新${what}」通知`, merged ? `${c.title.slice(0, 80)}（30 分鐘內已通知過，這次合併不重複發送）` : `${c.title.slice(0, 80)}（通知了 ${sent} 位系列訂閱者）`, link).run();
+  } catch {
+    /* 通知失敗不影響新增 */
+  }
+}
+
 /** 通知某個中心／系列的所有訂閱者（站內通知；推播由通知機制自動處理）。except＝不重複通知的人（上架者自己，另外收確認通知）；回傳通知人數。 */
 async function notifySubscribers(db: D1Database, key: string, title: string, body: string, link: string, except: string | null = null): Promise<number> {
   const { results } = await db.prepare("SELECT member_sub FROM center_subscriptions WHERE center_key = ?").bind(key).all<{ member_sub: string }>();
@@ -3307,6 +3331,7 @@ const routes: [string, RegExp, Handler][] = [
         ...(yt ? [] : [ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, courseId, title, u.toString(), classifyLink(u), admin.sub)]),
         audit(ctx.db, admin.sub, "material.create", "lesson", id, `${classifyLink(u)}:${title}`),
       ]);
+      await notifyNewContent(ctx, courseId, "教材");
       return courseDetail(ctx, courseId);
     },
   ],
@@ -4478,6 +4503,7 @@ const routes: [string, RegExp, Handler][] = [
         ...(speaker ? [speakerSync(ctx.db, courseId)] : []),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);
+      await notifyNewContent(ctx, courseId, kind === "material" ? "教材" : "章節");
       return courseDetail(ctx, courseId);
     },
   ],
