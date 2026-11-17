@@ -37,7 +37,8 @@ function AppStack() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "寰宇行動大學" }} />
             <Stack.Screen name="course/[id]" options={{ title: "課程介紹" }} />
             <Stack.Screen name="review-invite/[token]" options={{ title: "審核人員邀請" }} />
-            <Stack.Screen name="library" options={{ title: "我的圖書館" }} />
+            <Stack.Screen name="library" options={{ headerShown: false }} />
+            <Stack.Screen name="library-settings" options={{ title: "圖書館設定" }} />
             <Stack.Screen name="library-invite/[code]" options={{ title: "我的圖書館邀請" }} />
             <Stack.Screen name="admin/libraries" options={{ title: "圖書館管理" }} />
             <Stack.Screen name="[slug]" options={{ title: "課程" }} />

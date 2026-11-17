@@ -20,7 +20,7 @@ export const LIB = { bg: "#2A1D16", wood: "#7A4B2A", woodDark: "#5A3820", brass:
 const SPINES = ["#7A1F26", "#1F5A44", "#1F3A6B", "#7A5330", "#5A2A6B", "#8A6D1F", "#2F6F6A", "#9A3B2B", "#3C4F8C", "#5F6F2A"];
 const spineColor = (id: string) => SPINES[[...id].reduce((n, ch) => n + ch.charCodeAt(0), 0) % SPINES.length]!;
 const KEY = (n: string) => `hglobal:learn:lib-tokens:${n}`;
-type Tokens = { lib?: string; items?: Record<string, string> };
+export type Tokens = { lib?: string; items?: Record<string, string> };
 
 export function openBook(b: LibraryItem) {
   if (!b.url) return;
@@ -73,13 +73,20 @@ export function LibraryScreen({ number }: { number: string }) {
   return <Shelves view={view} number={number} tokens={tokens} onTokens={saveTokens} />;
 }
 
-function Page({ children }: { children: React.ReactNode }) {
+function Page({ children, gear }: { children: React.ReactNode; gear?: () => void }) {
   // 圖書館自成一套深色木質版面，不用行動大學的標準上方工具列；自己放一個返回鍵（沒有上一頁就回首頁）。
   return (
     <ScrollView style={{ flex: 1, backgroundColor: LIB.bg }} contentContainerStyle={styles.page}>
-      <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} hitSlop={10} style={{ width: 44, height: 44, justifyContent: "center", marginTop: Platform.OS === "web" ? 0 : 20 }}>
-        <Ionicons name="chevron-back" size={28} color={LIB.brass} />
-      </Pressable>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Platform.OS === "web" ? 0 : 20 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} hitSlop={10} style={{ width: 44, height: 44, justifyContent: "center" }}>
+          <Ionicons name="chevron-back" size={28} color={LIB.brass} />
+        </Pressable>
+        {gear ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="圖書館設定" onPress={gear} hitSlop={10} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="settings-outline" size={26} color={LIB.brass} />
+          </Pressable>
+        ) : null}
+      </View>
       {children}
     </ScrollView>
   );
@@ -136,7 +143,7 @@ function LockedLibrary({ view, number, onUnlocked }: { view: LibraryView; number
   );
 }
 
-function Shelves({ view, number, tokens, onTokens }: { view: LibraryView; number: string; tokens: Tokens; onTokens: (t: Tokens) => void }) {
+export function Shelves({ view, number, tokens, onTokens, onGear, emptyText = "書架還是空的" }: { view: LibraryView; number: string; tokens: Tokens; onTokens: (t: Tokens) => void; onGear?: () => void; emptyText?: string }) {
   const [folded, setFolded] = useState<Set<string>>(new Set());
   const [sheet, setSheet] = useState<LibraryItem | null>(null);
   // 書架（分類標題）與底下的書：第一個書架之前的書放在「散放的書」。
@@ -150,7 +157,7 @@ function Shelves({ view, number, tokens, onTokens }: { view: LibraryView; number
   }
   const total = view.items.filter((i) => i.kind === "book").length;
   return (
-    <Page>
+    <Page gear={view.owner ? () => router.push("/library-settings") : onGear}>
       <Plaque title={view.title} owner={view.ownerName} />
       <View style={styles.stats}>
         <Text style={styles.statN}>{total}</Text>
@@ -158,12 +165,7 @@ function Shelves({ view, number, tokens, onTokens }: { view: LibraryView; number
         <Text style={styles.statN}>{groups.filter((g) => g.shelf).length}</Text>
         <Text style={styles.statL}>書架</Text>
       </View>
-      {view.owner ? (
-        <Pressable accessibilityRole="button" onPress={() => router.push("/library")} style={({ pressed }) => [styles.brassBtn, { alignSelf: "center", paddingHorizontal: 22 }, pressed && { opacity: 0.8 }]}>
-          <Text style={styles.brassBtnText}>管理我的圖書館</Text>
-        </Pressable>
-      ) : null}
-      {!groups.length ? <Text style={styles.empty}>書架還是空的</Text> : null}
+      {!groups.length ? <Text style={styles.empty}>{emptyText}</Text> : null}
       {groups.map((g, gi) => {
         const id = g.shelf?.id ?? `loose-${gi}`;
         const open = !folded.has(id);
