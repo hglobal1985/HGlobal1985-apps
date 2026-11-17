@@ -12,6 +12,7 @@ export function RangePreview({ kind, ytId, audioFile, at, playing, onTime, onSto
   const loaded = useRef(false);
   const first = useRef(at);
   const lastTime = useRef(at); // 播放位置最後一次回報的秒數（判斷「是播放前進」還是「使用者拖曳跳秒」）
+  const ytState = useRef(-1); // YouTube 最近一次回報的播放狀態
   const playingRef = useRef(playing);
   playingRef.current = playing;
   const cb = useRef({ onTime, onStop });
@@ -66,13 +67,17 @@ export function RangePreview({ kind, ytId, audioFile, at, playing, onTime, onSto
     const onMsg = (ev: MessageEvent) => {
       if (ev.source !== frame.current?.contentWindow || typeof ev.data !== "string") return;
       try {
-        const d = JSON.parse(ev.data) as { event?: string; info?: { currentTime?: number; playerState?: number } };
-        const info = d.info;
-        if (d.event !== "infoDelivery" || !info) return;
-        if (info.playerState === 0 && playingRef.current) cb.current.onStop();
-        if (typeof info.currentTime === "number" && playingRef.current && info.playerState === 1) {
-          lastTime.current = info.currentTime;
-          cb.current.onTime(info.currentTime);
+        const d = JSON.parse(ev.data) as { event?: string; info?: { currentTime?: number; playerState?: number } | number };
+        // YouTube 的回報只帶「有變的欄位」：狀態只在改變時才有，時間則每 0.25 秒一次，所以狀態要自己記下來。
+        const state = d.event === "onStateChange" ? (d.info as number) : d.event === "infoDelivery" && typeof d.info === "object" ? d.info?.playerState : undefined;
+        if (typeof state === "number") {
+          ytState.current = state;
+          if (state === 0 && playingRef.current) cb.current.onStop();
+        }
+        const time = d.event === "infoDelivery" && typeof d.info === "object" ? d.info?.currentTime : undefined;
+        if (typeof time === "number" && playingRef.current && ytState.current !== 2 && ytState.current !== 0) {
+          lastTime.current = time;
+          cb.current.onTime(time);
         }
       } catch {
         /* 非播放器訊息 */
