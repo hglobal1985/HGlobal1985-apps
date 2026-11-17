@@ -453,7 +453,7 @@ export type ProfileForm = {
 };
 
 // ---------- 學習成就（徽章）----------
-export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed";
+export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day";
 /** 條件類型的中文說明（單位用在「累計 N ○」）。 */
 export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; needsCourse?: boolean }> = {
   lessons_completed: { label: "累計完成幾堂課", unit: "堂" },
@@ -462,6 +462,15 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   learning_days: { label: "累計幾個不同的日子有學習紀錄", unit: "天" },
   comments_posted: { label: "在課程留言板留言幾次", unit: "次" },
   course_completed: { label: "學完指定的某一門課程", unit: "堂", needsCourse: true },
+  streak_days: { label: "連續幾天都有完成章節（建議最多 7 天）", unit: "天" },
+  watch_minutes: { label: "累計完成章節的學習分鐘數", unit: "分鐘" },
+  centers_subscribed: { label: "訂閱幾個中心", unit: "個" },
+  series_subscribed: { label: "訂閱幾個系列", unit: "個" },
+  categories_explored: { label: "學習過幾種不同分類的課程", unit: "種" },
+  early_lessons: { label: "早晨（04:00～08:00）完成幾堂章節", unit: "堂" },
+  night_lessons: { label: "夜間（22:00～04:00）完成幾堂章節", unit: "堂" },
+  weekend_lessons: { label: "週末完成幾堂章節", unit: "堂" },
+  lessons_in_a_day: { label: "單日最多完成幾堂章節", unit: "堂" },
 };
 /** 會員看到的徽章：已取得或尚未取得（含目前進度）。 */
 export type Achievement = {

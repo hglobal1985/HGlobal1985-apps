@@ -38,6 +38,24 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
       );
     case "course_completed":
       return d.course_id ? courseDone(db, sub, d.course_id) : 0;
+    case "streak_days":
+      return one(db, "SELECT COALESCE(MAX(c), 0) AS n FROM (SELECT COUNT(*) AS c FROM (SELECT d, julianday(d) - ROW_NUMBER() OVER (ORDER BY d) AS g FROM (SELECT DISTINCT date(completed_at, '+8 hours') AS d FROM lesson_progress WHERE member_sub = ?)) GROUP BY g)", sub);
+    case "watch_minutes":
+      return one(db, "SELECT CAST(COALESCE(SUM(COALESCE(NULLIF(l.duration_minutes, 0), (l.end_seconds - l.start_seconds) / 60.0, 0)), 0) AS INTEGER) AS n FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id WHERE p.member_sub = ? AND l.kind = 'chapter'", sub);
+    case "centers_subscribed":
+      return one(db, "SELECT COUNT(*) AS n FROM center_subscriptions WHERE member_sub = ? AND center_key NOT LIKE 'series:%'", sub);
+    case "series_subscribed":
+      return one(db, "SELECT COUNT(*) AS n FROM center_subscriptions WHERE member_sub = ? AND center_key LIKE 'series:%'", sub);
+    case "categories_explored":
+      return one(db, "SELECT COUNT(DISTINCT c.category) AS n FROM lesson_progress p JOIN courses c ON c.id = p.course_id WHERE p.member_sub = ? AND c.category <> ''", sub);
+    case "early_lessons":
+      return one(db, "SELECT COUNT(*) AS n FROM lesson_progress WHERE member_sub = ? AND CAST(strftime('%H', completed_at, '+8 hours') AS INTEGER) BETWEEN 4 AND 7", sub);
+    case "night_lessons":
+      return one(db, "SELECT COUNT(*) AS n FROM lesson_progress WHERE member_sub = ? AND (CAST(strftime('%H', completed_at, '+8 hours') AS INTEGER) >= 22 OR CAST(strftime('%H', completed_at, '+8 hours') AS INTEGER) < 4)", sub);
+    case "weekend_lessons":
+      return one(db, "SELECT COUNT(*) AS n FROM lesson_progress WHERE member_sub = ? AND strftime('%w', completed_at, '+8 hours') IN ('0', '6')", sub);
+    case "lessons_in_a_day":
+      return one(db, "SELECT COALESCE(MAX(c), 0) AS n FROM (SELECT COUNT(*) AS c FROM lesson_progress WHERE member_sub = ? GROUP BY date(completed_at, '+8 hours'))", sub);
   }
 }
 
