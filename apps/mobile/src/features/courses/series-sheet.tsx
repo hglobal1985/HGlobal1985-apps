@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -41,6 +42,15 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
   return (
     <BottomSheet onClose={onClose} onExpand={showAllSeries ? showAll : undefined} expandLabel="繼續上拉顯示全部">
       <View style={styles.head}>
+        {/* 素材（清單類別）的標示放在標題左邊（業主 2026-11-17：從小卡右下角移到這裡）。 */}
+        {items.length > 0 && items.every((x) => x.isList) ? (
+          <View style={styles.matTag} accessibilityLabel="素材">
+            <Ionicons name="folder-open" size={14} color="#1D2A22" />
+            <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
+              素材
+            </AppText>
+          </View>
+        ) : null}
         <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
           {title}
         </AppText>
@@ -83,6 +93,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
 }
 
 const styles = StyleSheet.create({
+  matTag: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#FFD43B" },
   head: { flexDirection: "row", alignItems: "center", gap: space.sm },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, maxWidth: 120 },
   thumb: { width: 64, height: 36, borderRadius: radius.sm },

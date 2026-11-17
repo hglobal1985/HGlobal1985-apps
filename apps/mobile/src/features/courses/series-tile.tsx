@@ -1,6 +1,5 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 import { useSession } from "@/state/session";
@@ -72,12 +71,6 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
         {edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
-        {isMaterial ? (
-          <View style={styles.matTag} pointerEvents="none">
-            <Ionicons name="folder-open" size={12} color="#1D2A22" />
-            <Text style={styles.matTagText}>素材</Text>
-          </View>
-        ) : null}
         {/* 管理者才看得到的未上架課程：左下角標「未上架」（學員的清單裡不會有這些課）。 */}
         {group.sessions.some((x) => x.status === "draft") ? (
           <View style={[styles.draft, { backgroundColor: c.warning }]}>
@@ -94,8 +87,6 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
 const styles = StyleSheet.create({
   art: { borderRadius: radius.md, overflow: "hidden" },
   mat: { borderWidth: 2, borderStyle: "dashed", borderColor: "#486C48" },
-  matTag: { position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: "#FFD43B" },
-  matTagText: { color: "#1D2A22", fontSize: 12, fontWeight: "800" },
   draft: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   draftText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });
