@@ -4319,6 +4319,7 @@ const routes: [string, RegExp, Handler][] = [
           .bind(newId, l.course_id, l.position + 1, `${l.title}（複製）`.slice(0, 120), l.sharer, l.sharer_rank, l.sharer_title, audio ? 0 : l.duration_minutes, audio ? "demo" : l.media_type, audio ? null : l.media_ref, audio ? null : l.start_seconds, audio ? null : l.end_seconds, l.event_date, l.auto_cover, l.kind),
         audit(ctx.db, admin.sub, "lesson.duplicate", "lesson", newId, id),
       ]);
+      if (ctx.url.searchParams.get("lite") === "1") return { id: newId }; // 畫面已即時更新，不必回整份課程資料（比較快）
       return courseDetail(ctx, l.course_id);
     },
   ],
@@ -4342,6 +4343,7 @@ const routes: [string, RegExp, Handler][] = [
         ...ids.map((id, i) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(slots[i]!, id)),
         audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId),
       ]);
+      if (ctx.url.searchParams.get("lite") === "1") return { ok: true };
       return courseDetail(ctx, courseId);
     },
   ],

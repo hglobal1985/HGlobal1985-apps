@@ -53,7 +53,15 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
   // 剛儲存回來的最新資料（重新載入完成前先用它，避免下一次儲存誤判「別人剛改過」）。
   const [saved, setSaved] = useState<CourseDetail | null>(null);
-  const course = saved && saved.id === data?.id && (saved.admin?.updatedAt ?? "") > (data?.admin?.updatedAt ?? "") ? saved : data;
+  const base = saved && saved.id === data?.id && (saved.admin?.updatedAt ?? "") > (data?.admin?.updatedAt ?? "") ? saved : data;
+  // 章節排序、複製要「瞬間」有反應（業主 2026-11-17）：先在畫面上直接改，伺服器在背景處理，處理完再用正式資料換回來。
+  const [opt, setOpt] = useState<Lesson[] | null>(null);
+  const pendingOps = useRef(0);
+  const opQueue = useRef<Promise<unknown>>(Promise.resolve());
+  const course = base && opt ? { ...base, lessons: opt } : base;
+  useEffect(() => {
+    if (!pendingOps.current) setOpt(null);
+  }, [data]);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "success"; text: string } | null>(null);
   // 原地編輯：有權限的人在工具列按「編輯」進入；可「預覽」切回學員看到的樣子。
@@ -183,43 +191,53 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
 
   const lessons = course.lessons.filter((l) => !l.material);
   const materials = course.lessons.filter((l) => l.material);
+  /** 重新編號：章節、教材各自從 1 開始（完整版課程影片不編號）。 */
+  const renumber = (list: Lesson[]): Lesson[] => {
+    const n = { chapter: 0, material: 0 };
+    return list.map((l) => (l.full ? l : { ...l, position: ++n[l.material ? "material" : "chapter"] }));
+  };
+  /** 畫面先改、請求排隊在背景送：連續按很多下也照順序處理；全部完成才重新載入，失敗就還原並提示。 */
+  const optimistic = (next: Lesson[], send: () => Promise<unknown>) => {
+    setOpt(next);
+    pendingOps.current += 1;
+    opQueue.current = opQueue.current.then(async () => {
+      try {
+        await send();
+      } catch (e) {
+        setMessage({ tone: "danger", text: (e as Error).message });
+        pendingOps.current = 0;
+        setOpt(null);
+        invalidate();
+        return;
+      }
+      pendingOps.current -= 1;
+      if (pendingOps.current === 0) invalidate();
+    });
+  };
   const moveLesson = async (group: Lesson[], from: number, to: number) => {
-    const ids = group.filter((l) => !l.full).map((l) => l.id); // 「完整版課程影片」固定在最後，不參與排序
-    const [x] = ids.splice(from, 1);
-    ids.splice(to, 0, x!);
-    setLessonBusy(true);
-    try {
-      await api("POST", `/admin/courses/${course.id}/lessons/order`, { ids });
-      invalidate();
-    } catch (e) {
-      setMessage({ tone: "danger", text: (e as Error).message });
-    } finally {
-      setLessonBusy(false);
-    }
+    const movable = group.filter((l) => !l.full); // 「完整版課程影片」固定在最後，不參與排序
+    const next = [...movable];
+    const [x] = next.splice(from, 1);
+    next.splice(to, 0, x!);
+    const ids = next.map((l) => l.id);
+    const groupIds = new Set(group.map((l) => l.id));
+    // 這一組在整份清單裡原本佔的位置，依新順序放回去。
+    const all = course!.lessons;
+    const slots = all.map((l, i) => (groupIds.has(l.id) && !l.full ? i : -1)).filter((i) => i >= 0);
+    const merged = [...all];
+    slots.forEach((slot, k) => (merged[slot] = next[k]!));
+    optimistic(renumber(merged), () => api("POST", `/admin/courses/${course!.id}/lessons/order?lite=1`, { ids }));
   };
   const duplicateLesson = async (l: Lesson) => {
-    setLessonBusy(true);
-    try {
-      await api("POST", `/admin/lessons/${l.id}/duplicate`);
-      invalidate();
-    } catch (e) {
-      setMessage({ tone: "danger", text: (e as Error).message });
-    } finally {
-      setLessonBusy(false);
-    }
+    const all = course!.lessons;
+    const at = all.findIndex((x) => x.id === l.id);
+    const copy: Lesson = { ...l, id: `tmp-${Date.now()}`, title: `${l.title}（複製）`.slice(0, 120), completed: false };
+    optimistic(renumber([...all.slice(0, at + 1), copy, ...all.slice(at + 1)]), () => api("POST", `/admin/lessons/${l.id}/duplicate?lite=1`));
   };
   const deleteLesson = async (l: Lesson) => {
     const what = l.material ? "教材" : "章節";
     if (!(await confirmAsk(`刪除${what}`, `確定刪除「${l.title}」？這一${l.material ? "份" : "堂"}的音檔與附件會一併刪除。`, "刪除"))) return;
-    setLessonBusy(true);
-    try {
-      await api("DELETE", `/admin/lessons/${l.id}`);
-      invalidate();
-    } catch (e) {
-      setMessage({ tone: "danger", text: (e as Error).message });
-    } finally {
-      setLessonBusy(false);
-    }
+    optimistic(renumber(course!.lessons.filter((x) => x.id !== l.id)), () => api("DELETE", `/admin/lessons/${l.id}`));
   };
   const fullRow = materials.find((l) => l.full);
   const toggleFull = async (on: boolean) => {
