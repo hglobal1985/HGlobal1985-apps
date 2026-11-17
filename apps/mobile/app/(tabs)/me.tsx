@@ -5,7 +5,7 @@ import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-nati
 import { confirmAsk } from "@/features/confirm";
 import { MemberHeader } from "@/features/member-header";
 import { openAccountCenter } from "@/features/account-link";
-import type { AppConfig, Member } from "@/api/client";
+import type { AppConfig, LibraryMine, Member } from "@/api/client";
 import { canManageCourses, canManageEditors } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -41,6 +41,7 @@ export default function MeScreen() {
   const { next } = useLocalSearchParams<{ next?: string }>();
   const back = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
   const config = useApi<AppConfig>("/config");
+  const myLibrary = useApi<LibraryMine>(member ? "/library/mine" : null);
   const demo = useApi<Member[]>(!member && config.data?.demoLogin ? "/demo-members" : null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "success"; text: string } | null>(null);
@@ -121,6 +122,7 @@ export default function MeScreen() {
       {member && isWeb ? (
         <Card style={{ paddingVertical: 0 }}>
           <ListRow icon="document-text-outline" title="訂單紀錄" onPress={() => router.push("/orders")} />
+          {myLibrary.data?.library ? <ListRow icon="library-outline" title="我的圖書館" subtitle="個人專屬頁面：書架、影片、簡報、連結，可設密碼" onPress={() => router.push("/library")} /> : null}
         </Card>
       ) : null}
 
@@ -140,6 +142,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="pricetags-outline" title="關鍵字管理" subtitle="集中新增、改名、刪除課程的分類、系列、場地" onPress={() => router.push("/admin/keywords")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="options-outline" title="APP 數值設定" subtitle="首頁推薦規則、輪播秒數與其他全站數值" onPress={() => router.push("/admin/app-settings")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="share-social-outline" title="分享預設值" subtitle="分享選單的文字、LINE 預覽卡片的標題與備註格式" onPress={() => router.push("/admin/share-defaults")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="library-outline" title="圖書館管理" subtitle="產生「我的圖書館」邀請網址、查看與移除圖書館" onPress={() => router.push("/admin/libraries")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="link-outline" title="短網址" subtitle="集中設定分類、系列、中心的短網址與課程專屬網址" onPress={() => router.push("/admin/short-links")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="sparkles-outline" title="AI 模型" subtitle="切換逐字稿、關鍵字、語意搜尋用的 AI 模型，並比較花費" onPress={() => router.push("/admin/ai-models")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="trophy-outline" title="學習成就徽章設定" subtitle="設定要達成什麼條件才能獲得徽章" onPress={() => router.push("/admin/achievements")} /> : null}

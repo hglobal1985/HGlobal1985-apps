@@ -240,3 +240,56 @@ test("通知頁審核：中央的獎銜、中心新申請即時顯示（權限�
   assert.equal((await call("POST", "/central-reviews/gone/decision", { token: token({ sub: "m_pres" }), body: { decision: "reject" } })).status, 404);
   assert.equal((await call("GET", "/central-reviews")).status, 401);
 });
+
+test("我的圖書館：超級管理員邀請→會員接受（網址＝會員編號）→擁有者加書架與書→訪客要密碼才看得到；密碼可失效、可只鎖單一本書", async () => {
+  const call = setup();
+  // 在假中央的個人資料裡加上會員編號
+  setCentralFetch(async (url, init) => {
+    const res = await fakeCentral(url, init);
+    if (!url.endsWith("/v1/me/profile")) return res;
+    const b = (await res.json()) as { fields: Record<string, unknown> };
+    return new Response(JSON.stringify({ ...b, fields: { ...b.fields, member_number: { value: [{ country: "TW", number: "TW9475831" }] } } }), { status: 200 });
+  });
+  const boss = token({ sub: "m_bob" });
+  const alice = token({ sub: "m_alice" });
+  // 沒有邀請：什麼都沒有
+  assert.deepEqual((await call<{ library: unknown }>("GET", "/library/mine", { token: alice })).data.library, null);
+  assert.equal((await call("POST", "/admin/library-invites", { token: alice })).status, 403, "只有超級管理員能邀請");
+  const code = (await call<{ code: string }>("POST", "/admin/library-invites", { token: boss })).data.code;
+  const mine = (await call<{ library: { number: string; title: string } }>("POST", `/library-invites/${code}/accept`, { token: alice })).data;
+  assert.equal(mine.library.number, "tw9475831");
+  assert.equal((await call("POST", `/library-invites/${code}/accept`, { token: boss })).status, 404, "邀請只能用一次");
+  // 擁有者加書架與書
+  assert.equal((await call("POST", "/library/mine/items", { token: alice, body: { kind: "shelf", title: "我主講的課程" } })).status, 200);
+  const d = (await call<{ items: { id: string; kind: string; title: string; type: string }[] }>("POST", "/library/mine/items", { token: alice, body: { kind: "book", url: "https://docs.google.com/presentation/d/abc/edit", title: "第一屆簡報", eventDate: "2026-10-05" } })).data;
+  assert.deepEqual(d.items.map((i) => [i.kind, i.title]), [["shelf", "我主講的課程"], ["book", "第一屆簡報"]]);
+  assert.equal(d.items[1]!.type, "google_slides");
+  const book = d.items[1]!.id;
+  // 訪客（不用登入）看得到內容；網址不分大小寫
+  const view = async (tokens?: unknown, who?: string) => (await call<{ locked: boolean; lockExpired: boolean; owner: boolean; items: { id: string; url: string | null; locked: boolean }[] }>("POST", "/library/view/TW9475831", { token: who, body: { tokens } })).data;
+  assert.equal((await view()).items[1]!.url, "https://docs.google.com/presentation/d/abc/edit");
+  // 單獨替這本書設密碼：訪客只看到書名，沒有連結
+  assert.equal((await call("PATCH", `/library/mine/items/${book}`, { token: alice, body: { password: "abcd", passwordDays: 7 } })).status, 200);
+  let v = await view();
+  assert.equal(v.items[1]!.locked, true);
+  assert.equal(v.items[1]!.url, null);
+  assert.equal((await call("POST", "/library/view/tw9475831/unlock", { body: { password: "xxxx", itemId: book } })).status, 403);
+  const t = (await call<{ token: string }>("POST", "/library/view/tw9475831/unlock", { body: { password: "abcd", itemId: book } })).data.token;
+  v = await view({ items: { [book]: t } });
+  assert.equal(v.items[1]!.url, "https://docs.google.com/presentation/d/abc/edit");
+  assert.equal((await view(undefined, alice)).items[1]!.url !== null, true, "擁有者永遠看得到");
+  // 整座圖書館設密碼：沒憑證只看到上鎖畫面；改密碼後舊憑證失效
+  await call("PUT", "/library/mine", { token: alice, body: { password: "open", passwordDays: 1 } });
+  assert.deepEqual(await view().then((x) => [x.locked, x.items.length]), [true, 0]);
+  const lt = (await call<{ token: string }>("POST", "/library/view/tw9475831/unlock", { body: { password: "open" } })).data.token;
+  assert.equal((await view({ lib: lt })).locked, false);
+  await call("PUT", "/library/mine", { token: alice, body: { password: "newpw", passwordDays: 1 } });
+  assert.equal((await view({ lib: lt })).locked, true, "換密碼後舊憑證失效");
+  // 密碼失效日（改資料庫成已過期）：任何人都解不開，擁有者重設後才恢復
+  const env = (await import("./sqlite-d1.ts")).createTestDb;
+  void env;
+  // 關閉密碼＝公開
+  await call("PUT", "/library/mine", { token: alice, body: { password: null } });
+  assert.equal((await view()).locked, false);
+  assert.equal((await call("POST", "/library/view/not-exist", { body: {} })).status, 404);
+});

@@ -747,3 +747,26 @@ export const KEYWORD_INFO: Record<KeywordKind, { title: string; hint: string }> 
   series: { title: "系列", hint: "同系列的課，全部課程清單只顯示最近的一場" },
   location: { title: "場地", hint: "課程的上課地點" },
 };
+
+// ---------- 我的圖書館（業主 2026-11-17） ----------
+export type LibraryItemType = "shelf" | "book";
+/** 圖書館裡的一格：shelf＝書架（分類標題，可收合）、book＝一本書（影片、簡報、PDF、連結）。locked＝這本書有密碼且尚未解鎖（沒有 url）。 */
+export type LibraryItem = {
+  id: string;
+  kind: LibraryItemType;
+  title: string;
+  url: string | null;
+  type: AttachmentType | null;
+  eventDate: string | null;
+  start: number | null;
+  end: number | null;
+  locked: boolean;
+  /** 只有擁有者看得到：這本書有沒有設密碼、幾時失效。 */
+  pwSet?: boolean;
+  pwExpiresAt?: string | null;
+  pwExpired?: boolean;
+};
+export type LibraryMine = { library: null | { number: string; title: string; ownerName: string; views: number; pwSet: boolean; pwExpiresAt: string | null; pwExpired: boolean }; items: LibraryItem[] };
+/** 公開檢視：locked＝整座圖書館要先輸入密碼（items 是空的）；owner＝正在看自己的圖書館。 */
+export type LibraryView = { number: string; title: string; ownerName: string; locked: boolean; lockExpired: boolean; owner: boolean; items: LibraryItem[] };
+export type LibraryUnlock = { token: string; until: number };

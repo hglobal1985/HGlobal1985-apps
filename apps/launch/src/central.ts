@@ -276,6 +276,14 @@ export async function centralDecide(token: string, id: string, decision: "approv
   return res?.status ?? 503;
 }
 
+/** 會員在會員中心的第一組會員編號（安麗會員編號，用來當「我的圖書館」網址）；查不到回 null。只在建立圖書館那一刻讀一次。 */
+export async function memberNumberOf(sub: string, token: string): Promise<string | null> {
+  const doc = await profileDoc(sub, token);
+  const v = doc?.fields?.member_number?.value;
+  const first = Array.isArray(v) ? (v[0] as { number?: unknown } | undefined) : undefined;
+  return typeof first?.number === "string" ? first.number : null;
+}
+
 export type MemberContext = { roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
 const NO_CONTEXT: MemberContext = { roles: [], hglobal: false, center: null };
 

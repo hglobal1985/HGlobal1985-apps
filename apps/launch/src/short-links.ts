@@ -7,5 +7,5 @@ export const HQ_SLUG = "hq";
 /** 網站本身的頁面路徑，不能拿來當縮寫（否則短網址會蓋掉正常頁面）。 */
 export const RESERVED_SLUGS = new Set([
   "courses", "course", "learn", "learning", "notices", "me", "admin", "orders", "settings", "achievements", "auth",
-  "privacy", "support", "api", "assets", "static", "login", "logout", "home", "index", "app", "www", "c", "s", "hq",
+  "privacy", "support", "api", "assets", "static", "login", "logout", "home", "index", "app", "www", "c", "s", "hq", "library", "library-invite",
 ]);
