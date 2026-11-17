@@ -8,7 +8,9 @@ import { Platform } from "react-native";
  */
 export function installWebPullRefresh(): () => void {
   if (Platform.OS !== "web" || typeof document === "undefined") return () => undefined;
-  const THRESHOLD = 70; // 串接指令 2026-11-14.3：往下拖超過約 70 px 才觸發
+  // 業主 2026-11-17：原本太靈敏。改成「要拉到完整距離（FULL）的一半以上」才觸發，並用小樹苗長成結綠色櫻桃的樹來顯示進度百分比。
+  const FULL = 280; // 拉到 100% 所需的手指位移（px）
+  const THRESHOLD = FULL / 2; // 過半（50%）才會重新整理
   const MIN_GAP_MS = 2000; // 連續兩次觸發至少間隔 2 秒（中央有每分鐘 120 次的讀取限制）
   let startY = 0;
   let startX = 0;
@@ -23,14 +25,34 @@ export function installWebPullRefresh(): () => void {
     }
     return true;
   };
-  const show = (text: string, y: number) => {
+  /** 小樹苗→長成樹→結出綠色櫻桃（p：0～1）。0～60% 長高長大；過 50%（可以放開了）開始結出綠色櫻桃，到 100% 結滿。 */
+  const treeSvg = (p: number): string => {
+    const g = Math.min(1, p / 0.6);
+    const h = 8 + 38 * g; // 樹幹高
+    const r = 5 + 24 * g; // 樹冠半徑
+    const cy = 86 - h - r * 0.35;
+    const cherry = Math.max(0, (p - 0.5) / 0.5); // 櫻桃大小進度
+    const spots = [[-0.55, -0.1], [0.5, -0.2], [-0.15, 0.45], [0.45, 0.42], [-0.05, -0.55]];
+    const cherries = cherry > 0
+      ? spots.map(([dx, dy]) => {
+          const x = 50 + dx! * r;
+          const y = cy + dy! * r;
+          const rr = 1.5 + 3.6 * cherry;
+          return `<path d="M${x} ${y - rr} q2 -6 5 -7" stroke="#4E7D2F" stroke-width="1.2" fill="none" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="${rr}" fill="#7CC043"/><circle cx="${x - rr * 0.35}" cy="${y - rr * 0.35}" r="${rr * 0.28}" fill="#fff" opacity=".7"/>`;
+        }).join("")
+      : "";
+    const sap = p < 0.18 ? `<path d="M50 ${86 - h} q-9 -2 -11 -9 q9 0 11 9 M50 ${86 - h} q9 -2 11 -9 q-9 0 -11 9" fill="#4C8A5B"/>` : "";
+    return `<svg width="72" height="72" viewBox="0 0 100 100"><ellipse cx="50" cy="90" rx="22" ry="5" fill="#8B6B4A"/><rect x="${48 - g * 1.5}" y="${86 - h}" width="${4 + g * 3}" height="${h}" rx="2" fill="#7A5A3A"/>${p >= 0.18 ? `<circle cx="50" cy="${cy}" r="${r}" fill="#2F7A46"/><circle cx="${50 - r * 0.35}" cy="${cy - r * 0.2}" r="${r * 0.62}" fill="#3F9A5A"/>` : sap}${cherries}</svg>`;
+  };
+  const show = (progress: number, y: number, label?: string) => {
     if (!bar) {
       bar = document.createElement("div");
       bar.setAttribute("aria-live", "polite");
-      bar.style.cssText = "position:fixed;left:50%;top:0;z-index:99999;padding:10px 18px;border-radius:999px;background:#2F5D3A;color:#fff;font:600 15px sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;white-space:nowrap";
+      bar.style.cssText = "position:fixed;left:50%;top:0;z-index:99999;display:flex;flex-direction:column;align-items:center;padding:8px 18px 8px;border-radius:24px;background:#fff;color:#2F5D3A;font:700 14px sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.3);pointer-events:none;white-space:nowrap;border:3px solid #2F5D3A";
       document.body.appendChild(bar);
     }
-    bar.textContent = text;
+    const pct = Math.round(Math.min(1, progress) * 100);
+    bar.innerHTML = `${treeSvg(Math.min(1, progress))}<span>${label ?? (progress >= 0.5 ? `${pct}%　放開重新整理` : `${pct}%　再往下拉`)}</span>`;
     bar.style.transform = `translate(-50%, calc(env(safe-area-inset-top, 0px) + ${Math.round(y)}px))`;
   };
   const hide = () => {
@@ -65,7 +87,7 @@ export function installWebPullRefresh(): () => void {
       return;
     }
     pull = dy;
-    show(pull >= THRESHOLD ? "放開重新整理" : "下拉重新整理", Math.min(pull * 0.5, 70) - 8);
+    show(pull / FULL, Math.min(pull * 0.5, 150) - 90);
   };
   const end = () => {
     if (active && pull >= THRESHOLD) {
@@ -78,7 +100,7 @@ export function installWebPullRefresh(): () => void {
       }
       if (Date.now() - last < MIN_GAP_MS) hide();
       else {
-        show("更新中…", 14);
+        show(1, 14, "更新中…");
         window.location.reload();
       }
     } else hide();
