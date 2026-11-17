@@ -113,6 +113,8 @@
 
 - **待開工：我的圖書館（業主 2026-11-17 已選版面＝方案 1 木質書架，正式名稱「我的圖書館」，尚未實作）**：個人專屬頁面、不公開、只有網址持有者能開、只有超級管理員能指定誰有權限、從設定進入；詳見 `docs/plan-my-library.md`。
 
+- **中心清單隱藏「安麗公司」（業主 2026-11-17）**：「全部課程 › 中心」清單不列出「安麗公司」（`courses-view.tsx` 的 `HIDDEN_FROM_CENTER_LIST`），它仍在中央的中心清單裡，可以當課程的主辦單位／素材的建立單位；要隱藏其他單位就加進那個清單。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。

@@ -200,6 +200,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const centerCounts = useMemo(
     () =>
       centers
+        .filter((name) => !HIDDEN_FROM_CENTER_LIST.has(normCenter(name))) // 業主 2026-11-17：「安麗公司」不顯示在中心清單（仍可當主辦單位）
         .map((name) => ({ name, count: courses.filter((x) => x.centerCourse && x.hasMaterial && normCenter(x.hostCenter) === normCenter(name) && inCategory(x)).length }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
     [centers, courses, category], // eslint-disable-line react-hooks/exhaustive-deps
@@ -442,6 +443,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     </View>
   );
 }
+
+/** 不顯示在「中心」清單的單位（只是不列出，仍可選為課程的主辦單位／建立單位）。 */
+const HIDDEN_FROM_CENTER_LIST = new Set(["安麗公司"]);
 
 /** 系列檢視的區塊標題色帶：課程系列（深綠淡底）、素材專區（亮黃淡底）。 */
 function ZoneBand({ icon, text, count, material }: { icon: "library" | "folder-open"; text: string; count: number; material?: boolean }) {
