@@ -1,5 +1,7 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { Animated, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { createPortal } from "react-dom";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { dimStyle } from "./dim-backdrop";
@@ -19,6 +21,27 @@ const listeners = new Set<() => void>();
 export function showFlash(content: FlashContent): void {
   current = { ...content, id: Date.now() + Math.random() };
   listeners.forEach((l) => l());
+}
+
+/**
+ * 一句話的操作回饋（原本底部黑色小字 toast 的替代品，業主 2026-11-17：全站統一用全螢幕提醒）：
+ * 例如 flashText("已複製連結")。依文字自動挑圖示（失敗＝紅色驚嘆號、提醒＝資訊圖示、其他＝綠色勾勾）；
+ * 太長的句子在第一個標點切成「標題＋說明」。新增任何一句話提示都用它，不要再做底部小字。
+ */
+export function flashText(text: string): void {
+  const m = /^(.{2,14}?)[，,。：:；;]\s*(.+)$/.exec(text);
+  const title = m && text.length > 12 ? m[1]! : text;
+  const body = m && text.length > 12 ? m[2] : undefined;
+  const bad = /無法|失敗|錯誤|不能|不正確|過期|已存在|不足|逾時/.test(text);
+  const hint = /^請|繼續播放|若沒有/.test(text);
+  const icon = bad ? (
+    <Ionicons name="alert-circle" size={FLASH_ICON - 3} color="#B3261E" />
+  ) : hint ? (
+    <Ionicons name="information-circle" size={FLASH_ICON - 3} color="#0C603C" />
+  ) : (
+    <Ionicons name="checkmark-circle" size={FLASH_ICON - 3} color="#0C603C" />
+  );
+  showFlash({ icon, title, body, holdMs: text.length > 14 ? 1600 : 1000 });
 }
 
 /**
@@ -66,8 +89,10 @@ export function FlashHost() {
     return () => run.stop();
   }, [cur, op]);
   if (!shown) return null;
-  return (
-    <View pointerEvents="box-none" style={[styles.wrap, { paddingTop: Math.round(height * 0.12) }]}>
+  // 網頁：用 portal 放到最上層（上拉面板、照片放大等彈出層開著時，提醒也要看得到、不被蓋住）。
+  const web = Platform.OS === "web" && typeof document !== "undefined";
+  const node = (
+    <View pointerEvents="box-none" style={[styles.wrap, { paddingTop: Math.round(height * 0.12) }, web && ({ position: "fixed", zIndex: 20000 } as object)]}>
       {/* 提醒出現時整個頁面背景暗化（業主 2026-11-17）；跟著卡片一起淡入淡出，不擋住下面的操作。 */}
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, dimStyle, { opacity: op }]} />
       <Pressable accessibilityRole="button" accessibilityLabel={`${shown.title}${shown.body ? `，${shown.body}` : ""}，點一下關閉`} onPress={dismiss}>
@@ -88,6 +113,7 @@ export function FlashHost() {
       </Pressable>
     </View>
   );
+  return web ? createPortal(node, document.body) : node;
 }
 
 const styles = StyleSheet.create({

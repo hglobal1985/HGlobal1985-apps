@@ -11,7 +11,7 @@ import { CourseCard } from "@/features/courses/course-card";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section, Select } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 export default function LearningScreen() {
   const { member } = useSession();
@@ -29,7 +29,7 @@ export default function LearningScreen() {
       await api("POST", `/courses/${course.id}/hide-learning`);
       reload();
     } catch (e) {
-      showToast((e as Error).message);
+      flashText((e as Error).message);
     }
   };
   /** 免費課程可以隱藏；沒報名紀錄、只是播放過的課程（管理員或公開課程）也可以隱藏。 */

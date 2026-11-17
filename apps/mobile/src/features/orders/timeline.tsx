@@ -8,7 +8,7 @@ import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, NoticeBox, Section } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 /** 操作紀錄（誰、何時、做了什麼）與留言。reviewer＝審核人員視角（可寫私人備註）。 */
 export function OrderTimeline({ order, reviewer, canDeletePayments }: { order: Order; reviewer?: boolean; canDeletePayments?: boolean }) {
@@ -44,10 +44,10 @@ export function OrderTimeline({ order, reviewer, canDeletePayments }: { order: O
     if (!(await confirmSheet({ title: "刪除這筆回報", message: `確定要刪除「${methodText(p)}」這筆繳費回報嗎？`, confirmLabel: "刪除", cancelLabel: "先不要", danger: true }))) return;
     try {
       await api("DELETE", `/orders/${order.id}/payments/${p.id}`);
-      showToast("已刪除");
+      flashText("已刪除");
       invalidate();
     } catch (e) {
-      showToast((e as Error).message);
+      flashText((e as Error).message);
     }
   };
   const input = (value: string, set: (v: string) => void, label: string) => (

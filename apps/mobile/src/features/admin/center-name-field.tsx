@@ -6,7 +6,7 @@ import { useCenterNames } from "@/state/center-names";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 /**
  * 教育中心名稱（編輯中心頁）：自訂這個中心在整個行動大學顯示的名稱；留空儲存＝還原預設「去掉數字代碼＋中心」。
@@ -26,7 +26,7 @@ export function CenterNameField({ center }: { center: string }) {
     try {
       await api("PUT", `/admin/center-name?center=${encodeURIComponent(center)}`, { name });
       reload();
-      showToast(name.trim() ? "已更新教育中心名稱" : "已還原預設名稱");
+      flashText(name.trim() ? "已更新教育中心名稱" : "已還原預設名稱");
       if (!name.trim()) setDraft("");
     } catch (e) {
       setErr((e as Error).message);

@@ -6,7 +6,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, DateSelect, NoticeBox, Select, todayStr } from "@/ui";
 import { useScreenFooter } from "@/ui/screen";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const HOURS = Array.from({ length: 24 }, (_, i) => ({ key: String(i), label: `${pad(i)} 時` }));
@@ -57,7 +57,7 @@ export function PaymentForm({ order, onDone, leftAction }: { order: Order; onDon
         ...(method === "linepay" ? { paidAt: toIso(date, hour, minute) } : {}),
         ...(method === "friend" ? { friendName: friend.trim() } : {}),
       });
-      showToast("已送出，審核人員會核對");
+      flashText("已送出，審核人員會核對");
       setLast5("");
       setFriend("");
       onDone();

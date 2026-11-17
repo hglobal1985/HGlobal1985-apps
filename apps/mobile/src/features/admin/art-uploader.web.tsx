@@ -4,7 +4,7 @@ import { api, resolveUrl } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { space } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 import { useSheetSave } from "@/features/course-edit/edit-sheet";
 import { EdmCropper } from "./edm-cropper.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
@@ -106,7 +106,7 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM" }: 
       await api("PATCH", endpoints.edm, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
       setJob(null);
       setMsg(null);
-      showToast(`已更新${label}${noun}`);
+      flashText(`已更新${label}${noun}`);
       onChanged();
     } catch (err) {
       setMsg((err as Error).message);

@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 /** 教育中心地址（編輯中心頁，與 EDM 同一個面板）：中心還沒有課程時，中心頁會顯示這個地址；留空儲存＝清除。 */
 export function CenterAddressField({ center, current, onSaved }: { center: string; current: string; onSaved: () => void }) {
@@ -19,7 +19,7 @@ export function CenterAddressField({ center, current, onSaved }: { center: strin
     try {
       await api("PUT", `/admin/center-info?center=${encodeURIComponent(center)}`, { address });
       onSaved();
-      showToast(address.trim() ? "已更新中心地址" : "已清除中心地址");
+      flashText(address.trim() ? "已更新中心地址" : "已清除中心地址");
     } catch (e) {
       setErr((e as Error).message);
     } finally {

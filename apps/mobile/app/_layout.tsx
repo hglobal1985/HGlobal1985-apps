@@ -7,7 +7,6 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { AppGate } from "@/features/app-gate";
 import { ConfirmSheetHost } from "@/features/confirm";
 import { FlashHost } from "@/ui/flash-notice";
-import { ToastHost } from "@/ui/toast";
 import { MiniAudioBar } from "@/features/player/audio-bar";
 import { PlayerLayer } from "@/features/player/player-layer";
 import { SwitchSheet } from "@/features/player/switch-sheet";
@@ -111,7 +110,6 @@ export default function RootLayout() {
           <PlayerLayer />
           <SwitchSheet />
           <ConfirmSheetHost />
-          <ToastHost />
           <FlashHost />
           <StatusBarCover />
           </View>

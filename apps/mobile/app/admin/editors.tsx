@@ -10,7 +10,7 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, LoadingLadybug, NoticeBox, Screen, Select } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 const ALL = "";
 
@@ -54,7 +54,7 @@ export default function EditorsScreen() {
     try {
       await api("DELETE", `/admin/editors/${e.memberId}?center=${encodeURIComponent(e.center)}`);
       list.reload();
-      showToast("已移除小編");
+      flashText("已移除小編");
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -129,7 +129,7 @@ function AddEditorSheet({ center, onClose, onAdded }: { center: string; onClose:
       await api("POST", "/admin/editors", { memberId: m.memberId, name: m.name, center });
       setItems((cur) => cur.map((x) => (x.memberId === m.memberId ? { ...x, already: true } : x)));
       onAdded();
-      showToast(`已指派 ${m.name}`);
+      flashText(`已指派 ${m.name}`);
     } catch (e) {
       setError((e as Error).message);
     } finally {

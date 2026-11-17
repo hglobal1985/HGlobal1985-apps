@@ -3,7 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { inAppBrowser, openInSystemBrowser } from "@/lib/in-app-browser";
 import { useTheme } from "@/theme/theme";
 import { minTouch } from "@/theme/tokens";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 const RED = "#B3261E";
 
@@ -29,7 +29,7 @@ export function InAppBrowserBanner() {
         accessibilityRole="button"
         accessibilityLabel={`按此改用${info.browser}瀏覽器開啟`}
         onPress={() => {
-          if (openInSystemBrowser(info) === "copied") showToast("已複製網址，若沒有自動跳轉，請到 Safari 貼上");
+          if (openInSystemBrowser(info) === "copied") flashText("已複製網址，若沒有自動跳轉，請到 Safari 貼上");
         }}
         style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}
       >

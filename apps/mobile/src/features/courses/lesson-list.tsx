@@ -10,7 +10,7 @@ import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
 import { Card, ListRow, SaplingIcon, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 
@@ -81,7 +81,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
             onPress={
               link
                 ? link.linkUrl
-                  ? () => void Linking.openURL(link.linkUrl!).catch(() => showToast("無法開啟連結"))
+                  ? () => void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結"))
                   : undefined
                 : lesson.locked
                   ? undefined
@@ -100,7 +100,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
 export function RowShare({ label, onShare }: { label: string; onShare: () => Promise<"shared" | "copied" | "cancelled"> }) {
   const { c } = useTheme();
   const press = async () => {
-    if ((await onShare()) === "copied") showToast("已複製連結");
+    if ((await onShare()) === "copied") flashText("已複製連結");
   };
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={6} style={({ pressed }) => [{ width: 34, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>

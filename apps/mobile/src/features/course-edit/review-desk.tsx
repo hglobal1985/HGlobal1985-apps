@@ -8,7 +8,7 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Button, Chips, NoticeBox } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 import { Check } from "./course-sections";
 
 /**
@@ -32,7 +32,7 @@ export function ReviewDeskBlock({ course }: { course: CourseDetail }) {
     try {
       await fn();
       desk.reload();
-      if (done) showToast(done);
+      if (done) flashText(done);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -52,7 +52,7 @@ export function ReviewDeskBlock({ course }: { course: CourseDetail }) {
     run("invite", async () => {
       const r = await api<{ path: string }>("POST", `/admin/courses/${course.id}/review-invites`);
       const out = await shareReviewerInvite(course.title, r.path);
-      if (out === "copied") showToast("已複製邀請文字與網址");
+      if (out === "copied") flashText("已複製邀請文字與網址");
     });
   const remove = async (sub: string, name: string) => {
     if (!(await confirmAsk("刪除審核人員", `確定刪除「${name || "這位會員"}」的審核權限？刪除後他就不能審核這門課的報名。`, "刪除"))) return;

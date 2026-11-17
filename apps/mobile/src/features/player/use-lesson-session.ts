@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { api, type CourseDetail, type Playback } from "@/api/client";
 import { saveLastLesson } from "@/lib/last-lesson";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { engine } from "./engine";
@@ -68,7 +68,7 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
         setClaimed(track.key);
         // 續播記憶：告訴學員是從上次的位置接著播（業主 2026-11-17）。
         const r = track.playback.resumeAt;
-        if (r != null) showToast(`從上次看到的 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
+        if (r != null) flashText(`從上次看到的 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
         return;
       }
       const cur = engine.getSnapshot().track;

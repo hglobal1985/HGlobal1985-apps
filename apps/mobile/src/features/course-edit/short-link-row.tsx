@@ -6,7 +6,7 @@ import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, ShareIcon } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 
 export type ShortLinkItem = { kind: "category" | "series" | "center"; value: string; slug: string | null };
 const KIND = { category: "分類", series: "系列", center: "中心" } as const;
@@ -29,7 +29,7 @@ export function ShortLinkRow({ item, onChanged, readOnly = false }: { item: Shor
     try {
       await fn();
       onChanged();
-      showToast(ok);
+      flashText(ok);
     } catch (e) {
       setMsg((e as Error).message);
     } finally {
@@ -38,7 +38,7 @@ export function ShortLinkRow({ item, onChanged, readOnly = false }: { item: Shor
   };
   const share = async () => {
     const r = await shareLink(item.value, `/${item.slug}`);
-    if (r === "copied") showToast("已複製短網址");
+    if (r === "copied") flashText("已複製短網址");
   };
   const clear = async () => {
     if (!(await confirmSheet({ title: "清除短網址", message: `清除後，${host()}/${item.slug} 就打不開了。`, confirmLabel: "清除", cancelLabel: "先不要", danger: true }))) return;

@@ -11,7 +11,7 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { courseThemes, minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Card, Chips, DateSelect, Field, ListRow, NoticeBox, Pill } from "@/ui";
-import { showToast } from "@/ui/toast";
+import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
 import { ReviewDeskBlock } from "./review-desk";
 
@@ -52,7 +52,7 @@ export function useCourseSave(course: CourseDetail, onSaved: (d: CourseDetail) =
       }
       invalidate();
       onSaved(d);
-      showToast(opts.done ?? "已儲存");
+      flashText(opts.done ?? "已儲存");
       return true;
     } catch (e) {
       setError((e as Error).message);
@@ -424,7 +424,7 @@ function StatusSheet({ course, onClose, onSaved }: SheetProps) {
       await api("DELETE", `/admin/courses/${course.id}`);
       invalidate();
       onClose();
-      showToast("已刪除課程");
+      flashText("已刪除課程");
       router.replace("/courses");
     } catch (e) {
       setError((e as Error).message);
