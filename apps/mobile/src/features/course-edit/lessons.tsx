@@ -118,18 +118,19 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       mediaDraftDirty(media, lesson)
     : !!createdId || !!title || !!sharer || !!sharerRank || !!sharerTitle || isSpeaker || isSummary || mediaDraftDirty(media);
 
-  const save = async () => {
-    if (!lesson) return;
-    if (rangeError) return setMsg({ tone: "danger", text: rangeError });
+  const save = async (): Promise<boolean> => {
+    if (!lesson) return false;
+    if (rangeError) return setMsg({ tone: "danger", text: rangeError }), false;
     setBusy("save");
     setMsg(null);
     try {
       const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, isSpeaker, isSummary, ...mediaDraftBody(media) };
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
-      setMsg({ tone: "success", text: "已儲存" });
       invalidate();
+      return true;
     } catch (err) {
       setMsg({ tone: "danger", text: (err as Error).message });
+      return false;
     } finally {
       setBusy(null);
     }
@@ -184,12 +185,11 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
     <EditSheet
       title={lesson ? `第 ${lesson.position} 堂：${lesson.title}` : "新增章節"}
       onClose={onClose}
-      onSave={isNew ? create : undefined}
-      saveLabel="新增"
-      hideSave={!isNew}
+      onSave={isNew ? create : async () => void ((await save()) && onClose())}
+      saveLabel={isNew ? "新增" : "儲存"}
       dirty={dirty}
-      busy={busy === "create"}
-      error={isNew && msg?.tone === "danger" ? msg.text : null}
+      busy={busy === "create" || busy === "save"}
+      error={msg?.tone === "danger" ? msg.text : null}
     >
       {/* 「主講」「總結」兩個勾選同一列（業主 2026-11-16）；每門課各只能一堂、兩者互斥。 */}
       <View style={styles.checkRow}>
@@ -255,10 +255,9 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
           {[allowMux ? "Mux 影片" : "", course.chapterCovers ? "章節封面" : ""].filter(Boolean).join("、")}要在章節建立後，再點章節旁的鉛筆設定。
         </AppText>
       ) : null}
-      {!isNew && msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
-      {!isNew ? (
+      {!isNew && msg?.tone === "success" ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
+      {!isNew && (currentKind === "mux" || currentKind === "audio") ? (
         <View style={styles.row}>
-          <Button label="儲存" icon="save-outline" loading={busy === "save"} disabled={!!busy} onPress={save} />
           {currentKind === "mux" || currentKind === "audio" ? <Button variant="secondary" label="播放檢查" icon="pulse-outline" loading={busy === "check"} disabled={!!busy} onPress={check} /> : null}
         </View>
       ) : null}

@@ -5,6 +5,7 @@ import { confirmSheet } from "@/features/confirm";
 import { space } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
 import { showToast } from "@/ui/toast";
+import { useSheetSave } from "@/features/course-edit/edit-sheet";
 import { EdmCropper } from "./edm-cropper.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
 import { COVER_MAX_SIDE, EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
@@ -41,6 +42,8 @@ export function ArtUploader({ label, art, endpoints, onChanged }: { label: strin
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // 在編輯面板裡：「儲存封面」登記到面板下方與「取消」同一列（業主 2026-11-17），不再在內文裡另放按鈕。
+  const inSheet = useSheetSave(job ? { label: "儲存封面", onPress: () => void save(), busy, dirty: true } : null);
 
   useEffect(() => {
     if (!job) return setPreview(null);
@@ -146,10 +149,12 @@ export function ArtUploader({ label, art, endpoints, onChanged }: { label: strin
           <AppText variant="callout" tone="muted">
             {job.mode === "contain" ? "整張照片都會保留，放在中間，背景用同一張照片模糊補滿。確認預覽後請按「儲存封面」。" : "拖曳框內移動位置，拖四個角調整大小（橫式 16:9，比例固定）。框內就是中心卡片的縮圖，框的上緣就是進入中心頁時一開始停留的位置。調整好請按「儲存封面」。"}
           </AppText>
-          <View style={styles.buttons}>
-            <Button label="儲存封面" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
-            <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
-          </View>
+          {inSheet ? null : (
+            <View style={styles.buttons}>
+              <Button label="儲存封面" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
+              <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
+            </View>
+          )}
           {job.mode === "crop" ? <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} /> : null}
           <AppText variant="callout" tone="muted">
             封面預覽

@@ -76,6 +76,9 @@
 
 - **小範圍讀取動畫「小瓢蟲」`LoadingLadybug`（業主 2026-11-17 定稿）**：`src/ui/loading-ladybug.web.tsx`（紅殼開闔、透明翅膀拍動、原地飛舞）。整頁／整個區塊在等資料用 `LoadingSapling`（`LoadingView`）；**只有一小塊在等**用小瓢蟲：按鈕送出中（`Button loading`、個人資料表單的儲存鈕）、**播放器的播放鈕等待播放時**（`PlayerControls`、`AudioBar`；課程頁按播放後取播放授權的空檔，舞台大鈕與待機控制列也換成瓢蟲）、通知設定的推播狀態、後台清單搜尋／載入更多、課程章節選單、全部課程搜尋。YouTube 的「讀取中」從載入、按播放、緩衝（state 3）到開始播放；LINE 等不准程式代按播放的環境，8 秒後自動不再顯示（見 `engine.web.ts` 的 `ytStopLoadingLater`）。iOS／Android 暫用系統轉圈圈。新增任何小區塊讀取都用它，要改動畫只改這個檔案。
 
+- **所有編輯面板的「儲存」與「取消／關閉」永遠同一列（業主 2026-11-17 永久指示）**：一律用 `EditSheet`，下方固定一列，左「取消」（沒有儲存就叫「關閉」）、右「儲存」；**不可**在面板內文裡另放儲存鈕。面板裡的內容自己有儲存動作（例如封面上傳）時，呼叫 `useSheetSave({label, onPress, busy, dirty})` 登記到下方那一列（`ArtUploader`、`EdmManager` 已照做）。章節面板編輯時按儲存會儲存並關閉；「播放檢查」這類輔助動作可以留在內文。
+- **影片時間軸設定（業主 2026-11-17）**：`TimeRangePicker` 永遠直接展開（已取消「用拖曳設定開始與結束」按鈕）；預覽畫面寬度佔滿整行；音檔來源時間軸下方有音波（靜音＝最低谷，高 72px），YouTube 的聲音瀏覽器拿不到所以沒有音波。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。

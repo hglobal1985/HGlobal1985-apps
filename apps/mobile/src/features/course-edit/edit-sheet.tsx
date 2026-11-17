@@ -1,9 +1,26 @@
-import type { ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { confirmSheet } from "@/features/confirm";
 import { space } from "@/theme/tokens";
 import { AppText, Button, NoticeBox } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
+
+/** 面板裡的內容（例如封面上傳）自己有「儲存」時，登記到面板下方那一列（業主 2026-11-17：儲存與關閉永遠同一列）。 */
+export type SheetSave = { label: string; onPress: () => void; busy?: boolean; disabled?: boolean; dirty?: boolean };
+const SaveSlot = createContext<((s: SheetSave | null) => void) | null>(null);
+/** 在 EditSheet 裡面登記儲存鈕（傳 null＝沒有）；回傳 true＝真的在面板裡（呼叫端就不要再自己畫儲存鈕）。 */
+export function useSheetSave(spec: SheetSave | null): boolean {
+  const set = useContext(SaveSlot);
+  const press = useRef(spec?.onPress);
+  press.current = spec?.onPress;
+  const on = !!spec;
+  useEffect(() => {
+    if (!set) return;
+    set(on ? { label: spec!.label, busy: spec!.busy, disabled: spec!.disabled, dirty: spec!.dirty, onPress: () => press.current?.() } : null);
+    return () => set(null);
+  }, [set, on, spec?.label, spec?.busy, spec?.disabled, spec?.dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  return !!set;
+}
 
 /**
  * 課程頁「原地編輯」用的底部面板：上方標題、中間可捲動的欄位、下方固定兩顆按鈕（左「取消」、右「儲存」）。
@@ -33,13 +50,17 @@ export function EditSheet({
   children: ReactNode;
 }) {
   const { height } = useWindowDimensions();
+  const [slot, setSlot] = useState<SheetSave | null>(null);
+  const isBusy = busy || !!slot?.busy;
+  const isDirty = dirty || !!slot?.dirty;
   const close = async () => {
-    if (busy) return;
-    if (dirty && !(await confirmSheet({ title: "還沒儲存", message: "剛才的修改還沒儲存，要放棄修改嗎？", cancelLabel: "繼續編輯", confirmLabel: "放棄", danger: true }))) return;
+    if (isBusy) return;
+    if (isDirty && !(await confirmSheet({ title: "還沒儲存", message: "剛才的修改還沒儲存，要放棄修改嗎？", cancelLabel: "繼續編輯", confirmLabel: "放棄", danger: true }))) return;
     onClose();
   };
   return (
     <BottomSheet onClose={close}>
+      <SaveSlot.Provider value={setSlot}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <AppText variant="title" accessibilityRole="header">
           {title}
@@ -50,15 +71,20 @@ export function EditSheet({
         {error ? <NoticeBox tone="danger" text={error} /> : null}
         <View style={styles.buttons}>
           <View style={{ flex: 1 }}>
-            <Button variant="secondary" label={hideSave ? "關閉" : "取消"} fullWidth disabled={busy} onPress={close} />
+            <Button variant="secondary" label={hideSave && !slot ? "關閉" : "取消"} fullWidth disabled={isBusy} onPress={close} />
           </View>
           {!hideSave && onSave ? (
             <View style={{ flex: 1 }}>
               <Button label={saveLabel} icon="save-outline" fullWidth loading={busy} disabled={busy} onPress={onSave} />
             </View>
+          ) : slot ? (
+            <View style={{ flex: 1 }}>
+              <Button label={slot.label} icon="save-outline" fullWidth loading={!!slot.busy} disabled={!!slot.busy || !!slot.disabled} onPress={slot.onPress} />
+            </View>
           ) : null}
         </View>
       </KeyboardAvoidingView>
+      </SaveSlot.Provider>
     </BottomSheet>
   );
 }

@@ -171,7 +171,7 @@ export function TimeRangePicker({
         {eSec != null ? <Flag left={x(eSec)} color={c.warning} label="終" /> : null}
         <View pointerEvents="none" style={[styles.center, { left: redX - 1, backgroundColor: c.danger }]} />
       </View>
-      {kind === "audio" && audioFile ? <WaveStrip file={audioFile} total={total} pos={pos} pps={pps} w={w} full={full} height={44} /> : null}
+      {kind === "audio" && audioFile ? <WaveStrip file={audioFile} total={total} pos={pos} pps={pps} w={w} full={full} height={72} /> : null}
       {/* 放大鏡：專門縮放時間軸；預設最左＝完整顯示 */}
       <View style={styles.zoomRow}>
         <Pressable accessibilityRole="button" accessibilityLabel="縮小時間軸" onPress={() => setZoom((z) => Math.max(0, z - ZOOM_STEP))} style={styles.lens}>

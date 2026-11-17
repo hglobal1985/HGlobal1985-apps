@@ -84,7 +84,7 @@ export function RangePreview({ kind, ytId, audioFile, at, playing, onTime, onSto
 
   if (kind === "youtube" && ytId)
     return (
-      <div style={{ position: "relative", width: "100%", maxWidth: 260, margin: "0 auto", aspectRatio: "16 / 9", borderRadius: 10, overflow: "hidden", background: "#000" }}>
+      <div style={{ position: "relative", width: "100%", aspectRatio: "16 / 9", borderRadius: 10, overflow: "hidden", background: "#000" }}>
         <iframe
           ref={frame}
           title="影片預覽"

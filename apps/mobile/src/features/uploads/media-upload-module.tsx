@@ -177,7 +177,7 @@ export function MediaUploadModule({
     };
   }, [draft.toEnd, draft.kind, draft.ref, draft.audio]); // eslint-disable-line react-hooks/exhaustive-deps
   // 拖曳設定時間軸（開啟時才偵測長度）。
-  const [pickOpen, setPickOpen] = useState(false);
+  const pickOpen = true; // 拖曳設定直接全部展開（業主 2026-11-17：取消「用拖曳設定開始與結束」按鈕）
   const [duration, setDuration] = useState<number | null>(null);
   useEffect(() => {
     if (!pickOpen) return;
@@ -210,14 +210,6 @@ export function MediaUploadModule({
       <AppText variant="callout" tone="muted">
         {showHint ? "時間軸區間（選填；空白＝從頭播到結束）" : "時間軸區間"}
       </AppText>
-      {canPick ? (
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: pickOpen }} onPress={() => setPickOpen(!pickOpen)} style={[styles.pickBtn, { borderColor: c.accent }]}>
-          <Icon name={pickOpen ? "chevron-up" : "film-outline"} size={22} color={c.accent} />
-          <AppText variant="callout" style={{ color: c.accentText, fontWeight: "700" }}>
-            {pickOpen ? "收起拖曳設定" : "用拖曳設定開始與結束"}
-          </AppText>
-        </Pressable>
-      ) : null}
       {canPick && pickOpen ? (
         <TimeRangePicker
           kind={draft.kind}

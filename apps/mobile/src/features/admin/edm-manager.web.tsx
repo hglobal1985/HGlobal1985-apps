@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, resolveUrl, type CourseDetail } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { AppText, Button, Card, NoticeBox, Section } from "@/ui";
+import { useSheetSave } from "@/features/course-edit/edit-sheet";
 import { EdmCropper } from "./edm-cropper.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
 import { EDM_MAX_SIDE, COVER_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
@@ -37,6 +38,8 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger" | "info"; text: string } | null>(null);
   const input = useRef<HTMLInputElement | null>(null);
+  // 在編輯面板裡：儲存登記到面板下方與「取消」同一列（業主 2026-11-17）。
+  const inSheet = useSheetSave(job ? { label: "儲存", onPress: () => void save(), busy, dirty: true } : null);
 
   // 封面預覽（裁切後 0.2 秒更新）。
   useEffect(() => {
@@ -181,10 +184,12 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
             </AppText>
             {preview ? <img src={preview} alt="封面預覽" style={{ width: "100%", maxWidth: 320, aspectRatio: "16 / 9", borderRadius: 8, display: "block" }} /> : <AppText>產生預覽中…</AppText>}
           </Card>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Button label="儲存" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
-            <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
-          </div>
+          {inSheet ? null : (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button label="儲存" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
+              <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
+            </div>
+          )}
         </>
       ) : null}
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
