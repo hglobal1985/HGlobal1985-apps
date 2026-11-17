@@ -280,28 +280,40 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
   );
 }
 
-// ---------- 報名資格條件：最低獎銜、會長、誰可以瀏覽（審核群組移到「費用與審核」的審核窗口） ----------
+// ---------- 報名資格條件：誰能瀏覽課程、最低獎銜（預設收起）、其他（審核群組移到「費用與審核」的審核窗口） ----------
 function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
-  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, viewScope: course.viewScope, hideFromGuests: course.hideFromGuests };
+  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, viewScope: course.viewScope };
   const [f, setF] = useState(init);
+  const [rankOpen, setRankOpen] = useState(false);
   const ranks = useApi<Rank[]>("/ranks");
   const { save, busy, error } = useCourseSave(course, onSaved);
   const submit = async () => {
-    if (await save({ ...f, hideFromGuests: f.viewScope === "all" ? f.hideFromGuests : false })) onClose();
+    if (await save({ ...f })) onClose();
   };
+  const rankName = ranks.data?.find((r) => r.code === f.minRankCode)?.name ?? course.minRank.name;
   return (
     <EditSheet title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
-      <Label>最低獎銜（誰可以報名）</Label>
-      <Chips options={(ranks.data ?? []).map((r) => ({ key: r.code, label: r.name }))} value={f.minRankCode} onChange={(v) => setF((x) => ({ ...x, minRankCode: v }))} />
-      {f.minRankCode !== "none" ? <Check label="會長不受獎銜限制也可報名" value={f.allowPresident} onChange={(v) => setF((x) => ({ ...x, allowPresident: v }))} /> : null}
-      <Chips label="誰可以瀏覽" options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => setF((x) => ({ ...x, viewScope: v as ViewScope }))} />
+      <AppText variant="headline">誰能瀏覽課程？</AppText>
+      <Chips options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => setF((x) => ({ ...x, viewScope: v as ViewScope }))} />
       <AppText variant="caption" tone="muted">
-        不在範圍內的人，這門課不會出現在清單與搜尋，也不能報名；已報名的學員照常看得到。
+        {f.viewScope === "link_login" || f.viewScope === "link_guest"
+          ? "私密連結：不會出現在行動大學的任何清單與搜尋，只有拿到網址的人才看得到。"
+          : "不在範圍內的人，這門課不會出現在清單與搜尋，也不能報名；已報名的學員照常看得到。"}
       </AppText>
-      <Check label="對訪客隱藏" value={f.viewScope === "all" && f.hideFromGuests} onChange={(v) => setF((x) => ({ ...x, hideFromGuests: v }))} disabled={f.viewScope !== "all"} />
-      <AppText variant="caption" tone="muted">
-        {"只有「所有人含訪客」時可勾選：勾了之後，訪客的清單與搜尋看不到，但拿到網址的訪客仍可開啟。"}
-      </AppText>
+      <AppText variant="headline">最低獎銜（誰可以報名）</AppText>
+      <View style={styles.rankRow}>
+        <AppText variant="body" style={{ flex: 1 }}>
+          {rankName}
+        </AppText>
+        <Pressable accessibilityRole="button" accessibilityLabel={rankOpen ? "收起獎銜" : "展開獎銜"} onPress={() => setRankOpen((v) => !v)} style={[styles.rankToggle, { borderColor: "#00000022" }]}>
+          <AppText variant="callout" style={{ fontWeight: "700" }}>
+            {rankOpen ? "收起" : "展開"}
+          </AppText>
+        </Pressable>
+      </View>
+      {rankOpen ? <Chips options={(ranks.data ?? []).map((r) => ({ key: r.code, label: r.name }))} value={f.minRankCode} onChange={(v) => setF((x) => ({ ...x, minRankCode: v }))} /> : null}
+      <AppText variant="headline">其他</AppText>
+      <Check label="會長不受獎銜限制也可報名" value={f.allowPresident} onChange={(v) => setF((x) => ({ ...x, allowPresident: v }))} />
       <NoticeBox text="審核群組與審核人員改在「費用與審核」的「審核窗口」設定。" />
     </EditSheet>
   );
@@ -487,7 +499,7 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
       {/* 素材清單沒有時間地點與費用（一律公開免費）。 */}
       {course.isList ? null : <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />}
       {course.isList ? null : <ListRow icon="pricetag-outline" title="費用與審核" subtitle={priceText} onPress={() => onOpen("price")} />}
-      <ListRow icon="people-outline" title="報名資格條件" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}・${VIEW_SCOPE_LABEL[course.viewScope]}可瀏覽${course.hideFromGuests ? "（對訪客隱藏）" : ""}`} onPress={() => onOpen("enroll")} />
+      <ListRow icon="people-outline" title="報名資格條件" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}・${VIEW_SCOPE_LABEL[course.viewScope]}`} onPress={() => onOpen("enroll")} />
       <ListRow icon="options-outline" title="進階設定" subtitle={`主辦：${course.hostUnit || "未設定"}${course.admin?.editedAt ? `・最後修改 ${course.admin.editedByName}` : ""}`} onPress={() => onOpen("advanced")} />
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />
     </Card>
@@ -495,6 +507,8 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
 }
 
 const styles = StyleSheet.create({
+  rankRow: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch },
+  rankToggle: { minWidth: 72, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, alignItems: "center", justifyContent: "center", paddingHorizontal: space.md },
   hostRow: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm },
   check: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },

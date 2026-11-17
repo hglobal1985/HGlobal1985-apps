@@ -149,7 +149,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const { config } = useUiConfig();
   // 公開清單只取「已上架」（學習中用的下架封存課程不放這裡）；管理者再加上自己能管的未上架課程。
   const merged = useMemo(() => {
-    const pub = (data ?? []).filter((x) => x.status === "published");
+    // 私密連結的課程不放在任何清單（開過的人只在「學習中」看得到）。
+    const pub = (data ?? []).filter((x) => x.status === "published" && x.viewScope !== "link_login" && x.viewScope !== "link_guest");
     const ids = new Set(pub.map((x) => x.id));
     return [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
   }, [data, adminList.data]);

@@ -102,8 +102,8 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
   const vs = urlNameVariants(name);
   const cols = "SELECT url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
   const c = await (center
-    ? db.prepare(`${cols} host_center_key = ? AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope = 'all'`).bind(centerKey(center.value), ...vs)
-    : db.prepare(`${cols} host_center_key IS NULL AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope = 'all'`).bind(...vs)
+    ? db.prepare(`${cols} host_center_key = ? AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')`).bind(centerKey(center.value), ...vs)
+    : db.prepare(`${cols} host_center_key IS NULL AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')`).bind(...vs)
   ).first<{ n: string; k: string | null; v: number }>();
   if (!c) return null;
   const S = await shareCfg(db);
@@ -156,7 +156,7 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
   const courseId = course?.[1] ?? lesson?.[1];
   if (courseId) {
     const c = await db
-      .prepare("SELECT host_center_key AS hk, host_unit AS hu, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published' AND view_scope = 'all'")
+      .prepare("SELECT host_center_key AS hk, host_unit AS hu, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')")
       .bind(courseId)
       .first<{ hk: string | null; hu: string | null; k: string | null; v: number }>()
       .catch(() => null);

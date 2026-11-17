@@ -52,7 +52,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       .catch(() => undefined);
   }, [series, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
   const courses = useMemo(() => {
-    const pub = (data ?? []).filter((x) => x.status === "published");
+    const pub = (data ?? []).filter((x) => x.status === "published" && x.viewScope !== "link_login" && x.viewScope !== "link_guest");
     const ids = new Set(pub.map((x) => x.id));
     const all = [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
     return nearestFirst(all.filter((x) => x.series === series));

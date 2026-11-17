@@ -327,7 +327,6 @@ type CourseRow = {
   event_end: string | null;
   is_public: number;
   view_scope: string;
-  hide_guests: number;
   price_tba: number;
   hide_home: number;
   diamond_free: number;
@@ -361,7 +360,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.hide_guests, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -462,7 +461,6 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     eventEnd: row.event_end,
     isPublic: row.is_public === 1,
     viewScope: scopeOf(row.view_scope),
-    hideFromGuests: row.hide_guests === 1,
     pendingOrderId: state.pendingOrder.get(row.id) ?? null,
     priceTba: row.price_tba === 1,
     hideFromHome: row.hide_home === 1,
@@ -503,9 +501,11 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
 }
 
 const scopeOf = (v: string): ViewScope => (VIEW_SCOPES as string[]).includes(v) ? (v as ViewScope) : "all";
+/** 私密連結：不顯示在任何清單與搜尋，只有拿到網址的人能開。 */
+const isPrivate = (scope: string) => scope === "link_login" || scope === "link_guest";
 /** 誰可以瀏覽（業主 2026-11-17）：這位使用者依課程的設定看不看得到。 */
 function scopeAllows(scope: string, s: Session | null): boolean {
-  if (scope === "members") return !!s;
+  if (scope === "members" || scope === "link_login") return !!s;
   if (scope === "hglobal") return !!s?.hglobal;
   if (scope === "center") return !!s?.center;
   return true;
@@ -541,7 +541,9 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
   if (!all) {
     const mine = s ? await rightsOf(ctx) : null;
     visible = results.filter((r) => {
-      if (!s) return r.view_scope === "all" && r.hide_guests !== 1;
+      const mineOnly = state.enrolled.has(r.id) || state.pending.has(r.id) || state.started.has(r.id);
+      if (isPrivate(r.view_scope)) return mineOnly; // 私密連結：不出現在任何清單（已報名／學習過的學員在「學習中」仍看得到）
+      if (!s) return r.view_scope === "all";
       if (scopeAllows(r.view_scope, s) || mine?.admin) return true;
       return state.enrolled.has(r.id) || state.pending.has(r.id) || state.started.has(r.id) || (mine?.any ? courseCan(mine, s, r).edit : false);
     });
@@ -738,7 +740,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const s = ctx.session;
   const row = await ctx.db.prepare(`${COURSE_SELECT} WHERE c.id = ?`).bind(id).first<CourseRow>();
   // 未登入的訪客：只有「完全公開」且已上架的課程可以看；其他一律要求登入。
-  if (!s && (!row || row.status !== "published" || row.view_scope !== "all")) return fail(401, "unauthenticated", "請先登入");
+  if (!s && (!row || row.status !== "published" || (row.view_scope !== "all" && row.view_scope !== "link_guest"))) return fail(401, "unauthenticated", "請先登入");
   if (!row) return fail(404, "not_found", "找不到這門課程");
   const can = s ? courseCan(await rightsOf(ctx), s, row) : { edit: false, remove: false, restore: false };
   const manages = can.edit || can.remove || can.restore;
@@ -1684,7 +1686,6 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     if (!(VIEW_SCOPES as string[]).includes(String(body.viewScope))) fail(400, "invalid_view_scope", "「誰可以瀏覽」的選項不正確");
     sets.push(["view_scope", body.viewScope]);
   } else if (creating && body.isPublic !== undefined) sets.push(["view_scope", body.isPublic === true ? "all" : "members"]);
-  if (body.hideFromGuests !== undefined) sets.push(["hide_guests", body.hideFromGuests === true ? 1 : 0]);
   if (body.isPublic !== undefined) sets.push(["is_public", body.isPublic === true ? 1 : 0]);
   if (body.priceTba !== undefined) sets.push(["price_tba", body.priceTba === true ? 1 : 0]);
   const loc = text(body.location, 100);
@@ -1789,7 +1790,7 @@ function checkPublicFree(price: number, isPublic: boolean, tba = false) {
 function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number } | null) {
   if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba"].includes(c))) return;
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
-  const pub = pick("view_scope", cur?.view_scope ?? "all") === "all" && Number(pick("price_twd", cur?.price_twd ?? 0)) === 0 && pick("price_tba", cur?.price_tba ?? 0) !== 1;
+  const pub = ["all", "link_guest"].includes(String(pick("view_scope", cur?.view_scope ?? "all"))) && Number(pick("price_twd", cur?.price_twd ?? 0)) === 0 && pick("price_tba", cur?.price_tba ?? 0) !== 1;
   const i = sets.findIndex(([c]) => c === "is_public");
   if (i >= 0) sets.splice(i, 1);
   sets.push(["is_public", pub ? 1 : 0]);
@@ -1799,6 +1800,7 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const body = await readJson<Record<string, unknown>>(ctx.req);
   const sets = await courseFields(ctx, body, true, admin);
   checkPublicFree(Number(sets.find(([c]) => c === "price_twd")?.[1] ?? 0), sets.find(([c]) => c === "is_public")?.[1] === 1, sets.find(([c]) => c === "price_tba")?.[1] === 1);
+  if (!sets.some(([c]) => c === "allow_president")) sets.push(["allow_president", 1]); // 新課程預設「會長不受獎銜限制也可報名」
   if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", sets.some(([c]) => c === "is_list") ? "all" : "members"]);
   deriveIsPublic(sets, null);
   await checkGuidanceGroup(ctx, body.guidanceUnit, body.reviewGroupId);
@@ -1952,7 +1954,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["view_scope", "hide_guests", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
+  const keep = ["view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
@@ -2565,10 +2567,10 @@ const routes: [string, RegExp, Handler][] = [
       const me = ctx.session;
       // 誰可以瀏覽：訪客只看「所有人」且沒勾「對訪客隱藏」的；登入者依身份；已報名的課程照常。
       const scopeSql = !me
-        ? "(c.view_scope = 'all' AND c.hide_guests = 0)"
+        ? "c.view_scope = 'all'"
         : me.role === "admin"
-          ? "1"
-          : `(c.view_scope IN ('all', 'members'${me.hglobal ? ", 'hglobal'" : ""}${me.center ? ", 'center'" : ""}) OR c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?))`;
+          ? "c.view_scope NOT IN ('link_login', 'link_guest')"
+          : `(c.view_scope IN ('all', 'members'${me.hglobal ? ", 'hglobal'" : ""}${me.center ? ", 'center'" : ""}) OR (c.view_scope NOT IN ('link_login', 'link_guest') AND c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?)))`;
       const { results } = await ctx.db
         .prepare(
           `SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.is_summary AS isSummary, c.is_shorts AS isShorts, c.is_list AS isList, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND ${scopeSql} AND (l.kind = 'chapter' OR (c.is_shorts = 1 AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position`,

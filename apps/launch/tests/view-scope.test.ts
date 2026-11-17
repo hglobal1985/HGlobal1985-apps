@@ -18,7 +18,7 @@ function setup() {
   return { call, login };
 }
 
-test("誰可以瀏覽：預設、四種範圍、訪客隱藏、報名限制", async () => {
+test("誰可以瀏覽：預設、六種範圍、私密連結、報名限制", async () => {
   const { call, login } = setup();
   const admin = await login("demo-admin");
   const student = await login("demo-student");
@@ -54,12 +54,16 @@ test("誰可以瀏覽：預設、四種範圍、訪客隱藏、報名限制", as
   // 錯誤值被擋
   assert.equal((await call("PATCH", `/admin/courses/${reg.id}`, { token: admin, body: { viewScope: "訪客" } })).status, 400);
 
-  // 所有人＋對訪客隱藏：訪客清單與搜尋沒有，但知道網址可開
-  const hidden = (await call<CourseDetail>("PATCH", `/admin/courses/${list.id}`, { token: admin, body: { hideFromGuests: true } })).data;
-  assert.equal(hidden.hideFromGuests, true);
+  // 私密連結：不在任何清單，拿到網址才開得了；「需登入」的訪客 401、「訪客可」的訪客也能開
+  await call("PATCH", `/admin/courses/${list.id}`, { token: admin, body: { viewScope: "link_guest" } });
   assert.ok(!(await call<CourseSummary[]>("GET", "/courses")).data.some((c) => c.id === list.id));
+  assert.ok(!(await call<CourseSummary[]>("GET", "/courses", { token: student })).data.some((c) => c.id === list.id));
   assert.equal((await call("GET", `/courses/${list.id}`)).status, 200);
-  assert.ok((await call<CourseSummary[]>("GET", "/courses", { token: student })).data.some((c) => c.id === list.id));
+  await call("PATCH", `/admin/courses/${list.id}`, { token: admin, body: { viewScope: "link_login" } });
+  assert.equal((await call("GET", `/courses/${list.id}`)).status, 401);
+  assert.equal((await call("GET", `/courses/${list.id}`, { token: student })).status, 200);
+  assert.ok((await call<CourseSummary[]>("GET", "/courses", { token: out })).data.every((c) => c.id !== list.id)); // 沒開過的人清單裡沒有（開過的人只在自己的「學習中」）
+  assert.equal((await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "新課" } })).data.allowPresident, true);
 
   // isPublic 由設定推算：所有會員的免費課不是「免登入可看」
   const m = (await call<CourseDetail>("PATCH", `/admin/courses/${reg.id}`, { token: admin, body: { viewScope: "members" } })).data;

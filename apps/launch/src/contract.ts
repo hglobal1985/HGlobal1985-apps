@@ -85,9 +85,9 @@ export type SeriesArt = { series: string; edmUrl: string; coverUrl: string | nul
 export type EnrollmentState = "opened" | "pending" | null;
 
 /** 誰可以瀏覽：所有人含訪客／所有會員／寰宇夥伴／中心會員。 */
-export type ViewScope = "all" | "members" | "hglobal" | "center";
-export const VIEW_SCOPES: ViewScope[] = ["all", "members", "hglobal", "center"];
-export const VIEW_SCOPE_LABEL: Record<ViewScope, string> = { all: "所有人含訪客", members: "所有會員", hglobal: "寰宇夥伴", center: "中心會員" };
+export type ViewScope = "all" | "members" | "hglobal" | "center" | "link_login" | "link_guest";
+export const VIEW_SCOPES: ViewScope[] = ["all", "members", "hglobal", "center", "link_login", "link_guest"];
+export const VIEW_SCOPE_LABEL: Record<ViewScope, string> = { all: "所有人含訪客", members: "所有會員", hglobal: "寰宇夥伴", center: "中心會員", link_login: "私密連結（需登入）", link_guest: "私密連結（訪客可）" };
 
 export type CourseSummary = {
   id: string;
@@ -122,8 +122,6 @@ export type CourseSummary = {
   isPublic: boolean;
   /** 誰可以瀏覽（業主 2026-11-17）。 */
   viewScope: ViewScope;
-  /** 「所有人」時不列在訪客的清單與搜尋（知道網址仍可開）。 */
-  hideFromGuests: boolean;
   /** 這位會員審核中的報名編號（沒有為 null）；點「付款審核中」直接進完整的報名明細與訊息頁。 */
   pendingOrderId: string | null;
   /** 費用尚未公布：顯示「費用尚未公布」、暫不開放報名。 */
