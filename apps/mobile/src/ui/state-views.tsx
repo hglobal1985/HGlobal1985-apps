@@ -1,14 +1,12 @@
-import { ActivityIndicator, View } from "react-native";
-import { useTheme } from "@/theme/theme";
-import { space } from "@/theme/tokens";
+import { View } from "react-native";
+import { LoadingSapling } from "./loading-sapling";
 import { Button } from "./button";
 import { EmptyState } from "./empty-state";
 
 export function LoadingView() {
-  const { c } = useTheme();
   return (
-    <View style={{ padding: space.xxl, alignItems: "center" }} accessibilityLabel="載入中">
-      <ActivityIndicator color={c.accentText} />
+    <View style={{ alignItems: "center" }}>
+      <LoadingSapling />
     </View>
   );
 }
