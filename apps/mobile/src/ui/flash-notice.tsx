@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } fro
 import { Animated, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
+import { GradientFrame } from "./gradient-frame";
 import { AppText } from "./text";
 
 /**
@@ -67,7 +68,9 @@ export function FlashHost() {
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingTop: Math.round(height * 0.12) }]}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${shown.title}${shown.body ? `，${shown.body}` : ""}，點一下關閉`} onPress={dismiss}>
-        <Animated.View style={[styles.box, { opacity: op, width: Math.min(FLASH_W, width - space.lg * 2), backgroundColor: c.surface, borderColor: c.accent }]} accessibilityLiveRegion="polite">
+        <Animated.View style={{ opacity: op }} accessibilityLiveRegion="polite">
+          {/* 邊框＝迷你播放器同款流光漸層邊框（共用模組 ui/gradient-frame，業主 2026-11-17） */}
+          <GradientFrame width={Math.min(FLASH_W, width - space.lg * 2)} height={FLASH_H} radius={radius.lg}>
           {shown.icon ? <View style={styles.icon}>{shown.icon}</View> : null}
           <AppText numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.title, { color: c.text, fontSize: titleSize(shown.title), lineHeight: Math.round(titleSize(shown.title) * 1.25) }]}>
             {shown.title}
@@ -77,6 +80,7 @@ export function FlashHost() {
               {shown.body}
             </AppText>
           ) : null}
+          </GradientFrame>
         </Animated.View>
       </Pressable>
     </View>

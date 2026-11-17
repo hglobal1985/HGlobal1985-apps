@@ -86,6 +86,8 @@
 
 - **中心「首頁圖」（業主 2026-11-17 命名）**：中心頁封面那張圖叫「**中心首頁圖**」，**不叫 EDM**（EDM 只指課程、系列的海報）；畫面文字一律寫「中心首頁圖」（`ArtUploader` 的 `noun` 參數：中心傳「首頁圖」）。中心頁封面**不放右上角放大鈕**，點封面任意處就放大看原始大圖，放大後與課程 EDM 共用同一個 `EdmLightbox`（下載、分享、拖曳、兩指放大縮小），不可另做。
 
+- **流光漸層邊框模組 `GradientFrame`（業主 2026-11-17 永久指示）**：迷你播放器那圈網站色系（深綠、橄欖、金）高級反光漸層邊框（邊框粗 4.5px、135 度漸層、7 秒一輪的流動動畫、外圍陰影），**全螢幕文字提醒（`showFlash`）與迷你播放器共用同一組定義**，集中在 `src/ui/gradient-frame.web.tsx`（`FRAME_GRADIENT`、`FRAME_PAD`、`FRAME_SHADOW`、`FRAME_ANIMATION`、`frameBoxStyle()`、`GradientFrame` 元件）。要改粗細、顏色、動畫、陰影只改這個檔案，所有用到的地方一起變；以後任何要用這種邊框的地方都用它，不可另寫。iOS／Android 版暫用單色邊框（`gradient-frame.tsx`），App 上架前補。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
