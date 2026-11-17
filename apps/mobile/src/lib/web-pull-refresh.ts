@@ -41,20 +41,28 @@ export function installWebPullRefresh(): () => void {
     const top = 86 - h;
     const leaves = leafOp > 0 ? `<g opacity="${leafOp}"><path d="M50 ${top} q${-12 * k} -2 ${-15 * k} ${-12 * k} q${12 * k} 0 ${15 * k} ${12 * k} M50 ${top} q${12 * k} -2 ${15 * k} ${-12 * k} q${-12 * k} 0 ${-15 * k} ${12 * k}" fill="#4C8A5B"/></g>` : "";
     const crown = r > 3 ? `<circle cx="50" cy="${cy}" r="${r}" fill="#2F7A46"/><circle cx="${50 - r * 0.35}" cy="${cy - r * 0.2}" r="${r * 0.62}" fill="#3F9A5A"/>` : "";
-    // 櫻桃：只吊掛在樹冠邊緣（上方頂端不放），6 顆；一顆一顆依序長出來，用短梗從樹冠邊緣垂吊下來。
-    const angles = [-30, 20, 70, 110, 160, 210]; // 度，0＝右、90＝正下方；避開頂端（270）
+    // 櫻桃：5 組雙子櫻桃，只吊掛在樹冠邊緣（頂端不放），一組一組依序長出來。
+    // 形狀仿插圖：心形果身（頂端有凹口）、兩顆各有彎曲的細梗在上方會合、左上角一點高光；
+    // 顏色是綠色為主、下緣帶一點點橘的漸層（成熟中的綠櫻桃）。
+    const angles = [-25, 35, 100, 150, 205]; // 度，0＝右、90＝正下方；避開頂端（270）
+    const cherryPath = (cx: number, cy: number, R: number) =>
+      `M${cx} ${cy - 0.62 * R} C${cx - 0.35 * R} ${cy - 0.95 * R} ${cx - 1.05 * R} ${cy - 0.6 * R} ${cx - R} ${cy + 0.1 * R} C${cx - 0.95 * R} ${cy + 0.75 * R} ${cx - 0.4 * R} ${cy + R} ${cx} ${cy + R} C${cx + 0.4 * R} ${cy + R} ${cx + 0.95 * R} ${cy + 0.75 * R} ${cx + R} ${cy + 0.1 * R} C${cx + 1.05 * R} ${cy - 0.6 * R} ${cx + 0.35 * R} ${cy - 0.95 * R} ${cx} ${cy - 0.62 * R}Z`;
     let cherries = "";
     angles.forEach((deg, i) => {
-      const c = Math.min(1, Math.max(0, (p - (0.5 + i * 0.05)) / 0.2));
+      const c = Math.min(1, Math.max(0, (p - (0.5 + i * 0.07)) / 0.2));
       if (c <= 0 || r < 10) return;
       const a = (deg * Math.PI) / 180;
-      const x = 50 + Math.cos(a) * r * 0.97;
-      const y = cy + Math.sin(a) * r * 0.97;
-      const rr = (4 + 3 * Math.max(0, (p - 0.5) / 0.5)) * c;
-      const len = 7 * c;
-      cherries += `<path d="M${x} ${y} L${x} ${y + len}" stroke="#4E7D2F" stroke-width="1.4" stroke-linecap="round"/><circle cx="${x}" cy="${y + len + rr * 0.85}" r="${rr}" fill="#7CC043" stroke="#4E7D2F" stroke-width=".6"/><circle cx="${x - rr * 0.35}" cy="${y + len + rr * 0.85 - rr * 0.35}" r="${rr * 0.28}" fill="#fff" opacity=".75"/>`;
+      const ax = 50 + Math.cos(a) * r * 0.97;
+      const ay = cy + Math.sin(a) * r * 0.97;
+      const R = (5.6 + 2.4 * Math.max(0, (p - 0.5) / 0.5)) * c;
+      const L = 8 * c;
+      const pts: [number, number][] = [[ax - 0.95 * R, ay + L + 0.2 * R], [ax + 1.05 * R, ay + L + 1.1 * R]];
+      pts.forEach(([x, y]) => {
+        cherries += `<path d="M${ax} ${ay} C${ax} ${ay + L * 0.45} ${x + (x < ax ? 0.4 : -0.4) * R} ${y - 0.62 * R - L * 0.35} ${x} ${y - 0.62 * R}" stroke="#6B7A3A" stroke-width="1.1" fill="none" stroke-linecap="round"/><path d="${cherryPath(x, y, R)}" fill="url(#chg)"/><ellipse cx="${x - 0.45 * R}" cy="${y - 0.25 * R}" rx="${0.28 * R}" ry="${0.16 * R}" transform="rotate(-35 ${x - 0.45 * R} ${y - 0.25 * R})" fill="#fff" opacity=".8"/>`;
+      });
     });
-    return `<svg width="104" height="104" viewBox="0 0 100 100"><ellipse cx="50" cy="90" rx="22" ry="5" fill="#8B6B4A"/><rect x="${48 - cr * 1.5}" y="${top}" width="${4 + cr * 3}" height="${h}" rx="2" fill="#7A5A3A"/>${crown}${leaves}${cherries}</svg>`;
+    const defs = `<defs><linearGradient id="chg" x1="0" y1="0" x2="0.25" y2="1"><stop offset="0" stop-color="#8FCB45"/><stop offset=".62" stop-color="#A9CC3C"/><stop offset="1" stop-color="#F2A040"/></linearGradient></defs>`;
+    return `<svg width="104" height="104" viewBox="0 0 100 100">${defs}<ellipse cx="50" cy="90" rx="22" ry="5" fill="#8B6B4A"/><rect x="${48 - cr * 1.5}" y="${top}" width="${4 + cr * 3}" height="${h}" rx="2" fill="#7A5A3A"/>${crown}${leaves}${cherries}</svg>`;
   };
   /** 全螢幕暗化＋模糊（跟全站彈出層同一組 DIM_COLOR／DIM_BLUR），隨拉動程度漸漸變暗。 */
   const showDim = (opacity: number) => {
