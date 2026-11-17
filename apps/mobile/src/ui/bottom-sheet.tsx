@@ -3,6 +3,7 @@ import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSh
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
+import { dimStyle } from "./dim-backdrop";
 import { AppText } from "./text";
 
 /** 網頁：手指按的位置在「已經往下捲過的清單」裡時，不攔截手勢（讓清單自己捲動，不會誤收起面板）。 */
@@ -127,7 +128,7 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  backdrop: { flex: 1, justifyContent: "flex-end", ...dimStyle },
   sheet: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: space.lg, gap: space.md },
   fill: { position: "absolute", left: 0, right: 0, top: "100%", height: 1200 },
   hint: { position: "absolute", left: 0, right: 0, top: -40, alignItems: "center" },

@@ -5,7 +5,7 @@ import { openAccountCenter } from "@/features/account-link";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Icon, LoadingLadybug, type IconName } from "@/ui";
+import { AppText, Icon, LoadingLadybug, dimStyle, type IconName } from "@/ui";
 
 type FieldView = { value: string; pending: string | null; status: string };
 type View_ = {
@@ -378,7 +378,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)" },
+  backdrop: { flex: 1, ...dimStyle },
   backdropInner: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 24 },
   box: { borderRadius: radius.md, borderWidth: 1, padding: space.md, gap: space.sm },
   actions: { flexDirection: "row", gap: space.sm, width: "100%" },

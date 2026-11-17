@@ -30,3 +30,4 @@ export { LoginPrompt } from "./login-prompt";
 export { InAppBrowserBanner } from "./in-app-banner";
 export { LoadingSapling } from "./loading-sapling";
 export { LoadingLadybug } from "./loading-ladybug";
+export { DIM_ALPHA, DIM_BLUR, DIM_COLOR, DimBackdrop, dimStyle } from "./dim-backdrop";

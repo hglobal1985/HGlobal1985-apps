@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText } from "@/ui";
+import { AppText, dimStyle } from "@/ui";
 
 export type AddKind = "course" | "list";
 
@@ -61,7 +61,7 @@ export function AddMaterialFab({ onPick }: { onPick: (k: AddKind) => void }) {
 }
 
 const styles = StyleSheet.create({
-  scrim: { backgroundColor: "rgba(0,0,0,0.45)", zIndex: 20 },
+  scrim: { ...dimStyle, zIndex: 20 },
   wrap: { position: "absolute", right: space.lg, bottom: space.lg, alignItems: "flex-end", gap: space.sm, zIndex: 21 },
   menu: { alignItems: "flex-end", gap: space.sm },
   option: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 52, paddingHorizontal: space.lg, borderRadius: radius.pill, borderWidth: 1, shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 4 },

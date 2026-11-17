@@ -9,7 +9,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
-import { AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame } from "@/ui";
+import { AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 
 /**
@@ -253,7 +253,7 @@ export function EdmLightbox({ uri, title, onClose }: { uri: string; title: strin
 
 const styles = StyleSheet.create({
   hint: { position: "absolute", bottom: 8, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
-  backdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.72)" },
+  backdrop: { flex: 1, alignItems: "center", justifyContent: "center", ...dimStyle },
   frame: { overflow: "hidden", borderRadius: radius.md, backgroundColor: "#000" },
   topRight: { position: "absolute", top: 16, right: 16 },
   bottom: { position: "absolute", left: 16, right: 16, bottom: 16, flexDirection: "row", alignItems: "center", gap: space.xs },
