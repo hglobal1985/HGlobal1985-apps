@@ -4,7 +4,7 @@ import { Animated, Platform, Pressable, StyleSheet, useWindowDimensions, View } 
 import { createPortal } from "react-dom";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { dimStyle } from "./dim-backdrop";
+import { dimStyle, hasDimLayer } from "./dim-backdrop";
 import { GradientFrame } from "./gradient-frame";
 import { AppText } from "./text";
 
@@ -71,6 +71,7 @@ export function FlashHost() {
   );
   const op = useRef(new Animated.Value(0)).current;
   const [shown, setShown] = useState<typeof current>(null);
+  const [dim, setDim] = useState(true); // 已有彈出層開著時，不再多疊一層暗化
   useEffect(() => {
     if (!cur) {
       op.stopAnimation();
@@ -78,6 +79,7 @@ export function FlashHost() {
       return;
     }
     setShown(cur);
+    setDim(!hasDimLayer());
     op.stopAnimation();
     op.setValue(0);
     const run = Animated.sequence([
@@ -94,7 +96,7 @@ export function FlashHost() {
   const node = (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingTop: Math.round(height * 0.12) }, web && ({ position: "fixed", zIndex: 20000 } as object)]}>
       {/* 提醒出現時整個頁面背景暗化（業主 2026-11-17）；跟著卡片一起淡入淡出，不擋住下面的操作。 */}
-      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, dimStyle, { opacity: op }]} />
+      {dim ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, dimStyle, { opacity: op }]} /> : null}
       <Pressable accessibilityRole="button" accessibilityLabel={`${shown.title}${shown.body ? `，${shown.body}` : ""}，點一下關閉`} onPress={dismiss}>
         <Animated.View style={{ opacity: op }} accessibilityLiveRegion="polite">
           {/* 邊框＝迷你播放器同款流光漸層邊框（共用模組 ui/gradient-frame，業主 2026-11-17） */}

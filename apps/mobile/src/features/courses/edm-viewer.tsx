@@ -9,7 +9,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
-import { AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle } from "@/ui";
+import { AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle, useDimLayer } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 
 /**
@@ -117,6 +117,7 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
 export function EdmLightbox({ uri, title, onClose }: { uri: string; title: string; onClose: () => void }) {
+  useDimLayer();
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const [scale, setScale] = useState(1);

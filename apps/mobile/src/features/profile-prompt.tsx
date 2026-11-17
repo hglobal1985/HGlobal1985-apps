@@ -5,7 +5,7 @@ import { openAccountCenter } from "@/features/account-link";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Icon, LoadingLadybug, dimStyle, type IconName } from "@/ui";
+import { AppText, Icon, LoadingLadybug, dimStyle, useDimLayer, type IconName } from "@/ui";
 
 type FieldView = { value: string; pending: string | null; status: string };
 type View_ = {
@@ -143,6 +143,7 @@ function Btn({ label, icon, onPress, disabled, loading, save }: { label: string;
  * 必填沒填時標示橘框，不送出。直接用會員本人的身分寫回會員中心（行動大學不保存）。
  */
 export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void; initial?: View_ | null }) {
+  useDimLayer();
   const { c } = useTheme();
   const { width } = useWindowDimensions();
   const { invalidate } = useSession();

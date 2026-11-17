@@ -3,7 +3,7 @@ import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSh
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { dimStyle } from "./dim-backdrop";
+import { dimStyle, useDimLayer } from "./dim-backdrop";
 import { AppText } from "./text";
 
 /** 網頁：手指按的位置在「已經往下捲過的清單」裡時，不攔截手勢（讓清單自己捲動，不會誤收起面板）。 */
@@ -39,6 +39,7 @@ function inUnfinishedList(target: unknown): boolean {
  */
 export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand, expandLabel }: { onClose: () => void; children: ReactNode; swipeUpClose?: boolean; onExpand?: () => void; expandLabel?: string }) {
   const { c } = useTheme();
+  useDimLayer();
   const insets = useSafeAreaInsets();
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
