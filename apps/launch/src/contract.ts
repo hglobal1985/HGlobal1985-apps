@@ -152,6 +152,8 @@ export type CourseSummary = {
   isList: boolean;
   /** 課程專屬網址路徑（中心縮寫/英譯姓名-編號）；缺資料時為 null，用 /course/編號。 */
   shortPath: string | null;
+  /** 素材的第二層網址名稱（/系列縮寫/這個名稱）；沒設定為 null。 */
+  matUrl: string | null;
   /** 課程建立時間（ISO）；「分類」選單的「新」標籤用。 */
   createdAt: string;
   /** 付費課程（原價大於 0；限時免費、早鳥、鑽石免費仍算）。學習中的課程卡用來顯示「付費課程」標籤（不寫金額）。 */

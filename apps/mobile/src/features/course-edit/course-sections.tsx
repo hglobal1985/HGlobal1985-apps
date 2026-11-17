@@ -175,6 +175,10 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const isSuper = isSuperAdmin(member);
   const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
   const [f, setF] = useState(init);
+  // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
+  const [matUrl, setMatUrl] = useState(course.matUrl ?? "");
+  const links = useApi<{ kind: string; value: string; slug: string }[]>(course.isList && isSuper ? "/short-links" : null);
+  const seriesSlug = links.data?.find((l) => l.kind === "series" && l.value === (course.series || f.series))?.slug;
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const submit = async () => {
     if (!f.title.trim()) return setError(course.isList ? "請輸入素材清單名稱" : "請輸入課程名稱");
@@ -182,10 +186,34 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
     // 日期與「時間與地點」面板是同一份資料；素材清單沒有日期，不送。
     const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
     const important = !course.isList && (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
-    if (await save({ ...(isSuper ? { ...rest, series: f.series } : rest), ...dates }, { important })) onClose();
+    const matBody = course.isList && isSuper && matUrl.trim().toLowerCase() !== (course.matUrl ?? "") ? { matUrl: matUrl.trim() } : {};
+    if (await save({ ...(isSuper ? { ...rest, series: f.series } : rest), ...dates, ...matBody }, { important })) onClose();
   };
   return (
-    <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
+      {course.isList && isSuper ? (
+        <View style={{ gap: space.xs }}>
+          <Label>素材網址（只有超級管理員能設定）</Label>
+          {seriesSlug ? (
+            <>
+              <AppText variant="caption" tone="muted">
+                learn.hglobal1985.com/{seriesSlug}/
+              </AppText>
+              <Field label="" value={matUrl} onChange={(v) => setMatUrl(v.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="例如：2027-final（英文、數字、短橫線）" />
+              {matUrl ? (
+                <AppText variant="callout" style={{ fontWeight: "700" }}>
+                  完整網址：learn.hglobal1985.com/{seriesSlug}/{matUrl}
+                </AppText>
+              ) : null}
+              <AppText variant="caption" tone="muted">
+                同一個系列內不能重複；改名後舊網址仍然有效。
+              </AppText>
+            </>
+          ) : (
+            <NoticeBox text="這份素材還沒有系列短網址。請先把素材放進系列，並到「設定 › 短網址設定」替這個系列設定英文短網址，才能設定素材網址。" />
+          )}
+        </View>
+      ) : null}
       <BasicsFields isList={course.isList} f={f} setF={setF} />
     </EditSheet>
   );

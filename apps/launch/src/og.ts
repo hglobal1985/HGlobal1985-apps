@@ -97,6 +97,17 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
 export async function courseUrlMeta(db: D1Database, slug: string, name: string, origin: string): Promise<ShareMeta | null> {
   // 中心縮寫（照設定的大小寫顯示、輸入不分大小寫）或總部的 hq。
   const hq = slug.toLowerCase() === HQ_SLUG;
+  // 素材的第二層網址：/系列縮寫/素材名稱（改名前的舊名稱也認得）。
+  const serRow = hq ? null : await db.prepare("SELECT slug, value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'series'").bind(slug).first<{ slug: string; value: string }>();
+  if (serRow) {
+    const m =
+      (await db.prepare("SELECT mat_url AS n, host_unit AS h, host_center_key AS hk, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE series = ? AND mat_url = ? COLLATE NOCASE AND status = 'published'").bind(serRow.value, name).first<{ n: string; h: string; hk: string | null; k: string | null; v: number }>()) ??
+      (await db.prepare("SELECT c.mat_url AS n, c.host_unit AS h, c.host_center_key AS hk, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM material_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.series = ? AND a.name = ? COLLATE NOCASE AND c.status = 'published'").bind(serRow.value, name).first<{ n: string; h: string; hk: string | null; k: string | null; v: number }>());
+    if (!m) return null;
+    const S = await shareCfg(db);
+    const card = await centerCard(db, S, m.hk ? (m.h.split(/[、,，;；\n]+/)[0] ?? "").trim() : null);
+    return { title: titleOf(S, card.name), description: card.description, url: `${origin}/${serRow.slug}/${m.n}`, image: pubImage(origin, m.k, m.v) };
+  }
   const center = hq ? null : await db.prepare("SELECT slug, value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ slug: string; value: string }>();
   if (!hq && !center) return null;
   const vs = urlNameVariants(name);

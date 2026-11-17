@@ -84,7 +84,7 @@ const fail = (status: number, code: string, message: string): never => {
 /** demo：模擬會員（rankCode 為示範獎銜）；central：中央會員（不持有獎銜，資格每次向中央查詢）。 */
 type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
-type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string> };
+type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
 
 // ---------- helpers ----------
 
@@ -320,6 +320,7 @@ type CourseRow = {
   is_shorts: number;
   is_list: number;
   url_name: string | null;
+  mat_url: string | null;
   free_from: string | null;
   free_until: string | null;
   review_group_id: string | null;
@@ -362,7 +363,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -452,7 +453,9 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     centerCourse: row.host_center_key != null,
     isShorts: row.is_shorts === 1,
     isList: row.is_list === 1,
-    shortPath: row.url_name ? (row.host_center_key ? (ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null) : `${HQ_SLUG}/${row.url_name}`) : null,
+    // 素材（清單）有第二層網址且系列有短網址：/系列縮寫/素材名稱；否則沿用原本的課程專屬網址。
+    shortPath: row.is_list === 1 && row.mat_url && row.series && ctx.seriesSlugs?.get(row.series) ? `${ctx.seriesSlugs.get(row.series)}/${row.mat_url}` : row.url_name ? (row.host_center_key ? (ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null) : `${HQ_SLUG}/${row.url_name}`) : null,
+    matUrl: row.mat_url,
     createdAt: row.created_at,
     hostCenter: hostCenterOf(row.host_unit),
     hostCenterKey: row.host_center_key,
@@ -553,6 +556,7 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
   }
   const eligibility = await eligibilityFor(s, rankMap, [...visible.map((r) => r.min_rank_code), DIAMOND]);
   ctx.centerSlugs = await centerSlugMap(ctx.db);
+  ctx.seriesSlugs = await seriesSlugMap(ctx.db);
   const out = visible.map((r) => summarize(r, ctx, rankMap, state, eligibility));
   if (!rights || !s) return out;
   const r = rights;
@@ -631,6 +635,12 @@ async function registrationCount(db: D1Database, courseId: string): Promise<numb
 }
 
 /** 中心縮寫對照：centerKey（主辦中心的正規化名稱）→ 短網址縮寫。 */
+/** 系列短網址（系列名稱 → 縮寫），素材的第二層網址用。 */
+async function seriesSlugMap(db: D1Database): Promise<Map<string, string>> {
+  const { results } = await db.prepare("SELECT slug, value FROM short_links WHERE kind = 'series'").all<{ slug: string; value: string }>();
+  return new Map(results.map((r) => [r.value, r.slug]));
+}
+
 async function centerSlugMap(db: D1Database): Promise<Map<string, string>> {
   const { results } = await db.prepare("SELECT slug, value FROM short_links WHERE kind = 'center'").all<{ slug: string; value: string }>();
   return new Map(results.map((r) => [centerKey(r.value), r.slug]));
@@ -773,6 +783,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     for (const l of lessons.results) groupPos.set(l.id, l.kind === "section" ? 0 : ++n[l.kind === "material" ? "material" : "chapter"]);
   }
   ctx.centerSlugs = await centerSlugMap(ctx.db);
+  ctx.seriesSlugs = await seriesSlugMap(ctx.db);
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
   const admin = manages;
@@ -1787,6 +1798,15 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
       sets.push(["early_bird", 1], ["early_price_twd", price], ["early_until", until]);
     } else sets.push(["early_bird", 0], ["early_price_twd", null], ["early_until", null]);
   }
+  // 素材的第二層短網址（只有超級管理員）：英文小寫、數字、短橫線；是否重複在儲存時檢查。
+  const matUrl = text(body.matUrl, 60);
+  if (matUrl !== undefined) {
+    if (!who.roles.includes("super_admin")) fail(403, "mat_url_super_admin_only", "只有超級管理員可以設定素材網址");
+    const v = matUrl.trim().toLowerCase();
+    if (v && !/^[a-z0-9](?:[a-z0-9-]{0,58}[a-z0-9])$/.test(v)) fail(400, "invalid_mat_url", "素材網址只能用英文、數字和短橫線（至少 2 個字）");
+    if (v && ["edit", "share", "api", "new", "admin", "series", "course", "courses"].includes(v)) fail(400, "reserved_mat_url", "這個名稱是系統保留字，請換一個");
+    sets.push(["mat_url", v || null]);
+  }
   const series = text(body.series, 60);
   if (series !== undefined) {
     // 設定「系列」只限超級管理員（業主 2026-11-16）。
@@ -2066,7 +2086,7 @@ function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; url_name: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -2109,15 +2129,28 @@ async function updateCourse(ctx: Ctx, id: string) {
     else if (cur.view_scope === "all") sets.push(["view_scope", "members"]);
   }
   deriveIsPublic(sets, cur);
+  // 素材網址：同一個系列內不可重複（也不能撞到別份素材改名前的舊網址）；改名後舊網址記進別名永遠有效。
+  const matSet = sets.find(([c]) => c === "mat_url");
+  const matAlias: D1PreparedStatement[] = [];
+  if (matSet) {
+    const newName = matSet[1] as string | null;
+    const ser = String(pick("series", cur.series) ?? "");
+    if (newName) {
+      const clash = await ctx.db.prepare("SELECT id FROM courses WHERE series = ? AND mat_url = ? COLLATE NOCASE AND id <> ? UNION SELECT course_id FROM material_url_aliases WHERE series = ? AND name = ? COLLATE NOCASE AND course_id <> ?").bind(ser, newName, id, ser, newName, id).first();
+      if (clash) fail(400, "mat_url_taken", "這個素材網址已被這個系列的其他素材使用，請換一個");
+    }
+    if (cur.mat_url && cur.mat_url !== newName) matAlias.push(ctx.db.prepare("INSERT OR IGNORE INTO material_url_aliases (series, name, course_id) VALUES (?, ?, ?)").bind(cur.series, cur.mat_url, id));
+  }
   await checkGuidanceGroup(ctx, pick("guidance_unit", cur.guidance_unit), pick("review_group_id", cur.review_group_id));
   const batchRes = await ctx.db.batch([
+    ...matAlias,
     ...aliasStmts,
     ctx.db.prepare(`UPDATE courses SET ${sets.map(([c]) => `${c} = ?`).join(", ")}, updated_at = ?, edited_by_name = ?, edited_at = ? WHERE id = ?`).bind(...sets.map(([, v]) => v), iso(), admin.name.slice(0, 60), iso(), id),
     // 主講人章節的名稱、分享者、獎銜、職稱永遠等於課程基本資料：課程改了就一起同步。
     ...(sets.some(([c]) => ["title", "teacher", "teacher_rank", "teacher_title"].includes(c)) ? [speakerSync(ctx.db, id)] : []),
     audit(ctx.db, admin.sub, "course.update", "course", id, sets.map(([c]) => c).join(",")),
   ]);
-  const res = batchRes[aliasStmts.length]!;
+  const res = batchRes[matAlias.length + aliasStmts.length]!;
   if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
   await ensureCourseUrl(ctx, id);
   if (pick("status", cur.status) === "published" && cur.status !== "published") await notifyNewCourse(ctx, id);
@@ -2749,6 +2782,13 @@ const routes: [string, RegExp, Handler][] = [
     /^\/short-links\/([A-Za-z0-9-]{2,30})\/([A-Za-z0-9-]{3,80})$/,
     async (ctx, [slug, name]) => {
       // 課程專屬網址：中心縮寫（或總部 hq）+ 英譯姓名-編號 → 課程編號。網址不分大小寫。
+      // 素材的第二層網址：系列縮寫 + 素材名稱 → 素材編號（改名前的舊名稱也認得）。
+      const serRow = slug.toLowerCase() === HQ_SLUG ? null : await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'series'").bind(slug).first<{ value: string }>();
+      if (serRow) {
+        const m = (await ctx.db.prepare("SELECT id FROM courses WHERE series = ? AND mat_url = ? COLLATE NOCASE").bind(serRow.value, name).first<{ id: string }>()) ?? (await ctx.db.prepare("SELECT course_id AS id FROM material_url_aliases WHERE series = ? AND name = ? COLLATE NOCASE").bind(serRow.value, name).first<{ id: string }>());
+        if (m) return { courseId: m.id };
+        return fail(404, "not_found", "找不到這個網址");
+      }
       const row = slug.toLowerCase() === HQ_SLUG ? { value: "" } : await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ value: string }>();
       const course = row
         ? row.value

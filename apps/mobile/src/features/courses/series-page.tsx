@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Animated, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { api, type CourseSummary, type SeriesArt } from "@/api/client";
 import { SeriesEdm } from "@/features/admin/series-edm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
@@ -58,6 +58,13 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     return nearestFirst(all.filter((x) => x.series === series));
   }, [data, adminList.data, series]);
   const sub = useSubscribe("series", series, path);
+  // 分享網址一律用系列短網址（/Beauty-Starry），沒設定才用 /series/名稱（業主 2026-11-17）；網頁版網址列也換成短網址。
+  const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
+  const slug = links.data?.find((l) => l.kind === "series" && l.value === series)?.slug;
+  const sharePath = slug ? `/${slug}` : path;
+  useEffect(() => {
+    if (Platform.OS === "web" && slug && typeof window !== "undefined" && window.location.pathname !== sharePath) window.history.replaceState(window.history.state, "", sharePath + window.location.search);
+  }, [slug, sharePath]);
   const art = artList.data?.find((x) => x.series === series);
   const pick = (v: View_) => {
     setView(v);
@@ -73,7 +80,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     <>
       <PageHeader
         title={series}
-        path={path}
+        path={sharePath}
         extra={isSuperAdmin(member) ? <TopBarButton label="編輯" accessibilityLabel="編輯系列封面" iconName="create-outline" onPress={() => setEditOpen(true)} /> : undefined}
       />
       <Screen header={false} hero={<CenterHero art={art} scrollY={scrollY} courses={courses.length} lessons={lessonsOf(courses)} views={views} title={series} subscribe={sub} />} heroHeight={centerHeroFull(winW)} scrollY={scrollY}>
