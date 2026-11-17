@@ -9,7 +9,7 @@ import { Platform } from "react-native";
 export function installWebPullRefresh(): () => void {
   if (Platform.OS !== "web" || typeof document === "undefined") return () => undefined;
   // 業主 2026-11-17：原本太靈敏。改成「要拉到完整距離（FULL）的一半以上」才觸發，並用小樹苗長成結綠色櫻桃的樹來顯示進度百分比。
-  const FULL = 280; // 拉到 100% 所需的手指位移（px）
+  const FULL = 480; // 拉到 100% 所需的手指位移（px）
   const THRESHOLD = FULL / 2; // 過半（50%）才會重新整理
   const MIN_GAP_MS = 2000; // 連續兩次觸發至少間隔 2 秒（中央有每分鐘 120 次的讀取限制）
   let startY = 0;
@@ -37,12 +37,12 @@ export function installWebPullRefresh(): () => void {
       ? spots.map(([dx, dy]) => {
           const x = 50 + dx! * r;
           const y = cy + dy! * r;
-          const rr = 1.5 + 3.6 * cherry;
-          return `<path d="M${x} ${y - rr} q2 -6 5 -7" stroke="#4E7D2F" stroke-width="1.2" fill="none" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="${rr}" fill="#7CC043"/><circle cx="${x - rr * 0.35}" cy="${y - rr * 0.35}" r="${rr * 0.28}" fill="#fff" opacity=".7"/>`;
+          const rr = 3 + 7 * cherry;
+          return `<path d="M${x} ${y - rr} q3 -8 7 -9" stroke="#4E7D2F" stroke-width="1.2" fill="none" stroke-linecap="round"/><circle cx="${x}" cy="${y}" r="${rr}" fill="#7CC043"/><circle cx="${x - rr * 0.35}" cy="${y - rr * 0.35}" r="${rr * 0.28}" fill="#fff" opacity=".7"/>`;
         }).join("")
       : "";
     const sap = p < 0.18 ? `<path d="M50 ${86 - h} q-9 -2 -11 -9 q9 0 11 9 M50 ${86 - h} q9 -2 11 -9 q-9 0 -11 9" fill="#4C8A5B"/>` : "";
-    return `<svg width="72" height="72" viewBox="0 0 100 100"><ellipse cx="50" cy="90" rx="22" ry="5" fill="#8B6B4A"/><rect x="${48 - g * 1.5}" y="${86 - h}" width="${4 + g * 3}" height="${h}" rx="2" fill="#7A5A3A"/>${p >= 0.18 ? `<circle cx="50" cy="${cy}" r="${r}" fill="#2F7A46"/><circle cx="${50 - r * 0.35}" cy="${cy - r * 0.2}" r="${r * 0.62}" fill="#3F9A5A"/>` : sap}${cherries}</svg>`;
+    return `<svg width="96" height="96" viewBox="0 0 100 100"><ellipse cx="50" cy="90" rx="22" ry="5" fill="#8B6B4A"/><rect x="${48 - g * 1.5}" y="${86 - h}" width="${4 + g * 3}" height="${h}" rx="2" fill="#7A5A3A"/>${p >= 0.18 ? `<circle cx="50" cy="${cy}" r="${r}" fill="#2F7A46"/><circle cx="${50 - r * 0.35}" cy="${cy - r * 0.2}" r="${r * 0.62}" fill="#3F9A5A"/>` : sap}${cherries}</svg>`;
   };
   const show = (progress: number, y: number, label?: string) => {
     if (!bar) {
@@ -87,7 +87,7 @@ export function installWebPullRefresh(): () => void {
       return;
     }
     pull = dy;
-    show(pull / FULL, Math.min(pull * 0.5, 150) - 90);
+    show(pull / FULL, Math.min(pull * 0.4, 190) - 110);
   };
   const end = () => {
     if (active && pull >= THRESHOLD) {
