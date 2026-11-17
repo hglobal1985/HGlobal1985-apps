@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { inAppBrowser, openInSystemBrowser } from "@/lib/in-app-browser";
 import { useTheme } from "@/theme/theme";
 import { minTouch } from "@/theme/tokens";
+import { DIM_COLOR } from "@/ui/dim-backdrop";
 import { flashText } from "@/ui/flash-notice";
 
 const RED = "#B3261E";
@@ -15,10 +17,12 @@ const RED = "#B3261E";
 export function InAppBrowserBanner() {
   const { c } = useTheme();
   const info = inAppBrowser();
+  const [h, setH] = useState(0);
   if (!info) return null;
   const long = info.app.length > 6; // 名稱較長時第二行縮字，仍維持一行
   return (
-    <View accessibilityRole="alert" style={[styles.box, { backgroundColor: c.dangerSoft, borderColor: RED }]}>
+    <>
+    <View onLayout={(e) => setH(e.nativeEvent.layout.height)} accessibilityRole="alert" style={[styles.box, { backgroundColor: c.dangerSoft, borderColor: RED }]}>
       <Text numberOfLines={1} style={[styles.l1, { color: RED }]}>
         ⚠️目前播放功能被受限⚠️
       </Text>
@@ -37,6 +41,9 @@ export function InAppBrowserBanner() {
         <Text style={styles.btnText}>按此改用{info.browser}瀏覽器開啟</Text>
       </Pressable>
     </View>
+    {/* 警示條下方整個 App 蓋一層 60% 暗化（業主 2026-11-17）；只是視覺提醒，不擋操作。 */}
+    {h > 0 ? <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: h, backgroundColor: DIM_COLOR, zIndex: 50 }} /> : null}
+    </>
   );
 }
 
