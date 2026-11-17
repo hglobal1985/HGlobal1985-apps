@@ -97,6 +97,8 @@
 
 - **訂閱模組（業主 2026-11-17）**：中心首頁圖與系列首頁圖的訂閱鈕設計、尺寸、樣式一律統一，集中在 `features/courses/subscribe.tsx`：`SubscribeButton`（鈕本體）＋`useSubscribe(kind, name, loginNext)`（讀取、訂閱／取消、登入導向、全螢幕提醒）；`CenterHero` 的 `subscribe` 參數由它提供，中心頁與系列頁（`SeriesPage`）都用同一個。系列訂閱 API＝`/series-subscription`（沿用 `center_subscriptions` 表，鍵為 `series:系列名`），人數同樣從 688 開始；系列有新課程上架（`notifyNewCourse`）也通知系列訂閱者。要改訂閱鈕外觀只改這個檔案，不可在別處另畫。
 
+- **封面裁切框（業主 2026-11-17）**：`EdmCropper`（`features/admin/edm-cropper.web.tsx`）裁掉的部分用標準暗化色 `DIM_COLOR` 蓋住，裁切框四周是 5px 白色粗框（框貼著圖片邊緣時也完整看得到）。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { DIM_COLOR } from "@/ui/dim-backdrop";
 import type { Rect } from "./image-tools";
 
 const MIN = 32;
@@ -73,7 +74,7 @@ export function EdmCropper({ src, imgW, imgH, aspect, value, onChange }: { src: 
   return (
     <div ref={wrap} onPointerMove={move} onPointerUp={end} onPointerCancel={end} style={{ position: "relative", width: view.w, height: view.h, overflow: "hidden", userSelect: "none", touchAction: "none", background: "#000", borderRadius: 8, margin: "0 auto" }}>
       <img src={src} alt="" draggable={false} style={{ width: view.w, height: view.h, display: "block" }} />
-      <div onPointerDown={start("move")} style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, boxShadow: "0 0 0 9999px rgba(0,0,0,0.62)", border: "3px solid #fff", outline: "1px solid #2F5D3A", cursor: "move", touchAction: "none" }}>
+      <div onPointerDown={start("move")} style={{ position: "absolute", left: box.x, top: box.y, width: box.w, height: box.h, boxSizing: "border-box", boxShadow: `0 0 0 9999px ${DIM_COLOR}`, border: "5px solid #fff", cursor: "move", touchAction: "none" }}>
         {handle("nw", { left: 0, top: 0 })}
         {handle("ne", { right: 0, top: 0 })}
         {handle("sw", { left: 0, bottom: 0 })}
