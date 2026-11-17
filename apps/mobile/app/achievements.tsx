@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import type { Achievement } from "@/api/client";
 import { conditionText } from "@/features/achievements/text";
@@ -6,7 +5,7 @@ import { dateOnly } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
+import { GuestGate, AppText, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
 
 /** 學習成就：達成條件就會獲得徽章；還沒達成的顯示目前進度。 */
 export default function AchievementsScreen() {
@@ -16,7 +15,7 @@ export default function AchievementsScreen() {
   if (!member)
     return (
       <Screen header={false}>
-        <EmptyState icon="trophy-outline" title="尚未登入" body="登入後可以查看你的學習徽章。" action={<Button label="前往登入" onPress={() => router.navigate("/me")} />} />
+        <GuestGate icon="trophy-outline" body="登入後可以查看你的學習徽章。" />
       </Screen>
     );
   const earned = (data ?? []).filter((a) => a.earned);

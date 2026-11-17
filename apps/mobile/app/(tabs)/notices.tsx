@@ -7,7 +7,7 @@ import { dateTime, noticeTarget } from "@/features/format";
 import { NoticeSheet } from "@/features/notices/notice-sheet";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
-import { Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen } from "@/ui";
+import { GuestGate, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen } from "@/ui";
 
 export default function NoticesScreen() {
   const { c } = useTheme();
@@ -28,12 +28,7 @@ export default function NoticesScreen() {
   if (!member)
     return (
       <Screen>
-        <EmptyState
-          icon="notifications-outline"
-          title="尚未登入"
-          body="登入後可在這裡收到開課、報名審核等通知。"
-          action={<Button label="前往登入" onPress={() => router.navigate("/me")} />}
-        />
+        <GuestGate icon="notifications-outline" body="登入後可在這裡收到開課、報名審核等通知。" />
       </Screen>
     );
   return (

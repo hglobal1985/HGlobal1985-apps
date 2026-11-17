@@ -10,7 +10,7 @@ import { confirmSheet } from "@/features/confirm";
 import { CourseCard } from "@/features/courses/course-card";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section, Select } from "@/ui";
+import { GuestGate, AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section, Select } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 export default function LearningScreen() {
@@ -53,12 +53,7 @@ export default function LearningScreen() {
   if (!member)
     return (
       <Screen>
-        <EmptyState
-          icon="person-circle-outline"
-          title="尚未登入"
-          body="登入後，這裡會列出你已開通的課程與學習進度。"
-          action={<Button label="前往登入" onPress={() => router.navigate("/me")} />}
-        />
+        <GuestGate body="登入後，這裡會列出你已開通的課程與學習進度。" />
       </Screen>
     );
   return (

@@ -10,7 +10,7 @@ import { canManageCourses, canManageEditors } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { AppText, Button, Card, ListRow, LoadingView, NoticeBox, Pill, SandboxBanner, Screen, Section } from "@/ui";
+import { GuestGate, AppText, Button, Card, ListRow, LoadingView, NoticeBox, Pill, SandboxBanner, Screen, Section } from "@/ui";
 
 /**
  * 頁尾：與寰宇中央會員網站的頁尾相同（淡色小字：左邊「隱私權政策」連結、右邊設計者署名）。
@@ -86,19 +86,15 @@ export default function MeScreen() {
           </View>
         </View>
       ) : ready ? (
-        <Section title="登入">
-          <Card>
-            <AppText variant="headline">使用 Google 帳號登入</AppText>
-            <AppText variant="callout" tone="muted">
-              登入後即可報名課程、記錄學習進度。課程的獎銜資格會依你在會員中心的資料自動判斷。
-            </AppText>
-            <View style={styles.row}>
-              <Button label="使用 Google 登入" icon="logo-google" loading={busy === "google"} onPress={() => run("google", async () => {
-                await signInGoogle(back ?? "/");
-                router.replace((back ?? "/") as Href); // 登入後預設回首頁
-              })} />
-            </View>
-          </Card>
+        <Section title="">
+          <GuestGate
+            body="登入後即可報名課程、記錄學習進度。課程的獎銜資格會依你在會員中心的資料自動判斷。"
+            loading={busy === "google"}
+            onLogin={() => void run("google", async () => {
+              await signInGoogle(back ?? "/");
+              router.replace((back ?? "/") as Href); // 登入後預設回首頁
+            })}
+          />
           {config.data?.demoLogin ? (
             <>
               <SandboxBanner text="內部測試：也可以用以下測試身分登入（資料為示範用）。" />
