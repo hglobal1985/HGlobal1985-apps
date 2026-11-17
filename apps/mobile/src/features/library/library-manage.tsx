@@ -11,6 +11,7 @@ import { TYPE_INFO } from "@/features/link-types";
 import { dateTime, eventDays } from "@/features/format";
 import { fromHms, toHms, type Hms } from "@/features/uploads/hms";
 import { TimeRangePicker } from "@/features/uploads/time-range-picker";
+import { useLibraryChrome } from "@/lib/library-mode";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
@@ -24,6 +25,7 @@ import { flashText } from "@/ui/flash-notice";
  * 公開檢視在 /會員編號（features/library/library-view.tsx）。
  */
 export function LibraryManage() {
+  useLibraryChrome();
   const { c } = useTheme();
   const { data, loading, reload } = useApi<LibraryMine>("/library/mine");
   const [name, setName] = useState("");

@@ -3,6 +3,7 @@ import { router, usePathname, type Href } from "expo-router";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { LIB, useLibraryMode } from "@/lib/library-mode";
 import { useUnreadCount } from "@/state/unread";
 import { useTheme } from "@/theme/theme";
 import { barHeight } from "@/theme/tokens";
@@ -29,6 +30,7 @@ export function BottomBar() {
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const unread = useUnreadCount();
+  const lib = useLibraryMode();
   const [keyboard, setKeyboard] = useState(false);
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -38,10 +40,10 @@ export function BottomBar() {
   }, []);
   if (pathname.startsWith("/auth") || keyboard) return null;
   return (
-    <View style={[styles.bar, { backgroundColor: c.tabBar, paddingBottom: insets.bottom }]} accessibilityRole="tablist">
+    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.tabBar, paddingBottom: insets.bottom }]} accessibilityRole="tablist">
       {tabs.map((t) => {
-        const on = t.match(pathname);
-        const color = on ? c.accentText : c.textMuted;
+        const on = !lib && t.match(pathname);
+        const color = lib ? LIB.muted : on ? c.accentText : c.textMuted;
         return (
           <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title} onPress={() => router.navigate(t.href)}>
             <View>

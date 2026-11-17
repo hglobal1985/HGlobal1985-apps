@@ -6,6 +6,7 @@ import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { api, type LibraryItem, type LibraryUnlock, type LibraryView } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
 import { eventDays } from "@/features/format";
+import { LIB, useLibraryChrome } from "@/lib/library-mode";
 import { LoadingView } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { BottomSheet } from "@/ui/bottom-sheet";
@@ -16,7 +17,7 @@ import { flashText } from "@/ui/flash-notice";
  * 深色木質底、黃銅名牌、每個書架（分類標題，點一下收合）上一排書脊；整座圖書館或單獨一本書都可以有密碼（可設幾天後失效）。
  * 這一頁自成一套配色，故意跟行動大學標準頁面不同；不計學習進度。
  */
-export const LIB = { bg: "#2A1D16", wood: "#7A4B2A", woodDark: "#5A3820", brass: "#D8B26A", brassDark: "#B28A3E", text: "#F3E6CC", muted: "#BFA98A", card: "#3A2A20" };
+export { LIB };
 const SPINES = ["#7A1F26", "#1F5A44", "#1F3A6B", "#7A5330", "#5A2A6B", "#8A6D1F", "#2F6F6A", "#9A3B2B", "#3C4F8C", "#5F6F2A"];
 const spineColor = (id: string) => SPINES[[...id].reduce((n, ch) => n + ch.charCodeAt(0), 0) % SPINES.length]!;
 const KEY = (n: string) => `hglobal:learn:lib-tokens:${n}`;
@@ -31,6 +32,11 @@ export function openBook(b: LibraryItem) {
 }
 
 export function LibraryScreen({ number }: { number: string }) {
+  useLibraryChrome();
+  useEffect(() => {
+    // 自己的圖書館從設定進來時（網址是 /library），網址列換成專屬網址 /會員編號。
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.location.pathname !== `/${number}`) window.history.replaceState(window.history.state, "", `/${number}`);
+  }, [number]);
   const [view, setView] = useState<LibraryView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tokens, setTokens] = useState<Tokens>({});

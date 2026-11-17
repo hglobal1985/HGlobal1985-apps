@@ -3,6 +3,7 @@ import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
 import { useApi, useSession } from "@/state/session";
 import type { LibraryMine, LibraryView } from "@/api/client";
 import { LoadingView } from "@/ui";
+import { useLibraryChrome } from "@/lib/library-mode";
 import { LibraryScreen, Shelves } from "./library-view";
 
 /**
@@ -11,6 +12,7 @@ import { LibraryScreen, Shelves } from "./library-view";
  * 所有設定功能（名稱、密碼、書架與書的管理）都集中在齒輪裡（app/library-settings.tsx）。
  */
 export function LibraryHome() {
+  useLibraryChrome();
   const { member } = useSession();
   const { data, loading } = useApi<LibraryMine>("/library/mine");
   if (loading && !data) return <LoadingView />;
