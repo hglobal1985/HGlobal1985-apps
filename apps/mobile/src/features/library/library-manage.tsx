@@ -38,7 +38,7 @@ export function LibraryManage() {
   if (!data?.library)
     return (
       <Screen header={false}>
-        <NoticeBox text="你還沒有「我的圖書館」。請向超級管理員索取邀請網址。" />
+        <NoticeBox text="你尚未解鎖圖書館鑰匙。請向超級管理員索取邀請網址，接受後就能使用。" />
       </Screen>
     );
   const lib = data.library;
