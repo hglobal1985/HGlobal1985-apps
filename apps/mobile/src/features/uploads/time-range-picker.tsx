@@ -54,6 +54,9 @@ export function TimeRangePicker({
   const [zoom, setZoom] = useState(0); // 0＝完整顯示（整支影片剛好塞滿膠卷），1＝最大
   const [w, setW] = useState(320);
   const [playing, setPlaying] = useState(false);
+  // 使用者正在拖曳、點選、微調時（含放開後約 1.2 秒，等預覽跳到新位置），播放回報的時間不能把紅線拉回去（業主 2026-11-17）。
+  const hold = useRef(0);
+  const touch = () => void (hold.current = Date.now() + 1200);
   // 每秒幾個像素：最小＝整支影片剛好塞滿膠卷；最大＝約每秒 60 像素（以對數連續變化，拉起來手感平均）。
   const ppsMin = Math.max(0.0001, w / total);
   const ppsMax = Math.max(60, ppsMin * 4);
@@ -71,6 +74,7 @@ export function TimeRangePicker({
       onMoveShouldSetPanResponder: () => true,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
+        touch();
         const gx = geo.current;
         base.current = gx.pos;
         gx.left = e.nativeEvent.pageX - e.nativeEvent.locationX; // 膠卷左緣的位置（算手指點在哪個時間用）
@@ -78,12 +82,14 @@ export function TimeRangePicker({
         if (gx.full) setPos(Math.min(gx.total, Math.max(0, Math.round(((e.nativeEvent.pageX - gx.left) / gx.pps) * 10) / 10)));
       },
       onPanResponderMove: (e, g) => {
+        touch();
         const gx = geo.current;
         if (gx.full) setPos(Math.min(gx.total, Math.max(0, Math.round(((e.nativeEvent.pageX - gx.left) / gx.pps) * 10) / 10)));
         else setPos(Math.min(gx.total, Math.max(0, Math.round((base.current - g.dx / gx.pps) * 10) / 10)));
       },
       // 放大後點一下（幾乎沒移動）＝紅線直接跳到點的位置。
       onPanResponderRelease: (e, g) => {
+        touch();
         const gx = geo.current;
         if (gx.full || Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6) return;
         const px = e.nativeEvent.pageX - gx.left;
@@ -108,7 +114,7 @@ export function TimeRangePicker({
   }, [pos, pps, w, step, total, full]);
   const setStart = () => onChange({ start: toHms(at), ...(eSec != null && eSec <= at ? { end: toHms(null) } : {}) });
   const setEnd = () => onChange({ end: toHms(at), toEnd: false });
-  const fine = (d: number) => move(pos + d);
+  const fine = (d: number) => (touch(), move(pos + d));
   const btn = (label: string, onPress: () => void, tone: "plain" | "start" | "end" = "plain") => (
     <Pressable
       key={label}
@@ -133,6 +139,7 @@ export function TimeRangePicker({
         at={at}
         playing={playing}
         onTime={(sec) => {
+          if (Date.now() < hold.current) return; // 使用者正在操作時間軸，不被播放位置蓋掉
           // 試播跨過「結束」位置就自動停在結束點。
           if (eSec != null && sec >= eSec && pos < eSec) {
             setPlaying(false);
