@@ -654,3 +654,4 @@
 - 金鑰：Secret `VAPID_PRIVATE_JWK`（JWK 字串，由開發者在部署時以 wrangler 直接寫入 Cloudflare，未出現在對話或 repo）。換金鑰會讓所有裝置需要重新開啟推播。
 - 測試 tests/push.test.ts：以接收端演算法解密驗證內容、驗證 VAPID 簽章、失效裝置刪除、開課提醒時間與防重複。後端共 140 項。
 - 2026-11-17：業主授權後，已產生正式站推播金鑰並以 `wrangler secret put VAPID_PRIVATE_JWK` 寫入 Cloudflare（金鑰未出現在對話或 repo）；`GET /push/key` 已回傳公鑰，推播正式啟用。
+- 2026-11-17：分享網址進來的返回鍵：`TopBar` 新增 `backTo`（`PageHeader` 經 Stack options 傳入；沒有上一頁才用）；課程頁 backTo＝主辦中心頁或 /courses；中心頁打開時墊的「上一頁」改成 `/courses?view=centers`（`CoursesView` 新增 `initialCenters`）；中心短網址頁沒有上一頁時 replace 到所有中心清單。本機以全新分頁開分享網址逐一驗證 4 種入口＋連續返回，以及 App 內正常點擊的返回不受影響。

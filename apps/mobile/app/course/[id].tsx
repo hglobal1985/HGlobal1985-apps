@@ -246,6 +246,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
         course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
         list={course.isList ? { title: course.title } : undefined}
+        // 直接從分享網址進來時，返回鍵回到「上一層」：中心主辦的課程＝該中心專屬頁；總部課程＝全部課程（業主 2026-11-17）。
+        backTo={course.hostCenter ? `/courses?center=${encodeURIComponent(course.hostCenter)}` : "/courses"}
         extra={
           manages && mode === "view" ? (
             <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => setMode("edit")} />

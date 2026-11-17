@@ -31,7 +31,7 @@ function AppStack() {
     <Stack
             screenOptions={{
               // 全站上方返回工具列只用一個元件 TopBar（src/ui/top-bar.tsx）：頁面用 Stack.Screen／PageHeader 設定的 title 與 headerRight 會傳給它。
-              header: ({ options, route }) => <TopBar title={typeof options.title === "string" ? options.title : route.name} right={options.headerRight?.({ canGoBack: true })} safeTop />,
+              header: ({ options, route }) => <TopBar title={typeof options.title === "string" ? options.title : route.name} right={options.headerRight?.({ canGoBack: true })} backTo={(options as { backTo?: string }).backTo} safeTop />,
               contentStyle: { backgroundColor: c.background },
             }}
           >

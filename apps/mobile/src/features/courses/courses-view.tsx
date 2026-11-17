@@ -42,7 +42,7 @@ const GAP = space.md;
  * 「中心」下拉：選了中心，下方先顯示該中心的 EDM（有上傳才有），只列該中心主辦的課程。
  * 管理者（總部、會長、音控、小編）另外看得到自己能管的「未上架」課程（標示未上架）、最下面可展開「已封存」、右下角「＋新增教材」（往上展開：新增課程／新增清單）。
  */
-export function CoursesView({ initialCategory = "", initialCenter = "", inStack = false }: { initialCategory?: string; initialCenter?: string; inStack?: boolean }) {
+export function CoursesView({ initialCategory = "", initialCenter = "", inStack = false, initialCenters = false }: { initialCategory?: string; initialCenter?: string; inStack?: boolean; /** /courses?view=centers：直接打開「所有中心」清單。 */ initialCenters?: boolean }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
   const { member } = useSession();
   useCenterNames(); // 中心名稱有更新時重新畫
@@ -62,8 +62,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     if (initialCenter) {
       setCenter(initialCenter);
       setMode("center"); // 從課程卡的「XX主辦」或中心短網址進來＝直接看該中心
+    } else if (initialCenters) {
+      setCenter(ALL);
+      setMode("center"); // 從中心專屬頁返回（直接從分享網址進來的情況）＝所有中心的清單
     }
-  }, [initialCenter]);
+  }, [initialCenter, initialCenters]);
   // 網頁：網址列跟著篩選變：只選分類或只選中心＝該短網址（有設定才換）；兩個都選＝/courses?center=…&category=…；都沒選＝/courses。
   const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
   const urlFor = (cat: string, cen: string) => {
@@ -109,7 +112,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [mode, setMode] = useState<CourseViewMode>("series");
   useEffect(() => {
     AsyncStorage.getItem(MODE_KEY)
-      .then((v) => (v === "chapter" || v === "series" || v === "center") && !initialCenter && setMode(v))
+      .then((v) => (v === "chapter" || v === "series" || v === "center") && !initialCenter && !initialCenters && setMode(v))
       .catch(() => undefined);
   }, []);
   // 「單元」模式的三個勾選篩選（主講人／短影音／總結；短影音不能與另外兩個並存）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
@@ -291,7 +294,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     if (activeCenter !== ALL && !pushedRef.current) {
       // 先把目前這一筆紀錄的網址還原成沒選中心的樣子，再另外記一筆「中心頁」：返回時才不會又被網址帶回中心頁。
       const here = window.location.href;
-      window.history.replaceState(window.history.state, "", urlFor(category, ALL));
+      // 中心專屬頁的「上一頁」一律＝所有中心的清單（業主 2026-11-17：不論是中心短網址、/courses?center=，或從課程頁返回進來）。
+      window.history.replaceState(window.history.state, "", category === ALL ? "/courses?view=centers" : urlFor(category, ALL));
       window.history.pushState({ hgCenter: 1 }, "", here);
       centerUrlRef.current = new URL(here).pathname + new URL(here).search;
       pushedRef.current = true;
@@ -317,6 +321,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   }); // eslint-disable-line react-hooks/exhaustive-deps
   const backFromCenter = () => {
     if (Platform.OS === "web" && pushedRef.current && typeof window !== "undefined") window.history.back();
+    // 中心短網址（獨立頁面）直接從分享網址進來：返回「所有中心」清單（業主 2026-11-17）。
+    else if (inStack) (router.canGoBack() ? router.back() : router.replace("/courses?view=centers"));
     else pickCenter(ALL);
   };
   // Android 實體返回鍵：只在這個畫面是目前畫面（焦點）、而且選了中心時才攔截；課程頁蓋在上面時不攔，讓它正常返回。

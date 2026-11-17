@@ -10,11 +10,13 @@ import { HeaderShare } from "./share-button";
  * path＝要分享的網址路徑（有短網址就傳 /縮寫）。extra＝放在分享左邊的按鈕（例如管理者的「編輯」）。
  */
 /** course＝單堂課程的分享（主講人與課程名稱會帶進分享文字範本）；list＝素材清單的分享（清單範本）；其他頁面不傳。 */
-export function PageHeader({ title, path, shareTitle, extra, course, list }: { title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; teacherTitle?: string; title: string }; list?: { title: string } }) {
+/** backTo＝直接從分享網址進來（沒有上一頁）時，返回鍵要去的上一層頁面（例如課程 → 主辦中心專屬頁）。 */
+export function PageHeader({ title, path, shareTitle, extra, course, list, backTo }: { title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; teacherTitle?: string; title: string }; list?: { title: string }; backTo?: string }) {
   return (
     <Stack.Screen
       options={{
         title,
+        ...({ backTo } as object),
         headerRight: () => (
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {extra}
