@@ -410,7 +410,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             )
           ) : null}
           {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (
-            <EmptyState icon="business-outline" title="暫時看不到中心清單" body="請稍後再試，或先到「全部課程」瀏覽。" />
+            <EmptyState icon="business-outline" title="暫時看不到中心清單" body="請稍後再試，或先到「寰宇大學」瀏覽。" />
           ) : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL

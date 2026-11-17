@@ -1,4 +1,3 @@
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { router, useFocusEffect, useLocalSearchParams, type Href } from "expo-router";
 import { centerTitle } from "@/features/format";
 import { useCallback, useState } from "react";
@@ -33,7 +32,6 @@ function SiteFooter() {
 
 export default function MeScreen() {
   const { member, ready, signInGoogle, signInDemo, signOut, deleteAccount, refreshMember } = useSession();
-  const { c } = useTheme();
   // 進入設定頁就向會員中心更新一次獎銜與資料（1 分鐘內不重複）：App 沒有重新整理鈕，這裡是最自然的更新時機。
   useFocusEffect(
     useCallback(() => {
@@ -123,7 +121,7 @@ export default function MeScreen() {
 
       {member && isWeb ? (
         <Card style={{ paddingVertical: 0 }}>
-          <ListRow leading={<MaterialCommunityIcons name="bank-outline" size={22} color={c.textMuted} />} title="我的圖書館" subtitle={myLibrary.data?.library ? "個人專屬頁面：書架、影片、簡報、連結，可設密碼" : "尚未解鎖圖書館鑰匙"} onPress={() => router.push("/library")} />
+          <ListRow icon="library-outline" title="我的書櫃" subtitle={myLibrary.data?.library ? "個人專屬頁面：書架、影片、簡報、連結，可設密碼" : "尚未解鎖圖書館鑰匙"} onPress={() => router.push("/library")} />
           <ListRow icon="document-text-outline" title="訂單紀錄" onPress={() => router.push("/orders")} />
         </Card>
       ) : null}
@@ -144,7 +142,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="pricetags-outline" title="關鍵字管理" subtitle="集中新增、改名、刪除課程的分類、系列、場地" onPress={() => router.push("/admin/keywords")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="options-outline" title="APP 數值設定" subtitle="首頁推薦規則、輪播秒數與其他全站數值" onPress={() => router.push("/admin/app-settings")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="share-social-outline" title="分享預設值" subtitle="分享選單的文字、LINE 預覽卡片的標題與備註格式" onPress={() => router.push("/admin/share-defaults")} /> : null}
-            {member.titles.includes("超級管理員") ? <ListRow leading={<MaterialCommunityIcons name="bank-outline" size={22} color={c.textMuted} />} title="圖書館管理" subtitle="產生「我的圖書館」邀請網址、查看與移除圖書館" onPress={() => router.push("/admin/libraries")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="library-outline" title="書櫃管理" subtitle="產生「我的書櫃」邀請網址、查看與移除書櫃" onPress={() => router.push("/admin/libraries")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="link-outline" title="短網址" subtitle="集中設定分類、系列、中心的短網址與課程專屬網址" onPress={() => router.push("/admin/short-links")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="sparkles-outline" title="AI 模型" subtitle="切換逐字稿、關鍵字、語意搜尋用的 AI 模型，並比較花費" onPress={() => router.push("/admin/ai-models")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="trophy-outline" title="學習成就徽章設定" subtitle="設定要達成什麼條件才能獲得徽章" onPress={() => router.push("/admin/achievements")} /> : null}

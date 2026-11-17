@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { router, usePathname, type Href } from "expo-router";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -10,12 +11,14 @@ import { barHeight } from "@/theme/tokens";
 import { AppText } from "./text";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
+/** 寰宇大學分頁用建築物圖示（MaterialCommunityIcons），其餘用 Ionicons。 */
+const BUILDING = { icon: "bank-outline", active: "bank" } as const;
 /** 短網址（/縮寫）：單層路徑且不是網站固定頁面。 */
 const FIXED = new Set(["/me", "/learning", "/notices", "/achievements", "/orders", "/courses", "/admin", "/settings", "/auth"]);
 const isShortLink = (p: string) => /^\/[a-z0-9-]{2,30}$/i.test(p) && !FIXED.has(p);
-const tabs: { href: Href; title: string; icon: IconName; active: IconName; match: (p: string) => boolean }[] = [
+const tabs: { href: Href; title: string; icon: IconName; active: IconName; building?: boolean; match: (p: string) => boolean }[] = [
   { href: "/", title: "首頁", icon: "home-outline", active: "home", match: (p) => p === "/" },
-  { href: "/courses", title: "全部課程", icon: "library-outline", active: "library", match: (p) => p === "/courses" || p.startsWith("/course/") || p.startsWith("/series/") || isShortLink(p) },
+  { href: "/courses", title: "寰宇大學", icon: "library-outline", active: "library", building: true, match: (p) => p === "/courses" || p.startsWith("/course/") || p.startsWith("/series/") || isShortLink(p) },
   { href: "/learning", title: "學習中", icon: "play-circle-outline", active: "play-circle", match: (p) => p === "/learning" || p.startsWith("/learn/") },
   { href: "/notices", title: "通知", icon: "notifications-outline", active: "notifications", match: (p) => p === "/notices" },
   { href: "/me", title: "設定", icon: "person-circle-outline", active: "person-circle", match: (p) => p === "/me" || p.startsWith("/orders") || p.startsWith("/admin") || p.startsWith("/settings") },
@@ -47,7 +50,7 @@ export function BottomBar() {
         return (
           <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title} onPress={() => router.navigate(t.href)}>
             <View>
-              <Ionicons name={on ? t.active : t.icon} size={24} color={color} />
+              {t.building ? <MaterialCommunityIcons name={on ? BUILDING.active : BUILDING.icon} size={24} color={color} /> : <Ionicons name={on ? t.active : t.icon} size={24} color={color} />}
               {t.title === "通知" && unread > 0 ? (
                 <View style={[styles.badge, { backgroundColor: c.accent }]}>
                   <AppText variant="caption" style={{ color: c.textOnAccent, fontSize: 10, lineHeight: 12, fontWeight: "700" }}>

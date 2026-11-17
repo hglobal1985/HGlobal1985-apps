@@ -111,7 +111,7 @@ export default function HomeScreen() {
               empty={
                 member ? (
                   <AppText variant="callout" tone="muted" style={{ textAlign: "center" }}>
-                    還沒有已報名的課程，到「全部課程」看看。
+                    還沒有已報名的課程，到「寰宇大學」看看。
                   </AppText>
                 ) : (
                   <>
