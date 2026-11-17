@@ -122,30 +122,21 @@ function Label({ children }: { children: ReactNode }) {
 const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.stringify(a) === JSON.stringify(b);
 
 // ---------- 基本資料：名稱、主講人、分類、系列、封面顏色 ----------
-function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
+/** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
+export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; theme: string };
+export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
   const { c } = useTheme();
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
-  const [f, setF] = useState(init);
-  const set = <K extends keyof typeof init>(k: K) => (v: (typeof init)[K]) => setF((x) => ({ ...x, [k]: v }));
+  const set = <K extends keyof BasicsForm>(k: K) => (v: BasicsForm[K]) => setF((x) => ({ ...x, [k]: v }));
   const rankOptions = useRankOptions();
   const categories = useApi<string[]>("/admin/categories");
   const series = useApi<string[]>(isSuper ? "/admin/series" : null);
-  const { save, busy, error, setError } = useCourseSave(course, onSaved);
-  const submit = async () => {
-    if (!f.title.trim()) return setError(course.isList ? "請輸入素材清單名稱" : "請輸入課程名稱");
-    const { series: _series, eventStart, eventEnd, ...rest } = f;
-    // 日期與「時間與地點」面板是同一份資料；素材清單沒有日期，不送。
-    const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
-    const important = !course.isList && (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
-    if (await save({ ...(isSuper ? { ...rest, series: f.series } : rest), ...dates }, { important })) onClose();
-  };
   return (
-    <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
-      <Field label={course.isList ? "素材清單名稱（必填）" : "課程名稱（必填）"} value={f.title} onChange={set("title")} placeholder={course.isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
+    <>
+      <Field label={isList ? "素材清單名稱（必填）" : "課程名稱（必填）"} value={f.title} onChange={set("title")} placeholder={isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
       {/* 素材清單沒有主講人、職稱、獎銜（業主 2026-11-16）。 */}
-      {course.isList ? null : (
+      {isList ? null : (
         <>
           <Field label="主講人" value={f.teacher} onChange={set("teacher")} placeholder="例如：王大明（選填）" />
           <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
@@ -175,6 +166,27 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
           </Pressable>
         ))}
       </View>
+    </>
+  );
+}
+
+function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
+  const { member } = useSession();
+  const isSuper = isSuperAdmin(member);
+  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
+  const [f, setF] = useState(init);
+  const { save, busy, error, setError } = useCourseSave(course, onSaved);
+  const submit = async () => {
+    if (!f.title.trim()) return setError(course.isList ? "請輸入素材清單名稱" : "請輸入課程名稱");
+    const { series: _series, eventStart, eventEnd, ...rest } = f;
+    // 日期與「時間與地點」面板是同一份資料；素材清單沒有日期，不送。
+    const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
+    const important = !course.isList && (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
+    if (await save({ ...(isSuper ? { ...rest, series: f.series } : rest), ...dates }, { important })) onClose();
+  };
+  return (
+    <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+      <BasicsFields isList={course.isList} f={f} setF={setF} />
     </EditSheet>
   );
 }
