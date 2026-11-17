@@ -39,6 +39,8 @@ import {
   type RegistrationReport,
   type ReportBy,
   type ReportRow,
+  VIEW_SCOPES,
+  type ViewScope,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { centerMembers, centralAddJobTitle, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
@@ -324,6 +326,8 @@ type CourseRow = {
   event_start: string | null;
   event_end: string | null;
   is_public: number;
+  view_scope: string;
+  hide_guests: number;
   price_tba: number;
   hide_home: number;
   diamond_free: number;
@@ -357,7 +361,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.hide_guests, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -457,6 +461,8 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     eventStart: row.event_start,
     eventEnd: row.event_end,
     isPublic: row.is_public === 1,
+    viewScope: scopeOf(row.view_scope),
+    hideFromGuests: row.hide_guests === 1,
     pendingOrderId: state.pendingOrder.get(row.id) ?? null,
     priceTba: row.price_tba === 1,
     hideFromHome: row.hide_home === 1,
@@ -496,6 +502,15 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
   };
 }
 
+const scopeOf = (v: string): ViewScope => (VIEW_SCOPES as string[]).includes(v) ? (v as ViewScope) : "all";
+/** 誰可以瀏覽（業主 2026-11-17）：這位使用者依課程的設定看不看得到。 */
+function scopeAllows(scope: string, s: Session | null): boolean {
+  if (scope === "members") return !!s;
+  if (scope === "hglobal") return !!s?.hglobal;
+  if (scope === "center") return !!s?.center;
+  return true;
+}
+
 async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
   const s = ctx.session;
   let where = " WHERE c.status = 'published'";
@@ -521,13 +536,23 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
   ]);
-  const eligibility = await eligibilityFor(s, rankMap, [...results.map((r) => r.min_rank_code), DIAMOND]);
+  // 瀏覽範圍：管理清單不過濾；公開清單依「誰可以瀏覽」，管理者與已報名／審核中／學習過的人照常看得到。
+  let visible = results;
+  if (!all) {
+    const mine = s ? await rightsOf(ctx) : null;
+    visible = results.filter((r) => {
+      if (!s) return r.view_scope === "all" && r.hide_guests !== 1;
+      if (scopeAllows(r.view_scope, s) || mine?.admin) return true;
+      return state.enrolled.has(r.id) || state.pending.has(r.id) || state.started.has(r.id) || (mine?.any ? courseCan(mine, s, r).edit : false);
+    });
+  }
+  const eligibility = await eligibilityFor(s, rankMap, [...visible.map((r) => r.min_rank_code), DIAMOND]);
   ctx.centerSlugs = await centerSlugMap(ctx.db);
-  const out = results.map((r) => summarize(r, ctx, rankMap, state, eligibility));
+  const out = visible.map((r) => summarize(r, ctx, rankMap, state, eligibility));
   if (!rights || !s) return out;
   const r = rights;
   return out.flatMap((c, i) => {
-    const can = courseCan(r, s, results[i]!);
+    const can = courseCan(r, s, visible[i]!);
     // 小編看不到「別人的、自己又不能動」的未上架課程。
     if (c.status !== "published" && !can.edit && !can.remove && !can.restore) return [];
     return [{ ...c, can }];
@@ -713,7 +738,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const s = ctx.session;
   const row = await ctx.db.prepare(`${COURSE_SELECT} WHERE c.id = ?`).bind(id).first<CourseRow>();
   // 未登入的訪客：只有「完全公開」且已上架的課程可以看；其他一律要求登入。
-  if (!s && (!row || row.status !== "published" || row.is_public !== 1)) return fail(401, "unauthenticated", "請先登入");
+  if (!s && (!row || row.status !== "published" || row.view_scope !== "all")) return fail(401, "unauthenticated", "請先登入");
   if (!row) return fail(404, "not_found", "找不到這門課程");
   const can = s ? courseCan(await rightsOf(ctx), s, row) : { edit: false, remove: false, restore: false };
   const manages = can.edit || can.remove || can.restore;
@@ -729,6 +754,8 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
   const archivedForMe = row.status === "archived" && (state.enrolled.has(id) || state.pending.has(id) || state.started.has(id));
   if (row.status !== "published" && !manages && !archivedForMe) return fail(404, "not_found", "找不到這門課程");
+  // 誰可以瀏覽：不在範圍內的登入者（管理者、已報名／審核中／學習過的除外）看不到這門課。
+  if (!manages && !scopeAllows(row.view_scope, s) && !(state.enrolled.has(id) || state.pending.has(id) || state.started.has(id))) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
   const linkRows = await ctx.db.prepare("SELECT lesson_id, att_type, link_url FROM lesson_attachments WHERE course_id = ? AND kind = 'link' ORDER BY created_at").bind(id).all<{ lesson_id: string; att_type: AttachmentType; link_url: string }>();
@@ -1180,6 +1207,10 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
     memberCourseState(ctx.db, s.sub),
   ]);
   if (courses.length !== ids.length) fail(409, "unavailable", "課程已下架或不存在，請重新確認");
+  {
+    const { results: scopes } = await ctx.db.prepare(`SELECT id, view_scope FROM courses WHERE id IN (${marks})`).bind(...ids).all<{ id: string; view_scope: string }>();
+    if (scopes.some((c) => !scopeAllows(c.view_scope, s))) fail(403, "not_visible", "這門課程不開放你報名");
+  }
   if (courses.some((c) => c.price_tba === 1)) fail(409, "price_tba", "這門課程的費用尚未公布，暫不開放報名");
   const eligibility = await eligibilityFor(s, rankMap, [...courses.map((c) => c.min_rank_code), DIAMOND]);
   if (courses.some((c) => eligibility.get(c.min_rank_code) !== true && !byPresident(s, c))) fail(403, "rank_required", "此課程需要符合資格才能報名");
@@ -1649,6 +1680,11 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     sets.push(["status", body.status]);
   }
   if (body.allowPresident !== undefined) sets.push(["allow_president", body.allowPresident === true ? 1 : 0]);
+  if (body.viewScope !== undefined) {
+    if (!(VIEW_SCOPES as string[]).includes(String(body.viewScope))) fail(400, "invalid_view_scope", "「誰可以瀏覽」的選項不正確");
+    sets.push(["view_scope", body.viewScope]);
+  } else if (creating && body.isPublic !== undefined) sets.push(["view_scope", body.isPublic === true ? "all" : "members"]);
+  if (body.hideFromGuests !== undefined) sets.push(["hide_guests", body.hideFromGuests === true ? 1 : 0]);
   if (body.isPublic !== undefined) sets.push(["is_public", body.isPublic === true ? 1 : 0]);
   if (body.priceTba !== undefined) sets.push(["price_tba", body.priceTba === true ? 1 : 0]);
   const loc = text(body.location, 100);
@@ -1749,10 +1785,22 @@ function checkPublicFree(price: number, isPublic: boolean, tba = false) {
   if (isPublic && price > 0) fail(400, "public_must_be_free", "「完全公開」只能用在免費課程；請先把費用改成 0");
 }
 
+/** 「完全公開（免登入可看）」由設定推算：誰可以瀏覽＝所有人，且免費、費用已公布。 */
+function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number } | null) {
+  if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba"].includes(c))) return;
+  const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
+  const pub = pick("view_scope", cur?.view_scope ?? "all") === "all" && Number(pick("price_twd", cur?.price_twd ?? 0)) === 0 && pick("price_tba", cur?.price_tba ?? 0) !== 1;
+  const i = sets.findIndex(([c]) => c === "is_public");
+  if (i >= 0) sets.splice(i, 1);
+  sets.push(["is_public", pub ? 1 : 0]);
+}
+
 async function createCourse(ctx: Ctx, admin: Session) {
   const body = await readJson<Record<string, unknown>>(ctx.req);
   const sets = await courseFields(ctx, body, true, admin);
   checkPublicFree(Number(sets.find(([c]) => c === "price_twd")?.[1] ?? 0), sets.find(([c]) => c === "is_public")?.[1] === 1, sets.find(([c]) => c === "price_tba")?.[1] === 1);
+  if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", sets.some(([c]) => c === "is_list") ? "all" : "members"]);
+  deriveIsPublic(sets, null);
   await checkGuidanceGroup(ctx, body.guidanceUnit, body.reviewGroupId);
   const id = `c${randomId(7)}`;
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
@@ -1904,7 +1952,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
+  const keep = ["view_scope", "hide_guests", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
@@ -1934,7 +1982,7 @@ function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, view_scope, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -1953,7 +2001,14 @@ async function updateCourse(ctx: Ctx, id: string) {
   const newHost = sets.find(([c]) => c === "host_center_key");
   if (newHost && newHost[1] !== cur.host_center_key) sets.push(["url_name", null]);
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
-  checkPublicFree(Number(pick("price_twd", cur.price_twd)), pick("is_public", cur.is_public) === 1, pick("price_tba", cur.price_tba) === 1);
+  const legacyPublic = body.isPublic !== undefined && body.viewScope === undefined;
+  if (legacyPublic) {
+    // 舊寫法：isPublic true＝所有人；false 只在原本是「所有人」時改成「所有會員」。
+    checkPublicFree(Number(pick("price_twd", cur.price_twd)), body.isPublic === true, pick("price_tba", cur.price_tba) === 1);
+    if (body.isPublic === true) sets.push(["view_scope", "all"]);
+    else if (cur.view_scope === "all") sets.push(["view_scope", "members"]);
+  }
+  deriveIsPublic(sets, cur);
   await checkGuidanceGroup(ctx, pick("guidance_unit", cur.guidance_unit), pick("review_group_id", cur.review_group_id));
   const [res] = await ctx.db.batch([
     ctx.db.prepare(`UPDATE courses SET ${sets.map(([c]) => `${c} = ?`).join(", ")}, updated_at = ?, edited_by_name = ?, edited_at = ? WHERE id = ?`).bind(...sets.map(([, v]) => v), iso(), admin.name.slice(0, 60), iso(), id),
@@ -2507,11 +2562,18 @@ const routes: [string, RegExp, Handler][] = [
       // 登入時再帶「這位會員是否已完成」。公開資料（章節標題本來就顯示在課程頁），只回需要的欄位。
       const rankMap = await ranks(ctx.db);
       const sub = ctx.session?.sub ?? "";
+      const me = ctx.session;
+      // 誰可以瀏覽：訪客只看「所有人」且沒勾「對訪客隱藏」的；登入者依身份；已報名的課程照常。
+      const scopeSql = !me
+        ? "(c.view_scope = 'all' AND c.hide_guests = 0)"
+        : me.role === "admin"
+          ? "1"
+          : `(c.view_scope IN ('all', 'members'${me.hglobal ? ", 'hglobal'" : ""}${me.center ? ", 'center'" : ""}) OR c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?))`;
       const { results } = await ctx.db
         .prepare(
-          "SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.is_summary AS isSummary, c.is_shorts AS isShorts, c.is_list AS isList, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND (l.kind = 'chapter' OR (c.is_shorts = 1 AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position",
+          `SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.is_summary AS isSummary, c.is_shorts AS isShorts, c.is_list AS isList, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND ${scopeSql} AND (l.kind = 'chapter' OR (c.is_shorts = 1 AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position`,
         )
-        .bind(sub)
+        .bind(...(me && me.role !== "admin" ? [sub, sub] : [sub]))
         .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; isSummary: number; isShorts: number; isList: number; lessonKind: string; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
       return {
         lessons: results.map((r) => ({

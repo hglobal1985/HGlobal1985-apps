@@ -22,11 +22,12 @@ function setup() {
 }
 
 test("未登入可看課程目錄，但不能領課", async () => {
-  const { call } = setup();
+  const { call, login } = setup();
   const list = await call<CourseSummary[]>("GET", "/courses");
   assert.equal(list.status, 200);
-  assert.equal(list.data.length, 6);
-  assert.equal(list.data[0].eligible, false);
+  // 既有一般課程都是「所有會員」：訪客看不到，登入後 6 門都在。
+  assert.equal(list.data.length, 0);
+  assert.equal((await call<CourseSummary[]>("GET", "/courses", { token: await login("demo-student") })).data.length, 6);
   assert.equal((await call("POST", "/orders", { body: { courseIds: ["start"] } })).status, 401);
 });
 

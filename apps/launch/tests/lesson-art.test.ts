@@ -36,7 +36,7 @@ test("章節封面：課程要先勾選；上傳橫式／直式、顯示、換�
   };
   const admin = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
   const student = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-student" })).data.token;
-  const course = (await call<CourseDetail>("POST", "/admin/courses", admin, { title: "封面課", priceTwd: 0 })).data;
+  const course = (await call<CourseDetail>("POST", "/admin/courses", admin, { title: "封面課", priceTwd: 0, viewScope: "all" })).data;
   await call("PATCH", `/admin/courses/${course.id}`, admin, { status: "published" });
   const lessonId = (await call<CourseDetail>("GET", `/courses/${course.id}`, admin)).data.lessons[0]!.id;
 

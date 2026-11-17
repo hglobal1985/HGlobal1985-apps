@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, RequestError, type CourseDetail, type CourseSummary, type Rank } from "@/api/client";
+import { api, HQ_UNIT, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type CourseSummary, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -233,7 +233,6 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
     }
     const important = price !== Number(init.priceTwd) || f.priceTba !== init.priceTba ? ["費用"] : [];
     const body: Record<string, unknown> = { priceTwd: price, priceTba: f.priceTba, diamondFree: f.diamondFree, earlyBird: early, earlyPriceTwd: Number(f.earlyPriceTwd), earlyUntil: f.earlyUntil, freeFrom, freeUntil };
-    if (price > 0 || f.priceTba) body.isPublic = false; // 完全公開只限免費課程
     if (await save(body, { important })) onClose();
   };
   return (
@@ -269,26 +268,28 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
   );
 }
 
-// ---------- 報名與資格：最低獎銜、會長、誰可以瀏覽（審核群組移到「費用與審核」的審核窗口） ----------
+// ---------- 報名資格條件：最低獎銜、會長、誰可以瀏覽（審核群組移到「費用與審核」的審核窗口） ----------
 function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
-  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, isPublic: course.isPublic };
+  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, viewScope: course.viewScope, hideFromGuests: course.hideFromGuests };
   const [f, setF] = useState(init);
   const ranks = useApi<Rank[]>("/ranks");
   const { save, busy, error } = useCourseSave(course, onSaved);
-  const paid = (course.admin?.basePriceTwd ?? 0) > 0 || course.priceTba;
   const submit = async () => {
-    if (await save({ ...f, isPublic: paid ? false : f.isPublic })) onClose();
+    if (await save({ ...f, hideFromGuests: f.viewScope === "all" ? f.hideFromGuests : false })) onClose();
   };
   return (
-    <EditSheet title="報名與資格" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <Label>最低獎銜（誰可以報名）</Label>
       <Chips options={(ranks.data ?? []).map((r) => ({ key: r.code, label: r.name }))} value={f.minRankCode} onChange={(v) => setF((x) => ({ ...x, minRankCode: v }))} />
       {f.minRankCode !== "none" ? <Check label="會長不受獎銜限制也可報名" value={f.allowPresident} onChange={(v) => setF((x) => ({ ...x, allowPresident: v }))} /> : null}
-      {paid ? (
-        <NoticeBox text="「完全公開」（訪客免登入可看）只限免費課程。" />
-      ) : (
-        <Chips label="誰可以瀏覽" options={[{ key: "no", label: "需要登入" }, { key: "yes", label: "完全公開（訪客免登入可看）" }]} value={f.isPublic ? "yes" : "no"} onChange={(v) => setF((x) => ({ ...x, isPublic: v === "yes" }))} />
-      )}
+      <Chips label="誰可以瀏覽" options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => setF((x) => ({ ...x, viewScope: v as ViewScope }))} />
+      <AppText variant="caption" tone="muted">
+        不在範圍內的人，這門課不會出現在清單與搜尋，也不能報名；已報名的學員照常看得到。
+      </AppText>
+      <Check label="對訪客隱藏" value={f.viewScope === "all" && f.hideFromGuests} onChange={(v) => setF((x) => ({ ...x, hideFromGuests: v }))} disabled={f.viewScope !== "all"} />
+      <AppText variant="caption" tone="muted">
+        {"只有「所有人含訪客」時可勾選：勾了之後，訪客的清單與搜尋看不到，但拿到網址的訪客仍可開啟。"}
+      </AppText>
       <NoticeBox text="審核群組與審核人員改在「費用與審核」的「審核窗口」設定。" />
     </EditSheet>
   );
@@ -474,7 +475,7 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
       {/* 素材清單沒有時間地點與費用（一律公開免費）。 */}
       {course.isList ? null : <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />}
       {course.isList ? null : <ListRow icon="pricetag-outline" title="費用與審核" subtitle={priceText} onPress={() => onOpen("price")} />}
-      <ListRow icon="people-outline" title="報名與資格" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}${course.isPublic ? "・完全公開" : ""}`} onPress={() => onOpen("enroll")} />
+      <ListRow icon="people-outline" title="報名資格條件" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}・${VIEW_SCOPE_LABEL[course.viewScope]}可瀏覽${course.hideFromGuests ? "（對訪客隱藏）" : ""}`} onPress={() => onOpen("enroll")} />
       <ListRow icon="options-outline" title="進階設定" subtitle={`主辦：${course.hostUnit || "未設定"}${course.admin?.editedAt ? `・最後修改 ${course.admin.editedByName}` : ""}`} onPress={() => onOpen("advanced")} />
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />
     </Card>

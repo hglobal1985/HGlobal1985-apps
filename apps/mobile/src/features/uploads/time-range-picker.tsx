@@ -6,6 +6,7 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { fromHms, toHms, type Hms } from "./hms";
 import { RangePreview } from "./range-preview";
+import { WaveStrip } from "./wave-strip";
 
 const STRIP_H = 72;
 const ZOOM_STEP = 0.12; // 放大鏡 − ＋ 每按一下移動的滑桿比例
@@ -53,6 +54,7 @@ export function TimeRangePicker({
   const [pos, setPos] = useState(sSec ?? 0);
   const [zoom, setZoom] = useState(0); // 0＝完整顯示（整支影片剛好塞滿膠卷），1＝最大
   const [w, setW] = useState(320);
+  const [playing, setPlaying] = useState(false);
   // 每秒幾個像素：最小＝整支影片剛好塞滿膠卷；最大＝約每秒 60 像素（以對數連續變化，拉起來手感平均）。
   const ppsMin = Math.max(0.0001, w / total);
   const ppsMax = Math.max(60, ppsMin * 4);
@@ -108,8 +110,6 @@ export function TimeRangePicker({
   const setStart = () => onChange({ start: toHms(at), ...(eSec != null && eSec <= at ? { end: toHms(null) } : {}) });
   const setEnd = () => onChange({ end: toHms(at), toEnd: false });
   const fine = (d: number) => move(pos + d);
-  const mag = pps / ppsMin; // 放大幾倍（1＝完整顯示）
-  const magText = full ? "完整顯示（整支影片）" : `放大 ${mag < 10 ? mag.toFixed(1).replace(/\.0$/, "") : Math.round(mag)} 倍`;
   const btn = (label: string, onPress: () => void, tone: "plain" | "start" | "end" = "plain") => (
     <Pressable
       key={label}
@@ -127,12 +127,30 @@ export function TimeRangePicker({
   const rangeR = eSec != null ? Math.min(w, x(eSec)) : sSec != null ? w : 0;
   return (
     <View style={[styles.box, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
-      <RangePreview kind={kind} ytId={ytId} audioFile={audioFile} at={at} />
+      <RangePreview
+        kind={kind}
+        ytId={ytId}
+        audioFile={audioFile}
+        at={at}
+        playing={playing}
+        onTime={(sec) => {
+          // 試播跨過「結束」位置就自動停在結束點。
+          if (eSec != null && sec >= eSec && pos < eSec) {
+            setPlaying(false);
+            setPos(eSec);
+          } else setPos(clamp(Math.round(sec * 10) / 10));
+        }}
+        onStop={() => setPlaying(false)}
+      />
       <View style={styles.readout}>
-        <AppText style={{ fontSize: 30, lineHeight: 36, fontWeight: "800", fontVariant: ["tabular-nums"], color: c.text }}>{clock(at)}</AppText>
-        <AppText variant="caption" tone="muted">
-          / {clock(total)}
-          {duration ? "" : "（抓不到影片長度，先以 3 小時為範圍）"}
+        {kind === "youtube" || kind === "audio" ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={playing ? "暫停試播" : "從紅線位置開始試播"} onPress={() => setPlaying((v) => !v)} style={[styles.play, { backgroundColor: c.accent }]}>
+            <Icon name={playing ? "pause" : "play"} size={26} color="#fff" />
+          </Pressable>
+        ) : null}
+        <AppText style={{ fontSize: 28, lineHeight: 34, fontWeight: "800", fontVariant: ["tabular-nums"], color: c.text }}>
+          {clock(at)}
+          <AppText style={{ fontSize: 16, lineHeight: 34, fontWeight: "600", fontVariant: ["tabular-nums"], color: c.textMuted }}> / {clock(total)}</AppText>
         </AppText>
       </View>
       {/* 膠卷：左右拖曳；固定的紅線＝目前時間 */}
@@ -153,6 +171,7 @@ export function TimeRangePicker({
         {eSec != null ? <Flag left={x(eSec)} color={c.warning} label="終" /> : null}
         <View pointerEvents="none" style={[styles.center, { left: redX - 1, backgroundColor: c.danger }]} />
       </View>
+      {kind === "audio" && audioFile ? <WaveStrip file={audioFile} total={total} pos={pos} pps={pps} w={w} full={full} height={44} /> : null}
       {/* 放大鏡：專門縮放時間軸；預設最左＝完整顯示 */}
       <View style={styles.zoomRow}>
         <Pressable accessibilityRole="button" accessibilityLabel="縮小時間軸" onPress={() => setZoom((z) => Math.max(0, z - ZOOM_STEP))} style={styles.lens}>
@@ -165,10 +184,6 @@ export function TimeRangePicker({
           <AppText style={{ fontSize: 20, lineHeight: 22, fontWeight: "800", color: c.text }}>+</AppText>
         </Pressable>
       </View>
-      <AppText variant="caption" tone="muted" style={{ textAlign: "center" }}>
-        放大鏡：{magText}
-        {full ? "，拖曳或點一下，紅線就跟著到那裡" : "（拉到最左＝完整顯示）"}
-      </AppText>
       <View style={styles.row}>
         {btn("−5秒", () => fine(-5))}
         {btn("−1秒", () => fine(-1))}
@@ -179,9 +194,6 @@ export function TimeRangePicker({
         {btn("設為開始", setStart, "start")}
         {btn("設為結束", setEnd, "end")}
       </View>
-      <AppText variant="caption" tone="muted">
-        先在「完整顯示」大致點出位置，再用放大鏡放大、微調，讓紅線停在想要的時間，按「設為開始」或「設為結束」；綠旗是開始、橘旗是結束。
-      </AppText>
     </View>
   );
 }
@@ -231,7 +243,8 @@ function Flag({ left, color, label }: { left: number; color: string; label: stri
 
 const styles = StyleSheet.create({
   box: { borderWidth: 1, borderRadius: radius.md, padding: space.sm, gap: space.sm },
-  readout: { alignItems: "center" },
+  readout: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm },
+  play: { width: minTouch, height: minTouch, borderRadius: minTouch / 2, alignItems: "center", justifyContent: "center" },
   strip: { height: STRIP_H, borderWidth: 1, borderRadius: radius.sm, overflow: "hidden" },
   holes: { position: "absolute", left: 0, right: 0, height: 6, borderStyle: "dashed", borderWidth: 1.5, borderColor: "#00000033", borderRadius: 3 },
   center: { position: "absolute", top: 0, bottom: 0, width: 3, zIndex: 5 },

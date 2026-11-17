@@ -53,7 +53,14 @@ test("完全公開：訪客可看免費且已上架的公開課程與章節；�
   await call("PATCH", `/admin/courses/${id}`, { token: admin, body: { status: "published" } });
   // 付費課程不能設為公開，公開課程也不能改成付費
   assert.equal((await call("POST", "/admin/courses", { token: admin, body: { title: "付費公開", priceTwd: 100, isPublic: true } })).status, 400);
-  assert.equal((await call("PATCH", `/admin/courses/${id}`, { token: admin, body: { priceTwd: 100 } })).status, 400);
+  // 公開課程改成付費：不再被擋，但自動不再免登入可看（誰可以瀏覽仍是「所有人」，介紹可看、內容鎖住）。
+  const paid = await call<CourseDetail>("PATCH", `/admin/courses/${id}`, { token: admin, body: { priceTwd: 100 } });
+  assert.equal(paid.status, 200);
+  assert.equal(paid.data.isPublic, false);
+  assert.equal(paid.data.viewScope, "all");
+  assert.equal((await call("GET", `/courses/${id}`)).status, 200);
+  assert.equal((await call("GET", `/courses/${id}/lessons/${lessonId}/playback`)).status, 401);
+  await call("PATCH", `/admin/courses/${id}`, { token: admin, body: { priceTwd: 0 } });
   // 關閉公開後訪客又看不到
   await call("PATCH", `/admin/courses/${id}`, { token: admin, body: { isPublic: false } });
   assert.equal((await call("GET", `/courses/${id}`)).status, 401);
