@@ -63,8 +63,12 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title, subsc
             onPress={subscribe.onPress}
             style={[styles.sub, { backgroundColor: subscribe.subscribed ? "#0C603C" : "#FFFFFF" }]}
           >
-            <Icon name={subscribe.subscribed ? "notifications" : "notifications-outline"} size={30} color={subscribe.subscribed ? "#FFFFFF" : "#0C603C"} />
-            <AppText style={{ color: subscribe.subscribed ? "#FFFFFF" : "#0C603C", fontSize: 18, fontWeight: "800" }}>{subscribe.count}</AppText>
+            {/* 鈴鐺下面兩個小字：訂閱／已訂閱。已訂閱＝深綠底、黃色實心鈴鐺；未訂閱＝白底、綠色空心鈴鐺，一眼分得出來。 */}
+            <View style={styles.subIcon}>
+              <Icon name={subscribe.subscribed ? "notifications" : "notifications-outline"} size={22} color={subscribe.subscribed ? "#FFD43B" : "#0C603C"} />
+              <AppText style={{ color: subscribe.subscribed ? "#FFFFFF" : "#0C603C", fontSize: 10, fontWeight: "800", lineHeight: 12 }}>{subscribe.subscribed ? "已訂閱" : "訂閱"}</AppText>
+            </View>
+            <AppText style={{ color: subscribe.subscribed ? "#FFFFFF" : "#0C603C", fontSize: 16, fontWeight: "800" }}>{subscribe.count}</AppText>
           </Pressable>
         ) : null}
         <View style={styles.chipRow} pointerEvents="none">
@@ -123,7 +127,8 @@ const styles = StyleSheet.create({
   box: { overflow: "hidden", backgroundColor: "#2F5D3A", alignSelf: "stretch" },
   chips: { position: "absolute", left: 12, bottom: 10, flexDirection: "row", gap: 6, alignItems: "center" },
   chipRow: { flexDirection: "row", gap: 6 },
-  sub: { flexDirection: "row", alignItems: "center", gap: 6, height: 52, paddingHorizontal: 14, borderRadius: 26, marginRight: 2, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  subIcon: { alignItems: "center", justifyContent: "center" },
+  sub: { flexDirection: "row", alignItems: "center", gap: 6, height: 44, paddingHorizontal: 12, borderRadius: 22, marginRight: 2, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.22)" },
   chipText: { color: "#fff", fontWeight: "600" },
   zoom: { position: "absolute", right: 10, top: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },

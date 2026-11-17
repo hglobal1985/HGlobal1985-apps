@@ -913,6 +913,7 @@ async function courseDeleteImpact(db: D1Database, id: string): Promise<CourseDel
 
 /** 公開圖片（封面、EDM）的網址；版本號讓更新後瀏覽器改抓新圖。 */
 /** 頁面瀏覽次數 +1 並回傳累計（中心頁、系列頁共用；業主 2026-11-16：每進入一次就算一次，不分是否同一人）。 */
+const CENTER_VIEW_BASE = 688; // 所有中心的點閱數都加 688（業主 2026-11-17，只影響顯示）
 const SUBSCRIBER_BASE = 688; // 每個中心顯示的訂閱人數從 688 開始算（業主 2026-11-17）
 
 async function subscriptionState(ctx: Ctx, key: string): Promise<{ count: number; subscribed: boolean }> {
@@ -2672,7 +2673,7 @@ const routes: [string, RegExp, Handler][] = [
       const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
       if (!label) fail(400, "invalid_center", "請指定中心");
       const key = centerKey(label);
-      return { total: await bumpView(ctx.db, "center", key) };
+      return { total: CENTER_VIEW_BASE + (await bumpView(ctx.db, "center", key)) };
     },
   ],
   [
@@ -2682,7 +2683,7 @@ const routes: [string, RegExp, Handler][] = [
       requireMember(ctx);
       const label = (ctx.url.searchParams.get("center") ?? "").trim();
       const n = label ? await ctx.db.prepare("SELECT total AS n FROM page_views WHERE kind = 'center' AND key = ?").bind(centerKey(label)).first<{ n: number }>() : null;
-      return { total: n?.n ?? 0 };
+      return { total: CENTER_VIEW_BASE + (n?.n ?? 0) };
     },
   ],
   [

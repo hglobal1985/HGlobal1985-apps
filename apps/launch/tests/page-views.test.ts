@@ -16,7 +16,7 @@ test("點閱：訪客也算、重新整理也 +1；從課程連結進入算進�
   // 訪客（沒登入）進入課程頁：中心與系列各 +1，重複進入再 +1
   assert.equal((await call("POST", "/course-views", { body: { courseId: made.id } })).status, 200);
   await call("POST", "/course-views", { body: { courseId: made.id } });
-  assert.equal((await call<{ total: number }>("POST", "/center-views", { body: { center: "台北中心" } })).data.total, 3, "課程 2 次＋中心頁 1 次");
+  assert.equal((await call<{ total: number }>("POST", "/center-views", { body: { center: "台北中心" } })).data.total, 688 + 3, "課程 2 次＋中心頁 1 次（中心點閱另加 688）");
   assert.equal((await call<{ total: number }>("POST", "/series-views", { body: { series: "點閱系列" } })).data.total, 3);
   // 不存在的課程不計數、也不報錯
   assert.equal((await call<{ ok: boolean }>("POST", "/course-views", { body: { courseId: "nope" } })).data.ok, false);
