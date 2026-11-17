@@ -695,8 +695,9 @@ async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
     const used = c.host_center_key
       ? await ctx.db.prepare("SELECT url_name FROM courses WHERE host_center_key = ? AND url_name LIKE ? ESCAPE '\\'").bind(c.host_center_key, like).all<{ url_name: string }>()
       : await ctx.db.prepare("SELECT url_name FROM courses WHERE host_center_key IS NULL AND url_name LIKE ? ESCAPE '\\'").bind(like).all<{ url_name: string }>();
+    const olds = await ctx.db.prepare("SELECT url_name FROM course_url_aliases WHERE scope = ? AND url_name LIKE ? ESCAPE '\\'").bind(c.host_center_key ? centerKey(c.host_center_key) : "", like).all<{ url_name: string }>().catch(() => ({ results: [] as { url_name: string }[] }));
     let max = 0;
-    for (const r of used.results) {
+    for (const r of [...used.results, ...olds.results]) {
       const m = /-(\d+)$/.exec(r.url_name);
       if (m && r.url_name.slice(0, -m[0].length) === base) max = Math.max(max, Number(m[1]));
     }
@@ -1984,7 +1985,7 @@ function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, view_scope, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; url_name: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -2001,7 +2002,23 @@ async function updateCourse(ctx: Ctx, id: string) {
   if (!sets.length) fail(400, "nothing_to_update", "沒有要更新的欄位");
   // 換了主辦中心：專屬網址在新中心底下重新產生（主辦中心沒變就維持原網址）。
   const newHost = sets.find(([c]) => c === "host_center_key");
-  if (newHost && newHost[1] !== cur.host_center_key) sets.push(["url_name", null]);
+  const aliasStmts: D1PreparedStatement[] = [];
+  const keepOld = (reason: string) => {
+    // 舊網址存成別名：之前分享出去的連結照樣打得開（開啟後網址列會自動換成新的）。
+    if (cur.url_name) aliasStmts.push(ctx.db.prepare("INSERT OR REPLACE INTO course_url_aliases (scope, url_name, course_id) VALUES (?, ?, ?)").bind(cur.host_center_key ? centerKey(cur.host_center_key) : "", cur.url_name, id));
+    sets.push(["url_name", null]);
+    void reason;
+  };
+  if (newHost && newHost[1] !== cur.host_center_key) keepOld("host");
+  else {
+    // 主講人改了：專屬網址（/中心縮寫/英譯姓名-編號）跟著換；英譯結果一樣（只是改錯字等）就不動。
+    const newTeacher = sets.find(([c]) => c === "teacher")?.[1];
+    if (typeof newTeacher === "string" && newTeacher.trim() && cur.url_name) {
+      const base = romanizeName(newTeacher);
+      const oldBase = cur.url_name.replace(/-\d+$/, "");
+      if (base && base.toLowerCase() !== oldBase.toLowerCase()) keepOld("teacher");
+    }
+  }
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
   const legacyPublic = body.isPublic !== undefined && body.viewScope === undefined;
   if (legacyPublic) {
@@ -2012,12 +2029,14 @@ async function updateCourse(ctx: Ctx, id: string) {
   }
   deriveIsPublic(sets, cur);
   await checkGuidanceGroup(ctx, pick("guidance_unit", cur.guidance_unit), pick("review_group_id", cur.review_group_id));
-  const [res] = await ctx.db.batch([
+  const batchRes = await ctx.db.batch([
+    ...aliasStmts,
     ctx.db.prepare(`UPDATE courses SET ${sets.map(([c]) => `${c} = ?`).join(", ")}, updated_at = ?, edited_by_name = ?, edited_at = ? WHERE id = ?`).bind(...sets.map(([, v]) => v), iso(), admin.name.slice(0, 60), iso(), id),
     // 主講人章節的名稱、分享者、獎銜、職稱永遠等於課程基本資料：課程改了就一起同步。
     ...(sets.some(([c]) => ["title", "teacher", "teacher_rank", "teacher_title"].includes(c)) ? [speakerSync(ctx.db, id)] : []),
     audit(ctx.db, admin.sub, "course.update", "course", id, sets.map(([c]) => c).join(",")),
   ]);
+  const res = batchRes[aliasStmts.length]!;
   if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
   await ensureCourseUrl(ctx, id);
   return courseDetail(ctx, id);
@@ -2545,7 +2564,13 @@ const routes: [string, RegExp, Handler][] = [
           ? await ctx.db.prepare(`SELECT id FROM courses WHERE host_center_key = ? AND url_name COLLATE NOCASE IN (${urlNameVariants(name).map(() => "?").join(",")})`).bind(centerKey(row.value), ...urlNameVariants(name)).first<{ id: string }>()
           : await ctx.db.prepare(`SELECT id FROM courses WHERE host_center_key IS NULL AND url_name COLLATE NOCASE IN (${urlNameVariants(name).map(() => "?").join(",")})`).bind(...urlNameVariants(name)).first<{ id: string }>()
         : null;
-      return course ? { courseId: course.id } : fail(404, "not_found", "找不到這個網址");
+      if (course) return { courseId: course.id };
+      // 改名前的舊網址（別名）：照樣打得開。
+      if (row) {
+        const alias = await ctx.db.prepare(`SELECT course_id FROM course_url_aliases WHERE scope = ? AND url_name COLLATE NOCASE IN (${urlNameVariants(name).map(() => "?").join(",")})`).bind(row.value ? centerKey(row.value) : "", ...urlNameVariants(name)).first<{ course_id: string }>();
+        if (alias) return { courseId: alias.course_id };
+      }
+      return fail(404, "not_found", "找不到這個網址");
     },
   ],
   [

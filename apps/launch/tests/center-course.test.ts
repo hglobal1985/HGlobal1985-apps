@@ -60,7 +60,13 @@ test("課程專屬網址：中心縮寫＋英譯主講人-編號；同一主講�
   assert.equal(other.shortPath, "nj/li-hua-1");
   assert.equal(noTeacher.shortPath, null);
   await call("PATCH", `/admin/courses/${c1.id}`, admin, { teacher: "別人" });
-  assert.equal((await call<CourseDetail>("GET", `/courses/${c1.id}`, admin)).data.shortPath, "nj/wang-xiaoming-2", "改主講人不會改網址");
+  // 改主講人（英譯不同）＝專屬網址跟著換（業主 2026-11-17）；舊網址變別名，照樣開得到同一門課。
+  const renamed = (await call<CourseDetail>("GET", `/courses/${c1.id}`, admin)).data.shortPath;
+  assert.ok(renamed && renamed !== "nj/wang-xiaoming-2" && renamed.startsWith("nj/") && renamed.endsWith("-1"), `主講人改了網址要換，實際：${renamed}`);
+  assert.equal((await call<{ courseId: string }>("GET", "/short-links/nj/wang-xiaoming-2")).data.courseId, c1.id, "舊網址仍然有效");
+  assert.equal((await call<{ courseId: string }>("GET", `/short-links/${renamed}`)).data.courseId, c1.id);
+  await call("PATCH", `/admin/courses/${c1.id}`, admin, { teacher: "別人 " });
+  assert.equal((await call<CourseDetail>("GET", `/courses/${c1.id}`, admin)).data.shortPath, renamed, "英譯結果一樣就不再改網址");
   const found = await call<{ courseId: string }>("GET", "/short-links/nj/wang-xiaoming-2");
   assert.equal(found.data.courseId, c1.id);
   assert.equal((await call("GET", "/short-links/nj/wang-xiaoming-099")).status, 404);

@@ -105,10 +105,19 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
     ? db.prepare(`${cols} host_center_key = ? AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')`).bind(centerKey(center.value), ...vs)
     : db.prepare(`${cols} host_center_key IS NULL AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published' AND view_scope IN ('all', 'link_guest', 'link_login')`).bind(...vs)
   ).first<{ n: string; k: string | null; v: number }>();
-  if (!c) return null;
+  let hit = c;
+  if (!hit) {
+    // 改名前的舊網址（別名）：預覽照常給，網址用目前的新網址。
+    hit = await db
+      .prepare(`SELECT c.url_name AS n, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM course_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.scope = ? AND a.url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND c.status = 'published' AND c.url_name IS NOT NULL AND c.view_scope IN ('all', 'link_guest', 'link_login')`)
+      .bind(center ? centerKey(center.value) : "", ...vs)
+      .first<{ n: string; k: string | null; v: number }>()
+      .catch(() => null);
+  }
+  if (!hit) return null;
   const S = await shareCfg(db);
   const card = await centerCard(db, S, center ? center.value : null);
-  return { title: titleOf(S, card.name), description: card.description, url: `${origin}/${center ? center.slug : HQ_SLUG}/${c.n}`, image: pubImage(origin, c.k, c.v) };
+  return { title: titleOf(S, card.name), description: card.description, url: `${origin}/${center ? center.slug : HQ_SLUG}/${hit.n}`, image: pubImage(origin, hit.k, hit.v) };
 }
 
 /**
