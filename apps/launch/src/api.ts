@@ -43,6 +43,7 @@ import {
   type ViewScope,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
+import { ensureCentersReconciled } from "./center-reconcile.ts";
 import { centerMembers, centralAddJobTitle, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
@@ -3012,6 +3013,7 @@ const routes: [string, RegExp, Handler][] = [
       })();
       if (!s) {
         if (!saved.length) fail(503, "central_unavailable", "暫時無法取得中心清單，請稍後再試");
+        await ensureCentersReconciled(ctx.db, saved);
         return saved;
       }
       const list = await centerList(s.token);
@@ -3019,6 +3021,7 @@ const routes: [string, RegExp, Handler][] = [
         if (saved.length) return saved;
         fail(503, "central_unavailable", "暫時無法取得會員中心的中心清單，請稍後再試");
       }
+      await ensureCentersReconciled(ctx.db, list);
       if (JSON.stringify(list) !== JSON.stringify(saved)) await ctx.db.prepare("INSERT INTO central_snapshots (key, value) VALUES ('centers', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list)).run();
       return list;
     },

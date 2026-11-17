@@ -31,8 +31,8 @@ export function withShareMeta(html: string, m: { title: string; description: str
 
 /** 中心的分享標題名稱：去掉數字代碼，結尾補「中心」（已以「中心」或「教育中心」結尾的先去掉，避免重複；業主 2026-11-15 指定預設為 XX中心）。「南京 062」→「南京中心」、「美國洛杉磯」→「美國洛杉磯中心」、「台北中心」→「台北中心」。 */
 export function centerShareName(label: string): string {
-  const base = label.replace(/\s*\d+\s*$/, "").replace(/教育中心$|中心$/, "").trim();
-  return `${base || label}中心`;
+  // 業主 2026-11-17：取消「自動在後面加中心二個字」，中央的名稱怎麼寫就怎麼顯示（只拿掉尾巴的數字代碼）。
+  return label.replace(/\s*\d+\s*$/, "").trim() || label;
 }
 
 /** 分享標題用的中心名稱：有自訂名稱就用自訂，沒有用預設格式。 */

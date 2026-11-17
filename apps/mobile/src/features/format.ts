@@ -78,8 +78,8 @@ export const setCenterNames = (m: Record<string, string>) => {
 export function centerTitle(label: string): string {
   const custom = customCenterNames[centerKeyOf(label)];
   if (custom) return custom;
-  const base = label.replace(/\s*\d+\s*$/, "").replace(/教育中心$|中心$/, "").trim();
-  return `${base || label}中心`;
+  // 業主 2026-11-17：取消「自動在後面加中心二個字」，中央的名稱怎麼寫就怎麼顯示（只拿掉尾巴的數字代碼）。
+  return label.replace(/\s*\d+\s*$/, "").trim() || label;
 }
 
 /** 章節長度：「12分鐘」（超過 60 分鐘也一樣用分鐘，不顯示「小時」、不加「約」；沒有長度回空字串。業主 2026-11-16）。 */
