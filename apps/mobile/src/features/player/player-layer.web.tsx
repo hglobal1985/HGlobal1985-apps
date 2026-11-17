@@ -336,7 +336,8 @@ export function PlayerLayer() {
           />
         ) : null}
       </div>
-      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
+      {/* 沒在播放時，讓點擊直接落在 YouTube 影片上：LINE 內建瀏覽器等環境不允許程式代按播放，使用者親手點影片中央的播放鈕才會播（業主 2026-11-17）。 */}
+      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", pointerEvents: yt && !s.playing ? "none" : "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
       {canZoom && showHint ? (
         <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 999, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 12, lineHeight: "16px", fontWeight: 500, whiteSpace: "nowrap", pointerEvents: "none" }}>
           <span style={{ fontFamily: "ionicons", fontSize: 14, lineHeight: "16px" }}>{String.fromCodePoint(Number(Ionicons.glyphMap["move"]))}</span>

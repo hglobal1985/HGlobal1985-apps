@@ -1,3 +1,4 @@
+import { showToast } from "@/ui/toast";
 import { resolveUrl } from "@/api/client";
 import { embeddedCover } from "./audio-cover";
 import { EMPTY, nextRate, segmentOf, type Snapshot, type Track, resumeOf } from "./engine.types";
@@ -459,8 +460,14 @@ export const engine = {
   },
   play() {
     intent = true;
-    if (snap.track?.mode === "youtube") ytCommand("playVideo");
-    else void active()?.play().catch(() => undefined);
+    if (snap.track?.mode === "youtube") {
+      ytCommand("playVideo");
+      // 有些內建瀏覽器（例如 LINE）不准程式代按播放：1.5 秒後還沒開始，就提示直接點影片中央的播放鈕。
+      const id = snap.loadId;
+      setTimeout(() => {
+        if (snap.track?.mode === "youtube" && snap.loadId === id && !snap.playing && intent) showToast("請直接點一下影片中央的播放鈕");
+      }, 1500);
+    } else void active()?.play().catch(() => undefined);
   },
   pause() {
     intent = false;
