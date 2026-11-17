@@ -61,7 +61,7 @@ test("小編：會長從同中心名單指派；三種權限各自生效；換�
   assert.equal(added.status, 200);
   assert.deepEqual(added.data.map((e) => [e.memberId, e.center, e.canCreate, e.canEditOthers, e.canDeleteOthers]), [["demo-desk", "台北中心", true, false, false]]);
   assert.equal((await call("POST", "/admin/editors", { token: pres, body: { memberId: "demo-desk" } })).status, 409, "不重複指派");
-  const note = await env.DB.prepare("SELECT title FROM notifications WHERE recipient_sub = 'demo-desk'").first<{ title: string }>();
+  const note = await env.DB.prepare("SELECT title FROM notifications WHERE recipient_sub = 'demo-desk' AND title NOT LIKE '已送出%'").first<{ title: string }>();
   assert.match(note!.title, /小編/);
 
   // 小編的 /me
@@ -113,7 +113,7 @@ test("小編：會長從同中心名單指派；三種權限各自生效；換�
   assert.equal((await call("DELETE", "/admin/editors/demo-desk", { token: pres })).status, 200);
   assert.equal((await call("PATCH", `/admin/courses/${mine.data.id}`, { token: desk, body: { subtitle: "x" } })).status, 403);
   assert.equal((await call<{ member: Member }>("GET", "/me", { token: desk })).data.member.courseRights, undefined);
-  const notes = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_sub = 'demo-desk'").first<{ n: number }>();
+  const notes = await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_sub = 'demo-desk' AND title NOT LIKE '已送出%'").first<{ n: number }>();
   assert.equal(notes!.n, 2);
 
   // 總部：可以指定任何中心

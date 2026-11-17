@@ -39,6 +39,8 @@ test("中心訂閱（從 688 開始、可取消）與廣播公告（新增、秒
   const made = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "新開的課", teacher: "王小明", hostUnit: "台北中心", priceTwd: 0 } })).data;
   await call("PATCH", `/admin/courses/${made.id}`, { token: admin, body: { status: "published" } });
   assert.ok((await call<{ title: string; body: string }[]>("GET", "/notifications", { token: a })).data.some((n) => n.title.includes("有新課程上架") && n.body.includes("新開的課")));
+  // 上架的人自己也會收到一則確認通知（含通知人數），方便確認有沒有送出去
+  assert.ok((await call<{ title: string; body: string }[]>("GET", "/notifications", { token: admin })).data.some((n) => n.title.includes("已送出") && n.body.includes("新開的課") && n.body.includes("通知了 1 位訂閱者")));
 
   // 系列訂閱：同一套邏輯，系列有新課程上架通知訂閱者
   assert.deepEqual((await call<St>("GET", "/series-subscription?series=美力之星")).data, { count: 688, subscribed: false });

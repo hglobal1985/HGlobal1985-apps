@@ -939,22 +939,30 @@ async function broadcastsOf(db: D1Database, key: string): Promise<{ seconds: num
 async function notifyNewCourse(ctx: Ctx, id: string): Promise<void> {
   try {
     const c = await ctx.db.prepare("SELECT title, host_unit, host_center_key AS hk, view_scope, is_list, series FROM courses WHERE id = ? AND status = 'published'").bind(id).first<{ title: string; host_unit: string; hk: string | null; series: string | null; view_scope: string; is_list: number }>();
-    if (c?.is_list === 1 || !c || isPrivate(c.view_scope)) return;
-    if (c.hk) {
-      const label = hostCenterOf(c.host_unit) || c.hk;
-      await notifySubscribers(ctx.db, c.hk, `${label}有新課程上架`, c.title.slice(0, 80), `/course/${id}`);
+    if (!c) return;
+    const me = ctx.session?.sub ?? null;
+    const kind = c.is_list === 1 ? "清單" : "課程";
+    const title80 = c.title.slice(0, 80);
+    let sent = 0;
+    // 私密連結不通知訂閱者；其餘（課程與素材清單）通知所在中心與系列的訂閱者。
+    if (!isPrivate(c.view_scope)) {
+      if (c.hk) sent += await notifySubscribers(ctx.db, c.hk, `${hostCenterOf(c.host_unit) || c.hk}有新${kind}上架`, title80, `/course/${id}`, me);
+      // 系列訂閱者（業主 2026-11-17）：系列有新課程上架也通知。
+      if (c.series) sent += await notifySubscribers(ctx.db, seriesSubKey(c.series), `${c.series}有新${kind}上架`, title80, `/course/${id}`, me);
     }
-    // 系列訂閱者（業主 2026-11-17）：系列有新課程上架也通知。
-    if (c.series) await notifySubscribers(ctx.db, seriesSubKey(c.series), `${c.series}有新課程上架`, c.title.slice(0, 80), `/course/${id}`);
+    // 業主 2026-11-17：上架的人自己也會收到一則（不論有沒有訂閱者、是不是私密連結），用來確認通知有送出去。
+    if (me) await notify(ctx.db, { sub: me }, `已送出「新${kind}上架」通知`, `${title80}（通知了 ${sent} 位訂閱者）`, `/course/${id}`).run();
   } catch {
     /* 通知失敗不影響上架 */
   }
 }
 
-/** 通知某個中心的所有訂閱者（站內通知；推播由通知機制自動處理）。 */
-async function notifySubscribers(db: D1Database, key: string, title: string, body: string, link: string): Promise<void> {
+/** 通知某個中心／系列的所有訂閱者（站內通知；推播由通知機制自動處理）。except＝不重複通知的人（上架者自己，另外收確認通知）；回傳通知人數。 */
+async function notifySubscribers(db: D1Database, key: string, title: string, body: string, link: string, except: string | null = null): Promise<number> {
   const { results } = await db.prepare("SELECT member_sub FROM center_subscriptions WHERE center_key = ?").bind(key).all<{ member_sub: string }>();
-  for (let i = 0; i < results.length; i += 40) await db.batch(results.slice(i, i + 40).map((r) => notify(db, { sub: r.member_sub }, title, body, link)));
+  const subs = results.filter((r) => r.member_sub !== except);
+  for (let i = 0; i < subs.length; i += 40) await db.batch(subs.slice(i, i + 40).map((r) => notify(db, { sub: r.member_sub }, title, body, link)));
+  return subs.length;
 }
 
 async function bumpView(db: D1Database, kind: "center" | "series", key: string): Promise<number> {
