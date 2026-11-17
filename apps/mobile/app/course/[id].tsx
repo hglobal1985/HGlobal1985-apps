@@ -35,6 +35,15 @@ const isWeb = Platform.OS === "web";
  * 只有報名按鈕（依狀態）與課程章節。標題在上方導覽列。
  * 點章節＝原地播放（業主 2026-11-16）：上方的 EDM 換成播放器（同一個位置），章節清單不動；網址的 ?lesson=章節編號 記住播放哪一堂，舊的 /learn/… 網址會轉到這裡。
  */
+/** 是不是在 LINE 內建瀏覽器裡。 */
+const isLineBrowser = () => Platform.OS === "web" && typeof navigator !== "undefined" && /\bLine\//i.test(navigator.userAgent);
+/** 請 LINE 改用手機預設瀏覽器開啟目前這一頁（LINE 認得網址參數 openExternalBrowser=1）。 */
+const openExternal = () => {
+  const u = new URL(window.location.href);
+  u.searchParams.set("openExternalBrowser", "1");
+  window.location.href = u.toString();
+};
+
 export default function CourseRoute() {
   const params = useLocalSearchParams<{ id: string; edit?: string; lesson?: string }>();
   return <CourseDetailScreen id={params.id} edit={params.edit} lesson={params.lesson} chapter={chapterFromParams(params)} />;
@@ -305,6 +314,15 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
       <Screen header={false} footer={editing ? undefined : stickyAction}>
         {message ? <NoticeBox tone={message.tone} text={message.text} /> : null}
         {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
+        {playLesson && session.playback?.kind === "youtube" && isLineBrowser() ? (
+          // LINE 內建瀏覽器不准程式代按播放（要先親手點一次影片）：提供「改用手機瀏覽器開啟」，在那裡章節鈕與播放鈕第一下就能播（業主 2026-11-17）。
+          <View style={[styles.row, { flexWrap: "nowrap" }]}>
+            <AppText variant="caption" tone="muted" style={{ flex: 1 }}>
+              LINE 內建瀏覽器要先點一下影片中央才能播放
+            </AppText>
+            <Button variant="secondary" label="用瀏覽器開啟" icon="open-outline" onPress={openExternal} />
+          </View>
+        ) : null}
         {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
         {session.playback?.kind === "demo" && playLesson ? <Pill label={session.playback.label} tone="warning" /> : null}
         {playLesson && !member ? (

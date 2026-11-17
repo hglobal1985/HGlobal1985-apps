@@ -94,6 +94,12 @@ export function PlayerLayer() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   }, [canZoom]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 手勢狀態保險：播放狀態或影片一換，就清掉殘留的觸控記錄（手指放開的訊息偶爾會遺失，殘留會讓之後的點擊、捲動判斷卡住）。
+  useEffect(() => {
+    pointers.current.clear();
+    pinch.current = null;
+    tapInfo.current = null;
+  }, [s.playing, t?.key]); // eslint-disable-line react-hooks/exhaustive-deps
   const zDown = (e: PointerEvent<HTMLDivElement>) => {
     engine.pokeHint(); // 觸摸影片就顯示操作提示
     // 影片任意處點兩下：還原 100% 原始比例。
@@ -355,7 +361,7 @@ export function PlayerLayer() {
         ) : null}
       </div>
       {/* 沒在播放時，讓點擊直接落在 YouTube 影片上：LINE 內建瀏覽器等環境不允許程式代按播放，使用者親手點影片中央的播放鈕才會播（業主 2026-11-17）。 */}
-      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", pointerEvents: yt && !s.playing ? "none" : "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
+      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} onLostPointerCapture={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", pointerEvents: yt && !s.playing ? "none" : "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
       {canZoom && showHint ? (
         <div style={{ position: "absolute", bottom: 8, left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 999, background: "rgba(0,0,0,0.55)", color: "#fff", fontSize: 12, lineHeight: "16px", fontWeight: 500, whiteSpace: "nowrap", pointerEvents: "none" }}>
           <span style={{ fontFamily: "ionicons", fontSize: 14, lineHeight: "16px" }}>{String.fromCodePoint(Number(Ionicons.glyphMap["move"]))}</span>
