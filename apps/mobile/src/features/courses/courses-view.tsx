@@ -15,11 +15,11 @@ import { canCreateCourse, canManageCourses } from "@/lib/roles";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
+import { useSubscribe } from "./subscribe";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
 import { CenterBroadcastEditor } from "@/features/admin/center-broadcast-editor";
-import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { flashMode } from "./mode-flash";
@@ -347,35 +347,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       .then((r) => setCenterViews(r.total))
       .catch(() => undefined);
   }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
-  // 訂閱（業主 2026-11-17）：全部中心的人數都從 688 開始算；再按一下取消。
-  const [sub, setSub] = useState<{ count: number; subscribed: boolean } | null>(null);
-  useEffect(() => {
-    if (activeCenter === ALL) return;
-    setSub(null);
-    api<{ count: number; subscribed: boolean }>("GET", `/center-subscription?center=${encodeURIComponent(activeCenter)}`)
-      .then(setSub)
-      .catch(() => undefined);
-  }, [activeCenter, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toggleSub = async () => {
-    if (!member) return void router.push({ pathname: "/me", params: { next: `/courses?center=${encodeURIComponent(activeCenter)}` } });
-    try {
-      const r = await api<{ count: number; subscribed: boolean }>("POST", "/center-subscription", { center: activeCenter });
-      setSub(r);
-      // 全螢幕文字提醒（統一模組 showFlash，業主 2026-11-17）：鈴鐺圖示＋標題＋說明。
-      showFlash({
-        icon: <Ionicons name={r.subscribed ? "notifications" : "notifications-off-outline"} size={FLASH_ICON - 3} color={r.subscribed ? "#E0A800" : "#8A8A8A"} />,
-        title: r.subscribed ? "已訂閱" : "已取消訂閱",
-        body: r.subscribed ? "新課程或新公告都會通知你" : "不會再收到這個中心的通知",
-      });
-    } catch (e) {
-      showFlash({ icon: <Ionicons name="alert-circle-outline" size={FLASH_ICON - 3} color="#B3261E" />, title: "操作失敗", body: (e as Error).message });
-    }
-  };
+  // 訂閱：統一用訂閱模組（subscribe.tsx，中心與系列同一套）。
+  const sub = useSubscribe("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
   const bc = useCenterBroadcasts(activeCenter === ALL ? "" : activeCenter);
   const [bcOpen, setBcOpen] = useState(false);
   const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} subscribe={sub ? { ...sub, onPress: () => void toggleSub() } : undefined} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} subscribe={sub} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
   const { width: winWidth } = useWindowDimensions();
   const archivedBlock =

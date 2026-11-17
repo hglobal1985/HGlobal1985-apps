@@ -6,6 +6,7 @@ import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { EdmLightbox } from "./edm-viewer";
+import { SubscribeButton, type SubscribeProps } from "./subscribe";
 
 const COMPACT_H = 112;
 const SIDE = 16;
@@ -22,7 +23,7 @@ export const centerHeroFull = (winW: number) => Math.round((Math.min(winW, maxCo
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
  */
-export function CenterHero({ art, scrollY, courses, lessons, views, title, subscribe }: { subscribe?: { count: number; subscribed: boolean; onPress: () => void }; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
+export function CenterHero({ art, scrollY, courses, lessons, views, title, subscribe }: { subscribe?: SubscribeProps; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
   const { width: winW } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const full = centerHeroFull(winW);
@@ -57,22 +58,7 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title, subsc
       {art ? <Pressable accessibilityRole="button" accessibilityLabel="放大中心首頁圖" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill} /> : null}
       <View style={styles.chips} pointerEvents="box-none">
         {/* 訂閱鈕（業主 2026-11-17）：放在最左邊、比膠卷標籤大兩倍、實心不透明；鈴鐺圖案與主選單「通知」一致，旁邊是訂閱人數。 */}
-        {subscribe ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: subscribe.subscribed }}
-            accessibilityLabel={subscribe.subscribed ? `已訂閱，共 ${subscribe.count} 人，再按一下取消訂閱` : `訂閱這個中心，目前 ${subscribe.count} 人`}
-            onPress={subscribe.onPress}
-            style={[styles.sub, { backgroundColor: subscribe.subscribed ? "#0C603C" : "#FFFFFF" }]}
-          >
-            {/* 鈴鐺下面兩個小字：訂閱／已訂閱。已訂閱＝深綠底、黃色實心鈴鐺；未訂閱＝白底、綠色空心鈴鐺，一眼分得出來。 */}
-            <View style={styles.subIcon}>
-              <Icon name={subscribe.subscribed ? "notifications" : "notifications-outline"} size={22} color={subscribe.subscribed ? "#FFD43B" : "#0C603C"} />
-              <AppText style={{ color: subscribe.subscribed ? "#FFFFFF" : "#0C603C", fontSize: 10, fontWeight: "800", lineHeight: 12 }}>{subscribe.subscribed ? "已訂閱" : "訂閱"}</AppText>
-            </View>
-            <AppText style={{ color: subscribe.subscribed ? "#FFFFFF" : "#0C603C", fontSize: 16, fontWeight: "800" }}>{subscribe.count}</AppText>
-          </Pressable>
-        ) : null}
+        {subscribe ? <SubscribeButton {...subscribe} /> : null}
         <View style={styles.chipRow} pointerEvents="none">
           <Chip text={`${courses} 門課`} />
           <Chip text={`${lessons} 章節`} />
@@ -124,8 +110,6 @@ const styles = StyleSheet.create({
   box: { overflow: "hidden", backgroundColor: "#2F5D3A", alignSelf: "stretch" },
   chips: { position: "absolute", left: 12, bottom: 10, flexDirection: "row", gap: 6, alignItems: "center" },
   chipRow: { flexDirection: "row", gap: 6 },
-  subIcon: { alignItems: "center", justifyContent: "center" },
-  sub: { flexDirection: "row", alignItems: "center", gap: 6, height: 44, paddingHorizontal: 12, borderRadius: 22, marginRight: 2, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.22)" },
   chipText: { color: "#fff", fontWeight: "600" },
 });

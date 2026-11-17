@@ -17,6 +17,7 @@ import { lessonsOf } from "./category-sheet";
 import { CourseRow } from "./course-row";
 import { nearestFirst } from "./sort";
 import { SeriesTile } from "./series-tile";
+import { useSubscribe } from "./subscribe";
 
 type View_ = "list" | "edm";
 const KEY = "hglobal:learn:series-view";
@@ -56,6 +57,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     const all = [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
     return nearestFirst(all.filter((x) => x.series === series));
   }, [data, adminList.data, series]);
+  const sub = useSubscribe("series", series, path);
   const art = artList.data?.find((x) => x.series === series);
   const pick = (v: View_) => {
     setView(v);
@@ -74,7 +76,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         path={path}
         extra={isSuperAdmin(member) ? <TopBarButton label="編輯" accessibilityLabel="編輯系列封面" iconName="create-outline" onPress={() => setEditOpen(true)} /> : undefined}
       />
-      <Screen header={false} hero={<CenterHero art={art} scrollY={scrollY} courses={courses.length} lessons={lessonsOf(courses)} views={views} title={series} />} heroHeight={centerHeroFull(winW)} scrollY={scrollY}>
+      <Screen header={false} hero={<CenterHero art={art} scrollY={scrollY} courses={courses.length} lessons={lessonsOf(courses)} views={views} title={series} subscribe={sub} />} heroHeight={centerHeroFull(winW)} scrollY={scrollY}>
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}

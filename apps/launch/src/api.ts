@@ -916,6 +916,9 @@ async function courseDeleteImpact(db: D1Database, id: string): Promise<CourseDel
 const CENTER_VIEW_BASE = 688; // 所有中心的點閱數都加 688（業主 2026-11-17，只影響顯示）
 const SUBSCRIBER_BASE = 688; // 每個中心顯示的訂閱人數從 688 開始算（業主 2026-11-17）
 
+/** 系列的訂閱沿用中心訂閱表，用「series:」開頭的鍵區分。 */
+const seriesSubKey = (name: string) => `series:${name.trim()}`;
+
 async function subscriptionState(ctx: Ctx, key: string): Promise<{ count: number; subscribed: boolean }> {
   const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_subscriptions WHERE center_key = ?").bind(key).first<{ n: number }>();
   const mine = ctx.session ? await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(ctx.session.sub, key).first() : null;
@@ -935,10 +938,14 @@ async function broadcastsOf(db: D1Database, key: string): Promise<{ seconds: num
 /** 中心有新課程上架：通知這個中心的訂閱者（私密連結、素材清單、總部主辦的課不通知）。 */
 async function notifyNewCourse(ctx: Ctx, id: string): Promise<void> {
   try {
-    const c = await ctx.db.prepare("SELECT title, host_unit, host_center_key AS hk, view_scope, is_list FROM courses WHERE id = ? AND status = 'published'").bind(id).first<{ title: string; host_unit: string; hk: string | null; view_scope: string; is_list: number }>();
-    if (!c?.hk || c.is_list === 1 || isPrivate(c.view_scope)) return;
-    const label = hostCenterOf(c.host_unit) || c.hk;
-    await notifySubscribers(ctx.db, c.hk, `${label}有新課程上架`, c.title.slice(0, 80), `/course/${id}`);
+    const c = await ctx.db.prepare("SELECT title, host_unit, host_center_key AS hk, view_scope, is_list, series FROM courses WHERE id = ? AND status = 'published'").bind(id).first<{ title: string; host_unit: string; hk: string | null; series: string | null; view_scope: string; is_list: number }>();
+    if (c?.is_list === 1 || !c || isPrivate(c.view_scope)) return;
+    if (c.hk) {
+      const label = hostCenterOf(c.host_unit) || c.hk;
+      await notifySubscribers(ctx.db, c.hk, `${label}有新課程上架`, c.title.slice(0, 80), `/course/${id}`);
+    }
+    // 系列訂閱者（業主 2026-11-17）：系列有新課程上架也通知。
+    if (c.series) await notifySubscribers(ctx.db, seriesSubKey(c.series), `${c.series}有新課程上架`, c.title.slice(0, 80), `/course/${id}`);
   } catch {
     /* 通知失敗不影響上架 */
   }
@@ -2600,6 +2607,32 @@ const routes: [string, RegExp, Handler][] = [
       const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
       if (!label) fail(400, "invalid_center", "請指定中心");
       const key = centerKey(label);
+      const had = await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).first();
+      if (had) await ctx.db.prepare("DELETE FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).run();
+      else await ctx.db.prepare("INSERT OR IGNORE INTO center_subscriptions (member_sub, center_key) VALUES (?, ?)").bind(s.sub, key).run();
+      return subscriptionState(ctx, key);
+    },
+  ],
+  [
+    "GET",
+    /^\/series-subscription$/,
+    async (ctx) => {
+      // 中心訂閱：全部中心的顯示人數都從 688 開始算（業主 2026-11-17）；訪客也看得到人數。
+      const label = (ctx.url.searchParams.get("series") ?? "").trim().slice(0, 60);
+      if (!label) fail(400, "invalid_series", "請指定系列");
+      return subscriptionState(ctx, seriesSubKey(label));
+    },
+  ],
+  [
+    "POST",
+    /^\/series-subscription$/,
+    async (ctx) => {
+      // 按一下訂閱、再按一下取消。
+      const s = requireMember(ctx);
+      const body = await readJson<{ series?: unknown }>(ctx.req);
+      const label = typeof body.series === "string" ? body.series.trim().slice(0, 60) : "";
+      if (!label) fail(400, "invalid_series", "請指定系列");
+      const key = seriesSubKey(label);
       const had = await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).first();
       if (had) await ctx.db.prepare("DELETE FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).run();
       else await ctx.db.prepare("INSERT OR IGNORE INTO center_subscriptions (member_sub, center_key) VALUES (?, ?)").bind(s.sub, key).run();

@@ -39,4 +39,12 @@ test("中心訂閱（從 688 開始、可取消）與廣播公告（新增、秒
   const made = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "新開的課", teacher: "王小明", hostUnit: "台北中心", priceTwd: 0 } })).data;
   await call("PATCH", `/admin/courses/${made.id}`, { token: admin, body: { status: "published" } });
   assert.ok((await call<{ title: string; body: string }[]>("GET", "/notifications", { token: a })).data.some((n) => n.title.includes("有新課程上架") && n.body.includes("新開的課")));
+
+  // 系列訂閱：同一套邏輯，系列有新課程上架通知訂閱者
+  assert.deepEqual((await call<St>("GET", "/series-subscription?series=美力之星")).data, { count: 688, subscribed: false });
+  assert.equal((await call("POST", "/series-subscription", { body: { series: "美力之星" } })).status, 401);
+  assert.deepEqual((await call<St>("POST", "/series-subscription", { token: b, body: { series: "新系列" } })).data, { count: 689, subscribed: true });
+  const m2 = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "系列新課", teacher: "王小明", hostUnit: "台北中心", priceTwd: 0, series: "新系列" } })).data;
+  await call("PATCH", `/admin/courses/${m2.id}`, { token: admin, body: { status: "published" } });
+  assert.ok((await call<{ title: string; body: string }[]>("GET", "/notifications", { token: b })).data.some((n) => n.title.includes("新系列有新課程上架") && n.body.includes("系列新課")));
 });
