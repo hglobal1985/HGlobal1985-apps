@@ -4,9 +4,7 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
-import { inAppBrowser } from "@/lib/in-app-browser";
 import { barHeight, minTouch } from "@/theme/tokens";
-import { InAppBrowserBanner } from "./in-app-banner";
 
 /**
  * 全站「上方返回工具列」的唯一來源（業主 2026-11-15 永久指示：所有頁面的上方工具列一律一致）。
@@ -36,8 +34,6 @@ export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTo
         </Text>
         {right ? <View style={styles.right}>{right}</View> : null}
       </View>
-      {/* App 內建瀏覽器警示條：全站頁面堆疊的標題列正下方（業主 2026-11-17）；五個主分頁在 (tabs)/_layout 放。 */}
-      {safeTop ? <InAppBrowserBanner /> : null}
       {/* 放在頁面內容裡的工具列（例如中心專屬頁）自己畫下緣陰影；全站頁面堆疊的標題列改由根版面的 TopBarShadow 統一疊上去（頁面內容會蓋住標題列本身的陰影）。 */}
       {shadow ? (
         <View pointerEvents="none" style={styles.shadow}>
@@ -65,7 +61,7 @@ const TAB_ROOTS = new Set(["/", "/courses", "/learning", "/notices", "/me"]);
 export function TopBarShadow() {
   const insets = useSafeAreaInsets();
   const path = usePathname();
-  if (TAB_ROOTS.has(path) || path.startsWith("/auth") || inAppBrowser()) return null; // 警示條有自己的下緣線
+  if (TAB_ROOTS.has(path) || path.startsWith("/auth")) return null;
   return (
     <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: insets.top + barHeight, zIndex: 20 }}>
       <ShadowStrips />

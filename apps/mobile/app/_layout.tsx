@@ -19,7 +19,7 @@ import { SessionProvider } from "@/state/session";
 import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { UpdateNotice } from "@/features/update-notice";
-import { BottomBar, TopBar, TopBarShadow } from "@/ui";
+import { BottomBar, InAppBrowserBanner, TopBar, TopBarShadow } from "@/ui";
 
 /**
  * 全站頁面堆疊與上方標題列。標題列高度＝固定的 barHeight＋手機上方的安全區（瀏海、狀態列）；
@@ -99,6 +99,8 @@ export default function RootLayout() {
         <ThemeProvider value={navTheme}>
           <StatusBar style={scheme === "dark" ? "light" : "dark"} />
           <View style={{ flex: 1, backgroundColor: c.background }}>
+          {/* App 內建瀏覽器警示條：所有頁面最上方（業主 2026-11-17），只有這一處。 */}
+          <InAppBrowserBanner />
           <View style={{ flex: 1 }}>
           <AppStack />
           <TopBarShadow />

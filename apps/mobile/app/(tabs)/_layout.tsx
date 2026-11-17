@@ -1,6 +1,4 @@
 import { Tabs } from "expo-router/tabs";
-import { View } from "react-native";
-import { InAppBrowserBanner } from "@/ui";
 
 /**
  * 五個分頁的容器。分頁列本身改由根版面的 BottomBar 顯示（所有頁面都看得到），這裡只負責切換內容。
@@ -8,15 +6,12 @@ import { InAppBrowserBanner } from "@/ui";
  */
 export default function TabsLayout() {
   return (
-    <View style={{ flex: 1 }}>
-      <InAppBrowserBanner />
-      <Tabs tabBar={() => null} screenOptions={{ headerShown: false }}>
+    <Tabs tabBar={() => null} screenOptions={{ headerShown: false }}>
       <Tabs.Screen name="index" />
       <Tabs.Screen name="courses" />
       <Tabs.Screen name="learning" />
       <Tabs.Screen name="notices" />
       <Tabs.Screen name="me" />
-      </Tabs>
-    </View>
+    </Tabs>
   );
 }
