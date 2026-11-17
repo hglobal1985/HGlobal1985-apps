@@ -24,6 +24,8 @@ export function showFlash(content: FlashContent): void {
  * 所有提醒視窗固定同一個寬高（業主 2026-11-16：比原本 3 倍版再縮小 50％；之後再把整體縮成 80%：寬度不變、高度 230→184，圖示與文字一起縮成 80%）；
  * 文字依字數自動換行、自動縮小；點一下立刻關閉。
  */
+/** 背景暗化的顏色（黑色半透明）。 */
+const DIM = "rgba(0,0,0,0.5)";
 export const FLASH_W = 190;
 export const FLASH_H = 184;
 /** 圖示區高度（原本 64 的 80%）；呼叫端的圖示請用 FLASH_ICON 當尺寸。 */
@@ -67,6 +69,8 @@ export function FlashHost() {
   if (!shown) return null;
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingTop: Math.round(height * 0.12) }]}>
+      {/* 提醒出現時整個頁面背景暗化（業主 2026-11-17）；跟著卡片一起淡入淡出，不擋住下面的操作。 */}
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: DIM, opacity: op }]} />
       <Pressable accessibilityRole="button" accessibilityLabel={`${shown.title}${shown.body ? `，${shown.body}` : ""}，點一下關閉`} onPress={dismiss}>
         <Animated.View style={{ opacity: op }} accessibilityLiveRegion="polite">
           {/* 邊框＝迷你播放器同款流光漸層邊框（共用模組 ui/gradient-frame，業主 2026-11-17） */}
