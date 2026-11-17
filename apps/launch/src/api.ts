@@ -32,6 +32,7 @@ import {
   type CentralReviews,
   type LibraryItem,
   type LibraryMine,
+  LIBRARY_KEY_BADGES,
   type LibraryView,
   type LibraryUnlock,
   type NotificationSettings,
@@ -1747,9 +1748,28 @@ const libItemOut = (r: LibItemRow, owner: boolean, unlocked: boolean): LibraryIt
     ...(owner ? { pwSet: !!r.pw_hash, pwExpiresAt: r.pw_expires_at, pwExpired: !!r.pw_hash && !pwActive(r.pw_expires_at) } : {}),
   };
 };
+/** 建立書櫃（邀請接受、集滿徽章自動解鎖共用）：需要中央會員編號；失敗回傳白話原因。 */
+async function createLibrary(ctx: Ctx, s: Session): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  const number = libraryNumber(await memberNumberOf(s.sub, s.token));
+  if (!number) return { ok: false, code: "no_member_number", message: "請先到會員中心填寫你的安麗會員編號，再回來" };
+  if (await ctx.db.prepare("SELECT 1 AS ok FROM libraries WHERE number = ?").bind(number).first()) return { ok: false, code: "number_taken", message: "這個會員編號的書櫃已經存在（例如配偶共用同一個編號），請洽管理員" };
+  await ctx.db.batch([ctx.db.prepare("INSERT INTO libraries (member_sub, number, owner_name, title) VALUES (?, ?, ?, ?)").bind(s.sub, number, s.name, `${s.name}的書櫃`), audit(ctx.db, s.sub, "library.create", "library", s.sub, number)]);
+  return { ok: true };
+}
 async function libraryMine(ctx: Ctx, sub: string): Promise<LibraryMine> {
-  const lib = await libOf(ctx.db, sub);
-  if (!lib) return { library: null, items: [] };
+  let lib = await libOf(ctx.db, sub);
+  let keys: LibraryMine["keys"];
+  if (!lib && ctx.session?.kind === "central") {
+    // 獲得任意 20 枚徽章就自動解鎖書櫃鑰匙（業主 2026-11-17）；會員編號等問題留在 blocked 讓畫面提示。
+    const have = (await grantAchievements(ctx, sub)).filter((a) => a.earned).length;
+    keys = { have, need: LIBRARY_KEY_BADGES };
+    if (have >= LIBRARY_KEY_BADGES) {
+      const r = await createLibrary(ctx, ctx.session);
+      if (r.ok) lib = await libOf(ctx.db, sub);
+      else keys.blocked = r.message;
+    }
+  }
+  if (!lib) return { library: null, items: [], keys };
   return { library: { number: lib.number, title: lib.title, ownerName: lib.owner_name, views: lib.views, pwSet: !!lib.pw_hash, pwExpiresAt: lib.pw_expires_at, pwExpired: !!lib.pw_hash && !pwActive(lib.pw_expires_at) }, items: (await libItems(ctx.db, sub)).map((r) => libItemOut(r, true, true)) };
 }
 /** 書櫃密碼欄位：password 字串＝設定（可帶 passwordDays）、null＝關閉密碼、沒傳＝不動。 */
@@ -3095,14 +3115,9 @@ const routes: [string, RegExp, Handler][] = [
       if (await libOf(ctx.db, s.sub)) return fail(409, "already_has_library", "你已經有「我的書櫃」了");
       const inv = await ctx.db.prepare("SELECT code, expires_at, used_by FROM library_invites WHERE code = ?").bind(code).first<{ code: string; expires_at: string; used_by: string | null }>();
       if (!inv || inv.used_by || Date.parse(inv.expires_at) < Date.now()) return fail(404, "invite_invalid", "這個邀請網址已失效或已被使用");
-      const number = libraryNumber(await memberNumberOf(s.sub, s.token));
-      if (!number) return fail(400, "no_member_number", "請先到會員中心填寫你的安麗會員編號，再回來接受邀請");
-      if (await ctx.db.prepare("SELECT 1 AS ok FROM libraries WHERE number = ?").bind(number).first()) return fail(409, "number_taken", "這個會員編號的書櫃已經存在（例如配偶共用同一個編號），請洽管理員");
-      await ctx.db.batch([
-        ctx.db.prepare("INSERT INTO libraries (member_sub, number, owner_name, title) VALUES (?, ?, ?, ?)").bind(s.sub, number, s.name, `${s.name}的書櫃`),
-        ctx.db.prepare("UPDATE library_invites SET used_by = ? WHERE code = ? AND used_by IS NULL").bind(s.sub, code),
-        audit(ctx.db, s.sub, "library.create", "library", s.sub, number),
-      ]);
+      const made = await createLibrary(ctx, s);
+      if (!made.ok) return fail(made.code === "number_taken" ? 409 : 400, made.code, made.message);
+      await ctx.db.prepare("UPDATE library_invites SET used_by = ? WHERE code = ? AND used_by IS NULL").bind(s.sub, code).run();
       return libraryMine(ctx, s.sub);
     },
   ],
