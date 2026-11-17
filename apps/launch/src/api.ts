@@ -2545,8 +2545,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/center-views$/,
     async (ctx) => {
-      // 中心專屬頁瀏覽計數：每進入一次就 +1（業主 2026-11-16：不分是否同一人）；回傳累計次數。
-      requireMember(ctx);
+      // 中心專屬頁點閱計數：每進入一次就 +1（業主 2026-11-16：不分是否同一人；2026-11-17：訪客也算、重新整理也算）；回傳累計次數。
       const body = await readJson<{ center?: unknown }>(ctx.req);
       const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
       if (!label) fail(400, "invalid_center", "請指定中心");
@@ -4193,10 +4192,23 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "POST",
+    /^\/course-views$/,
+    async (ctx) => {
+      // 從課程連結直接進入課程頁，也算進「該課程主辦中心封面」與「所屬系列封面」的點閱（業主 2026-11-17：不分訪客、可重複、重新整理就 +1）。
+      const body = await readJson<{ courseId?: unknown }>(ctx.req);
+      const id = typeof body.courseId === "string" ? body.courseId.slice(0, 40) : "";
+      const row = id ? await ctx.db.prepare("SELECT host_center_key AS hk, series FROM courses WHERE id = ? AND status = 'published'").bind(id).first<{ hk: string | null; series: string }>() : null;
+      if (!row) return { ok: false };
+      if (row.hk) await bumpView(ctx.db, "center", row.hk);
+      if (row.series?.trim()) await bumpView(ctx.db, "series", row.series.trim());
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
     /^\/series-views$/,
     async (ctx) => {
-      // 系列頁瀏覽計數：每進入一次就 +1（與中心頁相同規則）；回傳累計次數。
-      requireMember(ctx);
+      // 系列頁點閱計數：每進入一次就 +1（與中心頁相同規則，訪客也算）；回傳累計次數。
       const body = await readJson<{ series?: unknown }>(ctx.req);
       const name = typeof body.series === "string" ? body.series.trim().slice(0, 60) : "";
       if (!name) fail(400, "invalid_series", "請指定系列");

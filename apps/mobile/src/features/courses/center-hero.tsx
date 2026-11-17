@@ -17,7 +17,7 @@ export const centerHeroFull = (winW: number) => Math.round((Math.min(winW, maxCo
 
 /**
  * 中心專屬頁上方的照片（業主 2026-11-16 選方案 A）：
- * 展開＝左右滿版 16:10、底部暗色漸層、不放中心名稱（上方工具列已有）、左下角透明小標籤「N 門課・N 章節・N 瀏覽」、右上角放大鈕；
+ * 展開＝左右滿版 16:10、底部暗色漸層、不放中心名稱（上方工具列已有）、左下角透明小標籤「N 門課・N 章節・N 點閱」、右上角放大鈕；
  * 往上滑時平順縮成窄橫幅（方案 D：高度 112、左右留白、圓角），往下滑回頂端再展開。沒有上傳照片就用品牌綠色漸層底。
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
@@ -56,7 +56,7 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title }: { a
       <View style={styles.chips} pointerEvents="none">
         <Chip text={`${courses} 門課`} />
         <Chip text={`${lessons} 章節`} />
-        <Chip text={`${views ?? 0} 瀏覽`} />
+        <Chip text={`${views ?? 0} 點閱`} />
       </View>
       {art ? (
         <Pressable accessibilityRole="button" accessibilityLabel="放大照片" onPress={() => setOpen(true)} hitSlop={8} style={styles.zoom}>

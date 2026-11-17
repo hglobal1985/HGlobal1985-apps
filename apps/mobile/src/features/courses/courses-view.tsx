@@ -334,16 +334,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       return () => sub.remove();
     }, [activeCenter]), // eslint-disable-line react-hooks/exhaustive-deps
   );
-  // 中心頁上方的照片：透明小標籤「N 門課・N 章節・N 瀏覽」；往上滑時縮成窄橫幅（CenterHero）。
+  // 中心頁上方的照片：透明小標籤「N 門課・N 章節・N 點閱」；往上滑時縮成窄橫幅（CenterHero）。
   const scrollY = useRef(new Animated.Value(0)).current;
   const [centerViews, setCenterViews] = useState<number | null>(null);
   useEffect(() => {
-    if (activeCenter === ALL || !member) return;
+    if (activeCenter === ALL) return;
     setCenterViews(null);
     api<{ total: number }>("POST", "/center-views", { center: activeCenter })
       .then((r) => setCenterViews(r.total))
       .catch(() => undefined);
-  }, [activeCenter, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
   const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
   const centerHero =
     activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} /> : undefined;

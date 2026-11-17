@@ -55,6 +55,13 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
   const [saved, setSaved] = useState<CourseDetail | null>(null);
   const base = saved && saved.id === data?.id && (saved.admin?.updatedAt ?? "") > (data?.admin?.updatedAt ?? "") ? saved : data;
   // 章節排序、複製要「瞬間」有反應（業主 2026-11-17）：先在畫面上直接改，伺服器在背景處理，處理完再用正式資料換回來。
+  // 點閱（業主 2026-11-17）：每進入／重新整理一次課程頁就 +1，算進主辦中心與所屬系列的封面點閱（訪客也算）。
+  const counted = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data || counted.current === data.id) return;
+    counted.current = data.id;
+    api("POST", "/course-views", { courseId: data.id }).catch(() => undefined);
+  }, [data?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
   const opQueue = useRef<Promise<unknown>>(Promise.resolve());

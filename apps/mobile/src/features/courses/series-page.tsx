@@ -24,7 +24,7 @@ const GAP = space.md;
 
 /**
  * 系列單頁（全部課程 > 系列 > 顯示全部；業主 2026-11-16 改版，版面比照中心頁）：
- * 上方工具列（返回、標題、超級管理員的「編輯」、分享）→ 照片區（封面圖＋「N 門課・N 章節・N 瀏覽」，可上滑縮小）→
+ * 上方工具列（返回、標題、超級管理員的「編輯」、分享）→ 照片區（封面圖＋「N 門課・N 章節・N 點閱」，可上滑縮小）→
  * 右上角切換「詳細清單」（每堂課一行，右側有分享）與「圖片 EDM」（一列三張，同中心頁的呈現）。
  * 照片與封面上傳都跟中心共用同一套（CenterHero、ArtUploader）。
  */
@@ -46,11 +46,10 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       .catch(() => undefined);
   }, []);
   useEffect(() => {
-    if (!member) return;
     api<{ total: number }>("POST", "/series-views", { series })
       .then((r) => setViews(r.total))
       .catch(() => undefined);
-  }, [series, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [series]); // eslint-disable-line react-hooks/exhaustive-deps
   const courses = useMemo(() => {
     const pub = (data ?? []).filter((x) => x.status === "published" && x.viewScope !== "link_login" && x.viewScope !== "link_guest");
     const ids = new Set(pub.map((x) => x.id));
