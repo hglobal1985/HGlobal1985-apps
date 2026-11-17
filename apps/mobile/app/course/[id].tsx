@@ -24,7 +24,7 @@ import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
+import { AppText, Button, Card, LoginPrompt, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
 
@@ -329,15 +329,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
         {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
         {session.playback?.kind === "demo" && playLesson ? <Pill label={session.playback.label} tone="warning" /> : null}
-        {!member && !editing && (playLesson || firstPlayable) ? (
-          // 訪客提示：登入鈕在左、文字在右，強制同一列（業主 2026-11-17；按鈕與文字置中）。
-          <View style={[styles.row, { flexWrap: "nowrap", alignItems: "center", justifyContent: "center" }]}>
-            <Button variant="secondary" label="免費註冊登入" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: lessonHref(course.id, (playLesson ?? firstPlayable)!.id) } })} />
-            <AppText variant="body" tone="muted" numberOfLines={1} style={{ flexShrink: 1, fontSize: 15 }}>
-              解鎖更多功能與學習成就
-            </AppText>
-          </View>
-        ) : playLesson?.completed && !playNext && !playLesson.material ? (
+        {!editing && !member ? <LoginPrompt /> : null}
+        {playLesson?.completed && !playNext && !playLesson.material ? (
           <NoticeBox tone="success" text="恭喜！你已完成這門課程的最後一堂。" />
         ) : null}
         {!editing ? stickyNotice : null}

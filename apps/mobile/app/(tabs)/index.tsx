@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -12,7 +12,7 @@ import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { usePullRefresh } from "@/ui/pull-refresh";
-import { AppText, BrandTitle, Button, ErrorView, HomeRailsSkeleton, Ticker } from "@/ui";
+import { AppText, BrandTitle, ErrorView, LoginPrompt, HomeRailsSkeleton, Ticker } from "@/ui";
 
 /**
  * 首頁：固定一頁、不上下捲動。上方置中顯示大標題與會員頭像＋姓名（點擊進入會員中心編輯基本資料）、跑馬燈公告，下方左右兩個直式區塊（繼續學習、推薦課程），
@@ -90,12 +90,9 @@ export default function HomeScreen() {
           <BrandTitle />
           {member ? (
             <MemberHeader member={member} onPress={member.demo ? undefined : () => setPromptOpen(true)} />
-          ) : (
-            <View style={styles.loginBtn}>
-              <Button label="前往登入" icon="log-in-outline" onPress={() => router.navigate("/me")} fullWidth />
-            </View>
-          )}
+          ) : null}
         </View>
+        <LoginPrompt />
         {noticeClosed ? null : <Ticker items={(notices.data ?? []).map((n) => n.text)} everyMs={config.app.tickerSec * 1000} pauseMs={config.app.tickerPauseSec * 1000} onClose={() => setNoticeClosed(true)} />}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {!data && !error ? <HomeRailsSkeleton /> : null}
@@ -154,7 +151,6 @@ const styles = StyleSheet.create({
   head: { alignItems: "center", gap: space.sm },
   brand: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm },
   logo: { width: 44, height: 44 },
-  loginBtn: { width: "100%", maxWidth: 420, minHeight: 56, justifyContent: "center" },
   rails: { flex: 1, flexDirection: "row", gap: space.md, alignItems: "stretch" },
   middle: { flex: 1, paddingBottom: space.sm },
 });

@@ -10,7 +10,7 @@ import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
+import { EmptyState, ErrorView, LoadingView, LoginPrompt, Screen } from "@/ui";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
 import { lessonsOf } from "./category-sheet";
@@ -76,6 +76,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         extra={isSuperAdmin(member) ? <TopBarButton label="編輯" accessibilityLabel="編輯系列封面" iconName="create-outline" onPress={() => setEditOpen(true)} /> : undefined}
       />
       <Screen header={false} hero={<CenterHero art={art} scrollY={scrollY} courses={courses.length} lessons={lessonsOf(courses)} views={views} title={series} />} heroHeight={centerHeroFull(winW)} scrollY={scrollY}>
+        <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}
         {data && !courses.length ? <EmptyState icon="library-outline" title="這個系列目前沒有課程" /> : null}

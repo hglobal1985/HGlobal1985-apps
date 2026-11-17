@@ -29,7 +29,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen, TopBar, TopBarButton } from "@/ui";
+import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView, Screen, TopBar, TopBarButton } from "@/ui";
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
@@ -377,6 +377,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
           } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+      <LoginPrompt />
       {centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
