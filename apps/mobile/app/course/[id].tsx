@@ -63,6 +63,15 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
     if (edit === "1" && manages) setMode("edit");
   }, [edit, manages]);
   const editing = manages && mode === "edit";
+  // 網址列＝分享選單給的規則網址（業主 2026-11-17）：有專屬網址的課程，網頁版把瀏覽器網址換成「/中心縮寫/英譯主講人-1」（重新整理仍回到這一頁）。
+  const shortPath = course?.shortPath;
+  useEffect(() => {
+    if (Platform.OS !== "web" || !shortPath || typeof window === "undefined") return;
+    const t = setTimeout(() => {
+      if (window.location.pathname !== `/${shortPath}`) window.history.replaceState(window.history.state, "", `/${shortPath}${window.location.search}`);
+    }, 60);
+    return () => clearTimeout(t);
+  }, [shortPath, lesson, id]);
   const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | "newMaterial" | null>(null);
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
