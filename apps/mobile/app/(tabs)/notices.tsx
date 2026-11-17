@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, type Href } from "expo-router";
 import { useState } from "react";
@@ -64,7 +65,7 @@ export default function NoticesScreen() {
           const on = mode === m.key;
           const n = m.key === "all" ? unread : count(m.key);
           return (
-            <Pressable key={m.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${m.label}${n ? `，${n} 則未處理` : ""}`} onPress={() => setMode(m.key)} style={{ flex: 1, minHeight: 44, borderRadius: radius.md, borderWidth: 1, borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 }}>
+            <Pressable key={m.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${m.label}${n ? `，${n} 則未處理` : ""}`} onPress={() => (trackFeature("notices_filter"), setMode(m.key))} style={{ flex: 1, minHeight: 44, borderRadius: radius.md, borderWidth: 1, borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 }}>
               <AppText variant="callout" style={{ fontWeight: "800", color: on ? c.textOnAccent : c.text }}>
                 {m.label}
               </AppText>

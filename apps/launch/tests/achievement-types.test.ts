@@ -29,3 +29,22 @@ test("新徽章條件：連續天數、早晨／夜間／週末、單日最多�
   assert.equal(got.categories_explored![0], true);
   assert.equal(got.watch_minutes![0], true);
 });
+
+test("功能體驗徽章：回報使用過的功能就取得徽章並通知；亂填的功能代碼被擋", async () => {
+  const { handleApi } = await import("../src/api.ts");
+  const db = createTestDb();
+  const env = { DB: db, DEMO_LOGIN: "on" } as never;
+  const call = async (method: string, path: string, body?: unknown, token?: string) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env);
+    return { status: res.status, data: (await res.json()) as Record<string, unknown> };
+  };
+  const token = ((await call("POST", "/auth/demo", { sub: "demo-student" })).data as { token: string }).token;
+  await db.prepare("INSERT INTO achievements (id, name, description, icon, condition_type, threshold, feature) VALUES ('f-share', '分享', '分享給朋友', '📤', 'feature_used', 1, 'share')").run();
+  assert.equal((await call("POST", "/me/features", { feature: "nope" }, token)).status, 400);
+  assert.equal((await call("POST", "/me/features", { feature: "share" })).status, 401);
+  assert.equal((await call("POST", "/me/features", { feature: "share" }, token)).status, 200);
+  const n = await db.prepare("SELECT COUNT(*) AS n FROM member_achievements WHERE achievement_id = 'f-share'").first<{ n: number }>();
+  assert.equal(n?.n, 1);
+  const list = (await call("GET", "/me/achievements", undefined, token)).data as unknown as { id: string; earned: boolean }[];
+  assert.equal(list.find((a) => a.id === "f-share")?.earned, true);
+});

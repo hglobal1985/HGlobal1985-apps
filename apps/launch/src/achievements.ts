@@ -5,7 +5,7 @@
 import type { Achievement, AchievementType } from "./contract.ts";
 import type { D1Database } from "./d1.ts";
 
-type Def = { id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null };
+type Def = { id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null };
 
 const one = async (db: D1Database, sql: string, ...args: unknown[]) => Number((await db.prepare(sql).bind(...args).first<{ n: number }>())?.n ?? 0);
 
@@ -38,6 +38,8 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
       );
     case "course_completed":
       return d.course_id ? courseDone(db, sub, d.course_id) : 0;
+    case "feature_used":
+      return d.feature ? one(db, "SELECT COALESCE(MAX(count), 0) AS n FROM feature_uses WHERE member_sub = ? AND feature = ?", sub, d.feature) : 0;
     case "streak_days":
       return one(db, "SELECT COALESCE(MAX(c), 0) AS n FROM (SELECT COUNT(*) AS c FROM (SELECT d, julianday(d) - ROW_NUMBER() OVER (ORDER BY d) AS g FROM (SELECT DISTINCT date(completed_at, '+8 hours') AS d FROM lesson_progress WHERE member_sub = ?)) GROUP BY g)", sub);
     case "watch_minutes":
@@ -66,7 +68,7 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
 export async function evaluateAchievements(db: D1Database, sub: string): Promise<{ list: Achievement[]; fresh: Achievement[] }> {
   const [defs, mine] = await Promise.all([
     db
-      .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, (SELECT title FROM courses WHERE id = a.course_id) AS course_title FROM achievements a WHERE a.active = 1 ORDER BY a.sort_order, a.created_at")
+      .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, (SELECT title FROM courses WHERE id = a.course_id) AS course_title FROM achievements a WHERE a.active = 1 ORDER BY a.sort_order, a.created_at")
       .all<Def & { course_title: string | null }>(),
     db.prepare("SELECT achievement_id, earned_at FROM member_achievements WHERE member_sub = ?").bind(sub).all<{ achievement_id: string; earned_at: string }>(),
   ]);
@@ -79,7 +81,7 @@ export async function evaluateAchievements(db: D1Database, sub: string): Promise
     const now = await current(db, sub, d);
     let earnedAt = got.get(d.id) ?? null;
     const earned = !!earnedAt || now >= need;
-    const a: Achievement = { id: d.id, name: d.name, description: d.description, icon: d.icon, type: d.condition_type, threshold: need, courseTitle: d.course_title, current: Math.min(now, need), earned, earnedAt };
+    const a: Achievement = { id: d.id, name: d.name, description: d.description, icon: d.icon, type: d.condition_type, threshold: need, feature: d.feature, courseTitle: d.course_title, current: Math.min(now, need), earned, earnedAt };
     if (earned && !earnedAt) {
       earnedAt = new Date().toISOString();
       a.earnedAt = earnedAt;

@@ -33,6 +33,7 @@ import {
   type LibraryItem,
   type LibraryMine,
   LIBRARY_KEY_BADGES,
+  FEATURES,
   type LibraryView,
   type LibraryUnlock,
   type NotificationSettings,
@@ -280,14 +281,19 @@ async function achievementBody(ctx: Ctx, body: Record<string, unknown>, creating
       sets.push(["course_id", body.courseId]);
     }
   }
+  if (body.feature !== undefined) {
+    if (body.feature === null || body.feature === "") sets.push(["feature", null]);
+    else if (typeof body.feature === "string" && body.feature in FEATURES) sets.push(["feature", body.feature]);
+    else fail(400, "invalid_feature", "功能代碼不正確");
+  }
   if (body.active !== undefined) sets.push(["active", body.active === true ? 1 : 0]);
   return sets;
 }
 async function listAchievements(ctx: Ctx): Promise<AdminAchievement[]> {
   const { results } = await ctx.db
-    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
-    .all<{ id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; active: number; course_title: string | null; earned_count: number }>();
-  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count }));
+    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
+    .all<{ id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; active: number; course_title: string | null; earned_count: number }>();
+  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count }));
 }
 
 /** 刪除一位會員在本 App 的所有資料。 */
@@ -299,6 +305,7 @@ export async function purgeMember(db: D1Database, sub: string, actor: string, ac
     db.prepare("DELETE FROM comment_reports WHERE reporter_sub = ?").bind(sub),
     db.prepare("DELETE FROM lesson_progress WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM learning_started WHERE member_sub = ?").bind(sub),
+    db.prepare("DELETE FROM feature_uses WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM center_views WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM series_views WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM lesson_watch WHERE member_sub = ?").bind(sub),
@@ -2994,6 +3001,21 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       if (!(await canViewStats(ctx, s))) fail(403, "forbidden", "沒有查看統計分析的權限");
       return collectCfStats(ctx.env);
+    },
+  ],
+  [
+    "POST",
+    /^\/me\/features$/,
+    async (ctx) => {
+      const s = requireMember(ctx);
+      const { feature } = await readJson<{ feature?: unknown }>(ctx.req);
+      if (typeof feature !== "string" || !(feature in FEATURES)) return fail(400, "invalid_feature", "功能代碼不正確");
+      await ctx.db.prepare("INSERT INTO feature_uses (member_sub, feature) VALUES (?, ?) ON CONFLICT (member_sub, feature) DO UPDATE SET count = count + 1, last_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(s.sub, feature).run();
+      // 只結算這個功能的徽章（便宜），達成就通知；其他徽章等會員打開學習成就頁再算。
+      const defs = await ctx.db.prepare("SELECT a.id, a.name, a.icon, a.description FROM achievements a WHERE a.active = 1 AND a.condition_type = 'feature_used' AND a.feature = ? AND NOT EXISTS (SELECT 1 FROM member_achievements m WHERE m.member_sub = ? AND m.achievement_id = a.id) AND (SELECT count FROM feature_uses WHERE member_sub = ? AND feature = ?) >= a.threshold").bind(feature, s.sub, s.sub, feature).all<{ id: string; name: string; icon: string; description: string }>();
+      if (defs.results.length)
+        await ctx.db.batch(defs.results.flatMap((a) => [ctx.db.prepare("INSERT OR IGNORE INTO member_achievements (member_sub, achievement_id) VALUES (?, ?)").bind(s.sub, a.id), notify(ctx.db, { sub: s.sub }, "獲得學習徽章", `${a.icon} ${a.name}：${a.description}`, "/achievements")]));
+      return { ok: true };
     },
   ],
   ["GET", /^\/me\/achievements$/, async (ctx) => grantAchievements(ctx, requireMember(ctx).sub)],

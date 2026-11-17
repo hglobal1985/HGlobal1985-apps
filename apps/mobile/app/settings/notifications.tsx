@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { disablePush, enablePush, pushState, type PushState } from "@/lib/web-push";
@@ -26,6 +27,7 @@ export default function NotificationSettingsScreen() {
     setMsg(null);
     try {
       await api<NotificationSettings>("PUT", "/me/notification-settings", body);
+      trackFeature("notify_settings");
       setMsg({ text: done, ok: true });
       reload();
     } catch (e) {
@@ -104,6 +106,7 @@ function PushCard() {
     setMsg(null);
     try {
       const next = v ? await enablePush() : await disablePush();
+      if (v && next === "on") trackFeature("push_enable");
       setState(next);
       if (v && next === "on") setMsg({ text: "已開啟手機推播", ok: true });
       if (!v) setMsg({ text: "已關閉這個裝置的推播", ok: true });

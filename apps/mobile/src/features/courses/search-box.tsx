@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, type ElementRef } from "react";
 import { Animated, Easing, Pressable, StyleSheet, TextInput } from "react-native";
@@ -16,6 +17,7 @@ export function SearchBox({ open, onOpen, onClose, value, onChange, rowWidth }: 
   const w = useRef(new Animated.Value(SEARCH_ICON_W)).current;
   const input = useRef<ElementRef<typeof TextInput>>(null);
   useEffect(() => {
+    if (open) trackFeature("search");
     Animated.timing(w, { toValue: open ? Math.max(rowWidth, SEARCH_ICON_W) : SEARCH_ICON_W, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(() => {
       if (open) input.current?.focus();
     });

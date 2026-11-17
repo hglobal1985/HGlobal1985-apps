@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { trackFeature } from "@/lib/feature-track";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import type { Achievement } from "@/api/client";
@@ -16,6 +18,7 @@ export default function AchievementsScreen() {
   const { c } = useTheme();
   const { member } = useSession();
   const { data, error, loading, reload } = useApi<Achievement[]>(member ? "/me/achievements" : null);
+  useEffect(() => (member ? trackFeature("achievements_view") : undefined), [member]);
   if (!member)
     return (
       <Screen header={false}>
@@ -66,7 +69,7 @@ export default function AchievementsScreen() {
               {a.name}
             </AppText>
             <AppText variant="caption" tone="muted" style={{ textAlign: "center" }} numberOfLines={3}>
-              {a.description || conditionText(a.type, a.threshold, a.courseTitle)}
+              {a.description || conditionText(a.type, a.threshold, a.courseTitle, a.feature)}
             </AppText>
             {a.earned ? (
               <AppText variant="caption" style={{ color: c.accentText, fontWeight: "700" }}>

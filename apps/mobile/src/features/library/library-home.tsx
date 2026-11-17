@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
 import { useApi, useSession } from "@/state/session";
@@ -13,6 +15,7 @@ import { LibraryScreen, Shelves } from "./library-view";
  */
 export function LibraryHome() {
   useLibraryChrome();
+  useEffect(() => trackFeature("bookshelf_view"), []);
   const { member } = useSession();
   const { data, loading } = useApi<LibraryMine>("/library/mine");
   if (loading && !data) return <LoadingView />;

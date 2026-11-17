@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useRef, useState } from "react";
 import { Animated, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { useApi } from "@/state/session";
@@ -81,6 +82,7 @@ export function CenterBroadcastBand({ items, seconds, onOpen }: { items: Broadca
 /** 全部公告：日期＋內容（用統一的上拉面板，高度依內容自動調整）。 */
 export function BroadcastSheet({ title, items, onClose }: { title: string; items: Broadcasts["items"]; onClose: () => void }) {
   const { c } = useTheme();
+  useEffect(() => trackFeature("broadcast_open"), []);
   return (
     <BottomSheet onClose={onClose}>
       <AppText variant="headline">{title}</AppText>

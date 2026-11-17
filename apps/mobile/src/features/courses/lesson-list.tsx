@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import { useState } from "react";
 import { router } from "expo-router";
 import { Linking, Pressable, type ViewStyle } from "react-native";
@@ -122,7 +123,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
             onPress={
               link
                 ? link.linkUrl
-                  ? () => void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結"))
+                  ? () => (trackFeature("open_material"), void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結")))
                   : undefined
                 : lesson.locked
                   ? undefined

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { trackFeature } from "@/lib/feature-track";
+import { useState, useEffect } from "react";
 import type { Order } from "@/api/client";
 import { OrderSheet } from "@/features/orders/order-sheet";
 import { OrderCard } from "@/features/orders/order-card";
@@ -7,6 +8,7 @@ import { useApi } from "@/state/session";
 import { EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
 
 function Orders() {
+  useEffect(() => trackFeature("orders_view"), []);
   const { data, error, loading, reload } = useApi<Order[]>("/orders");
   const [preview, setPreview] = useState<Order | null>(null);
   return (

@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type HostInstance, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { api } from "@/api/client";
@@ -228,6 +229,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       const r = await api<{ ok: boolean; errors: string[]; pending: boolean; form: View_ | null }>("PUT", "/me/central-profile", { changes: changed.map((key) => ({ key, value: vals[key] })) });
       if (r.form) apply(r.form);
       else load();
+      if (!r.errors.length) trackFeature("profile_edit");
       setShowBad(false);
       setMsg(r.errors.length ? { ok: false, text: r.errors[0] } : { ok: true, text: r.pending ? "已儲存，部分欄位等待審核" : "已儲存到會員中心" });
       invalidate();

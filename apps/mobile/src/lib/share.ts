@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { Platform, Share } from "react-native";
@@ -31,6 +32,12 @@ export function shareReviewerInvite(courseTitle: string, path: string): Promise<
 
 /** 叫出系統分享選單，送出已組好的整段文字（網頁沒有分享選單時改為複製）。 */
 async function shareText(title: string, message: string): Promise<"shared" | "copied" | "cancelled"> {
+  const r = await shareTextCore(title, message);
+  if (r === "shared") trackFeature("share");
+  else if (r === "copied") trackFeature("copy_link");
+  return r;
+}
+async function shareTextCore(title: string, message: string): Promise<"shared" | "copied" | "cancelled"> {
   if (Platform.OS !== "web") {
     try {
       await Share.share({ title, message });
@@ -87,6 +94,7 @@ export async function downloadImage(url: string, fileName: string): Promise<void
     await shareImage(fileName, url, fileName);
     return;
   }
+  trackFeature("download_image");
   const blob = await (await fetch(absolute(url))).blob();
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);

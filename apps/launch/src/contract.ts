@@ -453,9 +453,9 @@ export type ProfileForm = {
 };
 
 // ---------- 學習成就（徽章）----------
-export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day";
+export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used";
 /** 條件類型的中文說明（單位用在「累計 N ○」）。 */
-export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; needsCourse?: boolean }> = {
+export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; needsCourse?: boolean; needsFeature?: boolean }> = {
   lessons_completed: { label: "累計完成幾堂課", unit: "堂" },
   courses_completed: { label: "累計完整學完幾堂課程", unit: "堂" },
   courses_enrolled: { label: "累計報名（已開通）幾堂課程", unit: "堂" },
@@ -471,7 +471,33 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   night_lessons: { label: "夜間（22:00～04:00）完成幾堂章節", unit: "堂" },
   weekend_lessons: { label: "週末完成幾堂章節", unit: "堂" },
   lessons_in_a_day: { label: "單日最多完成幾堂章節", unit: "堂" },
+  feature_used: { label: "使用過某個網站功能（新手教學）", unit: "次", needsFeature: true },
 };
+/** 網站功能清單（功能體驗徽章，類似新手教學）：key 是前端回報用的代碼，label 是功能名稱，hint 是怎麼用。 */
+export const FEATURES = {
+  share: { label: "分享給朋友", hint: "在課程、章節或海報按分享鈕，傳給朋友" },
+  copy_link: { label: "複製連結", hint: "分享時選擇複製連結" },
+  download_image: { label: "下載海報圖片", hint: "放大海報後按下載" },
+  edm_zoom: { label: "放大看海報", hint: "點課程或中心的海報放大，可兩指縮放" },
+  player_speed: { label: "調整播放速度", hint: "播放章節時，點控制列的速度鈕" },
+  video_zoom: { label: "影片拖曳縮放", hint: "播放時用兩指放大縮小影片" },
+  open_material: { label: "開啟其他教材", hint: "點課程頁的簡報、文件等外部連結" },
+  push_enable: { label: "開啟手機推播", hint: "設定 > 通知設定，打開手機推播" },
+  notify_settings: { label: "調整通知設定", hint: "設定 > 通知設定，改 Email 通知等" },
+  search: { label: "使用搜尋", hint: "在寰宇大學點放大鏡搜尋課程或章節" },
+  view_mode: { label: "切換瀏覽模式", hint: "在寰宇大學切換系列、單元、教育中心" },
+  profile_edit: { label: "更新個人資料", hint: "設定頁點自己的資料，修改後儲存" },
+  orders_view: { label: "查看訂單紀錄", hint: "設定 > 訂單紀錄" },
+  achievements_view: { label: "查看學習成就", hint: "學習中頁點學習成就" },
+  sapling_tap: { label: "點小樹苗", hint: "學習中頁點小樹苗，看累計幾棵" },
+  bookshelf_view: { label: "打開我的書櫃", hint: "設定 > 我的書櫃" },
+  center_page: { label: "逛中心專屬頁", hint: "在寰宇大學選一個中心" },
+  series_page: { label: "逛系列頁", hint: "在寰宇大學進入一個系列" },
+  subscribe: { label: "訂閱中心或系列", hint: "在中心頁或系列頁按訂閱鈴鐺" },
+  broadcast_open: { label: "查看廣播公告", hint: "點中心頁的黃色公告橫條" },
+  notices_filter: { label: "切換通知分類", hint: "通知頁切換全部、審核、訂閱、留言" },
+} as const;
+export type FeatureKey = keyof typeof FEATURES;
 /** 會員看到的徽章：已取得或尚未取得（含目前進度）。 */
 export type Achievement = {
   id: string;
@@ -480,6 +506,7 @@ export type Achievement = {
   icon: string;
   type: AchievementType;
   threshold: number;
+  feature?: string | null;
   courseTitle: string | null;
   current: number;
   earned: boolean;
@@ -493,6 +520,7 @@ export type AdminAchievement = {
   icon: string;
   type: AchievementType;
   threshold: number;
+  feature?: string | null;
   courseId: string | null;
   courseTitle: string | null;
   active: boolean;

@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -118,6 +119,7 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
 export function EdmLightbox({ uri, title, onClose }: { uri: string; title: string; onClose: () => void }) {
+  useEffect(() => trackFeature("edm_zoom"), []);
   useDimLayer();
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();

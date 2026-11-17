@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -136,6 +137,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       return;
     }
     setMode(m);
+    trackFeature("view_mode");
     flashMode(m, c.accent);
     syncUrl(category, m === "center" ? center : ALL);
     if (m === "chapter") {
@@ -346,6 +348,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [centerViews, setCenterViews] = useState<number | null>(null);
   useEffect(() => {
     if (activeCenter === ALL) return;
+    trackFeature("center_page");
     setCenterViews(null);
     api<{ total: number }>("POST", "/center-views", { center: activeCenter })
       .then((r) => setCenterViews(r.total))

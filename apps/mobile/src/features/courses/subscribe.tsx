@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
@@ -57,6 +58,7 @@ export function useSubscribe(kind: SubKind, name: string | null, loginNext: stri
     try {
       const r = await api<SubState>("POST", path, { [kind]: name });
       setSub(r);
+      if (r.subscribed) trackFeature("subscribe");
       showFlash({
         icon: <Ionicons name={r.subscribed ? "notifications" : "notifications-off-outline"} size={FLASH_ICON - 3} color={r.subscribed ? "#E0A800" : "#8A8A8A"} />,
         title: r.subscribed ? "已訂閱" : "已取消訂閱",

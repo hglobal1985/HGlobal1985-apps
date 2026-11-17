@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -47,6 +48,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       .catch(() => undefined);
   }, []);
   useEffect(() => {
+    trackFeature("series_page");
     api<{ total: number }>("POST", "/series-views", { series })
       .then((r) => setViews(r.total))
       .catch(() => undefined);

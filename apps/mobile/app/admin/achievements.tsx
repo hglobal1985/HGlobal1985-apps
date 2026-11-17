@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
-import { ACHIEVEMENT_TYPES, api, type AchievementType, type AdminAchievement, type CourseSummary } from "@/api/client";
+import { ACHIEVEMENT_TYPES, FEATURES, api, type AchievementType, type AdminAchievement, type CourseSummary } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { BADGE_ICONS, conditionText } from "@/features/achievements/text";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Pill, Screen, Section, Select } from "@/ui";
 
-type Form = { id: string | null; name: string; description: string; icon: string; type: AchievementType; threshold: string; courseId: string; active: boolean };
-const blank: Form = { id: null, name: "", description: "", icon: "🏅", type: "lessons_completed", threshold: "10", courseId: "", active: true };
+type Form = { id: string | null; name: string; description: string; icon: string; type: AchievementType; threshold: string; courseId: string; feature: string; active: boolean };
+const blank: Form = { id: null, name: "", description: "", icon: "🏅", type: "lessons_completed", threshold: "10", courseId: "", feature: "", active: true };
 
 /** 超級管理員：設定學習成就徽章（名稱、圖示、要達成什麼條件）。會員達成後自動取得並收到通知。 */
 export default function AdminAchievementsScreen() {
@@ -23,6 +23,7 @@ export default function AdminAchievementsScreen() {
   if (!list.data) return <Screen header={false}>{list.error ? <ErrorView message={list.error} onRetry={list.reload} /> : <LoadingView />}</Screen>;
 
   const needsCourse = !!ACHIEVEMENT_TYPES[form?.type ?? "lessons_completed"].needsCourse;
+  const needsFeature = !!ACHIEVEMENT_TYPES[form?.type ?? "lessons_completed"].needsFeature;
   const run = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true);
     setMsg(null);
@@ -40,11 +41,11 @@ export default function AdminAchievementsScreen() {
   };
   const save = async () => {
     if (!form) return;
-    const body = { name: form.name, description: form.description, icon: form.icon, type: form.type, threshold: needsCourse ? 1 : Number(form.threshold), courseId: needsCourse ? form.courseId || null : null, active: form.active };
+    const body = { name: form.name, description: form.description, icon: form.icon, type: form.type, threshold: needsCourse ? 1 : Number(form.threshold), courseId: needsCourse ? form.courseId || null : null, feature: needsFeature ? form.feature || null : null, active: form.active };
     const ok = await run(() => (form.id ? api("PATCH", `/admin/achievements/${form.id}`, body) : api("POST", "/admin/achievements", body)), form.id ? "已儲存" : "已新增徽章");
     if (ok) setForm(null);
   };
-  const edit = (a: AdminAchievement) => setForm({ id: a.id, name: a.name, description: a.description, icon: a.icon, type: a.type, threshold: String(a.threshold), courseId: a.courseId ?? "", active: a.active });
+  const edit = (a: AdminAchievement) => setForm({ id: a.id, name: a.name, description: a.description, icon: a.icon, type: a.type, threshold: String(a.threshold), courseId: a.courseId ?? "", feature: a.feature ?? "", active: a.active });
 
   return (
     <Screen header={false}>
@@ -66,6 +67,7 @@ export default function AdminAchievementsScreen() {
               options={(Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).map((t) => ({ key: t, label: ACHIEVEMENT_TYPES[t].label }))}
               onChange={(v) => setForm({ ...form, type: v as AchievementType })}
             />
+            {needsFeature ? <Select label="要使用的功能" value={form.feature} options={[{ key: "", label: "請選擇功能" }, ...Object.entries(FEATURES).map(([k, f]) => ({ key: k, label: f.label }))]} onChange={(v) => setForm({ ...form, feature: v })} /> : null}
             {needsCourse ? (
               <Select label="要學完的課程" value={form.courseId} options={[{ key: "", label: "請選擇課程" }, ...(courses.data ?? []).map((c) => ({ key: c.id, label: c.title }))]} onChange={(v) => setForm({ ...form, courseId: v })} />
             ) : (
@@ -88,7 +90,7 @@ export default function AdminAchievementsScreen() {
               <View style={{ flex: 1, gap: 2 }}>
                 <AppText variant="headline">{a.name}</AppText>
                 <AppText variant="callout" tone="muted">
-                  {conditionText(a.type, a.threshold, a.courseTitle)}
+                  {conditionText(a.type, a.threshold, a.courseTitle, a.feature)}
                 </AppText>
               </View>
               <Pill label={a.active ? "啟用" : "停用"} tone={a.active ? "success" : "neutral"} />

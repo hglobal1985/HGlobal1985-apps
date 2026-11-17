@@ -1,3 +1,4 @@
+import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
@@ -36,7 +37,7 @@ export function PlayerControls() {
           {remainingText(total - at)}
         </AppText>
         {/* 倍數播放：每按一次跳一檔（1 → 1.2 → 1.5 → 1.8 → 2 → 1）；正常速度顯示加速圖示，加速中改顯示目前倍數。 */}
-        <Pressable accessibilityRole="button" accessibilityLabel={`播放速度，目前 ${s.rate} 倍，點一下切換`} onPress={() => engine.cycleRate()} style={styles.btnTight}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`播放速度，目前 ${s.rate} 倍，點一下切換`} onPress={() => (trackFeature("player_speed"), engine.cycleRate())} style={styles.btnTight}>
           {s.rate === 1 ? (
             <Ionicons name="speedometer-outline" size={22} color={c.text} />
           ) : (

@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -16,7 +18,11 @@ import { conditionText } from "./text";
 export function SaplingBar({ saplings }: { saplings: number }) {
   const { c } = useTheme();
   const { data } = useApi<Achievement[]>("/me/achievements");
-  const earned = (data ?? []).filter((a) => a.earned);
+  const earned = (data ?? []).filter((a) => a.earned).sort((a, b) => (b.earnedAt ?? "").localeCompare(a.earnedAt ?? ""));
+  // 只顯示最近取得的 4 枚，第 5 個圖示是「展開更多徽章」（業主 2026-11-17）；展開後最後一個變成「收合」。
+  const [open, setOpen] = useState(false);
+  const shown = open || earned.length <= 5 ? earned : earned.slice(0, 4);
+  const needMore = earned.length > 5;
   const tile = [styles.tile, { backgroundColor: c.surface, borderColor: c.border }];
   return (
     <View style={{ gap: space.sm }}>
@@ -24,7 +30,7 @@ export function SaplingBar({ saplings }: { saplings: number }) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`小樹苗 ${saplings} 棵`}
-          onPress={() => showFlash({ icon: <SaplingIcon size={FLASH_ICON} />, title: `小樹苗 ${saplings} 棵`, body: "每學完一堂課就長出一棵小樹苗", holdMs: 1800 })}
+          onPress={() => (trackFeature("sapling_tap"), showFlash({ icon: <SaplingIcon size={FLASH_ICON} />, title: `小樹苗 ${saplings} 棵`, body: "每學完一堂課就長出一棵小樹苗", holdMs: 1800 }))}
           style={tile}
         >
           <SaplingIcon size={44} />
@@ -43,17 +49,22 @@ export function SaplingBar({ saplings }: { saplings: number }) {
       </View>
       {earned.length ? (
         <View style={styles.icons}>
-          {earned.map((a) => (
+          {shown.map((a) => (
             <Pressable
               key={a.id}
               accessibilityRole="button"
               accessibilityLabel={`${a.name}，已解鎖`}
-              onPress={() => showFlash({ icon: <AppText style={styles.emoji}>{a.icon}</AppText>, title: a.name, body: a.description || conditionText(a.type, a.threshold, a.courseTitle), holdMs: 2200 })}
+              onPress={() => showFlash({ icon: <AppText style={styles.emoji}>{a.icon}</AppText>, title: a.name, body: a.description || conditionText(a.type, a.threshold, a.courseTitle, a.feature), holdMs: 2200 })}
               style={[styles.badge, { backgroundColor: c.accentSoft, borderColor: c.accent }]}
             >
               <AppText style={styles.badgeText}>{a.icon}</AppText>
             </Pressable>
           ))}
+          {needMore ? (
+            <Pressable accessibilityRole="button" accessibilityLabel={open ? "收合徽章" : `展開更多徽章，共 ${earned.length} 枚`} onPress={() => setOpen((v) => !v)} style={[styles.badge, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <Ionicons name={open ? "chevron-up" : "ellipsis-horizontal"} size={26} color={c.accentText} />
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
     </View>

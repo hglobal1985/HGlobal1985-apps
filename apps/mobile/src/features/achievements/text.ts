@@ -1,7 +1,7 @@
-import type { AchievementType } from "@/api/client";
+import { FEATURES, type AchievementType } from "@/api/client";
 
 /** 徽章條件的白話說明。 */
-export function conditionText(type: AchievementType, threshold: number, courseTitle: string | null): string {
+export function conditionText(type: AchievementType, threshold: number, courseTitle: string | null, feature?: string | null): string {
   switch (type) {
     case "lessons_completed":
       return `累計完成 ${threshold} 堂課`;
@@ -15,6 +15,10 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
       return `在課程留言板留言 ${threshold} 次`;
     case "course_completed":
       return `學完「${courseTitle ?? "指定課程"}」`;
+    case "feature_used": {
+      const f = feature ? FEATURES[feature as keyof typeof FEATURES] : undefined;
+      return f ? `${f.label}：${f.hint}` : "使用指定的網站功能";
+    }
     case "streak_days":
       return `連續 ${threshold} 天都有完成章節`;
     case "watch_minutes":
