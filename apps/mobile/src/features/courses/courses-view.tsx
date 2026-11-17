@@ -19,7 +19,7 @@ import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, 
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
 import { CenterBroadcastEditor } from "@/features/admin/center-broadcast-editor";
-import { showToast } from "@/ui/toast";
+import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { flashMode } from "./mode-flash";
@@ -361,9 +361,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     try {
       const r = await api<{ count: number; subscribed: boolean }>("POST", "/center-subscription", { center: activeCenter });
       setSub(r);
-      showToast(r.subscribed ? "已訂閱：有新課程上架或新公告，都會通知你" : "已取消訂閱");
+      // 全螢幕文字提醒（統一模組 showFlash，業主 2026-11-17）：鈴鐺圖示＋標題＋說明。
+      showFlash({
+        icon: <Ionicons name={r.subscribed ? "notifications" : "notifications-off-outline"} size={FLASH_ICON - 3} color={r.subscribed ? "#E0A800" : "#8A8A8A"} />,
+        title: r.subscribed ? "已訂閱" : "已取消訂閱",
+        body: r.subscribed ? "新課程或新公告都會通知你" : "不會再收到這個中心的通知",
+      });
     } catch (e) {
-      showToast((e as Error).message);
+      showFlash({ icon: <Ionicons name="alert-circle-outline" size={FLASH_ICON - 3} color="#B3261E" />, title: "操作失敗", body: (e as Error).message });
     }
   };
   const bc = useCenterBroadcasts(activeCenter === ALL ? "" : activeCenter);

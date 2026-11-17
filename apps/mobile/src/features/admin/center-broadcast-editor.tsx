@@ -6,7 +6,8 @@ import { useCenterBroadcasts } from "@/features/courses/center-broadcast";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, NoticeBox } from "@/ui";
-import { showToast } from "@/ui/toast";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
 
 /**
  * 中心頁「編輯」裡的廣播公告設定（業主 2026-11-17）：可以新增多則公告輪播、改內容、刪除，並設定每則停留幾秒（預設 2 秒）。
@@ -27,7 +28,7 @@ export function CenterBroadcastEditor({ center, onChanged }: { center: string; o
       await fn();
       list.reload();
       onChanged();
-      if (done) showToast(done);
+      if (done) showFlash({ icon: <Ionicons name="megaphone" size={FLASH_ICON - 3} color="#E0A800" />, title: done });
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -40,7 +41,7 @@ export function CenterBroadcastEditor({ center, onChanged }: { center: string; o
       else await api("POST", "/admin/center-broadcasts", { center, text });
       setText("");
       setEditId(null);
-    }, editId ? "已更新公告" : "已新增公告，訂閱的人會收到通知");
+    }, editId ? "已更新公告" : "已新增公告");
   const remove = async (id: string) => {
     if (!(await confirmAsk("刪除公告", "確定刪除這則廣播公告？", "刪除"))) return;
     await run(() => api("DELETE", `/admin/center-broadcasts/${id}?center=${encodeURIComponent(center)}`), "已刪除");
