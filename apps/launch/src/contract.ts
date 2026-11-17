@@ -132,6 +132,8 @@ export type CourseSummary = {
   series: string;
   /** 系列專屬 EDM 網址（沒上傳為 null）。 */
   seriesEdmUrl: string | null;
+  /** 系列封面（管理員裁切好的 16:9 版本，沒裁切為 null）；全部課程的系列小卡優先用它。 */
+  seriesCoverUrl: string | null;
   /** 設定免費、而且這位會員符合資格：不用報名就能收看。 */
   watchFree: boolean;
   /** 學員把這門免費課程從「學習中」隱藏了（再打開課程頁會恢復）。 */

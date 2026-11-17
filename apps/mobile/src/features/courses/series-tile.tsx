@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 import { useSession } from "@/state/session";
@@ -57,17 +58,26 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
   const inSeries = !flat && !!rep.series;
   // 平鋪（flat，中心頁）：統一用直式 4:3 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始；圖太小／太矮就完整顯示，用同一張圖模糊填滿背景）；沒有 EDM 才退回封面。
-  const cropped = flat && !rep.edmUrl && !!rep.coverUrl;
-  const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesEdmUrl : rep.edmUrl;
+  const cropped = (flat && !rep.edmUrl && !!rep.coverUrl) || (!flat && inSeries && !!rep.seriesCoverUrl);
+  // 系列小卡：有管理員裁切好的系列封面就用封面（16:9），沒有才用系列 EDM（業主 2026-11-17：新上傳的高 EDM 沒用裁切後的封面，字被切掉）。
+  const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesCoverUrl || rep.seriesEdmUrl : rep.edmUrl;
+  // 素材（清單類別）：橄欖綠虛線邊框＋右下角「素材」黃色標籤與檔案夾圖示，與課程系列一眼分辨（業主 2026-11-17 方案 A）。
+  const isMaterial = !flat && group.sessions.every((x) => x.isList);
   const ribbons = ribbonsFor(rep, member, config);
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
   const open = () => (flat || group.sessions.length > 1 || inSeries ? setSheet(true) : router.push(`/course/${rep.id}`));
   return (
     <View style={{ width }}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? rep.series : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: c.surfaceMuted }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? rep.series : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: c.surfaceMuted }, isMaterial && styles.mat]}>
         {edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
+        {isMaterial ? (
+          <View style={styles.matTag} pointerEvents="none">
+            <Ionicons name="folder-open" size={12} color="#1D2A22" />
+            <Text style={styles.matTagText}>素材</Text>
+          </View>
+        ) : null}
         {/* 管理者才看得到的未上架課程：左下角標「未上架」（學員的清單裡不會有這些課）。 */}
         {group.sessions.some((x) => x.status === "draft") ? (
           <View style={[styles.draft, { backgroundColor: c.warning }]}>
@@ -83,6 +93,9 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
 
 const styles = StyleSheet.create({
   art: { borderRadius: radius.md, overflow: "hidden" },
+  mat: { borderWidth: 2, borderStyle: "dashed", borderColor: "#486C48" },
+  matTag: { position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: "#FFD43B" },
+  matTagText: { color: "#1D2A22", fontSize: 12, fontWeight: "800" },
   draft: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   draftText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });

@@ -48,12 +48,12 @@ export function NewCourseSheet({ onClose, defaultCenter, list = false }: { onClo
     <EditSheet title={list ? "新增清單（影片／檔案）" : "新增課程"} onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!f.title.trim() || !!f.teacher.trim()} busy={busy} error={error}>
       <BasicsFields isList={list} f={f} setF={setF} />
       <AppText variant="callout" tone="muted">
-        主辦中心
+        {list ? "建立單位" : "主辦中心"}
       </AppText>
       {isHq ? (
         <Chips options={[HQ_UNIT, ...(centers.data ?? [])].map((x) => ({ key: x, label: `${x === HQ_UNIT ? x : centerTitle(x)}（${hostCounts[x] ?? 0}）` }))} value={host} onChange={setHost} />
       ) : (
-        <NoticeBox text={`主辦中心固定為「${host}」。`} />
+        <NoticeBox text={`${list ? "建立單位" : "主辦中心"}固定為「${host}」。`} />
       )}
       <AppText variant="caption" tone="muted">
         {list ? "建立後是「未上架」，學員看不到；在清單頁用「新增教材」加入影片或檔案，再上架。清單一律完全公開、免費。" : "建立後是「未上架」，學員看不到；在課程頁補好資料再上架。"}

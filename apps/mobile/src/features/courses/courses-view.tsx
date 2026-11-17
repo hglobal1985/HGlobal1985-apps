@@ -226,6 +226,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     () => (flat ? list.map((x) => ({ key: `c:${x.id}`, nearest: x, sessions: [x] })) : orderGroups(groupBySeries(list, pool), config.seriesOrder ?? [])),
     [flat, list, pool, config.seriesOrder],
   );
+  // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、素材專區（整組都是清單類別的）。
+  const materialGroups = useMemo(() => (flat ? [] : groups.filter((g) => g.sessions.every((x) => x.isList))), [flat, groups]);
+  const courseGroups = useMemo(() => (flat ? groups : groups.filter((g) => !g.sessions.every((x) => x.isList))), [flat, groups]);
   // 章節模式：符合條件的章節，不分組、不顯示系列標題，順序隨機（每次打開頁面、切到章節模式就重新洗牌；
   // 同一次瀏覽中打字搜尋、換分類時，相對順序保持不變，畫面不會跳動）。
   const [shuffleSeed, setShuffleSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
@@ -412,7 +415,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
-            {tileW && !(mode === "center" && center === ALL) ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
+            {tileW && !(mode === "center" && center === ALL) && !flat && materialGroups.length && courseGroups.length ? <ZoneBand icon="library" text="課程系列" count={courseGroups.length} /> : null}
+            {tileW && !(mode === "center" && center === ALL) ? (flat ? groups : courseGroups).map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
+            {tileW && !(mode === "center" && center === ALL) && !flat && materialGroups.length ? <ZoneBand icon="folder-open" text="素材專區" count={materialGroups.length} material /> : null}
+            {tileW && !(mode === "center" && center === ALL) && !flat ? materialGroups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} />) : null}
           </View>
         </>
       )}
@@ -437,7 +443,24 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   );
 }
 
+/** 系列檢視的區塊標題色帶：課程系列（深綠淡底）、素材專區（亮黃淡底）。 */
+function ZoneBand({ icon, text, count, material }: { icon: "library" | "folder-open"; text: string; count: number; material?: boolean }) {
+  const { c } = useTheme();
+  return (
+    <View style={[styles.zone, { backgroundColor: material ? "#FFF3C4" : c.accentSoft }]} accessibilityRole="header">
+      <Ionicons name={icon} size={18} color={material ? "#5A4300" : c.accentText} />
+      <AppText variant="callout" style={{ fontWeight: "800", color: material ? "#5A4300" : c.accentText }}>
+        {text}
+      </AppText>
+      <AppText variant="caption" style={{ color: material ? "#5A4300" : c.accentText }}>
+        {count}
+      </AppText>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  zone: { width: "100%", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: 12 },
   terms: { marginTop: space.xs, borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   term: { minHeight: 44, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", gap: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   kind: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }, filters: { flexDirection: "row", alignItems: "flex-end", gap: space.sm },

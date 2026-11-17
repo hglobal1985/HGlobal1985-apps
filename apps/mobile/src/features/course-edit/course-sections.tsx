@@ -151,7 +151,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
           <MultiChips options={categories.data} value={f.category} onChange={set("category")} />
         </View>
       ) : null}
-      <Check label="短影音專輯（章節與影音教材在「單元」頁歸類為短影音）" value={f.isShorts} onChange={set("isShorts")} />
+      {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
           <Field label="系列（同系列的課合併成一張卡、顯示在「相同系列」）" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
