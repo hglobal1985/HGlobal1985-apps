@@ -330,11 +330,11 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
         {session.playback?.kind === "demo" && playLesson ? <Pill label={session.playback.label} tone="warning" /> : null}
         {!member && !editing && (playLesson || firstPlayable) ? (
-          // 訪客提示：登入鈕在左、文字在右，強制同一列（業主 2026-11-17）。
-          <View style={[styles.row, { flexWrap: "nowrap", alignItems: "center" }]}>
-            <Button variant="secondary" label="登入" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: lessonHref(course.id, (playLesson ?? firstPlayable)!.id) } })} />
-            <AppText variant="callout" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
-              免費註冊 更多課程+解鎖成就
+          // 訪客提示：登入鈕在左、文字在右，強制同一列（業主 2026-11-17；按鈕與文字置中）。
+          <View style={[styles.row, { flexWrap: "nowrap", alignItems: "center", justifyContent: "center" }]}>
+            <Button variant="secondary" label="免費註冊登入" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: lessonHref(course.id, (playLesson ?? firstPlayable)!.id) } })} />
+            <AppText variant="body" tone="muted" numberOfLines={1} style={{ flexShrink: 1, fontSize: 15 }}>
+              解鎖更多功能與學習成就
             </AppText>
           </View>
         ) : playLesson?.completed && !playNext && !playLesson.material ? (
