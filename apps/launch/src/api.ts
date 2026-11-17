@@ -1864,20 +1864,11 @@ function checkPublicFree(price: number, isPublic: boolean, tba = false) {
   if (isPublic && price > 0) fail(400, "public_must_be_free", "「完全公開」只能用在免費課程；請先把費用改成 0");
 }
 
-/** 「所有人含訪客」「私密連結（訪客可）」時訪客無法判斷獎銜，所以獎銜限制不能用：儲存時一律改成「不限獎銜」（業主 2026-11-17）。 */
-function forceNoRankForAll(sets: [string, unknown][], cur: { view_scope: string } | null) {
-  const scope = String((sets.find(([c]) => c === "view_scope") ?? ["view_scope", cur?.view_scope ?? "all"])[1]);
-  if (scope !== "all" && scope !== "link_guest") return; // 訪客也能看的選項，沒有登入就無法判斷獎銜
-  const i = sets.findIndex(([c]) => c === "min_rank_code");
-  if (i >= 0) sets[i] = ["min_rank_code", "none"];
-  else if (sets.some(([c]) => c === "view_scope")) sets.push(["min_rank_code", "none"]);
-}
-
-/** 「完全公開（免登入可看）」由設定推算：誰可以瀏覽＝所有人，且免費、費用已公布。 */
-function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number } | null) {
-  if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba"].includes(c))) return;
+/** is_public＝訪客也能看、免費、費用已公布、而且沒有獎銜限制（有獎銜限制＝訪客只能看介紹，不能直接看內容也不能報名；業主 2026-11-17 規則 B）。 */
+function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number; min_rank_code?: string } | null) {
+  if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba", "min_rank_code"].includes(c))) return;
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
-  const pub = ["all", "link_guest"].includes(String(pick("view_scope", cur?.view_scope ?? "all"))) && Number(pick("price_twd", cur?.price_twd ?? 0)) === 0 && pick("price_tba", cur?.price_tba ?? 0) !== 1;
+  const pub = ["all", "link_guest"].includes(String(pick("view_scope", cur?.view_scope ?? "all"))) && Number(pick("price_twd", cur?.price_twd ?? 0)) === 0 && pick("price_tba", cur?.price_tba ?? 0) !== 1 && String(pick("min_rank_code", cur?.min_rank_code ?? "none")) === "none";
   const i = sets.findIndex(([c]) => c === "is_public");
   if (i >= 0) sets.splice(i, 1);
   sets.push(["is_public", pub ? 1 : 0]);
@@ -1889,7 +1880,6 @@ async function createCourse(ctx: Ctx, admin: Session) {
   checkPublicFree(Number(sets.find(([c]) => c === "price_twd")?.[1] ?? 0), sets.find(([c]) => c === "is_public")?.[1] === 1, sets.find(([c]) => c === "price_tba")?.[1] === 1);
   if (!sets.some(([c]) => c === "allow_president")) sets.push(["allow_president", 1]); // 新課程預設「會長不受獎銜限制也可報名」
   if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", "all"]); // 新課程（含清單）預設「所有人含訪客」（業主 2026-11-17）
-  forceNoRankForAll(sets, null);
   deriveIsPublic(sets, null);
   await checkGuidanceGroup(ctx, body.guidanceUnit, body.reviewGroupId);
   const id = `c${randomId(7)}`;
@@ -2073,7 +2063,7 @@ function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; url_name: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; url_name: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -2115,7 +2105,6 @@ async function updateCourse(ctx: Ctx, id: string) {
     if (body.isPublic === true) sets.push(["view_scope", "all"]);
     else if (cur.view_scope === "all") sets.push(["view_scope", "members"]);
   }
-  forceNoRankForAll(sets, cur);
   deriveIsPublic(sets, cur);
   await checkGuidanceGroup(ctx, pick("guidance_unit", cur.guidance_unit), pick("review_group_id", cur.review_group_id));
   const batchRes = await ctx.db.batch([
