@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { api, classifyLink, parseHttpsUrl, type CourseDetail, type Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
+import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
+import { fromHms, toHms, type Hms } from "@/features/uploads/hms";
+import { TimeRangePicker } from "@/features/uploads/time-range-picker";
 import { commitMediaDraft, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Icon } from "@/ui";
+import { AppText, DateSelect, Icon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { EditSheet } from "./edit-sheet";
 
@@ -28,6 +31,16 @@ export function EditMaterialSheet({ course, lesson, onClose }: { course: CourseD
 
 type Fetch = "idle" | "loading" | "done" | "none";
 
+/** 從 YouTube 網址取出影片編號（watch?v=、youtu.be/、shorts/、embed/）。 */
+function ytIdOfUrl(u: URL | null): string | null {
+  if (!u) return null;
+  if (u.hostname.replace(/^www\./, "") === "youtu.be") return u.pathname.split("/")[1] || null;
+  const v = u.searchParams.get("v");
+  if (v) return v;
+  const m = /\/(?:shorts|embed|live)\/([\w-]{6,})/.exec(u.pathname);
+  return m ? m[1]! : null;
+}
+
 function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
@@ -37,12 +50,22 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
   const [title, setTitle] = useState(lesson?.title ?? "");
   const lastAuto = useRef<string>(lesson?.title ?? ""); // 最近一次自動填入的名稱：名稱還是這個（或空白）時，換連結才會自動換名稱；自己改過的不會被蓋掉
   const [fetching, setFetching] = useState<Fetch>("idle");
+  // 素材項目自己的日期（選填）與影片時間軸區間（只有清單裡的 YouTube 影片；業主 2026-11-17）。
+  const [evDate, setEvDate] = useState(lesson?.eventDate ?? "");
+  const [trim, setTrim] = useState<{ start: Hms; end: Hms }>({ start: toHms(lesson?.start ?? null), end: toHms(lesson?.end ?? null) });
+  const secOf = (h: Hms) => (fromHms(h) === "invalid" ? null : (fromHms(h) as number | null));
+  const [vidSec, setVidSec] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const parsed = parseHttpsUrl(url);
   const fileType = parsed ? classifyLink(parsed) : null;
-  const dirty = lesson ? url !== baseLink || title !== lesson.title : !!url.trim() || !!title.trim();
+  const ytId = course.isList && fileType === "youtube" ? ytIdOfUrl(parsed) : null;
+  useEffect(() => {
+    setVidSec(null);
+    if (ytId) void detectYoutubeSeconds(ytId).then((n) => setVidSec(n));
+  }, [ytId]);
+  const dirty = lesson ? url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
 
   // 連結一變（貼上或手動輸入，停下來 0.6 秒後），請伺服器代為讀取網頁標題。
   useEffect(() => {
@@ -85,8 +108,16 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
     setBusy(true);
     setError(null);
     try {
-      if (lesson) await api("PUT", `/admin/lessons/${lesson.id}/material`, { url: parsed.toString(), title });
-      else await api("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title });
+      const dateBody = { eventDate: evDate || null };
+      let lessonId = lesson?.id;
+      if (lesson) await api("PUT", `/admin/lessons/${lesson.id}/material`, { url: parsed.toString(), title, ...dateBody });
+      else {
+        const before = new Set(course.lessons.map((l) => l.id));
+        const d = await api<CourseDetail>("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title, ...dateBody });
+        lessonId = d.lessons.find((l) => !before.has(l.id))?.id;
+      }
+      // 影片時間軸區間：連結換成別支影片時伺服器會清空區間，所以一律在儲存連結之後再寫入。
+      if (ytId && lessonId && (secOf(trim.start) !== null || secOf(trim.end) !== null || lesson?.start != null || lesson?.end != null)) await api("PATCH", `/admin/lessons/${lessonId}`, { startSeconds: secOf(trim.start), endSeconds: secOf(trim.end) });
       invalidate();
       onClose();
     } catch (e) {
@@ -148,10 +179,19 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
         </View>
         {course.isList ? (
           <AppText variant="caption" tone="muted">
-            YouTube 影片會在 App 內播放並記錄學習進度；其他連結（簡報、PDF、雲端檔案…）點了開啟外部網頁。
+            YouTube 影片會在 App 內播放；其他連結（簡報、PDF、雲端檔案…）點了開啟外部網頁。
           </AppText>
         ) : null}
       </View>
+      <DateSelect label="日期（選填，這個項目自己的日期）" value={evDate} onChange={setEvDate} />
+      {ytId ? (
+        <View style={{ gap: space.xs }}>
+          <AppText variant="callout" tone="muted">
+            影片時間軸區間（選填；空白＝從頭播到結束）
+          </AppText>
+          <TimeRangePicker kind="youtube" ytId={ytId} audioFile={null} duration={vidSec} start={trim.start} end={trim.end} onChange={(patch) => setTrim((x) => ({ ...x, ...patch }))} />
+        </View>
+      ) : null}
     </EditSheet>
   );
 }

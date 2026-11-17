@@ -1,14 +1,15 @@
+import { useState } from "react";
 import { router } from "expo-router";
 import { Linking, Pressable, type ViewStyle } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
-import { minutesText, sharerLine } from "@/features/format";
+import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { engine } from "@/features/player/engine";
 import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { Card, ListRow, SaplingIcon, ShareIcon } from "@/ui";
+import { AppText, Card, Icon, ListRow, SaplingIcon, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 import { SpeakerLead } from "./speaker-mark";
@@ -59,11 +60,51 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
  */
 export function FullVersionList({ course, playingId, onPlay }: { course: CourseDetail } & LessonPlayProps) {
-  const full = course.lessons.filter((l) => l.material && (l.ready || !!course.can?.edit));
-  if (!full.length) return null;
+  const { c } = useTheme();
+  const [folded, setFolded] = useState<Set<string>>(new Set());
+  const canEdit = !!course.can?.edit;
+  const all = course.lessons.filter((l) => l.material);
+  // 學員只看得到「有內容的項目」；分類標題底下沒有任何可看項目就整個隱藏（管理者全部都看得到）。
+  const shown = (l: Lesson) => l.ready || canEdit;
+  const rows: Lesson[] = [];
+  all.forEach((l, i) => {
+    if (!l.section) return void (shown(l) && rows.push(l));
+    const next = all.slice(i + 1);
+    const end = next.findIndex((x) => x.section);
+    const members = end < 0 ? next : next.slice(0, end);
+    if (canEdit || members.some(shown)) rows.push(l);
+  });
+  if (!rows.length) return null;
+  // 每個項目屬於它前面最近的分類標題；標題收合時底下的項目不顯示。
+  let current: string | null = null;
+  const visible = rows.filter((l) => {
+    if (l.section) {
+      current = l.id;
+      return true;
+    }
+    return !(current && folded.has(current));
+  });
+  const toggle = (id: string) =>
+    setFolded((x) => {
+      const n = new Set(x);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   return (
     <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-      {full.map((lesson) => {
+      {visible.map((lesson) => {
+        if (lesson.section) {
+          const open = !folded.has(lesson.id);
+          return (
+            <Pressable key={lesson.id} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${lesson.title}，${open ? "點一下收合" : "點一下展開"}`} onPress={() => toggle(lesson.id)} style={({ pressed }) => [{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space.sm, paddingVertical: 8 }, pressed && { opacity: 0.7 }]}>
+              <Icon name={open ? "chevron-down" : "chevron-forward"} size={18} color={c.accentText} />
+              <AppText variant="callout" style={{ flex: 1, fontWeight: "800", color: c.accentText }}>
+                {lesson.title}
+              </AppText>
+            </Pressable>
+          );
+        }
         const link = lesson.linkType && !lesson.full ? lesson : null;
         return (
           <ListRow
@@ -76,7 +117,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
             highlight={!link && playingId === lesson.id}
             note=""
             title={lesson.title}
-            subtitle={link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson) || undefined}
+            subtitle={[link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson), course.isList && lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ") || undefined}
             right={link?.linkUrl ? <MaterialShare course={course} lesson={link} /> : course.isList && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
             onPress={
               link

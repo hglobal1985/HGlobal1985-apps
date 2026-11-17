@@ -52,8 +52,47 @@ export function useYoutubeLengthFix(course: CourseDetail | null | undefined, ena
 
 /** 章節面板：新增與編輯同一個畫面（業主 2026-11-16）。教材（material）另有 material-sheet.tsx。 */
 export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
+  if (lesson.section) return <SectionTitleSheet course={course} lesson={lesson} onClose={onClose} />;
   if (lesson.material) return <EditMaterialSheet course={course} lesson={lesson} onClose={onClose} />;
   return <ChapterSheet course={course} lesson={lesson} onClose={onClose} />;
+}
+
+/**
+ * 素材的「分類區域標題」新增與改名（業主 2026-11-17）：只有一個名稱欄位；標題底下的素材項目點標題可以收合。
+ * 沒傳 lesson＝新增（加在最後面，之後可用上下移動調整位置）。
+ */
+export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
+  const { c } = useTheme();
+  const { invalidate } = useSession();
+  const [title, setTitle] = useState(lesson?.title ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (!title.trim()) return setError("請輸入分類標題");
+    setBusy(true);
+    setError(null);
+    try {
+      if (lesson) await api("PATCH", `/admin/lessons/${lesson.id}`, { title: title.trim() });
+      else await api("POST", `/admin/courses/${course.id}/lessons`, { kind: "section", title: title.trim() });
+      invalidate();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <EditSheet title={lesson ? "修改分類標題" : "新增分類標題"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={title.trim() !== (lesson?.title ?? "")} busy={busy} error={error}>
+      <AppText variant="callout" tone="muted">
+        分類標題
+      </AppText>
+      <TextInput value={title} onChangeText={setTitle} placeholder="例如：簡報與文件、影片精華" placeholderTextColor={c.textMuted} accessibilityLabel="分類標題" maxLength={60} style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }, type.body]} />
+      <AppText variant="caption" tone="muted">
+        標題底下（到下一個標題之前）的素材項目屬於這個分類；學員點標題可以把整個分類收合。用上下移動可以調整標題與項目的位置。
+      </AppText>
+    </EditSheet>
+  );
 }
 
 /** 新增章節：與編輯同一個面板，名稱、分享者、日期、影音、時間軸一次設定完，按「新增」後依序送出。 */
@@ -285,18 +324,18 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
       {group.map((lesson, i) => (
         <View key={lesson.id} style={[styles.lessonRow, { borderBottomColor: c.border }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={`編輯${word} ${lesson.position}`} onPress={() => onEdit(lesson)} style={styles.lessonMain}>
-            <AppText variant="body" numberOfLines={2}>
-              {lesson.full ? lesson.title : `${lesson.position}. ${lesson.title}`}
+            <AppText variant="body" numberOfLines={2} style={lesson.section ? { fontWeight: "800" } : undefined}>
+              {lesson.section ? `📂 ${lesson.title}` : lesson.full ? lesson.title : `${lesson.position}. ${lesson.title}`}
             </AppText>
             <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {[lesson.linkType ? TYPE_INFO[lesson.linkType].label : lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), minutesText(lesson.minutes), lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
+              {lesson.section ? "分類標題" : [lesson.linkType ? TYPE_INFO[lesson.linkType].label : lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), minutesText(lesson.minutes), lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
             </AppText>
           </Pressable>
           {lesson.full ? null : (
             <>
               <IconButton icon="arrow-up" label="上移" onPress={i > 0 ? () => onMove(i, i - 1) : undefined} disabled={busy} />
               <IconButton icon="arrow-down" label="下移" onPress={i < movable - 1 ? () => onMove(i, i + 1) : undefined} disabled={busy} />
-              <IconButton icon="copy-outline" label={`複製${word} ${lesson.position}`} onPress={() => onCopy(lesson)} disabled={busy} />
+              {lesson.section ? null : <IconButton icon="copy-outline" label={`複製${word} ${lesson.position}`} onPress={() => onCopy(lesson)} disabled={busy} />}
             </>
           )}
           <IconButton icon="create-outline" label={`編輯${word} ${lesson.position}`} onPress={() => onEdit(lesson)} disabled={busy} />

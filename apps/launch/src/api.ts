@@ -770,7 +770,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const groupPos = new Map<string, number>();
   {
     const n = { chapter: 0, material: 0 };
-    for (const l of lessons.results) groupPos.set(l.id, ++n[l.kind === "material" ? "material" : "chapter"]);
+    for (const l of lessons.results) groupPos.set(l.id, l.kind === "section" ? 0 : ++n[l.kind === "material" ? "material" : "chapter"]);
   }
   ctx.centerSlugs = await centerSlugMap(ctx.db);
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
@@ -785,7 +785,8 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       id: l.id,
       // 顯示用序號：章節與教材各自從 1 開始編號（資料庫裡的 position 是整門課共用、不重複的排序）。
       position: groupPos.get(l.id)!,
-      material: l.kind === "material",
+      material: l.kind === "material" || l.kind === "section",
+      ...(l.kind === "section" ? { section: true } : {}),
       ...(l.is_full === 1 ? { full: true } : {}),
       title: l.title,
       minutes: l.duration_minutes,
@@ -3307,10 +3308,11 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [courseId]) => {
       // 新增「其他教材」：只有外部連結與名稱（名稱空白＝自動抓取，抓不到用類型的預設名稱）。教材與連結一次建立。
       const admin = await requireCourseManager(ctx, courseId);
-      const body = await readJson<{ url?: unknown; title?: unknown }>(ctx.req);
+      const body = await readJson<{ url?: unknown; title?: unknown; eventDate?: unknown }>(ctx.req);
       const u = parseHttpsUrl(body.url);
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
+      const itemDate = body.eventDate === undefined ? null : dayOrNull(body.eventDate); // 項目自己的日期（業主 2026-11-17：素材可單獨設定日期）
       const course = await ctx.db.prepare("SELECT c.is_list, (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number; is_list: number }>();
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;
@@ -3321,7 +3323,7 @@ const routes: [string, RegExp, Handler][] = [
       const attId = crypto.randomUUID();
       await ctx.db.batch([
         ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, ?, ?, NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title, yt ? "youtube" : "demo", yt),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, ?, ?, ?, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title, yt ? "youtube" : "demo", yt, itemDate),
         ...(yt ? [] : [ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, courseId, title, u.toString(), classifyLink(u), admin.sub)]),
         audit(ctx.db, admin.sub, "material.create", "lesson", id, `${classifyLink(u)}:${title}`),
       ]);
@@ -3338,7 +3340,7 @@ const routes: [string, RegExp, Handler][] = [
       const lesson = await ctx.db.prepare("SELECT l.course_id, l.kind, l.is_full, l.media_type, l.media_ref, c.is_list FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ?").bind(id).first<{ course_id: string; kind: string; is_full: number; media_type: string; media_ref: string | null; is_list: number }>();
       if (!lesson) return fail(404, "not_found", "找不到這個教材");
       if (lesson.kind !== "material" || lesson.is_full === 1) return fail(400, "not_link_material", "這一列不是外部連結教材");
-      const body = await readJson<{ url?: unknown; title?: unknown }>(ctx.req);
+      const body = await readJson<{ url?: unknown; title?: unknown; eventDate?: unknown }>(ctx.req);
       const u = parseHttpsUrl(body.url);
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
@@ -3347,6 +3349,7 @@ const routes: [string, RegExp, Handler][] = [
       const sameVideo = !!yt && lesson.media_type === "youtube" && lesson.media_ref === yt;
       await ctx.db.batch([
         ctx.db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(title, id),
+        ...(body.eventDate !== undefined ? [ctx.db.prepare("UPDATE lessons SET event_date = ? WHERE id = ?").bind(dayOrNull(body.eventDate), id)] : []),
         ...(yt && !sameVideo ? [ctx.db.prepare("UPDATE lessons SET media_type = 'youtube', media_ref = ?, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(yt, id)] : []),
         ...(!yt && lesson.is_list === 1 && lesson.media_type !== "demo" ? [ctx.db.prepare("UPDATE lessons SET media_type = 'demo', media_ref = NULL, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(id)] : []),
         ctx.db.prepare("DELETE FROM lesson_attachments WHERE lesson_id = ? AND kind = 'link'").bind(id),
@@ -4470,8 +4473,10 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [courseId]) => {
       const admin = await requireCourseManager(ctx, courseId);
       const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown }>(ctx.req);
-      const kind = body.kind === "material" ? "material" : "chapter";
-      if (kind === "chapter" && (await isListCourse(ctx, courseId))) fail(400, "list_no_chapter", "素材清單沒有章節，請用「新增教材」");
+      const isList = await isListCourse(ctx, courseId);
+      if (body.kind === "section" && !isList) fail(400, "section_list_only", "只有素材可以新增分類標題");
+      const kind = body.kind === "section" && isList ? "section" : body.kind === "material" ? "material" : "chapter";
+      if (kind === "chapter" && isList) fail(400, "list_no_chapter", "素材清單沒有章節，請用「新增教材」");
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
       const sharerRank = typeof body.sharerRank === "string" ? body.sharerRank.trim().slice(0, 40) : "";
@@ -4497,7 +4502,7 @@ const routes: [string, RegExp, Handler][] = [
         ...(speaker ? [speakerSync(ctx.db, courseId)] : []),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);
-      await notifyNewContent(ctx, courseId, kind === "material" ? "教材" : "章節");
+      if (kind !== "section") await notifyNewContent(ctx, courseId, kind === "material" ? "教材" : "章節");
       return courseDetail(ctx, courseId);
     },
   ],
@@ -4565,9 +4570,11 @@ const routes: [string, RegExp, Handler][] = [
       // 章節與教材各自排序：傳進來的 ids 必須剛好是同一組（章節或教材）的全部；排好後放回這一組原本佔用的順位，另一組不動。
       const current = await ctx.db.prepare("SELECT id, kind, position FROM lessons WHERE course_id = ? AND is_full = 0").bind(courseId).all<{ id: string; kind: string; position: number }>();
       const byId = new Map(current.results.map((r) => [r.id, r]));
+      // 分類區域標題（section）和教材（material）同一組一起排序。
+      const grp = (k: string | undefined) => (k === "chapter" || k === undefined ? "chapter" : "material");
       const first = ids.length ? byId.get(ids[0]!) : undefined;
-      const group = current.results.filter((r) => r.kind === (first?.kind ?? "chapter"));
-      if (!first || ids.length !== group.length || new Set(ids).size !== ids.length || ids.some((i) => byId.get(i)?.kind !== first.kind)) fail(400, "invalid_order", "順序不正確，請重新整理後再試");
+      const group = current.results.filter((r) => grp(r.kind) === grp(first?.kind));
+      if (!first || ids.length !== group.length || new Set(ids).size !== ids.length || ids.some((i) => grp(byId.get(i)?.kind) !== grp(first.kind))) fail(400, "invalid_order", "順序不正確，請重新整理後再試");
       const slots = group.map((r) => r.position).sort((x, y) => x - y);
       // 先移到負數避開 UNIQUE(course_id, position)，再寫入新順序。
       await ctx.db.batch([

@@ -19,7 +19,7 @@ import { SectionList, SectionSheet, type SectionKey } from "@/features/course-ed
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
 import { Check } from "@/features/course-edit/course-sections";
-import { EditLessonRows, LessonSheet, NewLessonSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
+import { EditLessonRows, LessonSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -87,7 +87,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
     }, 60);
     return () => clearTimeout(t);
   }, [shortPath, lesson, id]);
-  const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | "newMaterial" | null>(null);
+  const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | "newMaterial" | "newSection" | null>(null);
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
   const detecting = useYoutubeLengthFix(course, editing && Platform.OS === "web");
@@ -98,7 +98,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
   }, [lesson]);
   // 網址 ?N：播放第 N 章（章節清單前面顯示的編號）；章節資料載入後才找得到。
   // 網址 ?N：一般課程＝第 N 章；素材清單＝第 N 段影片（清單只有教材）。
-  const chapterLesson = chapter && course ? course.lessons.find((l) => (course.isList ? l.material && !l.full : !l.material) && l.position === chapter)?.id : undefined;
+  const chapterLesson = chapter && course ? course.lessons.find((l) => (course.isList ? l.material && !l.full && !l.section : !l.material) && l.position === chapter)?.id : undefined;
   useEffect(() => {
     if (chapterLesson) setPlayingId(chapterLesson);
   }, [chapterLesson]);
@@ -110,10 +110,10 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
   const playLesson = playingId && !editing ? course?.lessons.find((l) => l.id === playingId) : undefined;
   const stage = playLesson ? (session.pinned && session.track ? { key: session.track.key, audio: session.track.mode === "audio" } : lastStage.current) : null;
   const playLegacy = !!playLesson && session.legacyYoutube && !!session.playback;
-  const playChapters = course ? course.lessons.filter((l) => !l.material) : [];
+  const playChapters = course ? course.lessons.filter((l) => !l.material && !l.section) : [];
   const playNext = playLesson && !playLesson.material ? playChapters[playChapters.findIndex((l) => l.id === playLesson.id) + 1] : undefined;
   // 進入課程頁就是「播放器版面」（業主 2026-11-17）：還沒按播放時，舞台是 EDM 加大播放鈕、下方是待機的控制列；按下去才開始載入並播放第一堂。
-  const firstPlayable = course && !editing ? course.lessons.find((l) => !l.locked && !l.full && (course.isList ? l.material : !l.material)) : undefined;
+  const firstPlayable = course && !editing ? course.lessons.find((l) => !l.locked && !l.full && !l.section && (course.isList ? l.material : !l.material)) : undefined;
   const playLesson_ = (lid: string) => {
     engine.expectSwitch();
     setPlayingId(lid);
@@ -201,7 +201,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
   /** 重新編號：章節、教材各自從 1 開始（完整版課程影片不編號）。 */
   const renumber = (list: Lesson[]): Lesson[] => {
     const n = { chapter: 0, material: 0 };
-    return list.map((l) => (l.full ? l : { ...l, position: ++n[l.material ? "material" : "chapter"] }));
+    return list.map((l) => (l.full || l.section ? l : { ...l, position: ++n[l.material ? "material" : "chapter"] }));
   };
   /** 畫面先改、請求排隊在背景送：連續按很多下也照順序處理；全部完成才重新載入，失敗就還原並提示。 */
   const optimistic = (next: Lesson[], send: () => Promise<unknown>) => {
@@ -379,6 +379,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
               {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
               {course.isList ? null : <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
               <Button variant="secondary" label="新增教材" icon="add" onPress={() => setSheet("newMaterial")} fullWidth />
+              {course.isList ? <Button variant="secondary" label="新增分類標題" icon="folder-open-outline" onPress={() => setSheet("newSection")} fullWidth /> : null}
             </Section>
           </>
         ) : null}
@@ -411,8 +412,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         <EditSheet title="EDM 與封面" onClose={() => setSheet(null)} hideSave>
           <EdmManager course={course} onChanged={invalidate} />
         </EditSheet>
-      ) : sheet === "newLesson" || sheet === "newMaterial" ? (
-        sheet === "newMaterial" ? <NewMaterialSheet course={course} onClose={() => setSheet(null)} /> : <NewLessonSheet course={course} onClose={() => setSheet(null)} />
+      ) : sheet === "newLesson" || sheet === "newMaterial" || sheet === "newSection" ? (
+        sheet === "newMaterial" ? <NewMaterialSheet course={course} onClose={() => setSheet(null)} /> : sheet === "newSection" ? <SectionTitleSheet course={course} onClose={() => setSheet(null)} /> : <NewLessonSheet course={course} onClose={() => setSheet(null)} />
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
