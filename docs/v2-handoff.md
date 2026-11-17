@@ -653,3 +653,4 @@
 - 前端：`public/sw.js`（只處理 push 與點通知，不快取）、`lib/web-push.ts`、`settings/notifications.tsx` 的 `PushCard`（開關、狀態說明、測試通知；iPhone 未加入主畫面時顯示教學）。
 - 金鑰：Secret `VAPID_PRIVATE_JWK`（JWK 字串，由開發者在部署時以 wrangler 直接寫入 Cloudflare，未出現在對話或 repo）。換金鑰會讓所有裝置需要重新開啟推播。
 - 測試 tests/push.test.ts：以接收端演算法解密驗證內容、驗證 VAPID 簽章、失效裝置刪除、開課提醒時間與防重複。後端共 140 項。
+- 2026-11-17：業主授權後，已產生正式站推播金鑰並以 `wrangler secret put VAPID_PRIVATE_JWK` 寫入 Cloudflare（金鑰未出現在對話或 repo）；`GET /push/key` 已回傳公鑰，推播正式啟用。
