@@ -9,7 +9,7 @@ import { radius, space } from "@/theme/tokens";
 import { GuestGate, AppText, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
 
 /** 集滿這麼多枚徽章解鎖書櫃鑰匙（與後端 LIBRARY_KEY_BADGES 相同）。 */
-const KEY_BADGES = 20;
+const KEY_BADGES = 100;
 
 /** 學習成就：達成條件就會獲得徽章；還沒達成的顯示目前進度。 */
 export default function AchievementsScreen() {

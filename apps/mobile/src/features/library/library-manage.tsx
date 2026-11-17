@@ -41,7 +41,7 @@ export function LibraryManage() {
   const items = data?.items ?? [];
   const locked = !data?.library;
   const lib = data?.library ?? { number: "你的會員編號", title: "我的書櫃", ownerName: "", views: 0, pwSet: false, pwExpiresAt: null, pwExpired: false };
-  const lockedTip = () => flashText("尚未解鎖書櫃鑰匙，獲得任意 20 枚徽章就能解鎖");
+  const lockedTip = () => flashText("尚未解鎖書櫃鑰匙，獲得任意 100 枚徽章就能解鎖");
   const url = `learn.hglobal1985.com/${lib.number}`;
   const call = async (method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown) => {
     if (locked) return lockedTip();
@@ -69,7 +69,7 @@ export function LibraryManage() {
   return (
     <Screen header={false}>
       <Card>
-        {locked ? <NoticeBox text="你尚未解鎖書櫃鑰匙。獲得任意 20 枚徽章就會自動解鎖；下面是書櫃的主畫面預覽。" /> : null}
+        {locked ? <NoticeBox text="你尚未解鎖書櫃鑰匙。獲得任意 100 枚徽章就會自動解鎖；下面是書櫃的主畫面預覽。" /> : null}
         <AppText variant="caption" tone="muted">
           專屬網址（只有拿到網址的人才進得來，不會出現在行動大學任何地方）
         </AppText>

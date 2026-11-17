@@ -1760,7 +1760,7 @@ async function libraryMine(ctx: Ctx, sub: string): Promise<LibraryMine> {
   let lib = await libOf(ctx.db, sub);
   let keys: LibraryMine["keys"];
   if (!lib && ctx.session?.kind === "central") {
-    // 獲得任意 20 枚徽章就自動解鎖書櫃鑰匙（業主 2026-11-17）；會員編號等問題留在 blocked 讓畫面提示。
+    // 獲得任意 100 枚徽章就自動解鎖書櫃鑰匙（業主 2026-11-17）；會員編號等問題留在 blocked 讓畫面提示。
     const have = (await grantAchievements(ctx, sub)).filter((a) => a.earned).length;
     keys = { have, need: LIBRARY_KEY_BADGES };
     if (have >= LIBRARY_KEY_BADGES) {

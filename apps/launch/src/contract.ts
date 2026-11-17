@@ -767,7 +767,7 @@ export type LibraryItem = {
   pwExpired?: boolean;
 };
 /** 集滿這麼多枚徽章就自動解鎖書櫃鑰匙（業主 2026-11-17）。 */
-export const LIBRARY_KEY_BADGES = 20;
+export const LIBRARY_KEY_BADGES = 100;
 export type LibraryMine = { keys?: { have: number; need: number; blocked?: string }; library: null | { number: string; title: string; ownerName: string; views: number; pwSet: boolean; pwExpiresAt: string | null; pwExpired: boolean }; items: LibraryItem[] };
 /** 公開檢視：locked＝整座書櫃要先輸入密碼（items 是空的）；owner＝正在看自己的書櫃。 */
 export type LibraryView = { number: string; title: string; ownerName: string; locked: boolean; lockExpired: boolean; owner: boolean; items: LibraryItem[] };

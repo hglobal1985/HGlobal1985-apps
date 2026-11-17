@@ -18,7 +18,7 @@ export function LibraryHome() {
   if (loading && !data) return <LoadingView />;
   if (data?.library) return <LibraryScreen number={data.library.number} />;
   const k = data?.keys;
-  const how = k ? `獲得任意 ${k.need} 枚徽章就能解鎖（你目前 ${k.have} 枚）` : "獲得任意 20 枚徽章就能解鎖";
+  const how = k ? `獲得任意 ${k.need} 枚徽章就能解鎖（你目前 ${k.have} 枚）` : "獲得任意 100 枚徽章就能解鎖";
   const view: LibraryView = { number: "", title: "我的書櫃", ownerName: member?.name ?? "", locked: false, lockExpired: false, owner: false, items: [] };
   return <Shelves view={view} number="" tokens={{}} onTokens={() => undefined} onGear={() => showFlash({ icon: <Ionicons name="key" size={FLASH_ICON - 3} color="#B28A3E" />, title: "尚未解鎖書櫃鑰匙", body: k?.blocked ?? how })} emptyText={`🔑 你尚未解鎖書櫃鑰匙\n${k?.blocked ?? how}`} />;
 }

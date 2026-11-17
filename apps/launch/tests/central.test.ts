@@ -294,7 +294,7 @@ test("我的書櫃：超級管理員邀請→會員接受（網址＝會員編�
   assert.equal((await call("POST", "/library/view/not-exist", { body: {} })).status, 404);
 });
 
-test("我的書櫃：獲得任意 20 枚徽章自動解鎖鑰匙（19 枚不行）", async () => {
+test("我的書櫃：獲得任意 100 枚徽章自動解鎖鑰匙（99 枚不行）", async () => {
   const db = createTestDb();
   const call = setup({ DB: db });
   setCentralFetch(async (url, init) => {
@@ -305,12 +305,12 @@ test("我的書櫃：獲得任意 20 枚徽章自動解鎖鑰匙（19 枚不行�
   });
   const alice = token({ sub: "m_alice" });
   await db.prepare("DELETE FROM achievements").run();
-  for (let i = 0; i < 20; i += 1) await db.prepare("INSERT INTO achievements (id, name, condition_type, threshold) VALUES (?, ?, 'lessons_completed', 999)").bind(`a${i}`, `徽章${i}`).run();
-  for (let i = 0; i < 19; i += 1) await db.prepare("INSERT INTO member_achievements (member_sub, achievement_id) VALUES ('m_alice', ?)").bind(`a${i}`).run();
+  for (let i = 0; i < 100; i += 1) await db.prepare("INSERT INTO achievements (id, name, condition_type, threshold) VALUES (?, ?, 'lessons_completed', 999)").bind(`a${i}`, `徽章${i}`).run();
+  for (let i = 0; i < 99; i += 1) await db.prepare("INSERT INTO member_achievements (member_sub, achievement_id) VALUES ('m_alice', ?)").bind(`a${i}`).run();
   const before = (await call<{ library: unknown; keys: { have: number; need: number } }>("GET", "/library/mine", { token: alice })).data;
   assert.equal(before.library, null);
-  assert.deepEqual([before.keys.have, before.keys.need], [19, 20]);
-  await db.prepare("INSERT INTO member_achievements (member_sub, achievement_id) VALUES ('m_alice', 'a19')").run();
+  assert.deepEqual([before.keys.have, before.keys.need], [99, 100]);
+  await db.prepare("INSERT INTO member_achievements (member_sub, achievement_id) VALUES ('m_alice', 'a99')").run();
   const after = (await call<{ library: { number: string } | null }>("GET", "/library/mine", { token: alice })).data;
   assert.equal(after.library?.number, "tw1234567");
 });
