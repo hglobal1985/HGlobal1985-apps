@@ -84,7 +84,7 @@ export default function EditorsScreen() {
             <Button variant="ghost" label="移除" disabled={busy === e.memberId} onPress={() => remove(e)} />
           </View>
           <Check label="新增課程（自己新增的課程可以完整修改、刪除）" value={e.canCreate} disabled={busy === e.memberId} onChange={(v) => patch(e, { canCreate: v })} />
-          <Check label="修改別人的課程（含上下架、價格、資格、審核群組、中心 EDM）" value={e.canEditOthers} disabled={busy === e.memberId} onChange={(v) => patch(e, { canEditOthers: v })} />
+          <Check label="修改別人的課程（含上下架、價格、資格、審核群組、中心首頁圖）" value={e.canEditOthers} disabled={busy === e.memberId} onChange={(v) => patch(e, { canEditOthers: v })} />
           <Check label="刪除別人的課程（有人報名的改為下架封存）" value={e.canDeleteOthers} disabled={busy === e.memberId} onChange={(v) => patch(e, { canDeleteOthers: v })} />
         </Card>
       ))}

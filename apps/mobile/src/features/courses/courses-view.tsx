@@ -42,7 +42,7 @@ const GAP = space.md;
 
 /**
  * 全部課程清單。initialCategory／initialCenter／series 由網址（短網址、?category=、?center=、?series=）帶入。
- * 「中心」下拉：選了中心，下方先顯示該中心的 EDM（有上傳才有），只列該中心主辦的課程。
+ * 「中心」下拉：選了中心，下方先顯示該中心的首頁圖（有上傳才有），只列該中心主辦的課程。
  * 管理者（總部、會長、音控、小編）另外看得到自己能管的「未上架」課程（標示未上架）、最下面可展開「已封存」、右下角「＋新增教材」（往上展開：新增課程／新增清單）。
  */
 export function CoursesView({ initialCategory = "", initialCenter = "", inStack = false, initialCenters = false }: { initialCategory?: string; initialCenter?: string; inStack?: boolean; /** /courses?view=centers：直接打開「所有中心」清單。 */ initialCenters?: boolean }) {
@@ -401,7 +401,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     <View style={{ flex: 1 }}>
     <Screen header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={centerTitle(activeCenter)} onBack={backFromCenter} right={
             <>
-              {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心 EDM" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
+              {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心首頁圖與公告" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
               {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>

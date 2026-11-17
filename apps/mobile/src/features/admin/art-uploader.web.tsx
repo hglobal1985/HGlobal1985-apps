@@ -36,7 +36,7 @@ export type ArtInfo = { edmUrl: string; coverUrl?: string | null; coverRect?: { 
  * 做法與課程 EDM 相同。圖片在瀏覽器內壓縮，不保留原始檔案。
  * endpoints.edm＝上傳 EDM（PUT）／調整框（PATCH）／移除（DELETE）共用的網址；endpoints.cover＝上傳封面（PUT）的網址。想改裁切流程或加功能，只改這個檔案。
  */
-export function ArtUploader({ label, art, endpoints, onChanged }: { label: string; art?: ArtInfo | null; endpoints: { edm: string; cover: string }; onChanged: () => void }) {
+export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM" }: { /** 這張圖的名稱：中心叫「首頁圖」、系列叫「EDM」（業主 2026-11-17）。 */ noun?: string; label: string; art?: ArtInfo | null; endpoints: { edm: string; cover: string }; onChanged: () => void }) {
   const input = useRef<HTMLInputElement | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -82,7 +82,7 @@ export function ArtUploader({ label, art, endpoints, onChanged }: { label: strin
   const adjust = async () => {
     if (!art) return;
     setBusy(true);
-    setMsg("讀取 EDM 中…");
+    setMsg(`讀取${noun}中…`);
     try {
       const img = await loadImageUrl(resolveUrl(art.edmUrl));
       const cover = art.coverRect ? rectFrom(img, art.coverRect) : { ...defaultCover(img), y: Math.min(Math.round(art.edmViewY * img.naturalHeight), Math.max(0, img.naturalHeight - defaultCover(img).h)) };
@@ -106,7 +106,7 @@ export function ArtUploader({ label, art, endpoints, onChanged }: { label: strin
       await api("PATCH", endpoints.edm, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
       setJob(null);
       setMsg(null);
-      showToast(`已更新${label} EDM`);
+      showToast(`已更新${label}${noun}`);
       onChanged();
     } catch (err) {
       setMsg((err as Error).message);
@@ -115,7 +115,7 @@ export function ArtUploader({ label, art, endpoints, onChanged }: { label: strin
     }
   };
   const remove = async () => {
-    if (!(await confirmSheet({ title: `移除${label} EDM`, message: `移除後，這個${label}就不顯示 EDM。`, confirmLabel: "移除", cancelLabel: "先不要", danger: true }))) return;
+    if (!(await confirmSheet({ title: `移除${label}${noun}`, message: `移除後，這個${label}就不顯示${noun}。`, confirmLabel: "移除", cancelLabel: "先不要", danger: true }))) return;
     setBusy(true);
     try {
       await api("DELETE", endpoints.edm);
@@ -131,15 +131,15 @@ export function ArtUploader({ label, art, endpoints, onChanged }: { label: strin
       {!job ? (
         <>
           {art ? (
-            <img src={resolveUrl(art.coverUrl ?? art.edmUrl)} alt={`${label} EDM`} style={{ width: "100%", maxWidth: 320, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: 8, display: "block" }} />
+            <img src={resolveUrl(art.coverUrl ?? art.edmUrl)} alt={`${label}${noun}`} style={{ width: "100%", maxWidth: 320, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: 8, display: "block" }} />
           ) : null}
           <AppText variant="caption" tone="muted">
             上傳後可以自己拖曳裁切 16:9 的封面：框內就是清單卡片的縮圖，也是進入頁面時一開始看到的位置。可選 JPG、PNG、WebP、HEIC，上傳時自動壓縮。
           </AppText>
           <View style={styles.buttons}>
-            <Button label={art ? "更換 EDM" : "上傳 EDM"} icon="image-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} />
+            <Button label={art ? `更換${noun}` : `上傳${noun}`} icon="image-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} />
             {art ? <Button variant="secondary" label="調整裁切位置" icon="crop-outline" disabled={busy} onPress={adjust} /> : null}
-            {art ? <Button variant="ghost" label="移除 EDM" disabled={busy} onPress={remove} /> : null}
+            {art ? <Button variant="ghost" label={`移除${noun}`} disabled={busy} onPress={remove} /> : null}
           </View>
         </>
       ) : (

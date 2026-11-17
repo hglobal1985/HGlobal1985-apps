@@ -17,7 +17,7 @@ export const centerHeroFull = (winW: number) => Math.round((Math.min(winW, maxCo
 
 /**
  * 中心專屬頁上方的照片（業主 2026-11-16 選方案 A）：
- * 展開＝左右滿版 16:10、底部暗色漸層、不放中心名稱（上方工具列已有）、左下角透明小標籤「N 門課・N 章節・N 點閱」、右上角放大鈕；
+ * 展開＝左右滿版 16:10、底部暗色漸層、不放中心名稱（上方工具列已有）、左下角透明小標籤「N 門課・N 章節・N 點閱」、點封面任意處放大；
  * 往上滑時平順縮成窄橫幅（方案 D：高度 112、左右留白、圓角），往下滑回頂端再展開。沒有上傳照片就用品牌綠色漸層底。
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
@@ -53,6 +53,8 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title, subsc
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#shade)" />
       </Svg>
+      {/* 點封面任意處放大看原始大圖（業主 2026-11-17：不再放右上角的放大鈕）；與課程 EDM 放大共用同一個 EdmLightbox（分享、下載、拖曳、放大縮小）。 */}
+      {art ? <Pressable accessibilityRole="button" accessibilityLabel="放大中心首頁圖" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill} /> : null}
       <View style={styles.chips} pointerEvents="box-none">
         {/* 訂閱鈕（業主 2026-11-17）：放在最左邊、比膠卷標籤大兩倍、實心不透明；鈴鐺圖案與主選單「通知」一致，旁邊是訂閱人數。 */}
         {subscribe ? (
@@ -77,11 +79,6 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title, subsc
           <Chip text={`${views ?? 0} 點閱`} />
         </View>
       </View>
-      {art ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="放大照片" onPress={() => setOpen(true)} hitSlop={8} style={styles.zoom}>
-          <Icon name="expand-outline" size={18} color="#fff" />
-        </Pressable>
-      ) : null}
       {open && art ? <EdmLightbox uri={art.edmUrl} title={title} onClose={() => setOpen(false)} /> : null}
     </Animated.View>
   );
@@ -131,5 +128,4 @@ const styles = StyleSheet.create({
   sub: { flexDirection: "row", alignItems: "center", gap: 6, height: 44, paddingHorizontal: 12, borderRadius: 22, marginRight: 2, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.22)" },
   chipText: { color: "#fff", fontWeight: "600" },
-  zoom: { position: "absolute", right: 10, top: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
 });
