@@ -4,7 +4,7 @@ import type { CourseDetail, CourseSummary } from "@/api/client";
 import { eventDays } from "@/features/format";
 import { useApi } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { AppText, ErrorView, LoadingView, SheetAction } from "@/ui";
+import { AppText, ErrorView, LoadingLadybug, SheetAction } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
 import { ChapterList } from "./lesson-list";
 
@@ -34,7 +34,7 @@ export function CourseLessonsSheet({ course, onClose }: { course: CourseSummary;
         <SheetAction label="完整介紹" accessibilityLabel="完整介紹：進入課程介紹頁" onPress={goDetail} />
       </View>
       <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: space.md }}>
-        {loading && !data ? <LoadingView /> : null}
+        {loading && !data ? <LoadingLadybug /> : null}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {data ? (
           <>

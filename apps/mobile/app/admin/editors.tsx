@@ -9,7 +9,7 @@ import { canManageEditors } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, NoticeBox, Screen, Select } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, LoadingLadybug, NoticeBox, Screen, Select } from "@/ui";
 import { showToast } from "@/ui/toast";
 
 const ALL = "";
@@ -158,7 +158,7 @@ function AddEditorSheet({ center, onClose, onAdded }: { center: string; onClose:
           {!m.already ? <Icon name="add-circle-outline" size={26} color={c.accent} /> : null}
         </Pressable>
       ))}
-      {loading ? <LoadingView /> : null}
+      {loading ? <LoadingLadybug /> : null}
       {!loading && !items.length && !error ? <EmptyState icon="people-outline" title="沒有符合的會員" /> : null}
       {next && !loading ? <Button variant="secondary" label="載入更多" onPress={() => load(next)} fullWidth /> : null}
     </EditSheet>

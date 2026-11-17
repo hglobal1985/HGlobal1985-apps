@@ -6,7 +6,7 @@ import { dateTime } from "@/features/format";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, Icon, LoadingView, NoticeBox, Pill, Screen } from "@/ui";
+import { AppText, Button, Card, EmptyState, Icon, LoadingLadybug, NoticeBox, Pill, Screen } from "@/ui";
 
 const duration = (s: number | null) => {
   if (s == null) return "";
@@ -117,7 +117,7 @@ export default function MuxPickerScreen() {
           </Pressable>
         );
       })}
-      {loading ? <LoadingView /> : null}
+      {loading ? <LoadingLadybug /> : null}
       {!loading && !error && !assets.length ? <EmptyState icon="videocam-outline" title="Mux 帳號裡還沒有影片" /> : null}
       {!loading && assets.length && !shown.length ? <EmptyState icon="search-outline" title="找不到符合的影片" /> : null}
       {!loading && cursor ? <Button variant="secondary" label="載入更多" onPress={() => load(cursor)} /> : null}

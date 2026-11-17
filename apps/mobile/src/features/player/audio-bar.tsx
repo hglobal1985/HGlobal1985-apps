@@ -5,7 +5,7 @@ import { useCallback } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText } from "@/ui";
+import { AppText, LoadingLadybug } from "@/ui";
 import { engine } from "./engine";
 import { PlayerControls } from "./player-controls";
 import { remainingText, segmentOf } from "./engine.types";
@@ -27,13 +27,13 @@ export function AudioBar({ compact }: { compact?: boolean }) {
   const total = Math.max(0, (end ?? s.duration) - start);
   const at = Math.min(total, Math.max(0, s.position - start));
   const seek = (v: number) => engine.seek(start + v);
-  const icon = s.loading && !s.playing ? "hourglass-outline" : s.playing ? "pause" : "play";
+  const icon = s.playing ? "pause" : "play";
   return (
     <View style={[styles.box, compact ? styles.compact : [styles.full, { backgroundColor: c.surface, borderColor: c.border }]]}>
       {compact ? <SeekBar value={at} max={total || 1} onSeek={seek} /> : null}
       <View style={styles.row}>
         <Pressable accessibilityRole="button" accessibilityLabel={s.playing ? "暫停" : "播放"} onPress={() => !engine.recentlySwitched() && engine.toggle()} style={[styles.play, { backgroundColor: c.accent }]}>
-          <Ionicons name={icon} size={26} color={c.textOnAccent} />
+          {s.loading ? <LoadingLadybug size={34} /> : <Ionicons name={icon} size={26} color={c.textOnAccent} />}
         </Pressable>
         <Pressable style={styles.info} disabled={!compact} onPress={() => back(t.courseId, t.lessonId)} accessibilityLabel="回到課程頁">
           <AppText variant="callout" numberOfLines={1} style={{ fontWeight: "600" }}>

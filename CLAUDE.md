@@ -74,6 +74,8 @@
 
 - **讀取中動畫（業主 2026-11-17 定稿）**：全站一律用「灌溉小樹苗」`LoadingSapling`（`src/ui/loading-sapling.web.tsx`；`LoadingView` 內部使用，不可再用系統轉圈圈 `ActivityIndicator` 做整頁／區塊讀取）。內容（業主 2026-11-17 再改：刪太陽、刪水壺、整體加快）：小樹苗長高（1.2 秒一輪）、土裡探頭眨眼的蚯蚓（2.4 秒）、葉上來回爬的瓢蟲（1.5 秒）；老鷹已於 2026-11-17 刪除，文字「灌溉中…」；`compact`＝小區塊縮小版（只有小樹苗，無文字）。iOS／Android 版暫用系統轉圈圈（`loading-sapling.tsx`），App 上架前補。**還沒讀取完成以前一律用它**（業主 2026-11-17）：首頁原本的灰色骨架已刪除（`skeleton.tsx` 不再存在），改用 `LoadingView`；網頁一開啟、程式還沒載入完的瞬間，由 `apps/launch/scripts/embed-static.mjs` 在 `#root` 裡塞進簡化版「灌溉中」開機畫面（App 一掛載就取代）。新增任何會等資料的頁面都要放 `LoadingView`。按鈕內的小轉圈（`Button loading`）因為太小維持原樣。要改動畫只改這一個檔案。
 
+- **小範圍讀取動畫「小瓢蟲」`LoadingLadybug`（業主 2026-11-17 定稿）**：`src/ui/loading-ladybug.web.tsx`（紅殼開闔、透明翅膀拍動、原地飛舞）。整頁／整個區塊在等資料用 `LoadingSapling`（`LoadingView`）；**只有一小塊在等**用小瓢蟲：按鈕送出中（`Button loading`、個人資料表單的儲存鈕）、**播放器的播放鈕等待播放時**（`PlayerControls`、`AudioBar`；課程頁按播放後取播放授權的空檔，舞台大鈕與待機控制列也換成瓢蟲）、通知設定的推播狀態、後台清單搜尋／載入更多、課程章節選單、全部課程搜尋。YouTube 的「讀取中」從載入、按播放、緩衝（state 3）到開始播放；LINE 等不准程式代按播放的環境，8 秒後自動不再顯示（見 `engine.web.ts` 的 `ytStopLoadingLater`）。iOS／Android 暫用系統轉圈圈。新增任何小區塊讀取都用它，要改動畫只改這個檔案。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。

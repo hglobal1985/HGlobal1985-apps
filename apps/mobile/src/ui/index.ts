@@ -29,3 +29,4 @@ export { SaplingIcon } from "./sapling-icon";
 export { LoginPrompt } from "./login-prompt";
 export { InAppBrowserBanner } from "./in-app-banner";
 export { LoadingSapling } from "./loading-sapling";
+export { LoadingLadybug } from "./loading-ladybug";

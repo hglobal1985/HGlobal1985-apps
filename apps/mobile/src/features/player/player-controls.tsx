@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, minTouch } from "@/theme/tokens";
-import { AppText } from "@/ui";
+import { AppText, LoadingLadybug } from "@/ui";
 import { engine } from "./engine";
 import { rateText, remainingText, segmentOf } from "./engine.types";
 import { SeekBar } from "./seek-bar";
@@ -21,12 +21,12 @@ export function PlayerControls() {
   const { start, end } = segmentOf(t);
   const total = Math.max(0, (end ?? s.duration) - start);
   const at = Math.min(total, Math.max(0, s.position - start));
-  const icon = s.loading && !s.playing ? "hourglass-outline" : s.playing ? "pause" : "play";
+  const icon = s.playing ? "pause" : "play";
   return (
     <View style={[styles.outer, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
       <View style={styles.box}>
         <Pressable accessibilityRole="button" accessibilityLabel={s.playing ? "暫停" : "播放"} onPress={() => engine.toggle()} style={styles.btn}>
-          <Ionicons name={icon} size={22} color={c.text} />
+          {s.loading ? <LoadingLadybug size={32} /> : <Ionicons name={icon} size={22} color={c.text} />}
         </Pressable>
         <View style={styles.bar}>
           <SeekBar value={at} max={total || 1} onSeek={(v) => engine.seek(start + v)} onTouch={t.mode === "audio" ? undefined : () => engine.pokeHint()} />

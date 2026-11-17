@@ -1,4 +1,5 @@
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { LoadingLadybug } from "./loading-ladybug";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { Icon, type IconName } from "./icon";
@@ -46,7 +47,7 @@ export function Button({
       ]}
     >
       <View style={styles.row}>
-        {loading ? <ActivityIndicator color={look.fg} /> : icon ? <Icon name={icon} color={look.fg} size={18} /> : null}
+        {loading ? <LoadingLadybug size={28} /> : icon ? <Icon name={icon} color={look.fg} size={18} /> : null}
         <AppText variant="headline" numberOfLines={1} style={{ color: look.fg }}>
           {label}
         </AppText>

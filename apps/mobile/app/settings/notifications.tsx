@@ -5,7 +5,7 @@ import { Switch, View } from "react-native";
 import { api, type NotificationSettings } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
-import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, LoadingLadybug, NoticeBox, Screen, Section } from "@/ui";
 
 /** 通知設定：Email 是會員中心「聯絡信箱」的同一個欄位，這裡改就是改會員中心。 */
 export default function NotificationSettingsScreen() {
@@ -150,7 +150,7 @@ function PushCard() {
           accessibilityLabel="手機推播開關"
         />
       </View>
-      {state ? <NoticeBox tone={state === "on" ? "success" : state === "off" ? "info" : "warning"} text={PUSH_TEXT[state]} /> : <LoadingView />}
+      {state ? <NoticeBox tone={state === "on" ? "success" : state === "off" ? "info" : "warning"} text={PUSH_TEXT[state]} /> : <LoadingLadybug />}
       {state === "on" ? <Button variant="secondary" icon="notifications-outline" label="傳一則測試通知給我" disabled={busy} onPress={test} /> : null}
       {msg ? <NoticeBox text={msg.text} tone={msg.ok ? "success" : "danger"} /> : null}
     </Card>

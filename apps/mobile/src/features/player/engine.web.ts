@@ -341,7 +341,9 @@ if (typeof window !== "undefined") {
       emit({ playing: true, segmentEnded: false, loading: false });
       if (userRate !== 1) ytCommand("setPlaybackRate", [ytRate(userRate)]);
     }
-    else if (state === 2) emit({ playing: false });
+    else if (state === 3) emit({ loading: true }); // 緩衝中：播放鈕顯示小瓢蟲
+    else if (state === 2) emit({ playing: false, loading: false });
+    else if (state === 5 || state === -1) ytStopLoadingLater();
     else if (state === 0) emit({ playing: false, segmentEnded: true });
     if (d.event === "infoDelivery" && typeof d.info === "object") {
       if (typeof d.info.currentTime === "number") emit({ position: d.info.currentTime });
@@ -352,6 +354,16 @@ if (typeof window !== "undefined") {
       ytCaptionsOff();
     }
   });
+}
+
+/** YouTube 有些環境（例如 LINE）不准程式代按播放，會一直停在待機：等候 8 秒後就不再顯示讀取中，改由「請點影片中央」提示處理。 */
+let ytLoadTimer: ReturnType<typeof setTimeout> | null = null;
+function ytStopLoadingLater() {
+  if (ytLoadTimer) clearTimeout(ytLoadTimer);
+  const id = snap.loadId;
+  ytLoadTimer = setTimeout(() => {
+    if (snap.loadId === id && snap.loading && !snap.playing) emit({ loading: false });
+  }, 8000);
 }
 
 let switchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -459,17 +471,24 @@ export const engine = {
     teardownMedia();
     endedFlag = false;
     intent = false; // 等真的開始播放（play 事件）才算「想播放」
-    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: t.mode !== "youtube", error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork, loadId: snap.loadId + 1 });
+    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork, loadId: snap.loadId + 1 });
     if (t.mode !== "youtube") {
       attach(element(), t, resumeOf(t), true, (h) => (hlsVideo = h));
       applyRate();
       setupSession(t);
-    } else if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
+    } else {
+      ytStopLoadingLater();
+      if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
+    }
   },
   play() {
     intent = true;
     if (snap.track?.mode === "youtube") {
       ytCommand("playVideo");
+      if (!snap.playing) {
+        emit({ loading: true });
+        ytStopLoadingLater();
+      }
       // 有些內建瀏覽器（例如 LINE）不准程式代按播放：1.5 秒後還沒開始，就提示直接點影片中央的播放鈕。
       const id = snap.loadId;
       setTimeout(() => {

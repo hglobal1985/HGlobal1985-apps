@@ -24,7 +24,7 @@ import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, LoginPrompt, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
+import { AppText, Button, Card, LoadingLadybug, LoginPrompt, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
 
@@ -298,21 +298,22 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
           <>
             <View>
               <EdmStage course={course} />
-              {firstPlayable ? (
+              {firstPlayable || playLesson ? (
                 <View pointerEvents="box-none" style={styles.stagePlay}>
-                  <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => playLesson_(firstPlayable.id)} style={styles.bigPlay}>
-                    <Ionicons name="play" size={34} color="#fff" style={{ marginLeft: 4 }} />
+                  {/* 按下播放後、播放器還沒出現的空檔（取播放授權中）：大播放鈕換成小瓢蟲 */}
+                  <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => firstPlayable && !playLesson && playLesson_(firstPlayable.id)} style={styles.bigPlay}>
+                    {playLesson ? <LoadingLadybug size={52} /> : <Ionicons name="play" size={34} color="#fff" style={{ marginLeft: 4 }} />}
                   </Pressable>
                 </View>
               ) : null}
             </View>
-            {firstPlayable ? (
+            {firstPlayable || playLesson ? (
               <View style={[styles.idleBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
-                <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => playLesson_(firstPlayable.id)} hitSlop={8} style={styles.idlePlay}>
-                  <Ionicons name="play" size={26} color={c.text} />
+                <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => firstPlayable && !playLesson && playLesson_(firstPlayable.id)} hitSlop={8} style={styles.idlePlay}>
+                  {playLesson ? <LoadingLadybug size={32} /> : <Ionicons name="play" size={26} color={c.text} />}
                 </Pressable>
                 <View style={[styles.idleTrack, { backgroundColor: c.border }]} />
-                <AppText variant="callout" tone="muted">{`-${Math.floor(firstPlayable.minutes)}:00`}</AppText>
+                <AppText variant="callout" tone="muted">{`-${Math.floor((playLesson ?? firstPlayable)!.minutes)}:00`}</AppText>
               </View>
             ) : null}
           </>

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ActivityIndicator, type HostInstance, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { type HostInstance, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { api } from "@/api/client";
 import { openAccountCenter } from "@/features/account-link";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Icon, type IconName } from "@/ui";
+import { AppText, Icon, LoadingLadybug, type IconName } from "@/ui";
 
 type FieldView = { value: string; pending: string | null; status: string };
 type View_ = {
@@ -127,7 +127,7 @@ function Btn({ label, icon, onPress, disabled, loading, save }: { label: string;
       accessibilityState={{ disabled: !!disabled }}
       style={[styles.btn, save ? { backgroundColor: "#f2dc27", borderWidth: 2, borderColor: scheme === "dark" ? "#6b5424" : "#e6c48c" } : { backgroundColor: c.accent }, { opacity: disabled && !loading ? 0.45 : 1 }]}
     >
-      {loading ? <ActivityIndicator size="small" color={fg} /> : <Icon name={icon} size={20} color={fg} />}
+      {loading ? <LoadingLadybug size={26} /> : <Icon name={icon} size={20} color={fg} />}
       <Text numberOfLines={1} style={{ color: fg, fontSize: 16, fontWeight: "700" }}>
         {loading ? "儲存中" : label}
       </Text>

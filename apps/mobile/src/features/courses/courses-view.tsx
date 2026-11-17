@@ -29,7 +29,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView, Screen, TopBar, TopBarButton } from "@/ui";
+import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView, LoadingLadybug, Screen, TopBar, TopBarButton } from "@/ui";
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
@@ -383,7 +383,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {loading && !data ? <LoadingView /> : null}
       {chapterMode ? (
         <>
-          {data && searchData.loading && !searchData.data ? <LoadingView /> : null}
+          {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
           {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}
           <ChapterList items={chapterItems} />
         </>

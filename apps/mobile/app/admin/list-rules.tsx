@@ -8,7 +8,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, Field, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, Field, LoadingLadybug, NoticeBox, Screen, Section } from "@/ui";
 
 /** 緞帶小預覽：一條橫的色帶，顯示目前的文字與顏色。 */
 function Sample({ label, color }: { label: string; color: keyof typeof RIBBON_COLORS }) {
@@ -107,9 +107,9 @@ export default function ListRulesScreen() {
         </AppText>
         <Card style={{ paddingVertical: 0 }}>
           {courses.loading && !courses.data ? (
-            <AppText variant="callout" tone="muted" style={{ padding: space.md }}>
-              載入中…
-            </AppText>
+            <View style={{ padding: space.md, alignItems: "center" }}>
+              <LoadingLadybug />
+            </View>
           ) : null}
           {cards.map((k, i) => (
             <View key={k.key} style={[styles.sortRow, { borderBottomColor: c.border }]}>
