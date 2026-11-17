@@ -3,7 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { clearCentral, handleWebSsoReturn, hasCentralSession, signInWithGoogle, signOutCentral, webSsoCheck, webSsoLogout } from "@/api/central";
-import { api, loadToken, saveToken, type Member } from "@/api/client";
+import { api, cachedGet, clearApiCache, loadToken, peekCache, prefetchCommon, saveToken, type Member } from "@/api/client";
 
 /**
  * 登入狀態、資料重新整理訊號與（Web 限定的）報名清單。
@@ -55,6 +55,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [ssoNext, setSsoNext] = useState<string | null>(null);
 
   useEffect(() => {
+    // 跟登入檢查同時開始抓公開資料，頁面一出現就有內容（不必等 /me 回來才開始）。
+    if (Platform.OS === "web") prefetchCommon(globalThis.location?.pathname ?? "/");
     (async () => {
       const raw = await AsyncStorage.getItem(CART_KEY).catch(() => null);
       if (raw) setCartState(JSON.parse(raw) as string[]);
@@ -90,6 +92,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     invalidate();
   }, [invalidate]);
   const memberSub = member?.sub;
+  // 換帳號（登入、登出）時清掉讀取快取；開啟網站、登入檢查剛完成那一次不清（預先抓的資料已經帶著憑證）。
+  const settledSub = useRef<{ sub: string | undefined } | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    if (settledSub.current && settledSub.current.sub !== memberSub) clearApiCache();
+    settledSub.current = { sub: memberSub };
+  }, [ready, memberSub]);
   const refreshMember = useCallback(
     async (minGapMs = 0) => {
       if (!memberSub || Date.now() - lastFetch.current < minGapMs) return;
@@ -177,15 +186,21 @@ export function useSession(): Session {
 /** early：公開資料（公告等）不必等登入狀態載入完成，頁面一開就先抓。 */
 export function useApi<T>(path: string | null, opts: { early?: boolean } = {}): { data: T | undefined; error: string | null; loading: boolean; reload: () => void } {
   const { version, member, ready } = useSession();
-  const [data, setData] = useState<T>();
+  const [data, setData] = useState<T | undefined>(() => (path ? peekCache<T>(path) : undefined));
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !(path && peekCache(path) !== undefined));
   const seq = useRef(0);
-  const load = useCallback(() => {
-    if ((!ready && !opts.early) || !path) return;
+  // 不再等登入檢查（/me）完成才抓資料：請求本來就會帶著登入憑證，伺服器自己判斷；登入狀態確定後只有「換了帳號」才重抓。
+  const load = useCallback((fresh = false) => {
+    if (!path) return;
     const id = ++seq.current;
-    setLoading(true);
-    api<T>("GET", path)
+    const hit = peekCache<T>(path);
+    if (hit !== undefined) {
+      setData(hit);
+      setLoading(false);
+    } else setLoading(true);
+    // 開啟頁面時，10 秒內剛抓過（例如開機預先抓的）就直接用；重新整理、資料異動、回到前景一律重抓。
+    cachedGet<T>(path, fresh ? 0 : 10_000)
       .then((d) => {
         if (id !== seq.current) return;
         setData(d);
@@ -193,15 +208,28 @@ export function useApi<T>(path: string | null, opts: { early?: boolean } = {}): 
       })
       .catch((e: Error) => id === seq.current && setError(e.message))
       .finally(() => id === seq.current && setLoading(false));
-  }, [path, ready, opts.early]);
-  // member?.sub 與 version 變動時重新抓取。
-  useEffect(load, [load, version, member?.sub]);
+  }, [path]);
+  const wasReady = useRef(ready);
+  const loadedOnce = useRef(false);
+  // member?.sub 與 version 變動時重新抓取；「登入檢查剛完成」那一刻不重抓（第一次請求已經帶著憑證）。
+  useEffect(() => {
+    if (!wasReady.current && ready && loadedOnce.current) {
+      wasReady.current = true;
+      return;
+    }
+    wasReady.current = ready;
+    const first = !loadedOnce.current;
+    loadedOnce.current = true;
+    load(!first);
+  }, [load, version, member?.sub, ready]);
   const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      if (focused.current) load();
+      if (focused.current) load(true);
       focused.current = true;
     }, [load]),
   );
-  return { data, error, loading: loading || !ready, reload: load };
+  const reload = useCallback(() => load(true), [load]);
+  void opts;
+  return { data, error, loading: loading || (!ready && data === undefined), reload };
 }

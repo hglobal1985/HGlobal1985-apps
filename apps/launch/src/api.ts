@@ -560,15 +560,18 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
     where = " WHERE c.status = 'published' OR (c.status = 'archived' AND (c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?1) OR c.id IN (SELECT i.course_id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.member_sub = ?1 AND o.status = 'pending') OR c.id IN (SELECT course_id FROM learning_started WHERE member_sub = ?1)))";
     args = [s.sub];
   }
-  const [{ results }, rankMap, state] = await Promise.all([
+  // 全部同時查（以前網址對照表接在後面一個一個查，每一次都多等一趟資料庫來回）。
+  const [{ results }, rankMap, state, centerSlugs, seriesSlugs, mine] = await Promise.all([
     ctx.db.prepare(`${COURSE_SELECT}${where} ORDER BY c.sort_order, c.created_at`).bind(...args).all<CourseRow>(),
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
+    centerSlugMap(ctx.db),
+    seriesSlugMap(ctx.db),
+    !all && s ? rightsOf(ctx) : Promise.resolve(null),
   ]);
   // 瀏覽範圍：管理清單不過濾；公開清單依「誰可以瀏覽」，管理者與已報名／審核中／學習過的人照常看得到。
   let visible = results;
   if (!all) {
-    const mine = s ? await rightsOf(ctx) : null;
     visible = results.filter((r) => {
       const mineOnly = state.enrolled.has(r.id) || state.pending.has(r.id) || state.started.has(r.id);
       if (isPrivate(r.view_scope)) return mineOnly; // 私密連結：不出現在任何清單（已報名／學習過的學員在「學習中」仍看得到）
@@ -578,8 +581,8 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
     });
   }
   const eligibility = await eligibilityFor(s, rankMap, [...visible.map((r) => r.min_rank_code), DIAMOND]);
-  ctx.centerSlugs = await centerSlugMap(ctx.db);
-  ctx.seriesSlugs = await seriesSlugMap(ctx.db);
+  ctx.centerSlugs = centerSlugs;
+  ctx.seriesSlugs = seriesSlugs;
   const out = visible.map((r) => summarize(r, ctx, rankMap, state, eligibility));
   if (!rights || !s) return out;
   const r = rights;
@@ -1757,6 +1760,7 @@ const libItemOut = (r: LibItemRow, owner: boolean, unlocked: boolean): LibraryIt
 };
 /** 建立書櫃（邀請接受、集滿徽章自動解鎖共用）：需要中央會員編號；失敗回傳白話原因。 */
 async function createLibrary(ctx: Ctx, s: Session): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  if (s.kind !== "central") return { ok: false, code: "central_only", message: "請用會員中心帳號登入" };
   const number = libraryNumber(await memberNumberOf(s.sub, s.token));
   if (!number) return { ok: false, code: "no_member_number", message: "請先到會員中心填寫你的安麗會員編號，再回來" };
   if (await ctx.db.prepare("SELECT 1 AS ok FROM libraries WHERE number = ?").bind(number).first()) return { ok: false, code: "number_taken", message: "這個會員編號的書櫃已經存在（例如配偶共用同一個編號），請洽管理員" };
@@ -2555,17 +2559,18 @@ const routes: [string, RegExp, Handler][] = [
       const labels: Record<Duty, string> = { register: "報名窗口", collect: "收費窗口", review: "審核員" };
       // 向會員中心的幾個查詢彼此獨立，同時送出（以前是一個接一個，首頁會慢）。
       const central = s.kind === "central" ? s : null;
-      const [, rankMap, rv, opts, missing, badgeMap] = await Promise.all([
+      const [, rankMap, rv, opts, missing, badgeMap, canStats, rights] = await Promise.all([
         syncContact(ctx, s).catch(() => undefined),
         ranks(ctx.db),
         central ? rankValue(central.sub, central.token).catch(() => undefined) : undefined,
         central ? rankOptions(central.token).catch(() => new Map<string, string>()) : undefined,
         central ? profileGaps(central.sub, central.token, null).catch(() => []) : undefined,
         central ? rankBadges(central.token).catch(() => undefined) : undefined,
+        canViewStats(ctx, s).catch(() => false),
+        rightsOf(ctx),
       ]);
       const member = memberOf(s, rankMap, { duties: results.map((r) => labels[r.duty]) });
-      member.canViewStats = await canViewStats(ctx, s).catch(() => false);
-      const rights = await rightsOf(ctx);
+      member.canViewStats = canStats;
       if (rights.any) {
         member.courseRights = { all: rights.admin, create: canCreateCourse(rights), manageEditors: rights.admin || rights.staff, center: rights.center?.label ?? null, editor: rights.editor };
         if (rights.editor) member.titles = [...new Set([...member.titles, "小編"])];

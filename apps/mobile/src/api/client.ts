@@ -77,12 +77,14 @@ export function resolveUrl(url: string): string {
   return /^https?:\/\//.test(url) ? url : `${API_BASE}${url}`;
 }
 
+let tokenInit: Promise<unknown> | null = null;
 export async function loadToken(): Promise<string | null> {
   token = await AsyncStorage.getItem(TOKEN_KEY).catch(() => null);
   return token;
 }
 export async function saveToken(value: string | null): Promise<void> {
   token = value;
+  clearApiCache();
   if (value) await AsyncStorage.setItem(TOKEN_KEY, value).catch(() => undefined);
   else await AsyncStorage.removeItem(TOKEN_KEY).catch(() => undefined);
 }
@@ -100,6 +102,7 @@ export class RequestError extends Error {
 export async function api<T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown, retried = false): Promise<T> {
   const raw = typeof Blob !== "undefined" && body instanceof Blob;
   const headers: Record<string, string> = { "x-client-platform": Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : "web" };
+  await (tokenInit ??= loadToken()); // 第一個請求前先讀好測試登入憑證（開機預先抓資料時才不會漏帶）
   const central = token ? null : await centralToken();
   const bearer = token ?? central;
   if (bearer) headers.authorization = `Bearer ${bearer}`;
@@ -118,6 +121,42 @@ export async function api<T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
     throw new RequestError(res.status, err?.code ?? "http_error", err?.message ?? "系統忙碌，請稍後再試");
   }
   return data as T;
+}
+
+/**
+ * 讀取資料的記憶體快取（業主 2026-11-17：載入變慢）：
+ * ① 同一時間同樣的 GET 只送一次（好幾個元件同時要同一份資料）；
+ * ② 看過的資料先顯示、背景再更新（回到頁面不再從空白等起）；
+ * ③ 登入／登出、換帳號時整份清掉，不會看到上一位的資料。
+ */
+const GET_CACHE = new Map<string, { data: unknown; at: number }>();
+const GET_INFLIGHT = new Map<string, { p: Promise<unknown>; at: number }>();
+export const peekCache = <T>(path: string): T | undefined => GET_CACHE.get(path)?.data as T | undefined;
+export function clearApiCache() {
+  GET_CACHE.clear();
+  GET_INFLIGHT.clear();
+}
+/** 讀取並寫入快取；300 毫秒內同一路徑已在請求中就共用同一個請求（資料異動後的重新抓取不會用到舊的請求）。 */
+export function cachedGet<T>(path: string, maxAgeMs = 0): Promise<T> {
+  const hit = GET_CACHE.get(path);
+  if (maxAgeMs && hit && Date.now() - hit.at < maxAgeMs) return Promise.resolve(hit.data as T);
+  const run = GET_INFLIGHT.get(path);
+  if (run && Date.now() - run.at < 300) return run.p as Promise<T>;
+  const p = api<T>("GET", path).then((d) => {
+    GET_CACHE.set(path, { data: d, at: Date.now() });
+    if (GET_CACHE.size > 200) GET_CACHE.delete(GET_CACHE.keys().next().value!);
+    return d;
+  });
+  const entry = { p, at: Date.now() };
+  GET_INFLIGHT.set(path, entry);
+  const done = () => GET_INFLIGHT.get(path) === entry && GET_INFLIGHT.delete(path);
+  p.then(done, done);
+  return p;
+}
+/** 開啟網站時先把首頁、寰宇大學會用到的公開資料抓起來（跟登入檢查同時進行，不必等登入完成才開始）。 */
+export function prefetchCommon(pathname: string) {
+  if (/^\/(course|admin|library|auth|learn|series|orders|settings)(\/|$)/.test(pathname)) return;
+  for (const p of ["/courses", "/center-art", "/series-art", "/centers"]) cachedGet(p).catch(() => undefined);
 }
 
 /** 取得需要登入的圖片（例如 Mux 影片截圖）：回傳 Blob。只在 Web 使用。 */

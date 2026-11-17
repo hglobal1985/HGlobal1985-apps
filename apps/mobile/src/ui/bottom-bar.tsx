@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { router, usePathname, type Href } from "expo-router";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -9,10 +8,9 @@ import { useUnreadCount } from "@/state/unread";
 import { useTheme } from "@/theme/theme";
 import { barHeight } from "@/theme/tokens";
 import { AppText } from "./text";
+import { UniversityIcon } from "./university-icon";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
-/** 寰宇大學分頁用建築物圖示（MaterialCommunityIcons），其餘用 Ionicons。 */
-const BUILDING = { icon: "bank-outline", active: "bank" } as const;
 /** 短網址（/縮寫）：單層路徑且不是網站固定頁面。 */
 const FIXED = new Set(["/me", "/learning", "/notices", "/achievements", "/orders", "/courses", "/admin", "/settings", "/auth"]);
 const isShortLink = (p: string) => /^\/[a-z0-9-]{2,30}$/i.test(p) && !FIXED.has(p);
@@ -50,7 +48,7 @@ export function BottomBar() {
         return (
           <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title} onPress={() => router.navigate(t.href)}>
             <View>
-              {t.building ? <MaterialCommunityIcons name={on ? BUILDING.active : BUILDING.icon} size={24} color={color} /> : <Ionicons name={on ? t.active : t.icon} size={24} color={color} />}
+              {t.building ? <UniversityIcon size={24} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={24} color={color} />}
               {t.title === "通知" && unread > 0 ? (
                 <View style={[styles.badge, { backgroundColor: c.accent }]}>
                   <AppText variant="caption" style={{ color: c.textOnAccent, fontSize: 10, lineHeight: 12, fontWeight: "700" }}>
