@@ -97,6 +97,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
   const playLegacy = !!playLesson && session.legacyYoutube && !!session.playback;
   const playChapters = course ? course.lessons.filter((l) => !l.material) : [];
   const playNext = playLesson && !playLesson.material ? playChapters[playChapters.findIndex((l) => l.id === playLesson.id) + 1] : undefined;
+  // 進入課程頁就是「播放器版面」（業主 2026-11-17）：還沒按播放時，舞台是 EDM 加大播放鈕、下方是待機的控制列；按下去才開始載入並播放第一堂。
+  const firstPlayable = course && !editing ? course.lessons.find((l) => !l.locked && !l.full && (course.isList ? l.material : !l.material)) : undefined;
   const playLesson_ = (lid: string) => {
     engine.expectSwitch();
     setPlayingId(lid);
@@ -293,7 +295,27 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         ) : playLegacy && session.playback ? (
           <LessonPlayer playback={session.playback} onSegmentEnd={session.onLegacyEnd} />
         ) : (
-          <EdmStage course={course} />
+          <>
+            <View>
+              <EdmStage course={course} />
+              {firstPlayable ? (
+                <View pointerEvents="box-none" style={styles.stagePlay}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => playLesson_(firstPlayable.id)} style={styles.bigPlay}>
+                    <Ionicons name="play" size={34} color="#fff" style={{ marginLeft: 4 }} />
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+            {firstPlayable ? (
+              <View style={[styles.idleBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
+                <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => playLesson_(firstPlayable.id)} hitSlop={8} style={styles.idlePlay}>
+                  <Ionicons name="play" size={26} color={c.text} />
+                </Pressable>
+                <View style={[styles.idleTrack, { backgroundColor: c.border }]} />
+                <AppText variant="callout" tone="muted">{`-${Math.floor(firstPlayable.minutes)}:00`}</AppText>
+              </View>
+            ) : null}
+          </>
         )}
         {editing && canEditContent ? (
           <Pressable accessibilityRole="button" accessibilityLabel="編輯 EDM 與封面" onPress={() => setSheet("art")} style={styles.edmEdit}>
@@ -307,10 +329,10 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
         {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
         {session.playback?.kind === "demo" && playLesson ? <Pill label={session.playback.label} tone="warning" /> : null}
-        {playLesson && !member ? (
+        {!member && !editing && (playLesson || firstPlayable) ? (
           // 訪客提示：登入鈕在左、文字在右，強制同一列（業主 2026-11-17）。
           <View style={[styles.row, { flexWrap: "nowrap", alignItems: "center" }]}>
-            <Button variant="secondary" label="登入" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: lessonHref(course.id, playLesson.id) } })} />
+            <Button variant="secondary" label="登入" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: lessonHref(course.id, (playLesson ?? firstPlayable)!.id) } })} />
             <AppText variant="callout" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
               免費註冊 更多課程+解鎖成就
             </AppText>
@@ -396,6 +418,11 @@ function BannerButton({ label, onPress, strong }: { label: string; onPress: () =
 }
 
 const styles = StyleSheet.create({
+  stagePlay: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center" },
+  bigPlay: { width: 72, height: 72, borderRadius: 36, backgroundColor: "rgba(12,96,60,0.92)", alignItems: "center", justifyContent: "center" },
+  idleBar: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingHorizontal: 16, borderBottomWidth: 1 },
+  idlePlay: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  idleTrack: { flex: 1, height: 6, borderRadius: 3 },
   banner: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, paddingVertical: space.xs, minHeight: minTouch },
   bannerText: { flex: 1, color: "#fff", fontWeight: "700", fontSize: 15 },
   bannerBtn: { minHeight: 36, minWidth: 64, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1.5, borderColor: "#fff", alignItems: "center", justifyContent: "center" },
