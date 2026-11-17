@@ -913,6 +913,42 @@ async function courseDeleteImpact(db: D1Database, id: string): Promise<CourseDel
 
 /** 公開圖片（封面、EDM）的網址；版本號讓更新後瀏覽器改抓新圖。 */
 /** 頁面瀏覽次數 +1 並回傳累計（中心頁、系列頁共用；業主 2026-11-16：每進入一次就算一次，不分是否同一人）。 */
+const SUBSCRIBER_BASE = 688; // 每個中心顯示的訂閱人數從 688 開始算（業主 2026-11-17）
+
+async function subscriptionState(ctx: Ctx, key: string): Promise<{ count: number; subscribed: boolean }> {
+  const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_subscriptions WHERE center_key = ?").bind(key).first<{ n: number }>();
+  const mine = ctx.session ? await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(ctx.session.sub, key).first() : null;
+  return { count: SUBSCRIBER_BASE + (n?.n ?? 0), subscribed: !!mine };
+}
+
+async function broadcastsOf(db: D1Database, key: string): Promise<{ seconds: number; items: { id: string; text: string; date: string }[] }> {
+  const [cfg, list] = await Promise.all([
+    db.prepare("SELECT seconds FROM center_broadcast_cfg WHERE center_key = ?").bind(key).first<{ seconds: number }>(),
+    db.prepare("SELECT id, body, created_at FROM center_broadcasts WHERE center_key = ? ORDER BY created_at DESC, rowid DESC LIMIT 100").bind(key).all<{ id: string; body: string; created_at: string }>(),
+  ]);
+  // 日期用台灣時間（資料庫存 UTC）。
+  const tw = (iso: string) => new Date(Date.parse(iso.replace(" ", "T") + "Z") + 8 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, "/");
+  return { seconds: cfg?.seconds ?? 2, items: list.results.map((r) => ({ id: r.id, text: r.body, date: tw(r.created_at) })) };
+}
+
+/** 中心有新課程上架：通知這個中心的訂閱者（私密連結、素材清單、總部主辦的課不通知）。 */
+async function notifyNewCourse(ctx: Ctx, id: string): Promise<void> {
+  try {
+    const c = await ctx.db.prepare("SELECT title, host_unit, host_center_key AS hk, view_scope, is_list FROM courses WHERE id = ? AND status = 'published'").bind(id).first<{ title: string; host_unit: string; hk: string | null; view_scope: string; is_list: number }>();
+    if (!c?.hk || c.is_list === 1 || isPrivate(c.view_scope)) return;
+    const label = hostCenterOf(c.host_unit) || c.hk;
+    await notifySubscribers(ctx.db, c.hk, `${label}有新課程上架`, c.title.slice(0, 80), `/course/${id}`);
+  } catch {
+    /* 通知失敗不影響上架 */
+  }
+}
+
+/** 通知某個中心的所有訂閱者（站內通知；推播由通知機制自動處理）。 */
+async function notifySubscribers(db: D1Database, key: string, title: string, body: string, link: string): Promise<void> {
+  const { results } = await db.prepare("SELECT member_sub FROM center_subscriptions WHERE center_key = ?").bind(key).all<{ member_sub: string }>();
+  for (let i = 0; i < results.length; i += 40) await db.batch(results.slice(i, i + 40).map((r) => notify(db, { sub: r.member_sub }, title, body, link)));
+}
+
 async function bumpView(db: D1Database, kind: "center" | "series", key: string): Promise<number> {
   const row = await db.prepare("INSERT INTO page_views (kind, key, total) VALUES (?, ?, 1) ON CONFLICT(kind, key) DO UPDATE SET total = total + 1 RETURNING total").bind(kind, key).first<{ total: number }>();
   return row?.total ?? 0;
@@ -1828,6 +1864,7 @@ async function createCourse(ctx: Ctx, admin: Session) {
     audit(ctx.db, admin.sub, "course.create", "course", id, String(body.title ?? "")),
   ]);
   await ensureCourseUrl(ctx, id);
+  if (status === "published") await notifyNewCourse(ctx, id);
   return courseDetail(ctx, id);
 }
 
@@ -2050,6 +2087,7 @@ async function updateCourse(ctx: Ctx, id: string) {
   const res = batchRes[aliasStmts.length]!;
   if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
   await ensureCourseUrl(ctx, id);
+  if (pick("status", cur.status) === "published" && cur.status !== "published") await notifyNewCourse(ctx, id);
   return courseDetail(ctx, id);
 }
 
@@ -2540,6 +2578,90 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/short-links$/,
     async (ctx) => (await ctx.db.prepare("SELECT kind, value, slug FROM short_links ORDER BY kind, slug").all<{ kind: string; value: string; slug: string }>()).results,
+  ],
+  [
+    "GET",
+    /^\/center-subscription$/,
+    async (ctx) => {
+      // 中心訂閱：全部中心的顯示人數都從 688 開始算（業主 2026-11-17）；訪客也看得到人數。
+      const label = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 60);
+      if (!label) fail(400, "invalid_center", "請指定中心");
+      return subscriptionState(ctx, centerKey(label));
+    },
+  ],
+  [
+    "POST",
+    /^\/center-subscription$/,
+    async (ctx) => {
+      // 按一下訂閱、再按一下取消。
+      const s = requireMember(ctx);
+      const body = await readJson<{ center?: unknown }>(ctx.req);
+      const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
+      if (!label) fail(400, "invalid_center", "請指定中心");
+      const key = centerKey(label);
+      const had = await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).first();
+      if (had) await ctx.db.prepare("DELETE FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).run();
+      else await ctx.db.prepare("INSERT OR IGNORE INTO center_subscriptions (member_sub, center_key) VALUES (?, ?)").bind(s.sub, key).run();
+      return subscriptionState(ctx, key);
+    },
+  ],
+  [
+    "GET",
+    /^\/center-broadcasts$/,
+    async (ctx) => {
+      // 廣播公告（公開）：輪播秒數＋全部公告（新的在前）。
+      const label = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 60);
+      if (!label) fail(400, "invalid_center", "請指定中心");
+      return broadcastsOf(ctx.db, centerKey(label));
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/center-broadcasts$/,
+    async (ctx) => {
+      // 新增一則公告，並通知這個中心的訂閱者。
+      const body = await readJson<{ center?: unknown; text?: unknown }>(ctx.req);
+      const { s, center } = await requireCenterArt(ctx, typeof body.center === "string" ? body.center : null);
+      const text = typeof body.text === "string" ? body.text.trim().slice(0, 300) : "";
+      if (!text) fail(400, "text_required", "請輸入公告內容");
+      const id = crypto.randomUUID();
+      await ctx.db.batch([ctx.db.prepare("INSERT INTO center_broadcasts (id, center_key, body, edited_by) VALUES (?, ?, ?, ?)").bind(id, center.key, text, s.sub), audit(ctx.db, s.sub, "center.broadcast_add", "center", center.key, id)]);
+      await notifySubscribers(ctx.db, center.key, `${center.label}廣播公告`, text.slice(0, 80), `/courses?center=${encodeURIComponent(center.label)}`);
+      return broadcastsOf(ctx.db, center.key);
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/center-broadcasts\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      const body = await readJson<{ center?: unknown; text?: unknown }>(ctx.req);
+      const { s, center } = await requireCenterArt(ctx, typeof body.center === "string" ? body.center : null);
+      const text = typeof body.text === "string" ? body.text.trim().slice(0, 300) : "";
+      if (!text) fail(400, "text_required", "請輸入公告內容");
+      await ctx.db.batch([ctx.db.prepare("UPDATE center_broadcasts SET body = ?, edited_by = ? WHERE id = ? AND center_key = ?").bind(text, s.sub, id, center.key)]);
+      return broadcastsOf(ctx.db, center.key);
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/center-broadcasts\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      const { center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      await ctx.db.prepare("DELETE FROM center_broadcasts WHERE id = ? AND center_key = ?").bind(id, center.key).run();
+      return broadcastsOf(ctx.db, center.key);
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/center-broadcast-seconds$/,
+    async (ctx) => {
+      const body = await readJson<{ center?: unknown; seconds?: unknown }>(ctx.req);
+      const { center } = await requireCenterArt(ctx, typeof body.center === "string" ? body.center : null);
+      const n = Number(body.seconds);
+      if (!Number.isFinite(n) || n < 1 || n > 60) fail(400, "invalid_seconds", "輪播秒數請填 1～60");
+      await ctx.db.prepare("INSERT INTO center_broadcast_cfg (center_key, seconds) VALUES (?, ?) ON CONFLICT(center_key) DO UPDATE SET seconds = excluded.seconds").bind(center.key, Math.round(n)).run();
+      return broadcastsOf(ctx.db, center.key);
+    },
   ],
   [
     "POST",

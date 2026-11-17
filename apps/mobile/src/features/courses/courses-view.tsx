@@ -17,6 +17,9 @@ import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
+import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
+import { CenterBroadcastEditor } from "@/features/admin/center-broadcast-editor";
+import { showToast } from "@/ui/toast";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { flashMode } from "./mode-flash";
@@ -344,9 +347,30 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       .then((r) => setCenterViews(r.total))
       .catch(() => undefined);
   }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 訂閱（業主 2026-11-17）：全部中心的人數都從 688 開始算；再按一下取消。
+  const [sub, setSub] = useState<{ count: number; subscribed: boolean } | null>(null);
+  useEffect(() => {
+    if (activeCenter === ALL) return;
+    setSub(null);
+    api<{ count: number; subscribed: boolean }>("GET", `/center-subscription?center=${encodeURIComponent(activeCenter)}`)
+      .then(setSub)
+      .catch(() => undefined);
+  }, [activeCenter, member?.sub]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleSub = async () => {
+    if (!member) return void router.push({ pathname: "/me", params: { next: `/courses?center=${encodeURIComponent(activeCenter)}` } });
+    try {
+      const r = await api<{ count: number; subscribed: boolean }>("POST", "/center-subscription", { center: activeCenter });
+      setSub(r);
+      showToast(r.subscribed ? "已訂閱：有新課程上架或新公告，都會通知你" : "已取消訂閱");
+    } catch (e) {
+      showToast((e as Error).message);
+    }
+  };
+  const bc = useCenterBroadcasts(activeCenter === ALL ? "" : activeCenter);
+  const [bcOpen, setBcOpen] = useState(false);
   const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} subscribe={sub ? { ...sub, onPress: () => void toggleSub() } : undefined} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
   const { width: winWidth } = useWindowDimensions();
   const archivedBlock =
@@ -379,6 +403,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       <LoginPrompt />
       {centerAddress ? <CenterAddress address={centerAddress} /> : null}
+      {activeCenter !== ALL && bc.data?.items.length ? <CenterBroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setBcOpen(true)} /> : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {chapterMode ? (
@@ -416,11 +441,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     ) : null}
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
+    {bcOpen && bc.data ? <BroadcastSheet title={`${centerTitle(activeCenter)}廣播公告`} items={bc.data.items} onClose={() => setBcOpen(false)} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
         <CenterNameField key={activeCenter} center={activeCenter} />
         <CenterAddressField center={activeCenter} current={centerInfo.data?.[normCenter(activeCenter)] ?? ""} onSaved={centerInfo.reload} />
         <CenterEdm center={activeCenter} art={art} onChanged={centerArt.reload} />
+        <CenterBroadcastEditor center={activeCenter} onChanged={bc.reload} />
       </EditSheet>
     ) : null}
     </View>

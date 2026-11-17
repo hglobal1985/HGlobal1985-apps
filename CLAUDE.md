@@ -82,6 +82,8 @@
 
 - **編輯動作要「瞬間」反應（業主 2026-11-17 永久指示）**：章節與教材的上下移動、複製、刪除，畫面一律先直接更新（`app/course/[id].tsx` 的 `optimistic()`：先改畫面、請求排隊在背景送、全部完成才重新載入、失敗就還原並提示），後端對應請求帶 `?lite=1` 只回 `{ok}`／`{id}`，不重建整份課程資料。新增任何排序、複製、刪除、勾選類的編輯動作，都用同樣做法，不可讓使用者等伺服器。
 
+- **中心訂閱與廣播公告（業主 2026-11-17）**：中心頁封面左下角最左邊是**訂閱鈕**（`CenterHero` 的 `subscribe`：鈴鐺圖案與主選單「通知」一致、比膠卷標籤大兩倍、實心不透明、旁邊顯示訂閱人數；**全部中心都從 688 開始算**，`SUBSCRIBER_BASE`），膠卷標籤（門課／章節／點閱）維持原尺寸；再按一下取消，訪客按會先去登入。訂閱的人在「該中心有新課程上架」（`notifyNewCourse`，私密連結、素材清單、總部主辦不通知）與「中心管理員新增廣播公告」時收到通知（走 `notify()`，自動推播）。**廣播公告**（`center_broadcasts`）：中心頁地址下方的亮黃色橫條（網站標準亮黃色 `#FFD43B`，同「已付費」標籤；`CenterBroadcastBand`），強制一行、太長「…」＋「更多」，依設定秒數（預設 2 秒、`center_broadcast_cfg`）輪播，上下左右滑動切換，點一下彈出完整清單（日期＋內容，`BroadcastSheet`）；設定在中心頁 TopBar「編輯」面板最下面（`CenterBroadcastEditor`：新增多則、修改、刪除、每則停留秒數，按下就儲存），權限同中心封面編輯。**上拉面板的清單高度一律自動調整、寬度不變**：用 `SheetScroll`（`ui/bottom-sheet.tsx`，最高螢幕 62%），不要再寫固定 `maxHeight`。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。

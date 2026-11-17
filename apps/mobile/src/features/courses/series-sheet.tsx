@@ -1,11 +1,11 @@
 import { router } from "expo-router";
-import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Button, SheetAction } from "@/ui";
-import { BottomSheet } from "@/ui/bottom-sheet";
+import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
@@ -46,7 +46,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
         </AppText>
         {showAllSeries ? <SheetAction label="顯示全部" accessibilityLabel={`顯示「${showAllSeries}」全部梯次`} onPress={showAll} /> : null}
       </View>
-      <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ gap: 0 }}>
+      <SheetScroll>
         {nearestFirst(items).map((x) => (
           <Pressable
             key={x.id}
@@ -76,7 +76,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             <AppText tone="muted">›</AppText>
           </Pressable>
         ))}
-      </ScrollView>
+      </SheetScroll>
       <Button variant="secondary" label="關閉" onPress={onClose} fullWidth />
     </BottomSheet>
   );

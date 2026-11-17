@@ -1,11 +1,11 @@
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import type { CourseDetail, CourseSummary } from "@/api/client";
 import { eventDays } from "@/features/format";
 import { useApi } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, ErrorView, LoadingLadybug, SheetAction } from "@/ui";
-import { BottomSheet } from "@/ui/bottom-sheet";
+import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ChapterList } from "./lesson-list";
 
 /**
@@ -33,7 +33,7 @@ export function CourseLessonsSheet({ course, onClose }: { course: CourseSummary;
         </View>
         <SheetAction label="完整介紹" accessibilityLabel="完整介紹：進入課程介紹頁" onPress={goDetail} />
       </View>
-      <ScrollView style={{ maxHeight: 420 }} contentContainerStyle={{ gap: space.md }}>
+      <SheetScroll gap={space.md}>
         {loading && !data ? <LoadingLadybug /> : null}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {data ? (
@@ -41,7 +41,7 @@ export function CourseLessonsSheet({ course, onClose }: { course: CourseSummary;
             <ChapterList course={data} />
           </>
         ) : null}
-      </ScrollView>
+      </SheetScroll>
     </BottomSheet>
   );
 }

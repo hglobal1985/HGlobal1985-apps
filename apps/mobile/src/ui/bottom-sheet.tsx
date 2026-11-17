@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Animated, Modal, PanResponder, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -134,3 +134,16 @@ const styles = StyleSheet.create({
   hintPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.6)" },
   handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: space.xs },
 });
+
+/**
+ * 上拉面板裡的清單捲動區：高度依內容自動調整（內容少就矮、多就長高），最高到螢幕高度的 62%，超過才捲動；寬度不變（業主 2026-11-17）。
+ * 系列梯次、課程章節、廣播公告等所有上拉清單都用它，不要再寫固定的 maxHeight。
+ */
+export function SheetScroll({ children, gap = 0 }: { children: ReactNode; gap?: number }) {
+  const { height } = useWindowDimensions();
+  return (
+    <ScrollView style={{ maxHeight: Math.round(height * 0.62), flexGrow: 0 }} contentContainerStyle={{ gap }}>
+      {children}
+    </ScrollView>
+  );
+}

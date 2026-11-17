@@ -22,7 +22,7 @@ export const centerHeroFull = (winW: number) => Math.round((Math.min(winW, maxCo
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
  */
-export function CenterHero({ art, scrollY, courses, lessons, views, title }: { art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
+export function CenterHero({ art, scrollY, courses, lessons, views, title, subscribe }: { subscribe?: { count: number; subscribed: boolean; onPress: () => void }; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
   const { width: winW } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const full = centerHeroFull(winW);
@@ -53,10 +53,25 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title }: { a
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#shade)" />
       </Svg>
-      <View style={styles.chips} pointerEvents="none">
-        <Chip text={`${courses} 門課`} />
-        <Chip text={`${lessons} 章節`} />
-        <Chip text={`${views ?? 0} 點閱`} />
+      <View style={styles.chips} pointerEvents="box-none">
+        {/* 訂閱鈕（業主 2026-11-17）：放在最左邊、比膠卷標籤大兩倍、實心不透明；鈴鐺圖案與主選單「通知」一致，旁邊是訂閱人數。 */}
+        {subscribe ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: subscribe.subscribed }}
+            accessibilityLabel={subscribe.subscribed ? `已訂閱，共 ${subscribe.count} 人，再按一下取消訂閱` : `訂閱這個中心，目前 ${subscribe.count} 人`}
+            onPress={subscribe.onPress}
+            style={[styles.sub, { backgroundColor: subscribe.subscribed ? "#0C603C" : "#FFFFFF" }]}
+          >
+            <Icon name={subscribe.subscribed ? "notifications" : "notifications-outline"} size={30} color={subscribe.subscribed ? "#FFFFFF" : "#0C603C"} />
+            <AppText style={{ color: subscribe.subscribed ? "#FFFFFF" : "#0C603C", fontSize: 18, fontWeight: "800" }}>{subscribe.count}</AppText>
+          </Pressable>
+        ) : null}
+        <View style={styles.chipRow} pointerEvents="none">
+          <Chip text={`${courses} 門課`} />
+          <Chip text={`${lessons} 章節`} />
+          <Chip text={`${views ?? 0} 點閱`} />
+        </View>
       </View>
       {art ? (
         <Pressable accessibilityRole="button" accessibilityLabel="放大照片" onPress={() => setOpen(true)} hitSlop={8} style={styles.zoom}>
@@ -106,7 +121,9 @@ const styles = StyleSheet.create({
   addr: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: 14, borderWidth: 1 },
   pin: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   box: { overflow: "hidden", backgroundColor: "#2F5D3A", alignSelf: "stretch" },
-  chips: { position: "absolute", left: 12, bottom: 10, flexDirection: "row", gap: 6 },
+  chips: { position: "absolute", left: 12, bottom: 10, flexDirection: "row", gap: 6, alignItems: "center" },
+  chipRow: { flexDirection: "row", gap: 6 },
+  sub: { flexDirection: "row", alignItems: "center", gap: 6, height: 52, paddingHorizontal: 14, borderRadius: 26, marginRight: 2, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.22)" },
   chipText: { color: "#fff", fontWeight: "600" },
   zoom: { position: "absolute", right: 10, top: 10, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.45)", alignItems: "center", justifyContent: "center" },
