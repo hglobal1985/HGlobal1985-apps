@@ -105,6 +105,8 @@
 
 - **緞帶顯示規則（業主 2026-11-17）**：緞帶文字、顏色、開關全部來自「設定 > 課程排序與條件」（`ribbonsFor`，`features/courses/ribbons.ts`），程式內不可寫死緞帶文字。**公開免費（`isPublic`）的課程，不論有沒有登入都顯示 `public_free` 緞帶**（原本登入後被省略，改名「限時免費」時才發現）。
 
+- **待開工：素材專區（業主 2026-11-17 已定案，尚未實作）**：詳見 `docs/plan-materials-zone.md`（方案 A 兩區塊、合併短影音專輯與新增清單、素材第二層短網址只有超級管理員能設、分享網址從系列短網址往下長）。開工前先讀那份文件。
+
 ## 開發
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
