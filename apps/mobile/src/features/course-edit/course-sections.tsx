@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type CourseSummary, type Rank } from "@/api/client";
+import { api, HQ_UNIT, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -13,7 +13,7 @@ import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, DateSelect, Field, FormBlock, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
-import { BrandField, CategoryField } from "./field-groups";
+import { BrandField, CategoryField, HostField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
 
 /** 編輯面板的種類（每一區各自一個底部面板、各自儲存）。 */
@@ -266,17 +266,18 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
     earlyBird: !!course.earlyBird,
     earlyPriceTwd: course.earlyBird?.priceTwd != null ? String(course.earlyBird.priceTwd) : "",
     earlyUntil: course.earlyBird?.until ?? "",
-    freeFrom: toLocal(course.admin?.freeFrom),
-    freeUntil: toLocal(course.admin?.freeUntil),
+    freeFrom: toLocal(course.admin?.freeFrom).slice(0, 10), // 只選日期；開始＝當天 00:00、結束＝當天 23:59（業主 2026-11-18：日期一律用日期選單）
+    freeUntil: toLocal(course.admin?.freeUntil).slice(0, 10),
   };
   const [f, setF] = useState(init);
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const price = Number(f.priceTwd);
   const submit = async () => {
     if (!Number.isInteger(price) || price < 0) return setError("費用請輸入 0 以上的整數");
-    const freeFrom = parseLocal(f.freeFrom);
-    const freeUntil = parseLocal(f.freeUntil);
-    if (freeFrom === undefined || freeUntil === undefined) return setError("限時免費的日期格式請用 2026-12-01 19:30");
+    const freeFrom = f.freeFrom ? parseLocal(`${f.freeFrom} 00:00`) : null;
+    const freeUntil = f.freeUntil ? parseLocal(`${f.freeUntil} 23:59`) : null;
+    if (freeFrom === undefined || freeUntil === undefined) return setError("限時免費的日期不正確");
+    if (freeFrom && freeUntil && freeUntil < freeFrom) return setError("限時免費的結束日期不能早於開始日期");
     const early = f.earlyBird && !f.priceTba && price > 0;
     if (early) {
       const ep = Number(f.earlyPriceTwd);
@@ -310,8 +311,11 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
             </>
           ) : null}
           <Label>限時免費（選填）：期間內報名免費、自動開通</Label>
-          <Field label="開始（空白＝立即）" value={f.freeFrom} onChange={(v) => setF((x) => ({ ...x, freeFrom: v }))} placeholder="2026-12-01 00:00" />
-          <Field label="結束（空白＝不設定）" value={f.freeUntil} onChange={(v) => setF((x) => ({ ...x, freeUntil: v }))} placeholder="2026-12-31 23:59" hint="兩欄都空白表示不啟用；結束後恢復原價。" />
+          <DateSelect label="開始日期（空白＝立即，當天 00:00 起）" value={f.freeFrom} onChange={(v) => setF((x) => ({ ...x, freeFrom: v }))} />
+          <DateSelect label="結束日期（空白＝不設定，當天 23:59 止）" value={f.freeUntil} onChange={(v) => setF((x) => ({ ...x, freeUntil: v }))} />
+          <AppText variant="caption" tone="muted">
+            兩欄都空白表示不啟用；結束後恢復原價。
+          </AppText>
         </>
       ) : null}
       {f.priceTba ? <Pill label="費用尚未公布：課程頁顯示「費用尚未公布」，暫不開放報名" tone="warning" /> : price === 0 ? <Pill label="免費課程：報名後立即開通" tone="accent" /> : <Pill label="付費課程：報名後需審核繳費才開通" tone="warning" />}
@@ -366,48 +370,11 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
 }
 
 // ---------- 進階設定：指導／主辦單位、顯示選項、課程介紹、短網址、最後修改 ----------
-/** 主辦單位：預設收起（只顯示目前的主辦），要改再按「展開」。主辦單位含某個中心＝中心課程（出現在該中心頁）。 */
-function HostUnitBlock({ isHq, value, fixed, options, counts, onChange }: { isHq: boolean; value: string; fixed: string; options: string[]; counts: Record<string, number>; onChange: (v: string) => void }) {
-  const { c } = useTheme();
-  const [open, setOpen] = useState(false);
-  const summary = (value || HQ_UNIT).split(/[、,，]+/).map((x) => (x === HQ_UNIT ? x : centerTitle(x))).join("、");
-  if (!isHq) return <NoticeBox text={`主辦單位固定為「${fixed}」，由系統帶入。`} />;
-  return (
-    <View style={{ gap: space.sm }}>
-      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel="主辦單位" onPress={() => setOpen((o) => !o)} style={[styles.hostRow, { borderColor: c.border, backgroundColor: c.surface }]}>
-        <View style={{ flex: 1 }}>
-          <AppText variant="caption" tone="muted">
-            主辦單位（會公開顯示）
-          </AppText>
-          <AppText variant="body" numberOfLines={2}>
-            {summary}
-          </AppText>
-        </View>
-        <AppText variant="callout" tone="accent">
-          {open ? "收起" : "展開"}
-        </AppText>
-        <Ionicons name={open ? "chevron-up" : "chevron-down"} size={18} color={c.textMuted} />
-      </Pressable>
-      {open ? (
-        <>
-          <MultiChips options={options} value={value} counts={counts} onChange={onChange} />
-          <AppText variant="caption" tone="muted">
-            含某個中心＝中心課程，只出現在該中心頁；只有寰宇總部＝一般課程。管理權限與「中心」篩選以第一個中心為準。
-          </AppText>
-        </>
-      ) : null}
-    </View>
-  );
-}
-
 function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isHq = member?.role === "admin";
   const init = { hostUnit: course.hostUnit, chapterCovers: course.chapterCovers };
   const [f, setF] = useState(init);
-  const centers = useApi<string[]>(isHq ? "/centers" : null);
-  const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
-  const hostCounts = countByHost(allCourses.data ?? []);
   const { save, busy, error } = useCourseSave(course, onSaved);
   const submit = async () => {
     const body: Record<string, unknown> = { ...f };
@@ -416,7 +383,7 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   };
   return (
     <EditSheet material={course.isList} title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
-      <HostUnitBlock isHq={isHq} value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} options={[HQ_UNIT, ...(centers.data ?? [])]} counts={hostCounts} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
+      <HostField title="主辦單位" value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
       <AppText variant="caption" tone="muted">
         {course.admin?.editedAt ? `最後修改：${course.admin.editedByName || "（未記錄）"}　${dateTime(course.admin.editedAt)}` : "最後修改：（還沒有紀錄）"}
