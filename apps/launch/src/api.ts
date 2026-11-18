@@ -64,6 +64,7 @@ import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centr
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
+import { accessToken as driveAccess, authUrl as driveAuthUrl, cleanDriveName, completeConnect, driveConfigured, DriveError, DRIVE_CHUNK_BYTES, DRIVE_MAX_BYTES, isUploadSession, revoke as driveRevoke, sendChunk, startUpload } from "./gdrive.ts";
 import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
@@ -4165,6 +4166,128 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/admin\/drive$/,
+    async (ctx) => {
+      // 雲端硬碟上傳（業主 2026-11-18）：狀態與上傳紀錄。管理員只看得到自己傳的；超級管理員看全部。
+      const me = requireAdmin(ctx);
+      const isSuper = me.roles.includes("super_admin");
+      const link = await ctx.db.prepare("SELECT account_email, folder_name, connected_at, broken FROM drive_link WHERE id = 1").first<{ account_email: string; folder_name: string; connected_at: string; broken: number }>();
+      const rows = await (isSuper ? ctx.db.prepare("SELECT id, member_name, center, name, size, web_link, created_at FROM drive_uploads ORDER BY created_at DESC LIMIT 100") : ctx.db.prepare("SELECT id, member_name, center, name, size, web_link, created_at FROM drive_uploads WHERE member_sub = ? ORDER BY created_at DESC LIMIT 100").bind(me.sub)).all<{ id: string; member_name: string; center: string; name: string; size: number; web_link: string; created_at: string }>();
+      return {
+        configured: driveConfigured(ctx.env),
+        connected: !!link && !link.broken,
+        broken: !!link?.broken,
+        account: isSuper ? (link?.account_email ?? "") : "",
+        folder: link?.folder_name ?? "",
+        connectedAt: link?.connected_at ?? null,
+        maxBytes: DRIVE_MAX_BYTES,
+        chunkBytes: DRIVE_CHUNK_BYTES,
+        // 檔案連結只有業主本人（雲端硬碟擁有者）打得開，所以只給超級管理員。
+        uploads: rows.results.map((r) => ({ id: r.id, name: r.name, size: r.size, by: r.member_name, center: r.center, at: r.created_at, link: isSuper ? r.web_link : "" })),
+      };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/drive\/connect$/,
+    async (ctx) => {
+      const me = requireSuperAdmin(ctx);
+      if (!driveConfigured(ctx.env)) return fail(503, "drive_not_configured", "還沒有設定 Google 用戶端代碼與密鑰（Cloudflare 後台的 GOOGLE_CLIENT_ID、GOOGLE_CLIENT_SECRET）");
+      const state = `${randomId(16)}${randomId(16)}`;
+      await ctx.db.batch([
+        ctx.db.prepare("DELETE FROM drive_oauth_state WHERE expires_at < datetime('now')"),
+        ctx.db.prepare("INSERT INTO drive_oauth_state (state, sub, expires_at) VALUES (?, ?, datetime('now', '+10 minutes'))").bind(state, me.sub),
+      ]);
+      return { url: driveAuthUrl(ctx.env, `${ctx.url.origin}/api/v2/admin/drive/callback`, state) };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/drive\/callback$/,
+    async (ctx) => {
+      // Google 授權完成後導回這裡。身分用一次性 state 確認（它只由超級管理員按「連結」時產生）。
+      const back = (r: string) => new Response(null, { status: 302, headers: { location: `${ctx.url.origin}/admin/drive?drive=${r}` } });
+      const state = ctx.url.searchParams.get("state") ?? "";
+      const code = ctx.url.searchParams.get("code") ?? "";
+      const row = state ? await ctx.db.prepare("SELECT sub FROM drive_oauth_state WHERE state = ? AND expires_at >= datetime('now')").bind(state).first<{ sub: string }>() : null;
+      if (row) await ctx.db.prepare("DELETE FROM drive_oauth_state WHERE state = ?").bind(state).run();
+      if (!row || !code || ctx.url.searchParams.get("error")) return back("denied");
+      try {
+        const done = await completeConnect(ctx.env, code, `${ctx.url.origin}/api/v2/admin/drive/callback`);
+        await ctx.db.batch([
+          ctx.db.prepare("INSERT INTO drive_link (id, refresh_token, account_email, folder_id, folder_name, connected_by, connected_at, broken) VALUES (1, ?, ?, ?, '行動大學上傳', ?, datetime('now'), 0) ON CONFLICT(id) DO UPDATE SET refresh_token = excluded.refresh_token, account_email = excluded.account_email, folder_id = excluded.folder_id, folder_name = excluded.folder_name, connected_by = excluded.connected_by, connected_at = excluded.connected_at, broken = 0").bind(done.refreshToken, done.email, done.folderId, row.sub),
+          audit(ctx.db, row.sub, "drive.connect", "drive", "1", done.email),
+        ]);
+        return back("ok");
+      } catch (e) {
+        console.error("drive connect", e instanceof Error ? e.message : "error");
+        return back("failed");
+      }
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/drive\/connect$/,
+    async (ctx) => {
+      const me = requireSuperAdmin(ctx);
+      const link = await ctx.db.prepare("SELECT refresh_token FROM drive_link WHERE id = 1").first<{ refresh_token: string }>();
+      if (link) await driveRevoke(link.refresh_token);
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM drive_link WHERE id = 1"), audit(ctx.db, me.sub, "drive.disconnect", "drive", "1")]);
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/drive\/uploads$/,
+    async (ctx) => {
+      // 開始上傳：確認大小與名稱，向 Google 要一個可續傳的上傳工作（位址只給這位管理員這次用）。
+      requireAdmin(ctx);
+      const b = await readJson<{ name?: string; size?: number; mime?: string }>(ctx.req);
+      const name = cleanDriveName(String(b.name ?? ""));
+      const size = Number(b.size);
+      if (!name) return fail(400, "name_required", "找不到檔案名稱");
+      if (!Number.isInteger(size) || size <= 0) return fail(400, "empty_file", "檔案是空的");
+      if (size > DRIVE_MAX_BYTES) return fail(413, "file_too_large", `單檔最大 ${Math.round(DRIVE_MAX_BYTES / 1024 ** 3)}GB`);
+      try {
+        const { token, link } = await driveAccess(ctx.env);
+        const session = await startUpload(token, link.folder_id, name, String(b.mime ?? "").slice(0, 100), size);
+        return { session, chunkBytes: DRIVE_CHUNK_BYTES };
+      } catch (e) {
+        if (e instanceof DriveError) return fail(e.status, e.code, e.message);
+        throw e;
+      }
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/drive\/uploads\/chunk$/,
+    async (ctx) => {
+      // 轉傳一段（約 8MB）。回 {done:false,next}＝請從 next 位元組繼續；{done:true}＝完成並寫入紀錄。
+      const me = requireAdmin(ctx);
+      const session = ctx.url.searchParams.get("session") ?? "";
+      const start = Number(ctx.url.searchParams.get("start"));
+      const total = Number(ctx.url.searchParams.get("total"));
+      if (!isUploadSession(session)) return fail(400, "bad_session", "上傳資料不正確");
+      if (!Number.isInteger(start) || start < 0 || !Number.isInteger(total) || total <= 0 || total > DRIVE_MAX_BYTES || start >= total) return fail(400, "bad_range", "上傳範圍不正確");
+      const data = await ctx.req.arrayBuffer();
+      if (!data.byteLength || data.byteLength > DRIVE_CHUNK_BYTES || start + data.byteLength > total) return fail(400, "bad_chunk", "上傳資料大小不正確");
+      try {
+        const r = await sendChunk(session, data, start, total);
+        if (!r.done) return r;
+        const f = r.file;
+        await ctx.db.batch([
+          ctx.db.prepare("INSERT OR IGNORE INTO drive_uploads (id, member_sub, member_name, center, name, size, file_id, web_link) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), me.sub, me.name, me.center?.label ?? "", f.name, f.size, f.id, f.webViewLink),
+          audit(ctx.db, me.sub, "drive.upload", "drive", f.id, `${f.name}:${f.size}`),
+        ]);
+        return { done: true, name: f.name, size: f.size };
+      } catch (e) {
+        if (e instanceof DriveError) return fail(e.status, e.code, e.message);
+        throw e;
+      }
+    },
+  ],
+  [
+    "GET",
     /^\/admin\/storage$/,
     async (ctx) => {
       // 儲存空間管理（超級管理員）：各中心已使用的容量與各類型佔比。檔案大小以雲端儲存的實際大小為準，歸屬由資料庫對應。
@@ -5484,7 +5607,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
 }
 
 /** 不需要登入身分的公開路徑：不必為它們向會員中心查詢（首頁的公告、金句、設定每次都會打）。 */
-const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|central\/webhook|media\/(pub|img|file|audio))(\?|$)/;
+const NO_SESSION = /^\/api\/v2\/(admin\/drive\/callback|announcements|quotes\/random|config|central\/webhook|media\/(pub|img|file|audio))(\?|$)/;
 
 async function context(req: Request, env: Env, url: URL): Promise<Ctx> {
   const light = /^\/api\/v2\/me\/(central-profile|vocab)$/.test(url.pathname);

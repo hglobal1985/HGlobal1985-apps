@@ -37,6 +37,9 @@ export interface Env {
   DB: D1Database;
   /** YouTube Data API 金鑰（Secret，由業主在 Cloudflare 後台設定）：補教材的影片長度與發布日期。沒設定就不補。 */
   YOUTUBE_API_KEY?: string;
+  /** Google OAuth 用戶端（Secret，業主在 Cloudflare 後台設定）：管理員上傳檔案到業主的 Google 雲端硬碟用。沒設定就不提供該功能。 */
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
   /** Web Push 的 VAPID 私鑰（Secret，JWK 字串）。沒設定就不推播（站內通知照常）。 */
   VAPID_PRIVATE_JWK?: string;
   /** "on" 時開放模擬會員登入（內部測試用；上架前改為 "off"）。 */

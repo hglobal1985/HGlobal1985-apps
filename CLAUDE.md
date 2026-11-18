@@ -199,3 +199,5 @@
 - **寰宇大學專區標題列的「收合」（業主 2026-11-18）**：每個專區標題列（含教育中心）右邊、「移動」鈕的右邊有「收合／展開」鈕，預設展開；狀態記在本機 `hglobal:learn:zone-collapsed`（記住最後一次操作）。新增專區照用 `ZoneBand` 的 `folded`／`onFold`。
 - **安麗品牌專區訪客也看得到（業主 2026-11-18）**：專區標題一律顯示（就算還沒有卡片）；品牌卡是公開免費（`view_scope = 'all'`）所以訪客能點進去。品牌卡的連結來源清單優先用固定編號 `cxnfbadr`（`NEW_PRODUCT_LIST_ID`）找，因為清單名稱會被業主改（現在叫「安麗新品與特惠培訓」）。
 - **專區標題列整條可點收合（業主 2026-11-18）**：`ZoneBand` 整條是按鈕，點任意處都收合／展開；裡面的「移動」「收合」鈕仍各自運作。
+
+- **雲端硬碟上傳（業主 2026-11-18）**：設定 › 雲端硬碟上傳（`app/admin/drive.tsx`，所有管理員可用）把檔案存進業主 hglobal1985@gmail.com 的 Google 雲端硬碟「行動大學上傳」資料夾。**超級管理員用業主帳號授權一次**（頁面上的「連結 Google 雲端硬碟」，OAuth 只要 `drive.file`＋email 權限，只碰 App 自己建立的檔案）；授權後的長期通行證存在資料庫 `drive_link`（migration 0085，不回傳前端、不進 repo）。Cloudflare Secret 要由業主設定 `GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`（頁面上有一次性設定步驟；授權畫面要「發布應用程式」否則 7 天失效）；重新導向 URI＝`https://learn.hglobal1985.com/api/v2/admin/drive/callback`。上傳＝瀏覽器每 8MB 一段、經伺服器轉給 Google 的可續傳上傳（`src/gdrive.ts`、`/admin/drive/uploads`＋`/chunk`；單檔 2GB、任何格式含影片；斷線自動重試、從 Google 已收到處續傳；轉傳位址只允許 Google 上傳網址）；容量用業主的 15GB（與 Gmail、相簿共用），滿了提示「容量已滿」；授權失效（`invalid_grant`）標記 `broken` 並提示超級管理員重新連結。上傳紀錄 `drive_uploads`（誰、中心、檔名、大小）：管理員只看到自己的，超級管理員看全部並可開啟檔案連結（只有業主本人打得開）。App 版暫只有網頁版可上傳。
