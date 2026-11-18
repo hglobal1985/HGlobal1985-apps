@@ -17,8 +17,8 @@ import { CoverBadges, type CoverStats } from "./cover-stats";
 
 /**
  * 課程介紹頁與教材清單頁上方的封面（業主 2026-11-18：封面上不放任何提示文字，全部封面一致；左下角固定是封面統計模組的訂閱鈕＋點閱）。
- * EDM：圖片寬度自動符合畫面最大寬度，只能上下拖曳（滑鼠或手指，禁止左右），
- * 一進來停在管理員設定的預設位置（edmViewY）；點一下彈出小視窗可放大縮小、下載、分享。
+ * EDM：圖片寬度自動符合畫面最大寬度、停在管理員設定的預設位置，只有「點一下放大」，不能拖曳，
+ * 點一下彈出小視窗可放大縮小、下載、分享。
  * 沒有 EDM 時顯示色塊。外框用 StageFrame，高度與上課頁的影片區完全相同。
  */
 export function EdmStage({ course, stats }: { course: CourseSummary; stats?: CoverStats }) {
@@ -34,7 +34,7 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
         <Pressable accessibilityRole="button" accessibilityLabel="放大封面" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill}>
           <BrandCover brand={course.brand} fill />
         </Pressable>
-      ) : course.edmUrl ? <EdmPan uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
+      ) : course.edmUrl ? <EdmCoverImage uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
       {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={2} /> : null}
       {/* 左下角：訂閱鈕＋點閱次數（共用封面統計模組 cover-stats.tsx，與中心頁、系列頁封面同一組）。 */}
       {stats ? (
@@ -49,20 +49,17 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
   );
 }
 
-/** 網頁：在 EDM 上上下拖曳查看時，不觸發整頁的下拉重新整理（lib/web-pull-refresh.ts 認得 data-no-pull-refresh；業主 2026-11-17）。 */
+/** 網頁：放大視窗裡拖曳圖片時，不觸發整頁的下拉重新整理（lib/web-pull-refresh.ts 認得 data-no-pull-refresh；業主 2026-11-17）。 */
 const NO_PULL = Platform.OS === "web" ? ({ dataSet: { noPullRefresh: "" } } as object) : {};
 
-function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: () => void }) {
+/**
+ * EDM 封面（業主 2026-11-18：所有封面都只有「點一下放大」，不能拖曳）：圖片寬度符合舞台寬度，停在管理員設定的預設位置（edmViewY），
+ * 超出舞台的部分不顯示；要看完整圖點一下放大。圖比舞台矮（例如寬長條 logo）就置中、四周留安全距離。
+ */
+function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: () => void }) {
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [ratio, setRatio] = useState<number | null>(null); // 寬 / 高
-  const ty = useRef(new Animated.Value(0)).current;
-  const cur = useRef(0);
-  const maxUp = useRef(0);
-  const startY = useRef(0);
-  const openRef = useRef(onOpen);
-  openRef.current = onOpen;
-
   useEffect(() => {
     let alive = true;
     Image.getSize(uri, (w, h) => alive && h && setRatio(w / h), () => undefined);
@@ -70,36 +67,10 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
       alive = false;
     };
   }, [uri]);
-
   const imgH = ratio && box.w ? box.w / ratio : 0;
-  maxUp.current = Math.max(0, imgH - box.h);
-  const set = (v: number) => {
-    cur.current = Math.min(0, Math.max(-maxUp.current, v));
-    ty.setValue(cur.current);
-  };
-  // 一進來停在管理員指定的預設位置。
-  useEffect(() => {
-    if (imgH && box.h) set(-viewY * imgH);
-  }, [imgH, box.h, viewY]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > Math.abs(g.dx),
-      onPanResponderTerminationRequest: () => false,
-      onPanResponderGrant: () => {
-        startY.current = cur.current;
-      },
-      onPanResponderMove: (_e, g) => set(startY.current + g.dy), // 只看上下，左右拖曳完全忽略
-      onPanResponderRelease: (_e, g) => {
-        if (Math.hypot(g.dx, g.dy) < 6) openRef.current(); // 點一下＝放大
-      },
-    }),
-  ).current;
-  const wheel = Platform.OS === "web" ? { onWheel: (e: { deltaY: number; preventDefault?: () => void }) => set(cur.current - e.deltaY) } : {};
-
+  const top = -Math.min(Math.max(0, imgH - box.h), Math.max(0, viewY * imgH));
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} {...pan.panHandlers} {...wheel} {...NO_PULL} accessibilityRole="imagebutton" accessibilityLabel="課程海報，點一下放大，上下拖曳查看">
+    <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} onPress={onOpen} accessibilityRole="imagebutton" accessibilityLabel="課程封面，點一下放大">
       {imgH && imgH < box.h - 1 ? (
         // 圖比舞台「矮」（例如寬長條的 logo）：置中、四周保留安全距離，不貼上緣（業主 2026-11-18）。
         (() => {
@@ -110,10 +81,10 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
           return <Image source={{ uri }} resizeMode="contain" style={{ position: "absolute", width: w, height: w / (ratio ?? 1), left: (box.w - w) / 2, top: (box.h - w / (ratio ?? 1)) / 2 }} accessibilityIgnoresInvertColors />;
         })()
       ) : imgH ? (
-        <Animated.Image source={{ uri }} resizeMode="stretch" style={{ width: box.w, height: imgH, transform: [{ translateY: ty }] }} accessibilityIgnoresInvertColors />
+        <Image source={{ uri }} resizeMode="stretch" style={{ position: "absolute", left: 0, top, width: box.w, height: imgH }} accessibilityIgnoresInvertColors />
       ) : null}
       {!imgH ? <View style={[StyleSheet.absoluteFill, { backgroundColor: c.surfaceMuted }]} /> : null}
-    </View>
+    </Pressable>
   );
 }
 
