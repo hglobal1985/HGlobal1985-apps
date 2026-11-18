@@ -32,10 +32,11 @@ const GAP = space.sm;
  * 沒有確認鈕：點選即時套用；點空白處、或在面板上上滑／下滑＝確定並關閉。
  * 版面：一列固定三個、每個標籤固定大小（勾選前後尺寸、位置完全不變）。
  */
-export function CategorySheet({ courses, names, picked, onApply, onClose }: { courses: CourseSummary[]; names: string[]; picked: string[]; onApply: (sel: string[]) => void; onClose: () => void }) {
+export function CategorySheet({ courses, names, picked, brands, brand, onBrand, onApply, onClose }: { courses: CourseSummary[]; names: string[]; picked: string[]; brands: { id: string; name: string }[]; brand: string | null; onBrand: (id: string | null) => void; onApply: (sel: string[]) => void; onClose: () => void }) {
   const { c } = useTheme();
   const [sel, setSel] = useState<string[]>(picked);
   const [w, setW] = useState(0);
+  const [brandPick, setBrandPick] = useState<string | null>(brand);
   // 數字＝符合的課程裡的章節（堂）總數，不是課程數。
   const count = (s: string[]) => courses.filter((x) => matchesCats(x, s)).reduce((n, x) => n + x.lessonCount, 0);
   const total = count(sel);
@@ -79,6 +80,36 @@ export function CategorySheet({ courses, names, picked, onApply, onClose }: { co
               );
             })
           : null}
+        {brands.length ? (
+          <View style={{ width: "100%", gap: space.xs, marginTop: space.sm }}>
+            <AppText variant="callout" tone="muted" style={{ fontWeight: "700" }}>
+              品牌（單選）
+            </AppText>
+            <View style={styles.wrap}>
+              {brands.map((b) => {
+                const on = brandPick === b.id;
+                return (
+                  <Pressable
+                    key={b.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    accessibilityLabel={`品牌 ${b.name}`}
+                    onPress={() => {
+                      const next = on ? null : b.id;
+                      setBrandPick(next);
+                      onBrand(next);
+                    }}
+                    style={[styles.chip, { width: cell || undefined, backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : c.border }]}
+                  >
+                    <AppText variant="callout" numberOfLines={1} style={{ flexShrink: 1, fontWeight: "600", color: on ? c.textOnAccent : c.text }}>
+                      {b.name}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        ) : null}
       </ScrollView>
     </BottomSheet>
   );

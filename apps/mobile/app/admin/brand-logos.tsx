@@ -4,7 +4,6 @@ import { api, type BrandLogo } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { PickImageButton } from "@/features/admin/pick-image";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
-import { MultiChips } from "@/features/course-edit/course-sections";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -43,21 +42,18 @@ export default function BrandLogosScreen() {
   return (
     <Screen header={false}>
       <AppText variant="callout" tone="muted">
-        上傳品牌 logo，並指定它對應哪些分類。課程、素材在編輯「基本資料」勾選「使用品牌 logo 作為封面」，分類對得到時，封面就會用這個 logo。
+        新增品牌並上傳 logo。課程、素材、清單區塊在編輯時選「品牌」（和分類是分開的欄位）；沒有手動上傳封面時，封面就用這個品牌的 logo。
       </AppText>
-      <Button label="新增品牌 Logo" icon="add-circle-outline" loading={busy} onPress={create} fullWidth />
+      <Button label="新增品牌" icon="add-circle-outline" loading={busy} onPress={create} fullWidth />
       {list.data.map((b) => (
         <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`編輯 ${b.name}`} onPress={() => setEditId(b.id)}>
           <Card>
             {b.logoUrl ? <BrandCover brand={{ logoUrl: b.logoUrl, bgColor: b.bgColor, bgUrl: b.bgUrl }} style={{ borderRadius: radius.md }} /> : <View style={[styles.empty, { borderColor: c.border }]}><AppText tone="muted">還沒有上傳 logo</AppText></View>}
             <AppText variant="headline">{b.name}</AppText>
-            <AppText variant="caption" tone="muted">
-              {b.categories.length ? `對應分類：${b.categories.join("、")}` : "還沒有指定對應的分類"}
-            </AppText>
           </Card>
         </Pressable>
       ))}
-      {!list.data.length ? <EmptyState icon="images-outline" title="還沒有品牌 Logo" body="按上方「新增品牌 Logo」建立第一個。" /> : null}
+      {!list.data.length ? <EmptyState icon="images-outline" title="還沒有品牌 Logo" body="按上方「新增品牌」建立第一個。" /> : null}
       {cur ? <LogoSheet key={cur.id} logo={cur} onClose={() => setEditId(null)} onChanged={list.reload} /> : null}
     </Screen>
   );
@@ -65,14 +61,11 @@ export default function BrandLogosScreen() {
 
 function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () => void; onChanged: () => void }) {
   const { c } = useTheme();
-  const categories = useApi<string[]>("/admin/categories");
   const [name, setName] = useState(logo.name);
-  const [cats, setCats] = useState(logo.categories.join("、"));
   const [mode, setMode] = useState<BgMode>(logo.bgUrl ? "image" : logo.bgColor && logo.bgColor !== "#FFFFFF" ? "color" : "white");
   const [color, setColor] = useState(logo.bgColor ?? "#FFFFFF");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const catList = cats.split(/[、,，]+/).map((x) => x.trim()).filter(Boolean);
   const run = async (fn: () => Promise<unknown>, done?: string) => {
     setBusy(true);
     setError(null);
@@ -90,12 +83,12 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   };
   const upload = (part: "logo" | "bg") => (file: File) => run(() => api("PUT", `/admin/brand-logos/${logo.id}/${part}`, file), part === "logo" ? "已更新 logo" : "已更新底圖");
   const save = async () => {
-    const body: Record<string, unknown> = { name: name.trim(), categories: catList, bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null };
+    const body: Record<string, unknown> = { name: name.trim(), bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null };
     if (mode !== "image" && logo.bgUrl) await api("DELETE", `/admin/brand-logos/${logo.id}/bg`).catch(() => undefined);
     if (await run(() => api("PATCH", `/admin/brand-logos/${logo.id}`, body), "已儲存")) onClose();
   };
   const remove = async () => {
-    if (await confirmAsk("刪除品牌 Logo", `確定刪除「${logo.name}」？使用它當封面的課程會改回原本的封面。`, "刪除")) {
+    if (await confirmAsk("刪除品牌 Logo", `確定刪除「${logo.name}」？選了這個品牌的課程與素材會改回原本的封面。`, "刪除")) {
       if (await run(() => api("DELETE", `/admin/brand-logos/${logo.id}`), "已刪除")) onClose();
     }
   };
@@ -127,10 +120,6 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
           </AppText>
         </View>
       ) : null}
-      <AppText variant="callout" style={{ fontWeight: "700" }}>
-        對應的分類標籤（可複選）
-      </AppText>
-      {categories.data?.length ? <MultiChips options={categories.data} value={cats} onChange={setCats} /> : <AppText tone="muted">目前沒有分類</AppText>}
       <Button variant="danger" label="刪除這個品牌 Logo" icon="trash-outline" disabled={busy} onPress={remove} />
     </EditSheet>
   );

@@ -60,6 +60,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [selCats, setSelCats] = useState<string[]>(initialCategory ? initialCategory.split("、").filter(Boolean) : []);
   const category = selCats.join("、");
   const [catOpen, setCatOpen] = useState(false);
+  // 品牌篩選（業主 2026-11-18：品牌與分類分開，單選）；null＝全部品牌。
+  const brandList = useApi<{ id: string; name: string }[]>("/brands");
+  const [brandSel, setBrandSel] = useState<string | null>(null);
   const [center, setCenter] = useState(initialCenter || ALL);
   useEffect(() => {
     if (initialCategory) setSelCats(initialCategory.split("、").filter(Boolean));
@@ -101,6 +104,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       setModeBeforeCat(null);
     }
     syncUrl(vs.join("、"), vs.length ? ALL : center);
+  };
+  const pickBrand = (id: string | null) => {
+    setBrandSel(id);
+    if (id && mode !== "chapter") {
+      setModeBeforeCat(mode);
+      setMode("chapter");
+      flashMode("chapter", c.accent);
+    }
   };
   const pickCenter = (v: string) => {
     setCenter(v);
@@ -207,7 +218,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const normCenter = (v: string) => v.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
   const activeCenter = mode === "center" ? center : ALL;
-  const inCategory = (x: CourseSummary) => matchesCats(x, selCats);
+  const inCategory = (x: CourseSummary) => matchesCats(x, selCats) && (!brandSel || x.brandId === brandSel);
   // 中心清單的排序（業主 2026-11-16）：依「課程數」由多到少，但只計算「有上傳教材」的課程（影音來源或附件）；同數量依名稱。
   const centerCounts = useMemo(
     () =>
@@ -215,7 +226,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         .filter((name) => !HIDDEN_FROM_CENTER_LIST.has(normCenter(name))) // 業主 2026-11-17：「安麗公司」不顯示在中心清單（仍可當主辦單位）
         .map((name) => ({ name, count: courses.filter((x) => x.centerCourse && x.hasMaterial && normCenter(x.hostCenter) === normCenter(name) && inCategory(x)).length }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
-    [centers, courses, category], // eslint-disable-line react-hooks/exhaustive-deps
+    [centers, courses, category, brandSel], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const art = activeCenter !== ALL ? centerArt.data?.find((a) => a.center === activeCenter) : undefined;
   const canEditArt = activeCenter !== ALL && !!rights && (rights.all || (rights.center === activeCenter && (rights.manageEditors || !!rights.editor?.editOthers)));
@@ -264,7 +275,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [chapterMode, courses, searchData.data, searchIndex, q, category, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chapterMode, courses, searchData.data, searchIndex, q, category, brandSel, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
   // 一列幾張（業主 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
   const cols = flat ? portraitColumns(boxW) : tileColumns(boxW);
@@ -292,7 +303,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       <View style={[styles.filters, { alignItems: "center", gap: space.sm }]} onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}>
         <View style={{ flex: 1, minWidth: 0, height: minTouch }} onLayout={(e) => setSlotW(Math.floor(e.nativeEvent.layout.width))} />
         <View style={{ width: Math.round(112 * UI_SCALE), opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
-          <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
+          <CategoryFilterBox picked={brandSel ? [...selCats, brandList.data?.find((b) => b.id === brandSel)?.name ?? "品牌"] : selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => { pickCategory([]); setBrandSel(null); }} />
         </View>
         <View style={{ opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
           <ViewToggle value={mode} onChange={pickMode} wide />
@@ -316,7 +327,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       <View style={{ width: SEARCH_ICON_W }} />
       <View style={{ flex: 1, flexDirection: "row", alignItems: "flex-end", gap: space.sm, opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
       <View style={{ flex: 1 }}>
-        <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
+        <CategoryFilterBox picked={brandSel ? [...selCats, brandList.data?.find((b) => b.id === brandSel)?.name ?? "品牌"] : selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => { pickCategory([]); setBrandSel(null); }} />
       </View>
       <ViewToggle value={mode} onChange={pickMode} />
       </View>
@@ -474,7 +485,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     {canCreateCourse(member) ? (
       <AddMaterialFab onPick={setNewOpen} />
     ) : null}
-    {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
+    {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} brands={brandList.data ?? []} brand={brandSel} onBrand={pickBrand} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {bcOpen && bc.data ? <BroadcastSheet title={`${centerTitle(activeCenter)}廣播公告`} items={bc.data.items} onClose={() => setBcOpen(false)} /> : null}
     {artOpen && activeCenter !== ALL ? (

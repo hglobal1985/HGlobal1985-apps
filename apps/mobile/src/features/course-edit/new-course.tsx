@@ -20,7 +20,7 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list = f
   const centers = useApi<string[]>(isHq ? "/centers" : null);
   const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
   const hostCounts = countByHost(allCourses.data ?? []);
-  const [f, setF] = useState<BasicsForm>({ isShorts: false, title: "", teacher: "", teacherRank: "", teacherTitle: "", eventStart: "", eventEnd: "", category: "", series: defaultSeries ?? "", useBrandLogo: false });
+  const [f, setF] = useState<BasicsForm>({ isShorts: false, title: "", teacher: "", teacherRank: "", teacherTitle: "", eventStart: "", eventEnd: "", category: "", series: defaultSeries ?? "", brandId: "" });
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +31,7 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list = f
     setError(null);
     try {
       const body: Record<string, unknown> = list
-        ? { isList: true, title: f.title.trim(), category: f.category, useBrandLogo: f.useBrandLogo, ...(isSuper ? { series: f.series.trim() } : {}) }
+        ? { isList: true, title: f.title.trim(), category: f.category, brandId: f.brandId, ...(isSuper ? { series: f.series.trim() } : {}) }
         : { ...f, title: f.title.trim(), teacher: f.teacher.trim(), teacherTitle: f.teacherTitle.trim(), eventStart: f.eventStart || null, eventEnd: f.eventStart ? f.eventEnd || null : null, ...(isSuper ? { series: f.series.trim() } : { series: undefined }) };
       if (isHq) Object.assign(body, { hostUnit: host }); // 指導單位預設不勾（不建議勾選），建好後要的話到進階設定勾
       const d = await api<CourseDetail>("POST", "/admin/courses", body);

@@ -31,7 +31,7 @@ export function fitFontSize(title: string, w: number, h: number, max = 72, min =
 
 /**
  * 課程封面（課程清單縮圖）：有 16:9 封面圖就顯示圖片（管理員從 EDM 裁切出來的）；
- * 沒有就由系統自動產生：在主題色底上放大大的標題文字（程式排版，不是 AI 生成）；不顯示系列與分類標籤（業主 2026-11-14 指示）。
+ * 沒有就由系統自動產生（字級已依封面大小算好，不吃全站字體放大 noScale，否則平板／電腦會爆版，業主 2026-11-18）：在主題色底上放大大的標題文字（程式排版，不是 AI 生成）；不顯示系列與分類標籤（業主 2026-11-14 指示）。
  * fill＝填滿父層（課程介紹頁上方沒有 EDM 時用）。
  */
 export function CourseCover({ theme, label, title, height, imageUrl, fill }: { theme: string; label: string; title?: string; height?: number; imageUrl?: string | null; fill?: boolean }) {
@@ -62,7 +62,7 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
       {hasTitle ? (
         <View style={styles.titleBox}>
           {fs ? (
-            <AppText style={{ color: fg, fontSize: fs, lineHeight: Math.round(fs * 1.18), fontWeight: "900", textAlign: "center" }}>
+            <AppText style={{ color: fg, fontSize: fs, lineHeight: Math.round(fs * 1.18), fontWeight: "900", textAlign: "center" }} {...({ dataSet: { noScale: "" } } as object)}>
               {title}
             </AppText>
           ) : null}

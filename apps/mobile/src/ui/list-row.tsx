@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
@@ -21,6 +21,8 @@ export function ListRow({
   compact,
   playing,
   playingLesson,
+  titleLines,
+  dateChip,
 }: {
   icon?: IconName;
   /** 自訂的前置圖示（取代 icon），例如章節清單的主講人學士帽。 */
@@ -42,6 +44,10 @@ export function ListRow({
   playing?: boolean;
   /** 這一列的章節編號：讓圖示只認「播放器目前播的就是這一堂」的狀態（換章節的空檔不會誤用上一堂的播放／暫停狀態）。 */
   playingLesson?: string;
+  /** 標題最多幾行（超過「…」）；預設 compact＝1 行。清單（素材）頁用 2 行。 */
+  titleLines?: number;
+  /** 日期膠囊：接在標題最前面，跟標題一起排版，整列最多 titleLines 行（業主 2026-11-18）。 */
+  dateChip?: string;
 }) {
   const { c } = useTheme();
   return (
@@ -64,7 +70,9 @@ export function ListRow({
         leading ?? (icon ? <Icon name={icon} size={22} color={c.textMuted} /> : null)
       )}
       <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="headline" numberOfLines={compact ? 1 : undefined} style={unread ? undefined : { fontWeight: "500" }}>
+        <AppText variant="headline" numberOfLines={titleLines ?? (compact ? 1 : undefined)} style={unread ? undefined : { fontWeight: "500" }}>
+          {dateChip ? <Text style={[styles.chip, { backgroundColor: c.accentSoft, color: c.accentText }]}>{` ${dateChip} `}</Text> : null}
+          {dateChip ? " " : ""}
           {title}
         </AppText>
         {subtitle ? (
@@ -88,5 +96,6 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  chip: { fontSize: 12, lineHeight: 18, fontWeight: "700", borderRadius: 9, overflow: "hidden" },
   dot: { width: 10, height: 10, borderRadius: 5 },
 });

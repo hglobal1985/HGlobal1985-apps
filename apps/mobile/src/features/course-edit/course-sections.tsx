@@ -123,13 +123,14 @@ const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.st
 
 // ---------- 基本資料：名稱、主講人、分類、系列（封面顏色已刪除，無 EDM 時文字封面顏色自動隨機） ----------
 /** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
-export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; useBrandLogo: boolean };
+export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string };
 export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
   const set = <K extends keyof BasicsForm>(k: K) => (v: BasicsForm[K]) => setF((x) => ({ ...x, [k]: v }));
   const rankOptions = useRankOptions();
   const categories = useApi<string[]>("/admin/categories");
+  const brands = useApi<{ id: string; name: string }[]>("/brands");
   const series = useApi<string[]>(isSuper ? "/admin/series" : null);
   return (
     <>
@@ -150,11 +151,9 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
           <MultiChips options={categories.data} value={f.category} onChange={set("category")} />
         </View>
       ) : null}
-      <Check label="使用品牌 logo 作為封面（依上面的分類自動對應）" value={f.useBrandLogo} onChange={(v) => setF((x) => ({ ...x, useBrandLogo: v }))} />
-      {f.useBrandLogo ? (
-        <AppText variant="caption" tone="muted">
-          分類有對應的品牌 logo 才會套用（品牌 logo 在「設定 › 品牌 Logo」設定）；沒有對應時維持原本的封面。
-        </AppText>
+      {/* 品牌獨立於分類（業主 2026-11-18）：單選；沒有手動上傳封面時用品牌 logo 當封面（手動上傳 > 品牌 logo > 文字封面）。 */}
+      {brands.data?.length ? (
+        <Chips label="品牌（單選；沒上傳封面時用品牌 logo 當封面）" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={f.brandId} onChange={set("brandId")} />
       ) : null}
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
@@ -170,7 +169,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
 function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", useBrandLogo: course.useBrandLogo };
+  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "" };
   const [f, setF] = useState(init);
   // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");

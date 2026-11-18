@@ -118,7 +118,9 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
             highlight={!link && playingId === lesson.id}
             note=""
             title={lesson.title}
-            subtitle={[link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson), course.isList && lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ") || undefined}
+            titleLines={course.isList ? 2 : undefined}
+            dateChip={course.isList && lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined}
+            subtitle={course.isList ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
             right={link?.linkUrl ? <MaterialShare course={course} lesson={link} /> : course.isList && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
             onPress={
               link

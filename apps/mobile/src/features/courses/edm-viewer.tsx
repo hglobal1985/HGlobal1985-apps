@@ -26,9 +26,15 @@ export function EdmStage({ course }: { course: CourseSummary }) {
   const ribbons = ribbonsFor(course, member, config);
   return (
     <StageFrame>
-      {course.brand ? <BrandCover brand={course.brand} fill /> : course.edmUrl ? <EdmPan uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
+      {course.brand ? (
+        // 品牌 logo 封面點一下也能放大、下載、分享（業主 2026-11-18：與一般課程 EDM 同一個放大視窗）。
+        <Pressable accessibilityRole="button" accessibilityLabel="放大封面" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill}>
+          <BrandCover brand={course.brand} fill />
+        </Pressable>
+      ) : course.edmUrl ? <EdmPan uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
       {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={2} /> : null}
       {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={2} /> : null}
+      {course.brand && open ? <EdmLightbox uri={course.brand.logoUrl} bg={course.brand.bgColor ?? undefined} title={course.title} onClose={() => setOpen(false)} /> : null}
       {!course.brand && course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
     </StageFrame>
   );
@@ -129,7 +135,7 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
  * 站內小視窗：視窗大小剛好貼合圖片（沒有標題、沒有多餘留白），放大縮小、下載、分享按鈕都疊在圖片上。
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
-export function EdmLightbox({ uri, title, onClose }: { uri: string; title: string; onClose: () => void }) {
+export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: string; onClose: () => void; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string }) {
   useEffect(() => trackFeature("edm_zoom"), []);
   useDimLayer();
   const insets = useSafeAreaInsets();
@@ -233,7 +239,7 @@ export function EdmLightbox({ uri, title, onClose }: { uri: string; title: strin
     <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="關閉" />
-        <View style={[styles.frame, { width: frameW, height: frameH }]}>
+        <View style={[styles.frame, { width: frameW, height: frameH }, bg ? { backgroundColor: bg } : null]}>
           <View style={[StyleSheet.absoluteFill, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab" } as object) : null]} {...pan.panHandlers} {...wheel} {...NO_PULL}>
             <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors />
           </View>
