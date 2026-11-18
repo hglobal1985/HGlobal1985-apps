@@ -31,6 +31,7 @@ import { SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses } from "./sort";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
+import { portraitColumns, tileColumns } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView, LoadingLadybug, Screen, TopBar, TopBarButton } from "@/ui";
@@ -263,7 +264,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
   }, [chapterMode, courses, searchData.data, searchIndex, q, category, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
-  const cols = flat ? 3 : boxW >= 520 ? 3 : 2; // 中心頁的直式 EDM 卡一列三張
+  // 一列幾張（業主 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
+  const cols = flat ? portraitColumns(boxW) : tileColumns(boxW);
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
   const filterRow = (
     <View>
@@ -369,7 +371,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const centerHero =
     activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} subscribe={sub} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
-  const { width: winWidth } = useWindowDimensions();
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
   const archivedBlock =
     manager && archived.length ? (
       <View style={{ gap: space.sm }}>
@@ -391,13 +393,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const shortLink = activeCenter !== ALL ? links.data?.find((l) => l.kind === "center" && l.value === activeCenter) : undefined;
   return (
     <View style={{ flex: 1 }}>
-    <Screen header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={centerTitle(activeCenter)} onBack={backFromCenter} right={
+    <Screen wide header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={centerTitle(activeCenter)} onBack={backFromCenter} right={
             <>
               {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心首頁圖與公告" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
               {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
-          } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+          } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       <LoginPrompt />
       {centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {activeCenter !== ALL && bc.data?.items.length ? <CenterBroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setBcOpen(true)} /> : null}

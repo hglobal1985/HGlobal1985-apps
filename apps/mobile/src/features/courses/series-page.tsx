@@ -9,9 +9,10 @@ import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { PageHeader } from "@/features/page-header";
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
+import { portraitColumns } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { EmptyState, ErrorView, LoadingView, LoginPrompt, Screen } from "@/ui";
+import { CardGrid, EmptyState, ErrorView, LoadingView, LoginPrompt, Screen } from "@/ui";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
 import { lessonsOf } from "./category-sheet";
@@ -41,7 +42,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const [editOpen, setEditOpen] = useState(false);
   const [boxW, setBoxW] = useState(0);
   const scrollY = useRef(new Animated.Value(0)).current;
-  const { width: winW } = useWindowDimensions();
+  const { width: winW, height: winHeight } = useWindowDimensions();
   useEffect(() => {
     AsyncStorage.getItem(KEY)
       .then((v) => (v === "list" || v === "edm") && setView(v))
@@ -72,7 +73,8 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     setView(v);
     AsyncStorage.setItem(KEY, v).catch(() => undefined);
   };
-  const tileW = boxW ? Math.floor((boxW - GAP * 2) / 3) : 0;
+  const cols = portraitColumns(boxW); // 手機一列三張；大螢幕依寬度增加（業主 2026-11-18）
+  const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
   const toggle = (v: View_, icon: "list-outline" | "grid-outline", label: string) => (
     <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected: view === v }} accessibilityLabel={label} onPress={() => pick(v)} style={[styles.tbtn, view === v && { backgroundColor: c.accent }]}>
       <Ionicons name={icon} size={22} color={view === v ? c.textOnAccent : c.text} />
@@ -85,7 +87,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         path={sharePath}
         extra={isSuperAdmin(member) ? <TopBarButton label="編輯" accessibilityLabel="編輯系列封面" iconName="create-outline" onPress={() => setEditOpen(true)} /> : undefined}
       />
-      <Screen header={false} hero={<CenterHero art={art} scrollY={scrollY} courses={courses.length} lessons={lessonsOf(courses)} views={views} title={series} subscribe={sub} />} heroHeight={centerHeroFull(winW)} scrollY={scrollY}>
+      <Screen wide header={false} hero={<CenterHero art={art} scrollY={scrollY} courses={courses.length} lessons={lessonsOf(courses)} views={views} title={series} subscribe={sub} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}
@@ -96,7 +98,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
             {toggle("edm", "grid-outline", "圖片 EDM")}
           </View>
         ) : null}
-        {view === "list" ? courses.map((x) => <CourseRow key={x.id} course={x} />) : null}
+        {view === "list" ? <CardGrid>{courses.map((x) => <CourseRow key={x.id} course={x} />)}</CardGrid> : null}
         {view === "edm" ? (
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW ? courses.map((x) => <SeriesTile key={x.id} group={{ key: `c:${x.id}`, nearest: x, sessions: [x] }} width={tileW} flat />) : null}

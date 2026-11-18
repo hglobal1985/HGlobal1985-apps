@@ -2,7 +2,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import Svg, { Circle, Rect } from "react-native-svg";
 import { Pressable, StyleSheet, View } from "react-native";
-import { installNative, isIos, useInstallState } from "@/lib/install-app";
+import { installNative, isIos, isIpad, useInstallState } from "@/lib/install-app";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
@@ -14,8 +14,8 @@ import { flashText } from "./flash-notice";
 /** 與 App 內建瀏覽器警示條同一組紅色（in-app-banner.tsx）。 */
 const RED = "#B3261E";
 /**
- * 「加入主畫面」邀請卡（業主 2026-11-18，全站唯一來源）：只在手機網頁、還沒安裝時顯示。
- * 好處：手機推播的來源會顯示「寰宇行動大學」、開啟更快。Android 一鍵安裝；iPhone 顯示「分享 → 加入主畫面」教學。
+ * 「加入主畫面」邀請卡（業主 2026-11-18，全站唯一來源）：只在手機與平板網頁（含 iPad）、還沒安裝時顯示。
+ * 好處：手機推播的來源會顯示「寰宇行動大學」、開啟更快。Android 一鍵安裝；iPhone、iPad 顯示「分享 → 加入主畫面」教學。
  * dismissible＝可按 ✕ 先關掉這一次（首頁用）；通知設定頁不可關。
  */
 export function InstallCard({ dismissible = false }: { dismissible?: boolean }) {
@@ -69,7 +69,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
             {ios ? (
               <>
                 <AppText>1. 用 Safari 開啟本網站（不是在 LINE 或其他 App 裡）。</AppText>
-                <AppText>2. 點下方的「分享」圖示（方框加向上箭頭）。</AppText>
+                <AppText>{isIpad() ? "2. 點網址列右邊的「分享」圖示（方框加向上箭頭）。" : "2. 點下方的「分享」圖示（方框加向上箭頭）。"}</AppText>
                 <AppText>3. 往下找到「加入主畫面」，按右上角「加入」。</AppText>
                 <AppText variant="caption" tone="muted">
                   之後從主畫面的「寰宇行動大學」圖示開啟，才能收到手機推播（iOS 16.4 以上）。

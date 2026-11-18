@@ -10,7 +10,7 @@ import { confirmSheet } from "@/features/confirm";
 import { CourseCard } from "@/features/courses/course-card";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { GuestGate, AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section, Select } from "@/ui";
+import { CardGrid, GuestGate, AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section, Select } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 export default function LearningScreen() {
@@ -58,6 +58,7 @@ export default function LearningScreen() {
     );
   return (
     <Screen
+      wide
       top={
         enrolled.length ? (
           <View style={styles.filters}>
@@ -88,21 +89,23 @@ export default function LearningScreen() {
         </Card>
       ) : null}
       {inProgress.length ? (
-        <View style={styles.list}>
+        <CardGrid>
           {inProgress.map((course) => (
             <CourseCard key={course.id} course={course} onHide={canHide(course) ? () => hide(course) : undefined} />
           ))}
-        </View>
+        </CardGrid>
       ) : null}
       {finished.length ? (
         <Section title="已完成">
-          {finished.map((course) => (
-            <CourseCard key={course.id} course={course} onHide={canHide(course) ? () => hide(course) : undefined} />
-          ))}
+          <CardGrid>
+            {finished.map((course) => (
+              <CourseCard key={course.id} course={course} onHide={canHide(course) ? () => hide(course) : undefined} />
+            ))}
+          </CardGrid>
         </Section>
       ) : null}
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({ filters: { flexDirection: "row", gap: space.sm }, list: { gap: space.md } });
+const styles = StyleSheet.create({ filters: { flexDirection: "row", gap: space.sm } });

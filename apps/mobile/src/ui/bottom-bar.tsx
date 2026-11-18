@@ -5,6 +5,7 @@ import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
 import { useUnreadCount } from "@/state/unread";
+import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { barHeight } from "@/theme/tokens";
 import { AppText } from "./text";
@@ -33,6 +34,8 @@ export function BottomBar() {
   const unread = useUnreadCount();
   const lib = useLibraryMode();
   const [keyboard, setKeyboard] = useState(false);
+  // 大螢幕（業主 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
+  const { large } = useLayout();
   useEffect(() => {
     if (Platform.OS === "web") return;
     const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", () => setKeyboard(true));
@@ -42,13 +45,14 @@ export function BottomBar() {
   if (pathname.startsWith("/auth") || keyboard) return null;
   return (
     <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.tabBar, paddingBottom: insets.bottom }]} accessibilityRole="tablist">
+      <View style={[styles.row, large && styles.rowLarge]}>
       {tabs.map((t) => {
         const on = !lib && t.match(pathname);
         const color = lib ? LIB.muted : on ? c.accentText : c.textMuted;
         return (
           <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title} onPress={() => router.navigate(t.href)}>
             <View>
-              {t.building ? <UniversityIcon size={24} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={24} color={color} />}
+              {t.building ? <UniversityIcon size={large ? 26 : 24} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={large ? 26 : 24} color={color} />}
               {t.title === "通知" && unread > 0 ? (
                 <View style={[styles.badge, { backgroundColor: c.accent }]}>
                   <AppText variant="caption" style={{ color: c.textOnAccent, fontSize: 10, lineHeight: 12, fontWeight: "700" }}>
@@ -57,18 +61,21 @@ export function BottomBar() {
                 </View>
               ) : null}
             </View>
-            <AppText variant="caption" style={{ color, fontWeight: "600", fontSize: 12 }}>
+            <AppText variant="caption" style={{ color, fontWeight: "600", fontSize: large ? 13 : 12 }}>
               {t.title}
             </AppText>
           </Pressable>
         );
       })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { flexDirection: "row", minHeight: barHeight, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -3 }, elevation: 10 },
+  bar: { alignItems: "center", minHeight: barHeight, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: -3 }, elevation: 10 },
+  row: { flexDirection: "row", width: "100%" },
+  rowLarge: { maxWidth: 720 },
   tab: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2, paddingTop: 6, paddingBottom: 6, minHeight: barHeight },
   badge: { position: "absolute", top: -4, right: -12, minWidth: 16, height: 16, borderRadius: 8, paddingHorizontal: 3, alignItems: "center", justifyContent: "center" },
 });

@@ -9,6 +9,7 @@ import { HomeRail } from "@/features/courses/home-rail";
 import { collapseSeries } from "@/features/courses/sort";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
+import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { usePullRefresh } from "@/ui/pull-refresh";
@@ -24,6 +25,8 @@ let promptedFor: string | null = null;
 export default function HomeScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
+  // 大螢幕（業主 2026-11-18）：內容放寬到 960、左右留白加大；海報區在 HomeRail 依欄寬保留足夠高度（橫放時頁面可往下捲，不把海報裁成扁條）。
+  const lay = useLayout();
   const { member } = useSession();
   const { data, error, reload } = useApi<CourseSummary[]>("/courses");
   const [quote, setQuote] = useState<string | null>(null);
@@ -84,8 +87,8 @@ export default function HomeScreen() {
   return (
     <>
     {promptOpen && member ? <ProfilePrompt onClose={() => setPromptOpen(false)} initial={member.profileForm ?? null} /> : null}
-    <ScrollView style={{ flex: 1, backgroundColor: c.background }} contentContainerStyle={[styles.page, { paddingTop: insets.top + space.md }]} refreshControl={refreshControl} alwaysBounceVertical keyboardShouldPersistTaps="handled">
-      <View style={styles.inner}>
+    <ScrollView style={{ flex: 1, backgroundColor: c.background }} contentContainerStyle={[styles.page, { paddingTop: insets.top + space.md, paddingHorizontal: lay.large ? lay.gutter : space.md }]} refreshControl={refreshControl} alwaysBounceVertical keyboardShouldPersistTaps="handled">
+      <View style={[styles.inner, lay.large ? { maxWidth: Math.min(lay.wideMax, 960), gap: space.lg } : null]}>
         <View style={styles.head}>
           <BrandTitle />
           {member ? (
@@ -99,7 +102,7 @@ export default function HomeScreen() {
         {!data && !error ? <LoadingView /> : null}
         {data ? (
           <View style={styles.middle}>
-          <View style={styles.rails}>
+          <View style={[styles.rails, lay.large ? { gap: space.lg } : null]}>
             <HomeRail
               title="繼續學習"
               icon="book-outline"

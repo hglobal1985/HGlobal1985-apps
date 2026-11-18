@@ -1,4 +1,5 @@
 import { Platform } from "react-native";
+import { isIos as isIosDevice } from "./install-app";
 import { api } from "@/api/client";
 
 /**
@@ -8,7 +9,8 @@ import { api } from "@/api/client";
  */
 export type PushState = "unsupported" | "ios-needs-install" | "not-ready" | "denied" | "off" | "on";
 
-const isIos = () => typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
+// iPad Safari 的身分會寫成 Mac 電腦，用 install-app.ts 同一個判斷（含 iPad）。
+const isIos = () => isIosDevice();
 const isStandalone = () => typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true);
 const supported = () => Platform.OS === "web" && typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
 

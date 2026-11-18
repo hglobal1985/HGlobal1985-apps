@@ -3,6 +3,7 @@ import { Animated, Easing, Image, PanResponder, Platform, Pressable, StyleSheet,
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays, hostLine, placeText } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
+import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, CourseCover, Icon, type IconName } from "@/ui";
@@ -48,6 +49,10 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
   useCenterNames();
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
+  // 大螢幕（業主 2026-11-18）：海報區至少保留「欄寬 × 1.25」（橫放＝× 1）的高度，直式 EDM 大致完整，不會被壓成扁條。
+  const lay = useLayout();
+  const large = lay.large;
+  const [colW, setColW] = useState(0);
   const [page, setPage] = useState(0);
   // 點圖或名稱：先彈出這門課的章節摘要（右上角「完整介紹」，往上拉到最高處也會進入課程介紹頁），不直接跳頁。
   const [preview, setPreview] = useState<CourseSummary | null>(null);
@@ -119,7 +124,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
   };
   const [bg, fg] = tone === "green" ? [c.accentSoft, c.accentText] : [c.warningSoft, c.warning];
   return (
-    <View style={styles.col}>
+    <View style={styles.col} onLayout={large ? (e) => setColW(Math.floor(e.nativeEvent.layout.width)) : undefined}>
       <View style={[styles.pill, { backgroundColor: bg }]}>
         <Icon name={icon} size={18} color={fg} />
         <AppText variant="headline" numberOfLines={1} style={{ color: fg, fontWeight: "800" }}>
@@ -129,7 +134,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
       <AppText variant="caption" tone="muted" numberOfLines={3} style={styles.note}>
         {note ?? " "}
       </AppText>
-      <View style={styles.stage} onLayout={(e) => setBox({ w: Math.floor(e.nativeEvent.layout.width), h: Math.floor(e.nativeEvent.layout.height) })}>
+      <View style={[styles.stage, large && colW ? { minHeight: Math.round(colW * (lay.landscape ? 1 : 1.25)) } : null]} onLayout={(e) => setBox({ w: Math.floor(e.nativeEvent.layout.width), h: Math.floor(e.nativeEvent.layout.height) })}>
         {box.w > 0 && box.h > 0 ? (
           courses.length ? (
             <View style={{ width: box.w, height: box.h, overflow: "hidden", ...(Platform.OS === "web" ? ({ touchAction: "pan-y", userSelect: "none" } as object) : {}) }} {...pan.panHandlers}>
@@ -150,8 +155,9 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
         ) : null}
       </View>
       <View style={styles.dots}>
+        {/* 課程很多時，圓點只顯示放得下的數量（以目前這張為中心的一段），不會超出欄寬。 */}
         {courses.length > 1
-          ? courses.map((course, i) => (
+          ? dotWindow(courses.length, page, Math.max(5, Math.floor((box.w || 160) / 16))).map((i) => [courses[i], i] as const).map(([course, i]) => (
               <Pressable key={course.id} onPress={() => goTo(i)} accessibilityRole="button" accessibilityLabel={`第 ${i + 1} 張，共 ${courses.length} 張`} accessibilityState={{ selected: i === page }} hitSlop={4} style={styles.dotHit}>
                 <View style={[styles.dot, { backgroundColor: i === page ? c.accent : c.border }]} />
               </Pressable>
@@ -193,12 +199,19 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
   );
 }
 
+/** 圓點顯示範圍：最多 max 顆，以目前這張為中心。 */
+function dotWindow(n: number, page: number, max: number): number[] {
+  const len = Math.min(n, max);
+  const start = Math.max(0, Math.min(n - len, page - Math.floor(len / 2)));
+  return Array.from({ length: len }, (_, k) => start + k);
+}
+
 const styles = StyleSheet.create({
   col: { flex: 1, minWidth: 0, gap: space.xs, alignItems: "stretch" },
   pill: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.xs, minHeight: 36, paddingHorizontal: space.sm, borderRadius: radius.pill },
   note: { textAlign: "center", minHeight: 32 },
   stage: { flex: 1, minHeight: 120 },
-  dots: { flexDirection: "row", justifyContent: "center", alignItems: "center", height: 26 },
+  dots: { flexDirection: "row", justifyContent: "center", alignItems: "center", height: 26, overflow: "hidden" },
   dotHit: { width: 16, height: 26, alignItems: "center", justifyContent: "center", ...(Platform.OS === "web" ? ({ cursor: "pointer" } as object) : {}) },
   dot: { width: 11, height: 11, borderRadius: 6 },
   info: { gap: 2, alignItems: "center", minHeight: 112 },
