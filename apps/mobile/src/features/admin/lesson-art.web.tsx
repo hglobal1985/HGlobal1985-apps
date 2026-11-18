@@ -186,7 +186,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
             {preview.poster && job.usePoster ? <img src={preview.poster} alt="直式預覽" style={{ height: 90, aspectRatio: "3 / 4", borderRadius: 8 }} /> : null}
           </View>
           <View style={styles.buttons}>
-            <Button variant="secondary" label="取消" disabled={busy} onPress={() => setJob(null)} />
+            <Button variant="cancel" label="取消" disabled={busy} onPress={() => setJob(null)} />
             {job.step === "cover" ? (
               <>
                 <Button variant="secondary" label="只存橫式" disabled={busy} loading={busy} onPress={saveCoverOnly} />
@@ -194,7 +194,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
               </>
             ) : (
               <>
-                <Button variant="secondary" label="略過直式" disabled={busy} onPress={saveCoverOnly} />
+                <Button variant="cancel" label="略過直式" disabled={busy} onPress={saveCoverOnly} />
                 <Button label="儲存" icon="checkmark-outline" loading={busy} disabled={busy} onPress={save} />
               </>
             )}
@@ -362,7 +362,7 @@ function FramePicker({ lesson, onClose, onPicked }: { lesson: Lesson; onClose: (
       ) : null}
       <View style={styles.buttons}>
         {isYt ? <Button variant="secondary" label="重新載入播放器" icon="refresh-outline" onPress={() => (setPlayerOk(false), setReload((n) => n + 1))} /> : null}
-        <Button variant="secondary" label="取消" disabled={busy && isYt} onPress={onClose} />
+        <Button variant="cancel" label="取消" disabled={busy && isYt} onPress={onClose} />
         <Button label={isYt ? "擷取這個畫面" : "使用這張畫面"} icon="camera-outline" loading={busy} disabled={busy || (!isYt && !frame)} onPress={use} />
       </View>
     </BottomSheet>

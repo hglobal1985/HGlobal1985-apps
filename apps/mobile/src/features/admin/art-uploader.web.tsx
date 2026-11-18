@@ -156,8 +156,8 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", ce
           </AppText>
           {inSheet ? null : (
             <View style={styles.buttons}>
+              <Button variant="cancel" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
               <Button label="儲存封面" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
-              <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
             </View>
           )}
           {job.mode === "crop" ? <EdmCropper src={job.src} imgW={job.img.naturalWidth} imgH={job.img.naturalHeight} aspect={16 / 9} value={job.cover} onChange={(cover) => setJob({ ...job, cover })} /> : null}

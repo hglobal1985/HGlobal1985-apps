@@ -514,7 +514,7 @@ export function MoveToBlockSheet({ items, lesson, onPick, onClose }: { items: Le
           </Pressable>
         ))}
       </SheetScroll>
-      <Button variant="secondary" label="取消" onPress={onClose} fullWidth />
+      <Button variant="cancel" label="取消" onPress={onClose} fullWidth />
     </BottomSheet>
   );
 }
@@ -561,7 +561,7 @@ export function PickMaterialsSheet({ items, blockId, onMove, onClose }: { items:
       </SheetScroll>
       <View style={{ flexDirection: "row", gap: space.sm }}>
         <View style={{ flex: 1 }}>
-          <Button variant="secondary" label="取消" onPress={onClose} fullWidth />
+          <Button variant="cancel" label="取消" onPress={onClose} fullWidth />
         </View>
         <View style={{ flex: 1 }}>
           <Button label={sel.size ? `移動（${sel.size}）` : "移動"} disabled={!sel.size} onPress={() => onMove([...sel])} fullWidth />

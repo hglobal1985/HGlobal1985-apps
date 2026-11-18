@@ -89,7 +89,7 @@ export function EditSheet({
         {error ? <NoticeBox tone="danger" text={error} /> : null}
         <View style={styles.buttons}>
           <View style={{ flex: 1 }}>
-            <Button variant="secondary" label={hideSave && !slot ? "關閉" : "取消"} fullWidth disabled={isBusy} onPress={close} />
+            <Button variant="cancel" label={hideSave && !slot ? "關閉" : "取消"} fullWidth disabled={isBusy} onPress={close} />
           </View>
           {!hideSave && onSave ? (
             <View style={{ flex: 1 }}>

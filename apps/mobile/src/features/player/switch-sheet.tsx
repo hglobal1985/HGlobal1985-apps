@@ -36,7 +36,7 @@ function Sheet({ prompt }: { prompt: SwitchPrompt }) {
           </View>
           <View style={styles.buttons}>
             <View style={{ flexShrink: 0 }}>
-              <Button variant="secondary" label="關閉" onPress={() => prompt.resolve(false)} />
+              <Button variant="cancel" label="關閉" onPress={() => prompt.resolve(false)} />
             </View>
             <View style={{ flex: 1 }}>
               <Button label={`確定播放（${Math.max(0, left)}）`} fullWidth onPress={() => prompt.resolve(true)} />

@@ -82,7 +82,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
           </Pressable>
         ))}
       </SheetScroll>
-      <Button variant="secondary" label="關閉" onPress={onClose} fullWidth />
+      <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
     </BottomSheet>
   );
 }
@@ -165,7 +165,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
           </Pressable>
         ))}
       </SheetScroll>
-      <Button variant="secondary" label="關閉" onPress={onClose} fullWidth />
+      <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
     </BottomSheet>
   );
 }

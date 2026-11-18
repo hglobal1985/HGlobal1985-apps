@@ -1,3 +1,4 @@
+import { Button } from "@/ui/button";
 import { trackFeature } from "@/lib/feature-track";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type HostInstance, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
@@ -118,25 +119,6 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange 
 }
 
 /** 視窗頂端的按鈕：文字一律單行。儲存＝金黃色（中央視覺規範），儲存中顯示轉圈圈與「儲存中」。 */
-function Btn({ label, icon, onPress, disabled, loading, save }: { label: string; icon: IconName; onPress: () => void; disabled?: boolean; loading?: boolean; save?: boolean }) {
-  const { c, scheme } = useTheme();
-  const fg = save ? (scheme === "dark" ? "#172016" : "#1d2a22") : c.textOnAccent;
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
-      style={[styles.btn, save ? { backgroundColor: "#f2dc27", borderWidth: 2, borderColor: scheme === "dark" ? "#6b5424" : "#e6c48c" } : { backgroundColor: c.accent }, { opacity: disabled && !loading ? 0.45 : 1 }]}
-    >
-      {loading ? <LoadingLadybug size={26} /> : <Icon name={icon} size={20} color={fg} />}
-      <Text numberOfLines={1} style={{ color: fg, fontSize: 16, fontWeight: "700" }}>
-        {loading ? "儲存中" : label}
-      </Text>
-    </Pressable>
-  );
-}
-
 /**
  * 「資料需完整 才可瀏覽課程」視窗：蓋在首頁上層，內容壓縮在一個畫面內。
  * 欄位規則依中央會員最新版（串接指令 2026-11-13.9）：
@@ -368,10 +350,10 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       </Pressable>
       <View style={styles.actions}>
         <View style={{ flex: 1 }}>
-          <Btn save label="儲存" icon="save-outline" onPress={save} disabled={busy || !changed.length} loading={busy} />
+          <Button variant="cancel" label="關閉" icon="close" onPress={onClose} fullWidth />
         </View>
         <View style={{ flex: 1 }}>
-          <Btn label="關閉" icon="close" onPress={onClose} />
+          <Button label="儲存" icon="save-outline" onPress={save} disabled={busy || !changed.length} loading={busy} fullWidth />
         </View>
       </View>
     </BottomSheet>

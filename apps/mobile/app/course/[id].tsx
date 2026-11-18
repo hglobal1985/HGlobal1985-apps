@@ -190,7 +190,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       <View style={{ flex: 1 }}>
         <Button variant="secondary" label="付款審核中（點擊查看）" icon="time-outline" onPress={() => router.push(orderId ? `/orders/${orderId}` : "/orders")} fullWidth />
       </View>
-      <Button variant="danger" label="取消" loading={busy === "cancel-course"} disabled={!!busy} onPress={() => cancel()} />
+      <Button variant="cancel" label="取消" loading={busy === "cancel-course"} disabled={!!busy} onPress={() => cancel()} />
     </View>
     );
   };

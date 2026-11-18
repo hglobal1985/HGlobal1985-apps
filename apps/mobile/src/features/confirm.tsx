@@ -59,10 +59,10 @@ export function ConfirmSheetHost() {
       {p.message ? <AppText tone="muted">{p.message}</AppText> : null}
       <View style={styles.buttons}>
         <View style={{ flex: 1 }}>
-          <Button variant="secondary" label={p.cancelLabel ?? "取消"} fullWidth onPress={() => p.resolve(false)} />
+          <Button variant={p.danger ? "secondary" : "cancel"} label={p.cancelLabel ?? "取消"} fullWidth onPress={() => p.resolve(false)} />
         </View>
         <View style={{ flex: 1 }}>
-          <Button variant={p.danger ? "danger" : "primary"} label={p.confirmLabel ?? "確定"} fullWidth onPress={() => p.resolve(true)} />
+          <Button variant={p.danger ? "dangerSolid" : "primary"} label={p.confirmLabel ?? "確定"} fullWidth onPress={() => p.resolve(true)} />
         </View>
       </View>
     </BottomSheet>

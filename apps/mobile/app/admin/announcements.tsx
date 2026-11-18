@@ -64,8 +64,8 @@ export default function AnnouncementsScreen() {
               <>
                 <Field label="公告內容" value={editing.text} onChange={(v) => setEditing({ id: a.id, text: v })} multiline />
                 <View style={styles.row}>
+                  <Button variant="cancel" label="取消" onPress={() => setEditing(null)} />
                   <Button label="儲存" disabled={busy || !editing.text.trim()} onPress={() => run(async () => { await api("PATCH", `/admin/announcements/${a.id}`, { text: editing.text }); setEditing(null); }, "已儲存")} />
-                  <Button variant="ghost" label="取消" onPress={() => setEditing(null)} />
                 </View>
               </>
             ) : (

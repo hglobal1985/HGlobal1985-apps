@@ -188,8 +188,8 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
           </Card>
           {inSheet ? null : (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button variant="cancel" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
               <Button label="儲存" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
-              <Button variant="ghost" label="取消" disabled={busy} onPress={() => (setJob(null), setMsg(null))} />
             </div>
           )}
         </>

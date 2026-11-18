@@ -76,7 +76,7 @@ export function ZoneMoveSheet({ target, groups, onMoved, onClose }: { target: Zo
       </SheetScroll>
       <View style={{ flexDirection: "row", gap: space.sm }}>
         <View style={{ flex: 1 }}>
-          <Button variant="secondary" label="取消" onPress={onClose} fullWidth />
+          <Button variant="cancel" label="取消" onPress={onClose} fullWidth />
         </View>
         <View style={{ flex: 1 }}>
           <Button label={sel.size ? `移入（${sel.size}）` : "移入"} disabled={!sel.size} loading={busy} onPress={move} fullWidth />

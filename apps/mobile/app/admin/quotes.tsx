@@ -46,8 +46,8 @@ export default function QuotesScreen() {
               <>
                 <Field label="金句內容" value={editing.text} onChange={(v) => setEditing({ id: q.id, text: v })} multiline />
                 <View style={styles.row}>
+                  <Button variant="cancel" label="取消" onPress={() => setEditing(null)} />
                   <Button label="儲存" disabled={busy || !editing.text.trim()} onPress={() => run(async () => { await api("PATCH", `/admin/quotes/${q.id}`, { text: editing.text }); setEditing(null); })} />
-                  <Button variant="ghost" label="取消" onPress={() => setEditing(null)} />
                 </View>
               </>
             ) : (

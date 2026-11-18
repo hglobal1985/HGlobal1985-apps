@@ -147,7 +147,7 @@ export default function KeywordsScreen() {
               ))}
             {courses.loading && !courses.data ? <LoadingView /> : null}
           </SheetScroll>
-          <Button variant="secondary" label="關閉" onPress={() => setUsedBy(null)} fullWidth />
+          <Button variant="cancel" label="關閉" onPress={() => setUsedBy(null)} fullWidth />
         </BottomSheet>
       ) : null}
       {rename ? (
@@ -167,7 +167,7 @@ export default function KeywordsScreen() {
           </AppText>
           <View style={styles.sheetButtons}>
             <View style={{ flex: 1 }}>
-              <Button variant="secondary" label="取消" onPress={() => setRename(null)} fullWidth />
+              <Button variant="cancel" label="取消" onPress={() => setRename(null)} fullWidth />
             </View>
             <View style={{ flex: 1 }}>
               <Button label="確定改名" onPress={doRename} fullWidth />

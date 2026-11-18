@@ -119,7 +119,7 @@ export function OrderTimeline({ order, reviewer, canDeletePayments }: { order: O
         {reviewer ? input(note, setNote, "私人備註（只有審核人員看得到）") : null}
         {error ? <NoticeBox tone="danger" text={error} /> : null}
         <View style={{ flexDirection: "row" }}>
-          <Button variant="secondary" label="送出" icon="send-outline" loading={busy} disabled={!message.trim() && !note.trim()} onPress={send} />
+          <Button label="送出" icon="send-outline" loading={busy} disabled={!message.trim() && !note.trim()} onPress={send} />
         </View>
       </Card>
     </Section>

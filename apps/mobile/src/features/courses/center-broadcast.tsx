@@ -96,7 +96,7 @@ export function BroadcastSheet({ title, items, onClose }: { title: string; items
           </View>
         ))}
       </SheetScroll>
-      <Button variant="secondary" label="關閉" onPress={onClose} fullWidth />
+      <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
     </BottomSheet>
   );
 }

@@ -87,7 +87,7 @@ export function LibraryManage() {
 
       <Section title="書櫃名稱">
         <TextInput value={name} onChangeText={setName} placeholder="例如：王小明的書櫃" placeholderTextColor={c.textMuted} accessibilityLabel="書櫃名稱" maxLength={80} style={input} />
-        <Button variant="secondary" label="儲存名稱" onPress={() => void call("PUT", "/library/mine", { title: name })} disabled={!locked && (busy || !name.trim() || name.trim() === lib.title)} />
+        <Button label="儲存名稱" onPress={() => void call("PUT", "/library/mine", { title: name })} disabled={!locked && (busy || !name.trim() || name.trim() === lib.title)} />
       </Section>
 
       <Section title="進入密碼（整座書櫃）">

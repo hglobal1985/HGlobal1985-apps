@@ -93,8 +93,8 @@ export function CenterBroadcastEditor({ center, onChanged }: { center: string; o
         style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
       />
       <View style={styles.itemBtns}>
+        {editId ? <Button variant="cancel" label="取消修改" disabled={busy} onPress={() => (setEditId(null), setText(""))} /> : null}
         <Button label={editId ? "更新公告" : "新增公告"} icon="megaphone-outline" loading={busy} disabled={busy || !text.trim()} onPress={() => void submit()} />
-        {editId ? <Button variant="ghost" label="取消修改" disabled={busy} onPress={() => (setEditId(null), setText(""))} /> : null}
       </View>
     </View>
   );
