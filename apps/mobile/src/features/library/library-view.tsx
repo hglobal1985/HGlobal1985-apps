@@ -7,6 +7,7 @@ import { api, type LibraryItem, type LibraryUnlock, type LibraryView } from "@/a
 import { TYPE_INFO } from "@/features/link-types";
 import { eventDays } from "@/features/format";
 import { LIB, useLibraryChrome } from "@/lib/library-mode";
+import { useLayout } from "@/theme/layout";
 import { LoadingView } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { BottomSheet } from "@/ui/bottom-sheet";
@@ -81,8 +82,10 @@ export function LibraryScreen({ number }: { number: string }) {
 
 function Page({ children, gear }: { children: React.ReactNode; gear?: () => void }) {
   // 書櫃自成一套深色木質版面，不用行動大學的標準上方工具列；自己放一個返回鍵（沒有上一頁就回首頁）。
+  // 大螢幕（業主 2026-11-18）：書架放寬，一排看得到更多書。
+  const lay = useLayout();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: LIB.bg }} contentContainerStyle={styles.page}>
+    <ScrollView style={{ flex: 1, backgroundColor: LIB.bg }} contentContainerStyle={[styles.page, lay.large ? { maxWidth: lay.wideMax, paddingHorizontal: lay.gutter } : null]}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: Platform.OS === "web" ? 0 : 20 }}>
         <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))} hitSlop={10} style={{ width: 44, height: 44, justifyContent: "center" }}>
           <Ionicons name="chevron-back" size={28} color={LIB.brass} />

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { trackFeature } from "@/lib/feature-track";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -7,6 +7,7 @@ import { conditionText } from "@/features/achievements/text";
 import { dateOnly } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
+import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { GuestGate, AppText, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
@@ -15,6 +16,11 @@ import { GuestGate, AppText, EmptyState, ErrorView, LoadingView, Screen } from "
 export default function AchievementsScreen() {
   const { c } = useTheme();
   const { member } = useSession();
+  // 徽章卡一列幾張：手機 2 張、平板 3 張、寬螢幕 4～5 張（業主 2026-11-18 大螢幕版面）。
+  const lay = useLayout();
+  const perRow = lay.size === "compact" ? 2 : lay.size === "medium" ? 3 : lay.width >= 1180 ? 5 : 4;
+  const [gridW, setGridW] = useState(0);
+  const cardW = gridW ? Math.floor((gridW - space.sm * (perRow - 1)) / perRow) : "48.5%";
   const { config } = useUiConfig();
   const KEY_BADGES = config.app.libraryKeyBadges ?? 100; // 後台「徽章任務設定」可調
   const { data, error, loading, reload } = useApi<Achievement[]>(member ? "/me/achievements" : null);
@@ -27,7 +33,7 @@ export default function AchievementsScreen() {
     );
   const earned = (data ?? []).filter((a) => a.earned);
   return (
-    <Screen header={false}>
+    <Screen header={false} wide>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {data ? (
@@ -61,9 +67,9 @@ export default function AchievementsScreen() {
           </View>
         </Pressable>
       ) : null}
-      <View style={styles.grid}>
+      <View style={styles.grid} onLayout={(e) => setGridW(Math.floor(e.nativeEvent.layout.width))}>
         {(data ?? []).map((a) => (
-          <View key={a.id} style={[styles.card, { backgroundColor: c.surface, borderColor: a.earned ? c.accent : c.border, opacity: a.earned ? 1 : 0.6 }]} accessibilityLabel={`${a.name}，${a.earned ? "已取得" : "尚未取得"}`}>
+          <View key={a.id} style={[styles.card, { width: cardW }, { backgroundColor: c.surface, borderColor: a.earned ? c.accent : c.border, opacity: a.earned ? 1 : 0.6 }]} accessibilityLabel={`${a.name}，${a.earned ? "已取得" : "尚未取得"}`}>
             <AppText style={[styles.icon, !a.earned && { opacity: 0.35 }]}>{a.icon}</AppText>
             <AppText variant="headline" style={{ textAlign: "center" }} numberOfLines={2}>
               {a.name}
@@ -98,7 +104,7 @@ export default function AchievementsScreen() {
 
 const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
-  card: { width: "48.5%", borderWidth: 2, borderRadius: radius.md, padding: space.md, alignItems: "center", gap: space.xs },
+  card: { borderWidth: 2, borderRadius: radius.md, padding: space.md, alignItems: "center", gap: space.xs },
   key: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.md, padding: space.md },
   icon: { fontSize: 44, lineHeight: 54 },
   track: { height: 6, borderRadius: 3, overflow: "hidden" },

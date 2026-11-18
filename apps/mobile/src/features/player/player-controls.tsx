@@ -2,7 +2,8 @@ import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useTheme } from "@/theme/theme";
-import { maxContentWidth, minTouch } from "@/theme/tokens";
+import { minTouch } from "@/theme/tokens";
+import { useStageMax } from "@/ui/stage-frame";
 import { AppText, LoadingLadybug } from "@/ui";
 import { engine } from "./engine";
 import { rateText, remainingText, segmentOf } from "./engine.types";
@@ -17,6 +18,7 @@ import { usePlayer } from "./use-player";
 export function PlayerControls() {
   const { c } = useTheme();
   const s = usePlayer();
+  const maxWidth = useStageMax(); // 與上方舞台同寬（大螢幕兩欄時填滿左欄）
   const t = s.track;
   if (!t) return null;
   const { start, end } = segmentOf(t);
@@ -25,7 +27,7 @@ export function PlayerControls() {
   const icon = s.playing ? "pause" : "play";
   return (
     <View style={[styles.outer, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
-      <View style={styles.box}>
+      <View style={[styles.box, { maxWidth }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={s.playing ? "暫停" : "播放"} onPress={() => engine.toggle()} style={styles.btn}>
           {s.loading ? <LoadingLadybug size={32} /> : <Ionicons name={icon} size={22} color={c.text} />}
         </Pressable>
@@ -67,7 +69,7 @@ export function PlayerControls() {
 const styles = StyleSheet.create({
   outer: { borderBottomWidth: 1, alignItems: "center" },
   // 時間軸是主角：外距與按鈕間距都壓到最小，讓時間軸盡可能拉長（按鈕寬 36、高 44，圖示之間幾乎貼在一起）。
-  box: { flexDirection: "row", alignItems: "center", paddingHorizontal: 2, minHeight: minTouch, width: "100%", maxWidth: maxContentWidth },
+  box: { flexDirection: "row", alignItems: "center", paddingHorizontal: 2, minHeight: minTouch, width: "100%" },
   btn: { width: 36, height: minTouch, alignItems: "center", justifyContent: "center" },
   // 倍速與全螢幕兩顆貼得更近（寬度壓到 30、倍速文字不加寬），讓時間軸更長。
   btnTight: { minWidth: 30, height: minTouch, alignItems: "center", justifyContent: "center" },

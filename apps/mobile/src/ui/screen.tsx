@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { Animated, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
-import { maxContentWidth, space } from "@/theme/tokens";
+import { useLayout } from "@/theme/layout";
+import { space } from "@/theme/tokens";
 import { usePullRefresh } from "./pull-refresh";
 import { AppText } from "./text";
 
@@ -39,6 +40,8 @@ export function Screen({
   hero,
   heroHeight = 0,
   scrollY,
+  wide = false,
+  gutter: gutterOverride,
 }: {
   title?: string;
   subtitle?: string;
@@ -61,19 +64,27 @@ export function Screen({
   heroHeight?: number;
   /** 提供時，頁面捲動位移會寫進這個 Animated.Value（hero 內插縮放用）。 */
   scrollY?: Animated.Value;
+  /** 圖片、卡片類頁面（首頁、寰宇大學、學習中、系列、成就）：大螢幕時內容用寬版（theme/layout.ts 的 wideMax）；其他頁面用適合閱讀的寬度（readMax）。手機兩者一樣。 */
+  wide?: boolean;
+  /** 指定左右留白（例如課程頁大螢幕右欄比較窄，用小一點的留白）；預設依畫面寬度（theme/layout.ts）。 */
+  gutter?: number;
 }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const refreshControl = usePullRefresh();
   const [slot, setSlot] = useState<ReactNode>(null);
   const bar = footer ?? slot;
+  // 大螢幕版面（業主 2026-11-18）：內容寬度與左右留白依畫面寬度（theme/layout.ts）。
+  const lay = useLayout();
+  const maxW = { maxWidth: wide ? lay.wideMax : lay.readMax };
+  const gutter = { paddingHorizontal: gutterOverride ?? lay.gutter };
   return (
     <FooterSlot.Provider value={setSlot}>
     <View style={{ flex: 1 }}>
     {topBar ? <View style={{ zIndex: 6 }}>{topBar}</View> : null}
     {top ? (
-      <View style={[styles.top, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
-        <View style={styles.topInner}>{top}</View>
+      <View style={[styles.top, gutter, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
+        <View style={[styles.topInner, maxW]}>{top}</View>
       </View>
     ) : null}
     <View style={{ flex: 1 }}>
@@ -84,11 +95,12 @@ export function Screen({
       style={{ flex: 1, backgroundColor: c.background }}
       contentContainerStyle={[
         styles.content,
+        gutter,
         { paddingTop: (top ? space.md : (header ? insets.top : 0) + (tight ? space.xs : space.lg)) + (hero ? heroHeight : 0), paddingBottom: space.xxl },
       ]}
       contentInsetAdjustmentBehavior="automatic"
     >
-      <View style={[styles.inner, { gap }]}>
+      <View style={[styles.inner, maxW, { gap }]}>
         {header && (title || subtitle || right) ? (
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
@@ -111,8 +123,8 @@ export function Screen({
     </Scroller>
     </View>
     {bar ? (
-      <View style={[styles.footer, { backgroundColor: c.surface, borderTopColor: c.border }]}>
-        <View style={styles.footerInner}>{bar}</View>
+      <View style={[styles.footer, gutter, { backgroundColor: c.surface, borderTopColor: c.border }]}>
+        <View style={[styles.footerInner, maxW]}>{bar}</View>
       </View>
     ) : null}
     </View>
@@ -135,10 +147,10 @@ function Scroller({ scrollY, children, ...props }: { scrollY?: Animated.Value } 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: space.lg, alignItems: "center" },
   heroLayer: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 4 },
-  inner: { width: "100%", maxWidth: maxContentWidth, gap: space.lg },
+  inner: { width: "100%", gap: space.lg },
   top: { alignItems: "center", paddingHorizontal: space.lg, paddingBottom: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, zIndex: 5, elevation: 3, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
-  topInner: { width: "100%", maxWidth: maxContentWidth },
+  topInner: { width: "100%" },
   footer: { alignItems: "center", paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm, borderTopWidth: 1, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: -2 }, elevation: 6 },
-  footerInner: { width: "100%", maxWidth: maxContentWidth, gap: space.sm },
+  footerInner: { width: "100%", gap: space.sm },
   header: { flexDirection: "row", alignItems: "flex-end", gap: space.md, marginBottom: space.xs },
 });

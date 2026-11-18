@@ -27,10 +27,16 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
 }
 
 export const isStandalone = () => typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true);
-export const isIos = () => typeof navigator !== "undefined" && /iPad|iPhone|iPod/.test(navigator.userAgent);
-const isMobile = () => typeof navigator !== "undefined" && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+/**
+ * iPad 的 Safari 預設「以電腦版網站瀏覽」，瀏覽器身分會寫成 Mac 電腦（Macintosh），只能從「有觸控螢幕」分辨出是 iPad（業主 2026-11-18：iPad 也要顯示安裝提醒）。
+ */
+export const isIpad = () =>
+  typeof navigator !== "undefined" && (/iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && (navigator.maxTouchPoints ?? 0) > 1));
+export const isIos = () => typeof navigator !== "undefined" && (/iPhone|iPod/.test(navigator.userAgent) || isIpad());
+/** 手機或平板（Android 手機與平板、iPhone、iPad）；一般電腦不算。 */
+const isMobile = () => typeof navigator !== "undefined" && (/Android|iPhone|iPod/i.test(navigator.userAgent) || isIpad());
 
-/** 這個瀏覽器能不能（也值得）請使用者加入主畫面：手機網頁、還沒安裝、不是 App 內建瀏覽器（那裡裝不了，另有紅色警示條）。 */
+/** 這個瀏覽器能不能（也值得）請使用者加入主畫面：手機或平板網頁（含 iPad）、還沒安裝、不是 App 內建瀏覽器（那裡裝不了，另有紅色警示條）。 */
 export function canSuggestInstall(): boolean {
   return Platform.OS === "web" && isMobile() && !isStandalone() && !installed && !inAppBrowser();
 }

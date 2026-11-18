@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
+import { useLayout } from "@/theme/layout";
 import { radius, space } from "@/theme/tokens";
 import { dimStyle, useDimLayer } from "./dim-backdrop";
 import { AppText } from "./text";
@@ -48,6 +49,8 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
   const expandRef = useRef(onExpand);
   expandRef.current = onExpand;
   const { height: winH } = useWindowDimensions();
+  // 大螢幕（平板、電腦）：面板不再整片滿版，置中、限制寬度（theme/layout.ts 的 sheetMax，業主 2026-11-18）。
+  const { sheetMax } = useLayout();
   const [sheetH, setSheetH] = useState(0);
   // 上拉最多拉到「面板頂端接近螢幕上緣」。
   const maxUp = useRef(300);
@@ -103,7 +106,7 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="關閉" onPress={onClose} />
         <Animated.View
           onLayout={(e) => setSheetH(Math.round(e.nativeEvent.layout.height))}
-          style={[styles.sheet, { backgroundColor: c.surface, paddingBottom: space.lg + insets.bottom, transform: [{ translateY: ty }] }, onExpand && Platform.OS === "web" ? ({ userSelect: "none" } as object) : null]}
+          style={[styles.sheet, sheetMax ? { width: "100%", maxWidth: sheetMax, alignSelf: "center" } : null, { backgroundColor: c.surface, paddingBottom: space.lg + insets.bottom, transform: [{ translateY: ty }] }, onExpand && Platform.OS === "web" ? ({ userSelect: "none" } as object) : null]}
           accessibilityViewIsModal
           {...swipe}
         >

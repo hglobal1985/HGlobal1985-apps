@@ -43,5 +43,17 @@
   "migrationFrom1_0": {
     "note": "1.0 的鍵名對照 2.0：bg→background、card→surface、fg→text、muted→textMuted、line→border、green→accent、greenSoft→accentSoft、onGreen→textOnAccent、orangeSoft→warningSoft、warn→warning、ok→success。1.0 的 greenDark、olive、orange、borderWarn、borderBad、credit 不再是介面色（olive、orange 回到 logoPalette；greenDark 只用在緞帶與 App 圖示；borderWarn 只用在儲存按鈕外框）。",
     "darkChanged": { "accent": "#cee49f → #2f8a5b", "accentText": "（新增）#5db383", "accentSoft": "#2c3622 → #1d3226", "textOnAccent": "#172016 → #ffffff", "success": "#9bd39e → #4fa774" }
+  },
+  "responsive": {
+    "note": "大螢幕版面（2026-11-18）：平板、電腦不直接套用手機尺寸。來源：apps/mobile/src/theme/layout.ts、apps/mobile/src/lib/tablet-scale.ts。",
+    "breakpoints": { "compact": "<600", "medium": "600-899", "expanded": ">=900" },
+    "tabletScale": { "portrait": 1.2, "landscape": 1.12, "minScreenShortSide": 600 },
+    "desktopTextScale": 1.1,
+    "gutter": { "compact": 16, "medium": 24, "expanded": 32 },
+    "readMax": { "compact": 720, "medium": 760, "expanded": 880 },
+    "wideMax": { "compact": 720, "medium": 960, "expanded": 1280 },
+    "sheetMax": { "compact": null, "medium": 680, "expanded": 680 },
+    "columns": { "tile16x9": "2/3/4/5（格寬 <520、≥520、≥860、≥1180）", "portrait3x4": "3/4/5/6（格寬 <620、≥620、≥860、≥1180）", "courseCard": "1/2/2（寬 ≥1180 為 3）" },
+    "coursePageSplit": "expanded 且橫向：左 56% 影片／EDM＋控制列、右章節"
   }
 }

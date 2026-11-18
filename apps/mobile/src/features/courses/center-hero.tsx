@@ -3,6 +3,7 @@ import { Animated, Image, Linking, Pressable, StyleSheet, useWindowDimensions, V
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { resolveUrl } from "@/api/client";
 import { useTheme } from "@/theme/theme";
+import { layoutOf } from "@/theme/layout";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { EdmLightbox } from "./edm-viewer";
@@ -13,8 +14,17 @@ const SIDE = 16;
 /** 縮成窄橫幅時，照片上下留白合計（上 8＋下 4）。 */
 const COMPACT_GAP = space.sm + space.xs;
 
-/** 照片完全展開時的高度（左右滿版、16:10）。頁面用它在捲動內容最上方墊出同樣高的空間（Screen 的 heroHeight）。 */
-export const centerHeroFull = (winW: number) => Math.round((Math.min(winW, maxContentWidth) * 10) / 16);
+/**
+ * 照片完全展開時的寬與高。手機：左右滿版、16:10。頁面用高度在捲動內容最上方墊出同樣高的空間（Screen 的 heroHeight）。
+ * 大螢幕（業主 2026-11-18）：寬度跟內容寬版一樣（置中），高度最多畫面高度的 42%，橫放平板、電腦不會被照片佔滿整個畫面。
+ */
+export function centerHeroSize(winW: number, winH: number): { w: number; h: number } {
+  const lay = layoutOf(winW, winH);
+  if (!lay.large) return { w: winW, h: Math.round((Math.min(winW, maxContentWidth) * 10) / 16) };
+  const w = Math.min(winW, lay.wideMax + lay.gutter * 2);
+  return { w, h: Math.round(Math.min((w * 10) / 16, winH * 0.42)) };
+}
+export const centerHeroFull = (winW: number, winH = 10000) => centerHeroSize(winW, winH).h;
 
 /**
  * 中心專屬頁上方的照片（業主 2026-11-16 選方案 A）：
@@ -24,14 +34,14 @@ export const centerHeroFull = (winW: number) => Math.round((Math.min(winW, maxCo
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
  */
 export function CenterHero({ art, scrollY, courses, lessons, views, title, subscribe }: { subscribe?: SubscribeProps; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; courses: number; lessons: number; views: number | null; title: string }) {
-  const { width: winW } = useWindowDimensions();
+  const { width: winW, height: winH } = useWindowDimensions();
   const [open, setOpen] = useState(false);
-  const full = centerHeroFull(winW);
+  const { w: heroW, h: full } = centerHeroSize(winW, winH);
   const range = Math.max(1, full - (COMPACT_H + COMPACT_GAP));
   const at = (a: number, b: number) => scrollY.interpolate({ inputRange: [0, range], outputRange: [a, b], extrapolate: "clamp" });
   const url = art ? art.coverUrl ?? art.edmUrl : null;
   return (
-    <Animated.View style={[styles.box, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
+    <Animated.View style={[styles.box, heroW < winW ? { alignSelf: "center", width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
       {url ? (
         <Image source={{ uri: resolveUrl(url) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (

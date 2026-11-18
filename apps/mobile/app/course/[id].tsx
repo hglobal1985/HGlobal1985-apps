@@ -22,8 +22,10 @@ import { Check } from "@/features/course-edit/course-sections";
 import { EditLessonRows, LessonSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
+import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
+import { StageWidth } from "@/ui/stage-frame";
 import { AppText, Button, Card, LoadingLadybug, LoginPrompt, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
@@ -50,6 +52,7 @@ export function chapterFromParams(params: Record<string, unknown>): number | und
 export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; edit?: string; lesson?: string; chapter?: number }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
+  const lay = useLayout();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
   // 剛儲存回來的最新資料（重新載入完成前先用它，避免下一次儲存誤判「別人剛改過」）。
   const [saved, setSaved] = useState<CourseDetail | null>(null);
@@ -305,7 +308,10 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
           )}
         </View>
       ) : null}
-      <View>
+      {/* 大螢幕橫向（平板橫放、電腦）：左欄＝舞台＋控制列，右欄＝章節與其他內容（業主 2026-11-18）；手機、平板直式維持上下排列。 */}
+      <View style={lay.split ? styles.split : styles.stack}>
+      <StageWidth.Provider value={lay.split ? null : undefined}>
+      <View style={lay.split ? [styles.splitLeft, { width: Math.round(lay.width * 0.56) }] : undefined}>
         {stage ? (
           <View>
             {stage.audio ? (
@@ -343,7 +349,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
           </Pressable>
         ) : null}
       </View>
-      <Screen header={false} footer={editing ? undefined : stickyAction}>
+      </StageWidth.Provider>
+      <View style={lay.split ? [styles.splitRight, { borderLeftColor: c.border }] : styles.stack}>
+      <Screen header={false} gutter={lay.split ? space.lg : undefined} footer={editing ? undefined : stickyAction}>
         {message ? <NoticeBox tone={message.tone} text={message.text} /> : null}
         {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
         {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
@@ -408,6 +416,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         ) : null}
         {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}
       </Screen>
+      </View>
+      </View>
       {sheet === "art" ? (
         <EditSheet title="EDM 與封面" onClose={() => setSheet(null)} hideSave>
           <EdmManager course={course} onChanged={invalidate} />
@@ -431,6 +441,10 @@ function BannerButton({ label, onPress, strong }: { label: string; onPress: () =
 }
 
 const styles = StyleSheet.create({
+  stack: { flex: 1 },
+  split: { flex: 1, flexDirection: "row" },
+  splitLeft: { alignSelf: "flex-start" },
+  splitRight: { flex: 1, minWidth: 0, borderLeftWidth: StyleSheet.hairlineWidth },
   idleBar: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingHorizontal: 16, borderBottomWidth: 1 },
   idlePlay: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
   idleTrack: { flex: 1, height: 6, borderRadius: 3 },
