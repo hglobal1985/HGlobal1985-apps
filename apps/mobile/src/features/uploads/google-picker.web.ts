@@ -63,6 +63,15 @@ export function preloadGooglePicker(): Promise<void> {
   return ready;
 }
 
+/** Google 選檔視窗預設圖層只有 1000 多，會被上拉面板（圖層 9999）蓋住、看不到，所以把它拉到最上層。 */
+function raisePicker() {
+  if (document.getElementById("hg-picker-z")) return;
+  const el = document.createElement("style");
+  el.id = "hg-picker-z";
+  el.textContent = ".picker-dialog-bg{z-index:100000 !important}.picker-dialog{z-index:100001 !important}";
+  document.head.appendChild(el);
+}
+
 /** 回傳 null＝使用者按了取消。呼叫時才會向使用者索取權限。 */
 export async function pickFromMyDrive(cfg: PickerConfig): Promise<{ token: string; files: PickedFile[] } | null> {
   await preloadGooglePicker();
@@ -77,6 +86,7 @@ export async function pickFromMyDrive(cfg: PickerConfig): Promise<{ token: strin
   });
   if (!token) return null;
   const g = win().google;
+  raisePicker();
   return new Promise((ok) => {
     const view = new g.picker.DocsView(g.picker.ViewId.DOCS).setIncludeFolders(true).setMimeTypes(MIME);
     new g.picker.PickerBuilder()

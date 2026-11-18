@@ -79,6 +79,7 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
     const bad: string[] = [];
     let okCount = 0;
     try {
+      setMsg("請在 Google 的選檔視窗挑選檔案（沒看到視窗請檢查瀏覽器是否擋住彈出視窗）");
       const picked = await pickFromMyDrive(gcfg);
       if (picked) {
         for (let i = 0; i < picked.files.length; i++) {
