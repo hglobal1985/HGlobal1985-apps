@@ -1,12 +1,13 @@
 import { trackFeature } from "@/lib/feature-track";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type HostInstance, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { type HostInstance, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { api } from "@/api/client";
 import { openAccountCenter } from "@/features/account-link";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Icon, LoadingLadybug, dimStyle, useDimLayer, type IconName } from "@/ui";
+import { AppText, Icon, LoadingLadybug, type IconName } from "@/ui";
+import { BottomSheet } from "@/ui/bottom-sheet";
 
 type FieldView = { value: string; pending: string | null; status: string };
 type View_ = {
@@ -144,9 +145,8 @@ function Btn({ label, icon, onPress, disabled, loading, save }: { label: string;
  * 必填沒填時標示橘框，不送出。直接用會員本人的身分寫回會員中心（行動大學不保存）。
  */
 export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void; initial?: View_ | null }) {
-  useDimLayer();
   const { c } = useTheme();
-  const { width } = useWindowDimensions();
+  const { height: winH } = useWindowDimensions();
   const { invalidate } = useSession();
   const [data, setData] = useState<View_ | null>(first ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -277,21 +277,12 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   };
 
   return (
-    <Modal transparent animationType="fade" visible onRequestClose={onClose} accessibilityViewIsModal>
-      {/* 鍵盤打開時畫面可視高度會變矮：視窗本身維持原本大小，不跟著縮短；放不下時整個視窗可以一起上下拉動。 */}
-      <ScrollView style={styles.backdrop} contentContainerStyle={styles.backdropInner} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={[styles.box, { backgroundColor: c.surface, borderColor: c.border, width: Math.max(260, width * 0.73), maxWidth: 442 }]}>
+    // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
+    <BottomSheet onClose={onClose}>
+      <ScrollView style={{ maxHeight: Math.round(winH * 0.66) }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <AppText variant="title" numberOfLines={1} adjustsFontSizeToFit style={{ flexShrink: 0 }}>
             資料需完整 才可瀏覽課程
           </AppText>
-          <View style={styles.actions}>
-            <View style={{ flex: 1 }}>
-              <Btn save label="儲存" icon="save-outline" onPress={save} disabled={busy || !changed.length} loading={busy} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Btn label="關閉" icon="close" onPress={onClose} />
-            </View>
-          </View>
           {msg ? (
             <AppText variant="caption" tone={msg.ok ? "success" : "danger"} numberOfLines={2}>
               {msg.text}
@@ -374,16 +365,21 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
               前往會員中心完善更多資料
             </Text>
           </Pressable>
-        </View>
       </ScrollView>
-    </Modal>
+      <View style={styles.actions}>
+        <View style={{ flex: 1 }}>
+          <Btn save label="儲存" icon="save-outline" onPress={save} disabled={busy || !changed.length} loading={busy} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Btn label="關閉" icon="close" onPress={onClose} />
+        </View>
+      </View>
+    </BottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, ...dimStyle },
-  backdropInner: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 24 },
-  box: { borderRadius: radius.md, borderWidth: 1, padding: space.md, gap: space.sm },
+  sheetBody: { gap: space.sm, paddingBottom: space.sm },
   actions: { flexDirection: "row", gap: space.sm, width: "100%" },
   btn: { minHeight: 44, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm },
   line: { flexDirection: "row", alignItems: "center", gap: space.sm },
