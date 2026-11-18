@@ -14,6 +14,7 @@ import { minTouch, radius, space, type } from "@/theme/tokens";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { AppText, Button, Card, Chips, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
+import { CollapseToggle } from "@/ui/collapse-toggle";
 import { Check, MultiChips } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 import { EditMaterialSheet } from "./material-sheet";
@@ -146,6 +147,8 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
  */
 export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, onPickMove, busy }: { onMoveTo: (l: Lesson) => void; onPickMove: (blockId: string) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
   const { c } = useTheme();
+  // 編輯模式的區塊預設全部收起，同一時間只展開一個（業主 2026-11-18）。
+  const [openId, setOpenId] = useState<string | null>(null);
   const rows = items.filter((l) => !l.full);
   // 切成區塊：每組 = [區塊標題, 底下的教材…]；最前面還沒歸區塊的教材自成一組（沒有標題）。
   const groups: Lesson[][] = [];
@@ -177,16 +180,24 @@ export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, 
                 <IconButton icon="arrow-down" label="區塊下移" onPress={realIdx < blockCount - 1 ? () => onMoveBlock(groups, gi, gi + 1) : undefined} disabled={busy} />
                 <IconButton icon="create-outline" label={`編輯區塊 ${head.title}`} onPress={() => onEdit(head)} disabled={busy} />
                 <IconButton icon="trash-outline" label={`刪除區塊 ${head.title}`} onPress={() => onDelete(head)} disabled={busy} danger />
+                <CollapseToggle open={openId === head.id} onPress={() => setOpenId(openId === head.id ? null : head.id)} label={`區塊 ${head.title}`} />
               </View>
-            ) : null}
-            {body.length ? (
+            ) : (
+              <View style={[styles.lessonRow, { backgroundColor: c.accentSoft, borderBottomColor: c.border, paddingLeft: space.sm }]}>
+                <AppText variant="body" style={{ flex: 1, fontWeight: "800" }}>
+                  未歸區塊的教材（{body.length}）
+                </AppText>
+                <CollapseToggle open={openId === g[0]!.id} onPress={() => setOpenId(openId === g[0]!.id ? null : g[0]!.id)} label="未歸區塊的教材" />
+              </View>
+            )}
+            {(head ? openId !== head.id : openId !== g[0]!.id) ? null : body.length ? (
               <EditLessonRows group={body} word="教材" onEdit={onEdit} onMove={(i, j) => onMoveItem(body, i, j)} onCopy={onCopy} onDelete={onDelete} busy={busy} bare onMoveTo={blockCount > 1 || (!head && blockCount >= 1) ? onMoveTo : undefined} />
             ) : (
               <AppText variant="callout" tone="muted" style={{ padding: space.md }}>
                 這個區塊還沒有教材
               </AppText>
             )}
-            <View style={{ padding: space.sm }}>
+            {(head ? openId !== head.id : openId !== g[0]!.id) ? null : <View style={{ padding: space.sm }}>
               <View style={{ flexDirection: "row", gap: space.sm }}>
                 <View style={{ flex: 1 }}>
                   <Button variant="secondary" label={head ? `新增教材` : "新增教材"} icon="add" onPress={() => onAddMaterial(head?.id)} fullWidth />
@@ -197,7 +208,7 @@ export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, 
                   </View>
                 ) : null}
               </View>
-            </View>
+            </View>}
           </Card>
         );
       })}

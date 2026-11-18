@@ -19,6 +19,7 @@ import { SectionList, SectionSheet, type SectionKey } from "@/features/course-ed
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
 import { Check } from "@/features/course-edit/course-sections";
+import { CollapseToggle } from "@/ui/collapse-toggle";
 import { BlockEditList, EditLessonRows, LessonSheet, MoveToBlockSheet, PickMaterialsSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
@@ -92,6 +93,10 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   }, [shortPath, lesson, id]);
   const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | "newMaterial" | "newSection" | null>(null);
   const [moveTarget, setMoveTarget] = useState<Lesson | null>(null); // 要移到其他區塊的教材
+  const [settingsOpen, setSettingsOpen] = useState(false); // 編輯模式的「設定」預設收起
+  useEffect(() => {
+    if (!editing) setSettingsOpen(false);
+  }, [editing]);
   const [pickBlock, setPickBlock] = useState<string | null>(null); // 「移動教材」要移進哪個區塊
   const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
@@ -403,14 +408,25 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         {!editing ? stickyNotice : null}
         {manages && mode === "view" && course.status !== "published" ? <NoticeBox tone="warning" text={course.status === "archived" ? "這門課已下架封存：學員在全部課程看不到，已報名的人照常上課。" : "這門課尚未上架：只有管理者看得到。按右上「編輯」可以上架。"} /> : null}
         {editing ? (
-          <Section title="課程設定">
-            {detecting ? <NoticeBox text="正在偵測 YouTube 影片長度（讓課程顯示預估分鐘數）…" /> : null}
-            {canEditContent ? <SectionList course={course} onOpen={setSheet} /> : (
-              <Card style={{ paddingVertical: 0 }}>
-                <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => setSheet("status")} />
-              </Card>
-            )}
-          </Section>
+          // 編輯模式的「設定」預設收起，按右側「展開」才看到（業主 2026-11-18，全站一致）。
+          <View style={{ gap: space.sm }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+              <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
+                設定
+              </AppText>
+              <CollapseToggle open={settingsOpen} onPress={() => setSettingsOpen((v) => !v)} label="設定" />
+            </View>
+            {settingsOpen ? (
+              <>
+                {detecting ? <NoticeBox text="正在偵測 YouTube 影片長度（讓課程顯示預估分鐘數）…" /> : null}
+                {canEditContent ? <SectionList course={course} onOpen={setSheet} /> : (
+                  <Card style={{ paddingVertical: 0 }}>
+                    <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => setSheet("status")} />
+                  </Card>
+                )}
+              </>
+            ) : null}
+          </View>
         ) : null}
 
         {editing && canEditContent ? (
