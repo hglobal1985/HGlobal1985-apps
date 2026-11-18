@@ -168,7 +168,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
     if (course.priceTba) return <NoticeBox tone="warning" text="這門課程的費用尚未公布，公布後才開放報名。" />;
     if (!member) return <Button label="登入後報名" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: `/course/${course.id}` } })} fullWidth />;
     if (!course.eligible) return <NoticeBox tone="warning" text={`這門課程限 ${course.minRank.name} 以上獎銜${course.allowPresident ? "或會長" : ""}報名。`} />;
-    if (free) return <Button label="免費報名" icon="gift-outline" loading={busy === key} disabled={!!busy} onPress={() => register()} fullWidth />;
+    if (free) return <Button label="免費報名・有更新會通知你" icon="gift-outline" loading={busy === key} disabled={!!busy} onPress={() => register()} fullWidth />;
     // iOS/Android：依商店規範不顯示付費報名方式，只說明尚未開通。
     if (!isWeb) return <NoticeBox text="這門課程尚未為你開通。開通後即可在這裡觀看。" />;
     return <Button label="按此報名＋審核繳費" icon="create-outline" loading={busy === key} disabled={!!busy} onPress={() => register()} fullWidth />;
@@ -190,9 +190,11 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
   // 還不能看（尚未報名、不符資格…）：整個章節區蓋一層灰色遮罩加大鎖頭，章節完全不能點。
   const noAccess = course.lessons.length === 0 ? course.enrollment !== "opened" && !course.isPublic && !course.admin : course.lessons.every((l) => l.locked);
   const allLocked = noAccess;
-  const lockedText = course.priceTba ? "費用尚未公布，暫不開放" : member && !course.eligible ? "獎銜不符，目前無法報名" : "報名後才能觀看";
+  // 清單／素材類沒有報名：符合獎銜就能直接使用，不符合＝鎖頭（業主 2026-11-18）。
+  const lockedText = course.isList ? (member ? "獎銜不符，目前無法使用" : "登入並符合獎銜才能使用") : course.priceTba ? "費用尚未公布，暫不開放" : member && !course.eligible ? "獎銜不符，目前無法報名" : "報名後才能觀看";
   // 報名／審核中的操作固定在頁面下方（底部選單上方），往下看章節、留言時仍然按得到；只是說明文字的（費用未公布、獎銜不符…）留在內容區。
-  const canRegister = course.enrollment === null && !course.isPublic && !course.watchFree;
+  // 課程類一律手動報名（即使免費或完全公開，登入後都有報名鈕；報名＝訂閱，有更新會通知）；清單／素材類永遠沒有報名鈕（業主 2026-11-18）。
+  const canRegister = course.enrollment === null && !course.isList && (!course.isPublic || !!member);
   const registerNode = canRegister ? registerButton(course.free, "course") : null;
   const registerIsAction = !!registerNode && (registerNode as { type?: unknown }).type === Button;
   const stickyAction = course.enrollment === "pending" ? pendingRow() : registerIsAction ? registerNode : null;

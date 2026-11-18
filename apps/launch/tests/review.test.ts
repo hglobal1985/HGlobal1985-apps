@@ -348,7 +348,7 @@ test("學習中：免費課程可隱藏（再打開課程頁恢復）、付費�
   const { call, login } = setup();
   const student = await login("demo-student");
   const state = async (id: string) => (await call<CourseSummary[]>("GET", "/courses", { token: student })).data.find((c) => c.id === id)!;
-  await call("GET", "/courses/start", { token: student }); // 打開免費課程頁＝自動加入
+  await call("POST", "/orders", { token: student, body: { courseIds: ["start"] } }); // 免費課程要手動報名（業主 2026-11-18）
   assert.deepEqual([(await state("start")).enrollment, (await state("start")).hiddenFromLearning], ["opened", false]);
   assert.equal((await call("POST", "/courses/start/hide-learning", { token: student })).status, 200);
   assert.equal((await state("start")).hiddenFromLearning, true);
