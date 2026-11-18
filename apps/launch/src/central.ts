@@ -17,6 +17,7 @@ export function setCentralFetch(f: Fetch): void {
   centralFetch = f;
   keys.clear();
   memo.clear();
+  lastGoodContext.clear();
 }
 
 type Claims = { sub: string; iss: string; aud: string; app_id: string; exp: number; nbf?: number };
@@ -291,19 +292,27 @@ const NO_CONTEXT: MemberContext = { roles: [], hglobal: false, center: null };
 export const centerKey = (label: string) => label.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 
 /** 登入者自己的職務、是否為已驗證的寰宇、已核准的中心（GET /v1/eligibility/context）。查不到一律視為沒有。 */
+const lastGoodContext = new Map<string, MemberContext>();
 export async function memberContext(sub: string, token: string): Promise<MemberContext> {
-  return cached(`ctx:${sub}`, 60_000, async () => {
+  // 查詢失敗（會員中心暫時連不上、逾時、5xx）時，不可把「沒有任何職務」記起來：
+  // 否則超級管理員會被當成一般學員 60 秒（2026-11-19 業主回報：點通知「前往查看」顯示沒權限）。
+  // 失敗時回「最近一次成功的結果」（沒有就暫時視為沒有職務），而且這次失敗不進快取，下個請求馬上重試。
+  const fresh = await cached<MemberContext | undefined>(`ctx:${sub}`, 60_000, async () => {
     const res = await callCentral(token, "/v1/eligibility/context");
-    if (!res?.ok) return NO_CONTEXT;
+    if (!res?.ok) return undefined;
     const b = (await res.json().catch(() => null)) as { member_id?: string; roles?: { role?: string }[]; hglobal_verified?: boolean; center?: { key?: string; label?: string } | null } | null;
-    if (!b || b.member_id !== sub) return NO_CONTEXT;
+    if (!b || b.member_id !== sub) return undefined;
     const label = typeof b.center?.label === "string" ? b.center.label.trim().slice(0, 100) : "";
-    return {
+    const ctx: MemberContext = {
       roles: (b.roles ?? []).map((r) => String(r.role ?? "")).filter(Boolean),
       hglobal: b.hglobal_verified === true,
       center: label ? { key: typeof b.center?.key === "string" && b.center.key ? b.center.key : centerKey(label), label } : null,
     };
+    lastGoodContext.set(sub, ctx);
+    if (lastGoodContext.size > 2000) lastGoodContext.delete(lastGoodContext.keys().next().value!);
+    return ctx;
   });
+  return fresh ?? lastGoodContext.get(sub) ?? NO_CONTEXT;
 }
 
 export type CenterMember = { memberId: string; name: string; avatarUrl: string | null; signedIn: boolean };
