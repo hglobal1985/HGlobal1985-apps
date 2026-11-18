@@ -41,6 +41,7 @@ import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
+const ZONE_FOLD_KEY = "hglobal:learn:zone-collapsed"; // 各專區的收合狀態（業主 2026-11-18：預設展開，記住最後一次操作）
 const UNIT_FILTER_KEY = "hglobal:learn:unit-filter";
 const OLD_SPEAKER_KEY = "hglobal:learn:speaker-only";
 const GAP = space.md;
@@ -258,6 +259,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、素材專區（整組都是清單類別的）。
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
+  const [folded, setFolded] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    AsyncStorage.getItem(ZONE_FOLD_KEY).then((v) => v && setFolded(JSON.parse(v) as Record<string, boolean>)).catch(() => undefined);
+  }, []);
+  const toggleFold = (key: string) =>
+    setFolded((x) => {
+      const n = { ...x, [key]: !x[key] };
+      AsyncStorage.setItem(ZONE_FOLD_KEY, JSON.stringify(n)).catch(() => undefined);
+      return n;
+    });
   /** 在同一個區塊裡把第 i 張跟相鄰的交換，立刻更新畫面、背景存檔；失敗就還原。 */
   useEffect(() => setOrderOverride(null), [config.seriesOrder]);
   const canSort = isSuperAdmin(member) && mode === "series" && !flat && !matched;
@@ -522,15 +533,15 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               ? zoneSections.map(({ zone, items }) =>
                   items.length || canMove ? (
                     <Fragment key={zone}>
-                      <ZoneBand zone={zone} count={items.length} onMove={canMove ? () => setMoveTo(zone) : undefined} />
-                      {items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
+                      <ZoneBand zone={zone} count={items.length} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!!folded[zone]} onFold={() => toggleFold(zone)} />
+                      {folded[zone] ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
                     </Fragment>
                   ) : null,
                 )
               : null}
             {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
-            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.length} red /> : null}
-            {tileW && mode === "series" && !matched
+            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.length} red folded={!!folded.centers} onFold={() => toggleFold("centers")} /> : null}
+            {tileW && mode === "series" && !matched && !folded.centers
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
               : null}
           </View>
@@ -583,7 +594,7 @@ function SortableTile({ group, width, index, count, onSwap }: { group: SeriesGro
 }
 
 /** 系列檢視的專區標題色帶：寰宇＝深綠淡底、安麗素材＝亮黃淡底、安麗品牌＝淡藍底、教育中心＝紅色淡底；右邊可放「移動」鈕（超級管理員）。 */
-function ZoneBand({ zone, text, icon, count, red, onMove }: { zone?: Zone; text?: string; icon?: "library" | "folder-open" | "business" | "pricetag"; count: number; red?: boolean; onMove?: () => void }) {
+function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zone?: Zone; text?: string; icon?: "library" | "folder-open" | "business" | "pricetag"; count: number; red?: boolean; onMove?: () => void; folded?: boolean; onFold?: () => void }) {
   const { c } = useTheme();
   const look = red
     ? { bg: "#FCE1DE", fg: "#8F1D18", icon: "business" as const }
@@ -608,6 +619,14 @@ function ZoneBand({ zone, text, icon, count, red, onMove }: { zone?: Zone; text?
           <AppText variant="caption" style={{ color: look.bg, fontWeight: "800" }}>
             移動
           </AppText>
+        </Pressable>
+      ) : null}
+      {onFold ? (
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: !folded }} accessibilityLabel={`${folded ? "展開" : "收合"}${label}`} onPress={onFold} style={[styles.moveBtn, { backgroundColor: look.fg }]}>
+          <AppText variant="caption" style={{ color: look.bg, fontWeight: "800" }}>
+            {folded ? "展開" : "收合"}
+          </AppText>
+          <Ionicons name={folded ? "chevron-down" : "chevron-up"} size={16} color={look.bg} />
         </Pressable>
       ) : null}
     </View>
