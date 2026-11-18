@@ -104,6 +104,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     setCenter(v);
     syncUrl(category, v);
   };
+  // 系列檢視最下面的「教育中心」區：點中心卡片＝切到中心模式並進入該中心。
+  const openCenter = (v: string) => {
+    setMode("center");
+    setCenter(v);
+    syncUrl(category, v);
+    AsyncStorage.setItem(MODE_KEY, "center").catch(() => undefined);
+  };
   const [newOpen, setNewOpen] = useState<AddKind | null>(null);
   const [artOpen, setArtOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -419,10 +426,15 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
-            {tileW && !(mode === "center" && center === ALL) && !flat && materialGroups.length && courseGroups.length ? <ZoneBand icon="library" text="課程系列" count={courseGroups.length} /> : null}
+            {tileW && !(mode === "center" && center === ALL) && !flat && (materialGroups.length || (mode === "series" && !matched && centerCounts.length)) && courseGroups.length ? <ZoneBand icon="library" text="課程系列" count={courseGroups.length} /> : null}
             {tileW && !(mode === "center" && center === ALL) ? (flat ? groups : courseGroups).map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat && materialGroups.length ? <ZoneBand icon="folder-open" text="素材專區" count={materialGroups.length} material /> : null}
             {tileW && !(mode === "center" && center === ALL) && !flat ? materialGroups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} />) : null}
+            {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
+            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand icon="business" text="教育中心" count={centerCounts.length} red /> : null}
+            {tileW && mode === "series" && !matched
+              ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
+              : null}
           </View>
         </>
       )}
@@ -450,16 +462,19 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
 /** 不顯示在「中心」清單的單位（只是不列出，仍可選為課程的主辦單位／建立單位）。 */
 const HIDDEN_FROM_CENTER_LIST = new Set(["安麗公司"]);
 
-/** 系列檢視的區塊標題色帶：課程系列（深綠淡底）、素材專區（亮黃淡底）。 */
-function ZoneBand({ icon, text, count, material }: { icon: "library" | "folder-open"; text: string; count: number; material?: boolean }) {
+/** 系列檢視的區塊標題色帶：課程系列（深綠淡底）、素材專區（亮黃淡底）、教育中心（紅色淡底）。 */
+function ZoneBand({ icon, text, count, material, red }: { icon: "library" | "folder-open" | "business"; text: string; count: number; material?: boolean; red?: boolean }) {
   const { c } = useTheme();
+  // 課程系列＝深綠、素材專區＝亮黃、教育中心＝紅色系。
+  const bg = red ? "#FCE1DE" : material ? "#FFF3C4" : c.accentSoft;
+  const fg = red ? "#8F1D18" : material ? "#5A4300" : c.accentText;
   return (
-    <View style={[styles.zone, { backgroundColor: material ? "#FFF3C4" : c.accentSoft }]} accessibilityRole="header">
-      <Ionicons name={icon} size={18} color={material ? "#5A4300" : c.accentText} />
-      <AppText variant="callout" style={{ fontWeight: "800", color: material ? "#5A4300" : c.accentText }}>
+    <View style={[styles.zone, { backgroundColor: bg }]} accessibilityRole="header">
+      <Ionicons name={icon} size={18} color={fg} />
+      <AppText variant="callout" style={{ fontWeight: "800", color: fg }}>
         {text}
       </AppText>
-      <AppText variant="caption" style={{ color: material ? "#5A4300" : c.accentText }}>
+      <AppText variant="caption" style={{ color: fg }}>
         {count}
       </AppText>
     </View>
