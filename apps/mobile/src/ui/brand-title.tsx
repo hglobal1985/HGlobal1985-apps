@@ -32,7 +32,7 @@ function colorAt(palette: string[], shine: number[], t: number, i: number, n: nu
  * 首頁大標題：每個字的色彩沿 logo 色系緩慢流動，並週期性掃過一道由左到右的反光；logo 同步呼吸。
  * 只用 Animated，網頁與 iOS／Android 都能跑；沒有位移（不會跳動）。
  */
-export function BrandTitle() {
+export function BrandTitle({ scale = 1 }: { scale?: number }) {
   const { scheme } = useTheme();
   const [fontReady] = useFonts({ [THIN_FONT]: require("../../assets/fonts/NotoSansTC-Thin-brand.ttf") });
   const t = useRef(new Animated.Value(0)).current;
@@ -58,7 +58,7 @@ export function BrandTitle() {
   return (
     <View style={styles.row} accessibilityRole="header" accessibilityLabel="寰宇行動大學">
       <Animated.View style={{ transform: [{ scale: logoScale }] }}>
-        <Image source={require("../../assets/logo.png")} style={styles.logo} resizeMode="contain" />
+        <Image source={require("../../assets/logo.png")} style={[styles.logo, { width: 52 * scale, height: 52 * scale }]} resizeMode="contain" />
       </Animated.View>
       <View style={[styles.letters, { opacity: fontReady ? 1 : 0 }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {letters.map((l, i) => (
@@ -66,6 +66,7 @@ export function BrandTitle() {
             key={i}
             style={[
               styles.ch,
+              { fontSize: 32 * scale, lineHeight: 42 * scale, letterSpacing: 2 * scale },
               {
                 color: t.interpolate({ inputRange: input, outputRange: l.color }),
                 textShadowColor: scheme === "dark" ? "rgba(255,255,255,0.95)" : "rgba(255,196,0,0.9)",
