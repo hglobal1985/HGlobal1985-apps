@@ -148,7 +148,6 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="trophy-outline" title="徽章任務設定" subtitle="依分類新增、修改所有徽章任務，並設定書櫃鑰匙門檻" onPress={() => router.push("/admin/achievements")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="images-outline" title="品牌 Logo" subtitle="上傳品牌 logo、選底圖或底色，並對應分類，課程與素材可用它當封面" onPress={() => router.push("/admin/brand-logos")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="cloud-outline" title="儲存空間管理" subtitle="各中心已使用的檔案容量，以及圖片、文件、音檔的佔用比例" onPress={() => router.push("/admin/storage")} /> : null}
-            {member.role === "admin" ? <ListRow icon="cloud-upload-outline" title="雲端硬碟上傳" subtitle="把檔案上傳到業主的 Google 雲端硬碟，並查看上傳紀錄" onPress={() => router.push("/admin/drive")} /> : null}
             {member.role === "admin" ? <ListRow icon="flag-outline" title="留言檢舉" subtitle="處理被檢舉的留言" onPress={() => router.push("/admin/comments")} /> : null}
           </Card>
         </Section>

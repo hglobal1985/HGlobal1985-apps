@@ -64,7 +64,8 @@ import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centr
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
-import { accessToken as driveAccess, authUrl as driveAuthUrl, cleanDriveName, completeConnect, driveConfigured, DriveError, DRIVE_CHUNK_BYTES, DRIVE_MAX_BYTES, isUploadSession, revoke as driveRevoke, sendChunk, startUpload } from "./gdrive.ts";
+import { ImportError, loadFileSettings, normalizeFileSettings, openUserDriveFile, saveFileSettings, streamToR2 } from "./material-files.ts";
+import { centerShareName } from "./og.ts";
 import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
@@ -935,10 +936,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     if (key) linkCover.set(l.id, pubUrl(key, art!.art_version));
   }
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
-  const linkRows = await ctx.db.prepare(`SELECT lesson_id, att_type, link_url, kind, r2_key FROM lesson_attachments WHERE course_id IN (${[id, ...sourceCourses].map(() => "?").join(",")}) AND kind IN ('link', 'file') ORDER BY created_at`).bind(id, ...sourceCourses).all<{ lesson_id: string; att_type: AttachmentType; link_url: string | null; kind: string; r2_key: string | null }>();
+  const linkRows = await ctx.db.prepare(`SELECT id, lesson_id, att_type, link_url, kind FROM lesson_attachments WHERE course_id IN (${[id, ...sourceCourses].map(() => "?").join(",")}) AND kind IN ('link', 'file') ORDER BY created_at`).bind(id, ...sourceCourses).all<{ id: string; lesson_id: string; att_type: AttachmentType; link_url: string | null; kind: string }>();
   const linkOf = new Map<string, { type: AttachmentType; url: string }>();
-  // 上傳的檔案：網址是「教材檔案」下載路徑（檔案鍵是隨機碼，只在有權限看的人拿到的資料裡出現）；外部連結直接給原網址。
-  for (const r of linkRows.results) if (!linkOf.has(r.lesson_id)) linkOf.set(r.lesson_id, { type: r.att_type, url: r.kind === "file" ? `${ctx.url.origin}/api/v2/media/file?k=${encodeURIComponent(r.r2_key ?? "")}` : (r.link_url ?? "") });
+  // 上傳的檔案（雲端硬碟或舊的網站儲存空間）：網址一律是 dl://附件編號，不是真正的網址；畫面按下載時要先通過權限檢查才拿得到一次性下載連結。外部連結直接給原網址。
+  for (const r of linkRows.results) if (!linkOf.has(r.lesson_id)) linkOf.set(r.lesson_id, { type: r.att_type, url: r.kind === "file" || (r.link_url ?? "").startsWith("drive:") ? `dl://${r.id}` : (r.link_url ?? "") });
   const groupPos = new Map<string, number>();
   {
     const n = { chapter: 0, material: 0 };
@@ -1241,6 +1242,26 @@ const cleanTitle = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\
 async function attachmentKeys(db: D1Database, where: "lesson_id" | "course_id", id: string): Promise<string[]> {
   const { results } = await db.prepare(`SELECT r2_key FROM lesson_attachments WHERE r2_key IS NOT NULL AND ${where} = ?`).bind(id).all<{ r2_key: string }>();
   return results.map((r) => r.r2_key);
+}
+
+
+// ---------- 教材檔案（業主 2026-11-18：一律存在行動大學的儲存空間 R2；來源可以是手機／電腦，或使用者自己的 Google 雲端硬碟） ----------
+const MB = 1024 * 1024;
+/** 把已存進 R2 的檔案建成一個「其他教材」（放在完整版課程影片之前），並通知訂閱者。回傳教材編號。 */
+async function createFileMaterial(ctx: Ctx, admin: Session, courseId: string, f: { name: string; key: string; size: number; contentType: string; attType: AttachmentType; audit: string }): Promise<string> {
+  const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
+  if (!course) return fail(404, "not_found", "找不到這門課程");
+  const id = `${courseId}-${randomId(6)}`;
+  const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+  const title = cleanTitle(f.name.replace(/\.[^.]+$/, "")) || "檔案";
+  await ctx.db.batch([
+    ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
+    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title),
+    ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, att_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?)").bind(crypto.randomUUID(), id, courseId, f.name, f.key, f.size, f.contentType, f.attType, admin.sub),
+    audit(ctx.db, admin.sub, f.audit, "lesson", id, `${f.attType}:${f.name}:${f.size}`),
+  ]);
+  await notifyNewContent(ctx, courseId, "教材");
+  return id;
 }
 
 async function lessonOf(ctx: Ctx, courseId: string, lessonId: string) {
@@ -4125,165 +4146,153 @@ const routes: [string, RegExp, Handler][] = [
       const data = await ctx.req.arrayBuffer();
       if (!data.byteLength) return fail(400, "empty_file", "檔案是空的");
       if (data.byteLength > maxBytes) return fail(413, "file_too_large", fileTooBig(maxMb));
-      const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
-      if (!course) return fail(404, "not_found", "找不到這門課程");
-      const id = `${courseId}-${randomId(6)}`;
+      if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這門課程");
       const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(name)}`;
       await bucket.put(key, data, { httpMetadata: { contentType: kind.ct } });
-      const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
-      const title = cleanTitle(name.replace(/\.[^.]+$/, "")) || "檔案";
-      await ctx.db.batch([
-        ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title),
-        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, att_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?)").bind(crypto.randomUUID(), id, courseId, name, key, data.byteLength, kind.ct, kind.type, admin.sub),
-        audit(ctx.db, admin.sub, "material.file_upload", "lesson", id, `${kind.type}:${name}:${data.byteLength}`),
-      ]);
-      await notifyNewContent(ctx, courseId, "教材");
+      const id = await createFileMaterial(ctx, admin, courseId, { name, key, size: data.byteLength, contentType: kind.ct, attType: kind.type, audit: "material.file_upload" });
       return ctx.url.searchParams.get("lite") === "1" ? { id } : courseDetail(ctx, courseId);
     },
   ],
   [
     "GET",
     /^\/media\/file$/,
-    async (ctx) => {
-      // 教材檔案下載：檔案鍵是隨機碼，只有在課程資料裡拿得到的人（有權限者）知道；只服務資料庫裡仍在使用的檔案。
-      const key = ctx.url.searchParams.get("k") ?? "";
-      const bucket = ctx.env.MEDIA;
-      if (!bucket || !/^file\/[\w-]+\/[\w-]+\/.+$/.test(key)) return new Response("Not found", { status: 404 });
-      const att = await ctx.db.prepare("SELECT name, content_type, att_type FROM lesson_attachments WHERE r2_key = ?").bind(key).first<{ name: string; content_type: string; att_type: string }>();
-      const obj = att ? await bucket.get(key) : null;
-      if (!obj || !att) return new Response("Not found", { status: 404 });
-      const inline = att.att_type === "pdf" || att.att_type === "image" || att.att_type === "text";
-      return new Response(obj.body, {
-        headers: {
-          "content-type": att.content_type || "application/octet-stream",
-          "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(att.name)}`,
-          "cache-control": "private, max-age=3600",
-          "x-content-type-options": "nosniff",
-        },
-      });
-    },
+    async () =>
+      // 舊的教材檔案下載網址（只靠隨機碼保護，連結被轉傳別人也能下載）已停用：一律改走「權限檢查＋一次性下載連結」（/materials/:id/ticket）。
+      new Response("這個下載網址已停用。請回到行動大學，在課程頁重新按「下載」。", { status: 410, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } }),
   ],
   [
     "GET",
-    /^\/admin\/drive$/,
+    /^\/admin\/drive-import\/config$/,
     async (ctx) => {
-      // 雲端硬碟上傳（業主 2026-11-18）：狀態與上傳紀錄。管理員只看得到自己傳的；超級管理員看全部。
-      const me = requireAdmin(ctx);
-      const isSuper = me.roles.includes("super_admin");
-      const link = await ctx.db.prepare("SELECT account_email, folder_name, connected_at, broken FROM drive_link WHERE id = 1").first<{ account_email: string; folder_name: string; connected_at: string; broken: number }>();
-      const rows = await (isSuper ? ctx.db.prepare("SELECT id, member_name, center, name, size, web_link, created_at FROM drive_uploads ORDER BY created_at DESC LIMIT 100") : ctx.db.prepare("SELECT id, member_name, center, name, size, web_link, created_at FROM drive_uploads WHERE member_sub = ? ORDER BY created_at DESC LIMIT 100").bind(me.sub)).all<{ id: string; member_name: string; center: string; name: string; size: number; web_link: string; created_at: string }>();
-      return {
-        configured: driveConfigured(ctx.env),
-        connected: !!link && !link.broken,
-        broken: !!link?.broken,
-        account: isSuper ? (link?.account_email ?? "") : "",
-        folder: link?.folder_name ?? "",
-        connectedAt: link?.connected_at ?? null,
-        maxBytes: DRIVE_MAX_BYTES,
-        chunkBytes: DRIVE_CHUNK_BYTES,
-        // 檔案連結只有業主本人（雲端硬碟擁有者）打得開，所以只給超級管理員。
-        uploads: rows.results.map((r) => ({ id: r.id, name: r.name, size: r.size, by: r.member_name, center: r.center, at: r.created_at, link: isSuper ? r.web_link : "" })),
-      };
+      // 「從我的 Google 雲端硬碟選擇」需要的公開設定（OAuth 用戶端 ID、Picker 金鑰、專案編號）；缺任何一個＝這個來源尚未啟用。
+      await requireCourseStaff(ctx);
+      const set = await loadFileSettings(ctx.db);
+      const { GOOGLE_CLIENT_ID: clientId, GOOGLE_PICKER_API_KEY: apiKey, GOOGLE_PROJECT_NUMBER: appId } = ctx.env;
+      return { ready: !!(clientId && apiKey && appId), clientId: clientId ?? "", apiKey: apiKey ?? "", appId: appId ?? "", maxBytes: set.importMaxMb * MB };
     },
   ],
   [
     "POST",
-    /^\/admin\/drive\/connect$/,
-    async (ctx) => {
-      const me = requireSuperAdmin(ctx);
-      if (!driveConfigured(ctx.env)) return fail(503, "drive_not_configured", "還沒有設定 Google 用戶端代碼與密鑰（Cloudflare 後台的 GOOGLE_CLIENT_ID、GOOGLE_CLIENT_SECRET）");
-      const state = `${randomId(16)}${randomId(16)}`;
-      await ctx.db.batch([
-        ctx.db.prepare("DELETE FROM drive_oauth_state WHERE expires_at < datetime('now')"),
-        ctx.db.prepare("INSERT INTO drive_oauth_state (state, sub, expires_at) VALUES (?, ?, datetime('now', '+10 minutes'))").bind(state, me.sub),
-      ]);
-      return { url: driveAuthUrl(ctx.env, `${ctx.url.origin}/api/v2/admin/drive/callback`, state) };
-    },
-  ],
-  [
-    "GET",
-    /^\/admin\/drive\/callback$/,
-    async (ctx) => {
-      // Google 授權完成後導回這裡。身分用一次性 state 確認（它只由超級管理員按「連結」時產生）。
-      const back = (r: string) => new Response(null, { status: 302, headers: { location: `${ctx.url.origin}/admin/drive?drive=${r}` } });
-      const state = ctx.url.searchParams.get("state") ?? "";
-      const code = ctx.url.searchParams.get("code") ?? "";
-      const row = state ? await ctx.db.prepare("SELECT sub FROM drive_oauth_state WHERE state = ? AND expires_at >= datetime('now')").bind(state).first<{ sub: string }>() : null;
-      if (row) await ctx.db.prepare("DELETE FROM drive_oauth_state WHERE state = ?").bind(state).run();
-      if (!row || !code || ctx.url.searchParams.get("error")) return back("denied");
+    /^\/admin\/courses\/([\w-]+)\/drive-import$/,
+    async (ctx, [courseId]) => {
+      // 從使用者自己的 Google 雲端硬碟匯入教材（業主 2026-11-18）：使用者在瀏覽器用 Google Picker 挑檔案並授權一次性的存取權杖，
+      // 伺服器用它把那個檔案讀出來、轉存進行動大學的儲存空間（R2）並建立教材。權杖只用這一次，不保存、不寫日誌。
+      const admin = await requireCourseManager(ctx, courseId);
+      const b = await readJson<{ fileId?: unknown; token?: unknown }>(ctx.req);
+      const fileId = typeof b.fileId === "string" ? b.fileId : "";
+      const token = typeof b.token === "string" ? b.token : "";
+      if (!/^[\w-]{8,120}$/.test(fileId) || !/^[\w.~+/=-]{20,4096}$/.test(token)) return fail(400, "bad_request", "資料不正確，請重新選擇檔案");
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "檔案儲存空間尚未啟用");
+      if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這門課程");
+      const set = await loadFileSettings(ctx.db);
+      const maxBytes = set.importMaxMb * MB;
+      const tooBig = () => fail(413, "file_too_large", fileTooBig(set.importMaxMb));
       try {
-        const done = await completeConnect(ctx.env, code, `${ctx.url.origin}/api/v2/admin/drive/callback`);
-        await ctx.db.batch([
-          ctx.db.prepare("INSERT INTO drive_link (id, refresh_token, account_email, folder_id, folder_name, connected_by, connected_at, broken) VALUES (1, ?, ?, ?, '行動大學上傳', ?, datetime('now'), 0) ON CONFLICT(id) DO UPDATE SET refresh_token = excluded.refresh_token, account_email = excluded.account_email, folder_id = excluded.folder_id, folder_name = excluded.folder_name, connected_by = excluded.connected_by, connected_at = excluded.connected_at, broken = 0").bind(done.refreshToken, done.email, done.folderId, row.sub),
-          audit(ctx.db, row.sub, "drive.connect", "drive", "1", done.email),
-        ]);
-        return back("ok");
+        const src = await openUserDriveFile(token, fileId);
+        const kind = classifyFile(src.name);
+        if (kind === "video") return fail(400, "video_not_allowed", FILE_NO_VIDEO);
+        if (!kind) return fail(400, "file_type_not_allowed", "這種檔案格式不支援。可匯入圖片、PDF、Word、PowerPoint、Excel、文字檔（Google 文件、試算表、簡報會自動轉成 PDF、Excel、PowerPoint）");
+        if (src.size !== null && src.size > maxBytes) return tooBig();
+        const res = await src.open();
+        if (res.status === 401) return fail(401, "google_token_invalid", "Google 授權已失效，請重新選擇檔案");
+        if (res.status === 403 && src.size === null) return fail(413, "google_export_limit", "這個 Google 檔案太大，無法自動轉檔，請先在 Google 雲端硬碟另存成 PDF 或 Office 檔再選擇");
+        if (!res.ok || !res.body) return fail(502, "google_failed", "向 Google 讀取檔案失敗，請稍後再試");
+        const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(src.name)}`;
+        let size: number;
+        try {
+          size = await streamToR2(bucket, key, res.body, kind.ct, maxBytes);
+        } catch (e) {
+          if (e instanceof ImportError && e.code === "file_too_large") return tooBig();
+          throw e;
+        }
+        const id = await createFileMaterial(ctx, admin, courseId, { name: src.name, key, size, contentType: kind.ct, attType: kind.type, audit: "material.drive_import" });
+        return { id };
       } catch (e) {
-        console.error("drive connect", e instanceof Error ? e.message : "error");
-        return back("failed");
-      }
-    },
-  ],
-  [
-    "DELETE",
-    /^\/admin\/drive\/connect$/,
-    async (ctx) => {
-      const me = requireSuperAdmin(ctx);
-      const link = await ctx.db.prepare("SELECT refresh_token FROM drive_link WHERE id = 1").first<{ refresh_token: string }>();
-      if (link) await driveRevoke(link.refresh_token);
-      await ctx.db.batch([ctx.db.prepare("DELETE FROM drive_link WHERE id = 1"), audit(ctx.db, me.sub, "drive.disconnect", "drive", "1")]);
-      return { ok: true };
-    },
-  ],
-  [
-    "POST",
-    /^\/admin\/drive\/uploads$/,
-    async (ctx) => {
-      // 開始上傳：確認大小與名稱，向 Google 要一個可續傳的上傳工作（位址只給這位管理員這次用）。
-      requireAdmin(ctx);
-      const b = await readJson<{ name?: string; size?: number; mime?: string }>(ctx.req);
-      const name = cleanDriveName(String(b.name ?? ""));
-      const size = Number(b.size);
-      if (!name) return fail(400, "name_required", "找不到檔案名稱");
-      if (!Number.isInteger(size) || size <= 0) return fail(400, "empty_file", "檔案是空的");
-      if (size > DRIVE_MAX_BYTES) return fail(413, "file_too_large", `單檔最大 ${Math.round(DRIVE_MAX_BYTES / 1024 ** 3)}GB`);
-      try {
-        const { token, link } = await driveAccess(ctx.env);
-        const session = await startUpload(token, link.folder_id, name, String(b.mime ?? "").slice(0, 100), size);
-        return { session, chunkBytes: DRIVE_CHUNK_BYTES };
-      } catch (e) {
-        if (e instanceof DriveError) return fail(e.status, e.code, e.message);
+        if (e instanceof ImportError) return fail(e.status, e.code, e.message);
         throw e;
       }
+    },
+  ],
+  [
+    "POST",
+    /^\/materials\/([\w-]+)\/ticket$/,
+    async (ctx, [attId]) => {
+      // 下載教材檔案：先檢查權限（沿用該課程／清單的規則：誰能瀏覽、獎銜、報名、付費審核），通過才發一次性下載連結。
+      const s = ctx.session;
+      if (!s) return fail(401, "unauthenticated", "請先登入後再下載");
+      const att = await ctx.db.prepare("SELECT id, lesson_id, course_id, name, size FROM lesson_attachments WHERE id = ? AND kind = 'file'").bind(attId).first<{ id: string; lesson_id: string; course_id: string; name: string; size: number }>();
+      if (!att) return fail(404, "not_found", "找不到這個檔案");
+      // 權限一律以「課程頁實際給這位會員看到的內容」為準：有拿到下載網址（沒被鎖住）才能下載。
+      const detail = await courseDetail(ctx, att.course_id);
+      const lesson = detail.lessons.find((l) => l.id === att.lesson_id);
+      if (!lesson?.linkUrl) return fail(403, "forbidden", "你目前沒有下載這個檔案的權限（可能尚未報名，或獎銜、身分不符）");
+      const set = await loadFileSettings(ctx.db);
+      if (s.role !== "admin" && (set.dailyDownloads > 0 || set.dailyDownloadMb > 0)) {
+        const use = await ctx.db.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes FROM material_downloads WHERE member_sub = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')").bind(s.sub).first<{ n: number; bytes: number }>();
+        if (set.dailyDownloads > 0 && (use?.n ?? 0) >= set.dailyDownloads) return fail(429, "download_limit", "你今天下載的次數已達上限，請明天再試");
+        if (set.dailyDownloadMb > 0 && (use?.bytes ?? 0) + att.size > set.dailyDownloadMb * MB) return fail(429, "download_limit", "你今天下載的流量已達上限，請明天再試");
+      }
+      const id = `${randomId(16)}${randomId(16)}`;
+      await ctx.db.batch([
+        ctx.db.prepare("DELETE FROM download_tickets WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')"),
+        ctx.db.prepare("INSERT INTO download_tickets (id, att_id, member_sub, member_name, expires_at) VALUES (?, ?, ?, ?, ?)").bind(id, att.id, s.sub, s.name.slice(0, 60), iso(new Date(Date.now() + set.ticketSec * 1000))),
+      ]);
+      return { url: `${ctx.url.origin}/api/v2/media/dl?t=${id}`, name: att.name };
+    },
+  ],
+  [
+    "GET",
+    /^\/media\/dl$/,
+    async (ctx) => {
+      // 一次性下載：連結只用一次、約 2 分鐘內有效；用過之後只有「同一個網路、30 分鐘內的續傳」才會放行（手機斷線續傳用），轉傳給別人打開一律失效。
+      const gone = (msg: string, status = 410) => new Response(`${msg}\n請回到行動大學重新按「下載」。`, { status, headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" } });
+      const id = ctx.url.searchParams.get("t") ?? "";
+      const t = id.length >= 16 ? await ctx.db.prepare("SELECT id, att_id, member_sub, member_name, expires_at, used_at, used_ip FROM download_tickets WHERE id = ?").bind(id).first<{ id: string; att_id: string; member_sub: string; member_name: string; expires_at: string; used_at: string | null; used_ip: string | null }>() : null;
+      if (!t) return gone("下載連結無效或已失效。");
+      const ip = ctx.req.headers.get("cf-connecting-ip") ?? "";
+      const now = iso();
+      let first = false;
+      if (t.used_at) {
+        const resume = !!ctx.req.headers.get("range") && !!ip && t.used_ip === ip && Date.parse(now) - Date.parse(t.used_at) < 30 * 60_000;
+        if (!resume) return gone("下載連結已經使用過，無法再次開啟。");
+      } else {
+        if (t.expires_at < now) return gone("下載連結已逾時。");
+        const claimed = await ctx.db.prepare("UPDATE download_tickets SET used_at = ?, used_ip = ? WHERE id = ? AND used_at IS NULL").bind(now, ip, id).run();
+        if (claimed.meta?.changes !== 1) return gone("下載連結已經使用過，無法再次開啟。");
+        first = true;
+      }
+      const att = await ctx.db.prepare("SELECT id, course_id, name, size, r2_key, content_type FROM lesson_attachments WHERE id = ? AND kind = 'file'").bind(t.att_id).first<{ id: string; course_id: string; name: string; size: number; r2_key: string | null; content_type: string }>();
+      if (!att || !att.r2_key) return gone("檔案已經被刪除。", 404);
+      const bucket = ctx.env.MEDIA;
+      const head = bucket ? await bucket.head(att.r2_key) : null;
+      if (!bucket || !head) return gone("檔案已經不存在。", 404);
+      if (first) await ctx.db.prepare("INSERT INTO material_downloads (id, att_id, course_id, member_sub, member_name, name, size) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), att.id, att.course_id, t.member_sub, t.member_name, att.name, att.size).run();
+      const headers: Record<string, string> = { "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(att.name)}`, "cache-control": "no-store", "x-content-type-options": "nosniff", "accept-ranges": "bytes", "content-type": att.content_type || head.httpMetadata?.contentType || "application/octet-stream" };
+      // 斷線續傳：只放行從某個位置接著下載（bytes=N- 或 bytes=N-M）。
+      const m = /^bytes=(\d+)-(\d*)$/.exec(ctx.req.headers.get("range") ?? "");
+      if (m) {
+        const offset = Number(m[1]);
+        const end = Math.min(head.size - 1, m[2] ? Number(m[2]) : head.size - 1);
+        if (offset >= head.size || end < offset) return new Response("Range Not Satisfiable", { status: 416, headers: { "content-range": `bytes */${head.size}` } });
+        const part = await bucket.get(att.r2_key, { range: { offset, length: end - offset + 1 } });
+        if (!part) return gone("檔案已經不存在。", 404);
+        return new Response(part.body, { status: 206, headers: { ...headers, "content-range": `bytes ${offset}-${end}/${head.size}`, "content-length": String(end - offset + 1) } });
+      }
+      const obj = await bucket.get(att.r2_key);
+      if (!obj) return gone("檔案已經不存在。", 404);
+      return new Response(obj.body, { headers: { ...headers, "content-length": String(head.size) } });
     },
   ],
   [
     "PUT",
-    /^\/admin\/drive\/uploads\/chunk$/,
+    /^\/admin\/files\/settings$/,
     async (ctx) => {
-      // 轉傳一段（約 8MB）。回 {done:false,next}＝請從 next 位元組繼續；{done:true}＝完成並寫入紀錄。
-      const me = requireAdmin(ctx);
-      const session = ctx.url.searchParams.get("session") ?? "";
-      const start = Number(ctx.url.searchParams.get("start"));
-      const total = Number(ctx.url.searchParams.get("total"));
-      if (!isUploadSession(session)) return fail(400, "bad_session", "上傳資料不正確");
-      if (!Number.isInteger(start) || start < 0 || !Number.isInteger(total) || total <= 0 || total > DRIVE_MAX_BYTES || start >= total) return fail(400, "bad_range", "上傳範圍不正確");
-      const data = await ctx.req.arrayBuffer();
-      if (!data.byteLength || data.byteLength > DRIVE_CHUNK_BYTES || start + data.byteLength > total) return fail(400, "bad_chunk", "上傳資料大小不正確");
-      try {
-        const r = await sendChunk(session, data, start, total);
-        if (!r.done) return r;
-        const f = r.file;
-        await ctx.db.batch([
-          ctx.db.prepare("INSERT OR IGNORE INTO drive_uploads (id, member_sub, member_name, center, name, size, file_id, web_link) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), me.sub, me.name, me.center?.label ?? "", f.name, f.size, f.id, f.webViewLink),
-          audit(ctx.db, me.sub, "drive.upload", "drive", f.id, `${f.name}:${f.size}`),
-        ]);
-        return { done: true, name: f.name, size: f.size };
-      } catch (e) {
-        if (e instanceof DriveError) return fail(e.status, e.code, e.message);
-        throw e;
-      }
+      // 設定 › 儲存空間管理 › 上傳與下載設定（超級管理員）。
+      const me = requireSuperAdmin(ctx);
+      const next = normalizeFileSettings({ ...(await loadFileSettings(ctx.db)), ...(await readJson<Record<string, unknown>>(ctx.req)) });
+      await saveFileSettings(ctx.db, next);
+      await audit(ctx.db, me.sub, "files.settings", "files", "1").run();
+      return next;
     },
   ],
   [
@@ -4348,7 +4357,7 @@ const routes: [string, RegExp, Handler][] = [
         totals[o.kind] += size;
         total += size;
       }
-      return { totalBytes: total, objectCount: sizes.size, byType: totals, byCenter: [...rows.values()].sort((a, b) => b.total - a.total) };
+      return { totalBytes: total, objectCount: sizes.size, byType: totals, byCenter: [...rows.values()].sort((a, b) => b.total - a.total), fileSettings: await loadFileSettings(ctx.db) };
     },
   ],
   [
@@ -5607,7 +5616,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
 }
 
 /** 不需要登入身分的公開路徑：不必為它們向會員中心查詢（首頁的公告、金句、設定每次都會打）。 */
-const NO_SESSION = /^\/api\/v2\/(admin\/drive\/callback|announcements|quotes\/random|config|central\/webhook|media\/(pub|img|file|audio))(\?|$)/;
+const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|central\/webhook|media\/(pub|img|file|audio|dl))(\?|$)/;
 
 async function context(req: Request, env: Env, url: URL): Promise<Ctx> {
   const light = /^\/api\/v2\/me\/(central-profile|vocab)$/.test(url.pathname);

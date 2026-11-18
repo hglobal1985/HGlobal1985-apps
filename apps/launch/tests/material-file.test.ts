@@ -50,12 +50,17 @@ test("教材上傳檔案：建立教材、下載、超過 30MB 與影片被擋�
   assert.equal(ok.status, 200);
   const lesson = ok.data.lessons.find((l) => l.title === "簡報")!;
   assert.equal(lesson.linkType, "ppt");
-  assert.match(lesson.linkUrl ?? "", /\/api\/v2\/media\/file\?k=file%2F/);
-  const dl = await handleApi(new Request(lesson.linkUrl!), env);
+  assert.match(lesson.linkUrl ?? "", /^dl:\/\//, "網址不是真正的下載網址");
+  // 下載一律先檢查權限、拿一次性連結
+  assert.equal((await call("POST", `/materials/${lesson.linkUrl!.slice(5)}/ticket`)).status, 401, "訪客不行");
+  const t = await call<{ url: string }>("POST", `/materials/${lesson.linkUrl!.slice(5)}/ticket`, { token: student });
+  assert.equal(t.status, 200);
+  const dl = await handleApi(new Request(t.data.url), env);
   assert.equal(dl.status, 200);
   assert.match(dl.headers.get("content-disposition") ?? "", /attachment/);
   assert.equal((await dl.arrayBuffer()).byteLength, 4);
-  assert.equal((await handleApi(new Request("https://learn.test/api/v2/media/file?k=file%2Fx%2Fy%2Fz"), env)).status, 404);
+  assert.equal((await handleApi(new Request(t.data.url), env)).status, 410, "連結只能用一次");
+  assert.equal((await handleApi(new Request("https://learn.test/api/v2/media/file?k=file%2Fx%2Fy%2Fz"), env)).status, 410, "舊的直接下載網址已停用");
   const st = await call<{ totalBytes: number; byType: { doc: number }; byCenter: { center: string; doc: number }[] }>("GET", "/admin/storage", { token: admin });
   assert.equal(st.status, 200);
   assert.equal(st.data.totalBytes, 4);
