@@ -5,7 +5,7 @@ import { api, KEYWORD_INFO, type CourseSummary, type KeywordItem, type KeywordKi
 import { confirmSheet } from "@/features/confirm";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, EmptyState, ErrorView, LoadingView, NoticeBox, Pill, Screen, Section } from "@/ui";
+import { AppText, Button, Card, Chips, EmptyState, ErrorView, LoadingView, NoticeBox, Pill, Screen, Section, SheetRow } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { SeriesEdm } from "@/features/admin/series-edm";
 import { useApi, useSession } from "@/state/session";
@@ -138,12 +138,7 @@ export default function KeywordsScreen() {
             {(courses.data ?? [])
               .filter((x) => (usedBy.kind === "category" ? x.category.split(/[、,，]/).map((v) => v.trim()).includes(usedBy.value) : usedBy.kind === "series" ? x.series === usedBy.value : x.location === usedBy.value))
               .map((x) => (
-                <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={x.title} onPress={() => (setUsedBy(null), router.push(`/course/${x.id}`))} style={[styles.row, { borderTopColor: c.border, minHeight: minTouch }]}>
-                  <AppText variant="body" style={{ flex: 1 }} numberOfLines={2}>
-                    {x.title}
-                  </AppText>
-                  <AppText tone="muted">›</AppText>
-                </Pressable>
+                <SheetRow key={x.id} title={x.title} onPress={() => (setUsedBy(null), router.push(`/course/${x.id}`))} />
               ))}
             {courses.loading && !courses.data ? <LoadingView /> : null}
           </SheetScroll>

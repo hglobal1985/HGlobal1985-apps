@@ -1,18 +1,17 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Image, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { BrandCover, AppText, Button, SheetAction } from "@/ui";
+import { BrandCover, AppText, Button, SheetAction, SheetRow, SheetThumb } from "@/ui";
 import { CourseCover } from "@/ui/course-cover";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { seriesOrdered } from "./sort";
-import { fadedStyle } from "@/ui/fade-style";
 
 
 /** 狀態標籤：與課程卡左邊緞帶同步的文字與顏色；沒有左緞帶時用右邊緞帶（倒數、進行中…）。 */
@@ -33,7 +32,7 @@ function StatusChip({ course }: { course: CourseSummary }) {
 
 /**
  * 清單的區塊選單（業主 2026-11-18）：清單有勾「顯示在上拉選單」的區塊時，點寰宇大學的小卡彈出這個。
- * 每列＝封面（手動上傳 > 品牌 logo > 預設圖）＋區塊名稱＋灰色「有N個素材」；點一列進清單頁、自動捲到該區塊並展開。
+ * 每列＝封面（手動上傳 > 品牌 logo > 預設圖）＋區塊名稱＋灰色數字（只顯示數量）；點一列進清單頁、自動捲到該區塊並展開。
  */
 export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
   const { c } = useTheme();
@@ -57,29 +56,26 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
       </View>
       <SheetScroll>
         {course.blocks.map((b) => (
-          <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`${b.title}，有${b.count}個素材`} onPress={() => open(b.id)} style={[styles.row, { borderTopColor: c.border }, b.count === 0 ? fadedStyle : null]}>
-            {b.coverUrl ? (
-              <Image source={{ uri: resolveUrl(b.coverUrl) }} style={styles.thumb} resizeMode="cover" />
-            ) : b.brand ? (
-              <View style={styles.thumb}>
-                <BrandCover brand={b.brand} fill />
-              </View>
-            ) : (
-              // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
-              <View style={styles.thumb}>
-                <CourseCover theme="" label="" title={b.title} fill />
-              </View>
-            )}
-            <AppText variant="body" style={{ flex: 1, fontWeight: "700" }} numberOfLines={2}>
-              {b.title}
-            </AppText>
-            <View style={[styles.chip, { backgroundColor: c.surfaceMuted, borderWidth: 1, borderColor: c.border }]}>
-              <AppText variant="caption" style={{ color: c.text, fontWeight: "700" }} numberOfLines={1}>
-                有{b.count}個素材
-              </AppText>
-            </View>
-            <AppText tone="muted">›</AppText>
-          </Pressable>
+          <SheetRow
+            key={b.id}
+            accessibilityLabel={`${b.title}，有${b.count}個素材`}
+            onPress={() => open(b.id)}
+            faded={b.count === 0}
+            leading={
+              <SheetThumb>
+                {b.coverUrl ? (
+                  <Image source={{ uri: resolveUrl(b.coverUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                ) : b.brand ? (
+                  <BrandCover brand={b.brand} fill />
+                ) : (
+                  // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
+                  <CourseCover theme="" label="" title={b.title} fill />
+                )}
+              </SheetThumb>
+            }
+            title={b.title}
+            count={b.count}
+          />
         ))}
       </SheetScroll>
       <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
@@ -116,53 +112,25 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
       </View>
       <SheetScroll>
         {seriesOrdered(items).map((x) => (
-          <Pressable
+          <SheetRow
             key={x.id}
-            accessibilityRole="button"
             accessibilityLabel={`${x.title} ${x.eventStart ?? ""}`}
             onPress={() => {
               onClose();
               if (onPick) onPick(x);
               else router.push(`/course/${x.id}`);
             }}
-            style={[styles.row, { borderTopColor: c.border }]}
-          >
-            {x.brand ? (
-              <View style={styles.thumb}>
-                <BrandCover brand={x.brand} fill />
-              </View>
-            ) : x.coverUrl || x.edmUrl ? (
-              <Image source={{ uri: resolveUrl((x.coverUrl || x.edmUrl) as string) }} style={styles.thumb} resizeMode="cover" />
-            ) : (
-              <Image source={require("../../../assets/icon.png")} style={styles.thumb} resizeMode="cover" />
-            )}
-            {x.isList ? (
-              // 素材：素材清單名稱＋素材數量標籤（業主 2026-11-18）
-              <>
-                <AppText variant="body" style={{ flex: 1, fontWeight: "700" }} numberOfLines={2}>
-                  {x.title}
-                </AppText>
-                <View style={[styles.chip, { backgroundColor: c.surfaceMuted, borderWidth: 1, borderColor: c.border }]} accessibilityLabel={`有${x.materialCount}個素材`}>
-                  <AppText variant="caption" style={{ color: c.text, fontWeight: "700" }} numberOfLines={1}>
-                    有{x.materialCount}個素材
-                  </AppText>
-                </View>
-              </>
-            ) : (
-              <>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <AppText variant="body" style={{ fontWeight: "700" }}>
-                    {x.eventStart ? eventDays(x.eventStart, x.eventEnd) : "未設定日期"}{x.id === currentId ? "（目前顯示）" : ""}
-                  </AppText>
-                  <AppText variant="callout" tone="muted" numberOfLines={1}>
-                    {x.title}
-                  </AppText>
-                </View>
-                <StatusChip course={x} />
-              </>
-            )}
-            <AppText tone="muted">›</AppText>
-          </Pressable>
+            leading={
+              <SheetThumb>
+                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: resolveUrl((x.coverUrl || x.edmUrl) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <Image source={require("../../../assets/icon.png")} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+              </SheetThumb>
+            }
+            // 素材：素材清單名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）
+            title={x.isList ? x.title : `${x.eventStart ? eventDays(x.eventStart, x.eventEnd) : "未設定日期"}${x.id === currentId ? "（目前顯示）" : ""}`}
+            subtitle={x.isList ? undefined : x.title}
+            count={x.isList ? x.materialCount : undefined}
+            right={x.isList ? undefined : <StatusChip course={x} />}
+          />
         ))}
       </SheetScroll>
       <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
@@ -171,9 +139,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
 }
 
 const styles = StyleSheet.create({
+  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, maxWidth: 120 },
   matTag: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#FFD43B" },
   head: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, maxWidth: 120 },
-  thumb: { width: 64, height: 36, borderRadius: radius.sm, backgroundColor: "#fff" },
-  row: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch + 12, borderTopWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm },
 });

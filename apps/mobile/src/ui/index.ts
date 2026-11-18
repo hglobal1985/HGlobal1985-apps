@@ -14,6 +14,7 @@ export { LoadingView, ErrorView } from "./state-views";
 export { NoticeBox } from "./notice-box";
 export { Chips } from "./chips";
 export { Slider } from "./slider";
+export { SheetRow, SheetThumb, CountPill } from "./sheet-row";
 export { FormBlock } from "./form-block";
 export { Ticker } from "./ticker";
 export { Field } from "./field";
