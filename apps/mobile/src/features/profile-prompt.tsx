@@ -146,7 +146,7 @@ function Btn({ label, icon, onPress, disabled, loading, save }: { label: string;
  */
 export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void; initial?: View_ | null }) {
   const { c } = useTheme();
-  const { height: winH } = useWindowDimensions();
+  const { height: winH, width: winW } = useWindowDimensions();
   const { invalidate } = useSession();
   const [data, setData] = useState<View_ | null>(first ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -279,7 +279,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   return (
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
     <BottomSheet onClose={onClose}>
-      <ScrollView style={{ maxHeight: Math.round(winH * 0.66) }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ maxHeight: Math.round(winH * (winH >= winW ? 0.74 : 0.5)) }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <AppText variant="title" numberOfLines={1} adjustsFontSizeToFit style={{ flexShrink: 0 }}>
             資料需完整 才可瀏覽課程
           </AppText>
@@ -359,13 +359,13 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
               )}
             </>
           ) : null}
-          <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
-            <Icon name="open-outline" size={18} color={c.accentText} />
-            <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 14, fontWeight: "700", flexShrink: 1 }}>
-              前往會員中心完善更多資料
-            </Text>
-          </Pressable>
       </ScrollView>
+      <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
+        <Icon name="open-outline" size={18} color={c.accentText} />
+        <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 14, fontWeight: "700", flexShrink: 1 }}>
+          前往會員中心完善更多資料
+        </Text>
+      </Pressable>
       <View style={styles.actions}>
         <View style={{ flex: 1 }}>
           <Btn save label="儲存" icon="save-outline" onPress={save} disabled={busy || !changed.length} loading={busy} />
