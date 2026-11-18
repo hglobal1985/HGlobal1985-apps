@@ -537,6 +537,10 @@ export type AdminAchievement = {
   courseTitle: string | null;
   active: boolean;
   earnedCount: number;
+  /** 難易度 1～3 顆星（後台設定）。 */
+  difficulty: 1 | 2 | 3;
+  /** 目前有紀錄的會員總數（算「會員完成度」用，每一筆都帶同一個數字）。 */
+  memberTotal: number;
 };
 
 /** 申請人顯示名稱：本名＋暱稱同時顯示，例如「王小明（小明）」；兩者相同或只有一個時只顯示一個。 */

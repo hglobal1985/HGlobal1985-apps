@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_TYPES, FEATURES, api, type AchievementCategory, type AchievementType, type AdminAchievement } from "@/api/client";
@@ -8,13 +9,23 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type as typo } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Pill, Screen, Section } from "@/ui";
+import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen, Section } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
-type Form = { id: string | null; name: string; description: string; icon: string; type: AchievementType; threshold: string; feature: string; active: boolean };
+type Diff = 1 | 2 | 3;
+const DIFF_LABEL: Record<Diff, string> = { 1: "簡單", 2: "普通", 3: "困難" };
+/** 會員完成度＝取得人數 ÷ 會員總數：沒人／少數（<10%）／中等（10～40%）／多數（≥40%）。 */
+type Done = "all" | "none" | "low" | "mid" | "high";
+const doneOf = (a: AdminAchievement): Exclude<Done, "all"> => {
+  if (!a.earnedCount) return "none";
+  const r = a.memberTotal ? a.earnedCount / a.memberTotal : 0;
+  return r < 0.1 ? "low" : r < 0.4 ? "mid" : "high";
+};
+const pct = (a: AdminAchievement) => (a.memberTotal ? Math.round((a.earnedCount / a.memberTotal) * 100) : 0);
+type Form = { id: string | null; difficulty: Diff; name: string; description: string; icon: string; type: AchievementType; threshold: string; feature: string; active: boolean };
 const blank = (category: AchievementCategory): Form => {
   const type = (Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).find((t) => ACHIEVEMENT_TYPES[t].category === category && !ACHIEVEMENT_TYPES[t].retired)!;
-  return { id: null, name: "", description: "", icon: "🏅", type, threshold: "1", feature: "", active: true };
+  return { id: null, difficulty: 1, name: "", description: "", icon: "🏅", type, threshold: "1", feature: "", active: true };
 };
 const typesOf = (category: AchievementCategory) => (Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).filter((t) => ACHIEVEMENT_TYPES[t].category === category && !ACHIEVEMENT_TYPES[t].retired);
 
@@ -29,19 +40,23 @@ export default function AdminAchievementsScreen() {
   const isSuper = !!member?.titles.includes("超級管理員");
   const list = useApi<AdminAchievement[]>(isSuper ? "/admin/achievements" : null);
   const [filter, setFilter] = useState<"all" | AchievementCategory>("all");
+  const [diffF, setDiffF] = useState<"all" | "1" | "2" | "3">("all");
+  const [doneF, setDoneF] = useState<Done>("all");
+  const [over, setOver] = useState<Record<string, Diff>>({});
   const [form, setForm] = useState<Form | null>(null);
   const [formCat, setFormCat] = useState<AchievementCategory>("progress");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
-  const rows = list.data ?? [];
+  const rows = (list.data ?? []).map((a) => (over[a.id] ? { ...a, difficulty: over[a.id]! } : a));
+  const shown = rows.filter((a) => (diffF === "all" || String(a.difficulty) === diffF) && (doneF === "all" || doneOf(a) === doneF));
   const grouped = useMemo(
     () =>
       ACHIEVEMENT_CATEGORIES.map((cat) => ({
         cat,
-        items: rows.filter((a) => ACHIEVEMENT_TYPES[a.type].category === cat.key).sort((x, y) => x.type.localeCompare(y.type) || x.threshold - y.threshold),
+        items: shown.filter((a) => ACHIEVEMENT_TYPES[a.type].category === cat.key).sort((x, y) => x.type.localeCompare(y.type) || x.threshold - y.threshold),
       })).filter((g) => g.items.length && (filter === "all" || filter === g.cat.key)),
-    [rows, filter],
+    [shown, filter], // eslint-disable-line react-hooks/exhaustive-deps
   );
   if (!isSuper) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
   if (!list.data) return <Screen header={false}>{list.error ? <ErrorView message={list.error} onRetry={list.reload} /> : <LoadingView />}</Screen>;
@@ -69,7 +84,7 @@ export default function AdminAchievementsScreen() {
     setDirty(false);
     setError(null);
   };
-  const edit = (a: AdminAchievement) => open({ id: a.id, name: a.name, description: a.description, icon: a.icon, type: a.type, threshold: String(a.threshold), feature: a.feature ?? "", active: a.active }, ACHIEVEMENT_TYPES[a.type].category);
+  const edit = (a: AdminAchievement) => open({ id: a.id, difficulty: a.difficulty, name: a.name, description: a.description, icon: a.icon, type: a.type, threshold: String(a.threshold), feature: a.feature ?? "", active: a.active }, ACHIEVEMENT_TYPES[a.type].category);
   const patch = (p: Partial<Form>) => {
     setForm((f) => (f ? { ...f, ...p } : f));
     setDirty(true);
@@ -82,13 +97,18 @@ export default function AdminAchievementsScreen() {
     if (!form.name.trim()) return setError("請輸入徽章名稱");
     if (!t?.needsFeature && (!Number.isInteger(n) || n < 1)) return setError("達成數量請輸入 1 以上的整數");
     if (t?.needsFeature && !form.feature) return setError("請選擇要使用的功能");
-    const body = { name: form.name.trim(), description: form.description.trim(), icon: form.icon || "🏅", type: form.type, threshold: t?.needsFeature ? 1 : n, feature: t?.needsFeature ? form.feature : null, courseId: null, active: form.active };
+    const body = { difficulty: form.difficulty, name: form.name.trim(), description: form.description.trim(), icon: form.icon || "🏅", type: form.type, threshold: t?.needsFeature ? 1 : n, feature: t?.needsFeature ? form.feature : null, courseId: null, active: form.active };
     if (await run(() => (form.id ? api("PATCH", `/admin/achievements/${form.id}`, body) : api("POST", "/admin/achievements", body)), form.id ? "已儲存" : "已新增徽章")) setForm(null);
   };
   const remove = async (a: AdminAchievement) => {
     if (await confirmAsk("刪除徽章", `確定刪除「${a.name}」？已取得這枚徽章的 ${a.earnedCount} 位會員紀錄也會一併刪除，無法復原。`, "刪除")) {
       if (await run(() => api("DELETE", `/admin/achievements/${a.id}`), "已刪除")) setForm(null);
     }
+  };
+  const setDiff = (a: AdminAchievement, d: Diff) => {
+    if (a.difficulty === d) return;
+    setOver((o) => ({ ...o, [a.id]: d })); // 先直接換星星，背景再存
+    api("PATCH", `/admin/achievements/${a.id}`, { difficulty: d }).then(() => list.reload()).catch((e: Error) => { setOver((o) => { const n = { ...o }; delete n[a.id]; return n; }); flashText(e.message); });
   };
   const saveNeed = (v: number) => run(() => api("PUT", "/admin/ui-config", { app: { ...config.app, libraryKeyBadges: v } }).then(() => reloadConfig()), "已更新書櫃鑰匙門檻");
 
@@ -123,6 +143,9 @@ export default function AdminAchievementsScreen() {
       <Button label="新增任務" icon="add-circle-outline" onPress={() => open(blank(filter === "all" ? "progress" : filter), filter === "all" ? "progress" : filter)} fullWidth />
 
       <Chips label="任務分類" options={[{ key: "all", label: `全部（${rows.length}）` }, ...ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}（${rows.filter((a) => ACHIEVEMENT_TYPES[a.type].category === k.key).length}）` }))]} value={filter} onChange={(v) => setFilter(v as "all" | AchievementCategory)} />
+      <Chips label="難易度" options={[{ key: "all", label: "全部" }, ...([1, 2, 3] as Diff[]).map((d) => ({ key: String(d), label: `${"★".repeat(d)} ${DIFF_LABEL[d]}（${rows.filter((a) => a.difficulty === d).length}）` }))]} value={diffF} onChange={(v) => setDiffF(v as typeof diffF)} />
+      <Chips label="會員完成度（取得人數 ÷ 會員總數）" options={[{ key: "all", label: "全部" }, { key: "none", label: `沒人取得（${rows.filter((a) => doneOf(a) === "none").length}）` }, { key: "low", label: `少數 <10%（${rows.filter((a) => doneOf(a) === "low").length}）` }, { key: "mid", label: `中等（${rows.filter((a) => doneOf(a) === "mid").length}）` }, { key: "high", label: `多數 ≥40%（${rows.filter((a) => doneOf(a) === "high").length}）` }]} value={doneF} onChange={(v) => setDoneF(v as Done)} />
+      {shown.length !== rows.length ? <AppText variant="caption" tone="muted">符合條件 {shown.length} 個任務</AppText> : null}
 
       {grouped.map(({ cat, items }) => (
         <Section key={cat.key} title={`${cat.icon} ${cat.label}（${items.length}）`}>
@@ -131,18 +154,20 @@ export default function AdminAchievementsScreen() {
           </AppText>
           <Card style={{ paddingVertical: 0 }}>
             {items.map((a) => (
-              <Pressable key={a.id} accessibilityRole="button" accessibilityLabel={`修改 ${a.name}`} onPress={() => edit(a)} style={[styles.item, { borderBottomColor: c.border, opacity: a.active ? 1 : 0.55 }]}>
-                <AppText style={{ fontSize: 30, lineHeight: 38 }}>{a.icon}</AppText>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <AppText variant="headline" numberOfLines={1}>
-                    {a.name}
-                  </AppText>
-                  <AppText variant="caption" tone="muted" numberOfLines={2}>
-                    {ACHIEVEMENT_TYPES[a.type].label}：{conditionText(a.type, a.threshold, a.courseTitle, a.feature)}　· {a.earnedCount} 人取得
-                  </AppText>
-                </View>
-                {!a.active ? <Pill label="停用" tone="neutral" /> : null}
-              </Pressable>
+              <View key={a.id} style={[styles.item, { borderBottomColor: c.border, opacity: a.active ? 1 : 0.55 }]}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`修改 ${a.name}`} onPress={() => edit(a)} style={styles.itemMain}>
+                  <AppText style={{ fontSize: 24, lineHeight: 30 }}>{a.icon}</AppText>
+                  <View style={{ flex: 1 }}>
+                    <AppText variant="callout" style={{ fontWeight: "800" }} numberOfLines={1}>
+                      {a.name}{!a.active ? "（停用）" : ""}
+                    </AppText>
+                    <AppText variant="caption" tone="muted" numberOfLines={1}>
+                      {conditionText(a.type, a.threshold, a.courseTitle, a.feature)} · {a.earnedCount} 人（{pct(a)}%）
+                    </AppText>
+                  </View>
+                </Pressable>
+                <Stars value={a.difficulty} onChange={(d) => setDiff(a, d)} />
+              </View>
             ))}
           </Card>
         </Section>
@@ -216,7 +241,13 @@ export default function AdminAchievementsScreen() {
               <TextInput value={form.icon} onChangeText={(v) => patch({ icon: [...v].slice(-2).join("") })} accessibilityLabel="自訂圖示" style={[styles.iconInput, typo.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
             </View>
           </View>
-          <Chips label="⑥ 狀態" options={[{ key: "on", label: "啟用（會員看得到）" }, { key: "off", label: "停用（暫時隱藏）" }]} value={form.active ? "on" : "off"} onChange={(v) => patch({ active: v === "on" })} />
+          <View style={{ gap: 6 }}>
+            <AppText variant="callout" style={{ fontWeight: "700" }}>
+              ⑥ 難易度：{DIFF_LABEL[form.difficulty]}
+            </AppText>
+            <Stars value={form.difficulty} onChange={(d) => patch({ difficulty: d })} big />
+          </View>
+          <Chips label="⑦ 狀態" options={[{ key: "on", label: "啟用（會員看得到）" }, { key: "off", label: "停用（暫時隱藏）" }]} value={form.active ? "on" : "off"} onChange={(v) => patch({ active: v === "on" })} />
           {form.id ? (
             <View style={styles.row}>
               <Button variant="danger" label="刪除這個任務" icon="trash-outline" disabled={busy} onPress={() => remove(rows.find((x) => x.id === form.id)!)} />
@@ -225,6 +256,19 @@ export default function AdminAchievementsScreen() {
         </EditSheet>
       ) : null}
     </Screen>
+  );
+}
+
+/** 三顆星難易度：直接點第幾顆就設定成幾星（簡單／普通／困難）。 */
+function Stars({ value, onChange, big }: { value: Diff; onChange: (d: Diff) => void; big?: boolean }) {
+  return (
+    <View style={{ flexDirection: "row" }} accessibilityRole="radiogroup">
+      {([1, 2, 3] as Diff[]).map((d) => (
+        <Pressable key={d} accessibilityRole="radio" accessibilityState={{ selected: value === d }} accessibilityLabel={`難易度 ${d} 顆星（${DIFF_LABEL[d]}）`} onPress={() => onChange(d)} hitSlop={{ top: 6, bottom: 6 }} style={{ width: big ? 56 : 30, height: big ? 52 : 44, alignItems: "center", justifyContent: "center" }}>
+          <Ionicons name={d <= value ? "star" : "star-outline"} size={big ? 32 : 20} color={d <= value ? "#E0A800" : "#B8B2A0"} />
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
@@ -252,7 +296,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
   stepper: { flexDirection: "row", alignItems: "center", gap: 6 },
   stats: { flexDirection: "row", gap: space.sm },
-  item: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: minTouch + 12, paddingVertical: space.sm, paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  item: { flexDirection: "row", alignItems: "center", paddingLeft: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  itemMain: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 50, paddingVertical: 2 },
   kind: { borderWidth: 1, borderRadius: radius.md, padding: space.md, gap: 2, minHeight: minTouch },
   icons: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   iconBtn: { width: minTouch, height: minTouch, borderRadius: radius.md, borderWidth: 2, alignItems: "center", justifyContent: "center" },

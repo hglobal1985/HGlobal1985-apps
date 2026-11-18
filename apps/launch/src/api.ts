@@ -287,14 +287,25 @@ async function achievementBody(ctx: Ctx, body: Record<string, unknown>, creating
     else fail(400, "invalid_feature", "功能代碼不正確");
   }
   if (sets.some(([c, v]) => c === "condition_type" && v === "feature_used") && !sets.some(([c, v]) => c === "feature" && typeof v === "string")) fail(400, "feature_required", "請選擇要使用的功能");
+  if (body.difficulty !== undefined) {
+    const d = Number(body.difficulty);
+    if (!Number.isInteger(d) || d < 1 || d > 3) fail(400, "invalid_difficulty", "難易度請選 1～3 顆星");
+    sets.push(["difficulty", d]);
+  }
   if (body.active !== undefined) sets.push(["active", body.active === true ? 1 : 0]);
   return sets;
 }
 async function listAchievements(ctx: Ctx): Promise<AdminAchievement[]> {
+  // 會員總數＝有任何學習、報名、訂閱、功能使用或徽章紀錄的不同會員（本系統沒有獨立的會員名冊）。
+  // （D1 一個查詢最多接 5 個 UNION，所以分開查再合併。）
+  const subs = new Set<string>();
+  const parts = await ctx.db.batch(["member_achievements", "feature_uses", "enrollments", "lesson_progress", "learning_started", "center_subscriptions"].map((t) => ctx.db.prepare(`SELECT DISTINCT member_sub FROM ${t}`)));
+  for (const r of parts) for (const x of r.results as { member_sub: string }[]) subs.add(x.member_sub);
+  const total = subs.size;
   const { results } = await ctx.db
-    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
-    .all<{ id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; active: number; course_title: string | null; earned_count: number }>();
-  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count }));
+    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.difficulty, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
+    .all<{ difficulty: number; id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; active: number; course_title: string | null; earned_count: number }>();
+  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count, difficulty: (r.difficulty >= 1 && r.difficulty <= 3 ? r.difficulty : 2) as 1 | 2 | 3, memberTotal: total }));
 }
 
 /** 刪除一位會員在本 App 的所有資料。 */
