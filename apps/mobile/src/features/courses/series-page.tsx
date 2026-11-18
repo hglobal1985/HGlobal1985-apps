@@ -1,3 +1,5 @@
+import { AddMaterialFab, type AddKind } from "@/features/course-edit/add-material-fab";
+import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { trackFeature } from "@/lib/feature-track";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -39,6 +41,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const [views, setViews] = useState<number | null>(null);
   const [view, setView] = useState<View_>("list");
   const [editOpen, setEditOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState<AddKind | null>(null);
   const [boxW, setBoxW] = useState(0);
   const scrollY = useRef(new Animated.Value(0)).current;
   const { width: winW } = useWindowDimensions();
@@ -102,7 +105,11 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
             {tileW ? courses.map((x) => <SeriesTile key={x.id} group={{ key: `c:${x.id}`, nearest: x, sessions: [x] }} width={tileW} flat />) : null}
           </View>
         ) : null}
+        {isSuperAdmin(member) ? <View style={{ height: 64 }} /> : null}
       </Screen>
+      {/* 在系列頁直接新增：系列預先填好（只有超級管理員能設定系列，所以只有他看得到；業主 2026-11-18） */}
+      {isSuperAdmin(member) ? <AddMaterialFab onPick={setNewOpen} /> : null}
+      {newOpen ? <NewCourseSheet list={newOpen === "list"} defaultSeries={series} onClose={() => setNewOpen(null)} /> : null}
       {editOpen ? (
         <EditSheet title={`編輯「${series}」`} onClose={() => setEditOpen(false)} hideSave>
           <SeriesEdm series={series} edmUrl={art?.edmUrl} onChanged={artList.reload} />
