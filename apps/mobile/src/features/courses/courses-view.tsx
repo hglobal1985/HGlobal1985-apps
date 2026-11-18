@@ -109,7 +109,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     setMode("center");
     setCenter(v);
     syncUrl(category, v);
-    AsyncStorage.setItem(MODE_KEY, "center").catch(() => undefined);
   };
   const [newOpen, setNewOpen] = useState<AddKind | null>(null);
   const [artOpen, setArtOpen] = useState(false);
@@ -123,7 +122,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [mode, setMode] = useState<CourseViewMode>("series");
   useEffect(() => {
     AsyncStorage.getItem(MODE_KEY)
-      .then((v) => (v === "chapter" || v === "series" || v === "center") && !initialCenter && !initialCenters && setMode(v))
+      // 「教育中心」模式不記住（業主 2026-11-18）：每次進入寰宇大學預設都是「系列」檢視。
+      .then((v) => (v === "chapter" || v === "series") && !initialCenter && !initialCenters && setMode(v))
       .catch(() => undefined);
   }, []);
   // 「單元」模式的三個勾選篩選（主講人／短影音／總結；短影音不能與另外兩個並存）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
@@ -151,7 +151,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       setWantIndex(true);
       setShuffleSeed(Math.floor(Math.random() * 2 ** 31)); // 切到章節模式就重新洗牌
     }
-    AsyncStorage.setItem(MODE_KEY, m).catch(() => undefined);
+    if (m !== "center") AsyncStorage.setItem(MODE_KEY, m).catch(() => undefined);
   };
   const [rowW, setRowW] = useState(0);
   const [wantIndex, setWantIndex] = useState(false);
