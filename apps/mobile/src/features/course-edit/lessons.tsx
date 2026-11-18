@@ -429,19 +429,28 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
     <Wrap style={bare ? undefined : { paddingVertical: 0 }}>
       {group.map((lesson, i) => (
         <View key={lesson.id} style={[styles.lessonRow, { borderBottomColor: c.border }]}>
+<View style={{ flex: 1, minWidth: 0 }}>
           <Pressable accessibilityRole="button" accessibilityLabel={`編輯${word} ${lesson.position}`} onPress={() => onEdit(lesson)} style={styles.lessonMain}>
-            <AppText variant="body" numberOfLines={2} style={lesson.section ? { fontWeight: "800" } : undefined}>
-              {lesson.section ? `📂 ${lesson.title}` : lesson.full ? lesson.title : `${lesson.position}. ${lesson.title}`}
-            </AppText>
-            <AppText variant="caption" tone="muted" numberOfLines={1}>
-              {lesson.section ? "分類標題" : [lesson.linkType ? TYPE_INFO[lesson.linkType].label : lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), minutesText(lesson.minutes), lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
-            </AppText>
-          </Pressable>
+              <AppText variant="body" numberOfLines={2} style={lesson.section ? { fontWeight: "800" } : undefined}>
+                {lesson.section ? `📂 ${lesson.title}` : lesson.full ? lesson.title : `${lesson.position}. ${lesson.title}`}
+              </AppText>
+              <AppText variant="caption" tone="muted" numberOfLines={1}>
+                {lesson.section ? "分類標題" : [lesson.linkType ? TYPE_INFO[lesson.linkType].label : lesson.ready ? (lesson.kind === "audio" ? "音檔" : lesson.media?.type === "youtube" ? "YouTube" : lesson.media?.type === "mux" ? "Mux" : "影片") : "尚未設定內容", sharerLine(lesson), minutesText(lesson.minutes), lesson.eventDate ? eventDays(lesson.eventDate, null) : ""].filter(Boolean).join(" · ")}
+              </AppText>
+            </Pressable>
+            {onMoveTo && !lesson.section && !lesson.full ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={`移到其他區塊：${lesson.title}`} onPress={() => onMoveTo(lesson)} disabled={busy} style={[styles.moveBtn, { borderColor: c.accent, backgroundColor: c.accentSoft }]}>
+                <Icon name="folder-open-outline" size={13} color={c.accentText} />
+                <AppText variant="caption" style={{ color: c.accentText, fontWeight: "800" }}>
+                  移到…
+                </AppText>
+              </Pressable>
+            ) : null}
+          </View>
           {lesson.full ? null : (
             <>
               <IconButton icon="arrow-up" label="上移" onPress={i > 0 ? () => onMove(i, i - 1) : undefined} disabled={busy} />
               <IconButton icon="arrow-down" label="下移" onPress={i < movable - 1 ? () => onMove(i, i + 1) : undefined} disabled={busy} />
-              {onMoveTo && !lesson.section ? <IconButton icon="folder-open-outline" label={`移到其他區塊：${lesson.title}`} onPress={() => onMoveTo(lesson)} disabled={busy} /> : null}
               {lesson.section ? null : <IconButton icon="copy-outline" label={`複製${word} ${lesson.position}`} onPress={() => onCopy(lesson)} disabled={busy} />}
             </>
           )}
@@ -458,7 +467,7 @@ export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "
   const off = disabled || !onPress;
   return (
     <Pressable onPress={onPress} disabled={off} accessibilityRole="button" accessibilityLabel={label} style={[styles.iconBtn, { borderColor: c.border, opacity: off ? 0.35 : 1 }]}>
-      <Icon name={icon} size={16} color={danger ? c.danger : c.text} />
+      <Icon name={icon} size={14} color={danger ? c.danger : c.text} />
     </Pressable>
   );
 }
@@ -470,7 +479,8 @@ const styles = StyleSheet.create({
   sameCheck: { flexDirection: "row", alignItems: "center", gap: space.xs, minHeight: minTouch, paddingLeft: space.sm },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
   input: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },
-  iconBtn: { width: 32, height: 32, borderRadius: radius.sm, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  iconBtn: { width: 28, height: 28, borderRadius: radius.sm, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  moveBtn: { alignSelf: "flex-start", marginLeft: space.sm, marginBottom: 4, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, minHeight: 28, borderRadius: 999, borderWidth: 1 },
   lessonRow: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: space.xs, borderBottomWidth: StyleSheet.hairlineWidth },
   lessonMain: { flex: 1, minWidth: 0, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm },
 });
