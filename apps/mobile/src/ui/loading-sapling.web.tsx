@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { UI_SCALE } from "@/theme/ui-scale";
 import { useTheme } from "@/theme/theme";
 
 /**
@@ -28,7 +29,10 @@ function pick(): number {
 export function LoadingSapling({ compact = false }: { compact?: boolean }) {
   const { c } = useTheme();
   const [idx] = useState(pick);
-  const size = compact ? 88 : 220;
+  // iPad 與電腦（UI_SCALE > 1）：大型讀取動畫放大三倍（業主 2026-11-18），但不超過畫面可容納的大小。
+  const big = !compact && UI_SCALE > 1;
+  const fit = typeof window === "undefined" ? 660 : Math.max(220, Math.min(660, window.innerWidth - 48, window.innerHeight - 400));
+  const size = compact ? 88 : big ? fit : 220;
   const h = Math.round((size * 164) / 160);
   return (
     <div className="hgls" role="status" aria-label="載入中" style={{ padding: compact ? 8 : 16, color: c.accentText }}>
@@ -37,7 +41,7 @@ export function LoadingSapling({ compact = false }: { compact?: boolean }) {
         <svg viewBox="0 -8 160 164" width={size} height={h} aria-hidden="true" dangerouslySetInnerHTML={{ __html: compact ? COMPACT : SCENES[idx]! }} />
       </div>
       {compact ? null : (
-        <div className="cap">
+        <div className="cap" style={big ? { fontSize: Math.round(15 * UI_SCALE * 2) } : undefined}>
           灌溉中<span className="dots"><span /><span /><span /></span>
         </div>
       )}
