@@ -1,3 +1,4 @@
+import "@/lib/install-app"; // 要最早載入，才接得到瀏覽器只送一次的「可安裝」事件
 import { Stack } from "expo-router/stack";
 import { useEffect } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";

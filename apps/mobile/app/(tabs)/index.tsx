@@ -12,7 +12,7 @@ import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { usePullRefresh } from "@/ui/pull-refresh";
-import { AppText, BrandTitle, ErrorView, LoginPrompt, LoadingView, Ticker } from "@/ui";
+import { AppText, BrandTitle, ErrorView, InstallCard, LoginPrompt, LoadingView, Ticker } from "@/ui";
 
 /**
  * 首頁：固定一頁、不上下捲動。上方置中顯示大標題與會員頭像＋姓名（點擊進入會員中心編輯基本資料）、跑馬燈公告，下方左右兩個直式區塊（繼續學習、推薦課程），
@@ -93,6 +93,7 @@ export default function HomeScreen() {
           ) : null}
         </View>
         <LoginPrompt />
+        <InstallCard dismissible />
         {noticeClosed ? null : <Ticker items={(notices.data ?? []).map((n) => n.text)} everyMs={config.app.tickerSec * 1000} pauseMs={config.app.tickerPauseSec * 1000} onClose={() => setNoticeClosed(true)} />}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {!data && !error ? <LoadingView /> : null}

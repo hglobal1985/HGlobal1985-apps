@@ -6,7 +6,7 @@ import { Switch, View } from "react-native";
 import { api, type NotificationSettings } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
-import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, LoadingLadybug, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, Field, InstallCard, LoadingView, LoadingLadybug, NoticeBox, Screen, Section } from "@/ui";
 
 /** 通知設定：Email 是會員中心「聯絡信箱」的同一個欄位，這裡改就是改會員中心。 */
 export default function NotificationSettingsScreen() {
@@ -76,6 +76,7 @@ export default function NotificationSettingsScreen() {
           </View>
           {!data.email ? <AppText variant="caption" tone="muted">還沒有信箱，所以目前不會寄 Email。</AppText> : null}
         </Card>
+        <InstallCard />
         <PushCard />
       </Section>
       {msg ? <NoticeBox text={msg.text} tone={msg.ok ? "success" : "danger"} /> : null}

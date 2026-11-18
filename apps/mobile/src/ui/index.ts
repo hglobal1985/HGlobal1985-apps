@@ -26,6 +26,7 @@ export { ShareIcon, isApplePlatform } from "./share-icon";
 export { FlashHost, showFlash, type FlashContent } from "./flash-notice";
 export { SaplingIcon } from "./sapling-icon";
 export { LoginPrompt } from "./login-prompt";
+export { InstallCard } from "./install-card";
 export { GuestGate } from "./guest-gate";
 export { InAppBrowserBanner } from "./in-app-banner";
 export { LoadingSapling } from "./loading-sapling";
