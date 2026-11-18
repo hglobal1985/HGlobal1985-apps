@@ -2,7 +2,7 @@ import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image, Linking, Platform, Pressable, View, type ViewStyle } from "react-native";
+import { Image, Linking, Pressable, View, type ViewStyle } from "react-native";
 import { resolveUrl, type CourseDetail, type Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
 import { eventDays, minutesText, sharerLine } from "@/features/format";

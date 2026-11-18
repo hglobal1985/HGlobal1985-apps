@@ -22,7 +22,7 @@ test("清單的區塊：顯示在上拉選單、品牌、分類；沒上傳封�
   await add({ kind: "section", title: "隱藏區塊", inSheet: false });
   assert.equal((await add({ kind: "section", title: "壞品牌", brandId: "nope" })).status, 400);
   const list = async () => (await call<CourseSummary[]>("GET", "/courses", { token: admin })).data.find((x) => x.id === c.id)!;
-  let sum = await list();
+  const sum = await list();
   assert.equal(sum.blocks.length, 1, "只列勾了顯示在上拉選單的區塊");
   const b = sum.blocks[0]!;
   assert.deepEqual([b.title, b.brandId, b.categories, b.count], ["雅姿", brand, "美容、產品", 0]);
