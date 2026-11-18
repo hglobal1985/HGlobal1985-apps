@@ -605,7 +605,8 @@ function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zo
         : { bg: c.accentSoft, fg: c.accentText, icon: "library" as const };
   const label = text ?? (zone ? zoneLabel(zone) : "");
   return (
-    <View style={[styles.zone, { backgroundColor: look.bg }]} accessibilityRole="header">
+    // 點標題列任意處都能收合／展開（業主 2026-11-18）；裡面的「移動」「收合」鈕各自處理自己的點擊。
+    <Pressable onPress={onFold} disabled={!onFold} accessibilityRole="header" style={[styles.zone, { backgroundColor: look.bg }]}>
       <Ionicons name={icon ?? look.icon} size={18} color={look.fg} />
       <AppText variant="callout" style={{ fontWeight: "800", color: look.fg, flexShrink: 1 }}>
         {label}
@@ -629,7 +630,7 @@ function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zo
           <Ionicons name={folded ? "chevron-down" : "chevron-up"} size={16} color={look.bg} />
         </Pressable>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
