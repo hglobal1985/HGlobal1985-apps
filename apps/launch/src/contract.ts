@@ -89,7 +89,7 @@ export type EnrollmentState = "opened" | "pending" | null;
 export type Zone = "hglobal" | "amway_material" | "amway_brand";
 export const ZONES: { id: Zone; label: string }[] = [
   { id: "hglobal", label: "寰宇課程/活動/素材" },
-  { id: "amway_material", label: "安麗素材專區" },
+  { id: "amway_material", label: "安麗官方素材專區" },
   { id: "amway_brand", label: "安麗品牌專區" },
 ];
 export const zoneOf = (raw: string | null | undefined, isList: boolean): Zone => (ZONES.some((z) => z.id === raw) ? (raw as Zone) : isList ? "amway_material" : "hglobal");
