@@ -1,7 +1,8 @@
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
-import { Image, Linking, Pressable, View, type ViewStyle } from "react-native";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image, Linking, Platform, Pressable, View, type ViewStyle } from "react-native";
 import { resolveUrl, type CourseDetail, type Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
@@ -139,7 +140,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
                       {row.map((b) => {
                         const on = b.head.id === openId;
                         return (
-                          <Pressable key={b.head.id} nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={() => setOpenId(on ? null : b.head.id)} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, pressed && { opacity: 0.75 }]}>
+                          <Pressable key={b.head.id} nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={() => setOpenId(on ? null : b.head.id)} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72, opacity: openId && !on ? 0.3 : 1 } as ViewStyle, openId && !on && Platform.OS === "web" ? ({ filter: "grayscale(1)" } as ViewStyle) : null, pressed && { opacity: 0.75 }]}>
                             <View style={{ width: cell, aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: on ? 3 : 1, borderColor: on ? c.accent : c.border }}>
                               {b.head.coverUrl ? (
                                 <Image source={{ uri: resolveUrl(b.head.coverUrl) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
@@ -148,6 +149,13 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
                               ) : (
                                 <Image source={require("../../../assets/icon.png")} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
                               )}
+                              {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
+                              <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個素材，${on ? "已展開" : "已收起"}`}>
+                                <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
+                                  {b.items.filter(shown).length}
+                                </AppText>
+                                <Ionicons name={on ? "chevron-up" : "chevron-down"} size={12} color={c.textOnAccent} />
+                              </View>
                             </View>
                             <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontWeight: "800", color: on ? c.accentText : c.text }}>
                               {b.head.title}
