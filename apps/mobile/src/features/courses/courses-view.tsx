@@ -531,7 +531,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {tileW && flat ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat
               ? zoneSections.map(({ zone, items }) =>
-                  items.length || canMove ? (
+                  items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
                     <Fragment key={zone}>
                       <ZoneBand zone={zone} count={items.length} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!!folded[zone]} onFold={() => toggleFold(zone)} />
                       {folded[zone] ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}

@@ -1,6 +1,8 @@
 import type { D1Database, Env } from "./d1.ts";
 
 /** 品牌資訊卡（業主 2026-11-18）：每個品牌 logo 一張素材清單卡，放在「安麗品牌專區」，封面用品牌 logo。 */
+/** 業主可能改過清單名稱，所以優先用固定編號找。 */
+export const NEW_PRODUCT_LIST_ID = "cxnfbadr";
 export const NEW_PRODUCT_LIST_TITLE = "安麗新品與特惠直播培訓";
 export const BRAND_CARD_BLOCKS = ["新品特惠培訓直播", "產品示範", "宣傳短片", "媒體曝光", "專家說", "其他未分類"] as const;
 /** 「產品示範」區塊封面的範本圖（橫式 16:9、直式），放在 R2 的固定位置，建卡時各複製一份給各卡（刪除某卡的封面不會影響別張）。 */
@@ -18,7 +20,7 @@ export async function ensureBrandCards(env: Env, only?: string): Promise<number>
   const have = new Set((await db.prepare("SELECT id FROM courses WHERE id LIKE 'cb%' AND is_list = 1 AND zone = 'amway_brand'").all<{ id: string }>()).results.map((r) => r.id));
   const missing = brands.filter((b) => !have.has(brandCardId(b.id)));
   if (!missing.length) return 0;
-  const source = await db.prepare("SELECT id FROM courses WHERE is_list = 1 AND title = ? LIMIT 1").bind(NEW_PRODUCT_LIST_TITLE).first<{ id: string }>();
+  const source = await db.prepare("SELECT id FROM courses WHERE is_list = 1 AND (id = ? OR title = ?) ORDER BY id = ? DESC LIMIT 1").bind(NEW_PRODUCT_LIST_ID, NEW_PRODUCT_LIST_TITLE, NEW_PRODUCT_LIST_ID).first<{ id: string }>();
   const wide = env.MEDIA ? await env.MEDIA.get(DEMO_COVER_WIDE).catch(() => null) : null;
   const tall = env.MEDIA ? await env.MEDIA.get(DEMO_COVER_TALL).catch(() => null) : null;
   const wideBytes = wide ? await new Response(wide.body).arrayBuffer() : null;
