@@ -286,6 +286,7 @@ async function achievementBody(ctx: Ctx, body: Record<string, unknown>, creating
     else if (typeof body.feature === "string" && body.feature in FEATURES) sets.push(["feature", body.feature]);
     else fail(400, "invalid_feature", "功能代碼不正確");
   }
+  if (sets.some(([c, v]) => c === "condition_type" && v === "feature_used") && !sets.some(([c, v]) => c === "feature" && typeof v === "string")) fail(400, "feature_required", "請選擇要使用的功能");
   if (body.active !== undefined) sets.push(["active", body.active === true ? 1 : 0]);
   return sets;
 }
@@ -1773,8 +1774,9 @@ async function libraryMine(ctx: Ctx, sub: string): Promise<LibraryMine> {
   if (!lib && ctx.session?.kind === "central") {
     // 獲得任意 100 枚徽章就自動解鎖書櫃鑰匙（業主 2026-11-17）；會員編號等問題留在 blocked 讓畫面提示。
     const have = (await grantAchievements(ctx, sub)).filter((a) => a.earned).length;
-    keys = { have, need: LIBRARY_KEY_BADGES };
-    if (have >= LIBRARY_KEY_BADGES) {
+    const need = (await loadConfig(ctx.db)).app.libraryKeyBadges ?? LIBRARY_KEY_BADGES;
+    keys = { have, need };
+    if (have >= need) {
       const r = await createLibrary(ctx, ctx.session);
       if (r.ok) lib = await libOf(ctx.db, sub);
       else keys.blocked = r.message;

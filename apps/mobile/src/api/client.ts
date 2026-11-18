@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import type { ApiError } from "../../../launch/src/contract";
 export { classifyLink, parseHttpsUrl } from "../../../launch/src/links";
-export { VIEW_SCOPES, VIEW_SCOPE_LABEL, PAYMENT_METHODS, KEYWORD_INFO, ACHIEVEMENT_TYPES, FEATURES, applicantLabel, reviewerInviteMessage, REVIEW_ROLES, REVIEW_ROLE_LABEL, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, shareMessage, DUTY_LABELS, HQ_UNIT, REVIEW_REASONS, RIBBON_INFO, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUP_INFO, SORT_GROUPS, STATS_ROLE_OPTIONS } from "../../../launch/src/contract";
+export { VIEW_SCOPES, VIEW_SCOPE_LABEL, PAYMENT_METHODS, KEYWORD_INFO, ACHIEVEMENT_TYPES, ACHIEVEMENT_CATEGORIES, FEATURES, applicantLabel, reviewerInviteMessage, REVIEW_ROLES, REVIEW_ROLE_LABEL, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, shareMessage, DUTY_LABELS, HQ_UNIT, REVIEW_REASONS, RIBBON_INFO, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUP_INFO, SORT_GROUPS, STATS_ROLE_OPTIONS } from "../../../launch/src/contract";
 import { centralToken, refresh as refreshCentral } from "./central";
 
 export type {
@@ -14,6 +14,7 @@ export type {
   UiConfig,
   Achievement,
   AchievementType,
+  AchievementCategory,
   AdminAchievement,
   Announcement,
   AppConfig,

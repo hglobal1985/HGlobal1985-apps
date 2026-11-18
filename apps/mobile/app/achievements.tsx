@@ -6,17 +6,17 @@ import type { Achievement } from "@/api/client";
 import { conditionText } from "@/features/achievements/text";
 import { dateOnly } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
+import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { GuestGate, AppText, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
-
-/** 集滿這麼多枚徽章解鎖書櫃鑰匙（與後端 LIBRARY_KEY_BADGES 相同）。 */
-const KEY_BADGES = 100;
 
 /** 學習成就：達成條件就會獲得徽章；還沒達成的顯示目前進度。 */
 export default function AchievementsScreen() {
   const { c } = useTheme();
   const { member } = useSession();
+  const { config } = useUiConfig();
+  const KEY_BADGES = config.app.libraryKeyBadges ?? 100; // 後台「徽章任務設定」可調
   const { data, error, loading, reload } = useApi<Achievement[]>(member ? "/me/achievements" : null);
   useEffect(() => (member ? trackFeature("achievements_view") : undefined), [member]);
   if (!member)

@@ -454,25 +454,36 @@ export type ProfileForm = {
 
 // ---------- 學習成就（徽章）----------
 export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total";
-/** 條件類型的中文說明（單位用在「累計 N ○」）。 */
-export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; needsCourse?: boolean; needsFeature?: boolean }> = {
-  lessons_completed: { label: "累計完成幾堂課", unit: "堂" },
-  courses_completed: { label: "累計完整學完幾堂課程", unit: "堂" },
-  courses_enrolled: { label: "累計報名（已開通）幾堂課程", unit: "堂" },
-  learning_days: { label: "累計幾個不同的日子有學習紀錄", unit: "天" },
-  comments_posted: { label: "在課程留言板留言幾次", unit: "次" },
-  course_completed: { label: "學完指定的某一門課程", unit: "堂", needsCourse: true },
-  streak_days: { label: "連續幾天都有完成章節（建議最多 7 天）", unit: "天" },
-  watch_minutes: { label: "累計完成章節的學習分鐘數", unit: "分鐘" },
-  centers_subscribed: { label: "訂閱幾個中心", unit: "個" },
-  series_subscribed: { label: "訂閱幾個系列", unit: "個" },
-  categories_explored: { label: "學習過幾種不同分類的課程", unit: "種" },
-  early_lessons: { label: "早晨（04:00～08:00）完成幾堂章節", unit: "堂" },
-  night_lessons: { label: "夜間（22:00～04:00）完成幾堂章節", unit: "堂" },
-  weekend_lessons: { label: "週末完成幾堂章節", unit: "堂" },
-  lessons_in_a_day: { label: "單日最多完成幾堂章節", unit: "堂" },
-  subscriptions_total: { label: "訂閱中心與系列的總數", unit: "個" },
-  feature_used: { label: "使用過某個網站功能（新手教學）", unit: "次", needsFeature: true },
+/** 任務分類（後台「徽章任務設定」用，業主 2026-11-18）。 */
+export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature";
+export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; icon: string; desc: string }[] = [
+  { key: "progress", label: "學習進度", icon: "📈", desc: "學了多少：完成的堂數、課程、學習時間" },
+  { key: "habit", label: "學習習慣", icon: "🔥", desc: "有沒有持續：累計天數、連續天數" },
+  { key: "time", label: "學習時段", icon: "🕒", desc: "什麼時候學：早晨、夜間、週末" },
+  { key: "explore", label: "探索嘗鮮", icon: "🧭", desc: "報名多少門課、涉獵多少種分類" },
+  { key: "social", label: "社群互動", icon: "💬", desc: "在課程留言板的互動" },
+  { key: "subscribe", label: "訂閱關注", icon: "🔔", desc: "訂閱中心、系列的數量" },
+  { key: "feature", label: "功能體驗", icon: "🧰", desc: "第一次使用某個網站功能（新手教學）" },
+];
+/** 條件類型：中文名稱、單位、分類、白話說明（後台挑選時顯示）。retired＝已停用的類型，後台不再提供。 */
+export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; category: AchievementCategory; hint: string; needsCourse?: boolean; needsFeature?: boolean; retired?: boolean }> = {
+  lessons_completed: { label: "累計完成章節數", unit: "堂", category: "progress", hint: "會員一共完成了幾個章節（每個章節只算一次）" },
+  courses_completed: { label: "累計學完課程數", unit: "門", category: "progress", hint: "整門課的每個章節都完成，才算學完 1 門" },
+  lessons_in_a_day: { label: "單日最多完成章節數", unit: "堂", category: "progress", hint: "同一天（台灣時間）內完成的章節數，取最高的一天" },
+  watch_minutes: { label: "累計學習分鐘數", unit: "分鐘", category: "progress", hint: "把完成章節的長度加總（分鐘）" },
+  learning_days: { label: "累計學習天數", unit: "天", category: "habit", hint: "有完成章節的不同日期共幾天（不需連續）" },
+  streak_days: { label: "連續學習天數", unit: "天", category: "habit", hint: "連續幾天每天都有完成章節；太久很難達成，建議最多 7 天" },
+  early_lessons: { label: "早晨完成章節數", unit: "堂", category: "time", hint: "04:00～08:00（台灣時間）完成的章節數" },
+  night_lessons: { label: "夜間完成章節數", unit: "堂", category: "time", hint: "22:00～04:00（台灣時間）完成的章節數" },
+  weekend_lessons: { label: "週末完成章節數", unit: "堂", category: "time", hint: "星期六、日完成的章節數" },
+  courses_enrolled: { label: "累計報名課程數", unit: "門", category: "explore", hint: "已開通（含免費自動通過）的不同課程數" },
+  categories_explored: { label: "學習過的不同分類數", unit: "種", category: "explore", hint: "完成過章節的課程，涵蓋幾種不同的分類" },
+  comments_posted: { label: "課程留言次數", unit: "次", category: "social", hint: "在課程留言板留言的總次數" },
+  centers_subscribed: { label: "訂閱中心數", unit: "個", category: "subscribe", hint: "按過訂閱鈴鐺的教育中心數量" },
+  series_subscribed: { label: "訂閱系列數", unit: "個", category: "subscribe", hint: "按過訂閱鈴鐺的系列數量" },
+  subscriptions_total: { label: "訂閱總數（中心＋系列）", unit: "個", category: "subscribe", hint: "中心與系列加起來的訂閱數量" },
+  feature_used: { label: "使用過某個網站功能", unit: "次", category: "feature", hint: "第一次用到指定功能就達成（需要選功能），達成數量通常填 1", needsFeature: true },
+  course_completed: { label: "學完指定的某一門課程", unit: "門", category: "progress", hint: "已取消這類任務", needsCourse: true, retired: true },
 };
 /** 網站功能清單（功能體驗徽章，類似新手教學）：key 是前端回報用的代碼，label 是功能名稱，hint 是怎麼用。 */
 export const FEATURES = {
@@ -719,6 +730,8 @@ export type AppSettings = {
   learnDonePct: number;
   /** 學習紀錄：播放進度每次回報的最短間隔（秒）。 */
   watchReportSec: number;
+  /** 集滿幾枚徽章自動解鎖「我的書櫃」鑰匙（業主 2026-11-18 起可在後台「徽章任務設定」調整）。 */
+  libraryKeyBadges: number;
 };
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   homeLeftSec: 5,
@@ -733,6 +746,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   learnStartPct: 1,
   learnDonePct: 95,
   watchReportSec: 10,
+  libraryKeyBadges: 100,
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },

@@ -104,6 +104,7 @@ export function normalizeApp(raw: unknown): AppSettings {
     blurStrength: num(r.blurStrength, d.blurStrength, 4, 40),
     ...learnPct(r, d),
     watchReportSec: num(r.watchReportSec, d.watchReportSec, 5, 120),
+    libraryKeyBadges: num(r.libraryKeyBadges, d.libraryKeyBadges, 1, 1000),
   };
 }
 
