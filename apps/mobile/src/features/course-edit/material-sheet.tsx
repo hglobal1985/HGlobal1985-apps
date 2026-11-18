@@ -145,7 +145,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const input = [{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, bodyFont, { color: c.text, borderColor: c.border, backgroundColor: c.surface }];
   const info = fileType ? TYPE_INFO[fileType] : null;
   return (
-    <EditSheet title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
+    <EditSheet material={course.isList} title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
       <View style={{ gap: space.xs }}>
         <AppText variant="callout" tone="muted">
           外部連結

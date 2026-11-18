@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { confirmSheet } from "@/features/confirm";
@@ -36,6 +37,7 @@ export function EditSheet({
   error,
   saveLabel = "儲存",
   hideSave = false,
+  material = false,
   children,
 }: {
   title: string;
@@ -47,6 +49,8 @@ export function EditSheet({
   saveLabel?: string;
   /** 只有「關閉」（例如章節面板裡各自有儲存鈕、或只是查看）。 */
   hideSave?: boolean;
+  /** 素材（清單類別）：標題列右上角顯示黃色「素材」標示，方便跟課程區分（業主 2026-11-18）。 */
+  material?: boolean;
   children: ReactNode;
 }) {
   const { height } = useWindowDimensions();
@@ -62,9 +66,19 @@ export function EditSheet({
     <BottomSheet onClose={close}>
       <SaveSlot.Provider value={setSlot}>
       <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <AppText variant="title" accessibilityRole="header">
-          {title}
-        </AppText>
+        <View style={styles.titleRow}>
+          <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
+            {title}
+          </AppText>
+          {material ? (
+            <View style={styles.matTag} accessibilityLabel="素材">
+              <Ionicons name="folder-open" size={14} color="#1D2A22" />
+              <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
+                素材
+              </AppText>
+            </View>
+          ) : null}
+        </View>
         <ScrollView style={{ maxHeight: height * 0.68 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
@@ -90,6 +104,8 @@ export function EditSheet({
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  matTag: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#FFD43B" },
   body: { gap: space.md, paddingVertical: space.md },
   buttons: { flexDirection: "row", gap: space.sm, paddingTop: space.sm },
 });

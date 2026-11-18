@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { api, HQ_UNIT, type CourseDetail, type CourseSummary } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
-import { AppText, Chips, NoticeBox } from "@/ui";
+import { AppText, Chips, FormBlock, NoticeBox } from "@/ui";
 import { centerTitle } from "@/features/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { BasicsFields, countByHost, type BasicsForm } from "./course-sections";
@@ -45,16 +45,15 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list = f
     }
   };
   return (
-    <EditSheet title={list ? "新增清單（影片／檔案）" : "新增課程"} onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!f.title.trim() || !!f.teacher.trim()} busy={busy} error={error}>
+    <EditSheet material={list} title={list ? "新增清單（影片／檔案）" : "新增課程"} onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!f.title.trim() || !!f.teacher.trim()} busy={busy} error={error}>
       <BasicsFields isList={list} f={f} setF={setF} />
-      <AppText variant="callout" tone="muted">
-        {list ? "建立單位" : "主辦中心"}
-      </AppText>
-      {isHq ? (
-        <Chips options={[HQ_UNIT, ...(centers.data ?? [])].map((x) => ({ key: x, label: `${x === HQ_UNIT ? x : centerTitle(x)}（${hostCounts[x] ?? 0}）` }))} value={host} onChange={setHost} />
-      ) : (
-        <NoticeBox text={`${list ? "建立單位" : "主辦中心"}固定為「${host}」。`} />
-      )}
+      <FormBlock title={list ? "建立單位" : "主辦中心"}>
+        {isHq ? (
+          <Chips options={[HQ_UNIT, ...(centers.data ?? [])].map((x) => ({ key: x, label: `${x === HQ_UNIT ? x : centerTitle(x)}（${hostCounts[x] ?? 0}）` }))} value={host} onChange={setHost} />
+        ) : (
+          <NoticeBox text={`${list ? "建立單位" : "主辦中心"}固定為「${host}」。`} />
+        )}
+      </FormBlock>
       <AppText variant="caption" tone="muted">
         {list ? "建立後是「未上架」，學員看不到；在清單頁用「新增教材」加入影片或檔案，再上架。清單一律完全公開、免費。" : "建立後是「未上架」，學員看不到；在課程頁補好資料再上架。"}
       </AppText>

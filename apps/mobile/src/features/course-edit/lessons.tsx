@@ -12,7 +12,7 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
-import { AppText, Button, Card, Chips, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
+import { AppText, Button, Card, Chips, DateSelect, FormBlock, Icon, NoticeBox, todayStr } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { Check, MultiChips } from "./course-sections";
@@ -94,7 +94,7 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
     }
   };
   return (
-    <EditSheet title={lesson ? "編輯區塊" : "新增區塊"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
+    <EditSheet material title={lesson ? "編輯區塊" : "新增區塊"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
       <AppText variant="callout" tone="muted">
         區塊名稱
       </AppText>
@@ -115,23 +115,22 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
             </AppText>
           )}
           {brands.data?.length ? (
-            <View style={{ gap: space.xs }}>
+            <FormBlock title="品牌">
               <Pressable accessibilityRole="button" accessibilityState={{ expanded: brandOpen }} onPress={() => setBrandOpen((v) => !v)} style={{ minHeight: minTouch, flexDirection: "row", alignItems: "center", gap: space.sm }}>
                 <Icon name={brandOpen ? "chevron-down" : "chevron-forward"} size={18} color={c.accentText} />
-                <AppText variant="callout" style={{ fontWeight: "700", flex: 1 }}>
-                  品牌
+                <AppText variant="callout" style={{ flex: 1 }} tone="muted">
+                  {brandOpen ? "選一個品牌（單選）" : "點一下展開選擇"}
                 </AppText>
-                <AppText variant="callout" tone="muted">
+                <AppText variant="callout" style={{ fontWeight: "800" }}>
                   {brands.data.find((b) => b.id === brandId)?.name ?? "未選"}
                 </AppText>
               </Pressable>
               {brandOpen ? <Chips label="" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={brandId} onChange={setBrandId} /> : null}
-            </View>
+            </FormBlock>
           ) : null}
-          <AppText variant="callout" tone="muted">
-            分類（可複選）
-          </AppText>
-          {categories.data?.length ? <MultiChips options={categories.data} value={cats} onChange={setCats} /> : <AppText tone="muted">目前沒有分類</AppText>}
+          <FormBlock title="分類" hint="可複選">
+            {categories.data?.length ? <MultiChips options={categories.data} value={cats} onChange={setCats} /> : <AppText tone="muted">目前沒有分類</AppText>}
+          </FormBlock>
         </>
       ) : null}
       <AppText variant="caption" tone="muted">

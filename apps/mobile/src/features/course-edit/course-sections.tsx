@@ -10,7 +10,7 @@ import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, DateSelect, Field, ListRow, NoticeBox, Pill } from "@/ui";
+import { AppText, Button, Card, Chips, DateSelect, Field, FormBlock, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
 import { ReviewDeskBlock } from "./review-desk";
@@ -144,22 +144,23 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
           {f.eventStart ? <DateSelect label="結束日期（連續 2～3 天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
         </>
       )}
-      <Field label="分類（可複選，多個用「、」分開）" value={f.category} onChange={set("category")} placeholder="例如：達標班、會議" />
-      {categories.data?.length ? (
-        <View style={{ gap: space.xs }}>
-          <Label>已有的分類（點選加入或取消）</Label>
-          <MultiChips options={categories.data} value={f.category} onChange={set("category")} />
-        </View>
-      ) : null}
+      <FormBlock title="分類" hint="可複選；點選加入或取消，也可以自己輸入（多個用「、」分開）">
+        <Field label="" value={f.category} onChange={set("category")} placeholder="例如：達標班、會議" />
+        {categories.data?.length ? <MultiChips options={categories.data} value={f.category} onChange={set("category")} /> : null}
+      </FormBlock>
       {/* 品牌獨立於分類（業主 2026-11-18）：單選；沒有手動上傳封面時用品牌 logo 當封面（手動上傳 > 品牌 logo > 文字封面）。 */}
       {brands.data?.length ? (
-        <Chips label="品牌（單選；沒上傳封面時用品牌 logo 當封面）" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={f.brandId} onChange={set("brandId")} />
+        <FormBlock title="品牌" hint="單選；沒上傳封面時，用品牌 logo 當封面">
+          <Chips label="品牌" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={f.brandId} onChange={set("brandId")} />
+        </FormBlock>
       ) : null}
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
-          <Field label="系列（同系列的課合併成一張卡、顯示在「相同系列」）" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
-          {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
+          <FormBlock title="系列" hint="同系列合併成一張卡；沒指定系列，就自己單獨一張卡（素材會放在「素材專區」）">
+            <Field label="" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
+            {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
+          </FormBlock>
         </>
       ) : null}
     </>
@@ -186,7 +187,7 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save({ ...(isSuper ? { ...rest, series: f.series } : rest), ...dates, ...matBody }, { important })) onClose();
   };
   return (
-    <EditSheet title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
+    <EditSheet material={course.isList} title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
       {course.isList && isSuper ? (
         <View style={{ gap: space.xs }}>
           <Label>素材網址（只有超級管理員能設定）</Label>
@@ -250,7 +251,7 @@ function WhenSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save({ ...f, eventStart: f.eventStart || null, eventEnd: f.eventEnd || null }, { important })) onClose();
   };
   return (
-    <EditSheet title="時間與地點" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet material={course.isList} title="時間與地點" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <DateSelect label="活動開始日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
       {f.eventStart ? <DateSelect label="活動結束日期（連續 2～3 天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventEnd: v }))} /> : null}
       <AppText variant="caption" tone="muted">
@@ -296,7 +297,7 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save(body, { important })) onClose();
   };
   return (
-    <EditSheet title="費用與審核" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet material={course.isList} title="費用與審核" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <Label>報名費用（新台幣，0＝免費）</Label>
       <TextInput
         value={f.priceTwd}
@@ -341,7 +342,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
   };
   const rankName = ranks.data?.find((r) => r.code === f.minRankCode)?.name ?? course.minRank.name;
   return (
-    <EditSheet title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet material={course.isList} title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <AppText variant="headline">誰能瀏覽課程？</AppText>
       <Chips options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => (setF((x) => ({ ...x, viewScope: v as ViewScope })), (v === "all" || v === "link_guest") && setRankOpen(false))} />
       <AppText variant="caption" tone="muted">
@@ -423,7 +424,7 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save(body)) onClose();
   };
   return (
-    <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet material={course.isList} title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <HostUnitBlock isHq={isHq} value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} options={[HQ_UNIT, ...(centers.data ?? [])]} counts={hostCounts} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
       <AppText variant="caption" tone="muted">
@@ -475,7 +476,7 @@ function StatusSheet({ course, onClose, onSaved }: SheetProps) {
     }
   };
   return (
-    <EditSheet title="上架與刪除" onClose={onClose} busy={busy || working} error={error} hideSave>
+    <EditSheet material={course.isList} title="上架與刪除" onClose={onClose} busy={busy || working} error={error} hideSave>
       <View style={styles.row}>
         <Label>目前狀態</Label>
         <Pill label={status === "published" ? "上架中" : status === "archived" ? "已下架封存" : "未上架"} tone={status === "published" ? "success" : "danger"} />
