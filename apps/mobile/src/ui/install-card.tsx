@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import Svg, { Circle, Rect } from "react-native-svg";
 import { Pressable, StyleSheet, View } from "react-native";
 import { installNative, isIos, useInstallState } from "@/lib/install-app";
@@ -12,27 +13,22 @@ import { flashText } from "./flash-notice";
 
 /** 與 App 內建瀏覽器警示條同一組紅色（in-app-banner.tsx）。 */
 const RED = "#B3261E";
-const KEY = "hglobal:learn:install-dismissed";
-const readDismissed = () => {
-  try {
-    const t = Number(globalThis.localStorage?.getItem(KEY) ?? 0);
-    return Date.now() - t < 7 * 24 * 3600_000; // 按「之後再說」後 7 天不再顯示
-  } catch {
-    return false;
-  }
-};
-
 /**
  * 「加入主畫面」邀請卡（業主 2026-11-18，全站唯一來源）：只在手機網頁、還沒安裝時顯示。
  * 好處：手機推播的來源會顯示「寰宇行動大學」、開啟更快。Android 一鍵安裝；iPhone 顯示「分享 → 加入主畫面」教學。
- * dismissible＝可按 ✕ 之後再說（首頁用）；通知設定頁不可關。
+ * dismissible＝可按 ✕ 先關掉這一次（首頁用）；通知設定頁不可關。
  */
 export function InstallCard({ dismissible = false }: { dismissible?: boolean }) {
   const { c } = useTheme();
   const { suggest, native } = useInstallState();
   const [hidden, setHidden] = useState(false);
   const [steps, setSteps] = useState(false);
-  useEffect(() => setHidden(dismissible && readDismissed()), [dismissible]);
+  // ✕ 只是這一次先關掉：重新進入首頁（回到畫面、重新開啟網站）會再出現，直到安裝為止（業主 2026-11-18）。
+  useFocusEffect(
+    useCallback(() => {
+      setHidden(false);
+    }, []),
+  );
   if (!suggest || hidden) return null;
   const go = async () => {
     if (native) {
@@ -42,14 +38,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
     }
     setSteps(true);
   };
-  const dismiss = () => {
-    try {
-      globalThis.localStorage?.setItem(KEY, String(Date.now()));
-    } catch {
-      /* 沒有儲存空間就只在這次隱藏 */
-    }
-    setHidden(true);
-  };
+  const dismiss = () => setHidden(true);
   const ios = isIos();
   return (
     <>
@@ -68,7 +57,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
           <AppText style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>安裝</AppText>
         </Pressable>
         {dismissible ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="之後再說" onPress={dismiss} hitSlop={8} style={styles.x}>
+          <Pressable accessibilityRole="button" accessibilityLabel="先關閉這一次" onPress={dismiss} hitSlop={8} style={styles.x}>
             <Icon name="close" size={30} color={RED} />
           </Pressable>
         ) : null}
