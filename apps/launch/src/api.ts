@@ -5688,7 +5688,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
     if (e instanceof HttpError) res = json({ error: { code: e.code, message: e.message } }, e.status);
     else {
       console.error("api error", e);
-      res = json({ error: { code: "internal", message: "系統忙碌，請稍後再試" } }, 500);
+      res = json({ error: { code: "internal", message: "系統功能正在升級中，請稍後幾分鐘後再試" } }, 500);
     }
   }
   for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
