@@ -61,6 +61,7 @@ import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centr
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
+import { classifyFile, FILE_MAX_BYTES, FILE_NO_VIDEO, FILE_TOO_BIG, safeFileName, type StorageKind } from "./files.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
@@ -888,9 +889,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   if (!manages && !scopeAllows(row.view_scope, s) && !keepsAccess(state, row)) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
-  const linkRows = await ctx.db.prepare("SELECT lesson_id, att_type, link_url FROM lesson_attachments WHERE course_id = ? AND kind = 'link' ORDER BY created_at").bind(id).all<{ lesson_id: string; att_type: AttachmentType; link_url: string }>();
+  const linkRows = await ctx.db.prepare("SELECT lesson_id, att_type, link_url, kind, r2_key FROM lesson_attachments WHERE course_id = ? AND kind IN ('link', 'file') ORDER BY created_at").bind(id).all<{ lesson_id: string; att_type: AttachmentType; link_url: string | null; kind: string; r2_key: string | null }>();
   const linkOf = new Map<string, { type: AttachmentType; url: string }>();
-  for (const r of linkRows.results) if (!linkOf.has(r.lesson_id)) linkOf.set(r.lesson_id, { type: r.att_type, url: r.link_url });
+  // 上傳的檔案：網址是「教材檔案」下載路徑（檔案鍵是隨機碼，只在有權限看的人拿到的資料裡出現）；外部連結直接給原網址。
+  for (const r of linkRows.results) if (!linkOf.has(r.lesson_id)) linkOf.set(r.lesson_id, { type: r.att_type, url: r.kind === "file" ? `${ctx.url.origin}/api/v2/media/file?k=${encodeURIComponent(r.r2_key ?? "")}` : (r.link_url ?? "") });
   const groupPos = new Map<string, number>();
   {
     const n = { chapter: 0, material: 0 };
@@ -4040,6 +4042,127 @@ const routes: [string, RegExp, Handler][] = [
       const [res] = await ctx.db.batch([ctx.db.prepare("DELETE FROM announcements WHERE id = ?").bind(id), audit(ctx.db, admin.sub, "announcement.delete", "announcement", id)]);
       if (res.meta?.changes === 0) return fail(404, "not_found", "找不到這則公告");
       return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/courses\/([\w-]+)\/material-file$/,
+    async (ctx, [courseId]) => {
+      // 上傳檔案當教材（業主 2026-11-18）：圖片、照片、文件；不能是影片；單檔 30MB 內（圖片在瀏覽器已先壓縮）。
+      const admin = await requireCourseManager(ctx, courseId);
+      const name = (ctx.url.searchParams.get("name") ?? "").trim().slice(0, 120);
+      if (!name) return fail(400, "name_required", "找不到檔案名稱");
+      const kind = classifyFile(name);
+      if (kind === "video") return fail(400, "video_not_allowed", FILE_NO_VIDEO);
+      if (!kind) return fail(400, "file_type_not_allowed", "這種檔案格式不支援。可上傳圖片、PDF、Word、PowerPoint、Excel、文字檔；其他格式請上傳到雲端空間後貼連結");
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "檔案儲存空間尚未啟用");
+      const declared = Number(ctx.req.headers.get("content-length") ?? 0);
+      if (declared > FILE_MAX_BYTES + 1024) return fail(413, "file_too_large", FILE_TOO_BIG);
+      const data = await ctx.req.arrayBuffer();
+      if (!data.byteLength) return fail(400, "empty_file", "檔案是空的");
+      if (data.byteLength > FILE_MAX_BYTES) return fail(413, "file_too_large", FILE_TOO_BIG);
+      const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
+      if (!course) return fail(404, "not_found", "找不到這門課程");
+      const id = `${courseId}-${randomId(6)}`;
+      const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(name)}`;
+      await bucket.put(key, data, { httpMetadata: { contentType: kind.ct } });
+      const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+      const title = cleanTitle(name.replace(/\.[^.]+$/, "")) || "檔案";
+      await ctx.db.batch([
+        ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title),
+        ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, att_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?)").bind(crypto.randomUUID(), id, courseId, name, key, data.byteLength, kind.ct, kind.type, admin.sub),
+        audit(ctx.db, admin.sub, "material.file_upload", "lesson", id, `${kind.type}:${name}:${data.byteLength}`),
+      ]);
+      await notifyNewContent(ctx, courseId, "教材");
+      return ctx.url.searchParams.get("lite") === "1" ? { id } : courseDetail(ctx, courseId);
+    },
+  ],
+  [
+    "GET",
+    /^\/media\/file$/,
+    async (ctx) => {
+      // 教材檔案下載：檔案鍵是隨機碼，只有在課程資料裡拿得到的人（有權限者）知道；只服務資料庫裡仍在使用的檔案。
+      const key = ctx.url.searchParams.get("k") ?? "";
+      const bucket = ctx.env.MEDIA;
+      if (!bucket || !/^file\/[\w-]+\/[\w-]+\/.+$/.test(key)) return new Response("Not found", { status: 404 });
+      const att = await ctx.db.prepare("SELECT name, content_type, att_type FROM lesson_attachments WHERE r2_key = ?").bind(key).first<{ name: string; content_type: string; att_type: string }>();
+      const obj = att ? await bucket.get(key) : null;
+      if (!obj || !att) return new Response("Not found", { status: 404 });
+      const inline = att.att_type === "pdf" || att.att_type === "image" || att.att_type === "text";
+      return new Response(obj.body, {
+        headers: {
+          "content-type": att.content_type || "application/octet-stream",
+          "content-disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(att.name)}`,
+          "cache-control": "private, max-age=3600",
+          "x-content-type-options": "nosniff",
+        },
+      });
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/storage$/,
+    async (ctx) => {
+      // 儲存空間管理（超級管理員）：各中心已使用的容量與各類型佔比。檔案大小以雲端儲存的實際大小為準，歸屬由資料庫對應。
+      requireSuperAdmin(ctx);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "檔案儲存空間尚未啟用");
+      const sizes = new Map<string, number>();
+      let cursor: string | undefined;
+      for (let i = 0; i < 100; i++) {
+        const page = await bucket.list({ cursor, limit: 1000 });
+        for (const o of page.objects) sizes.set(o.key, o.size);
+        if (!page.truncated) break;
+        cursor = page.cursor;
+      }
+      const owners = new Map<string, { owner: string; kind: StorageKind }>();
+      const [courses, lessons, atts, centers, series, brands] = await Promise.all([
+        ctx.db.prepare("SELECT id, host_center_key, edm_key, cover_key FROM courses").all<{ id: string; host_center_key: string | null; edm_key: string | null; cover_key: string | null }>(),
+        ctx.db.prepare("SELECT l.course_id, l.cover_key, l.poster_key, l.media_type, l.media_ref FROM lessons l").all<{ course_id: string; cover_key: string | null; poster_key: string | null; media_type: string; media_ref: string | null }>(),
+        ctx.db.prepare("SELECT course_id, r2_key, att_type FROM lesson_attachments WHERE r2_key IS NOT NULL").all<{ course_id: string; r2_key: string; att_type: string }>(),
+        ctx.db.prepare("SELECT center_key, edm_key, cover_key FROM center_art").all<{ center_key: string; edm_key: string | null; cover_key: string | null }>(),
+        ctx.db.prepare("SELECT edm_key, cover_key FROM series_art").all<{ edm_key: string | null; cover_key: string | null }>(),
+        ctx.db.prepare("SELECT logo_key, bg_key FROM brand_logos").all<{ logo_key: string | null; bg_key: string | null }>(),
+      ]);
+      const HQ = "寰宇總部";
+      const centerOf = new Map(courses.results.map((c) => [c.id, c.host_center_key || HQ]));
+      const put = (key: string | null | undefined, owner: string, kind: StorageKind) => key && owners.set(key, { owner, kind });
+      for (const c of courses.results) {
+        put(c.edm_key, c.host_center_key || HQ, "image");
+        put(c.cover_key, c.host_center_key || HQ, "image");
+      }
+      for (const l of lessons.results) {
+        const o = centerOf.get(l.course_id) ?? HQ;
+        put(l.cover_key, o, "image");
+        put(l.poster_key, o, "image");
+        if (l.media_type === "audio") put(l.media_ref, o, "audio");
+      }
+      for (const a of atts.results) put(a.r2_key, centerOf.get(a.course_id) ?? HQ, a.att_type === "image" ? "image" : "doc");
+      for (const c of centers.results) {
+        put(c.edm_key, c.center_key, "image");
+        put(c.cover_key, c.center_key, "image");
+      }
+      for (const x of series.results) {
+        put(x.edm_key, HQ, "image");
+        put(x.cover_key, HQ, "image");
+      }
+      for (const b of brands.results) {
+        put(b.logo_key, HQ, "image");
+        put(b.bg_key, HQ, "image");
+      }
+      const rows = new Map<string, { center: string; total: number; image: number; doc: number; audio: number; other: number }>();
+      const totals = { image: 0, doc: 0, audio: 0, other: 0 };
+      let total = 0;
+      for (const [key, size] of sizes) {
+        const o = owners.get(key) ?? { owner: "（沒有歸屬的檔案）", kind: "other" as StorageKind };
+        const r = rows.get(o.owner) ?? { center: o.owner, total: 0, image: 0, doc: 0, audio: 0, other: 0 };
+        r[o.kind] += size;
+        r.total += size;
+        rows.set(o.owner, r);
+        totals[o.kind] += size;
+        total += size;
+      }
+      return { totalBytes: total, objectCount: sizes.size, byType: totals, byCenter: [...rows.values()].sort((a, b) => b.total - a.total) };
     },
   ],
   [

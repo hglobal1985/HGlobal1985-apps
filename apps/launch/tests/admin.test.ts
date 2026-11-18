@@ -24,6 +24,9 @@ function fakeR2(): R2Bucket & { objects: Map<string, { data: Uint8Array; type?: 
     async delete(key) {
       objects.delete(key);
     },
+    async list() {
+      return { objects: [...objects].map(([key, o]) => ({ key, size: o.data.byteLength })), truncated: false };
+    },
     async put(key, value, opts) {
       objects.set(key, { data: new Uint8Array(value), type: opts?.httpMetadata?.contentType });
     },

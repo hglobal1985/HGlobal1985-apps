@@ -9,7 +9,8 @@ import { commitMediaDraft, MediaUploadModule, TimeRangeFields, mediaDraftBody, m
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, DateSelect, Icon } from "@/ui";
+import { AppText, DateSelect, FormBlock, Icon } from "@/ui";
+import { FileUploadModule } from "@/features/uploads/file-upload-module";
 import { BrandIcon } from "@/ui/brand-icon";
 import { EditSheet } from "./edit-sheet";
 
@@ -24,7 +25,48 @@ export function NewMaterialSheet({ course, onClose, afterBlock }: { course: Cour
 
 export function EditMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
   if (lesson.full) return <FullVersionSheet lesson={lesson} onClose={onClose} />;
+  if (lesson.linkUrl?.includes("/media/file?k=")) return <FileMaterialSheet course={course} lesson={lesson} onClose={onClose} />;
   return <LinkMaterialSheet course={course} lesson={lesson} onClose={onClose} />;
+}
+
+/** 上傳的檔案教材：只能改名稱與日期（要換檔案就刪掉重新上傳）。 */
+function FileMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
+  const { c } = useTheme();
+  const { invalidate } = useSession();
+  const [title, setTitle] = useState(lesson.title);
+  const [evDate, setEvDate] = useState(lesson.eventDate ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (!title.trim()) return setError("請輸入教材名稱");
+    setBusy(true);
+    setError(null);
+    try {
+      await api("PATCH", `/admin/lessons/${lesson.id}`, { title: title.trim(), eventDate: evDate || null });
+      invalidate();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const info = lesson.linkType ? TYPE_INFO[lesson.linkType] : null;
+  return (
+    <EditSheet material={course.isList} title={`教材 ${lesson.position}：${lesson.title}`} onClose={onClose} onSave={submit} dirty={title !== lesson.title || evDate !== (lesson.eventDate ?? "")} busy={busy} error={error}>
+      <FormBlock title="檔案" hint="要換檔案，請刪除這個教材後重新上傳">
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+          {lesson.linkType ? <BrandIcon type={lesson.linkType} fallback={info!.icon as never} size={32} /> : null}
+          <AppText variant="body">{info?.label ?? "檔案"}</AppText>
+        </View>
+      </FormBlock>
+      <AppText variant="callout" tone="muted">
+        教材名稱
+      </AppText>
+      <TextInput value={title} onChangeText={setTitle} accessibilityLabel="教材名稱" maxLength={80} style={[{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
+      <DateSelect label="日期（選填）" value={evDate} onChange={setEvDate} />
+    </EditSheet>
+  );
 }
 
 type Fetch = "idle" | "loading" | "done" | "none";
@@ -106,6 +148,23 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
     }
   };
 
+  const before = useRef(new Set(course.lessons.map((l) => l.id)));
+  // 上傳檔案完成：新建的教材（可能多個）搬到指定區塊的最後面，然後關閉。
+  const onFiles = async (d: CourseDetail, hadErrors: boolean) => {
+    const fresh = d.lessons.filter((l) => l.material && !l.full && !before.current.has(l.id));
+    if (afterBlock && fresh.length) {
+      const all = d.lessons.filter((l) => l.material && !l.full);
+      const rest = all.filter((l) => !fresh.some((f) => f.id === l.id));
+      const at = rest.findIndex((l) => l.id === afterBlock);
+      if (at >= 0) {
+        let end = at + 1;
+        while (end < rest.length && !rest[end]!.section) end++;
+        await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: [...rest.slice(0, end), ...fresh, ...rest.slice(end)].map((l) => l.id) }).catch(() => undefined);
+      }
+    }
+    invalidate();
+    if (!hadErrors) onClose(); // 有檔案被擋時留在面板，讓使用者看到原因
+  };
   const submit = async () => {
     if (!parsed) return setError("請貼上 https 開頭的外部連結");
     setBusy(true);
@@ -146,6 +205,16 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const info = fileType ? TYPE_INFO[fileType] : null;
   return (
     <EditSheet material={course.isList} title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
+      {!lesson ? (
+        <FormBlock title="上傳檔案" hint="圖片、照片、文件（PDF、Word、PowerPoint、Excel、文字檔）；不可上傳影片；單檔 30MB 內，圖片會自動壓縮。選好就會直接上傳並建立教材。">
+          <FileUploadModule courseId={course.id} onUploaded={onFiles} onBusyChange={setBusy} />
+        </FormBlock>
+      ) : null}
+      {!lesson ? (
+        <AppText variant="callout" tone="muted" style={{ fontWeight: "700" }}>
+          或貼上外部連結
+        </AppText>
+      ) : null}
       <View style={{ gap: space.xs }}>
         <AppText variant="callout" tone="muted">
           外部連結
