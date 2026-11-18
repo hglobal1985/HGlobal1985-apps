@@ -825,7 +825,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
   const admin = manages;
-  const lockedAll = !admin && !(state.enrolled.has(id) || row.is_public === 1 || watchFree);
+  // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
+  const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
+  const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || row.is_public === 1 || watchFree));
   return {
     ...summaryNow,
     ...(manages ? { can } : {}),
@@ -903,8 +905,17 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
     }
   }
   const row = await ctx.db.prepare("SELECT 1 AS ok FROM enrollments WHERE member_sub = ? AND course_id = ? LIMIT 1").bind(s.sub, courseId).first();
-  if (row) return true;
+  if (row) return !(await freeRankBlocked(ctx, courseId)); // 免費課程的「報名」是自動完成的，不算資格：之後改成有獎銜限制，不符合的人就不能看
   return freeWatchable(ctx, courseId); // 設定免費的課程：符合資格就能直接看，不用報名
+}
+
+/** 免費（費用 0）、有獎銜限制、而這位會員不符合（會長例外只在勾選時）：即使先前自動報名過也不能看（業主 2026-11-18）。付費課程的報名是繳費換來的，不受影響。 */
+async function freeRankBlocked(ctx: Ctx, courseId: string): Promise<boolean> {
+  const s = ctx.session;
+  if (!s) return false;
+  const c = await ctx.db.prepare("SELECT min_rank_code, allow_president, price_twd, price_tba FROM courses WHERE id = ?").bind(courseId).first<{ min_rank_code: string; allow_president: number; price_twd: number; price_tba: number }>();
+  if (!c || c.price_twd !== 0 || c.price_tba === 1 || c.min_rank_code === "none" || byPresident(s, c)) return false;
+  return (await eligibilityFor(s, await ranks(ctx.db), [c.min_rank_code])).get(c.min_rank_code) !== true;
 }
 
 /** 設定免費（費用 0、不是「尚未公布」）、已上架、而且這位會員符合資格：不需報名就能收看。 */
