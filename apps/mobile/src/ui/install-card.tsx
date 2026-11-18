@@ -5,10 +5,13 @@ import { installNative, isIos, useInstallState } from "@/lib/install-app";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
+import { Icon } from "./icon";
 import { Button } from "./button";
 import { BottomSheet } from "./bottom-sheet";
 import { flashText } from "./flash-notice";
 
+/** 與 App 內建瀏覽器警示條同一組紅色（in-app-banner.tsx）。 */
+const RED = "#B3261E";
 const KEY = "hglobal:learn:install-dismissed";
 const readDismissed = () => {
   try {
@@ -50,20 +53,17 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
   const ios = isIos();
   return (
     <>
-      <View style={[styles.card, { backgroundColor: c.accentSoft, borderColor: c.accent }]}>
-        <Ionicons name="phone-portrait-outline" size={28} color={c.accentText} />
-        <View style={{ flex: 1, gap: 2 }}>
-          <AppText variant="callout" style={{ fontWeight: "800" }}>
-            加入主畫面當 App 用
-          </AppText>
-          <AppText variant="caption" tone="muted">
-            通知會顯示「寰宇行動大學」，開啟更快。
-          </AppText>
-        </View>
-        <Button label="加入" onPress={go} />
+      <View style={[styles.card, { backgroundColor: c.dangerSoft, borderColor: RED }]}>
+        <Ionicons name="phone-portrait-outline" size={28} color={RED} />
+        <AppText variant="callout" style={{ flex: 1, fontWeight: "800", color: RED }}>
+          {"安裝至手機主畫面\n變成app"}
+        </AppText>
+        <Pressable accessibilityRole="button" accessibilityLabel="安裝" onPress={go} style={styles.btn}>
+          <AppText style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>安裝</AppText>
+        </Pressable>
         {dismissible ? (
           <Pressable accessibilityRole="button" accessibilityLabel="之後再說" onPress={dismiss} hitSlop={8} style={styles.x}>
-            <Ionicons name="close" size={20} color={c.textMuted} />
+            <Icon name="close" size={30} color={RED} />
           </Pressable>
         ) : null}
       </View>
@@ -96,6 +96,8 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
 }
 
 const styles = StyleSheet.create({
-  card: { flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: 1, borderRadius: radius.md, paddingVertical: space.sm, paddingHorizontal: space.md, minHeight: minTouch },
-  x: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  card: { flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: 2, borderRadius: radius.md, paddingVertical: space.sm, paddingHorizontal: space.md, minHeight: minTouch },
+  btn: { minHeight: minTouch, paddingHorizontal: 18, borderRadius: 14, backgroundColor: RED, alignItems: "center", justifyContent: "center" },
+  // 與首頁公告跑馬燈的 ✕ 同尺寸、同粗細、同位置（ticker.tsx）。
+  x: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -space.sm },
 });
