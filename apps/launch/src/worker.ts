@@ -1,3 +1,4 @@
+import { ensureBrandCards } from "./brand-cards.ts";
 import { backfillYoutube } from "./youtube.ts";
 import { processImportJobs } from "./imports.ts";
 import { handleApi } from "./api.ts";
@@ -37,6 +38,7 @@ export function createWorker(staticFiles: StaticFiles) {
       const job = (async () => {
         await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));
         await processImportJobs(env).catch((e) => console.error("import jobs", e instanceof Error ? e.message : "error"));
+        await ensureBrandCards(env).catch((e) => console.error("brand cards", e instanceof Error ? e.message : "error"));
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));
       })();

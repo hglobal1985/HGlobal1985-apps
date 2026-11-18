@@ -6,7 +6,8 @@ import { radius, space } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
 import { EdmCropper } from "./edm-cropper.web";
-import { COVER_MAX_SIDE, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { useUiConfig } from "@/state/ui-config";
+import { cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 const POSTER_ASPECT = 3 / 4; // 直式封面
@@ -67,6 +68,7 @@ async function captureIframe(iframe: HTMLIFrameElement): Promise<HTMLImageElemen
  * 來源：①上傳圖片　②從影片挑畫面——YouTube（拖時間軸＋截取目前畫面）、Mux（指定秒數直接截圖）。圖片在瀏覽器裁切、壓縮後才上傳。
  */
 export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: () => void }) {
+  const { config } = useUiConfig();
   const input = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -114,7 +116,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
     setBusy(true);
     setMsg("上傳中…");
     try {
-      await api("PUT", `/admin/lessons/${lesson.id}/art?part=cover`, await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.9));
+      await api("PUT", `/admin/lessons/${lesson.id}/art?part=cover`, await cropCompress(job.img, job.cover, config.app.imageMaxSide, config.app.imageQuality / 100));
       if (job.usePoster) await api("PUT", `/admin/lessons/${lesson.id}/art?part=poster`, await cropCompress(job.img, job.poster, POSTER_MAX_SIDE, 0.9));
       setJob(null);
       setMsg(null);
@@ -208,7 +210,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
     setBusy(true);
     setMsg("上傳中…");
     try {
-      await api("PUT", `/admin/lessons/${lesson.id}/art?part=cover`, await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.9));
+      await api("PUT", `/admin/lessons/${lesson.id}/art?part=cover`, await cropCompress(job.img, job.cover, config.app.imageMaxSide, config.app.imageQuality / 100));
       setJob(null);
       setMsg(null);
       onChanged();
@@ -222,6 +224,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
 
 /** 從影片選畫面：YouTube＝拖時間軸＋截取目前畫面；Mux＝指定秒數，伺服器直接給該秒的截圖。 */
 function FramePicker({ lesson, onClose, onPicked }: { lesson: Lesson; onClose: () => void; onPicked: (img: HTMLImageElement) => void }) {
+  const { config } = useUiConfig();
   const media = lesson.media!;
   const isYt = media.type === "youtube";
   const lo = lesson.start ?? 0;

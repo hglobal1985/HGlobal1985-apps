@@ -245,6 +245,11 @@ export type Lesson = {
   section?: boolean;
   /** 區塊（section）專用（業主 2026-11-18）：顯示在上一層上拉選單、分類（「、」分隔，可複選）、品牌（單選）、沒上傳封面時的品牌 logo 封面。 */
   inSheet?: boolean;
+  /** 連結區塊（品牌資訊卡的「新品特惠培訓直播」）：內容與封面都來自另一份清單的區塊（業主 2026-11-18）。 */
+  linkedCourseId?: string;
+  linkedBlockId?: string;
+  /** 這個項目實際屬於哪份清單（連結區塊裡的項目才有）；編輯、排序都在原清單。 */
+  courseId?: string;
   categories?: string;
   brandId?: string | null;
   brandName?: string | null;
@@ -802,6 +807,9 @@ export type AppSettings = {
   fileMaxMb: number;
   imageMaxSide: number;
   imageQuality: number;
+  /** 中心封面照片（中心首頁圖）的壓縮：長邊與畫質，比一般圖片更高（業主 2026-11-18）。 */
+  centerMaxSide: number;
+  centerQuality: number;
 };
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   homeLeftSec: 5,
@@ -820,6 +828,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   fileMaxMb: 30,
   imageMaxSide: 1024,
   imageQuality: 88,
+  centerMaxSide: 2048,
+  centerQuality: 95,
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },

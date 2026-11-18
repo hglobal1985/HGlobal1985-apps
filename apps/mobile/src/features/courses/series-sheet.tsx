@@ -6,6 +6,7 @@ import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { BrandCover, AppText, Button, SheetAction } from "@/ui";
+import { CourseCover } from "@/ui/course-cover";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
@@ -63,7 +64,10 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
                 <BrandCover brand={b.brand} fill />
               </View>
             ) : (
-              <Image source={require("../../../assets/icon.png")} style={styles.thumb} resizeMode="cover" />
+              // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
+              <View style={styles.thumb}>
+                <CourseCover theme="" label="" title={b.title} fill />
+              </View>
             )}
             <AppText variant="body" style={{ flex: 1, fontWeight: "700" }} numberOfLines={2}>
               {b.title}

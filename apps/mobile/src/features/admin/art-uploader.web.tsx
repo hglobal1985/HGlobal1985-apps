@@ -8,7 +8,8 @@ import { flashText } from "@/ui/flash-notice";
 import { useSheetSave } from "@/features/course-edit/edit-sheet";
 import { EdmCropper } from "./edm-cropper.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
-import { COVER_MAX_SIDE, EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { useUiConfig } from "@/state/ui-config";
+import { EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode };
@@ -36,7 +37,11 @@ export type ArtInfo = { edmUrl: string; coverUrl?: string | null; coverRect?: { 
  * 做法與課程 EDM 相同。圖片在瀏覽器內壓縮，不保留原始檔案。
  * endpoints.edm＝上傳 EDM（PUT）／調整框（PATCH）／移除（DELETE）共用的網址；endpoints.cover＝上傳封面（PUT）的網址。想改裁切流程或加功能，只改這個檔案。
  */
-export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM" }: { /** 這張圖的名稱：中心叫「首頁圖」、系列叫「EDM」（業主 2026-11-17）。 */ noun?: string; label: string; art?: ArtInfo | null; endpoints: { edm: string; cover: string }; onChanged: () => void }) {
+export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", center = false }: { /** 中心封面照片：壓縮用「中心封面照片」設定（比一般高畫質；設定 › 儲存空間管理）。 */ center?: boolean; /** 這張圖的名稱：中心叫「首頁圖」、系列叫「EDM」（業主 2026-11-17）。 */ noun?: string; label: string; art?: ArtInfo | null; endpoints: { edm: string; cover: string }; onChanged: () => void }) {
+  const { config } = useUiConfig();
+  // 壓縮規格兩類（業主 2026-11-18）：中心封面照片＝高畫質；其餘＝一般。
+  const coverSide = center ? config.app.centerMaxSide : config.app.imageMaxSide;
+  const quality = (center ? config.app.centerQuality : config.app.imageQuality) / 100;
   const input = useRef<HTMLInputElement | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -99,10 +104,10 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM" }: 
     setBusy(true);
     setMsg("處理並上傳中…");
     try {
-      if (job.isNew) await api("PUT", endpoints.edm, await cropCompress(job.img, null, EDM_MAX_SIDE, 0.9));
+      if (job.isNew) await api("PUT", endpoints.edm, await cropCompress(job.img, null, center ? Math.max(EDM_MAX_SIDE, coverSide) : EDM_MAX_SIDE, center ? quality : 0.9));
       // 完整顯示：封面是「整張照片＋淡模糊背景」合成圖，預設停留位置固定在最上緣。
       const contain = job.mode === "contain";
-      await api("PUT", endpoints.cover, contain ? await composeContain(job.img, COVER_MAX_SIDE, 0.88) : await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.88));
+      await api("PUT", endpoints.cover, contain ? await composeContain(job.img, coverSide, quality) : await cropCompress(job.img, job.cover, coverSide, quality));
       await api("PATCH", endpoints.edm, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
       setJob(null);
       setMsg(null);

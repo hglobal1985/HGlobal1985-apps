@@ -5,7 +5,8 @@ import { AppText, Button, Card, NoticeBox, Section } from "@/ui";
 import { useSheetSave } from "@/features/course-edit/edit-sheet";
 import { EdmCropper } from "./edm-cropper.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
-import { EDM_MAX_SIDE, COVER_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { useUiConfig } from "@/state/ui-config";
+import { EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 import { locateCover } from "./cover-match.web";
 
 type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode };
@@ -33,6 +34,7 @@ function rectFrom(img: HTMLImageElement, r: { x: number; y: number; w: number })
  * 圖片在瀏覽器內壓縮，不保留原始檔案。
  */
 export function EdmManager({ course, onChanged }: { course: CourseDetail; onChanged: () => void }) {
+  const { config } = useUiConfig();
   const [job, setJob] = useState<Job | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -112,7 +114,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
     try {
       if (job.isNew) await api("PUT", `/admin/courses/${course.id}/edm`, await cropCompress(job.img, null, EDM_MAX_SIDE, 0.9));
       const contain = job.mode === "contain"; // 完整顯示：整張照片＋淡模糊背景的合成圖，預設位置固定在最上緣
-      await api("PUT", `/admin/courses/${course.id}/cover`, contain ? await composeContain(job.img, COVER_MAX_SIDE, 0.88) : await cropCompress(job.img, job.cover, COVER_MAX_SIDE, 0.88));
+      await api("PUT", `/admin/courses/${course.id}/cover`, contain ? await composeContain(job.img, config.app.imageMaxSide, config.app.imageQuality / 100) : await cropCompress(job.img, job.cover, config.app.imageMaxSide, config.app.imageQuality / 100));
       // 封面框（占圖片寬高的比例）一併存起來；後端用它算出「預設停留位置＝封面框上緣」，兩者永遠同步。
       await api("PATCH", `/admin/courses/${course.id}`, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
       setJob(null);

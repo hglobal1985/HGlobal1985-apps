@@ -6,10 +6,11 @@ import { api, classifyLink, parseHttpsUrl, type CourseDetail, type Lesson } from
 import { TYPE_INFO } from "@/features/link-types";
 import { fromHms, toHms, type Hms } from "@/features/uploads/hms";
 import { commitMediaDraft, MediaUploadModule, TimeRangeFields, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
-import { useSession } from "@/state/session";
+import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, DateSelect, FormBlock, Icon } from "@/ui";
+import { AppText, DateSelect, FormBlock, Icon, LoadingView } from "@/ui";
+import { BottomSheet } from "@/ui/bottom-sheet";
 import { FileUploadModule } from "@/features/uploads/file-upload-module";
 import { BrandIcon } from "@/ui/brand-icon";
 import { EditSheet } from "./edit-sheet";
@@ -20,6 +21,10 @@ import { EditSheet } from "./edit-sheet";
  * 不再有影音上傳、音檔、附件等舊功能。「完整版課程影片」那一列另有影音設定（FullVersionSheet），不受影響。
  */
 export function NewMaterialSheet({ course, onClose, afterBlock }: { course: CourseDetail; onClose: () => void; /** 新增到某個區塊的最後面（區塊的編號）；沒傳＝加在整份清單最後。 */ afterBlock?: string }) {
+  // 連結區塊（品牌資訊卡的「新品特惠培訓直播」，業主 2026-11-18）：內容存在來源清單，新增教材直接加到來源清單的那個區塊，兩邊同步。
+  const sec = afterBlock ? course.lessons.find((l) => l.id === afterBlock) : undefined;
+  const src = useApi<CourseDetail>(sec?.linkedCourseId ? `/courses/${sec.linkedCourseId}` : null);
+  if (sec?.linkedCourseId) return src.data ? <LinkMaterialSheet course={src.data} onClose={onClose} afterBlock={sec.linkedBlockId} /> : <BottomSheet onClose={onClose}><LoadingView /></BottomSheet>;
   return <LinkMaterialSheet course={course} onClose={onClose} afterBlock={afterBlock} />;
 }
 

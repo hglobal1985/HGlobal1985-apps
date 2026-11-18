@@ -65,11 +65,11 @@ function Stepper({ label, hint, value, min, max, step, unit, onChange }: { label
 export default function StorageScreen() {
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
-  const [lim, setLim] = useState({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality });
-  useEffect(() => setLim({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality }), [config.app.fileMaxMb, config.app.imageMaxSide, config.app.imageQuality]);
+  const [lim, setLim] = useState({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality });
+  useEffect(() => setLim({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality }), [config.app.fileMaxMb, config.app.imageMaxSide, config.app.imageQuality, config.app.centerMaxSide, config.app.centerQuality]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
-  const dirty = lim.fileMaxMb !== config.app.fileMaxMb || lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality;
+  const dirty = lim.fileMaxMb !== config.app.fileMaxMb || lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality || lim.centerMaxSide !== config.app.centerMaxSide || lim.centerQuality !== config.app.centerQuality;
   const saveLim = async () => {
     setSaving(true);
     setMsg(null);
@@ -92,8 +92,16 @@ export default function StorageScreen() {
       <Section title="上傳設定">
         <Card>
           <Stepper label="單檔大小上限" hint="超過就不能上傳，並提示改貼雲端連結（最多 95MB）" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
-          <Stepper label="圖片壓縮長邊" hint="上傳的圖片長邊縮到這個像素以內（預設與封面相同 1024）" value={lim.imageMaxSide} min={400} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, imageMaxSide: v }))} />
-          <Stepper label="圖片畫質" hint="數字越大畫質越好、檔案越大（預設 88）" value={lim.imageQuality} min={50} max={100} step={2} unit="%" onChange={(v) => setLim((x) => ({ ...x, imageQuality: v }))} />
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            ① 中心封面照片（中心首頁圖）
+          </AppText>
+          <Stepper label="長邊像素" hint="中心封面要特別清楚，建議比一般高（預設 2048）" value={lim.centerMaxSide} min={800} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, centerMaxSide: v }))} />
+          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 95）" value={lim.centerQuality} min={70} max={100} step={1} unit="%" onChange={(v) => setLim((x) => ({ ...x, centerQuality: v }))} />
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            ② 一般（課程、系列、區塊封面與上傳的圖片）
+          </AppText>
+          <Stepper label="長邊像素" hint="上傳的圖片長邊縮到這個像素以內（預設 1024）" value={lim.imageMaxSide} min={400} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, imageMaxSide: v }))} />
+          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 88）" value={lim.imageQuality} min={50} max={100} step={2} unit="%" onChange={(v) => setLim((x) => ({ ...x, imageQuality: v }))} />
           {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
           <Button label="儲存上傳設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={saveLim} fullWidth />
         </Card>

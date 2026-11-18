@@ -1,3 +1,4 @@
+import { ensureBrandCards } from "./brand-cards.ts";
 import { flushPushes, vapidPublicKey } from "./push.ts";
 import { HQ_SLUG, RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
 import { romanizeName, urlNameVariants } from "./romanize.ts";
@@ -114,9 +115,12 @@ function brandFor(ctx: Ctx, row: { brand_id?: string | null; edm_key?: string | 
 type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null };
 async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
   const { results } = await db
-    .prepare("SELECT l.id, l.course_id, l.kind, l.title, l.cover_key, l.art_version, l.brand_id, l.categories, l.in_sheet, (l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id) AS has FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.is_list = 1 AND l.is_full = 0 ORDER BY l.course_id, l.position")
-    .all<{ id: string; course_id: string; kind: string; title: string; cover_key: string | null; art_version: number; brand_id: string | null; categories: string; in_sheet: number; has: number }>();
+    .prepare("SELECT l.id, l.course_id, l.kind, l.title, l.cover_key, l.art_version, l.brand_id, l.categories, l.in_sheet, l.link_block_id, (l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id) AS has FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.is_list = 1 AND l.is_full = 0 ORDER BY l.course_id, l.position")
+    .all<{ id: string; course_id: string; kind: string; title: string; cover_key: string | null; art_version: number; brand_id: string | null; categories: string; in_sheet: number; link_block_id: string | null; has: number }>();
   const brands = await loadBrands(db);
+  const counts = new Map<string, number>(); // 每個區塊底下有內容的素材數（連結區塊要用來源區塊的數字）
+  const links: { block: SheetBlock; src: string }[] = [];
+  let any: string | null = null;
   const map = new Map<string, SheetBlock[]>();
   let cur: SheetBlock | null = null;
   let curCourse = "";
@@ -127,17 +131,31 @@ async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
       cur = null;
     }
     if (r.kind === "section") {
+      any = r.id;
       curShown = r.in_sheet === 1;
       cur = null;
       if (curShown) {
         const b = r.brand_id ? brands.find((x) => x.id === r.brand_id) : undefined;
         const brand: BrandCover | null = !r.cover_key && b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
         cur = { id: r.id, title: r.title, coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null, brand, count: 0, categories: r.categories, brandId: r.brand_id };
+        if (r.link_block_id) links.push({ block: cur, src: r.link_block_id });
         const list = map.get(r.course_id) ?? [];
         list.push(cur);
         map.set(r.course_id, list);
       }
-    } else if (cur && r.has) cur.count++;
+    } else if (r.has && any) counts.set(any, (counts.get(any) ?? 0) + 1);
+    if (r.kind !== "section" && cur && r.has) cur.count++;
+  }
+  if (links.length) {
+    // 連結區塊（品牌資訊卡）：數量用來源區塊的；封面＝來源清單的系列封面。
+    const arts = (await db.prepare("SELECT c.id, a.cover_key, a.edm_key, a.art_version FROM courses c JOIN series_art a ON a.series = c.series AND c.series <> ''").all<{ id: string; cover_key: string | null; edm_key: string | null; art_version: number }>()).results;
+    const srcCourse = new Map(results.filter((r) => r.kind === "section").map((r) => [r.id, r.course_id]));
+    for (const { block, src } of links) {
+      block.count = counts.get(src) ?? 0;
+      const a = arts.find((x) => x.id === srcCourse.get(src));
+      const key = a?.cover_key || a?.edm_key;
+      if (a && key) block.coverUrl = pubUrl(key, a.art_version);
+    }
   }
   return map;
 }
@@ -881,9 +899,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
     ctx.db
-      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet FROM lessons WHERE course_id = ? ORDER BY position")
+      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet, link_block_id FROM lessons WHERE course_id = ? ORDER BY position")
       .bind(id)
-      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string; is_full: number; is_speaker: number; is_summary: number; brand_id: string | null; categories: string; in_sheet: number }>(),
+      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string; is_full: number; is_speaker: number; is_summary: number; brand_id: string | null; categories: string; in_sheet: number; link_block_id: string | null }>(),
     s ? ctx.db.prepare("SELECT lesson_id FROM lesson_progress WHERE member_sub = ? AND course_id = ?").bind(s.sub, id).all<{ lesson_id: string }>() : Promise.resolve({ results: [] as { lesson_id: string }[] }),
   ]);
   // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
@@ -892,15 +910,38 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   // 誰可以瀏覽：不在範圍內的登入者（管理者、已報名／審核中／學習過的除外）看不到這門課。
   if (!manages && !scopeAllows(row.view_scope, s) && !keepsAccess(state, row)) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
+  // 連結區塊（品牌資訊卡，業主 2026-11-18）：這個區塊的內容與封面來自另一份清單的區塊——把來源區塊底下的項目接在區塊標題後面，編輯、排序、播放都回到來源清單。
+  type LRow = (typeof lessons.results)[number] & { src?: string };
+  const lessonRows: LRow[] = [];
+  const linkCover = new Map<string, string>();
+  const sourceCourses: string[] = [];
+  const sourceCourseOf = new Map<string, string>();
+  for (const l of lessons.results) {
+    lessonRows.push(l);
+    if (!l.link_block_id) continue;
+    const sec = await ctx.db.prepare("SELECT s.course_id, s.position, c.series FROM lessons s JOIN courses c ON c.id = s.course_id WHERE s.id = ? AND s.kind = 'section'").bind(l.link_block_id).first<{ course_id: string; position: number; series: string }>();
+    if (!sec) continue;
+    sourceCourses.push(sec.course_id);
+    sourceCourseOf.set(l.id, sec.course_id);
+    const { results: items } = await ctx.db
+      .prepare(`SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet, link_block_id FROM lessons WHERE course_id = ? AND position > ? AND position < COALESCE((SELECT MIN(position) FROM lessons WHERE course_id = ? AND kind = 'section' AND position > ?), 1000000000) AND kind <> 'section' AND is_full = 0 ORDER BY position`)
+      .bind(sec.course_id, sec.position, sec.course_id, sec.position)
+      .all<LRow>();
+    for (const it of items) lessonRows.push({ ...it, src: sec.course_id });
+    // 封面＝來源清單的系列封面（上傳的封面優先，沒有再用首頁圖）；之後來源修改，這裡自動一致。
+    const art = sec.series ? await ctx.db.prepare("SELECT cover_key, edm_key, art_version FROM series_art WHERE series = ?").bind(sec.series).first<{ cover_key: string | null; edm_key: string | null; art_version: number }>() : null;
+    const key = art?.cover_key || art?.edm_key;
+    if (key) linkCover.set(l.id, pubUrl(key, art!.art_version));
+  }
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
-  const linkRows = await ctx.db.prepare("SELECT lesson_id, att_type, link_url, kind, r2_key FROM lesson_attachments WHERE course_id = ? AND kind IN ('link', 'file') ORDER BY created_at").bind(id).all<{ lesson_id: string; att_type: AttachmentType; link_url: string | null; kind: string; r2_key: string | null }>();
+  const linkRows = await ctx.db.prepare(`SELECT lesson_id, att_type, link_url, kind, r2_key FROM lesson_attachments WHERE course_id IN (${[id, ...sourceCourses].map(() => "?").join(",")}) AND kind IN ('link', 'file') ORDER BY created_at`).bind(id, ...sourceCourses).all<{ lesson_id: string; att_type: AttachmentType; link_url: string | null; kind: string; r2_key: string | null }>();
   const linkOf = new Map<string, { type: AttachmentType; url: string }>();
   // 上傳的檔案：網址是「教材檔案」下載路徑（檔案鍵是隨機碼，只在有權限看的人拿到的資料裡出現）；外部連結直接給原網址。
   for (const r of linkRows.results) if (!linkOf.has(r.lesson_id)) linkOf.set(r.lesson_id, { type: r.att_type, url: r.kind === "file" ? `${ctx.url.origin}/api/v2/media/file?k=${encodeURIComponent(r.r2_key ?? "")}` : (r.link_url ?? "") });
   const groupPos = new Map<string, number>();
   {
     const n = { chapter: 0, material: 0 };
-    for (const l of lessons.results) groupPos.set(l.id, l.kind === "section" ? 0 : ++n[l.kind === "material" ? "material" : "chapter"]);
+    for (const l of lessonRows) groupPos.set(l.id, l.kind === "section" ? 0 : ++n[l.kind === "material" ? "material" : "chapter"]);
   }
   ctx.centerSlugs = await centerSlugMap(ctx.db);
   ctx.seriesSlugs = await seriesSlugMap(ctx.db);
@@ -915,13 +956,14 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     ...summaryNow,
     ...(manages ? { can } : {}),
     description: row.description ?? "",
-    lessons: [...lessons.results.map((l) => ({
+    lessons: [...lessonRows.map((l) => ({
       id: l.id,
+      ...(l.src ? { courseId: l.src } : {}),
       // 顯示用序號：章節與教材各自從 1 開始編號（資料庫裡的 position 是整門課共用、不重複的排序）。
       position: groupPos.get(l.id)!,
       material: l.kind === "material" || l.kind === "section",
       ...(l.kind === "section"
-        ? { section: true, inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key) }
+        ? { section: true, ...(l.link_block_id ? { linkedBlockId: l.link_block_id, linkedCourseId: sourceCourseOf.get(l.id) } : {}), inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key) }
         : {}),
       ...(l.is_full === 1 ? { full: true } : {}),
       title: l.title,
@@ -940,7 +982,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       sharerTitle: l.sharer_title,
       // 章節封面：勾了「自動使用 YouTube 畫面」＝影片縮圖；沒勾但沒上傳封面＝臨時用縮圖（非 YouTube 章節維持 null＝用課程封面）。
       // 素材清單裡的影片一律用 YouTube 縮圖（業主 2026-11-17）；一般課程：有上傳章節封面用上傳的，沒有才用 YouTube 縮圖。
-      coverUrl: l.media_type === "youtube" && l.media_ref && (row.is_list === 1 || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
+      coverUrl: linkCover.has(l.id) ? linkCover.get(l.id)! : l.media_type === "youtube" && l.media_ref && (row.is_list === 1 || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
       posterUrl: l.media_type === "youtube" && l.media_ref && (row.is_list === 1 || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
       autoCover: l.auto_cover === 1,
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
@@ -1201,10 +1243,13 @@ async function attachmentKeys(db: D1Database, where: "lesson_id" | "course_id", 
 }
 
 async function lessonOf(ctx: Ctx, courseId: string, lessonId: string) {
+  // 連結區塊（品牌資訊卡）裡的項目實際屬於另一份清單：回傳的 course_id 一律是真正的所屬清單。
   const lesson = await ctx.db
-    .prepare("SELECT l.id, l.media_type, l.media_ref, l.start_seconds, l.end_seconds FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ? AND l.course_id = ?")
-    .bind(lessonId, courseId)
-    .first<{ id: string; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null }>();
+    .prepare(
+      "SELECT l.id, l.course_id, l.media_type, l.media_ref, l.start_seconds, l.end_seconds FROM lessons l WHERE l.id = ? AND (l.course_id = ? OR EXISTS (SELECT 1 FROM lessons k JOIN lessons s ON s.id = k.link_block_id WHERE k.course_id = ? AND s.course_id = l.course_id))",
+    )
+    .bind(lessonId, courseId, courseId)
+    .first<{ id: string; course_id: string; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null }>();
   if (!lesson) return fail(404, "not_found", "找不到這個章節");
   return lesson;
 }
@@ -2833,7 +2878,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/courses\/([\w-]+)\/lessons\/([\w-]+)\/started$/,
     async (ctx, [courseId, lessonId]) => {
       const s = requireMember(ctx);
-      await lessonOf(ctx, courseId, lessonId); // 找不到章節時會丟錯
+      courseId = (await lessonOf(ctx, courseId, lessonId)).course_id; // 找不到章節時會丟錯；連結區塊的項目換成真正所屬的清單
       if (!(await canWatch(ctx, courseId))) fail(403, "not_enrolled", "請先報名並通過審核");
       // 播放超過 1%：納入學習中（已被隱藏的也恢復顯示）。
       await ctx.db
@@ -2854,7 +2899,7 @@ const routes: [string, RegExp, Handler][] = [
       if (!Number.isFinite(ratio) || ratio < 0) fail(400, "invalid_ratio", "播放進度不正確");
       const pos = Number(body.position);
       const position = Number.isFinite(pos) && pos >= 0 && pos < 24 * 3600 ? Math.round(pos * 10) / 10 : null;
-      await lessonOf(ctx, courseId, lessonId); // 找不到章節時會丟錯
+      courseId = (await lessonOf(ctx, courseId, lessonId)).course_id; // 找不到章節時會丟錯；連結區塊的項目換成真正所屬的清單
       if (!(await canWatch(ctx, courseId))) fail(403, "not_enrolled", "請先報名並通過審核");
       // 只會往前（取最大值），不會因為倒轉重看而退步。
       await ctx.db
@@ -2870,7 +2915,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/courses\/([\w-]+)\/lessons\/([\w-]+)\/complete$/,
     async (ctx, [courseId, lessonId]) => {
       const s = requireMember(ctx);
-      await lessonOf(ctx, courseId, lessonId); // 找不到章節時會丟錯
+      courseId = (await lessonOf(ctx, courseId, lessonId)).course_id; // 找不到章節時會丟錯；連結區塊的項目換成真正所屬的清單
       if (!(await canWatch(ctx, courseId))) fail(403, "not_enrolled", "請先報名並通過審核");
       await ctx.db
         .prepare("INSERT OR IGNORE INTO lesson_progress (member_sub, lesson_id, course_id) VALUES (?, ?, ?)")
@@ -2886,6 +2931,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/courses\/([\w-]+)\/lessons\/([\w-]+)\/playback$/,
     async (ctx, [courseId, lessonId]) => {
       const lesson = await lessonOf(ctx, courseId, lessonId);
+      courseId = lesson.course_id;
       if (!(await canWatch(ctx, courseId))) fail(ctx.session ? 403 : 401, ctx.session ? "not_enrolled" : "unauthenticated", ctx.session ? "請先報名並通過審核" : "請先登入");
       // 續播記憶（業主 2026-11-17）：還沒看完的這一堂，從上次播放到的秒數接著播（離起點不到 5 秒、離結尾不到 10 秒就從頭）。
       const resumeAt = await resumePoint(ctx, lessonId, lesson.start_seconds ?? 0, lesson.end_seconds);
@@ -4573,7 +4619,7 @@ const routes: [string, RegExp, Handler][] = [
       const old = await ctx.db.prepare("SELECT cover_key AS k FROM center_art WHERE center_key = ?").bind(center.key).first<{ k: string | null }>();
       if (!old) fail(409, "no_edm", "請先上傳中心 EDM");
       const data = new Uint8Array(await ctx.req.arrayBuffer());
-      if (!data.byteLength || data.byteLength > 3 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 3MB 以內（上傳時會自動壓縮）");
+      if (!data.byteLength || data.byteLength > 8 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 8MB 以內（上傳時會自動壓縮）"); // 中心封面照片畫質高，上限放寬
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const key = `center/${crypto.randomUUID().slice(0, 8)}/cover-${crypto.randomUUID()}.${img.ext}`;
       await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
@@ -4635,6 +4681,7 @@ const routes: [string, RegExp, Handler][] = [
       const id = `b${randomId(7)}`;
       const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM brand_logos").first<{ m: number }>();
       await ctx.db.batch([ctx.db.prepare("INSERT INTO brand_logos (id, name, sort_order) VALUES (?, ?, ?)").bind(id, name, (max?.m ?? 0) + 1), audit(ctx.db, s.sub, "brand.create", "brand", id, name)]);
+      await ensureBrandCards(ctx.env, id).catch(() => undefined); // 新品牌自動有一張資訊卡（業主 2026-11-18）
       return { id };
     },
   ],
@@ -4649,6 +4696,7 @@ const routes: [string, RegExp, Handler][] = [
         const n = text(body.name, 40);
         if (!n) return fail(400, "name_required", "請輸入品牌名稱");
         sets.push(["name", n]);
+        await ctx.db.prepare("UPDATE courses SET title = ? WHERE id = ? AND zone = 'amway_brand'").bind(n, `cb${id}`).run(); // 品牌改名，資訊卡跟著改
       }
       if (body.bgColor !== undefined) {
         if (body.bgColor === null || body.bgColor === "") sets.push(["bg_color", null]);
@@ -5338,22 +5386,43 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [courseId]) => {
       const admin = await requireCourseManager(ctx, courseId);
       const body = await readJson<{ ids?: unknown }>(ctx.req);
-      const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
+      const given = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
       // 章節與教材各自排序：傳進來的 ids 必須剛好是同一組（章節或教材）的全部；排好後放回這一組原本佔用的順位，另一組不動。
       const current = await ctx.db.prepare("SELECT id, kind, position FROM lessons WHERE course_id = ? AND is_full = 0").bind(courseId).all<{ id: string; kind: string; position: number }>();
       const byId = new Map(current.results.map((r) => [r.id, r]));
-      // 分類區域標題（section）和教材（material）同一組一起排序。
-      const grp = (k: string | undefined) => (k === "chapter" || k === undefined ? "chapter" : "material");
-      const first = ids.length ? byId.get(ids[0]!) : undefined;
-      const group = current.results.filter((r) => grp(r.kind) === grp(first?.kind));
-      if (!first || ids.length !== group.length || new Set(ids).size !== ids.length || ids.some((i) => grp(byId.get(i)?.kind) !== grp(first.kind))) fail(400, "invalid_order", "順序不正確，請重新整理後再試");
-      const slots = group.map((r) => r.position).sort((x, y) => x - y);
-      // 先移到負數避開 UNIQUE(course_id, position)，再寫入新順序。
-      await ctx.db.batch([
-        ctx.db.prepare(`UPDATE lessons SET position = -position WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids),
-        ...ids.map((id, i) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(slots[i]!, id)),
-        audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId),
-      ]);
+      // 連結區塊（品牌資訊卡）裡的項目屬於來源清單：它們彼此的先後順序換到來源清單（放回它們原本佔用的順位），其餘項目照一般規則。
+      const ids = given.filter((i) => byId.has(i));
+      const foreign = given.filter((i) => !byId.has(i));
+      const foreignStmts: D1PreparedStatement[] = [];
+      if (foreign.length) {
+        const { results: rows } = await ctx.db
+          .prepare(`SELECT id, course_id, position FROM lessons WHERE id IN (${foreign.map(() => "?").join(",")}) AND course_id IN (SELECT s.course_id FROM lessons k JOIN lessons s ON s.id = k.link_block_id WHERE k.course_id = ?)`)
+          .bind(...foreign, courseId)
+          .all<{ id: string; course_id: string; position: number }>();
+        if (rows.length !== new Set(foreign).size) fail(400, "invalid_order", "順序不正確，請重新整理後再試");
+        const per = new Map<string, string[]>();
+        for (const id of foreign) per.set(rows.find((r) => r.id === id)!.course_id, [...(per.get(rows.find((r) => r.id === id)!.course_id) ?? []), id]);
+        for (const [, list] of per) {
+          const slots = rows.filter((r) => list.includes(r.id)).map((r) => r.position).sort((x, y) => x - y);
+          foreignStmts.push(ctx.db.prepare(`UPDATE lessons SET position = -position WHERE id IN (${list.map(() => "?").join(",")})`).bind(...list), ...list.map((id, i) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(slots[i]!, id)));
+        }
+      }
+      if (ids.length) {
+        // 分類區域標題（section）和教材（material）同一組一起排序。
+        const grp = (k: string | undefined) => (k === "chapter" || k === undefined ? "chapter" : "material");
+        const first = byId.get(ids[0]!)!;
+        const group = current.results.filter((r) => grp(r.kind) === grp(first.kind));
+        if (ids.length !== group.length || new Set(ids).size !== ids.length || ids.some((i) => grp(byId.get(i)?.kind) !== grp(first.kind))) fail(400, "invalid_order", "順序不正確，請重新整理後再試");
+        const slots = group.map((r) => r.position).sort((x, y) => x - y);
+        // 先移到負數避開 UNIQUE(course_id, position)，再寫入新順序。
+        await ctx.db.batch([
+          ctx.db.prepare(`UPDATE lessons SET position = -position WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids),
+          ...ids.map((id, i) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(slots[i]!, id)),
+          ...foreignStmts,
+          audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId),
+        ]);
+      } else if (foreignStmts.length) await ctx.db.batch([...foreignStmts, audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId)]);
+      else fail(400, "invalid_order", "順序不正確，請重新整理後再試");
       if (ctx.url.searchParams.get("lite") === "1") return { ok: true };
       return courseDetail(ctx, courseId);
     },

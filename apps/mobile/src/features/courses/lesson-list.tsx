@@ -11,6 +11,7 @@ import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
+import { CourseCover } from "@/ui/course-cover";
 import { AppText, BrandCover, Card, ListRow, SaplingIcon, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
@@ -147,7 +148,8 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
                               ) : b.head.brand ? (
                                 <BrandCover brand={b.head.brand} fill />
                               ) : (
-                                <Image source={require("../../../assets/icon.png")} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                                // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
+                                <CourseCover theme="" label="" title={b.head.title} fill />
                               )}
                               {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
                               <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個素材，${on ? "已展開" : "已收起"}`}>

@@ -108,6 +108,8 @@ export function normalizeApp(raw: unknown): AppSettings {
     fileMaxMb: num(r.fileMaxMb, d.fileMaxMb, 1, 95),
     imageMaxSide: num(r.imageMaxSide, d.imageMaxSide, 400, 4096),
     imageQuality: num(r.imageQuality, d.imageQuality, 50, 100),
+    centerMaxSide: num(r.centerMaxSide, d.centerMaxSide, 800, 4096),
+    centerQuality: num(r.centerQuality, d.centerQuality, 70, 100),
   };
 }
 
