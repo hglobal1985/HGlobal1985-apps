@@ -27,11 +27,12 @@ import { flashMode } from "./mode-flash";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
 import { buildSearchIndex, matchCourses, matchLessons, suggestTerms, type SearchLesson } from "./course-search";
-import { SEARCH_ICON_W, SearchBox } from "./search-box";
+import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses } from "./sort";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
-import { portraitColumns, tileColumns } from "@/theme/layout";
+import { portraitColumns, tileColumns, useLayout } from "@/theme/layout";
+import { UI_SCALE } from "@/theme/ui-scale";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView, LoadingLadybug, Screen, TopBar, TopBarButton } from "@/ui";
@@ -267,7 +268,37 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 一列幾張（業主 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
   const cols = flat ? portraitColumns(boxW) : tileColumns(boxW);
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
-  const filterRow = (
+  const termsBox = terms.length ? (
+      <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {terms.map((t) => (
+          <Pressable key={`${t.kind}:${t.text}`} accessibilityRole="button" accessibilityLabel={`${t.kind} ${t.text}`} onPress={() => pickTerm(t.text)} style={[styles.term, { borderBottomColor: c.border }]}>
+            <View style={[styles.kind, { backgroundColor: c.accentSoft }]}>
+              <AppText variant="caption" style={{ color: c.accentText, fontWeight: "700" }}>
+                {t.kind}
+              </AppText>
+            </View>
+            <AppText variant="body" numberOfLines={1} style={{ flex: 1 }}>
+              {t.text}
+            </AppText>
+          </Pressable>
+        ))}
+      </View>
+    ) : null;
+  // 寬版（平板直橫式、手機橫放；業主 2026-11-18）：搜尋框一直展開直接輸入、分類框縮窄、三個模式按鈕＋文字且保持間距。
+  const wideBar = useLayout().large;
+  const filterRow = wideBar ? (
+    <View>
+      <View style={[styles.filters, { alignItems: "center", gap: space.sm }]}>
+        <InlineSearch value={q} onChange={(v) => (setQ(v), setPicked(""))} onFocus={() => setWantIndex(true)} />
+        <View style={{ width: Math.round(112 * UI_SCALE) }}>
+          <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
+        </View>
+        <ViewToggle value={mode} onChange={pickMode} wide />
+      </View>
+      {chapterMode ? <UnitFilter value={unitFilter} onChange={pickUnitFilter} /> : null}
+      {termsBox}
+    </View>
+  ) : (
     <View>
     <View style={styles.filters} onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}>
       <View style={{ width: SEARCH_ICON_W }} />
@@ -287,22 +318,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         />
     </View>
     {chapterMode ? <UnitFilter value={unitFilter} onChange={pickUnitFilter} /> : null}
-    {terms.length ? (
-      <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
-        {terms.map((t) => (
-          <Pressable key={`${t.kind}:${t.text}`} accessibilityRole="button" accessibilityLabel={`${t.kind} ${t.text}`} onPress={() => pickTerm(t.text)} style={[styles.term, { borderBottomColor: c.border }]}>
-            <View style={[styles.kind, { backgroundColor: c.accentSoft }]}>
-              <AppText variant="caption" style={{ color: c.accentText, fontWeight: "700" }}>
-                {t.kind}
-              </AppText>
-            </View>
-            <AppText variant="body" numberOfLines={1} style={{ flex: 1 }}>
-              {t.text}
-            </AppText>
-          </Pressable>
-        ))}
-      </View>
-    ) : null}
+    {termsBox}
     </View>
   );
   // 中心專屬頁：網頁進入時多記一筆瀏覽紀錄，瀏覽器／手機的「返回」＝回到中心清單；Android 實體返回鍵同理。
