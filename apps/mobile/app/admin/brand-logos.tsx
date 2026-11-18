@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { api, type BrandLogo } from "@/api/client";
+import { api, resolveUrl, type BrandLogo } from "@/api/client";
+import { logoColors } from "@/lib/logo-colors";
 import { confirmAsk } from "@/features/confirm";
 import { PickImageButton } from "@/features/admin/pick-image";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
@@ -49,7 +50,13 @@ export default function BrandLogosScreen() {
         <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`編輯 ${b.name}`} onPress={() => setEditId(b.id)}>
           <Card>
             {b.logoUrl ? <BrandCover brand={{ logoUrl: b.logoUrl, bgColor: b.bgColor, bgUrl: b.bgUrl }} style={{ borderRadius: radius.md }} /> : <View style={[styles.empty, { borderColor: c.border }]}><AppText tone="muted">還沒有上傳 logo</AppText></View>}
-            <AppText variant="headline">{b.name}</AppText>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
+              <View style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: c.accentSoft }} accessibilityLabel={`品牌標籤 ${b.name}`}>
+                <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>
+                  {b.name}
+                </AppText>
+              </View>
+            </View>
           </Card>
         </Pressable>
       ))}
@@ -64,6 +71,10 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   const [name, setName] = useState(logo.name);
   const [mode, setMode] = useState<BgMode>(logo.bgUrl ? "image" : logo.bgColor && logo.bgColor !== "#FFFFFF" ? "color" : "white");
   const [color, setColor] = useState(logo.bgColor ?? "#FFFFFF");
+  const [logoPicks, setLogoPicks] = useState<string[]>([]);
+  useEffect(() => {
+    if (logo.logoUrl) void logoColors(resolveUrl(logo.logoUrl)).then(setLogoPicks);
+  }, [logo.logoUrl]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async (fn: () => Promise<unknown>, done?: string) => {
@@ -95,7 +106,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   const preview = { logoUrl: logo.logoUrl ?? "", bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null, bgUrl: mode === "image" ? logo.bgUrl : null };
   return (
     <EditSheet title="品牌 Logo" onClose={onClose} onSave={save} dirty busy={busy} error={error}>
-      <Field label="品牌名稱" value={name} onChange={setName} />
+      <Field label="品牌標籤名稱（課程、清單選品牌時顯示的名稱）" value={name} onChange={setName} />
       <AppText variant="callout" style={{ fontWeight: "700" }}>
         封面預覽
       </AppText>
@@ -109,6 +120,18 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
               <Pressable key={x} accessibilityRole="button" accessibilityLabel={`底色 ${x}`} onPress={() => setColor(x)} style={[styles.swatch, { backgroundColor: x, borderColor: color === x ? c.accent : c.border, borderWidth: color === x ? 3 : 1 }]} />
             ))}
           </View>
+          {logoPicks.length ? (
+            <View style={{ gap: space.xs }}>
+              <AppText variant="caption" tone="muted">
+                logo 常用的顏色（點一下套用）
+              </AppText>
+              <View style={styles.swatches}>
+                {logoPicks.map((x) => (
+                  <Pressable key={x} accessibilityRole="button" accessibilityLabel={`logo 常用色 ${x}`} onPress={() => setColor(x)} style={[styles.swatch, { backgroundColor: x, borderColor: color === x ? c.accent : c.border, borderWidth: color === x ? 3 : 1 }]} />
+                ))}
+              </View>
+            </View>
+          ) : null}
           <Field label="自訂底色（#RRGGBB）" value={color} onChange={setColor} placeholder="#FFFFFF" />
         </View>
       ) : null}

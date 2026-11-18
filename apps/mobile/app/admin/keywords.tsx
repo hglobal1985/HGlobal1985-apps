@@ -1,11 +1,12 @@
+import { router } from "expo-router";
 import { useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
-import { api, KEYWORD_INFO, type KeywordItem, type KeywordKind, type KeywordLists } from "@/api/client";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { api, KEYWORD_INFO, type CourseSummary, type KeywordItem, type KeywordKind, type KeywordLists } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Pill, Screen, Section } from "@/ui";
-import { BottomSheet } from "@/ui/bottom-sheet";
+import { AppText, Button, Card, Chips, EmptyState, ErrorView, LoadingView, NoticeBox, Pill, Screen, Section } from "@/ui";
+import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { SeriesEdm } from "@/features/admin/series-edm";
 import { useApi, useSession } from "@/state/session";
 
@@ -19,6 +20,9 @@ export default function KeywordsScreen() {
   const { data, error, loading, reload } = useApi<KeywordLists>(isSuper ? "/admin/keywords" : null);
   const [drafts, setDrafts] = useState<Record<KeywordKind, string>>({ category: "", series: "", location: "" });
   const [rename, setRename] = useState<{ kind: KeywordKind; from: string; to: string } | null>(null);
+  const [tab, setTab] = useState<KeywordKind>("category"); // 分類／系列／場地分頁切換，不再全部排成一長頁
+  const [usedBy, setUsedBy] = useState<{ kind: KeywordKind; value: string } | null>(null);
+  const courses = useApi<CourseSummary[]>(isSuper ? "/admin/courses" : null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   if (!isSuper)
@@ -72,10 +76,11 @@ export default function KeywordsScreen() {
         集中管理課程的「分類、系列、場地」。改名會同步更新所有用到的課程；新增的關鍵字會出現在課程編輯頁的「已有的…」選項裡。
       </AppText>
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
+      <Chips label="" options={KINDS.map((k) => ({ key: k, label: `${KEYWORD_INFO[k].title}${data ? `（${data[k].length}）` : ""}` }))} value={tab} onChange={(v) => setTab(v as KeywordKind)} />
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {data
-        ? KINDS.map((kind) => (
+        ? [tab].map((kind) => (
             <Section key={kind} title={KEYWORD_INFO[kind].title}>
               <Card>
                 <AppText variant="caption" tone="muted">
@@ -89,7 +94,13 @@ export default function KeywordsScreen() {
                           {item.value}
                         </AppText>
                         <View style={styles.tags}>
-                          <Pill label={item.count ? `${item.count} 堂課程使用` : "尚未使用"} tone={item.count ? "accent" : "neutral"} />
+                          {item.count ? (
+                            <Pressable accessibilityRole="button" accessibilityLabel={`看使用「${item.value}」的課程`} onPress={() => setUsedBy({ kind, value: item.value })}>
+                              <Pill label={`${item.count} 堂課程使用 ›`} tone="accent" />
+                            </Pressable>
+                          ) : (
+                            <Pill label="尚未使用" tone="neutral" />
+                          )}
                         </View>
                         {kind === "series" ? <SeriesEdm series={item.value} edmUrl={item.edmUrl} onChanged={() => { invalidate(); reload(); }} /> : null}
                       </View>
@@ -118,6 +129,27 @@ export default function KeywordsScreen() {
             </Section>
           ))
         : null}
+      {usedBy ? (
+        <BottomSheet onClose={() => setUsedBy(null)}>
+          <AppText variant="headline" numberOfLines={2}>
+            使用「{usedBy.value}」的課程
+          </AppText>
+          <SheetScroll>
+            {(courses.data ?? [])
+              .filter((x) => (usedBy.kind === "category" ? x.category.split(/[、,，]/).map((v) => v.trim()).includes(usedBy.value) : usedBy.kind === "series" ? x.series === usedBy.value : x.location === usedBy.value))
+              .map((x) => (
+                <Pressable key={x.id} accessibilityRole="button" accessibilityLabel={x.title} onPress={() => (setUsedBy(null), router.push(`/course/${x.id}`))} style={[styles.row, { borderTopColor: c.border, minHeight: minTouch }]}>
+                  <AppText variant="body" style={{ flex: 1 }} numberOfLines={2}>
+                    {x.title}
+                  </AppText>
+                  <AppText tone="muted">›</AppText>
+                </Pressable>
+              ))}
+            {courses.loading && !courses.data ? <LoadingView /> : null}
+          </SheetScroll>
+          <Button variant="secondary" label="關閉" onPress={() => setUsedBy(null)} fullWidth />
+        </BottomSheet>
+      ) : null}
       {rename ? (
         <BottomSheet onClose={() => setRename(null)}>
           <AppText variant="headline">
