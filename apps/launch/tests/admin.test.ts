@@ -53,6 +53,9 @@ function fakeR2(): R2Bucket & { objects: Map<string, { data: Uint8Array; type?: 
           }
           objects.set(key, { data, type: u.type });
         },
+        async abort() {
+          uploads.delete(uploadId);
+        },
       };
     },
   };
