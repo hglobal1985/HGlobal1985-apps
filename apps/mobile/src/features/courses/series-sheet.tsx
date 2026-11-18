@@ -5,7 +5,7 @@ import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, SheetAction } from "@/ui";
+import { BrandCover, AppText, Button, SheetAction } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
@@ -69,7 +69,11 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             }}
             style={[styles.row, { borderTopColor: c.border }]}
           >
-            {x.coverUrl || x.edmUrl ? (
+            {x.brand ? (
+              <View style={styles.thumb}>
+                <BrandCover brand={x.brand} fill />
+              </View>
+            ) : x.coverUrl || x.edmUrl ? (
               <Image source={{ uri: resolveUrl((x.coverUrl || x.edmUrl) as string) }} style={styles.thumb} resizeMode="cover" />
             ) : (
               <Image source={require("../../../assets/icon.png")} style={styles.thumb} resizeMode="cover" />

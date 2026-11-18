@@ -146,6 +146,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="link-outline" title="短網址" subtitle="集中設定分類、系列、中心的短網址與課程專屬網址" onPress={() => router.push("/admin/short-links")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="sparkles-outline" title="AI 模型" subtitle="切換逐字稿、關鍵字、語意搜尋用的 AI 模型，並比較花費" onPress={() => router.push("/admin/ai-models")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="trophy-outline" title="徽章任務設定" subtitle="依分類新增、修改所有徽章任務，並設定書櫃鑰匙門檻" onPress={() => router.push("/admin/achievements")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="images-outline" title="品牌 Logo" subtitle="上傳品牌 logo、選底圖或底色，並對應分類，課程與素材可用它當封面" onPress={() => router.push("/admin/brand-logos")} /> : null}
             {member.role === "admin" ? <ListRow icon="flag-outline" title="留言檢舉" subtitle="處理被檢舉的留言" onPress={() => router.push("/admin/comments")} /> : null}
           </Card>
         </Section>

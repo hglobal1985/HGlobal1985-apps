@@ -6,7 +6,7 @@ import { useCenterNames } from "@/state/center-names";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
-import { AppText, CourseCover } from "@/ui";
+import { BrandCover, AppText, CourseCover } from "@/ui";
 import { styles } from "./chapter-list";
 import { shareLink } from "@/lib/share";
 import { RowShare } from "./lesson-list";
@@ -28,7 +28,7 @@ export function CourseRow({ course }: { course: CourseSummary }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${date} ${course.title}`} onPress={() => router.push(`/course/${course.id}`)} style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}>
       <View style={styles.thumb}>
-        {img ? <Image source={{ uri: resolveUrl(img) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <CourseCover theme={course.theme} label="" title={course.series || course.title} fill />}
+        {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: resolveUrl(img) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <CourseCover theme={course.theme} label="" title={course.series || course.title} fill />}
       </View>
       <View style={styles.mid}>
         <AppText variant="callout" style={{ fontWeight: "800" }} numberOfLines={2}>

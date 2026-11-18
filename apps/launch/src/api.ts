@@ -32,6 +32,8 @@ import {
   type CentralReviews,
   type LibraryItem,
   type LibraryMine,
+  type BrandCover,
+  type BrandLogo,
   NOTICE_KINDS,
   type NoticeKind,
   LIBRARY_KEY_BADGES,
@@ -95,7 +97,31 @@ const fail = (status: number, code: string, message: string): never => {
 /** demo：模擬會員（rankCode 為示範獎銜）；central：中央會員（不持有獎銜，資格每次向中央查詢）。 */
 type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
-type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
+type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 品牌 logo（組課程封面用，列表／詳情載入）。 */ brands?: BrandRow[]; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
+
+type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; categories: string; art_version: number };
+const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
+/** 課程的品牌封面：勾選使用、而且分類（可複選，「、」分隔）對得到某個品牌 logo 才有。 */
+function brandFor(ctx: Ctx, row: { use_brand_logo?: number; category: string }): BrandCover | null {
+  if (row.use_brand_logo !== 1 || !ctx.brands?.length) return null;
+  const cats = row.category.split(/[、,，]/).map((x) => x.trim()).filter(Boolean);
+  for (const b of ctx.brands) {
+    let list: string[] = [];
+    try { list = JSON.parse(b.categories) as string[]; } catch { list = []; }
+    if (b.logo_key && cats.some((c) => list.includes(c))) return { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null };
+  }
+  return null;
+}
+const brandUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
+
+const safeList = (raw: string): string[] => {
+  try {
+    const v = JSON.parse(raw) as unknown;
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
 
 // ---------- helpers ----------
 
@@ -368,6 +394,7 @@ type CourseRow = {
   view_scope: string;
   price_tba: number;
   hide_home: number;
+  use_brand_logo: number;
   series_order: number;
   diamond_free: number;
   series: string;
@@ -401,7 +428,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.diamond_free, c.series, c.series_order, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.use_brand_logo, c.diamond_free, c.series, c.series_order, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -516,6 +543,8 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     priceTba: row.price_tba === 1,
     hideFromHome: row.hide_home === 1,
     seriesOrder: row.series_order,
+    useBrandLogo: row.use_brand_logo === 1,
+    brand: brandFor(ctx, row),
     series: row.series,
     seriesEdmUrl: row.series_edm_key ? pubUrl(row.series_edm_key, row.series_art_version ?? 1) : null,
     seriesCoverUrl: row.series_cover_key ? pubUrl(row.series_cover_key, row.series_art_version ?? 1) : null,
@@ -609,6 +638,7 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
   const eligibility = await eligibilityFor(s, rankMap, [...visible.map((r) => r.min_rank_code), DIAMOND]);
   ctx.centerSlugs = centerSlugs;
   ctx.seriesSlugs = seriesSlugs;
+  ctx.brands = await loadBrands(ctx.db);
   const out = visible.map((r) => summarize(r, ctx, rankMap, state, eligibility));
   if (!rights || !s) return out;
   const r = rights;
@@ -836,6 +866,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   }
   ctx.centerSlugs = await centerSlugMap(ctx.db);
   ctx.seriesSlugs = await seriesSlugMap(ctx.db);
+  ctx.brands = await loadBrands(ctx.db);
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
   const admin = manages;
@@ -1967,6 +1998,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   }
   if (body.diamondFree !== undefined) sets.push(["diamond_free", body.diamondFree === true ? 1 : 0]);
   if (body.hideFromHome !== undefined) sets.push(["hide_home", body.hideFromHome === true ? 1 : 0]);
+  if (body.useBrandLogo !== undefined) sets.push(["use_brand_logo", body.useBrandLogo === true ? 1 : 0]);
   // 封面框與預設停留位置永遠同步：有 coverRect 時，預設位置＝封面框上緣（edm_view_y 由它算出，不接受另外指定）。
   // 只改預設位置（沒有封面框）時，封面框作廢（NULL），免得兩者不一致。
   if (body.coverRect !== undefined) {
@@ -2209,7 +2241,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
+  const keep = ["view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "use_brand_logo", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
@@ -3963,8 +3995,8 @@ const routes: [string, RegExp, Handler][] = [
       // 課程封面與 EDM 是公開圖片（課程列表本來就要顯示；EDM 開放下載）。只服務資料庫裡仍在使用的檔案。
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
-      if (!bucket || !/^(edm|cover|series|center|lesson)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ?").bind(key, key, key, key, key, key, key, key).first();
+      if (!bucket || !/^(edm|cover|series|center|lesson|brand)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
+      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first();
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       return new Response(obj.body, {
@@ -4389,6 +4421,99 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   ["GET", /^\/admin\/courses$/, async (ctx) => listCourses(ctx, true)],
+  [
+    "GET",
+    /^\/admin\/brand-logos$/,
+    async (ctx): Promise<BrandLogo[]> => {
+      requireSuperAdmin(ctx);
+      const { results } = await ctx.db.prepare("SELECT id, name, logo_key, bg_key, bg_color, categories, art_version FROM brand_logos ORDER BY sort_order, created_at").all<BrandRow>();
+      return results.map((r) => ({ id: r.id, name: r.name, logoUrl: r.logo_key ? brandUrl(r.logo_key, r.art_version) : null, bgColor: r.bg_color, bgUrl: r.bg_key ? brandUrl(r.bg_key, r.art_version) : null, categories: safeList(r.categories) }));
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/brand-logos$/,
+    async (ctx) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ name?: unknown }>(ctx.req);
+      const name = text(body.name, 40);
+      if (!name) return fail(400, "name_required", "請輸入品牌名稱");
+      const id = `b${randomId(7)}`;
+      const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM brand_logos").first<{ m: number }>();
+      await ctx.db.batch([ctx.db.prepare("INSERT INTO brand_logos (id, name, sort_order) VALUES (?, ?, ?)").bind(id, name, (max?.m ?? 0) + 1), audit(ctx.db, s.sub, "brand.create", "brand", id, name)]);
+      return { id };
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/brand-logos\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ name?: unknown; bgColor?: unknown; categories?: unknown }>(ctx.req);
+      const sets: [string, unknown][] = [];
+      if (body.name !== undefined) {
+        const n = text(body.name, 40);
+        if (!n) return fail(400, "name_required", "請輸入品牌名稱");
+        sets.push(["name", n]);
+      }
+      if (body.bgColor !== undefined) {
+        if (body.bgColor === null || body.bgColor === "") sets.push(["bg_color", null]);
+        else if (typeof body.bgColor === "string" && /^#[0-9a-fA-F]{6}$/.test(body.bgColor)) sets.push(["bg_color", body.bgColor.toUpperCase()]);
+        else return fail(400, "invalid_color", "底色請用 #RRGGBB 格式");
+      }
+      if (body.categories !== undefined) {
+        if (!Array.isArray(body.categories)) return fail(400, "invalid_request", "分類格式不正確");
+        sets.push(["categories", JSON.stringify([...new Set(body.categories.filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter(Boolean))].slice(0, 30))]);
+      }
+      if (!sets.length) return { ok: true };
+      const r = await ctx.db.prepare(`UPDATE brand_logos SET ${sets.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`).bind(...sets.map(([, v]) => v), id).run();
+      if (r.meta?.changes === 0) return fail(404, "not_found", "找不到這個品牌");
+      await audit(ctx.db, s.sub, "brand.update", "brand", id, sets.map(([c]) => c).join(",")).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/brand-logos\/([\w-]+)\/(logo|bg)$/,
+    async (ctx, [id, part]) => {
+      const s = requireSuperAdmin(ctx);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      const max = 8 * 1024 * 1024;
+      if (!data.byteLength || data.byteLength > max) fail(413, "invalid_size", `圖片大小需在 ${max / 1024 / 1024}MB 以內`);
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      const col = part === "logo" ? "logo_key" : "bg_key";
+      const old = await ctx.db.prepare(`SELECT ${col} AS k FROM brand_logos WHERE id = ?`).bind(id).first<{ k: string | null }>();
+      if (!old) return fail(404, "not_found", "找不到這個品牌");
+      const key = `brand/${id}/${crypto.randomUUID()}.${img.ext}`;
+      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      await ctx.db.batch([ctx.db.prepare(`UPDATE brand_logos SET ${col} = ?, art_version = art_version + 1 WHERE id = ?`).bind(key, id), audit(ctx.db, s.sub, `brand.${part}_upload`, "brand", id, key)]);
+      if (old.k) await bucket.delete(old.k).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/brand-logos\/([\w-]+)\/bg$/,
+    async (ctx, [id]) => {
+      requireSuperAdmin(ctx);
+      const old = await ctx.db.prepare("SELECT bg_key AS k FROM brand_logos WHERE id = ?").bind(id).first<{ k: string | null }>();
+      await ctx.db.prepare("UPDATE brand_logos SET bg_key = NULL, art_version = art_version + 1 WHERE id = ?").bind(id).run();
+      if (old?.k) await ctx.env.MEDIA?.delete(old.k).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/brand-logos\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      const s = requireSuperAdmin(ctx);
+      const old = await ctx.db.prepare("SELECT logo_key, bg_key FROM brand_logos WHERE id = ?").bind(id).first<{ logo_key: string | null; bg_key: string | null }>();
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM brand_logos WHERE id = ?").bind(id), audit(ctx.db, s.sub, "brand.delete", "brand", id)]);
+      for (const k of [old?.logo_key, old?.bg_key]) if (k) await ctx.env.MEDIA?.delete(k).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
   [
     "POST",
     /^\/admin\/series-order$/,

@@ -68,3 +68,28 @@ test("素材系列手動排序：只有超級管理員、只能排這個系列�
   const list = (await call<{ id: string; seriesOrder: number }[]>("GET", "/courses", { token: admin })).data.filter((x) => [a, b, c].includes(x.id));
   assert.deepEqual(list.sort((x, y) => x.seriesOrder - y.seriesOrder).map((x) => x.id), [c, a, b]);
 });
+
+test("品牌 logo：後台建立與設定；勾選使用且分類對得上的課程才有品牌封面", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
+    return { status: res.status, data: (await res.json()) as T };
+  };
+  const tok = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", { body: { sub } })).data.token;
+  const admin = await tok("demo-admin");
+  const student = await tok("demo-student");
+  assert.equal((await call("GET", "/admin/brand-logos", { token: student })).status, 403);
+  const { id } = (await call<{ id: string }>("POST", "/admin/brand-logos", { token: admin, body: { name: "雅姿" } })).data;
+  assert.equal((await call("PATCH", `/admin/brand-logos/${id}`, { token: admin, body: { bgColor: "#FFFFFF", categories: ["美容", "產品"] } })).status, 200);
+  assert.equal((await call("PATCH", `/admin/brand-logos/${id}`, { token: admin, body: { bgColor: "red" } })).status, 400);
+  await db.prepare("UPDATE brand_logos SET logo_key = 'brand/x/a.png' WHERE id = ?").bind(id).run(); // 圖片上傳需要 R2，測試直接寫入
+  const c = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "美容課", teacher: "王", status: "published", category: "美容、新人" } })).data;
+  const find = async () => (await call<{ id: string; brand: { bgColor: string } | null; useBrandLogo: boolean }[]>("GET", "/courses", { token: admin })).data.find((x) => x.id === c.id)!;
+  assert.equal((await find()).brand, null, "沒勾選不使用");
+  await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { useBrandLogo: true } });
+  const f = await find();
+  assert.deepEqual([f.useBrandLogo, f.brand?.bgColor], [true, "#FFFFFF"]);
+  await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { category: "會議" } });
+  assert.equal((await find()).brand, null, "分類對不上就沒有");
+});

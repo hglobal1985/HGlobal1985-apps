@@ -5,7 +5,7 @@ import { eventDays, hostLine, placeText } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, CourseCover, Icon, type IconName } from "@/ui";
+import { BrandCover, AppText, CourseCover, Icon, type IconName } from "@/ui";
 import { CoursePriceTag } from "./course-card";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
 import { displayName } from "./sort";
@@ -31,6 +31,7 @@ function TopFillImage({ uri, w, h }: { uri: string; w: number; h: number }) {
 }
 
 function Slide({ course, w, h }: { course: CourseSummary; w: number; h: number }) {
+  if (course.brand) return <BrandCover brand={course.brand} fill />;
   return course.edmUrl ? (
     <TopFillImage uri={resolveUrl(course.edmUrl)} w={w} h={h} />
   ) : (

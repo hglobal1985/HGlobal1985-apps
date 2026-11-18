@@ -11,7 +11,7 @@ import { radius, space } from "@/theme/tokens";
 import { useSession } from "@/state/session";
 import { flashText } from "@/ui/flash-notice";
 import { useUiConfig } from "@/state/ui-config";
-import { AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle, useDimLayer } from "@/ui";
+import { BrandCover, AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle, useDimLayer } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 
 /**
@@ -26,10 +26,10 @@ export function EdmStage({ course }: { course: CourseSummary }) {
   const ribbons = ribbonsFor(course, member, config);
   return (
     <StageFrame>
-      {course.edmUrl ? <EdmPan uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
+      {course.brand ? <BrandCover brand={course.brand} fill /> : course.edmUrl ? <EdmPan uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
       {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={2} /> : null}
       {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={2} /> : null}
-      {course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
+      {!course.brand && course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
     </StageFrame>
   );
 }

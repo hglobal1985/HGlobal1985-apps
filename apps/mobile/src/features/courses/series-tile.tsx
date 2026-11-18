@@ -6,7 +6,7 @@ import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { radius } from "@/theme/tokens";
-import { CornerRibbon, CourseCover } from "@/ui";
+import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
 import { SeriesSheet } from "./series-sheet";
@@ -66,7 +66,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   return (
     <View style={{ width }}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? rep.series : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: edm ? "#fff" : c.surfaceMuted }]}>
-        {edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
+        {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         {/* 管理者才看得到的未上架課程：左下角標「未上架」（學員的清單裡不會有這些課）。 */}

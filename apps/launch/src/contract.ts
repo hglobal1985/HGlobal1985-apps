@@ -108,6 +108,10 @@ export type CourseSummary = {
   lessonCount: number;
   /** 有上傳教材：任何一堂（章節或其他教材）設了影音來源，或有附件。「寰宇教育中心」清單的排序只算這樣的課程。 */
   hasMaterial: boolean;
+  /** 勾選「使用品牌 logo 作為封面」（業主 2026-11-18）。 */
+  useBrandLogo: boolean;
+  /** 這門課的分類有對應品牌 logo、且勾選使用時才有：logo 圖、底色、底圖。 */
+  brand: BrandCover | null;
   /** 素材系列內的手動順序（0＝還沒排過）。 */
   seriesOrder: number;
   /** 素材（教材）數量：有影音來源或外部連結的項目數（素材清單的上拉選單標籤用）。 */
@@ -396,6 +400,11 @@ export type CourseComment = {
   reports?: number;
   courseTitle?: string;
 };
+
+/** 品牌 logo 封面的組成：底圖（優先）或底色（沒有就白色）＋ logo 置中、四周留安全距離。 */
+export type BrandCover = { logoUrl: string; bgColor: string | null; bgUrl: string | null };
+/** 後台品牌 logo 管理用。 */
+export type BrandLogo = { id: string; name: string; logoUrl: string | null; bgColor: string | null; bgUrl: string | null; categories: string[] };
 
 /** 通知情境（Email 可逐項開關，業主 2026-11-18）：預設只有「付費課程相關的審核通知」要寄 Email，其餘預設不寄；手機推播不看這個，全部都推。 */
 export type NoticeKind = "paid_review" | "role" | "course_update" | "subscribe_new" | "broadcast" | "reminder" | "comment" | "badge" | "other";

@@ -56,6 +56,8 @@ export type {
   CentralReviews,
   LibraryItem,
   LibraryMine,
+  BrandCover,
+  BrandLogo,
   LibraryView,
   LibraryUnlock,
   NotificationSettings,

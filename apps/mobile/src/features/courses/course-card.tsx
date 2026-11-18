@@ -12,7 +12,7 @@ import { SeriesSheet } from "./series-sheet";
 import { displayName } from "./sort";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Card, CornerRibbon, CourseCover, Pill } from "@/ui";
+import { BrandCover, AppText, Card, CornerRibbon, CourseCover, Pill } from "@/ui";
 
 export function CourseCard({ course, siblings = [], footer, onPress, onPickSibling, onHide }: { course: CourseSummary; siblings?: CourseSummary[]; footer?: React.ReactNode; onPress?: () => void; onPickSibling?: (c: CourseSummary) => void; onHide?: () => void }) {
   const { c } = useTheme();
@@ -26,7 +26,7 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
   return (
     <Card onPress={onPress ?? (() => router.push(`/course/${course.id}`))} accessibilityLabel={displayName(course)}>
       <View style={styles.coverWrap}>
-        <CourseCover theme={course.theme} label={course.category} title={displayName(course)} imageUrl={course.coverUrl} />
+        {course.brand ? <BrandCover brand={course.brand} style={{ borderRadius: radius.md }} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} imageUrl={course.coverUrl} />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" /> : null}
       </View>
