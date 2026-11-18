@@ -1971,7 +1971,6 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   const guidance = text(body.guidanceUnit, 60);
   if (centerOnly && guidance === HQ_UNIT) fail(403, "forbidden", `指導單位「${HQ_UNIT}」只有總部管理員可以設定`);
   if (guidance !== undefined) sets.push(["guidance_unit", guidance]);
-  else if (centerOnly && creating && who.center) sets.push(["guidance_unit", who.center.label]);
   // 主辦單位可以複選（總部管理員）：存成「、」分隔文字；權限與審核仍以第一個中心（非寰宇總部）為準。
   const hostList = Array.isArray(body.hostUnit)
     ? splitCats(body.hostUnit.filter((x): x is string => typeof x === "string").join(CAT_SEP))
@@ -2045,7 +2044,9 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const id = `c${randomId(7)}`;
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
   // 新課程一律先是草稿（小編也一樣，自己再決定上架）；記下建立者。
-  const status = sets.find(([c]) => c === "status")?.[1] === "published" ? "published" : "draft";
+  // 新增「素材清單」＝自動直接上架（業主 2026-11-18）；課程仍先是草稿。
+  const isListNew = sets.some(([c, v]) => c === "is_list" && (v === 1 || v === true));
+  const status = isListNew || sets.find(([c]) => c === "status")?.[1] === "published" ? "published" : "draft";
   const rest = sets.filter(([c]) => c !== "status");
   const cols = ["id", "sort_order", "status", "created_by_sub", "edited_by_name", "edited_at", ...rest.map(([c]) => c)];
   const vals = [id, (max?.m ?? 0) + 1, status, admin.sub, admin.name.slice(0, 60), iso(), ...rest.map(([, v]) => v)];

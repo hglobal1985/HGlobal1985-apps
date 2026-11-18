@@ -77,7 +77,6 @@ export default function HomeScreen() {
       x.status === "published" &&
       x.enrollment !== "opened" &&
       !x.started &&
-      !x.hideFromHome &&
       x.viewScope !== "link_login" && x.viewScope !== "link_guest" && (member ? (!rules.onlyEligible || x.eligible) && !x.isPublic && inScope(x) : x.isPublic) &&
       !(rules.hideEnded && (x.eventEnd ?? x.eventStart ?? "9999") < today),
   );

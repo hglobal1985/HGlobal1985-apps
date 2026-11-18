@@ -9,7 +9,7 @@ import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal }
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
-import { courseThemes, minTouch, radius, space, type } from "@/theme/tokens";
+import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, DateSelect, Field, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
@@ -121,11 +121,10 @@ function Label({ children }: { children: ReactNode }) {
 
 const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.stringify(a) === JSON.stringify(b);
 
-// ---------- 基本資料：名稱、主講人、分類、系列、封面顏色 ----------
+// ---------- 基本資料：名稱、主講人、分類、系列（封面顏色已刪除，無 EDM 時文字封面顏色自動隨機） ----------
 /** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
-export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; theme: string };
+export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string };
 export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
-  const { c } = useTheme();
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
   const set = <K extends keyof BasicsForm>(k: K) => (v: BasicsForm[K]) => setF((x) => ({ ...x, [k]: v }));
@@ -158,14 +157,6 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
           {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
         </>
       ) : null}
-      <Label>封面顏色（沒有 EDM 時的文字封面）</Label>
-      <View style={styles.chips}>
-        {Object.keys(courseThemes).map((t) => (
-          <Pressable key={t} onPress={() => set("theme")(t)} accessibilityRole="button" accessibilityLabel={`封面顏色 ${t}`} accessibilityState={{ selected: f.theme === t }} style={[styles.swatch, { borderColor: f.theme === t ? c.text : "transparent" }]}>
-            <View style={[styles.swatchInner, { backgroundColor: courseThemes[t].light[1] }]} />
-          </Pressable>
-        ))}
-      </View>
     </>
   );
 }
@@ -173,7 +164,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
 function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", theme: course.theme };
+  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? ""};
   const [f, setF] = useState(init);
   // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");
@@ -415,7 +406,7 @@ function HostUnitBlock({ isHq, value, fixed, options, counts, onChange }: { isHq
 function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isHq = member?.role === "admin";
-  const init = { guidanceUnit: course.guidanceUnit, hostUnit: course.hostUnit, chapterCovers: course.chapterCovers, hideFromHome: course.hideFromHome, description: course.description ?? "" };
+  const init = { hostUnit: course.hostUnit, chapterCovers: course.chapterCovers };
   const [f, setF] = useState(init);
   const centers = useApi<string[]>(isHq ? "/centers" : null);
   const allCourses = useApi<CourseSummary[]>(isHq ? "/admin/courses" : null);
@@ -428,12 +419,8 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   };
   return (
     <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
-      {isHq ? <Check label="指導單位：寰宇總部（會公開顯示，不建議勾選）" value={f.guidanceUnit === HQ_UNIT} onChange={(v) => setF((x) => ({ ...x, guidanceUnit: v ? HQ_UNIT : "" }))} /> : null}
-      {f.guidanceUnit === HQ_UNIT ? <NoticeBox text="由寰宇總部指導的課程，只能使用總部的審核群組。" /> : null}
       <HostUnitBlock isHq={isHq} value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} options={[HQ_UNIT, ...(centers.data ?? [])]} counts={hostCounts} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
-      <Check label="不顯示在首頁推薦（不建議勾選）" value={f.hideFromHome} onChange={(v) => setF((x) => ({ ...x, hideFromHome: v }))} />
-      <Field label="課程介紹（內部參考，課程頁不顯示）" value={f.description} onChange={(v) => setF((x) => ({ ...x, description: v }))} multiline placeholder="課程內容、上課時間、適合對象……" />
       <AppText variant="caption" tone="muted">
         {course.admin?.editedAt ? `最後修改：${course.admin.editedByName || "（未記錄）"}　${dateTime(course.admin.editedAt)}` : "最後修改：（還沒有紀錄）"}
       </AppText>

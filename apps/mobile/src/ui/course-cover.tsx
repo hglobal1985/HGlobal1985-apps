@@ -40,7 +40,10 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   if (imageUrl) {
     return <Image source={{ uri: resolveUrl(imageUrl) }} style={{ width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md }} resizeMode="cover" accessibilityLabel={`${label}課程封面`} />;
   }
-  const [bg, fg] = (courseThemes[theme] ?? courseThemes.sage)[scheme];
+  // 沒有封面圖時的文字封面顏色：自動隨機（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（業主 2026-11-18）。
+  const names = Object.keys(courseThemes);
+  const seed = [...(title || label || theme || "")].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
+  const [bg, fg] = courseThemes[names[seed % names.length]!]![scheme];
   const pad = space.md;
   const hasTitle = !!title?.trim();
   const innerW = Math.max(0, box.w - pad * 2);

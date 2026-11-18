@@ -25,6 +25,7 @@ test("課程類手動報名＝訂閱：新章節、時間地點更新都通知�
   await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { location: "新地點" } });
   assert.ok((await titles(a)).some((t) => t.includes("時間或地點有更新")));
   // 清單類：不能報名
-  const l = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "素材", isList: true, status: "published" } })).data;
+  const l = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "素材", isList: true } })).data;
+  assert.equal(l.status, "published", "新增素材清單自動直接上架");
   assert.equal((await call("POST", "/orders", { token: a, body: { courseIds: [l.id] } })).status, 400);
 });
