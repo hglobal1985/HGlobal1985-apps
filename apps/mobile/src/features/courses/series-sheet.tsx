@@ -10,7 +10,7 @@ import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
-import { nearestFirst } from "./sort";
+import { seriesOrdered } from "./sort";
 
 
 /** 狀態標籤：與課程卡左邊緞帶同步的文字與顏色；沒有左緞帶時用右邊緞帶（倒數、進行中…）。 */
@@ -57,7 +57,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
         {showAllSeries ? <SheetAction label="顯示全部" accessibilityLabel={`顯示「${showAllSeries}」全部梯次`} onPress={showAll} /> : null}
       </View>
       <SheetScroll>
-        {nearestFirst(items).map((x) => (
+        {seriesOrdered(items).map((x) => (
           <Pressable
             key={x.id}
             accessibilityRole="button"

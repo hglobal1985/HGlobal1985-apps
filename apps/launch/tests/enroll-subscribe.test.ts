@@ -49,3 +49,22 @@ test("Email 通知依情境開關：預設只有付費課程審核通知；可�
   const after = (await call<{ emailKinds: Record<string, boolean> }>("PUT", "/me/notification-settings", { token: t, body: { emailKinds: { badge: true, paid_review: false } } })).data.emailKinds;
   assert.deepEqual([after.badge, after.paid_review, after.comment], [true, false, false]);
 });
+
+test("素材系列手動排序：只有超級管理員、只能排這個系列的項目", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
+    return { status: res.status, data: (await res.json()) as T };
+  };
+  const tok = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", { body: { sub } })).data.token;
+  const admin = await tok("demo-admin");
+  const student = await tok("demo-student");
+  const mk = async (title: string) => (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title, isList: true, series: "新品" } })).data.id;
+  const [a, b, c] = [await mk("甲"), await mk("乙"), await mk("丙")];
+  assert.equal((await call("POST", "/admin/series-order", { token: student, body: { series: "新品", ids: [c, b, a] } })).status, 403);
+  assert.equal((await call("POST", "/admin/series-order", { token: admin, body: { series: "新品", ids: [c, b, "nope"] } })).status, 400);
+  assert.equal((await call("POST", "/admin/series-order", { token: admin, body: { series: "新品", ids: [c, a, b] } })).status, 200);
+  const list = (await call<{ id: string; seriesOrder: number }[]>("GET", "/courses", { token: admin })).data.filter((x) => [a, b, c].includes(x.id));
+  assert.deepEqual(list.sort((x, y) => x.seriesOrder - y.seriesOrder).map((x) => x.id), [c, a, b]);
+});

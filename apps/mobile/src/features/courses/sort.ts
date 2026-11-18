@@ -21,6 +21,16 @@ export function nearestFirst<T extends CourseSummary>(items: T[]): T[] {
 }
 
 /**
+ * 系列頁／梯次選單的項目排序（業主 2026-11-18）：素材系列（全部是素材清單）＝超級管理員手動排的順序（還沒排過的維持原順序放後面）；
+ * 課程系列＝日期最近優先（nearestFirst）。要在系列內排序一律用這個。
+ */
+export function seriesOrdered<T extends CourseSummary>(items: T[]): T[] {
+  if (!items.length || !items.every((x) => x.isList)) return nearestFirst(items);
+  const key = (x: T) => (x.seriesOrder > 0 ? x.seriesOrder : Number.POSITIVE_INFINITY);
+  return [...items].sort((a, b) => key(a) - key(b)); // 穩定排序：沒排過的維持原順序
+}
+
+/**
  * 「全部課程」排序：先依分組優先順序（由超級管理員在「課程排序與條件」設定），
  * 同一組內：還沒開始的日期由近到遠，已開始或沒有日期的由新到舊。
  */

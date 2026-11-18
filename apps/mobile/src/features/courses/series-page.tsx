@@ -15,11 +15,12 @@ import { portraitColumns } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { CardGrid, EmptyState, ErrorView, LoadingView, LoginPrompt, Screen } from "@/ui";
+import { flashText } from "@/ui/flash-notice";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
 import { lessonsOf } from "./category-sheet";
 import { CourseRow } from "./course-row";
-import { nearestFirst } from "./sort";
+import { seriesOrdered } from "./sort";
 import { SeriesTile } from "./series-tile";
 import { useSubscribe } from "./subscribe";
 
@@ -61,8 +62,25 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     const pub = (data ?? []).filter((x) => x.status === "published" && x.viewScope !== "link_login" && x.viewScope !== "link_guest");
     const ids = new Set(pub.map((x) => x.id));
     const all = [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
-    return nearestFirst(all.filter((x) => x.series === series));
+    return seriesOrdered(all.filter((x) => x.series === series));
   }, [data, adminList.data, series]);
+  // 素材系列：超級管理員用每列右邊的上下箭頭調整順序（手機不靠拖曳）；先直接換畫面，背景存檔，失敗還原（業主 2026-11-18）。
+  const canOrder = isSuperAdmin(member) && courses.length > 1 && courses.every((x) => x.isList);
+  const [localIds, setLocalIds] = useState<string[] | null>(null);
+  const shown = useMemo(() => (localIds ? localIds.map((id) => courses.find((x) => x.id === id)).filter((x): x is CourseSummary => !!x) : courses), [localIds, courses]);
+  const move = (i: number, j: number) => {
+    const ids = shown.map((x) => x.id);
+    const [it] = ids.splice(i, 1);
+    ids.splice(j, 0, it!);
+    setLocalIds(ids);
+    api("POST", "/admin/series-order", { series, ids })
+      .then(() => reload())
+      .catch((e: Error) => {
+        setLocalIds(null);
+        flashText(e.message);
+      });
+  };
+  useEffect(() => setLocalIds(null), [data]); // 重新讀回伺服器資料後，以伺服器順序為準
   const sub = useSubscribe("series", series, path);
   // 分享網址一律用系列短網址（/Beauty-Starry），沒設定才用 /series/名稱（業主 2026-11-17）；網頁版網址列也換成短網址。
   const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
@@ -101,7 +119,24 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
             {toggle("edm", "grid-outline", "圖片 EDM")}
           </View>
         ) : null}
-        {view === "list" ? <CardGrid>{courses.map((x) => <CourseRow key={x.id} course={x} />)}</CardGrid> : null}
+        {view === "list" && canOrder
+          ? shown.map((x, i) => (
+              <View key={x.id} style={styles.orderRow}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <CourseRow course={x} />
+                </View>
+                <View style={styles.arrows}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`上移 ${x.title}`} disabled={i === 0} onPress={() => move(i, i - 1)} style={[styles.arrow, { borderColor: c.border, backgroundColor: c.surface, opacity: i === 0 ? 0.3 : 1 }]}>
+                    <Ionicons name="arrow-up" size={22} color={c.text} />
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`下移 ${x.title}`} disabled={i === shown.length - 1} onPress={() => move(i, i + 1)} style={[styles.arrow, { borderColor: c.border, backgroundColor: c.surface, opacity: i === shown.length - 1 ? 0.3 : 1 }]}>
+                    <Ionicons name="arrow-down" size={22} color={c.text} />
+                  </Pressable>
+                </View>
+              </View>
+            ))
+          : null}
+        {view === "list" && !canOrder ? <CardGrid>{courses.map((x) => <CourseRow key={x.id} course={x} />)}</CardGrid> : null}
         {view === "edm" ? (
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW ? courses.map((x) => <SeriesTile key={x.id} group={{ key: `c:${x.id}`, nearest: x, sessions: [x] }} width={tileW} flat />) : null}
@@ -123,6 +158,9 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
 
 const styles = StyleSheet.create({
   toggle: { alignSelf: "flex-end", flexDirection: "row", borderWidth: 1, borderRadius: radius.md, overflow: "hidden", height: minTouch, marginBottom: space.sm },
+  orderRow: { flexDirection: "row", alignItems: "center", gap: space.xs },
+  arrows: { gap: 4 },
+  arrow: { width: 44, height: 44, borderRadius: radius.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   tbtn: { width: 48, height: "100%", alignItems: "center", justifyContent: "center" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP, rowGap: space.lg },
 });
