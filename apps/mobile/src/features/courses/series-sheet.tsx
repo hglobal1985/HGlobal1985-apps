@@ -80,9 +80,9 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
                 <AppText variant="body" style={{ flex: 1, fontWeight: "700" }} numberOfLines={2}>
                   {x.title}
                 </AppText>
-                <View style={[styles.chip, { backgroundColor: "#FFD43B" }]} accessibilityLabel={`${x.materialCount} 個素材`}>
-                  <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }} numberOfLines={1}>
-                    {x.materialCount} 素材
+                <View style={[styles.chip, { backgroundColor: c.surfaceMuted, borderWidth: 1, borderColor: c.border }]} accessibilityLabel={`有${x.materialCount}個素材`}>
+                  <AppText variant="caption" style={{ color: c.text, fontWeight: "700" }} numberOfLines={1}>
+                    有{x.materialCount}個素材
                   </AppText>
                 </View>
               </>
