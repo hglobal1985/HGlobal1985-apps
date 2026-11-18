@@ -46,6 +46,8 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
       return one(db, "SELECT CAST(COALESCE(SUM(COALESCE(NULLIF(l.duration_minutes, 0), (l.end_seconds - l.start_seconds) / 60.0, 0)), 0) AS INTEGER) AS n FROM lesson_progress p JOIN lessons l ON l.id = p.lesson_id WHERE p.member_sub = ? AND l.kind = 'chapter'", sub);
     case "centers_subscribed":
       return one(db, "SELECT COUNT(*) AS n FROM center_subscriptions WHERE member_sub = ? AND center_key NOT LIKE 'series:%'", sub);
+    case "subscriptions_total":
+      return one(db, "SELECT COUNT(*) AS n FROM center_subscriptions WHERE member_sub = ?", sub);
     case "series_subscribed":
       return one(db, "SELECT COUNT(*) AS n FROM center_subscriptions WHERE member_sub = ? AND center_key LIKE 'series:%'", sub);
     case "categories_explored":

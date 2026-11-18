@@ -25,6 +25,8 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
       return `累計完成章節的學習時間 ${threshold} 分鐘`;
     case "centers_subscribed":
       return `訂閱 ${threshold} 個中心`;
+    case "subscriptions_total":
+      return `訂閱中心與系列共 ${threshold} 個`;
     case "series_subscribed":
       return `訂閱 ${threshold} 個系列`;
     case "categories_explored":

@@ -64,7 +64,7 @@ export default function AdminAchievementsScreen() {
             <Select
               label="達成條件"
               value={form.type}
-              options={(Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).map((t) => ({ key: t, label: ACHIEVEMENT_TYPES[t].label }))}
+              options={(Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).filter((t) => t !== "course_completed").map((t) => ({ key: t, label: ACHIEVEMENT_TYPES[t].label }))}
               onChange={(v) => setForm({ ...form, type: v as AchievementType })}
             />
             {needsFeature ? <Select label="要使用的功能" value={form.feature} options={[{ key: "", label: "請選擇功能" }, ...Object.entries(FEATURES).map(([k, f]) => ({ key: k, label: f.label }))]} onChange={(v) => setForm({ ...form, feature: v })} /> : null}

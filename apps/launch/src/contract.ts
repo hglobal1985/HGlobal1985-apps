@@ -453,7 +453,7 @@ export type ProfileForm = {
 };
 
 // ---------- 學習成就（徽章）----------
-export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used";
+export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total";
 /** 條件類型的中文說明（單位用在「累計 N ○」）。 */
 export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; needsCourse?: boolean; needsFeature?: boolean }> = {
   lessons_completed: { label: "累計完成幾堂課", unit: "堂" },
@@ -471,6 +471,7 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   night_lessons: { label: "夜間（22:00～04:00）完成幾堂章節", unit: "堂" },
   weekend_lessons: { label: "週末完成幾堂章節", unit: "堂" },
   lessons_in_a_day: { label: "單日最多完成幾堂章節", unit: "堂" },
+  subscriptions_total: { label: "訂閱中心與系列的總數", unit: "個" },
   feature_used: { label: "使用過某個網站功能（新手教學）", unit: "次", needsFeature: true },
 };
 /** 網站功能清單（功能體驗徽章，類似新手教學）：key 是前端回報用的代碼，label 是功能名稱，hint 是怎麼用。 */
