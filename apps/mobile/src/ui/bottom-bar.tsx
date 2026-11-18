@@ -36,7 +36,7 @@ export function BottomBar() {
   const [keyboard, setKeyboard] = useState(false);
   // 大螢幕（業主 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
   const { large } = useLayout();
-  const iconSize = large ? 32 : 24;
+  const iconSize = 24; // 平板放大由 lib/global-scale.ts 統一處理
   const iconBox = iconSize + 4;
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -52,7 +52,7 @@ export function BottomBar() {
         const on = !lib && t.match(pathname);
         const color = lib ? LIB.muted : on ? c.accentText : c.textMuted;
         return (
-          <Pressable key={t.title} style={[styles.tab, large && { minHeight: 72 }]} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title} onPress={() => router.navigate(t.href)}>
+          <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title} onPress={() => router.navigate(t.href)}>
             <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
               {t.building ? <UniversityIcon size={iconSize} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={iconSize} color={color} />}
               {t.title === "通知" && unread > 0 ? (
@@ -63,7 +63,7 @@ export function BottomBar() {
                 </View>
               ) : null}
             </View>
-            <AppText variant="caption" style={{ color, fontWeight: "600", fontSize: large ? 15 : 12 }}>
+            <AppText variant="caption" style={{ color, fontWeight: "600", fontSize: 12 }}>
               {t.title}
             </AppText>
           </Pressable>

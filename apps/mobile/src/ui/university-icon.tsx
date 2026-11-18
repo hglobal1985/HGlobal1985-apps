@@ -1,4 +1,5 @@
 import Svg, { Path } from "react-native-svg";
+import { UI_SCALE } from "@/theme/ui-scale";
 
 /**
  * 「寰宇大學」分頁的建築物圖示（有柱子的學院）。自己畫成 SVG，不用 MaterialCommunityIcons：
@@ -8,7 +9,7 @@ import Svg, { Path } from "react-native-svg";
 export function UniversityIcon({ size = 24, color, active }: { size?: number; color: string; active?: boolean }) {
   const d = "M12 2.5 2.5 7v2h19V7zM5 11v6h3v-6zm5.5 0v6h3v-6zm5.5 0v6h3v-6zM2.5 19v2.5h19V19z";
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <Svg width={size * UI_SCALE} height={size * UI_SCALE} viewBox="0 0 24 24" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       <Path d={d} fill={active ? color : "none"} stroke={color} strokeWidth={active ? 0 : 1.6} strokeLinejoin="round" />
     </Svg>
   );
