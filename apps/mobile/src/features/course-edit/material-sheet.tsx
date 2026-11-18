@@ -4,10 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, TextInput, View } from "react-native";
 import { api, classifyLink, parseHttpsUrl, type CourseDetail, type Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
-import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
 import { fromHms, toHms, type Hms } from "@/features/uploads/hms";
-import { TimeRangePicker } from "@/features/uploads/time-range-picker";
-import { commitMediaDraft, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
+import { commitMediaDraft, MediaUploadModule, TimeRangeFields, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
@@ -53,18 +51,14 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
   // 素材項目自己的日期（選填）與影片時間軸區間（只有清單裡的 YouTube 影片；業主 2026-11-17）。
   const [evDate, setEvDate] = useState(lesson?.eventDate ?? "");
   const [trim, setTrim] = useState<{ start: Hms; end: Hms }>({ start: toHms(lesson?.start ?? null), end: toHms(lesson?.end ?? null) });
+  const [toEnd, setToEnd] = useState(false);
   const secOf = (h: Hms) => (fromHms(h) === "invalid" ? null : (fromHms(h) as number | null));
-  const [vidSec, setVidSec] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const parsed = parseHttpsUrl(url);
   const fileType = parsed ? classifyLink(parsed) : null;
   const ytId = course.isList && fileType === "youtube" ? ytIdOfUrl(parsed) : null;
-  useEffect(() => {
-    setVidSec(null);
-    if (ytId) void detectYoutubeSeconds(ytId).then((n) => setVidSec(n));
-  }, [ytId]);
   const dirty = lesson ? url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
 
   // 連結一變（貼上或手動輸入，停下來 0.6 秒後），請伺服器代為讀取網頁標題。
@@ -185,12 +179,15 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
       </View>
       <DateSelect label="日期（選填，這個項目自己的日期）" value={evDate} onChange={setEvDate} />
       {ytId ? (
-        <View style={{ gap: space.xs }}>
-          <AppText variant="callout" tone="muted">
-            影片時間軸區間（選填；空白＝從頭播到結束）
-          </AppText>
-          <TimeRangePicker kind="youtube" ytId={ytId} audioFile={null} duration={vidSec} start={trim.start} end={trim.end} onChange={(patch) => setTrim((x) => ({ ...x, ...patch }))} />
-        </View>
+        <TimeRangeFields
+          draft={{ kind: "youtube", ref: ytId, start: trim.start, end: trim.end, audio: null, toEnd: toEnd }}
+          set={(patch) => {
+            if (patch.start || patch.end) setTrim((x) => ({ start: patch.start ?? x.start, end: patch.end ?? x.end }));
+            if ("toEnd" in patch) setToEnd(!!patch.toEnd);
+          }}
+          lesson={lesson}
+          showHint
+        />
       ) : null}
     </EditSheet>
   );
