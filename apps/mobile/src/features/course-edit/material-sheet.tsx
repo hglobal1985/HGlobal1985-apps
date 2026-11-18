@@ -47,6 +47,7 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
   const [url, setUrl] = useState(baseLink);
   const [title, setTitle] = useState(lesson?.title ?? "");
   const lastAuto = useRef<string>(lesson?.title ?? ""); // 最近一次自動填入的名稱：名稱還是這個（或空白）時，換連結才會自動換名稱；自己改過的不會被蓋掉
+  const lastAutoDate = useRef<string>(lesson?.eventDate ?? "");
   const [fetching, setFetching] = useState<Fetch>("idle");
   // 素材項目自己的日期（選填）與影片時間軸區間（只有清單裡的 YouTube 影片；業主 2026-11-17）。
   const [evDate, setEvDate] = useState(lesson?.eventDate ?? "");
@@ -67,7 +68,7 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
     let alive = true;
     setFetching("loading");
     const t = setTimeout(() => {
-      api<{ title: string | null; defaultTitle: string }>("GET", `/admin/link-title?url=${encodeURIComponent(parsed.toString())}`)
+      api<{ title: string | null; date?: string | null; defaultTitle: string }>("GET", `/admin/link-title?url=${encodeURIComponent(parsed.toString())}`)
         .then((r) => {
           if (!alive) return;
           const name = r.title ?? r.defaultTitle;
@@ -76,6 +77,14 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
             lastAuto.current = name;
             return name;
           });
+          // 教材日期直接讀連結的發布日期並顯示在日期欄位（業主 2026-11-18）；日期欄是空的或還是上次自動填的才會換，自己改過的不蓋掉。
+          if (r.date) {
+            setEvDate((cur) => {
+              if (cur && cur !== lastAutoDate.current) return cur;
+              lastAutoDate.current = r.date!;
+              return r.date!;
+            });
+          }
           setFetching(r.title ? "done" : "none");
         })
         .catch(() => alive && setFetching("none"));
@@ -177,7 +186,7 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
           </AppText>
         ) : null}
       </View>
-      <DateSelect label="日期（選填，這個項目自己的日期）" value={evDate} onChange={setEvDate} />
+      <DateSelect label="日期（選填；貼上連結會自動帶入連結的日期，可自行修改）" value={evDate} onChange={setEvDate} />
       {ytId ? (
         <TimeRangeFields
           draft={{ kind: "youtube", ref: ytId, start: trim.start, end: trim.end, audio: null, toEnd: toEnd }}

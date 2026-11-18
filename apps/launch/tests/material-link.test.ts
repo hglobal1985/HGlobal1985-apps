@@ -95,3 +95,14 @@ test("章節分享文字：姓名、職稱、章節名稱取章節自己的設�
   const custom = { ...S, chapterText: "《{章節名稱}》出自「{課程名稱}」，講者 {主講人}{職稱}" };
   assert.equal(shareMessage(custom, "u", course, undefined, { sharer: "李華", sharerTitle: "經理", title: "T" }).split("\n")[0], "《T》出自「翡翠班」，講者 李華 經理");
 });
+
+test("連結日期：讀 datePublished／uploadDate／article:published_time，不合理的日期不採用", async () => {
+  const { extractDate, fetchLinkInfo } = await import("../src/link-title.ts");
+  assert.equal(extractDate('<meta itemprop="datePublished" content="2026-10-21T10:00:00-07:00">'), "2026-10-21");
+  assert.equal(extractDate('<meta property="article:published_time" content="2025-03-02T08:00:00+08:00"/>'), "2025-03-02");
+  assert.equal(extractDate('<script type="application/ld+json">{"datePublished":"2024-12-31T00:00:00Z"}</script>'), "2024-12-31");
+  assert.equal(extractDate('<meta itemprop="datePublished" content="2999-01-01">'), null);
+  assert.equal(extractDate("<html></html>"), null);
+  const f = (async () => new Response('<head><title>文章</title><meta property="article:published_time" content="2026-01-05T00:00:00Z"></head>', { headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
+  assert.deepEqual(await fetchLinkInfo(new URL("https://example.com/a"), f), { title: "文章", date: "2026-01-05" });
+});

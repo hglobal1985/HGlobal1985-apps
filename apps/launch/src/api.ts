@@ -58,7 +58,7 @@ import { ensureCentersReconciled } from "./center-reconcile.ts";
 import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
-import { fetchLinkTitle } from "./link-title.ts";
+import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
@@ -3698,7 +3698,8 @@ const routes: [string, RegExp, Handler][] = [
       const u = parseHttpsUrl(ctx.url.searchParams.get("url"));
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const type = classifyLink(u);
-      return { type, title: await fetchLinkTitle(u), defaultTitle: LINK_DEFAULT_TITLE[type] };
+      const info = await fetchLinkInfo(u);
+      return { type, title: info.title, date: info.date, defaultTitle: LINK_DEFAULT_TITLE[type] };
     },
   ],
   [

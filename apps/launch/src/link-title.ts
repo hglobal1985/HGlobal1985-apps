@@ -33,6 +33,32 @@ export function extractTitle(html: string): string | null {
   return clean || null;
 }
 
+/**
+ * 從網頁原始碼取「發布日期」（業主 2026-11-18：教材日期自動讀連結的日期）：依序找 datePublished／uploadDate／article:published_time 等標記；
+ * 回傳 YYYY-MM-DD，找不到或不合理（未來或太舊）回 null。
+ */
+export function extractDate(html: string): string | null {
+  const pats = [
+    /itemprop=["']datePublished["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*itemprop=["']datePublished["']/i,
+    /itemprop=["']uploadDate["'][^>]*content=["']([^"']+)["']/i,
+    /(?:property|name)=["']article:published_time["'][^>]*content=["']([^"']+)["']/i,
+    /content=["']([^"']+)["'][^>]*(?:property|name)=["']article:published_time["']/i,
+    /(?:property|name)=["'](?:og:)?(?:pubdate|publish_date|date)["'][^>]*content=["']([^"']+)["']/i,
+    /"datePublished"\s*:\s*"([^"]+)"/,
+    /"uploadDate"\s*:\s*"([^"]+)"/,
+    /"publishDate"\s*:\s*"([^"]+)"/,
+  ];
+  for (const re of pats) {
+    const m = re.exec(html)?.[1]?.trim().slice(0, 10);
+    if (m && /^\d{4}-\d{2}-\d{2}$/.test(m)) {
+      const t = Date.parse(`${m}T00:00:00Z`);
+      if (Number.isFinite(t) && t <= Date.now() + 86400_000 && t >= Date.parse("2000-01-01T00:00:00Z")) return m;
+    }
+  }
+  return null;
+}
+
 /** 標題只是「請登入」之類（網頁需要登入才看得到內容）：不能當教材名稱。 */
 const LOGIN_TITLE = /^(sign in|log in|login|登入|登錄|google (docs|drive|sheets|slides|forms)|notion|canva)(\s*[-–|:：].*)?$/i;
 export const cleanFetchedTitle = (t: string | null): string | null => {
@@ -58,36 +84,49 @@ async function readLimited(res: Response): Promise<string> {
   return out;
 }
 
-/** 抓連結的名稱；抓不到回 null（呼叫端改用類型的預設名稱）。fetcher 可注入（測試用）。 */
-export async function fetchLinkTitle(input: URL, fetcher: typeof fetch = fetch): Promise<string | null> {
+export type LinkInfo = { title: string | null; date: string | null };
+
+/** 抓連結的名稱與發布日期；抓不到的欄位回 null。fetcher 可注入（測試用）。 */
+export async function fetchLinkInfo(input: URL, fetcher: typeof fetch = fetch): Promise<LinkInfo> {
   let u = input;
-  if (!isPublicHost(u)) return null;
+  const none: LinkInfo = { title: null, date: null };
+  if (!isPublicHost(u)) return none;
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+  const headers = { accept: "text/html,application/xhtml+xml", "user-agent": "Mozilla/5.0 (compatible; HglobalLearnBot/1.0)", "accept-language": "zh-TW,zh;q=0.9,en;q=0.8" };
   try {
     if (classifyLink(u) === "youtube") {
-      const r = await fetcher(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u.toString())}`, { signal: ctl.signal, headers: { accept: "application/json" } });
-      if (r.ok) return cleanFetchedTitle(((await r.json()) as { title?: string }).title ?? null);
+      // 標題走官方 oEmbed；發布日期要讀影片頁（兩個同時送）。
+      const [o, pageRes] = await Promise.all([
+        fetcher(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u.toString())}`, { signal: ctl.signal, headers: { accept: "application/json" } }).catch(() => null),
+        fetcher(u.toString(), { signal: ctl.signal, headers }).catch(() => null),
+      ]);
+      const title = o?.ok ? cleanFetchedTitle(((await o.json()) as { title?: string }).title ?? null) : null;
+      const date = pageRes?.ok ? extractDate(await readLimited(pageRes)) : null;
+      if (title || date) return { title, date };
     }
     for (let hop = 0; hop <= MAX_HOPS; hop++) {
-      const res = await fetcher(u.toString(), { redirect: "manual", signal: ctl.signal, headers: { accept: "text/html,application/xhtml+xml", "user-agent": "Mozilla/5.0 (compatible; HglobalLearnBot/1.0)", "accept-language": "zh-TW,zh;q=0.9,en;q=0.8" } });
+      const res = await fetcher(u.toString(), { redirect: "manual", signal: ctl.signal, headers });
       if (res.status >= 300 && res.status < 400) {
         const loc = res.headers.get("location");
         const next = loc ? parseHttpsUrl(new URL(loc, u).toString()) : null;
-        if (!next || !isPublicHost(next)) return null;
+        if (!next || !isPublicHost(next)) return none;
         u = next;
         continue;
       }
-      if (!res.ok || !/text\/html|application\/xhtml/i.test(res.headers.get("content-type") ?? "")) return null;
-      return cleanFetchedTitle(extractTitle(await readLimited(res)));
+      if (!res.ok || !/text\/html|application\/xhtml/i.test(res.headers.get("content-type") ?? "")) return none;
+      const html = await readLimited(res);
+      return { title: cleanFetchedTitle(extractTitle(html)), date: extractDate(html) };
     }
-    return null;
+    return none;
   } catch {
-    return null;
+    return none;
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** 抓不到名稱時的預設名稱（依連結類型）。 */
-export const defaultLinkTitle = (u: URL) => LINK_DEFAULT_TITLE[classifyLink(u)];
+/** 抓連結的名稱；抓不到回 null（呼叫端改用類型的預設名稱）。 */
+export async function fetchLinkTitle(input: URL, fetcher: typeof fetch = fetch): Promise<string | null> {
+  return (await fetchLinkInfo(input, fetcher)).title;
+}
