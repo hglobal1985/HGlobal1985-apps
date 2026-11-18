@@ -1,3 +1,4 @@
+import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
@@ -94,11 +95,13 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
         titleLines={course.isList ? 2 : undefined}
         dateChip={course.isList && lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined}
         subtitle={course.isList ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
-        right={link?.linkUrl ? <MaterialShare course={course} lesson={link} /> : course.isList && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
+        right={link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : course.isList && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
         onPress={
           link
             ? link.linkUrl
-              ? () => (trackFeature("open_material"), void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結")))
+              ? isDownloadUrl(link.linkUrl)
+                ? () => (trackFeature("open_material"), void downloadMaterial(link.linkUrl!))
+                : () => (trackFeature("open_material"), void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結")))
               : undefined
             : lesson.locked
               ? undefined

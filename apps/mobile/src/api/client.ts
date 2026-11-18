@@ -103,6 +103,33 @@ export class RequestError extends Error {
   }
 }
 
+/** 上傳檔案並回報進度 0～100（網頁版用 XMLHttpRequest，fetch 拿不到上傳進度）。 */
+export async function apiUpload<T>(method: "POST" | "PUT", path: string, body: Blob, onProgress: (pct: number) => void, retried = false): Promise<T> {
+  await (tokenInit ??= loadToken());
+  const central = token ? null : await centralToken();
+  const bearer = token ?? central;
+  const done = await new Promise<{ status: number; text: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, `${API_BASE}/api/v2${path}`);
+    xhr.setRequestHeader("x-client-platform", "web");
+    xhr.setRequestHeader("content-type", "application/octet-stream");
+    if (bearer) xhr.setRequestHeader("authorization", `Bearer ${bearer}`);
+    xhr.upload.onprogress = (e) => e.lengthComputable && e.total > 0 && onProgress(Math.min(100, Math.round((e.loaded / e.total) * 100)));
+    xhr.onerror = () => reject(new RequestError(0, "network", "網路連線不穩定，請稍後再試"));
+    xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });
+    xhr.send(body);
+  });
+  if (done.status === 401 && central && !retried && (await refreshCentral())) return apiUpload<T>(method, path, body, onProgress, true);
+  let data: (T & ApiError) | null = null;
+  try {
+    data = JSON.parse(done.text) as T & ApiError;
+  } catch {
+    data = null;
+  }
+  if (done.status < 200 || done.status >= 300) throw new RequestError(done.status, data?.error?.code ?? "http_error", data?.error?.message ?? "系統忙碌，請稍後再試");
+  return data as T;
+}
+
 export async function api<T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: unknown, retried = false): Promise<T> {
   const raw = typeof Blob !== "undefined" && body instanceof Blob;
   const headers: Record<string, string> = { "x-client-platform": Platform.OS === "ios" || Platform.OS === "android" ? Platform.OS : "web" };

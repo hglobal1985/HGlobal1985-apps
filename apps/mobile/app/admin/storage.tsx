@@ -10,7 +10,8 @@ import { radius, space } from "@/theme/tokens";
 import { AppText, Card, EmptyState, ErrorView, LoadingView, Screen, Section } from "@/ui";
 
 type Kind = "image" | "doc" | "audio" | "other";
-type Storage = { totalBytes: number; objectCount: number; byType: Record<Kind, number>; byCenter: ({ center: string; total: number } & Record<Kind, number>)[] };
+type FileSettings = { importMaxMb: number; ticketSec: number; dailyDownloads: number; dailyDownloadMb: number };
+type Storage = { totalBytes: number; objectCount: number; byType: Record<Kind, number>; byCenter: ({ center: string; total: number } & Record<Kind, number>)[]; fileSettings: FileSettings };
 const KINDS: { key: Kind; label: string; color: string }[] = [
   { key: "image", label: "圖片（封面、EDM、照片）", color: "#2E7D5B" },
   { key: "doc", label: "文件檔案（PDF、簡報…）", color: "#E0A91A" },
@@ -84,14 +85,34 @@ export default function StorageScreen() {
     }
   };
   const { member } = useSession();
+  const [fs, setFs] = useState<FileSettings | null>(null);
+  const [fsSaving, setFsSaving] = useState(false);
+  const [fsMsg, setFsMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const isSuper = !!member?.titles.includes("超級管理員");
   const { data, error, loading, reload } = useApi<Storage>(isSuper ? "/admin/storage" : null);
+  useEffect(() => {
+    if (data) setFs(data.fileSettings);
+  }, [data]);
+  const saveFs = async () => {
+    if (!fs) return;
+    setFsSaving(true);
+    setFsMsg(null);
+    try {
+      await api("PUT", "/admin/files/settings", fs);
+      setFsMsg({ tone: "success", text: "已儲存。" });
+      reload();
+    } catch (e) {
+      setFsMsg({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setFsSaving(false);
+    }
+  };
   if (!isSuper) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以查看" /></Screen>;
   return (
     <Screen header={false}>
       <Section title="上傳設定">
         <Card>
-          <Stepper label="單檔大小上限" hint="超過就不能上傳，並提示改貼雲端連結（最多 95MB）" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
+          <Stepper label="手機／電腦上傳的單檔上限" hint="從這支裝置選檔案上傳時，超過就不能上傳，並提示改貼雲端連結（最多 95MB）" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             ① 中心封面照片（中心首頁圖）
           </AppText>
@@ -104,6 +125,22 @@ export default function StorageScreen() {
           <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 88）" value={lim.imageQuality} min={50} max={100} step={2} unit="%" onChange={(v) => setLim((x) => ({ ...x, imageQuality: v }))} />
           {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
           <Button label="儲存上傳設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={saveLim} fullWidth />
+        </Card>
+      </Section>
+      <Section title="教材檔案：從 Google 雲端硬碟匯入與下載">
+        <Card>
+          {fs ? (
+            <>
+              <Stepper label="雲端硬碟匯入的單檔上限" hint="管理員從自己的 Google 雲端硬碟匯入教材時，單檔最大多少（最多 1GB）" value={fs.importMaxMb} min={1} max={1024} step={50} unit="MB" onChange={(v) => setFs({ ...fs, importMaxMb: v })} />
+              <Stepper label="下載連結有效時間" hint="學員按下載後，連結幾秒內有效（只能用一次，轉傳給別人無效）" value={fs.ticketSec} min={30} max={600} step={30} unit="秒" onChange={(v) => setFs({ ...fs, ticketSec: v })} />
+              <Stepper label="每人每日下載次數" hint="24 小時內最多下載幾個檔案，防止被大量搜刮（0＝不限，管理員不受限）" value={fs.dailyDownloads} min={0} max={1000} step={10} unit="次" onChange={(v) => setFs({ ...fs, dailyDownloads: v })} />
+              <Stepper label="每人每日下載流量" hint="24 小時內最多下載多少（0＝不限）" value={Math.round(fs.dailyDownloadMb / 1024)} min={0} max={1000} step={1} unit="GB" onChange={(v) => setFs({ ...fs, dailyDownloadMb: v * 1024 })} />
+              {fsMsg ? <NoticeBox tone={fsMsg.tone} text={fsMsg.text} /> : null}
+              <Button label="儲存教材檔案設定" icon="save-outline" loading={fsSaving} disabled={fsSaving || JSON.stringify(fs) === JSON.stringify(data?.fileSettings)} onPress={saveFs} fullWidth />
+            </>
+          ) : (
+            <LoadingView />
+          )}
         </Card>
       </Section>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}

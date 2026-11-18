@@ -1,3 +1,4 @@
+import { revokeLegacyDriveLink } from "./material-files.ts";
 import { ensureBrandCards } from "./brand-cards.ts";
 import { backfillYoutube } from "./youtube.ts";
 import { processImportJobs } from "./imports.ts";
@@ -36,6 +37,7 @@ export function createWorker(staticFiles: StaticFiles) {
     /** 排程（每 10 分鐘）：開課前一天提醒（台灣時間 20:00 後）、補推還沒推播的通知。 */
     async scheduled(_event: unknown, env: Env, exec?: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
       const job = (async () => {
+        await revokeLegacyDriveLink(env.DB).catch((e) => console.error("legacy drive cleanup", e instanceof Error ? e.message : "error")); // 舊的「業主雲端硬碟上傳」授權：撤銷並刪除（業主 2026-11-18 取消該功能）
         await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));
         await processImportJobs(env).catch((e) => console.error("import jobs", e instanceof Error ? e.message : "error"));
         await ensureBrandCards(env).catch((e) => console.error("brand cards", e instanceof Error ? e.message : "error"));
