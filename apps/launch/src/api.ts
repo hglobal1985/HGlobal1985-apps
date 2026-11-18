@@ -97,7 +97,7 @@ const fail = (status: number, code: string, message: string): never => {
 /** demo：模擬會員（rankCode 為示範獎銜）；central：中央會員（不持有獎銜，資格每次向中央查詢）。 */
 type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
-type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 品牌 logo（組課程封面用，列表／詳情載入）。 */ brands?: BrandRow[]; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
+type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 品牌 logo（組課程封面用，列表／詳情載入）。 */ brands?: BrandRow[]; /** 清單的區塊（顯示在上拉選單的）：courseId → 區塊。 */ blocks?: Map<string, SheetBlock[]>; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
 
 type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; categories: string; art_version: number };
 const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
@@ -106,6 +106,41 @@ function brandFor(ctx: Ctx, row: { brand_id?: string | null; edm_key?: string | 
   if (!row.brand_id || row.edm_key || row.cover_key) return null;
   const b = ctx.brands?.find((x) => x.id === row.brand_id);
   return b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
+}
+/** 清單的區塊（只列勾了「顯示在上拉選單」的）：上拉選單用；count＝底下有內容的素材數。 */
+type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null };
+async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
+  const { results } = await db
+    .prepare("SELECT l.id, l.course_id, l.kind, l.title, l.cover_key, l.art_version, l.brand_id, l.categories, l.in_sheet, (l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id) AS has FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.is_list = 1 AND l.is_full = 0 ORDER BY l.course_id, l.position")
+    .all<{ id: string; course_id: string; kind: string; title: string; cover_key: string | null; art_version: number; brand_id: string | null; categories: string; in_sheet: number; has: number }>();
+  const brands = await loadBrands(db);
+  const map = new Map<string, SheetBlock[]>();
+  let cur: SheetBlock | null = null;
+  let curCourse = "";
+  let curShown = false;
+  for (const r of results) {
+    if (r.course_id !== curCourse) {
+      curCourse = r.course_id;
+      cur = null;
+    }
+    if (r.kind === "section") {
+      curShown = r.in_sheet === 1;
+      cur = null;
+      if (curShown) {
+        const b = r.brand_id ? brands.find((x) => x.id === r.brand_id) : undefined;
+        const brand: BrandCover | null = !r.cover_key && b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
+        cur = { id: r.id, title: r.title, coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null, brand, count: 0, categories: r.categories, brandId: r.brand_id };
+        const list = map.get(r.course_id) ?? [];
+        list.push(cur);
+        map.set(r.course_id, list);
+      }
+    } else if (cur && r.has) cur.count++;
+  }
+  return map;
+}
+/** 區塊的品牌封面：選了品牌、而且區塊沒有自己上傳的封面才用品牌 logo。 */
+function brandForBlock(ctx: Ctx, brandId: string | null, coverKey: string | null): BrandCover | null {
+  return brandFor(ctx, { brand_id: brandId, cover_key: coverKey });
 }
 const brandUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 
@@ -541,6 +576,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     brandId: row.brand_id,
     brandName: ctx.brands?.find((x) => x.id === row.brand_id)?.name ?? null,
     brand: brandFor(ctx, row),
+    blocks: row.is_list === 1 ? (ctx.blocks?.get(row.id) ?? []) : [],
     series: row.series,
     seriesEdmUrl: row.series_edm_key ? pubUrl(row.series_edm_key, row.series_art_version ?? 1) : null,
     seriesCoverUrl: row.series_cover_key ? pubUrl(row.series_cover_key, row.series_art_version ?? 1) : null,
@@ -634,7 +670,7 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
   const eligibility = await eligibilityFor(s, rankMap, [...visible.map((r) => r.min_rank_code), DIAMOND]);
   ctx.centerSlugs = centerSlugs;
   ctx.seriesSlugs = seriesSlugs;
-  ctx.brands = await loadBrands(ctx.db);
+  [ctx.brands, ctx.blocks] = await Promise.all([loadBrands(ctx.db), loadBlocks(ctx.db)]);
   const out = visible.map((r) => summarize(r, ctx, rankMap, state, eligibility));
   if (!rights || !s) return out;
   const r = rights;
@@ -840,9 +876,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
     ctx.db
-      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary FROM lessons WHERE course_id = ? ORDER BY position")
+      .prepare("SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet FROM lessons WHERE course_id = ? ORDER BY position")
       .bind(id)
-      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string; is_full: number; is_speaker: number; is_summary: number }>(),
+      .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string; is_full: number; is_speaker: number; is_summary: number; brand_id: string | null; categories: string; in_sheet: number }>(),
     s ? ctx.db.prepare("SELECT lesson_id FROM lesson_progress WHERE member_sub = ? AND course_id = ?").bind(s.sub, id).all<{ lesson_id: string }>() : Promise.resolve({ results: [] as { lesson_id: string }[] }),
   ]);
   // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
@@ -862,7 +898,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   }
   ctx.centerSlugs = await centerSlugMap(ctx.db);
   ctx.seriesSlugs = await seriesSlugMap(ctx.db);
-  ctx.brands = await loadBrands(ctx.db);
+  [ctx.brands, ctx.blocks] = await Promise.all([loadBrands(ctx.db), loadBlocks(ctx.db)]);
   const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
   const watchFree = summaryNow.watchFree;
   const admin = manages;
@@ -878,7 +914,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       // 顯示用序號：章節與教材各自從 1 開始編號（資料庫裡的 position 是整門課共用、不重複的排序）。
       position: groupPos.get(l.id)!,
       material: l.kind === "material" || l.kind === "section",
-      ...(l.kind === "section" ? { section: true } : {}),
+      ...(l.kind === "section"
+        ? { section: true, inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key) }
+        : {}),
       ...(l.is_full === 1 ? { full: true } : {}),
       title: l.title,
       minutes: l.duration_minutes,
@@ -2364,8 +2402,16 @@ const seconds = (v: unknown): number | null | undefined => {
 };
 
 /** 修改章節：名稱、影片來源（示範／YouTube／Mux）、時間軸區間。音檔由上傳流程設定。 */
+/** 區塊的品牌（單選）與分類（可複選）。 */
+async function blockBrand(ctx: Ctx, v: unknown): Promise<string | null> {
+  const id = typeof v === "string" ? v.trim() : "";
+  if (!id) return null;
+  if (!(await ctx.db.prepare("SELECT 1 AS ok FROM brand_logos WHERE id = ?").bind(id).first())) fail(400, "invalid_brand", "找不到這個品牌");
+  return id;
+}
+const blockCats = (v: unknown): string => (Array.isArray(v) ? joinCats(splitCats(v.filter((x): x is string => typeof x === "string").join(CAT_SEP))) : typeof v === "string" ? joinCats(splitCats(v)) : "").slice(0, 120);
 async function updateLesson(ctx: Ctx, id: string, admin: Session) {
-  const body = await readJson<{ isSpeaker?: unknown; isSummary?: unknown; eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; autoCover?: unknown }>(ctx.req);
+  const body = await readJson<{ isSpeaker?: unknown; isSummary?: unknown; eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; autoCover?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
   if (body.mediaType === "mux" && !admin.roles.includes("super_admin")) fail(403, "forbidden", "Mux 影片只有超級管理員可以設定，請改用 YouTube 或音檔");
   const cur = await ctx.db
     .prepare("SELECT course_id, kind, is_speaker, is_summary, media_type, media_ref, start_seconds, end_seconds FROM lessons WHERE id = ?")
@@ -2396,6 +2442,11 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
   if (title !== undefined) {
     if (!title) fail(400, "title_required", "請輸入章節名稱");
     sets.push(["title", title]);
+  }
+  if (cur.kind === "section") {
+    if (body.inSheet !== undefined) sets.push(["in_sheet", body.inSheet === false ? 0 : 1]);
+    if (body.brandId !== undefined) sets.push(["brand_id", await blockBrand(ctx, body.brandId)]);
+    if (body.categories !== undefined) sets.push(["categories", blockCats(body.categories)]);
   }
   const sharer = text(body.sharer, 60);
   if (sharer !== undefined) sets.push(["sharer", sharer]);
@@ -4083,10 +4134,10 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       const part = ctx.url.searchParams.get("part");
       if (part !== "cover" && part !== "poster") return fail(400, "invalid_part", "封面類型不正確");
-      const lesson = await ctx.db.prepare("SELECT l.course_id, l.cover_key, l.poster_key, c.chapter_covers FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ?").bind(id).first<{ course_id: string; cover_key: string | null; poster_key: string | null; chapter_covers: number }>();
+      const lesson = await ctx.db.prepare("SELECT l.course_id, l.cover_key, l.poster_key, c.chapter_covers, l.kind FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ?").bind(id).first<{ course_id: string; cover_key: string | null; poster_key: string | null; chapter_covers: number; kind: string }>();
       if (!lesson) return fail(404, "not_found", "找不到這個章節");
       await requireCourseArt(ctx, s, lesson.course_id);
-      if (lesson.chapter_covers !== 1) fail(409, "chapter_covers_off", "這門課程尚未勾選「章節各自設定封面」");
+      if (lesson.chapter_covers !== 1 && lesson.kind !== "section") fail(409, "chapter_covers_off", "這門課程尚未勾選「章節各自設定封面」");
       const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
       const data = new Uint8Array(await ctx.req.arrayBuffer());
       if (!data.byteLength || data.byteLength > 3 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 3MB 以內（上傳時會自動壓縮）");
@@ -5011,7 +5062,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/courses\/([\w-]+)\/lessons$/,
     async (ctx, [courseId]) => {
       const admin = await requireCourseManager(ctx, courseId);
-      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown }>(ctx.req);
+      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
       const isList = await isListCourse(ctx, courseId);
       if (body.kind === "section" && !isList) fail(400, "section_list_only", "只有素材可以新增分類標題");
       const kind = body.kind === "section" && isList ? "section" : body.kind === "material" ? "material" : "chapter";
@@ -5037,7 +5088,7 @@ const routes: [string, RegExp, Handler][] = [
         ...(speaker ? [ctx.db.prepare("UPDATE lessons SET is_speaker = 0 WHERE course_id = ?").bind(courseId)] : []),
         ...(summaryNew ? [ctx.db.prepare("UPDATE lessons SET is_summary = 0 WHERE course_id = ?").bind(courseId)] : []),
         ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker, is_summary) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?, ?)").bind(id, courseId, full ? full.position : course.maxpos + 1, title || "主講人", sharer, sharerRank, sharerTitle, eventDate, 0, kind, speaker ? 1 : 0, summaryNew ? 1 : 0),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker, is_summary, brand_id, categories, in_sheet) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, courseId, full ? full.position : course.maxpos + 1, title || "主講人", sharer, sharerRank, sharerTitle, eventDate, 0, kind, speaker ? 1 : 0, summaryNew ? 1 : 0, kind === "section" ? await blockBrand(ctx, body.brandId) : null, kind === "section" ? blockCats(body.categories) : "", kind === "section" && body.inSheet === false ? 0 : 1),
         ...(speaker ? [speakerSync(ctx.db, courseId)] : []),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);

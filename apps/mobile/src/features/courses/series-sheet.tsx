@@ -29,6 +29,59 @@ function StatusChip({ course }: { course: CourseSummary }) {
   );
 }
 
+/**
+ * 清單的區塊選單（業主 2026-11-18）：清單有勾「顯示在上拉選單」的區塊時，點寰宇大學的小卡彈出這個。
+ * 每列＝封面（手動上傳 > 品牌 logo > 預設圖）＋區塊名稱＋灰色「有N個素材」；點一列進清單頁、自動捲到該區塊並展開。
+ */
+export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
+  const { c } = useTheme();
+  const open = (block?: string) => {
+    onClose();
+    router.push(block ? { pathname: "/course/[id]", params: { id: course.id, block } } : `/course/${course.id}`);
+  };
+  return (
+    <BottomSheet onClose={onClose} onExpand={() => open()} expandLabel="繼續上拉進入清單">
+      <View style={styles.head}>
+        <View style={styles.matTag} accessibilityLabel="素材">
+          <Ionicons name="folder-open" size={14} color="#1D2A22" />
+          <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
+            素材
+          </AppText>
+        </View>
+        <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
+          {course.title}
+        </AppText>
+        <SheetAction label="完整清單" accessibilityLabel={`進入「${course.title}」完整清單`} onPress={() => open()} />
+      </View>
+      <SheetScroll>
+        {course.blocks.map((b) => (
+          <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`${b.title}，有${b.count}個素材`} onPress={() => open(b.id)} style={[styles.row, { borderTopColor: c.border }]}>
+            {b.coverUrl ? (
+              <Image source={{ uri: resolveUrl(b.coverUrl) }} style={styles.thumb} resizeMode="cover" />
+            ) : b.brand ? (
+              <View style={styles.thumb}>
+                <BrandCover brand={b.brand} fill />
+              </View>
+            ) : (
+              <Image source={require("../../../assets/icon.png")} style={styles.thumb} resizeMode="cover" />
+            )}
+            <AppText variant="body" style={{ flex: 1, fontWeight: "700" }} numberOfLines={2}>
+              {b.title}
+            </AppText>
+            <View style={[styles.chip, { backgroundColor: c.surfaceMuted, borderWidth: 1, borderColor: c.border }]}>
+              <AppText variant="caption" style={{ color: c.text, fontWeight: "700" }} numberOfLines={1}>
+                有{b.count}個素材
+              </AppText>
+            </View>
+            <AppText tone="muted">›</AppText>
+          </Pressable>
+        ))}
+      </SheetScroll>
+      <Button variant="secondary" label="關閉" onPress={onClose} fullWidth />
+    </BottomSheet>
+  );
+}
+
 /** 「還有 N 個梯次」：從下方彈出，列出同系列所有梯次（日期＋狀態），點一列進入那一場的課程頁。 */
 export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllSeries }: { title: string; items: CourseSummary[]; onClose: () => void; onPick?: (c: CourseSummary) => void; currentId?: string; showAllSeries?: string }) {
   const { c } = useTheme();

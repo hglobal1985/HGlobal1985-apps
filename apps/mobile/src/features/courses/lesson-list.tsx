@@ -1,5 +1,5 @@
 import { trackFeature } from "@/lib/feature-track";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import { Linking, Pressable, type ViewStyle } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
@@ -60,9 +60,15 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
  * 「其他教材」區塊的清單：外部連結教材（業主 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
  */
-export function FullVersionList({ course, playingId, onPlay }: { course: CourseDetail } & LessonPlayProps) {
+export function FullVersionList({ course, playingId, onPlay, openBlock }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string } & LessonPlayProps) {
   const { c } = useTheme();
-  const [folded, setFolded] = useState<Set<string>>(new Set());
+  // 清單的區塊預設全部收起（業主 2026-11-18）；只有從上拉選單指定的那個區塊展開。
+  const [folded, setFolded] = useState<Set<string>>(() => new Set(course.isList ? course.lessons.filter((l) => l.section && l.id !== openBlock).map((l) => l.id) : []));
+  useEffect(() => {
+    if (!openBlock || typeof document === "undefined") return;
+    const t = setTimeout(() => document.getElementById(`blk-${openBlock}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
+    return () => clearTimeout(t);
+  }, [openBlock]);
   const canEdit = !!course.can?.edit;
   const all = course.lessons.filter((l) => l.material);
   // 學員只看得到「有內容的項目」；分類標題底下沒有任何可看項目就整個隱藏（管理者全部都看得到）。
@@ -98,7 +104,7 @@ export function FullVersionList({ course, playingId, onPlay }: { course: CourseD
         if (lesson.section) {
           const open = !folded.has(lesson.id);
           return (
-            <Pressable key={lesson.id} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${lesson.title}，${open ? "點一下收合" : "點一下展開"}`} onPress={() => toggle(lesson.id)} style={({ pressed }) => [{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space.sm, paddingVertical: 8 }, pressed && { opacity: 0.7 }]}>
+            <Pressable key={lesson.id} nativeID={`blk-${lesson.id}`} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${lesson.title}，${open ? "點一下收合" : "點一下展開"}`} onPress={() => toggle(lesson.id)} style={({ pressed }) => [{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space.sm, paddingVertical: 8, scrollMarginTop: 72 } as ViewStyle, pressed && { opacity: 0.7 }]}>
               <Icon name={open ? "chevron-down" : "chevron-forward"} size={18} color={c.accentText} />
               <AppText variant="callout" style={{ flex: 1, fontWeight: "800", color: c.accentText }}>
                 {lesson.title}

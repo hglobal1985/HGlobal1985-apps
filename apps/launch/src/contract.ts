@@ -113,6 +113,8 @@ export type CourseSummary = {
   brandName: string | null;
   /** 選了品牌、且沒有手動上傳封面時才有：logo 圖、底色、底圖。 */
   brand: BrandCover | null;
+  /** 清單類別：勾了「顯示在上拉選單」的區塊（業主 2026-11-18）；課程類別永遠是空陣列。 */
+  blocks: { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null }[];
   /** 素材系列內的手動順序（0＝還沒排過）。 */
   seriesOrder: number;
   /** 素材（教材）數量：有影音來源或外部連結的項目數（素材清單的上拉選單標籤用）。 */
@@ -230,6 +232,12 @@ export type Lesson = {
   material?: boolean;
   /** 素材的「分類區域標題」（沒有內容，只是一個可收合的標題；業主 2026-11-17）。 */
   section?: boolean;
+  /** 區塊（section）專用（業主 2026-11-18）：顯示在上一層上拉選單、分類（「、」分隔，可複選）、品牌（單選）、沒上傳封面時的品牌 logo 封面。 */
+  inSheet?: boolean;
+  categories?: string;
+  brandId?: string | null;
+  brandName?: string | null;
+  brand?: BrandCover | null;
   /** 章節自己的封面：橫式 16:9（清單縮圖）與直式；沒設定為 null（改用課程封面）。 */
   coverUrl?: string | null;
   posterUrl?: string | null;

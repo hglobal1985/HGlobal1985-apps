@@ -8,12 +8,12 @@ import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { SuggestField, SuggestList, useSuggestions } from "@/features/admin/suggest-input";
 import { commitMediaDraft, emptyMediaDraft, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
 import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
-import { useSession } from "@/state/session";
+import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
-import { AppText, Button, Card, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
-import { Check } from "./course-sections";
+import { AppText, Button, Card, Chips, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
+import { Check, MultiChips } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 import { EditMaterialSheet } from "./material-sheet";
 
@@ -58,22 +58,30 @@ export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail;
 }
 
 /**
- * 素材的「分類區域標題」新增與改名（業主 2026-11-17）：只有一個名稱欄位；標題底下的素材項目點標題可以收合。
- * 沒傳 lesson＝新增（加在最後面，之後可用上下移動調整位置）。
+ * 清單的「區塊」新增與編輯（業主 2026-11-18，由原本的「分類標題」升級）：區塊名稱、「顯示在上拉選單」勾選（預設勾選）；
+ * 勾選後出現封面（上傳；沒上傳就用品牌 logo）、品牌（單選）、分類（可複選）。區塊底下（到下一個區塊之前）的教材屬於這個區塊，學員點區塊標題可收合。
+ * 沒傳 lesson＝新增（加在最後面，之後可用上下移動調整位置）；封面要區塊建立後才能上傳。
  */
 export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
+  const brands = useApi<{ id: string; name: string }[]>("/brands");
+  const categories = useApi<string[]>("/admin/categories");
   const [title, setTitle] = useState(lesson?.title ?? "");
+  const [inSheet, setInSheet] = useState(lesson ? lesson.inSheet !== false : true);
+  const [brandId, setBrandId] = useState(lesson?.brandId ?? "");
+  const [cats, setCats] = useState(lesson?.categories ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dirty = !lesson || title.trim() !== lesson.title || inSheet !== (lesson.inSheet !== false) || brandId !== (lesson.brandId ?? "") || cats !== (lesson.categories ?? "");
   const submit = async () => {
-    if (!title.trim()) return setError("請輸入分類標題");
+    if (!title.trim()) return setError("請輸入區塊名稱");
     setBusy(true);
     setError(null);
     try {
-      if (lesson) await api("PATCH", `/admin/lessons/${lesson.id}`, { title: title.trim() });
-      else await api("POST", `/admin/courses/${course.id}/lessons`, { kind: "section", title: title.trim() });
+      const body = { title: title.trim(), inSheet, brandId: inSheet ? brandId : "", categories: inSheet ? cats : "" };
+      if (lesson) await api("PATCH", `/admin/lessons/${lesson.id}`, body);
+      else await api("POST", `/admin/courses/${course.id}/lessons`, { kind: "section", ...body });
       invalidate();
       onClose();
     } catch (e) {
@@ -83,15 +91,97 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
     }
   };
   return (
-    <EditSheet title={lesson ? "修改分類標題" : "新增分類標題"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={title.trim() !== (lesson?.title ?? "")} busy={busy} error={error}>
+    <EditSheet title={lesson ? "編輯區塊" : "新增區塊"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
       <AppText variant="callout" tone="muted">
-        分類標題
+        區塊名稱
       </AppText>
-      <TextInput value={title} onChangeText={setTitle} placeholder="例如：簡報與文件、影片精華" placeholderTextColor={c.textMuted} accessibilityLabel="分類標題" maxLength={60} style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }, type.body]} />
+      <TextInput value={title} onChangeText={setTitle} placeholder="例如：紐崔萊、雅姿" placeholderTextColor={c.textMuted} accessibilityLabel="區塊名稱" maxLength={60} style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }, type.body]} />
+      <Check label="顯示在上拉選單（學員從寰宇大學點進來時，選單會列出這個區塊）" value={inSheet} onChange={setInSheet} />
+      {inSheet ? (
+        <>
+          {lesson ? (
+            <View style={{ gap: space.xs }}>
+              <AppText variant="callout" tone="muted">
+                區塊封面（沒上傳時，有選品牌就用品牌 logo）
+              </AppText>
+              <LessonArt lesson={lesson} onChanged={invalidate} />
+            </View>
+          ) : (
+            <AppText variant="caption" tone="muted">
+              區塊封面要等區塊建立後，再按區塊旁的鉛筆上傳；沒上傳時，有選品牌就用品牌 logo。
+            </AppText>
+          )}
+          {brands.data?.length ? <Chips label="品牌（單選）" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={brandId} onChange={setBrandId} /> : null}
+          <AppText variant="callout" tone="muted">
+            分類（可複選）
+          </AppText>
+          {categories.data?.length ? <MultiChips options={categories.data} value={cats} onChange={setCats} /> : <AppText tone="muted">目前沒有分類</AppText>}
+        </>
+      ) : null}
       <AppText variant="caption" tone="muted">
-        標題底下（到下一個標題之前）的素材項目屬於這個分類；學員點標題可以把整個分類收合。用上下移動可以調整標題與項目的位置。
+        區塊底下（到下一個區塊之前）的教材屬於這個區塊；學員點區塊標題可以收合，預設都是收起。用上下移動可以調整區塊的順序。
       </AppText>
     </EditSheet>
+  );
+}
+
+/**
+ * 清單編輯模式（業主 2026-11-18）：每個區塊一張卡（區塊標題列＋底下的教材＋「新增教材到這個區塊」），「新增區塊」獨立放在最下面。
+ * 區塊的上下移動＝整個區塊（連同底下的教材）一起移；教材的上下移動只在區塊內。
+ */
+export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, busy }: { items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
+  const { c } = useTheme();
+  const rows = items.filter((l) => !l.full);
+  // 切成區塊：每組 = [區塊標題, 底下的教材…]；最前面還沒歸區塊的教材自成一組（沒有標題）。
+  const groups: Lesson[][] = [];
+  for (const l of rows) {
+    if (l.section || !groups.length) groups.push([l]);
+    else groups[groups.length - 1]!.push(l);
+  }
+  const full = items.filter((l) => l.full);
+  return (
+    <View style={{ gap: space.md }}>
+      {groups.map((g, gi) => {
+        const head = g[0]!.section ? g[0]! : null;
+        const body = head ? g.slice(1) : g;
+        const realIdx = groups.filter((x) => x[0]!.section).indexOf(g); // 只算有標題的區塊，沒標題的那組不能移動
+        const blockCount = groups.filter((x) => x[0]!.section).length;
+        return (
+          <Card key={g[0]!.id} style={{ paddingVertical: 0, paddingHorizontal: 0, overflow: "hidden" }}>
+            {head ? (
+              <View style={[styles.lessonRow, { backgroundColor: c.accentSoft, borderBottomColor: c.border }]}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`編輯區塊 ${head.title}`} onPress={() => onEdit(head)} style={styles.lessonMain}>
+                  <AppText variant="body" numberOfLines={2} style={{ fontWeight: "800" }}>
+                    {`📂 ${head.title}`}
+                  </AppText>
+                  <AppText variant="caption" tone="muted" numberOfLines={1}>
+                    {[head.inSheet === false ? "不顯示在上拉選單" : "顯示在上拉選單", head.brandName ?? "", head.categories ?? ""].filter(Boolean).join(" · ")}
+                  </AppText>
+                </Pressable>
+                <IconButton icon="arrow-up" label="區塊上移" onPress={gi > 0 && realIdx > 0 ? () => onMoveBlock(groups, gi, gi - 1) : undefined} disabled={busy} />
+                <IconButton icon="arrow-down" label="區塊下移" onPress={realIdx < blockCount - 1 ? () => onMoveBlock(groups, gi, gi + 1) : undefined} disabled={busy} />
+                <IconButton icon="create-outline" label={`編輯區塊 ${head.title}`} onPress={() => onEdit(head)} disabled={busy} />
+                <IconButton icon="trash-outline" label={`刪除區塊 ${head.title}`} onPress={() => onDelete(head)} disabled={busy} danger />
+              </View>
+            ) : null}
+            {body.length ? (
+              <EditLessonRows group={body} word="教材" onEdit={onEdit} onMove={(i, j) => onMoveItem(body, i, j)} onCopy={onCopy} onDelete={onDelete} busy={busy} bare />
+            ) : (
+              <AppText variant="callout" tone="muted" style={{ padding: space.md }}>
+                這個區塊還沒有教材
+              </AppText>
+            )}
+            <View style={{ padding: space.sm }}>
+              <Button variant="secondary" label={head ? `新增教材到「${head.title}」` : "新增教材"} icon="add" onPress={() => onAddMaterial(head?.id)} fullWidth />
+            </View>
+          </Card>
+        );
+      })}
+      {!groups.length ? <Button variant="secondary" label="新增教材" icon="add" onPress={() => onAddMaterial()} fullWidth /> : null}
+      {full.length ? <EditLessonRows group={full} word="教材" onEdit={onEdit} onMove={() => undefined} onCopy={onCopy} onDelete={onDelete} busy={busy} /> : null}
+      {/* 區塊是獨立的區域：新增區塊不跟教材清單混在一起（業主 2026-11-18）。 */}
+      <Button variant="secondary" label="新增區塊" icon="folder-open-outline" onPress={onAddBlock} fullWidth />
+    </View>
   );
 }
 
@@ -315,12 +405,13 @@ function SpeakerApplied({ course }: { course: { title: string; teacher: string; 
 }
 
 /** 課程頁編輯模式的章節／教材清單（同一個元件，兩組共用）：每列＝名稱（點了編輯）＋小按鈕 ↑ ↓ 複製 編輯 刪除（32px，讓名稱有空間）。 */
-export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, busy }: { group: Lesson[]; word: string; onEdit: (l: Lesson) => void; onMove: (from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; busy: boolean }) {
+export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, busy, bare }: { /** 放在區塊卡片裡時不再自己畫外框。 */ bare?: boolean; group: Lesson[]; word: string; onEdit: (l: Lesson) => void; onMove: (from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; busy: boolean }) {
   const { c } = useTheme();
   // 「完整版課程影片」永遠在最後一列：不能上下移、不能複製；其他列的上下移只在它們之間進行。
   const movable = group.filter((l) => !l.full).length;
+  const Wrap = bare ? View : Card;
   return (
-    <Card style={{ paddingVertical: 0 }}>
+    <Wrap style={bare ? undefined : { paddingVertical: 0 }}>
       {group.map((lesson, i) => (
         <View key={lesson.id} style={[styles.lessonRow, { borderBottomColor: c.border }]}>
           <Pressable accessibilityRole="button" accessibilityLabel={`編輯${word} ${lesson.position}`} onPress={() => onEdit(lesson)} style={styles.lessonMain}>
@@ -342,7 +433,7 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
           <IconButton icon="trash-outline" label={`刪除${word} ${lesson.position}`} onPress={() => onDelete(lesson)} disabled={busy} danger />
         </View>
       ))}
-    </Card>
+    </Wrap>
   );
 }
 

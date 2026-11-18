@@ -19,7 +19,7 @@ import { SectionList, SectionSheet, type SectionKey } from "@/features/course-ed
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
 import { Check } from "@/features/course-edit/course-sections";
-import { EditLessonRows, LessonSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
+import { BlockEditList, EditLessonRows, LessonSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
 import { useLayout } from "@/theme/layout";
@@ -38,8 +38,8 @@ const isWeb = Platform.OS === "web";
  * 點章節＝原地播放（業主 2026-11-16）：上方的 EDM 換成播放器（同一個位置），章節清單不動；網址的 ?lesson=章節編號 記住播放哪一堂，舊的 /learn/… 網址會轉到這裡。
  */
 export default function CourseRoute() {
-  const params = useLocalSearchParams<{ id: string; edit?: string; lesson?: string }>();
-  return <CourseDetailScreen id={params.id} edit={params.edit} lesson={params.lesson} chapter={chapterFromParams(params)} />;
+  const params = useLocalSearchParams<{ id: string; edit?: string; lesson?: string; block?: string }>();
+  return <CourseDetailScreen id={params.id} edit={params.edit} lesson={params.lesson} block={params.block} chapter={chapterFromParams(params)} />;
 }
 
 /** 課程介紹頁本體（/course/編號 與課程專屬網址 /中心縮寫/英譯姓名-編號 共用）。 */
@@ -49,7 +49,7 @@ export function chapterFromParams(params: Record<string, unknown>): number | und
   return k ? Number(k) : undefined;
 }
 
-export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; edit?: string; lesson?: string; chapter?: number }) {
+export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: string; edit?: string; lesson?: string; chapter?: number; block?: string }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
   const lay = useLayout();
@@ -91,6 +91,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
     return () => clearTimeout(t);
   }, [shortPath, lesson, id]);
   const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | "newMaterial" | "newSection" | null>(null);
+  const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
   const detecting = useYoutubeLengthFix(course, editing && Platform.OS === "web");
@@ -226,11 +227,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
       if (pendingOps.current === 0) invalidate();
     });
   };
-  const moveLesson = async (group: Lesson[], from: number, to: number) => {
-    const movable = group.filter((l) => !l.full); // 「完整版課程影片」固定在最後，不參與排序
-    const next = [...movable];
-    const [x] = next.splice(from, 1);
-    next.splice(to, 0, x!);
+  /** 把一組項目依新順序放回它們原本佔的位置（畫面先改、背景存檔）。 */
+  const applyOrder = (group: Lesson[], next: Lesson[]) => {
     const ids = next.map((l) => l.id);
     const groupIds = new Set(group.map((l) => l.id));
     // 這一組在整份清單裡原本佔的位置，依新順序放回去。
@@ -239,6 +237,20 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
     const merged = [...all];
     slots.forEach((slot, k) => (merged[slot] = next[k]!));
     optimistic(renumber(merged), () => api("POST", `/admin/courses/${course!.id}/lessons/order?lite=1`, { ids }));
+  };
+  const moveLesson = async (group: Lesson[], from: number, to: number) => {
+    const movable = group.filter((l) => !l.full); // 「完整版課程影片」固定在最後，不參與排序
+    const next = [...movable];
+    const [x] = next.splice(from, 1);
+    next.splice(to, 0, x!);
+    applyOrder(group, next);
+  };
+  /** 清單的區塊整塊移動（區塊標題連同底下的教材一起）。 */
+  const moveBlock = (groups: Lesson[][], from: number, to: number) => {
+    const next = [...groups];
+    const [x] = next.splice(from, 1);
+    next.splice(to, 0, x!);
+    applyOrder(materials.filter((l) => !l.full), next.flat());
   };
   const duplicateLesson = async (l: Lesson) => {
     const all = course!.lessons;
@@ -386,10 +398,15 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
             )}
             {/* 素材清單（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
             <Section title={course.isList ? "" : "其他教材"}>
-              {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
-              {course.isList ? null : <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
-              <Button variant="secondary" label="新增教材" icon="add" onPress={() => setSheet("newMaterial")} fullWidth />
-              {course.isList ? <Button variant="secondary" label="新增分類標題" icon="folder-open-outline" onPress={() => setSheet("newSection")} fullWidth /> : null}
+              {course.isList ? (
+                <BlockEditList items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} busy={lessonBusy} />
+              ) : (
+                <>
+                  {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
+                  <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />
+                  <Button variant="secondary" label="新增教材" icon="add" onPress={() => (setMaterialBlock(undefined), setSheet("newMaterial"))} fullWidth />
+                </>
+              )}
             </Section>
           </>
         ) : null}
@@ -413,7 +430,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
         )}
         {!(editing && canEditContent) && course.lessons.some((l) => l.material) ? (
           <Section title={course.isList ? "" : "其他教材"}>
-            <FullVersionList course={course} playingId={editing ? null : playingId} onPlay={playLesson_} />
+            <FullVersionList course={course} openBlock={block} playingId={editing ? null : playingId} onPlay={playLesson_} />
           </Section>
         ) : null}
         {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}
@@ -425,7 +442,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter }: { id: string; 
           <EdmManager course={course} onChanged={invalidate} />
         </EditSheet>
       ) : sheet === "newLesson" || sheet === "newMaterial" || sheet === "newSection" ? (
-        sheet === "newMaterial" ? <NewMaterialSheet course={course} onClose={() => setSheet(null)} /> : sheet === "newSection" ? <SectionTitleSheet course={course} onClose={() => setSheet(null)} /> : <NewLessonSheet course={course} onClose={() => setSheet(null)} />
+        sheet === "newMaterial" ? <NewMaterialSheet course={course} afterBlock={materialBlock} onClose={() => setSheet(null)} /> : sheet === "newSection" ? <SectionTitleSheet course={course} onClose={() => setSheet(null)} /> : <NewLessonSheet course={course} onClose={() => setSheet(null)} />
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}

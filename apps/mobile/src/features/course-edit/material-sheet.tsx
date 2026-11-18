@@ -18,8 +18,8 @@ import { EditSheet } from "./edit-sheet";
  * ① 外部連結（旁邊有「貼上」鈕）② 教材名稱（貼上連結後自動抓取網頁標題填入，可自行修改）③ 檔案類型（依連結自動判斷，顯示官方 Logo）。
  * 不再有影音上傳、音檔、附件等舊功能。「完整版課程影片」那一列另有影音設定（FullVersionSheet），不受影響。
  */
-export function NewMaterialSheet({ course, onClose }: { course: CourseDetail; onClose: () => void }) {
-  return <LinkMaterialSheet course={course} onClose={onClose} />;
+export function NewMaterialSheet({ course, onClose, afterBlock }: { course: CourseDetail; onClose: () => void; /** 新增到某個區塊的最後面（區塊的編號）；沒傳＝加在整份清單最後。 */ afterBlock?: string }) {
+  return <LinkMaterialSheet course={course} onClose={onClose} afterBlock={afterBlock} />;
 }
 
 export function EditMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
@@ -39,7 +39,7 @@ function ytIdOfUrl(u: URL | null): string | null {
   return m ? m[1]! : null;
 }
 
-function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
+function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: CourseDetail; lesson?: Lesson; onClose: () => void; afterBlock?: string }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
   // 素材清單的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
@@ -118,6 +118,18 @@ function LinkMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
         const before = new Set(course.lessons.map((l) => l.id));
         const d = await api<CourseDetail>("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title, ...dateBody });
         lessonId = d.lessons.find((l) => !before.has(l.id))?.id;
+        // 指定區塊：把新教材移到該區塊的最後面（區塊底下＝到下一個區塊標題之前）。
+        if (afterBlock && lessonId) {
+          const all = d.lessons.filter((l) => l.material && !l.full);
+          const rest = all.filter((l) => l.id !== lessonId);
+          const at = rest.findIndex((l) => l.id === afterBlock);
+          if (at >= 0) {
+            let end = at + 1;
+            while (end < rest.length && !rest[end]!.section) end++;
+            const next = [...rest.slice(0, end), all.find((l) => l.id === lessonId)!, ...rest.slice(end)];
+            await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: next.map((l) => l.id) });
+          }
+        }
       }
       // 影片時間軸區間：連結換成別支影片時伺服器會清空區間，所以一律在儲存連結之後再寫入。
       if (ytId && lessonId && (secOf(trim.start) !== null || secOf(trim.end) !== null || lesson?.start != null || lesson?.end != null)) await api("PATCH", `/admin/lessons/${lessonId}`, { startSeconds: secOf(trim.start), endSeconds: secOf(trim.end) });

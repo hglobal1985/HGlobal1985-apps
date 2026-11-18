@@ -9,7 +9,7 @@ import { radius } from "@/theme/tokens";
 import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
-import { SeriesSheet } from "./series-sheet";
+import { BlockSheet, SeriesSheet } from "./series-sheet";
 import type { SeriesGroup } from "./sort";
 
 /** EDM 填滿方框、靠上對齊（先依寬度放大，不夠高再依高度放大）。 */
@@ -62,7 +62,9 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesCoverUrl || rep.seriesEdmUrl : rep.edmUrl;
   const ribbons = ribbonsFor(rep, member, config);
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
-  const open = () => (flat || group.sessions.length > 1 || inSeries ? setSheet(true) : router.push(`/course/${rep.id}`));
+  // 系列裡只有一份清單：有勾「顯示在上拉選單」的區塊就彈出區塊選單，沒有區塊就直接進清單頁（業主 2026-11-18）。
+  const soloList = !flat && group.sessions.length === 1 && rep.isList;
+  const open = () => (soloList && !rep.blocks.length ? router.push(`/course/${rep.id}`) : flat || group.sessions.length > 1 || inSeries ? setSheet(true) : router.push(`/course/${rep.id}`));
   return (
     <View style={{ width }}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? rep.series : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: edm ? "#fff" : c.surfaceMuted }]}>
@@ -77,7 +79,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
         ) : null}
       </Pressable>
       {sheet && flat ? <CourseLessonsSheet course={rep} onClose={() => setSheet(false)} /> : null}
-      {sheet && !flat ? <SeriesSheet title={inSeries ? rep.series : rep.title} items={group.sessions} showAllSeries={inSeries ? rep.series : undefined} onClose={() => setSheet(false)} /> : null}
+      {sheet && !flat && soloList && rep.blocks.length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : sheet && !flat ? <SeriesSheet title={inSeries ? rep.series : rep.title} items={group.sessions} showAllSeries={inSeries ? rep.series : undefined} onClose={() => setSheet(false)} /> : null}
     </View>
   );
 }
