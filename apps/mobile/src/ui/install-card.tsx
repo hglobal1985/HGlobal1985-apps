@@ -54,10 +54,16 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
   return (
     <>
       <View style={[styles.card, { backgroundColor: c.dangerSoft, borderColor: RED }]}>
-        <Ionicons name="phone-portrait-outline" size={28} color={RED} />
-        <AppText variant="callout" style={{ flex: 1, fontWeight: "800", color: RED }}>
-          {"安裝至手機主畫面\n變成app"}
-        </AppText>
+        <Ionicons name="phone-portrait-outline" size={24} color={RED} />
+        {/* 強制兩行、每行不換行：字級固定 15，窄手機也放得下 */}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <AppText numberOfLines={1} style={styles.title}>
+            安裝至手機主畫面
+          </AppText>
+          <AppText numberOfLines={1} style={styles.title}>
+            變成app
+          </AppText>
+        </View>
         <Pressable accessibilityRole="button" accessibilityLabel="安裝" onPress={go} style={styles.btn}>
           <AppText style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>安裝</AppText>
         </Pressable>
@@ -97,7 +103,8 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
 
 const styles = StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: 2, borderRadius: radius.md, paddingVertical: space.sm, paddingHorizontal: space.md, minHeight: minTouch },
-  btn: { minHeight: minTouch, paddingHorizontal: 18, borderRadius: 14, backgroundColor: RED, alignItems: "center", justifyContent: "center" },
+  title: { color: RED, fontWeight: "800", fontSize: 15, lineHeight: 22 },
+  btn: { minHeight: minTouch, paddingHorizontal: 14, borderRadius: 14, backgroundColor: RED, alignItems: "center", justifyContent: "center" },
   // 與首頁公告跑馬燈的 ✕ 同尺寸、同粗細、同位置（ticker.tsx）。
   x: { width: 44, height: 44, alignItems: "center", justifyContent: "center", marginRight: -space.sm },
 });
