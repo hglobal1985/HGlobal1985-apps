@@ -115,7 +115,7 @@ function brandFor(ctx: Ctx, row: { brand_id?: string | null; edm_key?: string | 
   return b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
 }
 /** 清單的區塊（只列勾了「顯示在上拉選單」的）：上拉選單用；count＝底下有內容的素材數。 */
-type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null };
+type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null; /** 連結區塊：內容在另一份清單（不算在這份清單自己的教材數裡）。 */ linked?: boolean };
 async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
   const { results } = await db
     .prepare("SELECT l.id, l.course_id, l.kind, l.title, l.cover_key, l.art_version, l.brand_id, l.categories, l.in_sheet, l.link_block_id, (l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id) AS has FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.is_list = 1 AND l.is_full = 0 ORDER BY l.course_id, l.position")
@@ -140,7 +140,7 @@ async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
       if (curShown) {
         const b = r.brand_id ? brands.find((x) => x.id === r.brand_id) : undefined;
         const brand: BrandCover | null = !r.cover_key && b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
-        cur = { id: r.id, title: r.title, coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null, brand, count: 0, categories: r.categories, brandId: r.brand_id };
+        cur = { id: r.id, title: r.title, coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null, brand, count: 0, categories: r.categories, brandId: r.brand_id, ...(r.link_block_id ? { linked: true } : {}) };
         if (r.link_block_id) links.push({ block: cur, src: r.link_block_id });
         const list = map.get(r.course_id) ?? [];
         list.push(cur);
@@ -621,7 +621,8 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     chapterCovers: row.chapter_covers === 1,
     lessonCount: row.lesson_count,
     hasMaterial: row.material_count > 0,
-    materialCount: row.material_count,
+    // 教材數：自己的教材，加上連結區塊（品牌資訊卡的「新品特惠培訓直播」）來源清單裡的教材。
+    materialCount: row.material_count + (row.is_list === 1 ? (ctx.blocks?.get(row.id) ?? []).reduce((n, b) => n + (b.linked ? b.count : 0), 0) : 0),
     totalMinutes: row.total_minutes,
     eligible: eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row),
     allowPresident: row.allow_president === 1,
