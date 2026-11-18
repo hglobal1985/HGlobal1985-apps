@@ -1,5 +1,5 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
+import Svg, { Circle, Rect } from "react-native-svg";
 import { Pressable, StyleSheet, View } from "react-native";
 import { installNative, isIos, useInstallState } from "@/lib/install-app";
 import { useTheme } from "@/theme/theme";
@@ -54,7 +54,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
   return (
     <>
       <View style={[styles.card, { backgroundColor: c.dangerSoft, borderColor: RED }]}>
-        <Ionicons name="phone-portrait-outline" size={24} color={RED} />
+        <PhoneAppIcon size={34} color={RED} />
         {/* 強制兩行、每行不換行：字級固定 15，窄手機也放得下 */}
         <View style={{ flex: 1, minWidth: 0 }}>
           <AppText numberOfLines={1} style={styles.title}>
@@ -98,6 +98,21 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
         </BottomSheet>
       ) : null}
     </>
+  );
+}
+
+/** 手機輪廓＋桌面上排好的 App 小點點（業主 2026-11-18）：示意「裝到手機主畫面」。 */
+function PhoneAppIcon({ size, color }: { size: number; color: string }) {
+  const dots = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => ({ x: 8.5 + c * 5, y: 8.5 + r * 5.5 })));
+  return (
+    <Svg width={size * 0.7} height={size} viewBox="0 0 24 34" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Rect x="1.5" y="1.5" width="21" height="31" rx="4.5" fill="none" stroke={color} strokeWidth="2.2" />
+      <Rect x="9" y="3.6" width="6" height="1.6" rx="0.8" fill={color} />
+      {dots.map((d, i) => (
+        <Circle key={i} cx={d.x + 1} cy={d.y + 2} r="1.7" fill={color} />
+      ))}
+      <Rect x="9.5" y="28.4" width="5" height="1.4" rx="0.7" fill={color} />
+    </Svg>
   );
 }
 
