@@ -24,7 +24,7 @@ function TopFillImage({ uri, w, h }: { uri: string; w: number; h: number }) {
   const iw = Math.max(w, h * r);
   const ih = iw / r;
   return (
-    <View style={{ width: w, height: h, overflow: "hidden", borderRadius: radius.md }}>
+    <View style={{ width: w, height: h, overflow: "hidden", borderRadius: radius.md, backgroundColor: "#fff" }}>
       <Image source={{ uri }} resizeMode="stretch" style={{ position: "absolute", top: 0, left: (w - iw) / 2, width: iw, height: ih }} accessibilityLabel="課程海報" />
     </View>
   );

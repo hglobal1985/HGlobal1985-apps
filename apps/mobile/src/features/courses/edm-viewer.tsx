@@ -99,7 +99,7 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
   const wheel = Platform.OS === "web" ? { onWheel: (e: { deltaY: number; preventDefault?: () => void }) => set(cur.current - e.deltaY) } : {};
 
   return (
-    <View style={StyleSheet.absoluteFill} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} {...pan.panHandlers} {...wheel} {...NO_PULL} accessibilityRole="imagebutton" accessibilityLabel="課程海報，點一下放大，上下拖曳查看">
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} {...pan.panHandlers} {...wheel} {...NO_PULL} accessibilityRole="imagebutton" accessibilityLabel="課程海報，點一下放大，上下拖曳查看">
       {imgH ? <Animated.Image source={{ uri }} resizeMode="stretch" style={{ width: box.w, height: imgH, transform: [{ translateY: ty }] }} accessibilityIgnoresInvertColors /> : null}
       {maxUp.current > 8 && !pressed ? (
         <View style={[styles.hint, { backgroundColor: "rgba(0,0,0,0.8)" }]} pointerEvents="none">
@@ -250,7 +250,7 @@ export function EdmLightbox({ uri, title, onClose }: { uri: string; title: strin
 const styles = StyleSheet.create({
   hint: { position: "absolute", bottom: 8, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
   backdrop: { flex: 1, alignItems: "center", justifyContent: "center", ...dimStyle },
-  frame: { overflow: "hidden", borderRadius: radius.md, backgroundColor: "#000" },
+  frame: { overflow: "hidden", borderRadius: radius.md, backgroundColor: "#fff" },
   topRight: { position: "absolute", top: 16, right: 16 },
   bottom: { position: "absolute", left: 16, right: 16, bottom: 16, flexDirection: "row", alignItems: "center", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },

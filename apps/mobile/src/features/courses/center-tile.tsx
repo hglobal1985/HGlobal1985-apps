@@ -14,7 +14,7 @@ export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edm
   const title = centerTitle(name);
   const height = Math.round((width * 10) / 16);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={[styles.card, { width, height }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={[styles.card, { width, height }, edmUrl ? { backgroundColor: "#fff" } : null]}>
       {edmUrl ? (
         <Image source={{ uri: resolveUrl(edmUrl) }} style={{ width, height }} resizeMode="cover" />
       ) : (

@@ -41,7 +41,7 @@ export function CenterHero({ art, scrollY, courses, lessons, views, title, subsc
   const at = (a: number, b: number) => scrollY.interpolate({ inputRange: [0, range], outputRange: [a, b], extrapolate: "clamp" });
   const url = art ? art.coverUrl ?? art.edmUrl : null;
   return (
-    <Animated.View style={[styles.box, heroW < winW ? { alignSelf: "center", width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
+    <Animated.View style={[styles.box, url ? { backgroundColor: "#fff" } : null, heroW < winW ? { alignSelf: "center", width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
       {url ? (
         <Image source={{ uri: resolveUrl(url) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
