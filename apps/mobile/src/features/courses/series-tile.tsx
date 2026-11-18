@@ -76,7 +76,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
         {!flat && rep.zone === "amway_brand" ? (
           <View style={styles.count} pointerEvents="none" accessibilityLabel={`${count}個教材`}>
             <Text style={styles.countText} {...({ dataSet: { noScale: "" } } as object)}>
-              {count} 個教材
+              {count}
             </Text>
           </View>
         ) : null}
@@ -96,7 +96,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
 const styles = StyleSheet.create({
   art: { borderRadius: radius.md, overflow: "hidden" },
   draft: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  count: { position: "absolute", right: 8, bottom: 8, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, backgroundColor: "rgba(232,232,230,0.96)" },
-  countText: { color: "#5A5A57", fontSize: 13, fontWeight: "700" },
+  count: { position: "absolute", right: 6, bottom: 6, minWidth: 22, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999, alignItems: "center", backgroundColor: "rgba(232,232,230,0.96)" },
+  countText: { color: "#5A5A57", fontSize: 12, fontWeight: "700" },
   draftText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });
