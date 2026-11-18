@@ -13,6 +13,7 @@ import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, DateSelect, Field, FormBlock, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
+import { BrandField, CategoryField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
 
 /** 編輯面板的種類（每一區各自一個底部面板、各自儲存）。 */
@@ -129,8 +130,6 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
   const isSuper = isSuperAdmin(member);
   const set = <K extends keyof BasicsForm>(k: K) => (v: BasicsForm[K]) => setF((x) => ({ ...x, [k]: v }));
   const rankOptions = useRankOptions();
-  const categories = useApi<string[]>("/admin/categories");
-  const brands = useApi<{ id: string; name: string }[]>("/brands");
   const series = useApi<string[]>(isSuper ? "/admin/series" : null);
   return (
     <>
@@ -144,16 +143,8 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
           {f.eventStart ? <DateSelect label="結束日期（連續 2～3 天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
         </>
       )}
-      <FormBlock title="分類" hint="可複選；點選加入或取消，也可以自己輸入（多個用「、」分開）">
-        <Field label="" value={f.category} onChange={set("category")} placeholder="例如：達標班、會議" />
-        {categories.data?.length ? <MultiChips options={categories.data} value={f.category} onChange={set("category")} /> : null}
-      </FormBlock>
-      {/* 品牌獨立於分類（業主 2026-11-18）：單選；沒有手動上傳封面時用品牌 logo 當封面（手動上傳 > 品牌 logo > 文字封面）。 */}
-      {brands.data?.length ? (
-        <FormBlock title="品牌" hint="單選；沒上傳封面時，用品牌 logo 當封面">
-          <Chips label="品牌" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={f.brandId} onChange={set("brandId")} />
-        </FormBlock>
-      ) : null}
+      <CategoryField value={f.category} onChange={set("category")} withInput />
+      <BrandField value={f.brandId} onChange={set("brandId")} />
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
@@ -260,7 +251,7 @@ function WhenSheet({ course, onClose, onSaved }: SheetProps) {
       <Field label="地點" value={f.location} onChange={(v) => setF((x) => ({ ...x, location: v }))} placeholder="例如：台北總部教室" />
       <Check label="不顯示地點" value={f.locationNone} onChange={(v) => setF((x) => ({ ...x, locationNone: v }))} />
       <Check label="線上課程（地點顯示「線上課程」）" value={f.isOnline} onChange={(v) => setF((x) => ({ ...x, isOnline: v }))} />
-      {!f.locationNone && !f.isOnline && locations.data?.length ? <Chips label="已有的場地" options={locations.data.map((x) => ({ key: x, label: x }))} value={f.location} onChange={(v) => setF((x) => ({ ...x, location: v }))} /> : null}
+      {!f.locationNone && !f.isOnline && locations.data?.length ? <Chips title="已有的場地（點一下帶入）" label="已有的場地" options={locations.data.map((x) => ({ key: x, label: x }))} value={f.location} onChange={(v) => setF((x) => ({ ...x, location: v }))} /> : null}
     </EditSheet>
   );
 }
@@ -344,7 +335,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
   return (
     <EditSheet material={course.isList} title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <AppText variant="headline">誰能瀏覽課程？</AppText>
-      <Chips options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => (setF((x) => ({ ...x, viewScope: v as ViewScope })), (v === "all" || v === "link_guest") && setRankOpen(false))} />
+      <Chips title="瀏覽範圍" options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => (setF((x) => ({ ...x, viewScope: v as ViewScope })), (v === "all" || v === "link_guest") && setRankOpen(false))} />
       <AppText variant="caption" tone="muted">
         {f.viewScope === "link_login" || f.viewScope === "link_guest"
           ? "私密連結：不會出現在行動大學的任何清單與搜尋，只有拿到網址的人才看得到。"

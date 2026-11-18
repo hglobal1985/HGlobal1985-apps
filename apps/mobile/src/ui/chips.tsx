@@ -4,10 +4,10 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
 
 /** 單選的圓角選項列（自訂元件，不使用原生下拉）。 */
-export function Chips<T extends string>({ options, value, onChange, label }: { options: { key: T; label: string }[]; value: T | null; onChange: (key: T) => void; label?: string }) {
+export function Chips<T extends string>({ options, value, onChange, label, title }: { options: { key: T; label: string }[]; value: T | null; onChange: (key: T) => void; label?: string; /** 顯示在選項上方的標題（業主 2026-11-18：選項列一定要有看得到的標題；label 只給讀屏）。 */ title?: string }) {
   const { c } = useTheme();
-  return (
-    <View style={styles.row} accessibilityLabel={label}>
+  const row = (
+    <View style={styles.row} accessibilityLabel={label ?? title}>
       {options.map((o) => {
         const active = o.key === value;
         return (
@@ -24,6 +24,15 @@ export function Chips<T extends string>({ options, value, onChange, label }: { o
           </Pressable>
         );
       })}
+    </View>
+  );
+  if (!title) return row;
+  return (
+    <View style={{ gap: space.xs }}>
+      <AppText variant="callout" tone="muted" style={{ fontWeight: "700" }}>
+        {title}
+      </AppText>
+      {row}
     </View>
   );
 }

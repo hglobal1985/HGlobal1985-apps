@@ -68,7 +68,7 @@ function Review() {
           <Card>
             <AppText variant="headline">確認繳費</AppText>
             <Field label="實收金額（新台幣）" value={paid ?? String(data.totalTwd)} onChange={setPaid} numeric />
-            <Chips label="繳費方式" options={[{ key: "cash", label: "現金" }, { key: "transfer", label: "轉帳" }]} value={method} onChange={setMethod} />
+            <Chips title="繳費方式" label="繳費方式" options={[{ key: "cash", label: "現金" }, { key: "transfer", label: "轉帳" }]} value={method} onChange={setMethod} />
             <View style={{ gap: space.sm }}>
               <Button label="已繳費，開通課程" icon="checkmark-circle" loading={busy === "paid"} disabled={!!busy} onPress={() => act("paid")} fullWidth />
               <Button variant="secondary" label="VIP 免繳費，開通課程" icon="ribbon-outline" loading={busy === "vip"} disabled={!!busy} onPress={() => act("vip")} fullWidth />
@@ -76,13 +76,13 @@ function Review() {
           </Card>
           <Card>
             <AppText variant="headline">退回或延後</AppText>
-            <Chips label="處理方式" options={[{ key: "defer", label: "延後再審" }, { key: "reject", label: "退回" }]} value={mode === "revoke" ? null : mode} onChange={setMode} />
+            <Chips title="處理方式" label="處理方式" options={[{ key: "defer", label: "延後再審" }, { key: "reject", label: "退回" }]} value={mode === "revoke" ? null : mode} onChange={setMode} />
             {mode ? (
               <>
                 <AppText variant="callout" tone="muted">
                   原因（會通知學員）
                 </AppText>
-                <Chips label="原因" options={reasons} value={reason} onChange={setReason} />
+                <Chips title="原因" label="原因" options={reasons} value={reason} onChange={setReason} />
               </>
             ) : null}
           </Card>
@@ -94,7 +94,7 @@ function Review() {
           <AppText variant="callout" tone="muted">
             按錯或事後退費時使用；學員將無法再觀看，並會收到通知。
           </AppText>
-          {mode === "revoke" ? <Chips label="原因" options={reasons} value={reason} onChange={setReason} /> : <Button variant="secondary" label="我要撤銷這筆開通" onPress={() => (setMode("revoke"), setReason(null))} />}
+          {mode === "revoke" ? <Chips title="原因" label="原因" options={reasons} value={reason} onChange={setReason} /> : <Button variant="secondary" label="我要撤銷這筆開通" onPress={() => (setMode("revoke"), setReason(null))} />}
         </Card>
       ) : null}
       {pending || mode === "revoke" ? (

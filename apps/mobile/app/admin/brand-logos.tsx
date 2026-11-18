@@ -112,7 +112,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
       </AppText>
       {logo.logoUrl ? <BrandCover brand={preview} style={{ borderRadius: radius.md }} /> : <AppText tone="muted">先上傳 logo 才看得到預覽</AppText>}
       <PickImageButton label={logo.logoUrl ? "更換 logo 圖檔" : "上傳 logo 圖檔"} onPick={upload("logo")} busy={busy} variant="primary" />
-      <Chips label="底" options={[{ key: "white", label: "白色（預設）" }, { key: "color", label: "指定底色" }, { key: "image", label: "底圖" }]} value={mode} onChange={(v) => setMode(v as BgMode)} />
+      <Chips title="封面底" label="底" options={[{ key: "white", label: "白色（預設）" }, { key: "color", label: "指定底色" }, { key: "image", label: "底圖" }]} value={mode} onChange={(v) => setMode(v as BgMode)} />
       {mode === "color" ? (
         <View style={{ gap: space.xs }}>
           <View style={styles.swatches}>

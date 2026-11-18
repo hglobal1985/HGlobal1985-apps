@@ -8,14 +8,15 @@ import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { SuggestField, SuggestList, useSuggestions } from "@/features/admin/suggest-input";
 import { commitMediaDraft, emptyMediaDraft, MediaUploadModule, mediaDraftBody, mediaDraftDirty, mediaDraftError, mediaDraftOf, type MediaDraft } from "@/features/uploads";
 import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
-import { useApi, useSession } from "@/state/session";
+import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
-import { AppText, Button, Card, Chips, DateSelect, FormBlock, Icon, NoticeBox, todayStr } from "@/ui";
+import { AppText, Button, Card, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CollapseToggle } from "@/ui/collapse-toggle";
-import { Check, MultiChips } from "./course-sections";
+import { Check } from "./course-sections";
+import { BrandField, CategoryField } from "./field-groups";
 import { EditSheet } from "./edit-sheet";
 import { EditMaterialSheet } from "./material-sheet";
 
@@ -67,13 +68,10 @@ export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail;
 export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseDetail; lesson?: Lesson; onClose: () => void }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
-  const brands = useApi<{ id: string; name: string }[]>("/brands");
-  const categories = useApi<string[]>("/admin/categories");
   const [title, setTitle] = useState(lesson?.title ?? "");
   const [inSheet, setInSheet] = useState(lesson ? lesson.inSheet !== false : true);
   const [brandId, setBrandId] = useState(lesson?.brandId ?? "");
   const [cats, setCats] = useState(lesson?.categories ?? "");
-  const [brandOpen, setBrandOpen] = useState(false); // 品牌預設收起
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = !lesson || title.trim() !== lesson.title || inSheet !== (lesson.inSheet !== false) || brandId !== (lesson.brandId ?? "") || cats !== (lesson.categories ?? "");
@@ -114,23 +112,8 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
               區塊封面要等區塊建立後，再按區塊旁的鉛筆上傳；沒上傳時，有選品牌就用品牌 logo。
             </AppText>
           )}
-          {brands.data?.length ? (
-            <FormBlock title="品牌">
-              <Pressable accessibilityRole="button" accessibilityState={{ expanded: brandOpen }} onPress={() => setBrandOpen((v) => !v)} style={{ minHeight: minTouch, flexDirection: "row", alignItems: "center", gap: space.sm }}>
-                <Icon name={brandOpen ? "chevron-down" : "chevron-forward"} size={18} color={c.accentText} />
-                <AppText variant="callout" style={{ flex: 1 }} tone="muted">
-                  {brandOpen ? "選一個品牌（單選）" : "點一下展開選擇"}
-                </AppText>
-                <AppText variant="callout" style={{ fontWeight: "800" }}>
-                  {brands.data.find((b) => b.id === brandId)?.name ?? "未選"}
-                </AppText>
-              </Pressable>
-              {brandOpen ? <Chips label="" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={brandId} onChange={setBrandId} /> : null}
-            </FormBlock>
-          ) : null}
-          <FormBlock title="分類" hint="可複選">
-            {categories.data?.length ? <MultiChips options={categories.data} value={cats} onChange={setCats} /> : <AppText tone="muted">目前沒有分類</AppText>}
-          </FormBlock>
+          <BrandField value={brandId} onChange={setBrandId} />
+          <CategoryField value={cats} onChange={setCats} />
         </>
       ) : null}
       <AppText variant="caption" tone="muted">

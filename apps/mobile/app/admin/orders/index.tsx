@@ -55,17 +55,17 @@ function ReviewList() {
 
   return (
     <Screen header={false}>
-      <Chips label="狀態" options={statuses} value={status} onChange={setStatus} />
+      <Chips title="狀態" label="狀態" options={statuses} value={status} onChange={setStatus} />
       <AppText variant="callout" tone="muted">
         課程
       </AppText>
-      <Chips label="課程" options={[{ key: "all", label: "全部課程" }, ...paidCourses.map((c) => ({ key: c.id, label: c.title }))]} value={courseId} onChange={setCourseId} />
+      <Chips title="課程" label="課程" options={[{ key: "all", label: "全部課程" }, ...paidCourses.map((c) => ({ key: c.id, label: c.title }))]} value={courseId} onChange={setCourseId} />
       {centers.data?.length ? (
         <>
           <AppText variant="callout" tone="muted">
             中心
           </AppText>
-          <Chips label="中心" options={[{ key: "all", label: "全部中心" }, ...centers.data.map((c) => ({ key: c, label: c }))]} value={center} onChange={setCenter} />
+          <Chips title="中心" label="中心" options={[{ key: "all", label: "全部中心" }, ...centers.data.map((c) => ({ key: c, label: c }))]} value={center} onChange={setCenter} />
         </>
       ) : null}
       <Field label="搜尋姓名或報名編號" value={q} onChange={setQ} />

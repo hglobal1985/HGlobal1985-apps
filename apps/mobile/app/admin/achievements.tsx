@@ -142,9 +142,9 @@ export default function AdminAchievementsScreen() {
 
       <Button label="新增任務" icon="add-circle-outline" onPress={() => open(blank(filter === "all" ? "progress" : filter), filter === "all" ? "progress" : filter)} fullWidth />
 
-      <Chips label="任務分類" options={[{ key: "all", label: `全部（${rows.length}）` }, ...ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}（${rows.filter((a) => ACHIEVEMENT_TYPES[a.type].category === k.key).length}）` }))]} value={filter} onChange={(v) => setFilter(v as "all" | AchievementCategory)} />
-      <Chips label="難易度" options={[{ key: "all", label: "全部" }, ...([1, 2, 3] as Diff[]).map((d) => ({ key: String(d), label: `${"★".repeat(d)} ${DIFF_LABEL[d]}（${rows.filter((a) => a.difficulty === d).length}）` }))]} value={diffF} onChange={(v) => setDiffF(v as typeof diffF)} />
-      <Chips label="會員完成度（取得人數 ÷ 會員總數）" options={[{ key: "all", label: "全部" }, { key: "none", label: `沒人取得（${rows.filter((a) => doneOf(a) === "none").length}）` }, { key: "low", label: `少數 <10%（${rows.filter((a) => doneOf(a) === "low").length}）` }, { key: "mid", label: `中等（${rows.filter((a) => doneOf(a) === "mid").length}）` }, { key: "high", label: `多數 ≥40%（${rows.filter((a) => doneOf(a) === "high").length}）` }]} value={doneF} onChange={(v) => setDoneF(v as Done)} />
+      <Chips title="任務分類" label="任務分類" options={[{ key: "all", label: `全部（${rows.length}）` }, ...ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}（${rows.filter((a) => ACHIEVEMENT_TYPES[a.type].category === k.key).length}）` }))]} value={filter} onChange={(v) => setFilter(v as "all" | AchievementCategory)} />
+      <Chips title="難易度" label="難易度" options={[{ key: "all", label: "全部" }, ...([1, 2, 3] as Diff[]).map((d) => ({ key: String(d), label: `${"★".repeat(d)} ${DIFF_LABEL[d]}（${rows.filter((a) => a.difficulty === d).length}）` }))]} value={diffF} onChange={(v) => setDiffF(v as typeof diffF)} />
+      <Chips title="會員完成度（取得人數 ÷ 會員總數）" label="會員完成度" options={[{ key: "all", label: "全部" }, { key: "none", label: `沒人取得（${rows.filter((a) => doneOf(a) === "none").length}）` }, { key: "low", label: `少數 <10%（${rows.filter((a) => doneOf(a) === "low").length}）` }, { key: "mid", label: `中等（${rows.filter((a) => doneOf(a) === "mid").length}）` }, { key: "high", label: `多數 ≥40%（${rows.filter((a) => doneOf(a) === "high").length}）` }]} value={doneF} onChange={(v) => setDoneF(v as Done)} />
       {shown.length !== rows.length ? <AppText variant="caption" tone="muted">符合條件 {shown.length} 個任務</AppText> : null}
 
       {grouped.map(({ cat, items }) => (
@@ -176,7 +176,7 @@ export default function AdminAchievementsScreen() {
 
       {form ? (
         <EditSheet title={form.id ? "修改徽章任務" : "新增徽章任務"} onClose={() => setForm(null)} onSave={save} dirty={dirty} busy={busy} error={error}>
-          <Chips label="① 任務分類" options={ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}` }))} value={formCat} onChange={(v) => { setFormCat(v as AchievementCategory); const first = typesOf(v as AchievementCategory)[0]; if (first && ACHIEVEMENT_TYPES[form.type].category !== v) patch({ type: first, feature: "" }); }} />
+          <Chips title="① 任務分類" label="① 任務分類" options={ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}` }))} value={formCat} onChange={(v) => { setFormCat(v as AchievementCategory); const first = typesOf(v as AchievementCategory)[0]; if (first && ACHIEVEMENT_TYPES[form.type].category !== v) patch({ type: first, feature: "" }); }} />
           <View style={{ gap: 6 }}>
             <AppText variant="callout" style={{ fontWeight: "700" }}>
               ② 任務種類
@@ -247,7 +247,7 @@ export default function AdminAchievementsScreen() {
             </AppText>
             <Stars value={form.difficulty} onChange={(d) => patch({ difficulty: d })} big />
           </View>
-          <Chips label="⑦ 狀態" options={[{ key: "on", label: "啟用（會員看得到）" }, { key: "off", label: "停用（暫時隱藏）" }]} value={form.active ? "on" : "off"} onChange={(v) => patch({ active: v === "on" })} />
+          <Chips title="⑦ 狀態" label="⑦ 狀態" options={[{ key: "on", label: "啟用（會員看得到）" }, { key: "off", label: "停用（暫時隱藏）" }]} value={form.active ? "on" : "off"} onChange={(v) => patch({ active: v === "on" })} />
           {form.id ? (
             <View style={styles.row}>
               <Button variant="danger" label="刪除這個任務" icon="trash-outline" disabled={busy} onPress={() => remove(rows.find((x) => x.id === form.id)!)} />
