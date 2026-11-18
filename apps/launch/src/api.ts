@@ -1247,6 +1247,23 @@ async function attachmentKeys(db: D1Database, where: "lesson_id" | "course_id", 
 
 // ---------- 教材檔案（業主 2026-11-18：一律存在行動大學的儲存空間 R2；來源可以是手機／電腦，或使用者自己的 Google 雲端硬碟） ----------
 const MB = 1024 * 1024;
+/** 徹底刪除 R2 檔案：失敗重試一次，仍失敗記在日誌（不影響刪除教材本身）。 */
+async function deleteR2Files(env: Env, keys: (string | null | undefined)[]): Promise<void> {
+  const bucket = env.MEDIA;
+  if (!bucket) return;
+  for (const k of keys) {
+    if (!k) continue;
+    for (let i = 0; i < 2; i++) {
+      try {
+        await bucket.delete(k);
+        break;
+      } catch (e) {
+        if (i === 1) console.error("r2 delete failed", k, e instanceof Error ? e.message : "error");
+      }
+    }
+  }
+}
+
 /** 把已存進 R2 的檔案建成一個「其他教材」（放在完整版課程影片之前），並通知訂閱者。回傳教材編號。 */
 async function createFileMaterial(ctx: Ctx, admin: Session, courseId: string, f: { name: string; key: string; size: number; contentType: string; attType: AttachmentType; audit: string }): Promise<string> {
   const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
@@ -3767,7 +3784,7 @@ const routes: [string, RegExp, Handler][] = [
       // 完整版課程影片可能與章節共用同一個音檔：還有別的章節在用就不刪檔。
       const shared = lesson.media_ref ? await ctx.db.prepare("SELECT 1 AS ok FROM lessons WHERE media_ref = ? LIMIT 1").bind(lesson.media_ref).first() : null;
       if (lesson.media_type === "audio" && lesson.media_ref && !shared) await ctx.env.MEDIA?.delete(lesson.media_ref).catch(() => undefined);
-      for (const k of files) await ctx.env.MEDIA?.delete(k).catch(() => undefined);
+      await deleteR2Files(ctx.env, files); // 附件檔案與封面徹底從儲存空間刪除
       return { ok: true };
     },
   ],
@@ -4172,13 +4189,24 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/admin\/drive-import\/progress$/,
+    async (ctx) => {
+      // 匯入的轉存進度（畫面每秒查一次）：只有發起的人查得到；total＝0 代表大小未知（例如 Google 文件轉檔）。
+      const me = await requireCourseStaff(ctx);
+      const row = await ctx.db.prepare("SELECT written, total FROM import_progress WHERE id = ? AND member_sub = ?").bind(ctx.url.searchParams.get("id") ?? "", me.sub).first<{ written: number; total: number }>();
+      return row ?? { written: 0, total: 0 };
+    },
+  ],
+  [
     "POST",
     /^\/admin\/courses\/([\w-]+)\/drive-import$/,
     async (ctx, [courseId]) => {
       // 從使用者自己的 Google 雲端硬碟匯入教材（業主 2026-11-18）：使用者在瀏覽器用 Google Picker 挑檔案並授權一次性的存取權杖，
       // 伺服器用它把那個檔案讀出來、轉存進行動大學的儲存空間（R2）並建立教材。權杖只用這一次，不保存、不寫日誌。
       const admin = await requireCourseManager(ctx, courseId);
-      const b = await readJson<{ fileId?: unknown; token?: unknown }>(ctx.req);
+      const b = await readJson<{ fileId?: unknown; token?: unknown; progressId?: unknown }>(ctx.req);
+      const progressId = typeof b.progressId === "string" && /^[\w-]{8,40}$/.test(b.progressId) ? b.progressId : "";
       const fileId = typeof b.fileId === "string" ? b.fileId : "";
       const token = typeof b.token === "string" ? b.token : "";
       if (!/^[\w-]{8,120}$/.test(fileId) || !/^[\w.~+/=-]{20,4096}$/.test(token)) return fail(400, "bad_request", "資料不正確，請重新選擇檔案");
@@ -4199,11 +4227,21 @@ const routes: [string, RegExp, Handler][] = [
         if (!res.ok || !res.body) return fail(502, "google_failed", "向 Google 讀取檔案失敗，請稍後再試");
         const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(src.name)}`;
         let size: number;
+        // 轉存進度：每秒最多寫一次（畫面用 /admin/drive-import/progress 查，顯示進度條）。
+        const total = src.size ?? 0;
+        let lastReport = 0;
+        if (progressId) await ctx.db.batch([ctx.db.prepare("DELETE FROM import_progress WHERE updated_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 day')"), ctx.db.prepare("INSERT OR REPLACE INTO import_progress (id, member_sub, written, total) VALUES (?, ?, 0, ?)").bind(progressId, admin.sub, total)]);
         try {
-          size = await streamToR2(bucket, key, res.body, kind.ct, maxBytes);
+          size = await streamToR2(bucket, key, res.body, kind.ct, maxBytes, async (read) => {
+            if (!progressId || Date.now() - lastReport < 1000) return;
+            lastReport = Date.now();
+            await ctx.db.prepare("UPDATE import_progress SET written = ?, updated_at = ? WHERE id = ?").bind(read, iso(), progressId).run();
+          });
         } catch (e) {
           if (e instanceof ImportError && e.code === "file_too_large") return tooBig();
           throw e;
+        } finally {
+          if (progressId) await ctx.db.prepare("DELETE FROM import_progress WHERE id = ?").bind(progressId).run().catch(() => undefined);
         }
         const id = await createFileMaterial(ctx, admin, courseId, { name: src.name, key, size, contentType: kind.ct, attType: kind.type, audit: "material.drive_import" });
         return { id };
@@ -5391,7 +5429,7 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("DELETE FROM courses WHERE id = ?").bind(id),
       ]);
       if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
-      for (const k of [...files, art?.edm_key, art?.cover_key]) if (k) await ctx.env.MEDIA?.delete(k).catch(() => undefined);
+      await deleteR2Files(ctx.env, [...files, art?.edm_key, art?.cover_key]);
       for (const a of audio.results) await ctx.env.MEDIA?.delete(a.media_ref).catch(() => undefined);
       return { ok: true };
     },

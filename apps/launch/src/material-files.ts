@@ -94,7 +94,7 @@ export const PART_BYTES = 8 * 1024 * 1024;
 /**
  * 把一串資料邊讀邊存進 R2（不把整個檔案放進記憶體）：小檔直接存，大檔用分段上傳；超過 maxBytes 或中途失敗就中止並清掉。回傳總大小。
  */
-export async function streamToR2(bucket: R2Bucket, key: string, body: ReadableStream<Uint8Array>, contentType: string, maxBytes: number): Promise<number> {
+export async function streamToR2(bucket: R2Bucket, key: string, body: ReadableStream<Uint8Array>, contentType: string, maxBytes: number, onProgress?: (bytesRead: number) => Promise<void> | void): Promise<number> {
   const reader = body.getReader();
   let buf = new Uint8Array(PART_BYTES);
   let filled = 0;
@@ -112,6 +112,7 @@ export async function streamToR2(bucket: R2Bucket, key: string, body: ReadableSt
       const { done, value } = await reader.read();
       if (done) break;
       total += value.byteLength;
+      await onProgress?.(total);
       if (total > maxBytes) throw new ImportError(413, "file_too_large", "檔案超過大小上限");
       let off = 0;
       while (off < value.byteLength) {

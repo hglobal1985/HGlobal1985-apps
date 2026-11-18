@@ -226,3 +226,26 @@ test("舊的雲端硬碟授權：排程撤銷並刪除", async () => {
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM drive_link").first<{ n: number }>())!.n, 0);
   assert.equal(await db.prepare("SELECT 1 AS x FROM ui_settings WHERE key = 'drive'").first(), null);
 });
+
+test("刪除教材與課程：R2 裡的檔案一併徹底刪除；轉存進度回報", async () => {
+  const { r2, call, login } = harness({ GOOGLE_CLIENT_ID: "c", GOOGLE_PICKER_API_KEY: "k", GOOGLE_PROJECT_NUMBER: "1" });
+  const admin = await login("demo-admin");
+  const mk = async () => (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { isList: true, title: "清單" } })).data;
+  fakeUserDrive({ small0001: { name: "簡報.pdf", mimeType: "application/pdf", body: bytes(10) }, bigfile01: { name: "大檔.pdf", mimeType: "application/pdf", body: bytes(PART_BYTES + 5) } });
+  const imp = (courseId: string, fileId: string, progressId?: string) => call("POST", `/admin/courses/${courseId}/drive-import`, { token: admin, body: { fileId, token: TOKEN, ...(progressId ? { progressId } : {}) } });
+
+  const a = await mk();
+  const one = await imp(a.id, "small0001");
+  const big = await imp(a.id, "bigfile01", "progress-abc-123");
+  assert.equal(one.status, 200);
+  assert.equal(big.status, 200);
+  assert.equal(r2.store.size, 2);
+  // 進度只有發起的人查得到；完成後已清掉
+  assert.deepEqual((await call("GET", "/admin/drive-import/progress?id=progress-abc-123", { token: admin })).data, { written: 0, total: 0 });
+  // 刪除一個教材：它的檔案從 R2 刪掉，另一個還在
+  assert.equal((await call("DELETE", `/admin/lessons/${one.data.id}`, { token: admin })).status, 200);
+  assert.equal(r2.store.size, 1);
+  // 刪除整門課程：剩下的檔案也刪掉
+  assert.equal((await call("DELETE", `/admin/courses/${a.id}`, { token: admin })).status, 200);
+  assert.equal(r2.store.size, 0, "R2 不留任何殘檔");
+});

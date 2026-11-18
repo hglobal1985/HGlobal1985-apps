@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { api, type CourseDetail } from "@/api/client";
+import { api, apiUpload, type CourseDetail } from "@/api/client";
 import { useApi } from "@/state/session";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
 import { AppText, Button, NoticeBox } from "@/ui";
 import { useUiConfig } from "@/state/ui-config";
 import { COMPRESSIBLE, FILE_ACCEPT, FILE_TOO_BIG, fileProblem } from "./file-rules";
 import { pickFromMyDrive, preloadGooglePicker } from "./google-picker.web";
+import { UploadProgress } from "./upload-progress";
 
 type DriveCfg = { ready: boolean; clientId: string; apiKey: string; appId: string; maxBytes: number };
 
@@ -22,8 +23,11 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [prog, setProg] = useState<{ label: string; pct: number | null; detail?: string } | null>(null); // 進度條
   const [errors, setErrors] = useState<string[]>([]);
-  const gcfg = useApi<DriveCfg>("/admin/drive-import/config").data;
+  const cfgQ = useApi<DriveCfg>("/admin/drive-import/config");
+  const gcfg = cfgQ.data;
+  const driveLoading = !gcfg && !cfgQ.error; // 設定還在讀：按鈕先顯示（暫時不能按），避免晚兩秒才跳出來
   // 只先載入 Google 的程式（不索取任何權限），讓使用者按按鈕時授權視窗能立刻跳出、不被手機瀏覽器擋掉。
   useEffect(() => {
     if (gcfg?.ready) void preloadGooglePicker().catch(() => undefined);
@@ -43,7 +47,8 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
           bad.push(`「${f.name}」：${problem}`);
           continue;
         }
-        setMsg(`上傳中（${i + 1}／${files.length}）：${f.name}`);
+        const label = `上傳中（${i + 1}／${files.length}）：${f.name}`;
+        setProg({ label, pct: 0 });
         try {
           let blob: Blob = f;
           let name = f.name;
@@ -56,7 +61,7 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
             bad.push(`「${f.name}」：${FILE_TOO_BIG(fileMaxMb)}`);
             continue;
           }
-          last = await api<CourseDetail>("POST", `/admin/courses/${courseId}/material-file?name=${encodeURIComponent(name)}`, blob);
+          last = await apiUpload<CourseDetail>("POST", `/admin/courses/${courseId}/material-file?name=${encodeURIComponent(name)}`, blob, (pct) => setProg({ label, pct, detail: `${(blob.size / 1024 ** 2).toFixed(1)} MB` }));
         } catch (e) {
           bad.push(`「${f.name}」：${(e as Error).message}`);
         }
@@ -65,6 +70,7 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
       setBusy(false);
       onBusyChange?.(false);
       setMsg(null);
+      setProg(null);
       setErrors(bad);
     }
     if (last) onUploaded(last, bad.length > 0);
@@ -84,12 +90,22 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
       if (picked) {
         for (let i = 0; i < picked.files.length; i++) {
           const f = picked.files[i]!;
-          setMsg(`從 Google 雲端硬碟轉存中（${i + 1}／${picked.files.length}）：${f.name}　檔案大時需要一些時間，請不要離開這個畫面`);
+          const label = `從 Google 雲端硬碟轉存中（${i + 1}／${picked.files.length}）：${f.name}（檔案大時需要一些時間，請不要離開這個畫面）`;
+          setProg({ label, pct: 0 });
+          // 轉存在伺服器進行，每秒查一次進度：大小已知顯示百分比，未知（Google 文件轉檔）顯示來回跑的進度條。
+          const progressId = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+          const timer = setInterval(() => {
+            void api<{ written: number; total: number }>("GET", `/admin/drive-import/progress?id=${progressId}`)
+              .then((r) => setProg({ label, pct: r.total > 0 ? Math.min(99, Math.round((r.written / r.total) * 100)) : null, detail: `已轉存 ${(r.written / 1024 ** 2).toFixed(1)} MB` }))
+              .catch(() => undefined);
+          }, 1000);
           try {
-            await api("POST", `/admin/courses/${courseId}/drive-import`, { fileId: f.id, token: picked.token });
+            await api("POST", `/admin/courses/${courseId}/drive-import`, { fileId: f.id, token: picked.token, progressId });
             okCount += 1;
           } catch (e) {
             bad.push(`「${f.name}」：${(e as Error).message}`);
+          } finally {
+            clearInterval(timer);
           }
         }
       }
@@ -99,6 +115,7 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
       setBusy(false);
       onBusyChange?.(false);
       setMsg(null);
+      setProg(null);
       setErrors(bad);
     }
     if (okCount) onUploaded(await api<CourseDetail>("GET", `/courses/${courseId}`), bad.length > 0);
@@ -107,7 +124,7 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
   return (
     <>
       <Button label="從這支裝置選擇檔案" icon="cloud-upload-outline" variant="secondary" loading={busy} disabled={busy} onPress={() => input.current?.click()} fullWidth />
-      {gcfg?.ready ? <Button label="從我的 Google 雲端硬碟選擇" icon="logo-google" variant="secondary" loading={busy} disabled={busy} onPress={() => void runDrive()} fullWidth /> : null}
+      {driveLoading || gcfg?.ready ? <Button label="從我的 Google 雲端硬碟選擇" icon="logo-google" variant="secondary" loading={busy} disabled={busy || driveLoading} onPress={() => void runDrive()} fullWidth /> : null}
       <input
         ref={input}
         type="file"
@@ -120,11 +137,12 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
           if (files.length) void run(files);
         }}
       />
-      {msg ? (
+      {msg && !prog ? (
         <AppText variant="caption" tone="muted">
           {msg}
         </AppText>
       ) : null}
+      {prog ? <UploadProgress label={prog.label} pct={prog.pct} detail={prog.detail} /> : null}
       {errors.map((t) => (
         <NoticeBox key={t} tone="danger" text={t} />
       ))}
