@@ -530,6 +530,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     chapterCovers: row.chapter_covers === 1,
     lessonCount: row.lesson_count,
     hasMaterial: row.material_count > 0,
+    materialCount: row.material_count,
     totalMinutes: row.total_minutes,
     eligible: eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row),
     allowPresident: row.allow_president === 1,
