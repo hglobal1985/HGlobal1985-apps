@@ -324,7 +324,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
         list={course.isList ? { title: course.title } : undefined}
         // 直接從分享網址進來時，返回鍵回到「上一層」：中心主辦的課程＝該中心專屬頁；總部課程＝全部課程（業主 2026-11-17）。
-        backTo={course.hostCenter ? `/courses?center=${encodeURIComponent(course.hostCenter)}` : "/courses"}
+        backTo={course.isList ? `/courses?focus=${encodeURIComponent(course.series ? `s:${course.series}` : `c:${course.id}`)}` : course.hostCenter ? `/courses?center=${encodeURIComponent(course.hostCenter)}` : "/courses"}
+        // 素材清單：返回一律回到寰宇大學的卡片清單並定位到這張卡（業主 2026-11-18），不會跑到主辦中心頁。
+        backAlways={course.isList}
         extra={
           manages && mode === "view" ? (
             <TopBarButton label="編輯" accessibilityLabel="編輯這門課程" iconName="create-outline" onPress={() => setMode("edit")} />

@@ -49,7 +49,7 @@ const GAP = space.md;
  * 「中心」下拉：選了中心，下方先顯示該中心的首頁圖（有上傳才有），只列該中心主辦的課程。
  * 管理者（總部、會長、音控、小編）另外看得到自己能管的「未上架」課程（標示未上架）、最下面可展開「已封存」、右下角「＋新增教材」（往上展開：新增課程／新增清單）。
  */
-export function CoursesView({ initialCategory = "", initialCenter = "", inStack = false, initialCenters = false }: { initialCategory?: string; initialCenter?: string; inStack?: boolean; /** /courses?view=centers：直接打開「所有中心」清單。 */ initialCenters?: boolean }) {
+export function CoursesView({ initialCategory = "", initialCenter = "", inStack = false, initialCenters = false, focusKey = "" }: { /** 從清單頁返回：要定位到的卡片（s:系列名 或 c:課程編號），一律用「所有系列」檢視。 */ focusKey?: string; initialCategory?: string; initialCenter?: string; inStack?: boolean; /** /courses?view=centers：直接打開「所有中心」清單。 */ initialCenters?: boolean }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
   const { member } = useSession();
   useCenterNames(); // 中心名稱有更新時重新畫
@@ -138,7 +138,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   useEffect(() => {
     AsyncStorage.getItem(MODE_KEY)
       // 「教育中心」模式不記住（業主 2026-11-18）：每次進入寰宇大學預設都是「系列」檢視。
-      .then((v) => (v === "chapter" || v === "series") && !initialCenter && !initialCenters && setMode(v))
+      .then((v) => (v === "chapter" || v === "series") && !initialCenter && !initialCenters && !focusKey && setMode(v))
       .catch(() => undefined);
   }, []);
   // 「單元」模式的三個勾選篩選（主講人／短影音／總結；短影音不能與另外兩個並存）：記住上次的選擇；舊版「只顯示主講人」的設定轉成「只看主講」。
@@ -303,6 +303,19 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 一列幾張（業主 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
   const cols = flat ? portraitColumns(boxW) : tileColumns(boxW);
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
+  // 從清單頁返回：捲到同一張卡（網頁版）。
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focusKey || focused.current || !tileW || !groups.length || typeof document === "undefined") return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`tile-${focusKey}`);
+      if (el) {
+        focused.current = true;
+        el.scrollIntoView({ block: "center" });
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [focusKey, tileW, groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const termsBox = terms.length ? (
       <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
         {terms.map((t) => (

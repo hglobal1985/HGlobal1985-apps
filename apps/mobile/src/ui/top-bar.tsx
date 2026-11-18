@@ -16,12 +16,12 @@ import { barHeight, minTouch } from "@/theme/tokens";
  * backTo（業主 2026-11-17）：沒有上一頁可回（直接從分享網址進來）時，返回鍵要去的「上一層」頁面，例如中心主辦的課程＝該中心專屬頁。
  * 有上一頁就照常回上一頁；沒有傳 backTo 才用下面依網址判斷的預設。
  */
-export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTop, backTo }: { title: string; onBack?: () => void; right?: ReactNode; safeTop?: boolean; shadow?: boolean; backTo?: string }) {
+export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTop, backTo, backAlways }: { title: string; onBack?: () => void; right?: ReactNode; safeTop?: boolean; shadow?: boolean; backTo?: string; /** 一律去 backTo（不管有沒有上一頁）：例如清單頁返回一定回到寰宇大學並定位到那張卡。 */ backAlways?: boolean }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const path = usePathname();
   const fallback = path.startsWith("/course") || path.startsWith("/learn") ? "/courses" : path.startsWith("/orders") || path.startsWith("/admin") || path.startsWith("/settings") || path.startsWith("/achievements") ? "/me" : "/";
-  const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace((backTo ?? fallback) as never)));
+  const back = onBack ?? (() => (!backAlways && router.canGoBack() ? router.back() : router.replace((backTo ?? fallback) as never)));
   const top = safeTop ? insets.top : 0;
   return (
     <View style={styles.wrap}>

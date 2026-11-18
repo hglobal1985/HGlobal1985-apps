@@ -66,7 +66,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const soloList = !flat && group.sessions.length === 1 && rep.isList;
   const open = () => (soloList && !rep.blocks.length ? router.push(`/course/${rep.id}`) : flat || group.sessions.length > 1 || inSeries ? setSheet(true) : router.push(`/course/${rep.id}`));
   return (
-    <View style={{ width }}>
+    <View style={{ width }} nativeID={`tile-${group.key}`}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? rep.series : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: edm ? "#fff" : c.surfaceMuted }]}>
         {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
