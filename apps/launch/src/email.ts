@@ -4,6 +4,7 @@
  * - 沒有設定 EMAIL 綁定（或沒有寄件地址）就完全不動作，通知維持原樣。
  * - 失敗不影響主流程；信箱不寫入日誌。
  */
+import { NOTICE_KINDS, noticeKindOf } from "./contract.ts";
 import { lookupContactEmails, type ContactPurpose } from "./central.ts";
 import type { D1PreparedStatement, Env } from "./d1.ts";
 
@@ -64,5 +65,23 @@ async function recipients(db: Env["DB"], n: Pending): Promise<string[]> {
   else if (n.recipient_role === "president" && n.recipient_center_key) stmt = db.prepare("SELECT member_sub FROM member_contacts WHERE president_center_key = ? AND notify_email = 1").bind(n.recipient_center_key);
   else return [];
   const { results } = await stmt.all<{ member_sub: string }>();
-  return results.map((r) => r.member_sub);
+  const subs = results.map((r) => r.member_sub);
+  if (!subs.length) return [];
+  // 依通知情境過濾（業主 2026-11-18）：會員改過的用他的設定，沒改過的用預設（只有付費課程審核通知預設寄）。
+  const kind = noticeKindOf(n.title, n.link);
+  const def = NOTICE_KINDS.find((k) => k.key === kind)?.emailDefault ?? false;
+  const saved = new Map<string, string | null>();
+  for (let i = 0; i < subs.length; i += 80) {
+    const part = subs.slice(i, i + 80);
+    const rows = await db.prepare(`SELECT member_sub, email_kinds FROM member_contacts WHERE member_sub IN (${part.map(() => "?").join(",")})`).bind(...part).all<{ member_sub: string; email_kinds: string | null }>();
+    for (const r of rows.results) saved.set(r.member_sub, r.email_kinds);
+  }
+  return subs.filter((sub) => {
+    try {
+      const v = (JSON.parse(saved.get(sub) ?? "{}") as Record<string, unknown>)[kind];
+      return typeof v === "boolean" ? v : def;
+    } catch {
+      return def;
+    }
+  });
 }

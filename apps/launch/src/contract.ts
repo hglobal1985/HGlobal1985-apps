@@ -395,10 +395,39 @@ export type CourseComment = {
   courseTitle?: string;
 };
 
+/** 通知情境（Email 可逐項開關，業主 2026-11-18）：預設只有「付費課程相關的審核通知」要寄 Email，其餘預設不寄；手機推播不看這個，全部都推。 */
+export type NoticeKind = "paid_review" | "role" | "course_update" | "subscribe_new" | "broadcast" | "reminder" | "comment" | "badge" | "other";
+export const NOTICE_KINDS: { key: NoticeKind; label: string; desc: string; emailDefault: boolean }[] = [
+  { key: "paid_review", label: "付費課程相關的審核通知", desc: "報名送出、待審核、繳費確認、開通、退回、延後、報名留言", emailDefault: true },
+  { key: "role", label: "身分與職務指派", desc: "被指派為審核人員、中心小編，或不再是小編", emailDefault: false },
+  { key: "course_update", label: "已報名課程的更新", desc: "課程有新章節、新教材，或上課日期、地點有更新", emailDefault: false },
+  { key: "subscribe_new", label: "訂閱的中心與系列", desc: "訂閱的中心或系列有新課程、新清單上架", emailDefault: false },
+  { key: "broadcast", label: "中心廣播公告", desc: "訂閱的中心發布新的廣播公告", emailDefault: false },
+  { key: "reminder", label: "開課前一天提醒", desc: "明天要上的課程提醒（晚上 8 點後）", emailDefault: false },
+  { key: "comment", label: "留言與檢舉", desc: "留言回覆、有留言被檢舉等", emailDefault: false },
+  { key: "badge", label: "獲得學習徽章", desc: "達成徽章任務時的恭喜通知", emailDefault: false },
+  { key: "other", label: "其他系統通知", desc: "上面沒有列到的通知", emailDefault: false },
+];
+/** 依通知標題與連結判斷屬於哪一種情境。 */
+export function noticeKindOf(title: string, link: string): NoticeKind {
+  if (/^\/(admin\/)?orders\//.test(link) || /^\/admin\/orders/.test(link)) return "paid_review";
+  if (/審核人員|小編/.test(title)) return "role";
+  if (/獲得學習徽章/.test(title)) return "badge";
+  if (/開課提醒/.test(title)) return "reminder";
+  if (/廣播公告/.test(title)) return "broadcast";
+  if (/有新(課程|清單)/.test(title)) return "subscribe_new";
+  if (/有新(章節|教材)|時間或地點有更新/.test(title)) return "course_update";
+  if (/留言|回覆|檢舉/.test(title)) return "comment";
+  if (/審核|等待|報名已|報名延後|課程已開通|繳費確認|開通已撤銷/.test(title)) return "paid_review";
+  return "other";
+}
+
 /** 通知設定：Email 的正本在會員中心「聯絡信箱」，這裡只是同一個欄位的入口。 */
 export type NotificationSettings = {
   email: string | null;
   notifyEmail: boolean;
+  /** 各情境要不要寄 Email（已套用預設值；手機推播一律全收，不受影響）。 */
+  emailKinds: Record<NoticeKind, boolean>;
   /** 伺服器是否已啟用寄信（未啟用時畫面提示「Email 通知尚未開放」）。 */
   emailReady: boolean;
   source: "central" | "local";

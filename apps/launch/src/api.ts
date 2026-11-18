@@ -32,6 +32,8 @@ import {
   type CentralReviews,
   type LibraryItem,
   type LibraryMine,
+  NOTICE_KINDS,
+  type NoticeKind,
   LIBRARY_KEY_BADGES,
   FEATURES,
   type LibraryView,
@@ -1487,11 +1489,22 @@ async function syncContact(ctx: Ctx, s: Session): Promise<void> {
   if (s.kind === "central" && s.role === "admin") void reportIntegration(s.token).catch(() => undefined);
 }
 
+/** 會員的 Email 情境開關：存的是改過的項目，沒存的用預設（只有付費課程審核通知預設要寄）。 */
+function emailKindsOf(raw: string | null): Record<NoticeKind, boolean> {
+  let saved: Record<string, unknown> = {};
+  try {
+    saved = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+  } catch {
+    saved = {};
+  }
+  return Object.fromEntries(NOTICE_KINDS.map((k) => [k.key, typeof saved[k.key] === "boolean" ? saved[k.key] : k.emailDefault])) as Record<NoticeKind, boolean>;
+}
+
 async function contactSettings(ctx: Ctx, s: Session): Promise<NotificationSettings> {
-  const row = await ctx.db.prepare("SELECT email, notify_email FROM member_contacts WHERE member_sub = ?").bind(s.sub).first<{ email: string | null; notify_email: number }>();
+  const row = await ctx.db.prepare("SELECT email, notify_email, email_kinds FROM member_contacts WHERE member_sub = ?").bind(s.sub).first<{ email: string | null; notify_email: number; email_kinds: string | null }>();
   // 中央會員：信箱只即時向中央查，不看本地；模擬會員（測試用）才用本地欄位。
   const email = s.kind === "central" ? ((await contactEmail(s.sub, s.token)) ?? null) : (row?.email ?? null);
-  return { email, notifyEmail: (row?.notify_email ?? 1) === 1, emailReady: !!ctx.env.EMAIL && !!ctx.env.EMAIL_FROM, source: s.kind === "central" ? "central" : "local" };
+  return { email, notifyEmail: (row?.notify_email ?? 1) === 1, emailKinds: emailKindsOf(row?.email_kinds ?? null), emailReady: !!ctx.env.EMAIL && !!ctx.env.EMAIL_FROM, source: s.kind === "central" ? "central" : "local" };
 }
 
 async function dutyOf(ctx: Ctx, s: Session): Promise<string | undefined> {
@@ -2558,7 +2571,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/me\/notification-settings$/,
     async (ctx) => {
       const s = requireMember(ctx);
-      const body = await readJson<{ email?: unknown; notifyEmail?: unknown }>(ctx.req);
+      const body = await readJson<{ email?: unknown; notifyEmail?: unknown; emailKinds?: unknown }>(ctx.req);
       let email: string | null | undefined;
       if (body.email !== undefined) {
         if (body.email === null || body.email === "") email = null;
@@ -2582,6 +2595,15 @@ const routes: [string, RegExp, Handler][] = [
           .prepare("INSERT INTO member_contacts (member_sub, notify_email) VALUES (?, ?) ON CONFLICT(member_sub) DO UPDATE SET notify_email = excluded.notify_email")
           .bind(s.sub, body.notifyEmail ? 1 : 0)
           .run();
+      }
+      if (body.emailKinds && typeof body.emailKinds === "object") {
+        const cur = (await ctx.db.prepare("SELECT email_kinds FROM member_contacts WHERE member_sub = ?").bind(s.sub).first<{ email_kinds: string | null }>())?.email_kinds ?? null;
+        const next = { ...emailKindsOf(cur) } as Record<string, boolean>;
+        for (const k of NOTICE_KINDS) {
+          const v = (body.emailKinds as Record<string, unknown>)[k.key];
+          if (typeof v === "boolean") next[k.key] = v;
+        }
+        await ctx.db.prepare("INSERT INTO member_contacts (member_sub, email_kinds) VALUES (?, ?) ON CONFLICT(member_sub) DO UPDATE SET email_kinds = excluded.email_kinds").bind(s.sub, JSON.stringify(next)).run();
       }
       return contactSettings(ctx, s);
     },

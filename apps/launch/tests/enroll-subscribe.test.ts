@@ -29,3 +29,23 @@ test("課程類手動報名＝訂閱：新章節、時間地點更新都通知�
   assert.equal(l.status, "published", "新增素材清單自動直接上架");
   assert.equal((await call("POST", "/orders", { token: a, body: { courseIds: [l.id] } })).status, 400);
 });
+
+test("Email 通知依情境開關：預設只有付費課程審核通知；可改；通知分類正確", async () => {
+  const { noticeKindOf } = await import("../src/contract.ts");
+  assert.equal(noticeKindOf("報名已送出，等待審核", "/orders/o1"), "paid_review");
+  assert.equal(noticeKindOf("獲得學習徽章", "/achievements"), "badge");
+  assert.equal(noticeKindOf("某某課有新章節", "/course/x"), "course_update");
+  assert.equal(noticeKindOf("新竹中心廣播公告", "/courses"), "broadcast");
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
+    return { status: res.status, data: (await res.json()) as T };
+  };
+  const t = ((await call<{ token: string }>("POST", "/auth/demo", { body: { sub: "demo-student" } })).data).token;
+  const get = async () => (await call<{ emailKinds: Record<string, boolean> }>("GET", "/me/notification-settings", { token: t })).data.emailKinds;
+  const d = await get();
+  assert.deepEqual(Object.entries(d).filter(([, v]) => v).map(([k]) => k), ["paid_review"]);
+  const after = (await call<{ emailKinds: Record<string, boolean> }>("PUT", "/me/notification-settings", { token: t, body: { emailKinds: { badge: true, paid_review: false } } })).data.emailKinds;
+  assert.deepEqual([after.badge, after.paid_review, after.comment], [true, false, false]);
+});

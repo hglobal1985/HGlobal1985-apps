@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { disablePush, enablePush, pushState, type PushState } from "@/lib/web-push";
 import { Switch, View } from "react-native";
-import { api, type NotificationSettings } from "@/api/client";
+import { api, NOTICE_KINDS, type NotificationSettings } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { AppText, Button, Card, EmptyState, ErrorView, Field, InstallCard, LoadingView, LoadingLadybug, NoticeBox, Screen, Section } from "@/ui";
@@ -40,6 +40,9 @@ export default function NotificationSettingsScreen() {
   return (
     <Screen header={false}>
       <Section title="通知方式">
+        {/* 手機推播放最前面（業主 2026-11-18）；推播一律全收，不能逐項關閉 */}
+        <PushCard />
+        <InstallCard />
         <Card>
           <AppText variant="headline">站內通知</AppText>
           <AppText tone="muted">一定會收到，在「通知」分頁查看。</AppText>
@@ -75,9 +78,34 @@ export default function NotificationSettingsScreen() {
             />
           </View>
           {!data.email ? <AppText variant="caption" tone="muted">還沒有信箱，所以目前不會寄 Email。</AppText> : null}
+          <View style={{ gap: 4, opacity: data.notifyEmail ? 1 : 0.5 }}>
+            <AppText variant="headline">哪些情況要寄 Email</AppText>
+            <AppText variant="caption" tone="muted">
+              預設只寄「付費課程相關的審核通知」，其他想收到再打開。（手機推播不受這裡影響，所有通知都會推播。）
+            </AppText>
+            {NOTICE_KINDS.map((k) => (
+              <View key={k.key} style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingVertical: 6 }}>
+                <View style={{ flex: 1 }}>
+                  <AppText variant="body" style={{ fontWeight: "600" }}>
+                    {k.label}
+                  </AppText>
+                  <AppText variant="caption" tone="muted">
+                    {k.desc}
+                  </AppText>
+                </View>
+                <Switch
+                  value={!!data.emailKinds?.[k.key]}
+                  disabled={busy || !data.notifyEmail}
+                  onValueChange={(v) => save({ emailKinds: { [k.key]: v } }, v ? `已開啟「${k.label}」的 Email` : `已關閉「${k.label}」的 Email`)}
+                  trackColor={{ false: c.border, true: c.accent }}
+                  thumbColor="#FFFFFF"
+                  ios_backgroundColor={c.border}
+                  accessibilityLabel={`${k.label} Email 通知開關`}
+                />
+              </View>
+            ))}
+          </View>
         </Card>
-        <InstallCard />
-        <PushCard />
       </Section>
       {msg ? <NoticeBox text={msg.text} tone={msg.ok ? "success" : "danger"} /> : null}
     </Screen>
@@ -141,7 +169,7 @@ function PushCard() {
         <View style={{ flex: 1 }}>
           <AppText variant="headline">手機推播</AppText>
           <AppText variant="caption" tone="muted">
-            報名審核結果、開課前一天提醒、新通知，直接推到這支手機。
+            所有通知都會直接推到這支手機（不能逐項關閉，要收就是全部收）。
           </AppText>
         </View>
         <Switch
