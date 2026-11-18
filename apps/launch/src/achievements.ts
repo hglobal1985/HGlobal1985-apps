@@ -76,9 +76,14 @@ export async function evaluateAchievements(db: D1Database, sub: string): Promise
   const list: Achievement[] = [];
   const fresh: Achievement[] = [];
   const inserts = [];
+  // 同一種條件只算一次（100 枚徽章只有十幾種不同的算法），而且全部同時查（以前一枚一枚排隊查，要等好幾秒）。
+  const keyOf = (d: Def) => `${d.condition_type}|${d.course_id ?? ""}|${d.feature ?? ""}`;
+  const uniq = new Map<string, Def>();
+  for (const d of defs.results) if (!uniq.has(keyOf(d))) uniq.set(keyOf(d), d);
+  const values = new Map<string, number>(await Promise.all([...uniq].map(async ([k, d]) => [k, await current(db, sub, d)] as const)));
   for (const d of defs.results) {
     const need = d.condition_type === "course_completed" ? 1 : d.threshold;
-    const now = await current(db, sub, d);
+    const now = values.get(keyOf(d)) ?? 0;
     let earnedAt = got.get(d.id) ?? null;
     const earned = !!earnedAt || now >= need;
     const a: Achievement = { id: d.id, name: d.name, description: d.description, icon: d.icon, type: d.condition_type, threshold: need, feature: d.feature, courseTitle: d.course_title, current: Math.min(now, need), earned, earnedAt };
