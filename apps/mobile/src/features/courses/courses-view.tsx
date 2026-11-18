@@ -586,16 +586,20 @@ function SortableTile({ group, width, index, count, onSwap }: { group: SeriesGro
   );
 }
 
+/** 專區色帶的顏色：寰宇專區沿用站內主色（c.accentSoft／c.accentText，本來就有深色），其他專區各有淺色與深色兩組。 */
+const ZONE_PALETTE: Record<string, Record<"light" | "dark", { bg: string; fg: string }> | null> = {
+  hglobal: null,
+  material: { light: { bg: "#FFF3C4", fg: "#5A4300" }, dark: { bg: "#3A3112", fg: "#F2D675" } },
+  brand: { light: { bg: "#DCEBFA", fg: "#0F3D6E" }, dark: { bg: "#15283D", fg: "#8EC1F0" } },
+  centers: { light: { bg: "#FCE1DE", fg: "#8F1D18" }, dark: { bg: "#3B1B19", fg: "#F0A8A2" } },
+};
+
 /** 系列檢視的專區標題色帶：寰宇＝深綠淡底、安麗素材＝亮黃淡底、安麗品牌＝淡藍底、教育中心＝紅色淡底；右邊可放「移動」鈕（超級管理員）。 */
 function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zone?: Zone; text?: string; icon?: "library" | "folder-open" | "business" | "pricetag"; count: number; red?: boolean; onMove?: () => void; folded?: boolean; onFold?: () => void }) {
-  const { c } = useTheme();
-  const look = red
-    ? { bg: "#FCE1DE", fg: "#8F1D18", icon: "business" as const }
-    : zone === "amway_material"
-      ? { bg: "#FFF3C4", fg: "#5A4300", icon: "folder-open" as const }
-      : zone === "amway_brand"
-        ? { bg: "#DCEBFA", fg: "#0F3D6E", icon: "pricetag" as const }
-        : { bg: c.accentSoft, fg: c.accentText, icon: "library" as const };
+  const { c, scheme } = useTheme();
+  // 專區色帶顏色（業主 2026-11-18：深色模式的色帶也要變暗色）：每個專區一組「淺色／深色」，深色模式底色暗、文字與按鈕用亮色，全部集中在這裡。
+  const pal = ZONE_PALETTE[red ? "centers" : zone === "amway_material" ? "material" : zone === "amway_brand" ? "brand" : "hglobal"];
+  const look = pal ? { ...pal[scheme], icon: red ? ("business" as const) : zone === "amway_material" ? ("folder-open" as const) : ("pricetag" as const) } : { bg: c.accentSoft, fg: c.accentText, icon: "library" as const };
   const label = text ?? (zone ? zoneLabel(zone) : "");
   return (
     // 點標題列任意處都能收合／展開（業主 2026-11-18）；裡面的「移動」「收合」鈕各自處理自己的點擊。
