@@ -27,6 +27,11 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   // 大螢幕（業主 2026-11-18）：內容放寬到 960、左右留白加大；海報區在 HomeRail 依欄寬保留足夠高度（橫放時頁面可往下捲，不把海報裁成扁條）。
   const lay = useLayout();
+  // 首頁一律一頁顯示、不上下捲動（業主永久指示）：橫式（寬 > 高，平板、手機、電腦都一樣）標題與會員資料並排成一行；
+  // 直式維持兩行，並依視窗比例放大（寬度越大放越大，上限 1.55 倍）。
+  const landscape = lay.width > lay.height;
+  const shortLand = landscape && lay.height < 500; // 手機橫放：空間很矮，隱藏安裝提醒與備註
+  const k = landscape ? Math.max(0.75, Math.min(1.2, lay.height / 560)) : lay.large ? Math.max(1, Math.min(1.55, lay.width / 440)) : 1;
   const { member } = useSession();
   const { data, error, reload } = useApi<CourseSummary[]>("/courses");
   const [quote, setQuote] = useState<string | null>(null);
@@ -89,14 +94,14 @@ export default function HomeScreen() {
     {promptOpen && member ? <ProfilePrompt onClose={() => setPromptOpen(false)} initial={member.profileForm ?? null} /> : null}
     <ScrollView style={{ flex: 1, backgroundColor: c.background }} contentContainerStyle={[styles.page, { paddingTop: insets.top + space.md, paddingHorizontal: lay.large ? lay.gutter : space.md }]} refreshControl={refreshControl} alwaysBounceVertical keyboardShouldPersistTaps="handled">
       <View style={[styles.inner, lay.large ? { maxWidth: Math.min(lay.wideMax, 960), gap: space.lg } : null]}>
-        <View style={styles.head}>
-          <BrandTitle />
+        <View style={[styles.head, landscape && { flexDirection: "row", justifyContent: "center", gap: space.xl }]}>
+          <BrandTitle scale={k} />
           {member ? (
-            <MemberHeader member={member} onPress={member.demo ? undefined : () => setPromptOpen(true)} />
+            <MemberHeader member={member} scale={k} onPress={member.demo ? undefined : () => setPromptOpen(true)} />
           ) : null}
         </View>
         <LoginPrompt />
-        <InstallCard dismissible />
+        {shortLand ? null : <InstallCard dismissible />}
         {noticeClosed ? null : <Ticker items={(notices.data ?? []).map((n) => n.text)} everyMs={config.app.tickerSec * 1000} pauseMs={config.app.tickerPauseSec * 1000} onClose={() => setNoticeClosed(true)} />}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {!data && !error ? <LoadingView /> : null}
@@ -108,6 +113,8 @@ export default function HomeScreen() {
               icon="book-outline"
               tone="green"
               courses={mine}
+              scale={k}
+              compact={shortLand}
               autoSec={config.app.homeLeftSec}
               pauseSec={config.app.homePauseSec}
               note={quote ?? undefined}
@@ -131,6 +138,8 @@ export default function HomeScreen() {
               icon="sparkles-outline"
               tone="orange"
               courses={recommended}
+              scale={k}
+              compact={shortLand}
               autoSec={config.app.homeRightSec}
               pauseSec={config.app.homePauseSec}
               note={rules.scope === "all" ? "顯示您可報名的課程" : "顯示您中心、您可報名的課程"}
@@ -152,7 +161,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   page: { flexGrow: 1, alignItems: "center", paddingHorizontal: space.md, overflow: "hidden" },
   inner: { width: "100%", maxWidth: maxContentWidth, gap: space.md, flex: 1 },
-  head: { alignItems: "center", gap: space.sm },
+  head: { alignItems: "center", gap: space.sm, flexWrap: "nowrap" },
   brand: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm },
   logo: { width: 44, height: 44 },
   rails: { flex: 1, flexDirection: "row", gap: space.md, alignItems: "stretch" },

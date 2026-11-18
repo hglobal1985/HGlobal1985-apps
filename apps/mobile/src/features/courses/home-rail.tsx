@@ -3,7 +3,6 @@ import { Animated, Easing, Image, PanResponder, Platform, Pressable, StyleSheet,
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays, hostLine, placeText } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
-import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, CourseCover, Icon, type IconName } from "@/ui";
@@ -45,15 +44,11 @@ function Slide({ course, w, h }: { course: CourseSummary; w: number; h: number }
  * 首頁的一個區塊（左或右）：標題與備註置中；海報（EDM）區塊填滿剩下的高度，手指在區塊內左右滑動切換；
  * 下方顯示目前這門課的名稱、主辦單位、日期、金額，點圖或名稱進入課程。
  */
-export function HomeRail({ title, icon, tone, note, courses, empty, progress, autoSec = 0, pauseSec = 8 }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean; /** 自動輪播間隔（秒；0＝不自動輪播）。 */ autoSec?: number; /** 手指滑過後暫停自動輪播的秒數。 */ pauseSec?: number }) {
+export function HomeRail({ title, icon, tone, note, courses, empty, progress, autoSec = 0, pauseSec = 8, scale = 1, compact = false }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean; /** 自動輪播間隔（秒；0＝不自動輪播）。 */ autoSec?: number; /** 手指滑過後暫停自動輪播的秒數。 */ pauseSec?: number; /** 首頁大螢幕放大倍數（標題、備註、資訊文字）。 */ scale?: number; /** 手機橫放等矮視窗：隱藏備註、資訊壓縮，海報才有空間。 */ compact?: boolean }) {
   useCenterNames();
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
-  // 大螢幕（業主 2026-11-18）：海報區至少保留「欄寬 × 1.25」（橫放＝× 1）的高度，直式 EDM 大致完整，不會被壓成扁條。
-  const lay = useLayout();
-  const large = lay.large;
-  const [colW, setColW] = useState(0);
-  const [page, setPage] = useState(0);
+    const [page, setPage] = useState(0);
   // 點圖或名稱：先彈出這門課的章節摘要（右上角「完整介紹」，往上拉到最高處也會進入課程介紹頁），不直接跳頁。
   const [preview, setPreview] = useState<CourseSummary | null>(null);
   const cur = courses[Math.min(page, Math.max(0, courses.length - 1))];
@@ -122,19 +117,20 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
     pausedUntil.current = Date.now() + livePause.current * 1000;
     slideTo(i);
   };
+  const info = { fontSize: Math.round(12 * scale), lineHeight: Math.round(16 * scale) };
   const [bg, fg] = tone === "green" ? [c.accentSoft, c.accentText] : [c.warningSoft, c.warning];
   return (
-    <View style={styles.col} onLayout={large ? (e) => setColW(Math.floor(e.nativeEvent.layout.width)) : undefined}>
-      <View style={[styles.pill, { backgroundColor: bg }]}>
-        <Icon name={icon} size={18} color={fg} />
-        <AppText variant="headline" numberOfLines={1} style={{ color: fg, fontWeight: "800" }}>
+    <View style={styles.col}>
+      <View style={[styles.pill, { backgroundColor: bg, minHeight: Math.round(36 * scale) }]}>
+        <Icon name={icon} size={Math.round(18 * scale)} color={fg} />
+        <AppText variant="headline" numberOfLines={1} style={{ color: fg, fontWeight: "800", fontSize: Math.round(17 * scale), lineHeight: Math.round(24 * scale) }}>
           {title}
         </AppText>
       </View>
-      <AppText variant="caption" tone="muted" numberOfLines={3} style={styles.note}>
+      {compact ? null : <AppText variant="caption" tone="muted" numberOfLines={3} style={[styles.note, { fontSize: Math.round(12 * scale), lineHeight: Math.round(16 * scale), minHeight: Math.round(32 * scale) }]}>
         {note ?? " "}
-      </AppText>
-      <View style={[styles.stage, large && colW ? { minHeight: Math.round(colW * (lay.landscape ? 1 : 1.25)) } : null]} onLayout={(e) => setBox({ w: Math.floor(e.nativeEvent.layout.width), h: Math.floor(e.nativeEvent.layout.height) })}>
+      </AppText>}
+      <View style={styles.stage} onLayout={(e) => setBox({ w: Math.floor(e.nativeEvent.layout.width), h: Math.floor(e.nativeEvent.layout.height) })}>
         {box.w > 0 && box.h > 0 ? (
           courses.length ? (
             <View style={{ width: box.w, height: box.h, overflow: "hidden", ...(Platform.OS === "web" ? ({ touchAction: "pan-y", userSelect: "none" } as object) : {}) }} {...pan.panHandlers}>
@@ -154,7 +150,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
           )
         ) : null}
       </View>
-      <View style={styles.dots}>
+      <View style={[styles.dots, compact && { height: 16 }]}>
         {/* 課程很多時，圓點只顯示放得下的數量（以目前這張為中心的一段），不會超出欄寬。 */}
         {courses.length > 1
           ? dotWindow(courses.length, page, Math.max(5, Math.floor((box.w || 160) / 16))).map((i) => [courses[i], i] as const).map(([course, i]) => (
@@ -164,21 +160,21 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
             ))
           : null}
       </View>
-      {!cur ? <View style={styles.info} /> : null}
+      {!cur ? <View style={[styles.info, compact && { minHeight: 0 }]} /> : null}
       {cur ? (
-        <Pressable onPress={() => setPreview(cur)} accessibilityRole="link" style={styles.info}>
+        <Pressable onPress={() => setPreview(cur)} accessibilityRole="link" style={[styles.info, compact && { minHeight: 0 }]}>
           {hostLine(cur) ? (
-            <AppText variant="caption" tone="muted" numberOfLines={2}>
+            <AppText variant="caption" tone="muted" numberOfLines={2} style={info}>
               {hostLine(cur)}
             </AppText>
           ) : null}
           {cur.eventStart ? (
-            <AppText variant="caption" tone="muted" numberOfLines={1}>
+            <AppText variant="caption" tone="muted" numberOfLines={1} style={info}>
               {eventDays(cur.eventStart, cur.eventEnd)}
             </AppText>
           ) : null}
           {placeText(cur) ? (
-            <AppText variant="caption" tone="muted" numberOfLines={1}>
+            <AppText variant="caption" tone="muted" numberOfLines={1} style={info}>
               {placeText(cur)}
             </AppText>
           ) : null}
@@ -188,7 +184,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
             </View>
           )}
           {progress && cur.lessonCount ? (
-            <AppText variant="caption" tone="muted" numberOfLines={1}>
+            <AppText variant="caption" tone="muted" numberOfLines={1} style={info}>
               學習進度 {cur.progressPercent}%
             </AppText>
           ) : null}
@@ -210,9 +206,9 @@ const styles = StyleSheet.create({
   col: { flex: 1, minWidth: 0, gap: space.xs, alignItems: "stretch" },
   pill: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.xs, minHeight: 36, paddingHorizontal: space.sm, borderRadius: radius.pill },
   note: { textAlign: "center", minHeight: 32 },
-  stage: { flex: 1, minHeight: 120 },
+  stage: { flex: 1, minHeight: 60 },
   dots: { flexDirection: "row", justifyContent: "center", alignItems: "center", height: 26, overflow: "hidden" },
   dotHit: { width: 16, height: 26, alignItems: "center", justifyContent: "center", ...(Platform.OS === "web" ? ({ cursor: "pointer" } as object) : {}) },
   dot: { width: 11, height: 11, borderRadius: 6 },
-  info: { gap: 2, alignItems: "center", minHeight: 112 },
+  info: { gap: 2, alignItems: "center", minHeight: 100 },
 });
