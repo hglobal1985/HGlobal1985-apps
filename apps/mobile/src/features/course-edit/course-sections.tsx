@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type Rank } from "@/api/client";
+import { api, HQ_UNIT, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -13,6 +13,7 @@ import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, DateSelect, Field, FormBlock, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
+import { KindToggle } from "./kind-toggle";
 import { BrandField, CategoryField, HostField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
 
@@ -124,7 +125,7 @@ const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.st
 
 // ---------- 基本資料：名稱、主講人、分類、系列（封面顏色已刪除，無 EDM 時文字封面顏色自動隨機） ----------
 /** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
-export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string };
+export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
 export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
@@ -145,10 +146,11 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
       )}
       <CategoryField value={f.category} onChange={set("category")} withInput />
       <BrandField value={f.brandId} onChange={set("brandId")} />
+      {isSuper ? <Chips title="專區（寰宇大學「所有系列」顯示在哪一區）" options={ZONES.map((z) => ({ key: z.id, label: z.label }))} value={f.zone} onChange={set("zone")} /> : null}
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
-          <FormBlock title="系列" hint="同系列合併成一張卡；沒指定系列，就自己單獨一張卡（素材會放在「素材專區」）">
+          <FormBlock title="系列" hint="同系列合併成一張卡；沒指定系列，就自己單獨一張卡">
             <Field label="" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
             {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
           </FormBlock>
@@ -161,7 +163,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
 function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "" };
+  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
   const [f, setF] = useState(init);
   // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");
@@ -170,15 +172,31 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const submit = async () => {
     if (!f.title.trim()) return setError(course.isList ? "請輸入素材清單名稱" : "請輸入課程名稱");
-    const { series: _series, eventStart, eventEnd, ...rest } = f;
+    const { series: _series, zone, eventStart, eventEnd, ...rest } = f;
     // 日期與「時間與地點」面板是同一份資料；素材清單沒有日期，不送。
     const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
     const important = !course.isList && (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
     const matBody = course.isList && isSuper && matUrl.trim().toLowerCase() !== (course.matUrl ?? "") ? { matUrl: matUrl.trim() } : {};
-    if (await save({ ...(isSuper ? { ...rest, series: f.series } : rest), ...dates, ...matBody }, { important })) onClose();
+    if (await save({ ...(isSuper ? { ...rest, series: f.series, ...(zone !== init.zone ? { zone } : {}) } : rest), ...dates, ...matBody }, { important })) onClose();
+  };
+  // 右上「素材／課程」（業主 2026-11-18）：課程→素材要確認且不可逆（只有超級管理員）；素材不能轉回課程。
+  const pickKind = async (toList: boolean) => {
+    if (!toList) return flashText("素材不能轉回課程，請另外新增一門課程");
+    if (!isSuper) return flashText("只有超級管理員可以把課程轉成素材");
+    if (!(await confirmAsk("轉成素材", `確定把「${course.title}」轉成素材？轉換後費用、獎銜、報名與審核、主講人、日期地點都會消失，無法復原。`, "轉成素材"))) return;
+    try {
+      onSaved(await api<CourseDetail>("POST", `/admin/courses/${course.id}/convert-to-list`));
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    }
   };
   return (
-    <EditSheet material={course.isList} title="基本資料" onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
+    <EditSheet
+      material={course.isList}
+      headRight={<KindToggle isList={course.isList} onPick={pickKind} />}
+      title="基本資料"
+      onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
       {course.isList && isSuper ? (
         <View style={{ gap: space.xs }}>
           <Label>素材網址（只有超級管理員能設定）</Label>
@@ -203,30 +221,6 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
         </View>
       ) : null}
       <BasicsFields isList={course.isList} f={f} setF={setF} />
-      {/* 轉成素材（只有超級管理員、只有一般課程；業主 2026-11-17）：章節變成素材項目，課程專屬設定（費用、獎銜、報名審核、主講人、日期地點）全部捨棄。 */}
-      {isSuper && !course.isList ? (
-        <View style={{ gap: space.xs, marginTop: space.md }}>
-          <Label>轉成素材</Label>
-          <AppText variant="caption" tone="muted">
-            把這門課直接變成「素材專區」裡的素材：章節變成素材項目（影片來源保留），費用、獎銜限制、報名與審核、主講人、日期地點都會消失，素材一律免費公開、不用緞帶、不計學習進度。已有人報名的課程不能轉。
-          </AppText>
-          <Button
-            variant="secondary"
-            label="轉成素材"
-            icon="folder-open-outline"
-            onPress={async () => {
-              if (!(await confirmAsk("轉成素材", `確定把「${course.title}」轉成素材？轉換後費用、獎銜、報名與審核、主講人、日期地點都會消失，無法復原。`, "轉成素材"))) return;
-              try {
-                onSaved(await api<CourseDetail>("POST", `/admin/courses/${course.id}/convert-to-list`));
-                onClose();
-              } catch (e) {
-                setError((e as Error).message);
-              }
-            }}
-            fullWidth
-          />
-        </View>
-      ) : null}
     </EditSheet>
   );
 }

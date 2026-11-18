@@ -53,6 +53,8 @@ import {
   type ReportRow,
   VIEW_SCOPES,
   type ViewScope,
+  ZONES,
+  zoneOf,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
@@ -426,6 +428,7 @@ type CourseRow = {
   price_tba: number;
   hide_home: number;
   brand_id: string | null;
+  zone: string;
   series_order: number;
   diamond_free: number;
   series: string;
@@ -459,7 +462,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.diamond_free, c.series, c.series_order, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -574,6 +577,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     priceTba: row.price_tba === 1,
     hideFromHome: row.hide_home === 1,
     seriesOrder: row.series_order,
+    zone: zoneOf(row.zone, row.is_list === 1),
     brandId: row.brand_id,
     brandName: ctx.brands?.find((x) => x.id === row.brand_id)?.name ?? null,
     brand: brandFor(ctx, row),
@@ -2032,6 +2036,13 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     if (!who.roles.includes("super_admin")) fail(403, "series_super_admin_only", "只有超級管理員可以設定系列");
     sets.push(["series", series]);
   }
+  if (body.zone !== undefined) {
+    // 專區只限超級管理員設定（業主 2026-11-18）；空字串＝依類型預設。
+    if (!who.roles.includes("super_admin")) fail(403, "zone_super_admin_only", "只有超級管理員可以設定專區");
+    const z = typeof body.zone === "string" ? body.zone : "";
+    if (z && !ZONES.some((x) => x.id === z)) fail(400, "invalid_zone", "專區不正確");
+    sets.push(["zone", z]);
+  }
   if (body.diamondFree !== undefined) sets.push(["diamond_free", body.diamondFree === true ? 1 : 0]);
   if (body.hideFromHome !== undefined) sets.push(["hide_home", body.hideFromHome === true ? 1 : 0]);
   if (body.brandId !== undefined) {
@@ -2281,7 +2292,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
+  const keep = ["zone", "view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
@@ -2377,6 +2388,10 @@ async function updateCourse(ctx: Ctx, id: string) {
   ]);
   const res = batchRes[matAlias.length + aliasStmts.length]!;
   if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
+  // 專區跟著「系列」走：同一個系列的課程一起換專區，避免同一張卡拆在兩個專區。
+  const zoneSet = sets.find(([c]) => c === "zone");
+  const serNow = String(pick("series", cur.series) ?? "");
+  if (zoneSet && serNow) await ctx.db.prepare("UPDATE courses SET zone = ? WHERE series = ?").bind(zoneSet[1], serNow).run();
   await ensureCourseUrl(ctx, id);
   if (pick("status", cur.status) === "published" && cur.status !== "published") await notifyNewCourse(ctx, id);
   // 上課日期或地點改了：已報名的學員收到更新通知（報名＝訂閱，業主 2026-11-18）。
@@ -4702,6 +4717,24 @@ const routes: [string, RegExp, Handler][] = [
       const { results } = await ctx.db.prepare(`SELECT id FROM courses WHERE series = ? AND id IN (${ids.map(() => "?").join(",")})`).bind(series, ...ids).all<{ id: string }>();
       if (results.length !== new Set(ids).size) return fail(400, "invalid_request", "有項目不屬於這個系列");
       await ctx.db.batch([...ids.map((id, i) => ctx.db.prepare("UPDATE courses SET series_order = ? WHERE id = ?").bind(i + 1, id)), audit(ctx.db, s.sub, "series.order", "series", series, String(ids.length))]);
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/zone-move$/,
+    async (ctx) => {
+      // 跨專區移動（業主 2026-11-18）：ids＝要搬的課程或清單；同系列的一起搬。只有超級管理員。
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ zone?: unknown; ids?: unknown }>(ctx.req);
+      const zone = typeof body.zone === "string" ? body.zone : "";
+      const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
+      if (!ZONES.some((z) => z.id === zone) || !ids.length || ids.length > 500) return fail(400, "invalid_request", "移動內容不正確");
+      const marks = ids.map(() => "?").join(",");
+      await ctx.db.batch([
+        ctx.db.prepare(`UPDATE courses SET zone = ? WHERE id IN (${marks}) OR (series <> '' AND series IN (SELECT series FROM courses WHERE id IN (${marks})))`).bind(zone, ...ids, ...ids),
+        audit(ctx.db, s.sub, "zone.move", "zone", zone, String(ids.length)),
+      ]);
       return { ok: true };
     },
   ],

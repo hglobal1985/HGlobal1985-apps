@@ -85,6 +85,15 @@ export type SeriesArt = { series: string; edmUrl: string; coverUrl: string | nul
 export type EnrollmentState = "opened" | "pending" | null;
 
 /** 誰可以瀏覽：所有人含訪客／所有會員／寰宇夥伴／中心會員。 */
+/** 寰宇大學「所有系列」檢視的三個專區（業主 2026-11-18）。空字串＝沒指定：課程放 hglobal、清單放 amway_material。 */
+export type Zone = "hglobal" | "amway_material" | "amway_brand";
+export const ZONES: { id: Zone; label: string }[] = [
+  { id: "hglobal", label: "寰宇課程活動與素材專區" },
+  { id: "amway_material", label: "安麗素材專區" },
+  { id: "amway_brand", label: "安麗品牌專區" },
+];
+export const zoneOf = (raw: string | null | undefined, isList: boolean): Zone => (ZONES.some((z) => z.id === raw) ? (raw as Zone) : isList ? "amway_material" : "hglobal");
+
 export type ViewScope = "all" | "members" | "hglobal" | "center" | "link_login" | "link_guest";
 export const VIEW_SCOPES: ViewScope[] = ["all", "members", "hglobal", "center", "link_login", "link_guest"];
 export const VIEW_SCOPE_LABEL: Record<ViewScope, string> = { all: "所有人含訪客", members: "所有會員", hglobal: "寰宇夥伴", center: "中心會員", link_login: "私密連結（需登入）", link_guest: "私密連結（訪客可）" };
@@ -111,6 +120,8 @@ export type CourseSummary = {
   /** 品牌（業主 2026-11-18，獨立於分類）：brand_logos 的 id 與名稱。 */
   brandId: string | null;
   brandName: string | null;
+  /** 所屬專區（業主 2026-11-18）。 */
+  zone: Zone;
   /** 選了品牌、且沒有手動上傳封面時才有：logo 圖、底色、底圖。 */
   brand: BrandCover | null;
   /** 清單類別：勾了「顯示在上拉選單」的區塊（業主 2026-11-18）；課程類別永遠是空陣列。 */

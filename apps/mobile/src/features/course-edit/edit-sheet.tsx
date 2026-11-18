@@ -38,6 +38,7 @@ export function EditSheet({
   saveLabel = "儲存",
   hideSave = false,
   material = false,
+  headRight,
   children,
 }: {
   title: string;
@@ -51,6 +52,8 @@ export function EditSheet({
   hideSave?: boolean;
   /** 素材（清單類別）：標題列右上角顯示黃色「素材」標示，方便跟課程區分（業主 2026-11-18）。 */
   material?: boolean;
+  /** 標題列右邊自訂內容（例如「素材／課程」切換）；有的話取代「素材」標示。 */
+  headRight?: ReactNode;
   children: ReactNode;
 }) {
   const { height } = useWindowDimensions();
@@ -70,7 +73,8 @@ export function EditSheet({
           <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
             {title}
           </AppText>
-          {material ? (
+          {headRight ?? null}
+          {!headRight && material ? (
             <View style={styles.matTag} accessibilityLabel="素材">
               <Ionicons name="folder-open" size={14} color="#1D2A22" />
               <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>

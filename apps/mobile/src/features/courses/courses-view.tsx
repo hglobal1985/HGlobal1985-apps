@@ -1,10 +1,10 @@
 import { trackFeature } from "@/lib/feature-track";
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, BackHandler, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { api, type CenterArt, type CourseSummary } from "@/api/client";
+import { api, ZONES, type CenterArt, type CourseSummary, type Zone } from "@/api/client";
 import { CenterEdm } from "@/features/admin/center-edm";
 import { CenterAddressField } from "@/features/admin/center-address-field";
 import { CenterNameField } from "@/features/admin/center-name-field";
@@ -25,6 +25,7 @@ import { CenterBroadcastEditor } from "@/features/admin/center-broadcast-editor"
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { flashMode } from "./mode-flash";
+import { ZoneMoveSheet, zoneLabel } from "./zone-move-sheet";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
 import { buildSearchIndex, matchCourses, matchLessons, suggestTerms, type SearchLesson } from "./course-search";
@@ -255,10 +256,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     [flat, list, pool, config.seriesOrder, orderOverride],
   );
   // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、素材專區（整組都是清單類別的）。
-  const materialGroups = useMemo(() => (flat ? [] : groups.filter((g) => g.sessions.every((x) => x.isList))), [flat, groups]);
+  const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
+  const [moveTo, setMoveTo] = useState<Zone | null>(null);
   /** 在同一個區塊裡把第 i 張跟相鄰的交換，立刻更新畫面、背景存檔；失敗就還原。 */
   useEffect(() => setOrderOverride(null), [config.seriesOrder]);
   const canSort = isSuperAdmin(member) && mode === "series" && !flat && !matched;
+  const canMove = canSort;
   const swapCard = (zone: typeof groups, i: number, dir: -1 | 1) => {
     const j = i + dir;
     if (j < 0 || j >= zone.length) return;
@@ -275,7 +278,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         flashText(e.message);
       });
   };
-  const courseGroups = useMemo(() => (flat ? groups : groups.filter((g) => !g.sessions.every((x) => x.isList))), [flat, groups]);
   // 章節模式：符合條件的章節，不分組、不顯示系列標題，順序隨機（每次打開頁面、切到章節模式就重新洗牌；
   // 同一次瀏覽中打字搜尋、換分類時，相對順序保持不變，畫面不會跳動）。
   const [shuffleSeed, setShuffleSeed] = useState(() => Math.floor(Math.random() * 2 ** 31));
@@ -503,7 +505,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             <Pressable accessibilityRole="button" accessibilityState={{ selected: sortMode }} onPress={() => setSortMode((v) => !v)} style={[styles.sortBar, { backgroundColor: sortMode ? c.accent : c.surface, borderColor: sortMode ? c.accent : c.border }]}>
               <Ionicons name="swap-horizontal" size={20} color={sortMode ? c.textOnAccent : c.accentText} />
               <AppText variant="callout" style={{ flex: 1, fontWeight: "700", color: sortMode ? c.textOnAccent : c.text }}>
-                {sortMode ? "排序模式：點卡片下方的 ◀ ▶ 與相鄰的卡交換位置" : "排序卡片（課程系列、素材專區各排各的）"}
+                {sortMode ? "排序模式：點卡片下方的 ◀ ▶ 與相鄰的卡交換位置" : "排序卡片（三個專區各排各的）"}
               </AppText>
               <AppText variant="callout" style={{ fontWeight: "800", color: sortMode ? c.textOnAccent : c.accentText }}>
                 {sortMode ? "完成" : "排序"}
@@ -514,12 +516,20 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
-            {tileW && !(mode === "center" && center === ALL) && !flat && (materialGroups.length || (mode === "series" && !matched && centerCounts.length)) && courseGroups.length ? <ZoneBand icon="library" text="課程系列" count={courseGroups.length} /> : null}
-            {tileW && !(mode === "center" && center === ALL) ? (flat ? groups : courseGroups).map((g, i, zone) => (sortMode && canSort && !flat ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={zone.length} onSwap={(d) => swapCard(zone, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />)) : null}
-            {tileW && !(mode === "center" && center === ALL) && !flat && materialGroups.length ? <ZoneBand icon="folder-open" text="素材專區" count={materialGroups.length} material /> : null}
-            {tileW && !(mode === "center" && center === ALL) && !flat ? materialGroups.map((g, i, zone) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={zone.length} onSwap={(d) => swapCard(zone, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />)) : null}
+            {/* 三個專區（業主 2026-11-18）：寰宇課程活動與素材專區／安麗素材專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
+            {tileW && flat ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
+            {tileW && !(mode === "center" && center === ALL) && !flat
+              ? zoneSections.map(({ zone, items }) =>
+                  items.length || canMove ? (
+                    <Fragment key={zone}>
+                      <ZoneBand zone={zone} count={items.length} onMove={canMove ? () => setMoveTo(zone) : undefined} />
+                      {items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
+                    </Fragment>
+                  ) : null,
+                )
+              : null}
             {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
-            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand icon="business" text="教育中心" count={centerCounts.length} red /> : null}
+            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.length} red /> : null}
             {tileW && mode === "series" && !matched
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
               : null}
@@ -532,6 +542,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     {canCreateCourse(member) ? (
       <AddMaterialFab onPick={setNewOpen} />
     ) : null}
+    {moveTo ? <ZoneMoveSheet target={moveTo} groups={groups} onMoved={() => { reload(); adminList.reload(); }} onClose={() => setMoveTo(null)} /> : null}
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} brands={brandList.data ?? []} brand={brandSel} onBrand={pickBrand} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {bcOpen && bc.data ? <BroadcastSheet title={`${centerTitle(activeCenter)}廣播公告`} items={bc.data.items} onClose={() => setBcOpen(false)} /> : null}
@@ -571,26 +582,40 @@ function SortableTile({ group, width, index, count, onSwap }: { group: SeriesGro
   );
 }
 
-/** 系列檢視的區塊標題色帶：課程系列（深綠淡底）、素材專區（亮黃淡底）、教育中心（紅色淡底）。 */
-function ZoneBand({ icon, text, count, material, red }: { icon: "library" | "folder-open" | "business"; text: string; count: number; material?: boolean; red?: boolean }) {
+/** 系列檢視的專區標題色帶：寰宇＝深綠淡底、安麗素材＝亮黃淡底、安麗品牌＝淡藍底、教育中心＝紅色淡底；右邊可放「移動」鈕（超級管理員）。 */
+function ZoneBand({ zone, text, icon, count, red, onMove }: { zone?: Zone; text?: string; icon?: "library" | "folder-open" | "business" | "pricetag"; count: number; red?: boolean; onMove?: () => void }) {
   const { c } = useTheme();
-  // 課程系列＝深綠、素材專區＝亮黃、教育中心＝紅色系。
-  const bg = red ? "#FCE1DE" : material ? "#FFF3C4" : c.accentSoft;
-  const fg = red ? "#8F1D18" : material ? "#5A4300" : c.accentText;
+  const look = red
+    ? { bg: "#FCE1DE", fg: "#8F1D18", icon: "business" as const }
+    : zone === "amway_material"
+      ? { bg: "#FFF3C4", fg: "#5A4300", icon: "folder-open" as const }
+      : zone === "amway_brand"
+        ? { bg: "#DCEBFA", fg: "#0F3D6E", icon: "pricetag" as const }
+        : { bg: c.accentSoft, fg: c.accentText, icon: "library" as const };
+  const label = text ?? (zone ? zoneLabel(zone) : "");
   return (
-    <View style={[styles.zone, { backgroundColor: bg }]} accessibilityRole="header">
-      <Ionicons name={icon} size={18} color={fg} />
-      <AppText variant="callout" style={{ fontWeight: "800", color: fg }}>
-        {text}
+    <View style={[styles.zone, { backgroundColor: look.bg }]} accessibilityRole="header">
+      <Ionicons name={icon ?? look.icon} size={18} color={look.fg} />
+      <AppText variant="callout" style={{ fontWeight: "800", color: look.fg, flexShrink: 1 }}>
+        {label}
       </AppText>
-      <AppText variant="caption" style={{ color: fg }}>
+      <AppText variant="caption" style={{ color: look.fg, flex: 1 }}>
         {count}
       </AppText>
+      {onMove ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`移動課程或清單到${label}`} onPress={onMove} style={[styles.moveBtn, { backgroundColor: look.fg }]}>
+          <Ionicons name="swap-horizontal" size={16} color={look.bg} />
+          <AppText variant="caption" style={{ color: look.bg, fontWeight: "800" }}>
+            移動
+          </AppText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  moveBtn: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   zone: { width: "100%", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: 12 },
   terms: { marginTop: space.xs, borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   term: { minHeight: 44, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", gap: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
