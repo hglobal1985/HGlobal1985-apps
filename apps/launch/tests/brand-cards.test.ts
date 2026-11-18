@@ -11,7 +11,7 @@ test("品牌資訊卡：每個品牌一張、6 個預設區塊、第一區塊連
   const store = new Map<string, Uint8Array>([["system/brand-demo-wide.jpg", new Uint8Array([1])], ["system/brand-demo-tall.jpg", new Uint8Array([2])]]);
   const r2 = {
     async put(k: string, v: ArrayBuffer) { store.set(k, new Uint8Array(v)); },
-    async get(k: string) { const v = store.get(k); return v ? { body: new Blob([v]).stream() } : null; },
+    async get(k: string) { const v = store.get(k); return v ? { body: new Blob([v as BlobPart]).stream() } : null; },
     async head() { return null; },
     async delete() {},
     async list() { return { objects: [], truncated: false }; },

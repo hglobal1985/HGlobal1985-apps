@@ -18,7 +18,7 @@ async function decrypt(body: Uint8Array, uaKeys: CryptoKeyPair, auth: Uint8Array
   const uaPublic = new Uint8Array(await crypto.subtle.exportKey("raw", uaKeys.publicKey));
   const asKey = await crypto.subtle.importKey("raw", asPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
   const ecdh = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: asKey }, uaKeys.privateKey, 256));
-  const hk = async (s: Uint8Array, ikm: Uint8Array, info: Uint8Array, len: number) => new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: s, info }, await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]), len * 8));
+  const hk = async (s: Uint8Array, ikm: Uint8Array, info: Uint8Array, len: number) => new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: s as BufferSource, info: info as BufferSource }, await crypto.subtle.importKey("raw", ikm as BufferSource, "HKDF", false, ["deriveBits"]), len * 8));
   const te = new TextEncoder();
   const ikm = await hk(auth, ecdh, new Uint8Array([...te.encode("WebPush: info\0"), ...uaPublic, ...asPublic]), 32);
   const cek = await hk(salt, ikm, te.encode("Content-Encoding: aes128gcm\0"), 16);

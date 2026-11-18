@@ -9,7 +9,6 @@ test("匯入工作：播放清單、連結、單支影片、封面、照片依�
   const store = new Map<string, Uint8Array>();
   const r2 = { async put(k: string, v: ArrayBuffer) { store.set(k, new Uint8Array(v)); }, async get() { return null; }, async head() { return null; }, async delete() {}, async list() { return { objects: [], truncated: false }; } } as unknown as R2Bucket;
   const env: Env = { DB: db, MEDIA: r2, YOUTUBE_API_KEY: "k" };
-  await db.exec?.("");
   const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
   await run("INSERT INTO courses (id, title, is_list, status) VALUES ('c1', '表揚', 1, 'published')");
   const sec = (id: string, pos: number, title: string) => run("INSERT INTO lessons (id, course_id, position, title, kind, media_type) VALUES (?, 'c1', ?, ?, 'section', 'demo')", id, pos, title);

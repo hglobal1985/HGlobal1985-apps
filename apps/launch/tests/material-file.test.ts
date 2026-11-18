@@ -11,11 +11,11 @@ const memR2 = (): R2Bucket & { store: Map<string, { data: Uint8Array; type?: str
   const store = new Map<string, { data: Uint8Array; type?: string }>();
   return {
     store,
-    async head(k) { const o = store.get(k); return o ? { size: o.data.byteLength } : null; },
-    async get(k) { const o = store.get(k); return o ? { size: o.data.byteLength, httpMetadata: { contentType: o.type }, body: new Response(o.data as Uint8Array<ArrayBuffer>).body! } : null; },
-    async delete(k) { store.delete(k); },
+    async head(k: string) { const o = store.get(k); return o ? { size: o.data.byteLength } : null; },
+    async get(k: string) { const o = store.get(k); return o ? { size: o.data.byteLength, httpMetadata: { contentType: o.type }, body: new Response(o.data as Uint8Array<ArrayBuffer>).body! } : null; },
+    async delete(k: string) { store.delete(k); },
     async list() { return { objects: [...store].map(([key, o]) => ({ key, size: o.data.byteLength })), truncated: false }; },
-    async put(k, v, opts) { store.set(k, { data: new Uint8Array(v), type: opts?.httpMetadata?.contentType }); },
+    async put(k: string, v: ArrayBuffer, opts?: { httpMetadata?: { contentType?: string } }) { store.set(k, { data: new Uint8Array(v), type: opts?.httpMetadata?.contentType }); },
     async createMultipartUpload() { throw new Error("x"); },
     resumeMultipartUpload() { throw new Error("x"); },
   } as never;
