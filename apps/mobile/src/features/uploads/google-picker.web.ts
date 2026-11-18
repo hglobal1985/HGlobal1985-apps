@@ -48,10 +48,24 @@ const MIME = [
   "application/vnd.google-apps.presentation",
 ].join(",");
 
-/** 回傳 null＝使用者按了取消。 */
+let ready: Promise<void> | null = null;
+/**
+ * 先把 Google 的程式載好（只載入程式，不要任何權限，也不讀任何資料）。手機瀏覽器只有在「按下按鈕的當下」才允許跳出授權視窗，
+ * 所以要在使用者按按鈕之前就準備好，按下去才能立刻跳出；真正的授權（索取雲端硬碟讀取權限）一律等到使用者按下按鈕才發生。
+ */
+export function preloadGooglePicker(): Promise<void> {
+  ready ??= Promise.all([loadScript("https://accounts.google.com/gsi/client"), loadScript("https://apis.google.com/js/api.js")])
+    .then(() => new Promise<void>((ok) => win().gapi.load("picker", { callback: ok })))
+    .catch((e) => {
+      ready = null;
+      throw e;
+    });
+  return ready;
+}
+
+/** 回傳 null＝使用者按了取消。呼叫時才會向使用者索取權限。 */
 export async function pickFromMyDrive(cfg: PickerConfig): Promise<{ token: string; files: PickedFile[] } | null> {
-  await Promise.all([loadScript("https://accounts.google.com/gsi/client"), loadScript("https://apis.google.com/js/api.js")]);
-  await new Promise<void>((ok) => win().gapi.load("picker", { callback: ok }));
+  await preloadGooglePicker();
   const token = await new Promise<string | null>((ok, fail) => {
     const client = win().google.accounts.oauth2.initTokenClient({
       client_id: cfg.clientId,

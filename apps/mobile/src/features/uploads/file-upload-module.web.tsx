@@ -1,11 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, type CourseDetail } from "@/api/client";
 import { useApi } from "@/state/session";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
 import { AppText, Button, NoticeBox } from "@/ui";
 import { useUiConfig } from "@/state/ui-config";
 import { COMPRESSIBLE, FILE_ACCEPT, FILE_TOO_BIG, fileProblem } from "./file-rules";
-import { pickFromMyDrive } from "./google-picker.web";
+import { pickFromMyDrive, preloadGooglePicker } from "./google-picker.web";
 
 type DriveCfg = { ready: boolean; clientId: string; apiKey: string; appId: string; maxBytes: number };
 
@@ -24,6 +24,10 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
   const [msg, setMsg] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const gcfg = useApi<DriveCfg>("/admin/drive-import/config").data;
+  // 只先載入 Google 的程式（不索取任何權限），讓使用者按按鈕時授權視窗能立刻跳出、不被手機瀏覽器擋掉。
+  useEffect(() => {
+    if (gcfg?.ready) void preloadGooglePicker().catch(() => undefined);
+  }, [gcfg?.ready]);
 
   const run = async (files: File[]) => {
     setBusy(true);
