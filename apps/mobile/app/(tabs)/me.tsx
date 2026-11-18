@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { confirmAsk } from "@/features/confirm";
 import { MemberHeader } from "@/features/member-header";
+import { useProfileGate } from "@/features/profile-gate";
 import { openAccountCenter } from "@/features/account-link";
 import type { AppConfig, LibraryMine, Member } from "@/api/client";
 import { canManageCourses, canManageEditors } from "@/lib/roles";
@@ -41,6 +42,7 @@ export default function MeScreen() {
   const { next } = useLocalSearchParams<{ next?: string }>();
   const back = next && next.startsWith("/") && !next.startsWith("//") ? next : null;
   const config = useApi<AppConfig>("/config");
+  const gate = useProfileGate(member);
   const myLibrary = useApi<LibraryMine>(member ? "/library/mine" : null);
   const demo = useApi<Member[]>(!member && config.data?.demoLogin ? "/demo-members" : null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -75,11 +77,12 @@ export default function MeScreen() {
 
   return (
     <Screen>
+      {gate.element}
       {message ? <NoticeBox tone={message.tone} text={message.text} /> : null}
       {!ready ? <LoadingView /> : null}
       {member ? (
         <View style={styles.headWho}>
-          <MemberHeader member={member} />
+          <MemberHeader member={member} onPress={member.demo ? undefined : gate.open} />
           <View style={[styles.row, { justifyContent: "center" }]}>
             {member.titles.length ? member.titles.map((t) => <Pill key={t} label={t} />) : <Pill label={member.role === "admin" ? "管理員" : "學員"} />}
             {member.center ? <Pill label={centerTitle(member.center)} tone="accent" /> : null}

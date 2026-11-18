@@ -262,9 +262,12 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
     <BottomSheet onClose={onClose}>
       <ScrollView style={{ maxHeight: Math.round(winH * (winH >= winW ? 0.74 : 0.5)) }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <AppText variant="title" numberOfLines={1} adjustsFontSizeToFit style={{ flexShrink: 0 }}>
-            資料需完整 才可瀏覽課程
-          </AppText>
+          <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
+            <Icon name="open-outline" size={20} color={c.accentText} />
+            <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
+              前往會員中心完善更多資料
+            </Text>
+          </Pressable>
           {msg ? (
             <AppText variant="caption" tone={msg.ok ? "success" : "danger"} numberOfLines={2}>
               {msg.text}
@@ -281,7 +284,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
               <View style={styles.line}>
                 <View style={{ flex: 1 }}>
                   <Row>
-                    <Label text="本名(窗口對帳用途)" />
+                    <Label text="本名（購買付費課程時，給中心窗口對帳用途）" />
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
                 </View>
@@ -342,12 +345,6 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
             </>
           ) : null}
       </ScrollView>
-      <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
-        <Icon name="open-outline" size={18} color={c.accentText} />
-        <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 14, fontWeight: "700", flexShrink: 1 }}>
-          前往會員中心完善更多資料
-        </Text>
-      </Pressable>
       <View style={styles.actions}>
         <View style={{ flex: 1 }}>
           <Button variant="cancel" label="關閉" icon="close" onPress={onClose} fullWidth />
@@ -372,5 +369,5 @@ const styles = StyleSheet.create({
   dropdown: { position: "absolute", left: 0, right: 0, borderWidth: 1, borderRadius: radius.md, zIndex: 60, overflow: "hidden" },
   search: { minHeight: 40, borderBottomWidth: 1, paddingHorizontal: space.md, fontSize: 15 },
   opt: { minHeight: 44, paddingHorizontal: space.md, justifyContent: "center" },
-  more: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 36 },
+  more: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44 },
 });

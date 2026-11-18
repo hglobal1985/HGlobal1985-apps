@@ -1,10 +1,10 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, HQ_UNIT, type Announcement, type CourseSummary } from "@/api/client";
 import { MemberHeader } from "@/features/member-header";
-import { ProfilePrompt } from "@/features/profile-prompt";
+import { useProfileGate } from "@/features/profile-gate";
 import { HomeRail } from "@/features/courses/home-rail";
 import { collapseSeries } from "@/features/courses/sort";
 import { useApi, useSession } from "@/state/session";
@@ -20,7 +20,6 @@ import { AppText, BrandTitle, ErrorView, InstallCard, LoginPrompt, LoadingView, 
  * 各自可以原地左右滑動瀏覽課程海報（EDM 本身，沒有 EDM 就用課程名稱）。推薦課程只顯示符合會員獎銜、尚未報名的課程。
  */
 // 每次登入只彈一次（登出後再登入會再提示）。
-let promptedFor: string | null = null;
 
 export default function HomeScreen() {
   const { c } = useTheme();
@@ -36,15 +35,8 @@ export default function HomeScreen() {
   const { data, error, reload } = useApi<CourseSummary[]>("/courses");
   const [quote, setQuote] = useState<string | null>(null);
   const [noticeClosed, setNoticeClosed] = useState(false);
-  const [promptOpen, setPromptOpen] = useState(false);
+  const gate = useProfileGate(member);
   const refreshControl = usePullRefresh(); // 首頁也能下拉：立刻更新名字旁的獎銜標籤
-  useEffect(() => {
-    if (!member) promptedFor = null;
-    else if (member.profileMissing?.length && promptedFor !== member.sub) {
-      promptedFor = member.sub;
-      setPromptOpen(true);
-    }
-  }, [member]);
   // 每次進入首頁換一則學習金句。
   useFocusEffect(
     useCallback(() => {
@@ -90,13 +82,13 @@ export default function HomeScreen() {
   const recommended = rules.max > 0 ? collapsed.slice(0, rules.max) : collapsed;
   return (
     <>
-    {promptOpen && member ? <ProfilePrompt onClose={() => setPromptOpen(false)} initial={member.profileForm ?? null} /> : null}
+    {gate.element}
     <ScrollView style={{ flex: 1, backgroundColor: c.background }} contentContainerStyle={[styles.page, { paddingTop: insets.top + space.md, paddingHorizontal: lay.large ? lay.gutter : space.md }]} refreshControl={refreshControl} alwaysBounceVertical keyboardShouldPersistTaps="handled">
       <View style={[styles.inner, lay.large ? { maxWidth: Math.min(lay.wideMax, 960), gap: space.lg } : null]}>
         <View style={[styles.head, landscape && { flexDirection: "row", justifyContent: "center", gap: space.xl }]}>
           <BrandTitle scale={k} />
           {member ? (
-            <MemberHeader member={member} scale={k} onPress={member.demo ? undefined : () => setPromptOpen(true)} />
+            <MemberHeader member={member} scale={k} onPress={member.demo ? undefined : gate.open} />
           ) : null}
         </View>
         <LoginPrompt />
