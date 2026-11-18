@@ -267,6 +267,8 @@ export type Lesson = {
   isSummary?: boolean;
   /** 其他教材的外部連結：類型（畫面用官方 Logo）與網址。網址只給有權限看的人（鎖定的課程不給）；沒有連結（舊教材、完整版）沒有這兩個欄位。 */
   linkType?: AttachmentType;
+  /** 項目圖示的類型（連結類型；清單裡的 YouTube 影片也是 youtube）。畫面一律用 BrandIcon 顯示。 */
+  iconType?: AttachmentType;
   linkUrl?: string;
   /** 只有管理員會拿到（編輯影片來源用）。 */
   media?: { type: MediaType; ref: string | null };

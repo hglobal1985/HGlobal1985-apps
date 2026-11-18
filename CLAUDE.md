@@ -199,3 +199,4 @@
 - **寰宇大學專區標題列的「收合」（業主 2026-11-18）**：每個專區標題列（含教育中心）右邊、「移動」鈕的右邊有「收合／展開」鈕，預設展開；狀態記在本機 `hglobal:learn:zone-collapsed`（記住最後一次操作）。新增專區照用 `ZoneBand` 的 `folded`／`onFold`。
 - **安麗品牌專區訪客也看得到（業主 2026-11-18）**：專區標題一律顯示（就算還沒有卡片）；品牌卡是公開免費（`view_scope = 'all'`）所以訪客能點進去。品牌卡的連結來源清單優先用固定編號 `cxnfbadr`（`NEW_PRODUCT_LIST_ID`）找，因為清單名稱會被業主改（現在叫「安麗新品與特惠培訓」）。
 - **專區標題列整條可點收合（業主 2026-11-18）**：`ZoneBand` 整條是按鈕，點任意處都收合／展開；裡面的「移動」「收合」鈕仍各自運作。
+- **連結類型規則模組化（業主 2026-11-18）**：「貼網址自動判斷類型、圖示、預設名稱」的規則只在 `apps/launch/src/link-rules.ts`（`LINK_TYPES` 名稱與預設教材名稱、`LINK_RULES` 判斷規則由上往下第一個符合、`classifyUrl`、`itemIconType`），後端（`links.ts`）與 App（`features/link-types.ts` 的類型文字）共用；官方圖形在 `lib/brand-icons.ts`。要新增或調整類型只改這一組（步驟寫在檔案開頭）。**課程「其他教材」與清單類別頁的項目圖示共用同一套**：後端每個教材項目回傳 `iconType`（連結類型；清單裡貼的 YouTube 影片也是 `youtube`），畫面用 `BrandIcon` 顯示（`lesson-list.tsx`）。

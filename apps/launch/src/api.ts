@@ -63,6 +63,7 @@ import { ensureCentersReconciled } from "./center-reconcile.ts";
 import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
+import { itemIconType } from "./link-rules.ts";
 import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
 import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
 import { evaluateAchievements } from "./achievements.ts";
@@ -989,6 +990,8 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
       // 完全公開的課程：任何人（含訪客與會員）都可以看章節，不需要報名。
       locked: lockedAll,
+      // 清單項目的圖示類型（連結類型，或清單裡的 YouTube 影片）；規則在 link-rules.ts（業主 2026-11-18）。
+      ...(l.kind === "material" && !l.is_full && itemIconType(linkOf.get(l.id)?.type, l.media_type, row.is_list === 1) ? { iconType: itemIconType(linkOf.get(l.id)?.type, l.media_type, row.is_list === 1) } : {}),
       ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...(lockedAll ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
       ...(admin ? { media: { type: l.media_type, ref: l.media_ref } } : {}),
