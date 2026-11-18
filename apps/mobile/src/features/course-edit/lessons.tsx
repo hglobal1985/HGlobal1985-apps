@@ -144,7 +144,7 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
  * 清單編輯模式（業主 2026-11-18）：每個區塊一張卡（區塊標題列＋底下的教材＋「新增教材到這個區塊」），「新增區塊」獨立放在最下面。
  * 區塊的上下移動＝整個區塊（連同底下的教材）一起移；教材的上下移動只在區塊內。
  */
-export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, busy }: { onMoveTo: (l: Lesson) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
+export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, onPickMove, busy }: { onMoveTo: (l: Lesson) => void; onPickMove: (blockId: string) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
   const { c } = useTheme();
   const rows = items.filter((l) => !l.full);
   // 切成區塊：每組 = [區塊標題, 底下的教材…]；最前面還沒歸區塊的教材自成一組（沒有標題）。
@@ -187,7 +187,16 @@ export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, 
               </AppText>
             )}
             <View style={{ padding: space.sm }}>
-              <Button variant="secondary" label={head ? `新增教材到「${head.title}」` : "新增教材"} icon="add" onPress={() => onAddMaterial(head?.id)} fullWidth />
+              <View style={{ flexDirection: "row", gap: space.sm }}>
+                <View style={{ flex: 1 }}>
+                  <Button variant="secondary" label={head ? `新增教材` : "新增教材"} icon="add" onPress={() => onAddMaterial(head?.id)} fullWidth />
+                </View>
+                {head && rows.some((l) => !l.section) ? (
+                  <View style={{ flex: 1 }}>
+                    <Button variant="secondary" label="移動教材" icon="swap-vertical" onPress={() => onPickMove(head.id)} fullWidth />
+                  </View>
+                ) : null}
+              </View>
             </View>
           </Card>
         );
@@ -513,6 +522,58 @@ export function MoveToBlockSheet({ items, lesson, onPick, onClose }: { items: Le
         ))}
       </SheetScroll>
       <Button variant="secondary" label="取消" onPress={onClose} fullWidth />
+    </BottomSheet>
+  );
+}
+
+/** 勾選本清單的教材，一次移到指定區塊的最後面（業主 2026-11-18）：列出清單內所有教材（依區塊分組），已在該區塊的灰掉不能勾。 */
+export function PickMaterialsSheet({ items, blockId, onMove, onClose }: { items: Lesson[]; blockId: string; onMove: (ids: string[]) => void; onClose: () => void }) {
+  const { c } = useTheme();
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const target = items.find((l) => l.id === blockId);
+  // 每個教材目前所在的區塊
+  let cur: string | null = null;
+  const rows = items.map((l) => {
+    if (l.section) cur = l.id;
+    return { l, block: l.section ? l.id : cur };
+  });
+  const toggle = (id: string) =>
+    setSel((x) => {
+      const n = new Set(x);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <BottomSheet onClose={onClose}>
+      <AppText variant="headline" numberOfLines={2}>
+        勾選要移到「{target?.title}」的教材
+      </AppText>
+      <SheetScroll>
+        {rows.map(({ l, block }) =>
+          l.section ? (
+            <AppText key={l.id} variant="callout" style={{ fontWeight: "800", color: c.accentText, paddingTop: space.sm }}>
+              📂 {l.title}
+            </AppText>
+          ) : (
+            <Pressable key={l.id} accessibilityRole="checkbox" accessibilityState={{ checked: sel.has(l.id), disabled: block === blockId }} disabled={block === blockId} onPress={() => toggle(l.id)} style={{ minHeight: minTouch, flexDirection: "row", alignItems: "center", gap: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, opacity: block === blockId ? 0.4 : 1 }}>
+              <Icon name={sel.has(l.id) || block === blockId ? "checkbox" : "square-outline"} size={26} color={sel.has(l.id) || block === blockId ? c.accent : c.textMuted} />
+              <AppText variant="body" numberOfLines={2} style={{ flex: 1 }}>
+                {l.title}
+              </AppText>
+              {block === blockId ? <AppText variant="caption" tone="muted">已在此區塊</AppText> : null}
+            </Pressable>
+          ),
+        )}
+      </SheetScroll>
+      <View style={{ flexDirection: "row", gap: space.sm }}>
+        <View style={{ flex: 1 }}>
+          <Button variant="secondary" label="取消" onPress={onClose} fullWidth />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button label={sel.size ? `移動（${sel.size}）` : "移動"} disabled={!sel.size} onPress={() => onMove([...sel])} fullWidth />
+        </View>
+      </View>
     </BottomSheet>
   );
 }

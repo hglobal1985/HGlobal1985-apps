@@ -19,7 +19,7 @@ import { SectionList, SectionSheet, type SectionKey } from "@/features/course-ed
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
 import { Check } from "@/features/course-edit/course-sections";
-import { BlockEditList, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
+import { BlockEditList, EditLessonRows, LessonSheet, MoveToBlockSheet, PickMaterialsSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
 import { useLayout } from "@/theme/layout";
@@ -92,6 +92,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   }, [shortPath, lesson, id]);
   const [sheet, setSheet] = useState<SectionKey | "art" | "newLesson" | "newMaterial" | "newSection" | null>(null);
   const [moveTarget, setMoveTarget] = useState<Lesson | null>(null); // 要移到其他區塊的教材
+  const [pickBlock, setPickBlock] = useState<string | null>(null); // 「移動教材」要移進哪個區塊
   const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
@@ -256,6 +257,18 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
     while (end < rest.length && !rest[end]!.section) end++;
     applyOrder(group, [...rest.slice(0, end), lesson, ...rest.slice(end)]);
   };
+  /** 勾選的多個教材一起移到某區塊的最後面（保持它們原本的先後順序）。 */
+  const moveManyToBlock = (ids: string[], blockId: string) => {
+    const group = materials.filter((l) => !l.full);
+    const pick = new Set(ids);
+    const moved = group.filter((l) => pick.has(l.id));
+    const rest = group.filter((l) => !pick.has(l.id));
+    const at = rest.findIndex((l) => l.id === blockId);
+    if (at < 0 || !moved.length) return;
+    let end = at + 1;
+    while (end < rest.length && !rest[end]!.section) end++;
+    applyOrder(group, [...rest.slice(0, end), ...moved, ...rest.slice(end)]);
+  };
   /** 清單的區塊整塊移動（區塊標題連同底下的教材一起）。 */
   const moveBlock = (groups: Lesson[][], from: number, to: number) => {
     const next = [...groups];
@@ -410,7 +423,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
             {/* 素材清單（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
             <Section title={course.isList ? "" : "其他教材"}>
               {course.isList ? (
-                <BlockEditList items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} busy={lessonBusy} />
+                <BlockEditList items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} busy={lessonBusy} />
               ) : (
                 <>
                   {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
@@ -457,6 +470,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
+      {pickBlock ? <PickMaterialsSheet items={materials.filter((l) => !l.full)} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={materials.filter((l) => !l.full)} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
       {lessonSheet ? <LessonSheet course={course} lesson={course.lessons.find((l) => l.id === lessonSheet.id) ?? lessonSheet} onClose={() => setLessonSheet(null)} /> : null}
     </View>
