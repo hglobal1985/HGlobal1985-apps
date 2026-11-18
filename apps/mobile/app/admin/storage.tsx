@@ -1,4 +1,8 @@
-import { StyleSheet, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { api } from "@/api/client";
+import { useUiConfig } from "@/state/ui-config";
+import { Button, Icon, NoticeBox } from "@/ui";
 import { centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -33,14 +37,67 @@ function StackBar({ parts, total }: { parts: { color: string; value: number }[];
  * 設定 > 儲存空間管理（超級管理員，業主 2026-11-18）：整個網站雲端儲存已使用的容量、
  * 各類型檔案的佔比，以及各中心（含寰宇總部）各自佔用多少、裡面各類型各多少。大小是雲端的實際大小。
  */
+/** 一個「減／數字／加」的調整列。 */
+function Stepper({ label, hint, value, min, max, step, unit, onChange }: { label: string; hint: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
+  const { c } = useTheme();
+  return (
+    <View style={styles.legend}>
+      <View style={{ flex: 1 }}>
+        <AppText variant="body">{label}</AppText>
+        <AppText variant="caption" tone="muted">
+          {hint}
+        </AppText>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${label}減少`} disabled={value <= min} onPress={() => onChange(Math.max(min, value - step))} style={[styles.step, { borderColor: c.border, opacity: value <= min ? 0.35 : 1 }]}>
+        <Icon name="remove" size={22} color={c.text} />
+      </Pressable>
+      <AppText variant="headline" style={{ minWidth: 76, textAlign: "center" }}>
+        {value}
+        {unit}
+      </AppText>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${label}增加`} disabled={value >= max} onPress={() => onChange(Math.min(max, value + step))} style={[styles.step, { borderColor: c.border, opacity: value >= max ? 0.35 : 1 }]}>
+        <Icon name="add" size={22} color={c.text} />
+      </Pressable>
+    </View>
+  );
+}
+
 export default function StorageScreen() {
   const { c } = useTheme();
+  const { config, reload: reloadConfig } = useUiConfig();
+  const [lim, setLim] = useState({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality });
+  useEffect(() => setLim({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality }), [config.app.fileMaxMb, config.app.imageMaxSide, config.app.imageQuality]);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const dirty = lim.fileMaxMb !== config.app.fileMaxMb || lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality;
+  const saveLim = async () => {
+    setSaving(true);
+    setMsg(null);
+    try {
+      await api("PUT", "/admin/ui-config", { app: { ...config.app, ...lim } });
+      reloadConfig();
+      setMsg({ tone: "success", text: "已儲存，之後的上傳照新設定。" });
+    } catch (e) {
+      setMsg({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setSaving(false);
+    }
+  };
   const { member } = useSession();
   const isSuper = !!member?.titles.includes("超級管理員");
   const { data, error, loading, reload } = useApi<Storage>(isSuper ? "/admin/storage" : null);
   if (!isSuper) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以查看" /></Screen>;
   return (
     <Screen header={false}>
+      <Section title="上傳設定">
+        <Card>
+          <Stepper label="單檔大小上限" hint="超過就不能上傳，並提示改貼雲端連結（最多 95MB）" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
+          <Stepper label="圖片壓縮長邊" hint="上傳的圖片長邊縮到這個像素以內（預設與封面相同 1024）" value={lim.imageMaxSide} min={400} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, imageMaxSide: v }))} />
+          <Stepper label="圖片畫質" hint="數字越大畫質越好、檔案越大（預設 88）" value={lim.imageQuality} min={50} max={100} step={2} unit="%" onChange={(v) => setLim((x) => ({ ...x, imageQuality: v }))} />
+          {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
+          <Button label="儲存上傳設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={saveLim} fullWidth />
+        </Card>
+      </Section>
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {data ? (
@@ -113,6 +170,7 @@ const styles = StyleSheet.create({
   bar: { flexDirection: "row", height: 14, borderRadius: radius.pill, overflow: "hidden", marginVertical: space.xs },
   legend: { flexDirection: "row", alignItems: "center", gap: space.sm },
   dot: { width: 10, height: 10, borderRadius: 5 },
+  step: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
 });

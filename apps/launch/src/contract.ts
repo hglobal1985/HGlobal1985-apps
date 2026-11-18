@@ -787,6 +787,10 @@ export type AppSettings = {
   watchReportSec: number;
   /** 集滿幾枚徽章自動解鎖「我的書櫃」鑰匙（業主 2026-11-18 起可在後台「徽章任務設定」調整）。 */
   libraryKeyBadges: number;
+  /** 上傳檔案設定（業主 2026-11-18，在「儲存空間管理」調整）：單檔大小上限（MB）、圖片壓縮長邊（像素）與畫質（%）。 */
+  fileMaxMb: number;
+  imageMaxSide: number;
+  imageQuality: number;
 };
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   homeLeftSec: 5,
@@ -802,6 +806,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   learnDonePct: 95,
   watchReportSec: 10,
   libraryKeyBadges: 100,
+  fileMaxMb: 30,
+  imageMaxSide: 1024,
+  imageQuality: 88,
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },

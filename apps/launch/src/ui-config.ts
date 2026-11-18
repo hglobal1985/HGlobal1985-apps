@@ -105,6 +105,9 @@ export function normalizeApp(raw: unknown): AppSettings {
     ...learnPct(r, d),
     watchReportSec: num(r.watchReportSec, d.watchReportSec, 5, 120),
     libraryKeyBadges: num(r.libraryKeyBadges, d.libraryKeyBadges, 1, 1000),
+    fileMaxMb: num(r.fileMaxMb, d.fileMaxMb, 1, 95),
+    imageMaxSide: num(r.imageMaxSide, d.imageMaxSide, 400, 4096),
+    imageQuality: num(r.imageQuality, d.imageQuality, 50, 100),
   };
 }
 

@@ -2,7 +2,8 @@ import type { AttachmentType } from "./contract.ts";
 
 /** 教材檔案上傳（業主 2026-11-18）：圖片、照片、文件可以；影片不行；單檔最大 30MB。 */
 export const FILE_MAX_BYTES = 30 * 1024 * 1024;
-export const FILE_TOO_BIG = "檔案超過 30MB。請上傳到其他雲端空間後再將連結複製貼上到這裡";
+export const FILE_TOO_BIG = "檔案太大。請上傳到其他雲端空間後再將連結複製貼上到這裡";
+export const fileTooBig = (mb: number) => `檔案超過 ${mb}MB。請上傳到其他雲端空間後再將連結複製貼上到這裡`;
 export const FILE_NO_VIDEO = "不能上傳影片檔。請先把影片上傳到 YouTube 或其他雲端空間，再將連結複製貼上到這裡";
 
 const VIDEO_EXT = /\.(mp4|mov|m4v|avi|mkv|webm|wmv|flv|mpg|mpeg|3gp|mts|m2ts|ogv|rm|rmvb)$/i;

@@ -61,7 +61,7 @@ import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centr
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
-import { classifyFile, FILE_MAX_BYTES, FILE_NO_VIDEO, FILE_TOO_BIG, safeFileName, type StorageKind } from "./files.ts";
+import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
@@ -4056,11 +4056,13 @@ const routes: [string, RegExp, Handler][] = [
       if (kind === "video") return fail(400, "video_not_allowed", FILE_NO_VIDEO);
       if (!kind) return fail(400, "file_type_not_allowed", "這種檔案格式不支援。可上傳圖片、PDF、Word、PowerPoint、Excel、文字檔；其他格式請上傳到雲端空間後貼連結");
       const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "檔案儲存空間尚未啟用");
+      const maxMb = (await loadConfig(ctx.db)).app.fileMaxMb; // 單檔上限可在「儲存空間管理」調整（預設 30MB）
+      const maxBytes = maxMb * 1024 * 1024;
       const declared = Number(ctx.req.headers.get("content-length") ?? 0);
-      if (declared > FILE_MAX_BYTES + 1024) return fail(413, "file_too_large", FILE_TOO_BIG);
+      if (declared > maxBytes + 1024) return fail(413, "file_too_large", fileTooBig(maxMb));
       const data = await ctx.req.arrayBuffer();
       if (!data.byteLength) return fail(400, "empty_file", "檔案是空的");
-      if (data.byteLength > FILE_MAX_BYTES) return fail(413, "file_too_large", FILE_TOO_BIG);
+      if (data.byteLength > maxBytes) return fail(413, "file_too_large", fileTooBig(maxMb));
       const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;

@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { api, type CourseDetail } from "@/api/client";
-import { COVER_MAX_SIDE, cropCompress, loadImage } from "@/features/admin/image-tools";
+import { cropCompress, loadImage } from "@/features/admin/image-tools";
 import { AppText, Button, NoticeBox } from "@/ui";
-import { COMPRESSIBLE, FILE_ACCEPT, FILE_MAX_BYTES, FILE_TOO_BIG, fileProblem } from "./file-rules";
+import { useUiConfig } from "@/state/ui-config";
+import { COMPRESSIBLE, FILE_ACCEPT, FILE_TOO_BIG, fileProblem } from "./file-rules";
 
 /**
  * 「上傳檔案」模組（業主 2026-11-18，教材新增／清單新增教材／區塊新增教材共用，要改只改這一個檔案）：
@@ -10,6 +11,8 @@ import { COMPRESSIBLE, FILE_ACCEPT, FILE_MAX_BYTES, FILE_TOO_BIG, fileProblem } 
  * 一次可選多個檔案；任何一個有問題就顯示原因並略過，其他照常上傳。超過 30MB 提示改貼雲端連結。
  */
 export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { courseId: string; onUploaded: (detail: CourseDetail, hadErrors: boolean) => void; onBusyChange?: (busy: boolean) => void }) {
+  const { config } = useUiConfig();
+  const { fileMaxMb, imageMaxSide, imageQuality } = config.app;
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -24,7 +27,7 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
     try {
       for (let i = 0; i < files.length; i++) {
         const f = files[i]!;
-        const problem = fileProblem(f.name, f.type, f.size);
+        const problem = fileProblem(f.name, f.type, f.size, fileMaxMb);
         if (problem) {
           bad.push(`「${f.name}」：${problem}`);
           continue;
@@ -34,12 +37,12 @@ export function FileUploadModule({ courseId, onUploaded, onBusyChange }: { cours
           let blob: Blob = f;
           let name = f.name;
           if (COMPRESSIBLE.test(f.name)) {
-            // 圖片自動壓縮：畫素與畫質和封面相同（長邊 COVER_MAX_SIDE，JPEG 0.88）
-            blob = await cropCompress(await loadImage(f), null, COVER_MAX_SIDE, 0.88);
+            // 圖片自動壓縮：長邊與畫質用「儲存空間管理」的設定（預設同封面：1024 像素、88%）
+            blob = await cropCompress(await loadImage(f), null, imageMaxSide, imageQuality / 100);
             name = f.name.replace(/\.[^.]+$/, "") + ".jpg";
           }
-          if (blob.size > FILE_MAX_BYTES) {
-            bad.push(`「${f.name}」：${FILE_TOO_BIG}`);
+          if (blob.size > fileMaxMb * 1024 * 1024) {
+            bad.push(`「${f.name}」：${FILE_TOO_BIG(fileMaxMb)}`);
             continue;
           }
           last = await api<CourseDetail>("POST", `/admin/courses/${courseId}/material-file?name=${encodeURIComponent(name)}`, blob);

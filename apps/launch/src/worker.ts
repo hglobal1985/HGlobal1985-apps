@@ -1,4 +1,5 @@
 import { backfillYoutube } from "./youtube.ts";
+import { processImportJobs } from "./imports.ts";
 import { handleApi } from "./api.ts";
 import type { Env } from "./d1.ts";
 import { resolveShareMeta, withShareMeta } from "./og.ts";
@@ -35,6 +36,7 @@ export function createWorker(staticFiles: StaticFiles) {
     async scheduled(_event: unknown, env: Env, exec?: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
       const job = (async () => {
         await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));
+        await processImportJobs(env).catch((e) => console.error("import jobs", e instanceof Error ? e.message : "error"));
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));
       })();

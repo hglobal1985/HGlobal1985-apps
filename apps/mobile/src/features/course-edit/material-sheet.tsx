@@ -206,7 +206,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   return (
     <EditSheet material={course.isList} title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
       {!lesson ? (
-        <FormBlock title="上傳檔案" hint="圖片、照片、文件（PDF、Word、PowerPoint、Excel、文字檔）；不可上傳影片；單檔 30MB 內，圖片會自動壓縮。選好就會直接上傳並建立教材。">
+        <FormBlock title="上傳檔案" hint="圖片、照片、文件（PDF、Word、PowerPoint、Excel、文字檔）；不可上傳影片；單檔大小有上限（預設 30MB，可在「儲存空間管理」調整），圖片會自動壓縮。選好就會直接上傳並建立教材。">
           <FileUploadModule courseId={course.id} onUploaded={onFiles} onBusyChange={setBusy} />
         </FormBlock>
       ) : null}

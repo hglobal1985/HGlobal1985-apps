@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { handleApi } from "../src/api.ts";
 import type { CourseDetail } from "../src/contract.ts";
 import type { Env, R2Bucket } from "../src/d1.ts";
-import { classifyFile, FILE_MAX_BYTES } from "../src/files.ts";
+import { classifyFile } from "../src/files.ts";
+const FILE_MAX_BYTES = 30 * 1024 * 1024;
 import { createTestDb } from "./sqlite-d1.ts";
 
 const memR2 = (): R2Bucket & { store: Map<string, { data: Uint8Array; type?: string }> } => {
