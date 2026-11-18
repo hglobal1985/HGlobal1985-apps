@@ -6,7 +6,9 @@ import { classifyLink, LINK_DEFAULT_TITLE, parseHttpsUrl } from "./links.ts";
  * YouTube 走官方 oEmbed（拿得到影片標題）；其他網站讀 og:title 或 <title>；需要登入才看得到的頁面（標題只是「登入」）視為抓不到。
  */
 const MAX_BYTES = 256 * 1024;
-const TIMEOUT_MS = 5000;
+/** YouTube 影片頁：發布日期（itemprop／JSON）在 </head> 之後，要多讀一些（業主 2026-11-18：貼 YouTube 連結沒有帶出日期）。 */
+const YT_MAX_BYTES = 2 * 1024 * 1024;
+const TIMEOUT_MS = 8000;
 const MAX_HOPS = 3;
 
 /** 公開網站才允許連線：https、有網域（不是 IP）、不是本機或內部網域。 */
@@ -67,18 +69,19 @@ export const cleanFetchedTitle = (t: string | null): string | null => {
   return !s || LOGIN_TITLE.test(s) ? null : s;
 };
 
-async function readLimited(res: Response): Promise<string> {
+async function readLimited(res: Response, wholePage = false): Promise<string> {
   const reader = res.body?.getReader();
   if (!reader) return (await res.text()).slice(0, MAX_BYTES);
   const dec = new TextDecoder("utf-8", { fatal: false });
   let out = "";
   let n = 0;
-  while (n < MAX_BYTES) {
+  const cap = wholePage ? YT_MAX_BYTES : MAX_BYTES;
+  while (n < cap) {
     const { done, value } = await reader.read();
     if (done) break;
     n += value.length;
     out += dec.decode(value, { stream: true });
-    if (/<\/head>/i.test(out)) break; // 標題都在 <head> 裡，讀到這就夠了
+    if (wholePage ? /"(?:publishDate|uploadDate)"\s*:\s*"\d{4}-\d{2}-\d{2}|itemprop="datePublished"[^>]*content="\d{4}-\d{2}-\d{2}/.test(out) : /<\/head>/i.test(out)) break; // 標題都在 <head> 裡；YouTube 的發布日期在 <head> 之後，要讀到日期標記為止
   }
   await reader.cancel().catch(() => undefined);
   return out;
@@ -99,10 +102,10 @@ export async function fetchLinkInfo(input: URL, fetcher: typeof fetch = fetch): 
       // 標題走官方 oEmbed；發布日期要讀影片頁（兩個同時送）。
       const [o, pageRes] = await Promise.all([
         fetcher(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u.toString())}`, { signal: ctl.signal, headers: { accept: "application/json" } }).catch(() => null),
-        fetcher(u.toString(), { signal: ctl.signal, headers }).catch(() => null),
+        fetcher(u.toString(), { signal: ctl.signal, headers: { ...headers, "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", cookie: "CONSENT=YES+1; SOCS=CAI" } }).catch(() => null),
       ]);
       const title = o?.ok ? cleanFetchedTitle(((await o.json()) as { title?: string }).title ?? null) : null;
-      const date = pageRes?.ok ? extractDate(await readLimited(pageRes)) : null;
+      const date = pageRes?.ok ? extractDate(await readLimited(pageRes, true)) : null;
       if (title || date) return { title, date };
     }
     for (let hop = 0; hop <= MAX_HOPS; hop++) {

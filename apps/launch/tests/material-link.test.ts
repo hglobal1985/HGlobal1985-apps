@@ -106,3 +106,9 @@ test("連結日期：讀 datePublished／uploadDate／article:published_time，�
   const f = (async () => new Response('<head><title>文章</title><meta property="article:published_time" content="2026-01-05T00:00:00Z"></head>', { headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
   assert.deepEqual(await fetchLinkInfo(new URL("https://example.com/a"), f), { title: "文章", date: "2026-01-05" });
 });
+
+import { extractDate as extractDateYt } from "../src/link-title.ts";
+test("YouTube 影片頁：發布日期在 </head> 之後的 itemprop 或 JSON 也讀得到", () => {
+  assert.equal(extractDateYt('<html><head><title>x</title></head><body><div itemscope><meta itemprop="datePublished" content="2024-03-25T06:57:33-07:00"></div>'), "2024-03-25");
+  assert.equal(extractDateYt('<script>var a={"publishDate":"2026-02-10T10:00:00-08:00","x":1}</script>'), "2026-02-10");
+});
