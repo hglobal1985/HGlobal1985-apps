@@ -2471,7 +2471,7 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
       mediaRef = ref;
     }
     type = t as MediaType;
-    sets.push(["media_type", t], ["media_ref", mediaRef]);
+    sets.push(["media_type", t], ["media_ref", mediaRef], ["yt_checked_at", null]);
   }
   const start = seconds(body.startSeconds);
   const end = seconds(body.endSeconds);
@@ -3783,7 +3783,7 @@ const routes: [string, RegExp, Handler][] = [
       const u = parseHttpsUrl(ctx.url.searchParams.get("url"));
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const type = classifyLink(u);
-      const info = await fetchLinkInfo(u);
+      const info = await fetchLinkInfo(u, fetch, ctx.env.YOUTUBE_API_KEY);
       return { type, title: info.title, date: info.date, defaultTitle: LINK_DEFAULT_TITLE[type] };
     },
   ],
@@ -3835,6 +3835,7 @@ const routes: [string, RegExp, Handler][] = [
       await ctx.db.batch([
         ctx.db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(title, id),
         ...(body.eventDate !== undefined ? [ctx.db.prepare("UPDATE lessons SET event_date = ? WHERE id = ?").bind(dayOrNull(body.eventDate), id)] : []),
+        ctx.db.prepare("UPDATE lessons SET yt_checked_at = NULL WHERE id = ?").bind(id),
         ...(yt && !sameVideo ? [ctx.db.prepare("UPDATE lessons SET media_type = 'youtube', media_ref = ?, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(yt, id)] : []),
         ...(!yt && lesson.is_list === 1 && lesson.media_type !== "demo" ? [ctx.db.prepare("UPDATE lessons SET media_type = 'demo', media_ref = NULL, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(id)] : []),
         ctx.db.prepare("DELETE FROM lesson_attachments WHERE lesson_id = ? AND kind = 'link'").bind(id),

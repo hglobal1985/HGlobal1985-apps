@@ -101,7 +101,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
-  const detecting = useYoutubeLengthFix(course, editing && Platform.OS === "web");
+  useYoutubeLengthFix(course, editing && Platform.OS === "web");
   // 原地播放：正在播放哪一堂（編輯模式不播放）。播放邏輯（授權、進度回報、自動完成…）都在 useLessonSession。
   const [playingId, setPlayingId] = useState<string | null>(lesson ?? null);
   useEffect(() => {
@@ -418,7 +418,6 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
             </View>
             {settingsOpen ? (
               <>
-                {detecting ? <NoticeBox text="正在偵測 YouTube 影片長度（讓課程顯示預估分鐘數）…" /> : null}
                 {canEditContent ? <SectionList course={course} onOpen={setSheet} /> : (
                   <Card style={{ paddingVertical: 0 }}>
                     <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => setSheet("status")} />

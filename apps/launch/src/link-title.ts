@@ -1,3 +1,4 @@
+import { fetchYoutubeMeta } from "./youtube.ts";
 import { classifyLink, LINK_DEFAULT_TITLE, parseHttpsUrl } from "./links.ts";
 
 /**
@@ -90,7 +91,7 @@ async function readLimited(res: Response, wholePage = false): Promise<string> {
 export type LinkInfo = { title: string | null; date: string | null };
 
 /** 抓連結的名稱與發布日期；抓不到的欄位回 null。fetcher 可注入（測試用）。 */
-export async function fetchLinkInfo(input: URL, fetcher: typeof fetch = fetch): Promise<LinkInfo> {
+export async function fetchLinkInfo(input: URL, fetcher: typeof fetch = fetch, ytKey?: string): Promise<LinkInfo> {
   let u = input;
   const none: LinkInfo = { title: null, date: null };
   if (!isPublicHost(u)) return none;
@@ -104,8 +105,14 @@ export async function fetchLinkInfo(input: URL, fetcher: typeof fetch = fetch): 
         fetcher(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(u.toString())}`, { signal: ctl.signal, headers: { accept: "application/json" } }).catch(() => null),
         fetcher(u.toString(), { signal: ctl.signal, headers: { ...headers, "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36", cookie: "CONSENT=YES+1; SOCS=CAI" } }).catch(() => null),
       ]);
+      // 有 YouTube 官方 API 金鑰就用它查發布日期（最可靠，不會被擋）；沒有才讀影片頁。
+      let apiDate: string | null = null;
+      if (ytKey) {
+        const vid = u.hostname.replace(/^www\./, "") === "youtu.be" ? u.pathname.split("/")[1] : (u.searchParams.get("v") ?? /\/(?:shorts|embed|live)\/([\w-]{6,})/.exec(u.pathname)?.[1]);
+        if (vid) apiDate = (await fetchYoutubeMeta(ytKey, [vid], fetcher)).get(vid)?.date ?? null;
+      }
       const title = o?.ok ? cleanFetchedTitle(((await o.json()) as { title?: string }).title ?? null) : null;
-      const date = pageRes?.ok ? extractDate(await readLimited(pageRes, true)) : null;
+      const date = apiDate ?? (pageRes?.ok ? extractDate(await readLimited(pageRes, true)) : null);
       if (title || date) return { title, date };
     }
     for (let hop = 0; hop <= MAX_HOPS; hop++) {
