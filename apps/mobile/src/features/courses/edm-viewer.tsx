@@ -21,6 +21,7 @@ import { ribbonsFor } from "./ribbons";
  */
 export function EdmStage({ course }: { course: CourseSummary }) {
   const [open, setOpen] = useState(false);
+  const { scheme } = useTheme();
   const { member } = useSession();
   const { config } = useUiConfig();
   const ribbons = ribbonsFor(course, member, config);
@@ -34,7 +35,7 @@ export function EdmStage({ course }: { course: CourseSummary }) {
       ) : course.edmUrl ? <EdmPan uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
       {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={2} /> : null}
       {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={2} /> : null}
-      {course.brand && open ? <EdmLightbox uri={course.brand.logoUrl} bg={course.brand.bgColor ?? undefined} title={course.title} onClose={() => setOpen(false)} /> : null}
+      {course.brand && open ? <EdmLightbox uri={course.brand.logoUrl} bg={(scheme === "dark" && course.brand.bgColorDark) || course.brand.bgColor || undefined} title={course.title} onClose={() => setOpen(false)} /> : null}
       {!course.brand && course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
     </StageFrame>
   );

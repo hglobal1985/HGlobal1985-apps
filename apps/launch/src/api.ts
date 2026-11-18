@@ -106,13 +106,13 @@ type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
 type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 品牌 logo（組課程封面用，列表／詳情載入）。 */ brands?: BrandRow[]; /** 清單的區塊（顯示在上拉選單的）：courseId → 區塊。 */ blocks?: Map<string, SheetBlock[]>; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
 
-type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; categories: string; art_version: number };
-const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
+type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; bg_color_dark: string | null; categories: string; art_version: number };
+const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, bg_color_dark, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
 /** 課程的品牌封面（業主 2026-11-18）：選了品牌、而且沒有手動上傳封面／EDM 才用品牌 logo（手動上傳 > 品牌 logo > 文字封面）。 */
 function brandFor(ctx: Ctx, row: { brand_id?: string | null; edm_key?: string | null; cover_key?: string | null }): BrandCover | null {
   if (!row.brand_id || row.edm_key || row.cover_key) return null;
   const b = ctx.brands?.find((x) => x.id === row.brand_id);
-  return b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
+  return b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgColorDark: b.bg_color_dark, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
 }
 /** 清單的區塊（只列勾了「顯示在上拉選單」的）：上拉選單用；count＝底下有內容的素材數。 */
 type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null; /** 連結區塊：內容在另一份清單（不算在這份清單自己的教材數裡）。 */ linked?: boolean };
@@ -139,7 +139,7 @@ async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
       cur = null;
       if (curShown) {
         const b = r.brand_id ? brands.find((x) => x.id === r.brand_id) : undefined;
-        const brand: BrandCover | null = !r.cover_key && b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
+        const brand: BrandCover | null = !r.cover_key && b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgColorDark: b.bg_color_dark, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
         cur = { id: r.id, title: r.title, coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null, brand, count: 0, categories: r.categories, brandId: r.brand_id, ...(r.link_block_id ? { linked: true } : {}) };
         if (r.link_block_id) links.push({ block: cur, src: r.link_block_id });
         const list = map.get(r.course_id) ?? [];
@@ -4840,8 +4840,8 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/brand-logos$/,
     async (ctx): Promise<BrandLogo[]> => {
       requireSuperAdmin(ctx);
-      const { results } = await ctx.db.prepare("SELECT id, name, logo_key, bg_key, bg_color, categories, art_version FROM brand_logos ORDER BY sort_order, created_at").all<BrandRow>();
-      return results.map((r) => ({ id: r.id, name: r.name, logoUrl: r.logo_key ? brandUrl(r.logo_key, r.art_version) : null, bgColor: r.bg_color, bgUrl: r.bg_key ? brandUrl(r.bg_key, r.art_version) : null}));
+      const { results } = await ctx.db.prepare("SELECT id, name, logo_key, bg_key, bg_color, bg_color_dark, categories, art_version FROM brand_logos ORDER BY sort_order, created_at").all<BrandRow>();
+      return results.map((r) => ({ id: r.id, name: r.name, logoUrl: r.logo_key ? brandUrl(r.logo_key, r.art_version) : null, bgColor: r.bg_color, bgColorDark: r.bg_color_dark, bgUrl: r.bg_key ? brandUrl(r.bg_key, r.art_version) : null}));
     },
   ],
   [
@@ -4864,7 +4864,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/brand-logos\/([\w-]+)$/,
     async (ctx, [id]) => {
       const s = requireSuperAdmin(ctx);
-      const body = await readJson<{ name?: unknown; bgColor?: unknown }>(ctx.req);
+      const body = await readJson<{ name?: unknown; bgColor?: unknown; bgColorDark?: unknown }>(ctx.req);
       const sets: [string, unknown][] = [];
       if (body.name !== undefined) {
         const n = text(body.name, 40);
@@ -4876,6 +4876,12 @@ const routes: [string, RegExp, Handler][] = [
         if (body.bgColor === null || body.bgColor === "") sets.push(["bg_color", null]);
         else if (typeof body.bgColor === "string" && /^#[0-9a-fA-F]{6}$/.test(body.bgColor)) sets.push(["bg_color", body.bgColor.toUpperCase()]);
         else return fail(400, "invalid_color", "底色請用 #RRGGBB 格式");
+      }
+      if (body.bgColorDark !== undefined) {
+        // 深色模式底色（業主 2026-11-18）：空白＝不設定（深色模式照原本的底色或底圖）。
+        if (body.bgColorDark === null || body.bgColorDark === "") sets.push(["bg_color_dark", null]);
+        else if (typeof body.bgColorDark === "string" && /^#[0-9a-fA-F]{6}$/.test(body.bgColorDark)) sets.push(["bg_color_dark", body.bgColorDark.toUpperCase()]);
+        else return fail(400, "invalid_color", "深色模式底色請用 #RRGGBB 格式");
       }
       if (!sets.length) return { ok: true };
       const r = await ctx.db.prepare(`UPDATE brand_logos SET ${sets.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`).bind(...sets.map(([, v]) => v), id).run();

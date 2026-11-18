@@ -83,6 +83,9 @@ test("品牌 logo：後台建立與設定；勾選使用且分類對得上的課
   const { id } = (await call<{ id: string }>("POST", "/admin/brand-logos", { token: admin, body: { name: "雅姿" } })).data;
   assert.equal((await call("PATCH", `/admin/brand-logos/${id}`, { token: admin, body: { bgColor: "#FFFFFF" } })).status, 200);
   assert.equal((await call("PATCH", `/admin/brand-logos/${id}`, { token: admin, body: { bgColor: "red" } })).status, 400);
+  assert.equal((await call("PATCH", `/admin/brand-logos/${id}`, { token: admin, body: { bgColorDark: "dark" } })).status, 400, "深色底色格式錯誤");
+  assert.equal((await call("PATCH", `/admin/brand-logos/${id}`, { token: student, body: { bgColorDark: "#111111" } })).status, 403);
+  assert.equal((await call("PATCH", `/admin/brand-logos/${id}`, { token: admin, body: { bgColorDark: "#1b1f1e" } })).status, 200);
   await db.prepare("UPDATE brand_logos SET logo_key = 'brand/x/a.png' WHERE id = ?").bind(id).run(); // 圖片上傳需要 R2，測試直接寫入
   const c = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "美容課", teacher: "王", status: "published", category: "美容、新人" } })).data;
   const find = async () => (await call<{ id: string; brand: { bgColor: string } | null; brandId: string | null; brandName: string | null }[]>("GET", "/courses", { token: admin })).data.find((x) => x.id === c.id)!;
@@ -91,6 +94,10 @@ test("品牌 logo：後台建立與設定；勾選使用且分類對得上的課
   await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { brandId: id } });
   const f = await find();
   assert.deepEqual([f.brandId, f.brandName, f.brand?.bgColor], [id, "雅姿", "#FFFFFF"]);
+  assert.equal((f.brand as { bgColorDark: string | null } | null)?.bgColorDark, "#1B1F1E", "課程資料帶出深色模式底色");
+  assert.equal(((await call<{ id: string; bgColorDark: string | null }[]>("GET", "/admin/brand-logos", { token: admin })).data.find((b) => b.id === id))?.bgColorDark, "#1B1F1E");
+  await call("PATCH", `/admin/brand-logos/${id}`, { token: admin, body: { bgColorDark: "" } });
+  assert.equal(((await find()).brand as { bgColorDark: string | null } | null)?.bgColorDark, null, "清空＝不設定");
   assert.deepEqual((await call<{ id: string; name: string }[]>("GET", "/brands")).data, [{ id, name: "雅姿" }]);
   await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { category: "會議" } });
   assert.ok((await find()).brand, "品牌與分類無關");

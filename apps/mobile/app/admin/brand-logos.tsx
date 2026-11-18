@@ -8,10 +8,12 @@ import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, BrandCover, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, Screen } from "@/ui";
+import { AppText, BrandCover, Button, Card, Chips, EmptyState, ErrorView, Field, FormBlock, LoadingView, Screen } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 const SWATCHES = ["#FFFFFF", "#F6F5F0", "#111111", "#1F4D3A", "#B3261E", "#F0B323", "#1F3A6B", "#7A4B2A"];
+/** 深色模式底色的常用選項（比 App 深色背景稍亮或同色，logo 才看得清楚）。 */
+const DARK_SWATCHES = ["#000000", "#111111", "#1B1F1E", "#23302B", "#2A2A2E", "#1A2540", "#3A2A24", "#FFFFFF"];
 type BgMode = "white" | "color" | "image";
 
 /**
@@ -49,7 +51,7 @@ export default function BrandLogosScreen() {
       {list.data.map((b) => (
         <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`編輯 ${b.name}`} onPress={() => setEditId(b.id)}>
           <Card>
-            {b.logoUrl ? <BrandCover brand={{ logoUrl: b.logoUrl, bgColor: b.bgColor, bgUrl: b.bgUrl }} style={{ borderRadius: radius.md }} /> : <View style={[styles.empty, { borderColor: c.border }]}><AppText tone="muted">還沒有上傳 logo</AppText></View>}
+            {b.logoUrl ? <BrandCover brand={{ logoUrl: b.logoUrl, bgColor: b.bgColor, bgColorDark: b.bgColorDark, bgUrl: b.bgUrl }} style={{ borderRadius: radius.md }} /> : <View style={[styles.empty, { borderColor: c.border }]}><AppText tone="muted">還沒有上傳 logo</AppText></View>}
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
               <View style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: c.accentSoft }} accessibilityLabel={`品牌標籤 ${b.name}`}>
                 <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>
@@ -71,6 +73,8 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   const [name, setName] = useState(logo.name);
   const [mode, setMode] = useState<BgMode>(logo.bgUrl ? "image" : logo.bgColor && logo.bgColor !== "#FFFFFF" ? "color" : "white");
   const [color, setColor] = useState(logo.bgColor ?? "#FFFFFF");
+  const [darkOn, setDarkOn] = useState(!!logo.bgColorDark); // 深色模式底色：不設定＝深色模式照原本的底色或底圖
+  const [darkColor, setDarkColor] = useState(logo.bgColorDark ?? "#1B1F1E");
   const [logoPicks, setLogoPicks] = useState<string[]>([]);
   useEffect(() => {
     if (logo.logoUrl) void logoColors(resolveUrl(logo.logoUrl)).then(setLogoPicks);
@@ -94,7 +98,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   };
   const upload = (part: "logo" | "bg") => (file: File) => run(() => api("PUT", `/admin/brand-logos/${logo.id}/${part}`, file), part === "logo" ? "已更新 logo" : "已更新底圖");
   const save = async () => {
-    const body: Record<string, unknown> = { name: name.trim(), bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null };
+    const body: Record<string, unknown> = { name: name.trim(), bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null, bgColorDark: darkOn ? darkColor : null };
     if (mode !== "image" && logo.bgUrl) await api("DELETE", `/admin/brand-logos/${logo.id}/bg`).catch(() => undefined);
     if (await run(() => api("PATCH", `/admin/brand-logos/${logo.id}`, body), "已儲存")) onClose();
   };
@@ -103,14 +107,14 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
       if (await run(() => api("DELETE", `/admin/brand-logos/${logo.id}`), "已刪除")) onClose();
     }
   };
-  const preview = { logoUrl: logo.logoUrl ?? "", bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null, bgUrl: mode === "image" ? logo.bgUrl : null };
+  const preview = { logoUrl: logo.logoUrl ?? "", bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null, bgColorDark: darkOn ? darkColor : null, bgUrl: mode === "image" ? logo.bgUrl : null };
   return (
     <EditSheet title="品牌 Logo" onClose={onClose} onSave={save} dirty busy={busy} error={error}>
       <Field label="品牌標籤名稱（課程、清單選品牌時顯示的名稱）" value={name} onChange={setName} />
       <AppText variant="callout" style={{ fontWeight: "700" }}>
         封面預覽
       </AppText>
-      {logo.logoUrl ? <BrandCover brand={preview} style={{ borderRadius: radius.md }} /> : <AppText tone="muted">先上傳 logo 才看得到預覽</AppText>}
+      {logo.logoUrl ? <BrandCover brand={preview} scheme="light" style={{ borderRadius: radius.md }} /> : <AppText tone="muted">先上傳 logo 才看得到預覽</AppText>}
       <PickImageButton label={logo.logoUrl ? "更換 logo 圖檔" : "上傳 logo 圖檔"} onPick={upload("logo")} busy={busy} variant="primary" />
       <Chips title="封面底" label="底" options={[{ key: "white", label: "白色（預設）" }, { key: "color", label: "指定底色" }, { key: "image", label: "底圖" }]} value={mode} onChange={(v) => setMode(v as BgMode)} />
       {mode === "color" ? (
@@ -143,6 +147,27 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
           </AppText>
         </View>
       ) : null}
+      <FormBlock title="深色模式底色" hint="只有使用者切換成「深色模式」時才套用，全站所有品牌 logo 出現的地方都一起變；淺色模式不受影響。不設定＝深色模式照上面的底色或底圖。">
+        <Chips title="深色模式" label="深色模式" options={[{ key: "off", label: "不設定" }, { key: "on", label: "指定深色底色" }]} value={darkOn ? "on" : "off"} onChange={(v) => setDarkOn(v === "on")} />
+        {darkOn ? (
+          <View style={{ gap: space.xs }}>
+            <View style={styles.swatches}>
+              {DARK_SWATCHES.map((x) => (
+                <Pressable key={x} accessibilityRole="button" accessibilityLabel={`深色模式底色 ${x}`} onPress={() => setDarkColor(x)} style={[styles.swatch, { backgroundColor: x, borderColor: darkColor === x ? c.accent : c.border, borderWidth: darkColor === x ? 3 : 1 }]} />
+              ))}
+            </View>
+            <Field label="自訂深色底色（#RRGGBB）" value={darkColor} onChange={setDarkColor} placeholder="#1B1F1E" />
+            {logo.logoUrl ? (
+              <>
+                <AppText variant="caption" tone="muted">
+                  深色模式預覽
+                </AppText>
+                <BrandCover brand={preview} scheme="dark" style={{ borderRadius: radius.md }} />
+              </>
+            ) : null}
+          </View>
+        ) : null}
+      </FormBlock>
       <Button variant="danger" label="刪除這個品牌 Logo" icon="trash-outline" disabled={busy} onPress={remove} />
     </EditSheet>
   );
