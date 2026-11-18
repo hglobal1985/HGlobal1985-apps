@@ -15,6 +15,7 @@ import { CourseCover } from "@/ui/course-cover";
 import { AppText, BrandCover, Card, ListRow, SaplingIcon, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
+import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 
@@ -141,7 +142,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
                       {row.map((b) => {
                         const on = b.head.id === openId;
                         return (
-                          <Pressable key={b.head.id} nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={() => setOpenId(on ? null : b.head.id)} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72, opacity: openId && !on ? 0.3 : 1 } as ViewStyle, openId && !on && Platform.OS === "web" ? ({ filter: "grayscale(1)" } as ViewStyle) : null, pressed && { opacity: 0.75 }]}>
+                          <Pressable key={b.head.id} nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={() => setOpenId(on ? null : b.head.id)} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, (openId && !on) || !b.items.some(shown) ? fadedStyle : null, pressed && { opacity: 0.75 }]}>
                             <View style={{ width: cell, aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: on ? 3 : 1, borderColor: on ? c.accent : c.border }}>
                               {b.head.coverUrl ? (
                                 <Image source={{ uri: resolveUrl(b.head.coverUrl) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />

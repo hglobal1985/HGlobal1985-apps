@@ -12,6 +12,7 @@ import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { seriesOrdered } from "./sort";
+import { fadedStyle } from "@/ui/fade-style";
 
 
 /** 狀態標籤：與課程卡左邊緞帶同步的文字與顏色；沒有左緞帶時用右邊緞帶（倒數、進行中…）。 */
@@ -56,7 +57,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
       </View>
       <SheetScroll>
         {course.blocks.map((b) => (
-          <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`${b.title}，有${b.count}個素材`} onPress={() => open(b.id)} style={[styles.row, { borderTopColor: c.border }]}>
+          <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`${b.title}，有${b.count}個素材`} onPress={() => open(b.id)} style={[styles.row, { borderTopColor: c.border }, b.count === 0 ? fadedStyle : null]}>
             {b.coverUrl ? (
               <Image source={{ uri: resolveUrl(b.coverUrl) }} style={styles.thumb} resizeMode="cover" />
             ) : b.brand ? (
