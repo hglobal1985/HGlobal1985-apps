@@ -92,7 +92,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
 /** 窄列的共用樣式（單元模式的章節列、系列頁的課程列共用，改一處兩邊一致）。 */
 export const styles = StyleSheet.create({
   row: { flexDirection: "row", gap: space.sm, borderWidth: 1, borderRadius: radius.md, padding: space.sm, marginBottom: space.sm },
-  thumb: { width: 96, aspectRatio: 16 / 9, borderRadius: radius.sm, overflow: "hidden", backgroundColor: "#00000010", alignSelf: "flex-start" },
+  thumb: { width: 96, aspectRatio: 16 / 9, borderRadius: radius.sm, overflow: "hidden", backgroundColor: "#fff", alignSelf: "flex-start" },
   mid: { flex: 1, minWidth: 0, gap: 2 },
   meta: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: space.sm },
   chip: { flexDirection: "row", alignItems: "center", gap: 3, alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, marginTop: 2 },

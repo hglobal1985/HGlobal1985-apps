@@ -112,6 +112,6 @@ const styles = StyleSheet.create({
   matTag: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: "#FFD43B" },
   head: { flexDirection: "row", alignItems: "center", gap: space.sm },
   chip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, maxWidth: 120 },
-  thumb: { width: 64, height: 36, borderRadius: radius.sm },
+  thumb: { width: 64, height: 36, borderRadius: radius.sm, backgroundColor: "#fff" },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch + 12, borderTopWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm },
 });

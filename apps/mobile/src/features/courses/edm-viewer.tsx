@@ -100,7 +100,18 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
 
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} {...pan.panHandlers} {...wheel} {...NO_PULL} accessibilityRole="imagebutton" accessibilityLabel="課程海報，點一下放大，上下拖曳查看">
-      {imgH ? <Animated.Image source={{ uri }} resizeMode="stretch" style={{ width: box.w, height: imgH, transform: [{ translateY: ty }] }} accessibilityIgnoresInvertColors /> : null}
+      {imgH && imgH < box.h - 1 ? (
+        // 圖比舞台「矮」（例如寬長條的 logo）：置中、四周保留安全距離，不貼上緣（業主 2026-11-18）。
+        (() => {
+          const pad = Math.round(box.w * 0.08);
+          const maxW = box.w - pad * 2;
+          const maxH = box.h - pad * 2;
+          const w = Math.min(maxW, maxH * (ratio ?? 1));
+          return <Image source={{ uri }} resizeMode="contain" style={{ position: "absolute", width: w, height: w / (ratio ?? 1), left: (box.w - w) / 2, top: (box.h - w / (ratio ?? 1)) / 2 }} accessibilityIgnoresInvertColors />;
+        })()
+      ) : imgH ? (
+        <Animated.Image source={{ uri }} resizeMode="stretch" style={{ width: box.w, height: imgH, transform: [{ translateY: ty }] }} accessibilityIgnoresInvertColors />
+      ) : null}
       {maxUp.current > 8 && !pressed ? (
         <View style={[styles.hint, { backgroundColor: "rgba(0,0,0,0.8)" }]} pointerEvents="none">
           <Ionicons name="swap-vertical" size={14} color="#fff" />
