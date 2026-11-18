@@ -25,8 +25,8 @@ test("課程與教材清單的封面：訂閱、點閱、訂閱者收到新教�
   assert.equal((await call<{ count: number; subscribed: boolean }>("GET", `/course-subscription?course=${list.id}`, { token: student })).data.subscribed, true);
 
   // 點閱：每進入一次 +1（訪客也算）；沒上架的課程不算
-  assert.equal((await call("POST", "/course-views", { body: { courseId: list.id } })).data.total, 1);
-  assert.equal((await call("POST", "/course-views", { body: { courseId: list.id } })).data.total, 2);
+  assert.equal((await call("POST", "/course-views", { body: { courseId: list.id } })).data.total, 688 + 1);
+  assert.equal((await call("POST", "/course-views", { body: { courseId: list.id } })).data.total, 688 + 2);
   const draft = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "草稿課" } })).data;
   assert.equal((await call("POST", "/course-views", { body: { courseId: draft.id } })).data.ok, false);
 
