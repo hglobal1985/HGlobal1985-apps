@@ -16,7 +16,8 @@ import { ribbonsFor } from "./ribbons";
 import { CoverBadges, type CoverStats } from "./cover-stats";
 
 /**
- * 課程介紹頁上方的 EDM：圖片寬度自動符合畫面最大寬度，只能上下拖曳（滑鼠或手指，禁止左右），
+ * 課程介紹頁與教材清單頁上方的封面（業主 2026-11-18：封面上不放任何提示文字，全部封面一致；左下角固定是封面統計模組的訂閱鈕＋點閱）。
+ * EDM：圖片寬度自動符合畫面最大寬度，只能上下拖曳（滑鼠或手指，禁止左右），
  * 一進來停在管理員設定的預設位置（edmViewY）；點一下彈出小視窗可放大縮小、下載、分享。
  * 沒有 EDM 時顯示色塊。外框用 StageFrame，高度與上課頁的影片區完全相同。
  */
@@ -48,17 +49,6 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
   );
 }
 
-/** 一般的 EDM 舞台（中心 EDM 等）：與課程頁相同的 16:9 外框、可上下拖曳、點一下放大。 */
-export function EdmImageStage({ url, title, viewY = 0 }: { url: string; title: string; viewY?: number }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <StageFrame>
-      <EdmPan uri={resolveUrl(url)} viewY={viewY} onOpen={() => setOpen(true)} />
-      {open ? <EdmLightbox uri={url} title={title} onClose={() => setOpen(false)} /> : null}
-    </StageFrame>
-  );
-}
-
 /** 網頁：在 EDM 上上下拖曳查看時，不觸發整頁的下拉重新整理（lib/web-pull-refresh.ts 認得 data-no-pull-refresh；業主 2026-11-17）。 */
 const NO_PULL = Platform.OS === "web" ? ({ dataSet: { noPullRefresh: "" } } as object) : {};
 
@@ -72,7 +62,6 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
   const startY = useRef(0);
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
-  const [pressed, setPressed] = useState(false); // 手指按著時，下方提示暫時消失
 
   useEffect(() => {
     let alive = true;
@@ -100,14 +89,11 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         startY.current = cur.current;
-        setPressed(true);
       },
       onPanResponderMove: (_e, g) => set(startY.current + g.dy), // 只看上下，左右拖曳完全忽略
       onPanResponderRelease: (_e, g) => {
-        setPressed(false);
         if (Math.hypot(g.dx, g.dy) < 6) openRef.current(); // 點一下＝放大
       },
-      onPanResponderTerminate: () => setPressed(false),
     }),
   ).current;
   const wheel = Platform.OS === "web" ? { onWheel: (e: { deltaY: number; preventDefault?: () => void }) => set(cur.current - e.deltaY) } : {};
@@ -125,14 +111,6 @@ function EdmPan({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: ()
         })()
       ) : imgH ? (
         <Animated.Image source={{ uri }} resizeMode="stretch" style={{ width: box.w, height: imgH, transform: [{ translateY: ty }] }} accessibilityIgnoresInvertColors />
-      ) : null}
-      {maxUp.current > 8 && !pressed ? (
-        <View style={[styles.hint, { backgroundColor: "rgba(0,0,0,0.8)" }]} pointerEvents="none">
-          <Ionicons name="swap-vertical" size={14} color="#fff" />
-          <AppText variant="caption" style={{ color: "#fff" }}>
-            上下拖曳 · 點一下放大
-          </AppText>
-        </View>
       ) : null}
       {!imgH ? <View style={[StyleSheet.absoluteFill, { backgroundColor: c.surfaceMuted }]} /> : null}
     </View>
@@ -273,7 +251,6 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
 }
 
 const styles = StyleSheet.create({
-  hint: { position: "absolute", bottom: 8, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill },
   backdrop: { flex: 1, alignItems: "center", justifyContent: "center", ...dimStyle },
   frame: { overflow: "hidden", borderRadius: radius.md, backgroundColor: "#fff" },
   topRight: { position: "absolute", top: 16, right: 16 },
