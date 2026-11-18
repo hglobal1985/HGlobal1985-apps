@@ -118,6 +118,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [boxW, setBoxW] = useState(0);
   // 搜尋：放大鏡展開後，每打一個字就即時過濾下方清單並列出關聯詞；搜尋時不受分類限制。
   const [searchOpen, setSearchOpen] = useState(false);
+  const [slotW, setSlotW] = useState(0);
   const [q, setQ] = useState("");
   const [picked, setPicked] = useState("");
   // 顯示模式：系列（封面牆）／章節（一堂一列）；記住上次的選擇。
@@ -288,12 +289,23 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const wideBar = useLayout().large;
   const filterRow = wideBar ? (
     <View>
-      <View style={[styles.filters, { alignItems: "center", gap: space.sm }]}>
-        <InlineSearch value={q} onChange={(v) => (setQ(v), setPicked(""))} onFocus={() => setWantIndex(true)} />
-        <View style={{ width: Math.round(112 * UI_SCALE) }}>
+      <View style={[styles.filters, { alignItems: "center", gap: space.sm }]} onLayout={(e) => setRowW(Math.floor(e.nativeEvent.layout.width))}>
+        <View style={{ flex: 1, minWidth: 0, height: minTouch }} onLayout={(e) => setSlotW(Math.floor(e.nativeEvent.layout.width))} />
+        <View style={{ width: Math.round(112 * UI_SCALE), opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
           <CategoryFilterBox picked={selCats} total={lessonsOf(courses.filter(inCategory))} onOpen={() => setCatOpen(true)} onClear={() => pickCategory([])} />
         </View>
-        <ViewToggle value={mode} onChange={pickMode} wide />
+        <View style={{ opacity: searchOpen ? 0 : 1 }} pointerEvents={searchOpen ? "none" : "auto"}>
+          <ViewToggle value={mode} onChange={pickMode} wide />
+        </View>
+        <InlineSearch
+          open={searchOpen}
+          onOpen={() => (setWantIndex(true), setSearchOpen(true))}
+          onClose={() => (setSearchOpen(false), setQ(""), setPicked(""))}
+          value={q}
+          onChange={(v) => (setQ(v), setPicked(""))}
+          collapsedWidth={slotW}
+          rowWidth={rowW}
+        />
       </View>
       {chapterMode ? <UnitFilter value={unitFilter} onChange={pickUnitFilter} /> : null}
       {termsBox}

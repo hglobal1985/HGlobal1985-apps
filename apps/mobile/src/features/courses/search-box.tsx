@@ -56,37 +56,41 @@ const styles = StyleSheet.create({
 });
 
 /**
- * 寬版（平板、手機橫放）的搜尋框：一直展開，直接點進去輸入；有文字時右邊出現 ✕ 清除（業主 2026-11-18）。
+ * 寬版（平板、手機橫放）的搜尋框（業主 2026-11-18）：平常展開在列的左邊（有輸入欄、可直接點）；點進去時動畫向右伸長，
+ * 蓋住右邊的分類與模式按鈕；清空並按 ✕（或失去焦點且沒有文字）就縮回原寬度。
+ * 絕對定位蓋在列上，collapsedWidth＝列內留給它的寬度、rowWidth＝整列寬度。
  */
-export function InlineSearch({ value, onChange, onFocus }: { value: string; onChange: (v: string) => void; onFocus: () => void }) {
+export function InlineSearch({ open, onOpen, onClose, value, onChange, collapsedWidth, rowWidth }: { open: boolean; onOpen: () => void; onClose: () => void; value: string; onChange: (v: string) => void; collapsedWidth: number; rowWidth: number }) {
   const { c } = useTheme();
+  const w = useRef(new Animated.Value(collapsedWidth)).current;
   const input = useRef<ElementRef<typeof TextInput>>(null);
+  useEffect(() => {
+    if (open) trackFeature("search");
+    Animated.timing(w, { toValue: open ? Math.max(rowWidth, collapsedWidth) : collapsedWidth, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, [open, rowWidth, collapsedWidth, w]);
   return (
-    <View style={[inline.box, { borderColor: c.border, backgroundColor: c.surface }]}>
+    <Animated.View style={[styles.box, { width: collapsedWidth ? w : undefined, borderColor: open ? c.accent : c.border, backgroundColor: c.surface, opacity: collapsedWidth ? 1 : 0 }]}>
       <Pressable accessibilityRole="button" accessibilityLabel="搜尋" onPress={() => input.current?.focus()} style={styles.icon}>
-        <Ionicons name="search" size={22} color={c.text} />
+        <Ionicons name="search" size={22} color={open ? c.accentText : c.text} />
       </Pressable>
       <TextInput
         ref={input}
         value={value}
-        onFocus={() => (trackFeature("search"), onFocus())}
+        onFocus={onOpen}
+        onBlur={() => !value && onClose()}
         onChangeText={onChange}
-        placeholder="搜尋主講人、章節…"
+        placeholder={open ? "主講人、獎銜、系列、章節、日期" : "搜尋主講人、章節…"}
         placeholderTextColor={c.textMuted}
         accessibilityLabel="搜尋課程"
         returnKeyType="search"
         autoCorrect={false}
         style={[styles.input, type.body, { color: c.text }, { outlineStyle: "none" } as object]}
       />
-      {value ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="清除搜尋文字" onPress={() => onChange("")} hitSlop={6} style={styles.icon}>
+      {open || value ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="清除搜尋並收起" onPress={() => (onChange(""), input.current?.blur(), onClose())} hitSlop={6} style={styles.icon}>
           <Ionicons name="close-circle" size={22} color={c.textMuted} />
         </Pressable>
       ) : null}
-    </View>
+    </Animated.View>
   );
 }
-
-const inline = StyleSheet.create({
-  box: { flex: 1, minWidth: 0, height: minTouch, borderWidth: 1, borderRadius: radius.md, flexDirection: "row", alignItems: "center", overflow: "hidden" },
-});
