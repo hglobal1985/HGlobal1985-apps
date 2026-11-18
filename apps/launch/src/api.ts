@@ -1103,6 +1103,8 @@ const SUBSCRIBER_BASE = 688; // 每個中心顯示的訂閱人數從 688 開始�
 
 /** 系列的訂閱沿用中心訂閱表，用「series:」開頭的鍵區分。 */
 const seriesSubKey = (name: string) => `series:${name.trim()}`;
+/** 課程／清單頁的訂閱（業主 2026-11-18：所有課程與教材清單的封面都有訂閱鈕）：同一張表，用「course:」開頭的鍵。 */
+const courseSubKey = (id: string) => `course:${id}`;
 
 async function subscriptionState(ctx: Ctx, key: string): Promise<{ count: number; subscribed: boolean }> {
   const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_subscriptions WHERE center_key = ?").bind(key).first<{ n: number }>();
@@ -1164,6 +1166,20 @@ async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "�
     let enrolledSent = 0;
     if (c.is_list !== 1 && !merged) enrolledSent = await notifyEnrolled(ctx.db, courseId, `${c.title.slice(0, 40)}有新${what}`, "你已報名這門課程，有新內容可以看了", link, me, c.series && !isPrivate(c.view_scope) ? seriesSubKey(c.series) : null);
     sent += enrolledSent;
+    // 這門課程／清單自己的訂閱者（業主 2026-11-18）：已經以系列訂閱者或已報名學員身分收過通知的人不重複；30 分鐘內同一類型只通知一次。
+    if (!merged && !isPrivate(c.view_scope)) {
+      const ctitle = `${c.title.slice(0, 40)}有新${what}`;
+      const recent = await ctx.db.prepare("SELECT 1 AS ok FROM notifications WHERE link = ? AND title = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') LIMIT 1").bind(link, ctitle).first();
+      if (!recent) {
+        const { results } = await ctx.db
+          .prepare("SELECT member_sub FROM center_subscriptions WHERE center_key = ?1 AND (?2 IS NULL OR member_sub NOT IN (SELECT member_sub FROM center_subscriptions WHERE center_key = ?2)) AND member_sub NOT IN (SELECT member_sub FROM enrollments WHERE course_id = ?3)")
+          .bind(courseSubKey(courseId), c.series && !isPrivate(c.view_scope) ? seriesSubKey(c.series) : null, courseId)
+          .all<{ member_sub: string }>();
+        const subs = results.filter((r) => r.member_sub !== me);
+        for (let i = 0; i < subs.length; i += 40) await ctx.db.batch(subs.slice(i, i + 40).map((r) => notify(ctx.db, { sub: r.member_sub }, ctitle, `${c.is_list === 1 ? "清單" : "課程"}有新內容可以看了`, link)));
+        sent += subs.length;
+      }
+    }
     if (me) await notify(ctx.db, { sub: me }, `已送出「新${what}」通知`, merged ? `${c.title.slice(0, 80)}（30 分鐘內已通知過，這次合併不重複發送）` : `${c.title.slice(0, 80)}（通知了 ${sent} 位系列訂閱者）`, link).run();
   } catch {
     /* 通知失敗不影響新增 */
@@ -1186,7 +1202,7 @@ async function notifySubscribers(db: D1Database, key: string, title: string, bod
   return subs.length;
 }
 
-async function bumpView(db: D1Database, kind: "center" | "series", key: string): Promise<number> {
+async function bumpView(db: D1Database, kind: "center" | "series" | "course", key: string): Promise<number> {
   const row = await db.prepare("INSERT INTO page_views (kind, key, total) VALUES (?, ?, 1) ON CONFLICT(kind, key) DO UPDATE SET total = total + 1 RETURNING total").bind(kind, key).first<{ total: number }>();
   return row?.total ?? 0;
 }
@@ -3045,6 +3061,32 @@ const routes: [string, RegExp, Handler][] = [
       const label = typeof body.series === "string" ? body.series.trim().slice(0, 60) : "";
       if (!label) fail(400, "invalid_series", "請指定系列");
       const key = seriesSubKey(label);
+      const had = await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).first();
+      if (had) await ctx.db.prepare("DELETE FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).run();
+      else await ctx.db.prepare("INSERT OR IGNORE INTO center_subscriptions (member_sub, center_key) VALUES (?, ?)").bind(s.sub, key).run();
+      return subscriptionState(ctx, key);
+    },
+  ],
+  [
+    "GET",
+    /^\/course-subscription$/,
+    async (ctx) => {
+      // 課程／教材清單頁的訂閱人數與自己有沒有訂閱（訪客也看得到人數）。
+      const id = (ctx.url.searchParams.get("course") ?? "").trim().slice(0, 40);
+      if (!id || !(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(id).first())) return fail(404, "not_found", "找不到這門課程");
+      return subscriptionState(ctx, courseSubKey(id));
+    },
+  ],
+  [
+    "POST",
+    /^\/course-subscription$/,
+    async (ctx) => {
+      // 按一下訂閱、再按一下取消。
+      const s = requireMember(ctx);
+      const body = await readJson<{ course?: unknown }>(ctx.req);
+      const id = typeof body.course === "string" ? body.course.trim().slice(0, 40) : "";
+      if (!id || !(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(id).first())) return fail(404, "not_found", "找不到這門課程");
+      const key = courseSubKey(id);
       const had = await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).first();
       if (had) await ctx.db.prepare("DELETE FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).run();
       else await ctx.db.prepare("INSERT OR IGNORE INTO center_subscriptions (member_sub, center_key) VALUES (?, ?)").bind(s.sub, key).run();
@@ -5364,7 +5406,8 @@ const routes: [string, RegExp, Handler][] = [
       if (!row) return { ok: false };
       if (row.hk) await bumpView(ctx.db, "center", row.hk);
       if (row.series?.trim()) await bumpView(ctx.db, "series", row.series.trim());
-      return { ok: true };
+      // 課程／清單自己頁面的點閱（封面統一顯示；業主 2026-11-18）。
+      return { ok: true, total: await bumpView(ctx.db, "course", id) };
     },
   ],
   [
@@ -5437,6 +5480,8 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("DELETE FROM order_items WHERE course_id = ?").bind(id),
         audit(ctx.db, admin.sub, "course.delete", "course", id, JSON.stringify({ title: impact.title, registrations: impact.registrations, students: impact.students, paidTwd: impact.paidTwd })),
         ctx.db.prepare("DELETE FROM courses WHERE id = ?").bind(id),
+        ctx.db.prepare("DELETE FROM center_subscriptions WHERE center_key = ?").bind(courseSubKey(id)), // 這門課程自己的訂閱與點閱一併清掉
+        ctx.db.prepare("DELETE FROM page_views WHERE kind = 'course' AND key = ?").bind(id),
       ]);
       if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
       await deleteR2Files(ctx.env, [...files, art?.edm_key, art?.cover_key]);

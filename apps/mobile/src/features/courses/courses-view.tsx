@@ -17,7 +17,7 @@ import { flashText } from "@/ui/flash-notice";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
-import { useSubscribe } from "./subscribe";
+import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
@@ -440,24 +440,17 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       return () => sub.remove();
     }, [activeCenter]), // eslint-disable-line react-hooks/exhaustive-deps
   );
-  // 中心頁上方的照片：透明小標籤「N 門課・N 章節・N 點閱」；往上滑時縮成窄橫幅（CenterHero）。
+  // 中心頁上方的照片：訂閱鈕＋點閱次數；往上滑時縮成窄橫幅（CenterHero）。
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [centerViews, setCenterViews] = useState<number | null>(null);
   useEffect(() => {
-    if (activeCenter === ALL) return;
-    trackFeature("center_page");
-    setCenterViews(null);
-    api<{ total: number }>("POST", "/center-views", { center: activeCenter })
-      .then((r) => setCenterViews(r.total))
-      .catch(() => undefined);
-  }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
-  // 訂閱：統一用訂閱模組（subscribe.tsx，中心與系列同一套）。
-  const sub = useSubscribe("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
+    if (activeCenter !== ALL) trackFeature("center_page");
+  }, [activeCenter]);
+  // 封面的訂閱鈕與點閱次數：統一用封面統計模組（cover-stats.tsx，中心、系列、課程、清單同一套）。
+  const stats = useCoverStats("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
   const bc = useCenterBroadcasts(activeCenter === ALL ? "" : activeCenter);
   const [bcOpen, setBcOpen] = useState(false);
-  const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} subscribe={sub} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const archivedBlock =

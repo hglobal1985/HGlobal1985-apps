@@ -13,13 +13,14 @@ import { flashText } from "@/ui/flash-notice";
 import { useUiConfig } from "@/state/ui-config";
 import { BrandCover, AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle, useDimLayer } from "@/ui";
 import { ribbonsFor } from "./ribbons";
+import { CoverBadges, type CoverStats } from "./cover-stats";
 
 /**
  * 課程介紹頁上方的 EDM：圖片寬度自動符合畫面最大寬度，只能上下拖曳（滑鼠或手指，禁止左右），
  * 一進來停在管理員設定的預設位置（edmViewY）；點一下彈出小視窗可放大縮小、下載、分享。
  * 沒有 EDM 時顯示色塊。外框用 StageFrame，高度與上課頁的影片區完全相同。
  */
-export function EdmStage({ course }: { course: CourseSummary }) {
+export function EdmStage({ course, stats }: { course: CourseSummary; stats?: CoverStats }) {
   const [open, setOpen] = useState(false);
   const { scheme } = useTheme();
   const { member } = useSession();
@@ -34,6 +35,12 @@ export function EdmStage({ course }: { course: CourseSummary }) {
         </Pressable>
       ) : course.edmUrl ? <EdmPan uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
       {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={2} /> : null}
+      {/* 左下角：訂閱鈕＋點閱次數（共用封面統計模組 cover-stats.tsx，與中心頁、系列頁封面同一組）。 */}
+      {stats ? (
+        <View style={{ position: "absolute", left: 12, bottom: 10 }} pointerEvents="box-none">
+          <CoverBadges stats={stats} />
+        </View>
+      ) : null}
       {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={2} /> : null}
       {course.brand && open ? <EdmLightbox uri={course.brand.logoUrl} bg={(scheme === "dark" && course.brand.bgColorDark) || course.brand.bgColor || undefined} title={course.title} onClose={() => setOpen(false)} /> : null}
       {!course.brand && course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
