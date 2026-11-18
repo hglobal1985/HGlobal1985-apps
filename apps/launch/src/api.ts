@@ -427,6 +427,14 @@ async function memberCourseState(db: D1Database, sub: string | undefined) {
   return { lastLearned: new Map((last.results as { course_id: string; t: string }[]).map((r) => [r.course_id, r.t])), partialMinutes: new Map(partial.map((r) => [r.course_id, r.m])), partialLessons: new Map(partial.map((r) => [r.course_id, r.n])), started: new Set(startedRows.map((r) => r.course_id)), startedHidden: new Set(startedRows.filter((r) => r.hidden === 1).map((r) => r.course_id)), hidden, enrolled: keys(e.results), pending: keys(p.results), pendingOrder, done: new Map((d.results as { course_id: string; n: number }[]).map((r) => [r.course_id, r.n])), doneMinutes: new Map((d.results as { course_id: string; m: number }[]).map((r) => [r.course_id, r.m])) };
 }
 type MemberState = Awaited<ReturnType<typeof memberCourseState>>;
+/**
+ * 已報名／審核中／學習過的人，在「誰能瀏覽」改嚴之後是否仍保有存取（業主 2026-11-18）：
+ * 付費課程的報名是繳費換來的，照常保留；免費課程的報名與「學習過」都是第一次打開時自動完成的，不算資格，要照現在的瀏覽範圍。
+ */
+function keepsAccess(state: MemberState, r: { id: string; price_twd: number; price_tba: number }): boolean {
+  if (r.price_twd === 0 && r.price_tba !== 1) return false;
+  return state.enrolled.has(r.id) || state.pending.has(r.id) || state.started.has(r.id);
+}
 
 /** 早鳥優惠是否有效：台灣時間 early_until（含當天）之前。 */
 const earlyActive = (row: { early_bird: number; early_price_twd: number | null; early_until: string | null; price_twd: number }, now = iso()) =>
@@ -589,7 +597,7 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
       if (isPrivate(r.view_scope)) return mineOnly; // 私密連結：不出現在任何清單（已報名／學習過的學員在「學習中」仍看得到）
       if (!s) return r.view_scope === "all";
       if (scopeAllows(r.view_scope, s) || mine?.admin) return true;
-      return state.enrolled.has(r.id) || state.pending.has(r.id) || state.started.has(r.id) || (mine?.any ? courseCan(mine, s, r).edit : false);
+      return keepsAccess(state, r) || (mine?.any ? courseCan(mine, s, r).edit : false);
     });
   }
   const eligibility = await eligibilityFor(s, rankMap, [...visible.map((r) => r.min_rank_code), DIAMOND]);
@@ -809,7 +817,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const archivedForMe = row.status === "archived" && (state.enrolled.has(id) || state.pending.has(id) || state.started.has(id));
   if (row.status !== "published" && !manages && !archivedForMe) return fail(404, "not_found", "找不到這門課程");
   // 誰可以瀏覽：不在範圍內的登入者（管理者、已報名／審核中／學習過的除外）看不到這門課。
-  if (!manages && !scopeAllows(row.view_scope, s) && !(state.enrolled.has(id) || state.pending.has(id) || state.started.has(id))) return fail(404, "not_found", "找不到這門課程");
+  if (!manages && !scopeAllows(row.view_scope, s) && !keepsAccess(state, row)) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
   const linkRows = await ctx.db.prepare("SELECT lesson_id, att_type, link_url FROM lesson_attachments WHERE course_id = ? AND kind = 'link' ORDER BY created_at").bind(id).all<{ lesson_id: string; att_type: AttachmentType; link_url: string }>();
@@ -913,8 +921,10 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
 async function freeRankBlocked(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) return false;
-  const c = await ctx.db.prepare("SELECT min_rank_code, allow_president, price_twd, price_tba FROM courses WHERE id = ?").bind(courseId).first<{ min_rank_code: string; allow_president: number; price_twd: number; price_tba: number }>();
-  if (!c || c.price_twd !== 0 || c.price_tba === 1 || c.min_rank_code === "none" || byPresident(s, c)) return false;
+  const c = await ctx.db.prepare("SELECT min_rank_code, allow_president, price_twd, price_tba, view_scope FROM courses WHERE id = ?").bind(courseId).first<{ min_rank_code: string; allow_president: number; price_twd: number; price_tba: number; view_scope: ViewScope }>();
+  if (!c || c.price_twd !== 0 || c.price_tba === 1) return false;
+  if (!scopeAllows(c.view_scope, s)) return true; // 後來把「誰能瀏覽」改嚴：先前自動報名的不在範圍內也不能看
+  if (c.min_rank_code === "none" || byPresident(s, c)) return false;
   return (await eligibilityFor(s, await ranks(ctx.db), [c.min_rank_code])).get(c.min_rank_code) !== true;
 }
 
