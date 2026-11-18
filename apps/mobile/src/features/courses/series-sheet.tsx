@@ -74,15 +74,31 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             ) : (
               <Image source={require("../../../assets/icon.png")} style={styles.thumb} resizeMode="cover" />
             )}
-            <View style={{ flex: 1, gap: 2 }}>
-              <AppText variant="body" style={{ fontWeight: "700" }}>
-                {x.eventStart ? eventDays(x.eventStart, x.eventEnd) : "未設定日期"}{x.id === currentId ? "（目前顯示）" : ""}
-              </AppText>
-              <AppText variant="callout" tone="muted" numberOfLines={1}>
-                {x.title}
-              </AppText>
-            </View>
-            <StatusChip course={x} />
+            {x.isList ? (
+              // 素材：素材清單名稱＋素材數量標籤（業主 2026-11-18）
+              <>
+                <AppText variant="body" style={{ flex: 1, fontWeight: "700" }} numberOfLines={2}>
+                  {x.title}
+                </AppText>
+                <View style={[styles.chip, { backgroundColor: c.surfaceMuted, borderWidth: 1, borderColor: c.border }]} accessibilityLabel={`有${x.materialCount}個素材`}>
+                  <AppText variant="caption" style={{ color: c.text, fontWeight: "700" }} numberOfLines={1}>
+                    有{x.materialCount}個素材
+                  </AppText>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <AppText variant="body" style={{ fontWeight: "700" }}>
+                    {x.eventStart ? eventDays(x.eventStart, x.eventEnd) : "未設定日期"}{x.id === currentId ? "（目前顯示）" : ""}
+                  </AppText>
+                  <AppText variant="callout" tone="muted" numberOfLines={1}>
+                    {x.title}
+                  </AppText>
+                </View>
+                <StatusChip course={x} />
+              </>
+            )}
             <AppText tone="muted">›</AppText>
           </Pressable>
         ))}

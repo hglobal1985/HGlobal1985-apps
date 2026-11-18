@@ -36,12 +36,12 @@ test("播放超過 1%：納入學習中（含沒有報名紀錄的管理員）�
   await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`, admin);
   assert.equal((await find(admin)).hiddenFromLearning, false);
 
-  // 學員：公開免費課程播放後自動報名＋列入
+  // 學員：公開課程播放後列入學習中（不再自動報名，報名要手動按；業主 2026-11-18）
   assert.equal((await find(student)).started, false);
   assert.equal((await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`, student)).status, 200);
   c = await find(student);
   assert.equal(c.started, true);
-  assert.equal(c.enrollment, "opened");
+  assert.equal(c.enrollment, null);
   // 沒登入不行
   assert.equal((await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`)).status, 401);
 });

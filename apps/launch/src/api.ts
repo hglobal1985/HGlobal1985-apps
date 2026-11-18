@@ -519,7 +519,8 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     hiddenFromLearning: state.enrolled.has(row.id) ? state.hidden.has(row.id) : state.startedHidden.has(row.id),
     lastLearnedAt: state.lastLearned.get(row.id) ?? null,
     started: state.started.has(row.id) || (state.done.get(row.id) ?? 0) > 0,
-    watchFree: !!ctx.session && row.status === "published" && row.price_twd === 0 && row.price_tba !== 1 && (eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row)),
+    // 只有清單／素材類「符合獎銜就能直接使用」；課程類一律要手動報名（業主 2026-11-18）。
+    watchFree: !!ctx.session && row.is_list === 1 && row.status === "published" && row.price_twd === 0 && row.price_tba !== 1 && (eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row)),
     diamondFree: row.diamond_free === 1,
     diamondFreeNow: diamondNow,
     earlyBird: row.early_bird === 1 && row.early_price_twd != null && !!row.early_until ? { priceTwd: web ? row.early_price_twd : null, until: row.early_until, active: earlyNow } : null,
@@ -529,6 +530,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     chapterCovers: row.chapter_covers === 1,
     lessonCount: row.lesson_count,
     hasMaterial: row.material_count > 0,
+    materialCount: row.material_count,
     totalMinutes: row.total_minutes,
     eligible: eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row),
     allowPresident: row.allow_president === 1,
@@ -928,12 +930,12 @@ async function freeRankBlocked(ctx: Ctx, courseId: string): Promise<boolean> {
   return (await eligibilityFor(s, await ranks(ctx.db), [c.min_rank_code])).get(c.min_rank_code) !== true;
 }
 
-/** 設定免費（費用 0、不是「尚未公布」）、已上架、而且這位會員符合資格：不需報名就能收看。 */
+/** 清單／素材類：免費、已上架、而且這位會員符合資格（獎銜）就能直接使用，不用報名；課程類一律要手動報名（業主 2026-11-18）。 */
 async function freeWatchable(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) return false;
   const c = await ctx.db
-    .prepare("SELECT min_rank_code, allow_president, price_twd, price_tba FROM courses WHERE id = ? AND status = 'published'")
+    .prepare("SELECT min_rank_code, allow_president, price_twd, price_tba FROM courses WHERE id = ? AND status = 'published' AND is_list = 1")
     .bind(courseId)
     .first<{ min_rank_code: string; allow_president: number; price_twd: number; price_tba: number }>();
   if (!c || c.price_twd !== 0 || c.price_tba === 1) return false;
@@ -942,24 +944,10 @@ async function freeWatchable(ctx: Ctx, courseId: string): Promise<boolean> {
   return eligibility.get(c.min_rank_code) === true;
 }
 
-/** 第一次開始看設定免費的課程時，自動幫他完成免費報名（這樣「學習中」、進度、學習成就都會正常記錄）。已經報名過的不會重複。 */
-async function ensureFreeEnrollment(ctx: Ctx, courseId: string): Promise<void> {
-  const s = ctx.session;
-  if (!s || s.role === "admin") return;
-  const has = await ctx.db.prepare("SELECT 1 AS ok FROM enrollments WHERE member_sub = ? AND course_id = ? LIMIT 1").bind(s.sub, courseId).first();
-  if (has) return;
-  const pubRow = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND status = 'published'").bind(courseId).first();
-  if (!pubRow && !(await freeWatchable(ctx, courseId))) return;
-  await createOrders(ctx, { courseIds: [courseId] }, true).catch(() => undefined);
-}
-
-/** 學員打開免費課程的介紹頁：自動加入「學習中」（沒報名過就自動完成免費報名），之前被隱藏的也恢復顯示。 */
+/** 打開課程頁：不再自動報名（課程一律手動報名，報名＝訂閱更新通知）；已報名／學習過但被隱藏的恢復顯示。 */
 async function openFreeCourse(ctx: Ctx, courseId: string): Promise<void> {
   const s = ctx.session;
   if (!s || s.role === "admin") return;
-  const c = await ctx.db.prepare("SELECT price_twd, price_tba FROM courses WHERE id = ? AND status = 'published'").bind(courseId).first<{ price_twd: number; price_tba: number }>();
-  if (!c || c.price_twd !== 0 || c.price_tba === 1) return;
-  await ensureFreeEnrollment(ctx, courseId);
   await ctx.db.prepare("UPDATE enrollments SET hidden = 0 WHERE member_sub = ? AND course_id = ? AND hidden = 1").bind(s.sub, courseId).run();
   await ctx.db.prepare("UPDATE learning_started SET hidden = 0 WHERE member_sub = ? AND course_id = ? AND hidden = 1").bind(s.sub, courseId).run();
 }
@@ -1049,10 +1037,22 @@ async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "�
       if (recent) merged = true;
       else sent = await notifySubscribers(ctx.db, seriesSubKey(c.series), title, `${c.title.slice(0, 80)}（${c.is_list === 1 ? "清單" : "課程"}）`, link, me);
     }
+    // 課程類：報名＝訂閱，已報名的學員（已開通、審核中不算）也收到更新通知；系列訂閱者不重複通知（業主 2026-11-18）。
+    let enrolledSent = 0;
+    if (c.is_list !== 1 && !merged) enrolledSent = await notifyEnrolled(ctx.db, courseId, `${c.title.slice(0, 40)}有新${what}`, "你已報名這門課程，有新內容可以看了", link, me, c.series && !isPrivate(c.view_scope) ? seriesSubKey(c.series) : null);
+    sent += enrolledSent;
     if (me) await notify(ctx.db, { sub: me }, `已送出「新${what}」通知`, merged ? `${c.title.slice(0, 80)}（30 分鐘內已通知過，這次合併不重複發送）` : `${c.title.slice(0, 80)}（通知了 ${sent} 位系列訂閱者）`, link).run();
   } catch {
     /* 通知失敗不影響新增 */
   }
+}
+
+/** 通知某門課已開通報名的學員（報名＝訂閱更新）。except＝不通知的人；skipSubKey＝已經以訂閱者身分收過通知的人不重複。 */
+async function notifyEnrolled(db: D1Database, courseId: string, title: string, body: string, link: string, except: string | null, skipSubKey: string | null): Promise<number> {
+  const { results } = await db.prepare("SELECT member_sub FROM enrollments WHERE course_id = ? AND (? IS NULL OR member_sub NOT IN (SELECT member_sub FROM center_subscriptions WHERE center_key = ?))").bind(courseId, skipSubKey, skipSubKey).all<{ member_sub: string }>();
+  const subs = results.filter((r) => r.member_sub !== except);
+  for (let i = 0; i < subs.length; i += 40) await db.batch(subs.slice(i, i + 40).map((r) => notify(db, { sub: r.member_sub }, title, body, link)));
+  return subs.length;
 }
 
 /** 通知某個中心／系列的所有訂閱者（站內通知；推播由通知機制自動處理）。except＝不重複通知的人（上架者自己，另外收確認通知）；回傳通知人數。 */
@@ -1363,6 +1363,7 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
   {
     const { results: scopes } = await ctx.db.prepare(`SELECT id, view_scope FROM courses WHERE id IN (${marks})`).bind(...ids).all<{ id: string; view_scope: string }>();
     if (scopes.some((c) => !scopeAllows(c.view_scope, s))) fail(403, "not_visible", "這門課程不開放你報名");
+    if ((await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE is_list = 1 AND id IN (${marks}) LIMIT 1`).bind(...ids).first())) fail(400, "list_no_enroll", "清單、素材不需要報名，打開就能看");
   }
   if (courses.some((c) => c.price_tba === 1)) fail(409, "price_tba", "這門課程的費用尚未公布，暫不開放報名");
   const eligibility = await eligibilityFor(s, rankMap, [...courses.map((c) => c.min_rank_code), DIAMOND]);
@@ -2222,7 +2223,7 @@ function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name FROM courses WHERE id = ?").bind(id).first<{ status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list FROM courses WHERE id = ?").bind(id).first<{ event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -2290,6 +2291,11 @@ async function updateCourse(ctx: Ctx, id: string) {
   if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
   await ensureCourseUrl(ctx, id);
   if (pick("status", cur.status) === "published" && cur.status !== "published") await notifyNewCourse(ctx, id);
+  // 上課日期或地點改了：已報名的學員收到更新通知（報名＝訂閱，業主 2026-11-18）。
+  const changed = (col: "event_start" | "event_end" | "location") => sets.some(([c, v]) => c === col && v !== cur[col]);
+  if (cur.is_list !== 1 && cur.status === "published" && (changed("event_start") || changed("event_end") || changed("location"))) {
+    await notifyEnrolled(ctx.db, id, `${cur.title.slice(0, 40)}時間或地點有更新`, "請打開課程頁確認最新的日期與地點", `/course/${id}`, admin.sub, null).catch(() => undefined);
+  }
   return courseDetail(ctx, id);
 }
 
@@ -2704,7 +2710,6 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       await lessonOf(ctx, courseId, lessonId); // 找不到章節時會丟錯
       if (!(await canWatch(ctx, courseId))) fail(403, "not_enrolled", "請先報名並通過審核");
-      await ensureFreeEnrollment(ctx, courseId);
       // 播放超過 1%：納入學習中（已被隱藏的也恢復顯示）。
       await ctx.db
         .prepare("INSERT INTO learning_started (member_sub, course_id) VALUES (?, ?) ON CONFLICT(member_sub, course_id) DO UPDATE SET hidden = 0")
@@ -2742,7 +2747,6 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       await lessonOf(ctx, courseId, lessonId); // 找不到章節時會丟錯
       if (!(await canWatch(ctx, courseId))) fail(403, "not_enrolled", "請先報名並通過審核");
-      await ensureFreeEnrollment(ctx, courseId);
       await ctx.db
         .prepare("INSERT OR IGNORE INTO lesson_progress (member_sub, lesson_id, course_id) VALUES (?, ?, ?)")
         .bind(s.sub, lessonId, courseId)
@@ -2758,7 +2762,6 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [courseId, lessonId]) => {
       const lesson = await lessonOf(ctx, courseId, lessonId);
       if (!(await canWatch(ctx, courseId))) fail(ctx.session ? 403 : 401, ctx.session ? "not_enrolled" : "unauthenticated", ctx.session ? "請先報名並通過審核" : "請先登入");
-      await ensureFreeEnrollment(ctx, courseId);
       // 續播記憶（業主 2026-11-17）：還沒看完的這一堂，從上次播放到的秒數接著播（離起點不到 5 秒、離結尾不到 10 秒就從頭）。
       const resumeAt = await resumePoint(ctx, lessonId, lesson.start_seconds ?? 0, lesson.end_seconds);
       const seg = { start: lesson.start_seconds, end: lesson.end_seconds, ...(resumeAt != null ? { resumeAt } : {}) };
