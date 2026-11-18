@@ -121,8 +121,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   const [name, setName] = useState(logo.name);
   const [tab, setTab] = useState<Tab>("light"); // 預覽圖共用：切到哪一顆按鈕，預覽就顯示那個模式的樣子
   const [lightColor, setLightColor] = useState(logo.bgColor ?? "#FFFFFF");
-  const [darkOn, setDarkOn] = useState(!!logo.bgColorDark); // 深色模式底色：不設定＝深色模式照淺色模式的底色或底圖
-  const [darkColor, setDarkColor] = useState(logo.bgColorDark ?? "#1B1F1E");
+  const [darkColor, setDarkColor] = useState<string | null>(logo.bgColorDark); // 深色模式底色：null＝沒設定，深色模式照淺色模式的底色或底圖；一選顏色就設定了
   const [logoPicks, setLogoPicks] = useState<string[]>([]);
   useEffect(() => {
     if (logo.logoUrl) void logoColors(resolveUrl(logo.logoUrl)).then(setLogoPicks);
@@ -148,7 +147,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   const upload = (part: "logo" | "bg") => (file: File) => run(() => api("PUT", `/admin/brand-logos/${logo.id}/${part}`, file), part === "logo" ? "已更新 logo" : "已更新背景圖");
   const save = async () => {
     // 有自訂背景圖時，淺色模式用背景圖（底色只是墊在下面）；沒有就用淺色底色。深色底色另外存。
-    const body: Record<string, unknown> = { name: name.trim(), bgColor: hasImage ? null : lightColor, bgColorDark: darkOn ? darkColor : null };
+    const body: Record<string, unknown> = { name: name.trim(), bgColor: hasImage ? null : lightColor, bgColorDark: darkColor };
     if (await run(() => api("PATCH", `/admin/brand-logos/${logo.id}`, body), "已儲存")) onClose();
   };
   const remove = async () => {
@@ -156,7 +155,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
       if (await run(() => api("DELETE", `/admin/brand-logos/${logo.id}`), "已刪除")) onClose();
     }
   };
-  const preview = { logoUrl: logo.logoUrl ?? "", bgColor: hasImage ? null : lightColor, bgColorDark: darkOn ? darkColor : null, bgUrl: logo.bgUrl };
+  const preview = { logoUrl: logo.logoUrl ?? "", bgColor: hasImage ? null : lightColor, bgColorDark: darkColor, bgUrl: logo.bgUrl };
   return (
     <EditSheet title="品牌 Logo" onClose={onClose} onSave={save} dirty busy={busy} error={error}>
       {/* 品牌名稱欄位的右邊就是 logo 上傳／更換鈕（業主 2026-11-18）。 */}
@@ -182,10 +181,10 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
       {tab === "dark" ? (
         <View style={{ gap: space.xs }}>
           <AppText variant="caption" tone="muted">
-            只有使用者切換成「深色模式」時才套用，全站所有品牌 logo 出現的地方都一起變；不設定＝深色模式照淺色模式的底色或背景圖。
+            只有使用者切換成「深色模式」時才套用，全站所有品牌 logo 出現的地方都一起變。還沒選顏色之前，深色模式照淺色模式的底色或背景圖。
           </AppText>
-          <Chips title="深色模式" label="深色模式" options={[{ key: "off", label: "不設定" }, { key: "on", label: "指定深色底色" }]} value={darkOn ? "on" : "off"} onChange={(v) => setDarkOn(v === "on")} />
-          {darkOn ? <ColorPicker value={darkColor} onChange={setDarkColor} swatches={DARK_SWATCHES} picks={logoPicks} /> : null}
+          <ColorPicker value={darkColor ?? "#1B1F1E"} onChange={setDarkColor} swatches={DARK_SWATCHES} picks={logoPicks} />
+          {darkColor ? <Button variant="cancel" label="清除深色底色（深色模式照淺色）" icon="close-circle-outline" disabled={busy} onPress={() => setDarkColor(null)} /> : null}
         </View>
       ) : null}
       {tab === "image" ? (
