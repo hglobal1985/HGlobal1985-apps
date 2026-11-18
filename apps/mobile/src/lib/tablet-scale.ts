@@ -47,6 +47,8 @@ function idealWidth(landscape: boolean): number {
 
 /** 這台裝置現在該用的 viewport 設定（也給 no-page-zoom.ts 用，兩邊不會互相蓋掉）。 */
 export function viewportContent(): string {
+  return plain; // 2026-11-18 起不再用 viewport 放大（iPad Safari 不一定理會、還會連圖片放大）；改由 theme/ui-scale.ts 放大字體、圖示與按鈕。
+  // eslint-disable-next-line no-unreachable
   if (Platform.OS !== "web" || typeof window === "undefined" || !isTouchTablet()) return plain;
   const landscape = landscapeNow();
   const ideal = idealWidth(landscape);

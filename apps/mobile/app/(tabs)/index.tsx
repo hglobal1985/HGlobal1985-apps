@@ -31,7 +31,7 @@ export default function HomeScreen() {
   // 直式維持兩行，並依視窗比例放大（寬度越大放越大，上限 1.55 倍）。
   const landscape = lay.width > lay.height;
   const shortLand = landscape && lay.height < 500; // 手機橫放：空間很矮，隱藏安裝提醒與備註
-  const k = landscape ? Math.max(0.75, Math.min(1.2, lay.height / 560)) : lay.large ? Math.max(1, Math.min(1.55, lay.width / 440)) : 1;
+  const k = landscape ? Math.max(0.75, Math.min(1, lay.height / 600)) : lay.large ? 1.15 : 1; // 字體本身的放大由 lib/global-scale.ts 統一處理，這裡只調標題區比例
   const { member } = useSession();
   const { data, error, reload } = useApi<CourseSummary[]>("/courses");
   const [quote, setQuote] = useState<string | null>(null);

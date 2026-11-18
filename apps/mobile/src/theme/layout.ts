@@ -1,5 +1,4 @@
 import { useWindowDimensions } from "react-native";
-import { tabletScaled } from "@/lib/tablet-scale";
 
 /**
  * 大螢幕版面規則（業主 2026-11-18：平板、電腦不可直接套用手機版面，全站統一從這裡取）。
@@ -61,7 +60,7 @@ export function layoutOf(width: number, height: number): Layout {
     sheetMax: compact ? undefined : 680,
     cardCols: compact ? 1 : size === "medium" ? 2 : width >= 1180 ? 3 : 2,
     split: size === "expanded" && landscape,
-    textScale: size === "expanded" && !tabletScaled() ? DESKTOP_TEXT_SCALE : 1,
+    textScale: 1,
   };
 }
 

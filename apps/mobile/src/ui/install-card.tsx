@@ -44,14 +44,9 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
     <>
       <View style={[styles.card, { backgroundColor: c.dangerSoft, borderColor: RED }]}>
         <PhoneAppIcon size={34} color={RED} />
-        {/* 強制兩行、每行不換行：字級固定 15，窄手機也放得下 */}
+        {/* 一行文字，空間不夠時自動換行（業主 2026-11-18） */}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <AppText numberOfLines={1} style={styles.title}>
-            安裝至手機主畫面
-          </AppText>
-          <AppText numberOfLines={1} style={styles.title}>
-            變成app
-          </AppText>
+          <AppText style={styles.title}>安裝至手機主畫面變成app</AppText>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="安裝" onPress={go} style={styles.btn}>
           <AppText style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>安裝</AppText>

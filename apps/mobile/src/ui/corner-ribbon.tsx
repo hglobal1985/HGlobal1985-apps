@@ -19,7 +19,7 @@ export function CornerRibbon({ label, bg, fg, side = "left", scale = 1 }: { labe
           { backgroundColor: bg },
         ]}
       >
-        <AppText variant="callout" style={[styles.text, { color: fg, fontSize: Math.max(9, k(11)), lineHeight: Math.max(12, k(14)) }]} numberOfLines={1}>
+        <AppText variant="callout" style={[styles.text, { color: fg, fontSize: Math.max(9, k(11)), lineHeight: Math.max(12, k(14)) }]} numberOfLines={1} {...({ dataSet: { noScale: "" } } as object)}>
           {label}
         </AppText>
       </View>

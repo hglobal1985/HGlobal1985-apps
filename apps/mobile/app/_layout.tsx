@@ -1,3 +1,4 @@
+import "@/lib/global-scale"; // 全站字體、圖示、按鈕放大（平板 1.3、電腦 1.1，theme/ui-scale.ts）
 import "@/lib/tablet-scale"; // 平板整體放大（業主 2026-11-18）：最早套用 viewport，避免先以手機尺寸畫一次
 import "@/lib/install-app"; // 要最早載入，才接得到瀏覽器只送一次的「可安裝」事件
 import { Stack } from "expo-router/stack";
