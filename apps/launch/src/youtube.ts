@@ -48,7 +48,7 @@ const idOf = (input: string | null | undefined): string | null => {
 };
 
 /**
- * 排程補齊（每 10 分鐘，每次最多 50 個教材）：YouTube 教材的影片長度（0 分鐘者）與發布日期（教材日期空白者）。
+ * 排程補齊（每 10 分鐘，每次最多 50 個教材，含「完整版課程影片」那一列，業主 2026-11-18）：YouTube 教材的影片長度（0 分鐘者）與發布日期（教材日期空白者）。
  * 沒設定 YOUTUBE_API_KEY 就什麼都不做（不耗資源）；沒有待查的教材時只有一個很小的資料庫查詢。
  * 只有「教材」會填日期（章節的日期是上課日期，不動）。
  */
@@ -60,7 +60,7 @@ export async function backfillYoutube(env: Env, limit = 50, fetcher: typeof fetc
     .prepare(
       `SELECT l.id, l.kind, l.start_seconds AS s, l.end_seconds AS e, l.duration_minutes AS mins, l.event_date AS d, l.media_type AS mt, l.media_ref AS ref,
         (SELECT a.link_url FROM lesson_attachments a WHERE a.lesson_id = l.id AND a.kind = 'link' AND a.att_type = 'youtube' LIMIT 1) AS link
-       FROM lessons l WHERE l.yt_checked_at IS NULL AND l.is_full = 0 AND l.kind <> 'section'
+       FROM lessons l WHERE l.yt_checked_at IS NULL AND l.kind <> 'section'
         AND ((l.media_type = 'youtube' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id AND a.kind = 'link' AND a.att_type = 'youtube'))
        LIMIT ?`,
     )
