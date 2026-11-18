@@ -131,10 +131,6 @@ export function MediaUploadModule({
   const [progress, setProgress] = useState<number | null>(null);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const set = (patch: Partial<MediaDraft>) => onChange({ ...draft, ...patch });
-  const s = fromHms(draft.start);
-  const e = fromHms(draft.end);
-  const error = mediaDraftError(draft);
-  const length = !error && e != null ? (e as number) - ((s as number | null) ?? 0) : null;
 
   const upload = async () => {
     setMsg(null);
@@ -156,6 +152,40 @@ export function MediaUploadModule({
     }
   };
 
+  const ctx: ChannelCtx = { draft, set, lesson, lessonId: id, busy, progress, upload };
+  const channels = MEDIA_CHANNELS.filter((ch) => (id ? true : ch.staged) && (!ch.superAdminOnly || allowMux || draft.kind === ch.key));
+  const active = MEDIA_CHANNELS.find((ch) => ch.key === draft.kind);
+  return (
+    <View style={{ gap: space.md }}>
+      <View style={styles.row}>
+        {channels.map((ch) => {
+          const on = ch.key === draft.kind;
+          return (
+            <Pressable key={ch.key} onPress={() => set({ kind: ch.key })} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.chip, { backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : c.border }]}>
+              <AppText variant="callout" style={{ color: on ? c.textOnAccent : c.text, fontWeight: "600" }}>
+                {ch.label}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+      {active?.render(ctx)}
+      <TimeRangeFields draft={draft} set={set} lesson={lesson} lengthLabel={lengthLabel} showHint={showHint} />
+      {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
+    </View>
+  );
+}
+
+/**
+ * 時間軸區間欄位（業主 2026-11-18 模組化）：拖曳時間軸（TimeRangePicker）＋手動輸入開始／結束時間＋「到影片結尾」勾選＋長度提示。
+ * 章節、完整版課程影片（透過 MediaUploadModule）與「素材清單」的 YouTube 教材都用這一個元件，不可在別處另做。
+ */
+export function TimeRangeFields({ draft, set, lesson, lengthLabel = "本段長度", showHint = true }: { draft: MediaDraft; set: (patch: Partial<MediaDraft>) => void; lesson?: Lesson; lengthLabel?: string; showHint?: boolean }) {
+  const { c } = useTheme();
+  const s = fromHms(draft.start);
+  const e = fromHms(draft.end);
+  const error = mediaDraftError(draft);
+  const length = !error && e != null ? (e as number) - ((s as number | null) ?? 0) : null;
   // 「到影片結尾」：勾選後自動偵測影片長度並填入結束欄位；來源或選好的檔案換了就重新偵測。
   const [endNote, setEndNote] = useState<{ tone: "info" | "danger"; text: string } | null>(null);
   useEffect(() => {
@@ -189,24 +219,8 @@ export function MediaUploadModule({
     };
   }, [pickOpen, draft.kind, draft.ref, draft.audio]); // eslint-disable-line react-hooks/exhaustive-deps
   const canPick = (draft.kind === "youtube" && !!youtubeIdOf(draft.ref)) || draft.kind === "audio" || draft.kind === "mux";
-  const ctx: ChannelCtx = { draft, set, lesson, lessonId: id, busy, progress, upload };
-  const channels = MEDIA_CHANNELS.filter((ch) => (id ? true : ch.staged) && (!ch.superAdminOnly || allowMux || draft.kind === ch.key));
-  const active = MEDIA_CHANNELS.find((ch) => ch.key === draft.kind);
   return (
     <View style={{ gap: space.md }}>
-      <View style={styles.row}>
-        {channels.map((ch) => {
-          const on = ch.key === draft.kind;
-          return (
-            <Pressable key={ch.key} onPress={() => set({ kind: ch.key })} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.chip, { backgroundColor: on ? c.accent : c.surface, borderColor: on ? c.accent : c.border }]}>
-              <AppText variant="callout" style={{ color: on ? c.textOnAccent : c.text, fontWeight: "600" }}>
-                {ch.label}
-              </AppText>
-            </Pressable>
-          );
-        })}
-      </View>
-      {active?.render(ctx)}
       <AppText variant="callout" tone="muted">
         {showHint ? "時間軸區間（選填；空白＝從頭播到結束）" : "時間軸區間"}
       </AppText>
@@ -241,7 +255,6 @@ export function MediaUploadModule({
           {lengthLabel}：{formatDuration(length)}
         </AppText>
       ) : null}
-      {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
     </View>
   );
 }
