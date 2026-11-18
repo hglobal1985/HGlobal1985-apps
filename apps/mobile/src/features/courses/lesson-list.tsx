@@ -1,16 +1,16 @@
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
-import { Linking, Pressable, type ViewStyle } from "react-native";
-import type { CourseDetail, Lesson } from "@/api/client";
+import { Image, Linking, Pressable, View, type ViewStyle } from "react-native";
+import { resolveUrl, type CourseDetail, type Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { engine } from "@/features/player/engine";
 import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
-import { space } from "@/theme/tokens";
-import { AppText, Card, Icon, ListRow, SaplingIcon, ShareIcon } from "@/ui";
+import { radius, space } from "@/theme/tokens";
+import { AppText, BrandCover, Card, ListRow, SaplingIcon, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 import { SpeakerLead } from "./speaker-mark";
@@ -62,8 +62,10 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
  */
 export function FullVersionList({ course, playingId, onPlay, openBlock }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string } & LessonPlayProps) {
   const { c } = useTheme();
-  // 清單的區塊預設全部收起（業主 2026-11-18）；只有從上拉選單指定的那個區塊展開。
-  const [folded, setFolded] = useState<Set<string>>(() => new Set(course.isList ? course.lessons.filter((l) => l.section && l.id !== openBlock).map((l) => l.id) : []));
+  const isBlocks = course.isList && course.lessons.some((l) => l.section);
+  // 清單的區塊：預設全部收起（業主 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
+  const [openId, setOpenId] = useState<string | null>(openBlock ?? null);
+  const [gridW, setGridW] = useState(0);
   useEffect(() => {
     if (!openBlock || typeof document === "undefined") return;
     const t = setTimeout(() => document.getElementById(`blk-${openBlock}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
@@ -71,79 +73,109 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
   }, [openBlock]);
   const canEdit = !!course.can?.edit;
   const all = course.lessons.filter((l) => l.material);
-  // 學員只看得到「有內容的項目」；分類標題底下沒有任何可看項目就整個隱藏（管理者全部都看得到）。
+  // 學員只看得到「有內容的項目」；區塊底下沒有任何可看項目就整個隱藏（管理者全部都看得到）。
   const shown = (l: Lesson) => l.ready || canEdit;
-  const rows: Lesson[] = [];
-  all.forEach((l, i) => {
-    if (!l.section) return void (shown(l) && rows.push(l));
-    const next = all.slice(i + 1);
-    const end = next.findIndex((x) => x.section);
-    const members = end < 0 ? next : next.slice(0, end);
-    if (canEdit || members.some(shown)) rows.push(l);
-  });
-  if (!rows.length) return null;
-  // 每個項目屬於它前面最近的分類標題；標題收合時底下的項目不顯示。
-  let current: string | null = null;
-  const visible = rows.filter((l) => {
-    if (l.section) {
-      current = l.id;
-      return true;
-    }
-    return !(current && folded.has(current));
-  });
-  const toggle = (id: string) =>
-    setFolded((x) => {
-      const n = new Set(x);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  return (
-    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-      {visible.map((lesson) => {
-        if (lesson.section) {
-          const open = !folded.has(lesson.id);
-          return (
-            <Pressable key={lesson.id} nativeID={`blk-${lesson.id}`} accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={`${lesson.title}，${open ? "點一下收合" : "點一下展開"}`} onPress={() => toggle(lesson.id)} style={({ pressed }) => [{ minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space.sm, paddingVertical: 8, scrollMarginTop: 72 } as ViewStyle, pressed && { opacity: 0.7 }]}>
-              <Icon name={open ? "chevron-down" : "chevron-forward"} size={18} color={c.accentText} />
-              <AppText variant="callout" style={{ flex: 1, fontWeight: "800", color: c.accentText }}>
-                {lesson.title}
-              </AppText>
-            </Pressable>
-          );
+  const itemRow = (lesson: Lesson) => {
+    const link = lesson.linkType && !lesson.full ? lesson : null;
+    return (
+      <ListRow
+        key={lesson.id}
+        icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
+        leading={link ? <BrandIcon type={link.linkType!} fallback={TYPE_INFO[link.linkType!].icon as never} size={36} /> : undefined}
+        compact
+        playing={!link && playingId === lesson.id}
+        playingLesson={lesson.id}
+        highlight={!link && playingId === lesson.id}
+        note=""
+        title={lesson.title}
+        titleLines={course.isList ? 2 : undefined}
+        dateChip={course.isList && lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined}
+        subtitle={course.isList ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
+        right={link?.linkUrl ? <MaterialShare course={course} lesson={link} /> : course.isList && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
+        onPress={
+          link
+            ? link.linkUrl
+              ? () => (trackFeature("open_material"), void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結")))
+              : undefined
+            : lesson.locked
+              ? undefined
+              : playingId === lesson.id
+                ? () => engine.toggle()
+                : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))
         }
-        const link = lesson.linkType && !lesson.full ? lesson : null;
-        return (
-          <ListRow
-            key={lesson.id}
-            icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-            leading={link ? <BrandIcon type={link.linkType!} fallback={TYPE_INFO[link.linkType!].icon as never} size={36} /> : undefined}
-            compact
-            playing={!link && playingId === lesson.id}
-            playingLesson={lesson.id}
-            highlight={!link && playingId === lesson.id}
-            note=""
-            title={lesson.title}
-            titleLines={course.isList ? 2 : undefined}
-            dateChip={course.isList && lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined}
-            subtitle={course.isList ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
-            right={link?.linkUrl ? <MaterialShare course={course} lesson={link} /> : course.isList && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
-            onPress={
-              link
-                ? link.linkUrl
-                  ? () => (trackFeature("open_material"), void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結")))
-                  : undefined
-                : lesson.locked
-                  ? undefined
-                  : playingId === lesson.id
-                    ? () => engine.toggle()
-                    : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))
-            }
-          />
-        );
-      })}
-    </Card>
-  );
+      />
+    );
+  };
+  if (isBlocks) {
+    // 切成：區塊前面沒歸區塊的項目＋各區塊（標題＋底下的項目）。
+    const lead: Lesson[] = [];
+    const blocks: { head: Lesson; items: Lesson[] }[] = [];
+    for (const l of all) {
+      if (l.full) continue;
+      if (l.section) blocks.push({ head: l, items: [] });
+      else if (blocks.length) blocks[blocks.length - 1]!.items.push(l);
+      else lead.push(l);
+    }
+    const full = all.filter((l) => l.full && shown(l));
+    const visibleBlocks = blocks.filter((b) => canEdit || b.items.some(shown));
+    const leadShown = lead.filter(shown);
+    if (!visibleBlocks.length && !leadShown.length && !full.length) return null;
+    // 欄數隨螢幕寬度自動變：手機 2 欄，越寬越多，最多 5 欄（業主 2026-11-18）。
+    const cols = gridW < 440 ? 2 : gridW < 660 ? 3 : gridW < 880 ? 4 : 5;
+    const GAP = space.sm;
+    const cell = gridW ? Math.floor((gridW - GAP * (cols - 1)) / cols) : 0;
+    const rows: (typeof visibleBlocks)[] = [];
+    for (let i = 0; i < visibleBlocks.length; i += cols) rows.push(visibleBlocks.slice(i, i + cols));
+    return (
+      <View style={{ gap: space.sm }}>
+        {leadShown.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{leadShown.map(itemRow)}</Card> : null}
+        <View style={{ gap: GAP }} onLayout={(e) => setGridW(Math.floor(e.nativeEvent.layout.width))}>
+          {cell
+            ? rows.map((row, ri) => {
+                const opened = row.find((b) => b.head.id === openId);
+                return (
+                  <View key={ri} style={{ gap: GAP }}>
+                    <View style={{ flexDirection: "row", gap: GAP }}>
+                      {row.map((b) => {
+                        const on = b.head.id === openId;
+                        return (
+                          <Pressable key={b.head.id} nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={() => setOpenId(on ? null : b.head.id)} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, pressed && { opacity: 0.75 }]}>
+                            <View style={{ width: cell, aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: on ? 3 : 1, borderColor: on ? c.accent : c.border }}>
+                              {b.head.coverUrl ? (
+                                <Image source={{ uri: resolveUrl(b.head.coverUrl) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                              ) : b.head.brand ? (
+                                <BrandCover brand={b.head.brand} fill />
+                              ) : (
+                                <Image source={require("../../../assets/icon.png")} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                              )}
+                            </View>
+                            <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontWeight: "800", color: on ? c.accentText : c.text }}>
+                              {b.head.title}
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                      {Array.from({ length: cols - row.length }, (_, k) => (
+                        <View key={`pad${k}`} style={{ width: cell }} />
+                      ))}
+                    </View>
+                    {opened ? (
+                      <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+                        {opened.items.filter(shown).length ? opened.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
+                      </Card>
+                    ) : null}
+                  </View>
+                );
+              })
+            : null}
+        </View>
+        {full.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{full.map(itemRow)}</Card> : null}
+      </View>
+    );
+  }
+  const rows: Lesson[] = all.filter(shown);
+  if (!rows.length) return null;
+  return <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{rows.map(itemRow)}</Card>;
 }
 
 /** 清單每列最右側的「分享」小按鈕（系統預設分享圖示）。 */

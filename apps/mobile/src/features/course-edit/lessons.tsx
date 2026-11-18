@@ -13,6 +13,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { AppText, Button, Card, Chips, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
+import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { Check, MultiChips } from "./course-sections";
 import { EditSheet } from "./edit-sheet";
 import { EditMaterialSheet } from "./material-sheet";
@@ -71,6 +72,7 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
   const [inSheet, setInSheet] = useState(lesson ? lesson.inSheet !== false : true);
   const [brandId, setBrandId] = useState(lesson?.brandId ?? "");
   const [cats, setCats] = useState(lesson?.categories ?? "");
+  const [brandOpen, setBrandOpen] = useState(false); // 品牌預設收起
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirty = !lesson || title.trim() !== lesson.title || inSheet !== (lesson.inSheet !== false) || brandId !== (lesson.brandId ?? "") || cats !== (lesson.categories ?? "");
@@ -102,7 +104,7 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
           {lesson ? (
             <View style={{ gap: space.xs }}>
               <AppText variant="callout" tone="muted">
-                區塊封面（沒上傳時，有選品牌就用品牌 logo）
+                區塊封面（沒上傳時，用下面選的品牌 logo）
               </AppText>
               <LessonArt lesson={lesson} onChanged={invalidate} />
             </View>
@@ -111,7 +113,20 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
               區塊封面要等區塊建立後，再按區塊旁的鉛筆上傳；沒上傳時，有選品牌就用品牌 logo。
             </AppText>
           )}
-          {brands.data?.length ? <Chips label="品牌（單選）" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={brandId} onChange={setBrandId} /> : null}
+          {brands.data?.length ? (
+            <View style={{ gap: space.xs }}>
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: brandOpen }} onPress={() => setBrandOpen((v) => !v)} style={{ minHeight: minTouch, flexDirection: "row", alignItems: "center", gap: space.sm }}>
+                <Icon name={brandOpen ? "chevron-down" : "chevron-forward"} size={18} color={c.accentText} />
+                <AppText variant="callout" style={{ fontWeight: "700", flex: 1 }}>
+                  品牌
+                </AppText>
+                <AppText variant="callout" tone="muted">
+                  {brands.data.find((b) => b.id === brandId)?.name ?? "未選"}
+                </AppText>
+              </Pressable>
+              {brandOpen ? <Chips label="" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={brandId} onChange={setBrandId} /> : null}
+            </View>
+          ) : null}
           <AppText variant="callout" tone="muted">
             分類（可複選）
           </AppText>
@@ -129,7 +144,7 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
  * 清單編輯模式（業主 2026-11-18）：每個區塊一張卡（區塊標題列＋底下的教材＋「新增教材到這個區塊」），「新增區塊」獨立放在最下面。
  * 區塊的上下移動＝整個區塊（連同底下的教材）一起移；教材的上下移動只在區塊內。
  */
-export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, busy }: { items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
+export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, busy }: { onMoveTo: (l: Lesson) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
   const { c } = useTheme();
   const rows = items.filter((l) => !l.full);
   // 切成區塊：每組 = [區塊標題, 底下的教材…]；最前面還沒歸區塊的教材自成一組（沒有標題）。
@@ -165,7 +180,7 @@ export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, 
               </View>
             ) : null}
             {body.length ? (
-              <EditLessonRows group={body} word="教材" onEdit={onEdit} onMove={(i, j) => onMoveItem(body, i, j)} onCopy={onCopy} onDelete={onDelete} busy={busy} bare />
+              <EditLessonRows group={body} word="教材" onEdit={onEdit} onMove={(i, j) => onMoveItem(body, i, j)} onCopy={onCopy} onDelete={onDelete} busy={busy} bare onMoveTo={groups.filter((x) => x[0]!.section).length > 1 ? onMoveTo : undefined} />
             ) : (
               <AppText variant="callout" tone="muted" style={{ padding: space.md }}>
                 這個區塊還沒有教材
@@ -405,7 +420,7 @@ function SpeakerApplied({ course }: { course: { title: string; teacher: string; 
 }
 
 /** 課程頁編輯模式的章節／教材清單（同一個元件，兩組共用）：每列＝名稱（點了編輯）＋小按鈕 ↑ ↓ 複製 編輯 刪除（32px，讓名稱有空間）。 */
-export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, busy, bare }: { /** 放在區塊卡片裡時不再自己畫外框。 */ bare?: boolean; group: Lesson[]; word: string; onEdit: (l: Lesson) => void; onMove: (from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; busy: boolean }) {
+export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, busy, bare, onMoveTo }: { /** 放在區塊卡片裡時不再自己畫外框。 */ bare?: boolean; /** 有傳＝每列多一個「移到其他區塊」鈕。 */ onMoveTo?: (l: Lesson) => void; group: Lesson[]; word: string; onEdit: (l: Lesson) => void; onMove: (from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; busy: boolean }) {
   const { c } = useTheme();
   // 「完整版課程影片」永遠在最後一列：不能上下移、不能複製；其他列的上下移只在它們之間進行。
   const movable = group.filter((l) => !l.full).length;
@@ -426,6 +441,7 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
             <>
               <IconButton icon="arrow-up" label="上移" onPress={i > 0 ? () => onMove(i, i - 1) : undefined} disabled={busy} />
               <IconButton icon="arrow-down" label="下移" onPress={i < movable - 1 ? () => onMove(i, i + 1) : undefined} disabled={busy} />
+              {onMoveTo && !lesson.section ? <IconButton icon="folder-open-outline" label={`移到其他區塊：${lesson.title}`} onPress={() => onMoveTo(lesson)} disabled={busy} /> : null}
               {lesson.section ? null : <IconButton icon="copy-outline" label={`複製${word} ${lesson.position}`} onPress={() => onCopy(lesson)} disabled={busy} />}
             </>
           )}
@@ -437,7 +453,7 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
   );
 }
 
-export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "arrow-up" | "arrow-down" | "trash-outline" | "create-outline" | "copy-outline"; label: string; onPress?: () => void; disabled?: boolean; danger?: boolean }) {
+export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "arrow-up" | "arrow-down" | "trash-outline" | "create-outline" | "copy-outline" | "folder-open-outline"; label: string; onPress?: () => void; disabled?: boolean; danger?: boolean }) {
   const { c } = useTheme();
   const off = disabled || !onPress;
   return (
@@ -458,3 +474,35 @@ const styles = StyleSheet.create({
   lessonRow: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: space.xs, borderBottomWidth: StyleSheet.hairlineWidth },
   lessonMain: { flex: 1, minWidth: 0, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm },
 });
+
+/** 把教材移到另一個區塊（業主 2026-11-18）：列出所有區塊，點一個就搬到那個區塊的最後面。 */
+export function MoveToBlockSheet({ items, lesson, onPick, onClose }: { items: Lesson[]; lesson: Lesson; onPick: (blockId: string) => void; onClose: () => void }) {
+  const { c } = useTheme();
+  const heads = items.filter((l) => l.section);
+  const current = (() => {
+    let cur: string | null = null;
+    for (const l of items) {
+      if (l.section) cur = l.id;
+      if (l.id === lesson.id) return cur;
+    }
+    return null;
+  })();
+  return (
+    <BottomSheet onClose={onClose}>
+      <AppText variant="headline" numberOfLines={2}>
+        移動「{lesson.title}」到哪個區塊？
+      </AppText>
+      <SheetScroll>
+        {heads.map((h) => (
+          <Pressable key={h.id} accessibilityRole="button" disabled={h.id === current} onPress={() => onPick(h.id)} style={{ minHeight: minTouch + 8, flexDirection: "row", alignItems: "center", gap: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, opacity: h.id === current ? 0.4 : 1 }}>
+            <AppText variant="body" style={{ flex: 1, fontWeight: "700" }}>
+              📂 {h.title}
+            </AppText>
+            <AppText tone="muted">{h.id === current ? "目前所在" : "›"}</AppText>
+          </Pressable>
+        ))}
+      </SheetScroll>
+      <Button variant="secondary" label="取消" onPress={onClose} fullWidth />
+    </BottomSheet>
+  );
+}
