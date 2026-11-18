@@ -12,7 +12,8 @@ import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { AddMaterialFab, type AddKind } from "@/features/course-edit/add-material-fab";
 import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { centerTitle } from "@/features/format";
-import { canCreateCourse, canManageCourses } from "@/lib/roles";
+import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
+import { flashText } from "@/ui/flash-notice";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
@@ -28,7 +29,7 @@ import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
 import { buildSearchIndex, matchCourses, matchLessons, suggestTerms, type SearchLesson } from "./course-search";
 import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
-import { groupBySeries, orderGroups, sortCourses } from "./sort";
+import { groupBySeries, orderGroups, sortCourses, type SeriesGroup } from "./sort";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { portraitColumns, tileColumns, useLayout } from "@/theme/layout";
@@ -172,7 +173,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const chapterMode = mode === "chapter";
   const searchData = useApi<{ lessons: SearchLesson[] }>(wantIndex || chapterMode ? "/search-index" : null);
   const { c } = useTheme();
-  const { config } = useUiConfig();
+  const { config, reload: reloadConfig } = useUiConfig();
+  // 卡片排序模式（業主 2026-11-18：方案 2，◀ ▶ 與相鄰交換）：只有超級管理員、只在「所有系列」；課程系列與素材專區各排各的。
+  const [sortMode, setSortMode] = useState(false);
+  const [orderOverride, setOrderOverride] = useState<string[] | null>(null);
   // 公開清單只取「已上架」（學習中用的下架封存課程不放這裡）；管理者再加上自己能管的未上架課程。
   const merged = useMemo(() => {
     // 私密連結的課程不放在任何清單（開過的人只在「學習中」看得到）。
@@ -247,11 +251,30 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 選了某個中心：該中心的課程一門一張平鋪，同系列也不合併（業主 2026-11-15）。
   const flat = mode === "center" && center !== ALL;
   const groups = useMemo(
-    () => (flat ? list.map((x) => ({ key: `c:${x.id}`, nearest: x, sessions: [x] })) : orderGroups(groupBySeries(list, pool), config.seriesOrder ?? [])),
-    [flat, list, pool, config.seriesOrder],
+    () => (flat ? list.map((x) => ({ key: `c:${x.id}`, nearest: x, sessions: [x] })) : orderGroups(groupBySeries(list, pool), orderOverride ?? config.seriesOrder ?? [])),
+    [flat, list, pool, config.seriesOrder, orderOverride],
   );
   // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、素材專區（整組都是清單類別的）。
   const materialGroups = useMemo(() => (flat ? [] : groups.filter((g) => g.sessions.every((x) => x.isList))), [flat, groups]);
+  /** 在同一個區塊裡把第 i 張跟相鄰的交換，立刻更新畫面、背景存檔；失敗就還原。 */
+  useEffect(() => setOrderOverride(null), [config.seriesOrder]);
+  const canSort = isSuperAdmin(member) && mode === "series" && !flat && !matched;
+  const swapCard = (zone: typeof groups, i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= zone.length) return;
+    const zoneKeys = zone.map((g) => g.key);
+    [zoneKeys[i], zoneKeys[j]] = [zoneKeys[j]!, zoneKeys[i]!];
+    const inZone = new Set(zoneKeys);
+    let k = 0;
+    const full = groups.map((g) => (inZone.has(g.key) ? zoneKeys[k++]! : g.key));
+    setOrderOverride(full);
+    void api("PUT", "/admin/ui-config", { seriesOrder: full, ribbons: config.ribbons })
+      .then(() => reloadConfig())
+      .catch((e: Error) => {
+        setOrderOverride(null);
+        flashText(e.message);
+      });
+  };
   const courseGroups = useMemo(() => (flat ? groups : groups.filter((g) => !g.sessions.every((x) => x.isList))), [flat, groups]);
   // 章節模式：符合條件的章節，不分組、不顯示系列標題，順序隨機（每次打開頁面、切到章節模式就重新洗牌；
   // 同一次瀏覽中打字搜尋、換分類時，相對順序保持不變，畫面不會跳動）。
@@ -463,14 +486,25 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (
             <EmptyState icon="business-outline" title="暫時看不到中心清單" body="請稍後再試，或先到「寰宇大學」瀏覽。" />
           ) : null}
+          {canSort ? (
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: sortMode }} onPress={() => setSortMode((v) => !v)} style={[styles.sortBar, { backgroundColor: sortMode ? c.accent : c.surface, borderColor: sortMode ? c.accent : c.border }]}>
+              <Ionicons name="swap-horizontal" size={20} color={sortMode ? c.textOnAccent : c.accentText} />
+              <AppText variant="callout" style={{ flex: 1, fontWeight: "700", color: sortMode ? c.textOnAccent : c.text }}>
+                {sortMode ? "排序模式：點卡片下方的 ◀ ▶ 與相鄰的卡交換位置" : "排序卡片（課程系列、素材專區各排各的）"}
+              </AppText>
+              <AppText variant="callout" style={{ fontWeight: "800", color: sortMode ? c.textOnAccent : c.accentText }}>
+                {sortMode ? "完成" : "排序"}
+              </AppText>
+            </Pressable>
+          ) : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {tileW && !(mode === "center" && center === ALL) && !flat && (materialGroups.length || (mode === "series" && !matched && centerCounts.length)) && courseGroups.length ? <ZoneBand icon="library" text="課程系列" count={courseGroups.length} /> : null}
-            {tileW && !(mode === "center" && center === ALL) ? (flat ? groups : courseGroups).map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />) : null}
+            {tileW && !(mode === "center" && center === ALL) ? (flat ? groups : courseGroups).map((g, i, zone) => (sortMode && canSort && !flat ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={zone.length} onSwap={(d) => swapCard(zone, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} flat={flat} />)) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat && materialGroups.length ? <ZoneBand icon="folder-open" text="素材專區" count={materialGroups.length} material /> : null}
-            {tileW && !(mode === "center" && center === ALL) && !flat ? materialGroups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} />) : null}
+            {tileW && !(mode === "center" && center === ALL) && !flat ? materialGroups.map((g, i, zone) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={zone.length} onSwap={(d) => swapCard(zone, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />)) : null}
             {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
             {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand icon="business" text="教育中心" count={centerCounts.length} red /> : null}
             {tileW && mode === "series" && !matched
@@ -503,6 +537,27 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
 /** 不顯示在「中心」清單的單位（只是不列出，仍可選為課程的主辦單位／建立單位）。 */
 const HIDDEN_FROM_CENTER_LIST = new Set(["安麗公司"]);
 
+/** 排序模式下的卡片：卡片本身＋下方 ◀ ▶（跟相鄰的卡交換位置，最前面不能再往前、最後面不能再往後）。 */
+function SortableTile({ group, width, index, count, onSwap }: { group: SeriesGroup; width: number; index: number; count: number; onSwap: (dir: -1 | 1) => void }) {
+  const { c } = useTheme();
+  const btn = (dir: -1 | 1, label: string, off: boolean) => (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={off} onPress={() => onSwap(dir)} style={[styles.swapBtn, { borderColor: c.border, backgroundColor: c.surface, opacity: off ? 0.3 : 1 }]}>
+      <Ionicons name={dir < 0 ? "chevron-back" : "chevron-forward"} size={22} color={c.accentText} />
+    </Pressable>
+  );
+  return (
+    <View style={{ width, gap: 6 }}>
+      <View pointerEvents="none">
+        <SeriesTile group={group} width={width} />
+      </View>
+      <View style={{ flexDirection: "row", gap: 8 }}>
+        {btn(-1, `${group.key.startsWith("s:") ? group.key.slice(2) : group.nearest.title} 往前移`, index === 0)}
+        {btn(1, `${group.key.startsWith("s:") ? group.key.slice(2) : group.nearest.title} 往後移`, index === count - 1)}
+      </View>
+    </View>
+  );
+}
+
 /** 系列檢視的區塊標題色帶：課程系列（深綠淡底）、素材專區（亮黃淡底）、教育中心（紅色淡底）。 */
 function ZoneBand({ icon, text, count, material, red }: { icon: "library" | "folder-open" | "business"; text: string; count: number; material?: boolean; red?: boolean }) {
   const { c } = useTheme();
@@ -527,6 +582,8 @@ const styles = StyleSheet.create({
   terms: { marginTop: space.xs, borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   term: { minHeight: 44, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", gap: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   kind: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }, filters: { flexDirection: "row", alignItems: "flex-end", gap: space.sm },
+  sortBar: { minHeight: minTouch, flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, marginBottom: space.sm },
+  swapBtn: { flex: 1, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: GAP, rowGap: space.lg },
   archHead: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, paddingHorizontal: space.md, borderWidth: 1, borderStyle: "dashed", borderRadius: radius.md },
 
