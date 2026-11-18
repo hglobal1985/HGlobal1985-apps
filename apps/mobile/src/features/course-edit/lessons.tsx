@@ -180,7 +180,7 @@ export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, 
               </View>
             ) : null}
             {body.length ? (
-              <EditLessonRows group={body} word="教材" onEdit={onEdit} onMove={(i, j) => onMoveItem(body, i, j)} onCopy={onCopy} onDelete={onDelete} busy={busy} bare onMoveTo={groups.filter((x) => x[0]!.section).length > 1 ? onMoveTo : undefined} />
+              <EditLessonRows group={body} word="教材" onEdit={onEdit} onMove={(i, j) => onMoveItem(body, i, j)} onCopy={onCopy} onDelete={onDelete} busy={busy} bare onMoveTo={blockCount > 1 || (!head && blockCount >= 1) ? onMoveTo : undefined} />
             ) : (
               <AppText variant="callout" tone="muted" style={{ padding: space.md }}>
                 這個區塊還沒有教材
