@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type Rank } from "@/api/client";
+import { api, HQ_UNIT, UNCATEGORIZED, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -132,7 +132,7 @@ const spanDays = (start: string, end: string) => (start && end ? Math.round((Dat
 
 /**
  * 課程日期（業主 2026-11-19）：勾「修改日期」才顯示開始日期欄位；填了開始日期才出現「＋輸入結束日期」；有日期就有「清除日期」；
- * 取消勾選＝清除日期。已經讀到日期（影片或素材系統帶入）時，日期以純文字顯示在勾選框右邊，勾了「修改日期」才能改。
+ * 取消勾選只收起欄位、日期保留；已經讀到日期（影片或素材系統帶入）時，日期以純文字顯示在勾選框右邊，勾了「修改日期」才能改。
  * 日期區間從不到 7 天變成 7 天以上時，自動勾選「套裝課程」（之後可手動取消）。
  */
 function DateEditor({ f, setF }: { f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
@@ -142,11 +142,7 @@ function DateEditor({ f, setF }: { f: BasicsForm; setF: React.Dispatch<React.Set
   const apply = (start: string, end: string) =>
     setF((x) => ({ ...x, eventStart: start, eventEnd: start ? end : "", ...(spanDays(start, end) >= 7 && spanDays(x.eventStart, x.eventEnd) < 7 ? { isPackage: true } : {}) }));
   const toggle = () => {
-    if (editing) {
-      apply("", ""); // 取消勾選＝清除日期
-      setShowEnd(false);
-    }
-    setEditing(!editing);
+    setEditing(!editing); // 取消勾選只是收起編輯欄位，已設定的日期保留
   };
   const shown = f.eventStart ? `${f.eventStart}${f.eventEnd ? ` ～ ${f.eventEnd}` : ""}` : "";
   return (
@@ -163,7 +159,15 @@ function DateEditor({ f, setF }: { f: BasicsForm; setF: React.Dispatch<React.Set
           <DateSelect label="開始日期" value={f.eventStart} onChange={(v) => apply(v, f.eventEnd)} />
           {f.eventStart && (showEnd || f.eventEnd) ? <DateSelect label="結束日期" value={f.eventEnd} defaultValue={f.eventStart} onChange={(v) => apply(f.eventStart, v)} /> : null}
           {f.eventStart && !showEnd && !f.eventEnd ? <Button variant="secondary" label="＋輸入結束日期" onPress={() => setShowEnd(true)} fullWidth /> : null}
-          {f.eventStart ? <Button variant="cancel" label="清除日期" onPress={() => (apply("", ""), setShowEnd(false))} fullWidth /> : null}
+          {f.eventStart ? (
+            <View style={{ alignItems: "flex-end" }}>
+              <Pressable accessibilityRole="button" accessibilityLabel="清除日期" onPress={() => (apply("", ""), setShowEnd(false))} style={{ paddingHorizontal: space.sm, paddingVertical: 4, borderRadius: radius.md, borderWidth: 1, borderColor: c.danger }}>
+                <AppText variant="caption" style={{ color: c.danger, fontWeight: "700" }}>
+                  清除日期
+                </AppText>
+              </Pressable>
+            </View>
+          ) : null}
         </>
       ) : null}
     </View>
@@ -198,13 +202,12 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
           <Check label="套裝課程（分類用途，不影響版面與功能）" value={f.isPackage} onChange={set("isPackage")} />
         </>
       )}
-      {isSuper ? <Chips title="專區（寰宇大學「所有系列」顯示在哪一區）" options={ZONES.map((z) => ({ key: z.id, label: z.label }))} value={f.zone} onChange={set("zone")} /> : null}
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
           <FormBlock collapsible title="系列" hint="同系列合併成一張卡；沒指定系列，就自己單獨一張卡">
             <Field label="" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
-            {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
+            {series.data?.length || !isList ? <Chips label="已有的系列" options={[...(isList ? [{ key: "", label: "無" }] : [{ key: UNCATEGORIZED, label: UNCATEGORIZED }]), ...(series.data ?? []).filter((x) => x !== UNCATEGORIZED).map((x) => ({ key: x, label: x }))]} value={f.series || (isList ? "" : UNCATEGORIZED)} onChange={set("series")} /> : null}
           </FormBlock>
         </>
       ) : null}
