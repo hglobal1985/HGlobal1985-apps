@@ -45,7 +45,7 @@ function Slide({ course, w, h }: { course: CourseSummary; w: number; h: number }
  * 首頁的一個區塊（左或右）：標題與備註置中；海報（EDM）區塊填滿剩下的高度，手指在區塊內左右滑動切換；
  * 下方顯示目前這門課的名稱、主辦單位、日期、金額，點圖或名稱進入課程。
  */
-export function HomeRail({ title, icon, tone, note, courses, empty, progress, autoSec = 0, pauseSec = 8, scale = 1, compact = false }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean; /** 自動輪播間隔（秒；0＝不自動輪播）。 */ autoSec?: number; /** 手指滑過後暫停自動輪播的秒數。 */ pauseSec?: number; /** 首頁大螢幕放大倍數（標題、備註、資訊文字）。 */ scale?: number; /** 手機橫放等矮視窗：隱藏備註、資訊壓縮，海報才有空間。 */ compact?: boolean }) {
+export function HomeRail({ title, icon, tone, note, courses, empty, progress, autoSec = 0, pauseSec = 8, scale = 1, compact = false, hideInfo = false, onStageHeight }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean; /** 自動輪播間隔（秒；0＝不自動輪播）。 */ autoSec?: number; /** 手指滑過後暫停自動輪播的秒數。 */ pauseSec?: number; /** 首頁大螢幕放大倍數（標題、備註、資訊文字）。 */ scale?: number; /** 手機橫放等矮視窗：隱藏備註、資訊壓縮，海報才有空間。 */ compact?: boolean; /** 版面太擠時由首頁通知：先隱藏海報下方的資訊（主辦、日期、地點、金額、進度），空間夠了再恢復（業主 2026-11-19）。 */ hideInfo?: boolean; /** 回報海報區目前的高度（首頁用來判斷擠不擠）。 */ onStageHeight?: (h: number) => void }) {
   useCenterNames();
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -131,7 +131,14 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
       {compact ? null : <AppText variant="caption" tone="muted" numberOfLines={3} style={[styles.note, { fontSize: Math.round(12 * scale), lineHeight: Math.round(16 * scale), minHeight: Math.round(32 * scale) }]}>
         {note ?? " "}
       </AppText>}
-      <View style={styles.stage} onLayout={(e) => setBox({ w: Math.floor(e.nativeEvent.layout.width), h: Math.floor(e.nativeEvent.layout.height) })}>
+      <View
+        style={styles.stage}
+        onLayout={(e) => {
+          const h = Math.floor(e.nativeEvent.layout.height);
+          setBox({ w: Math.floor(e.nativeEvent.layout.width), h });
+          onStageHeight?.(h);
+        }}
+      >
         {box.w > 0 && box.h > 0 ? (
           courses.length ? (
             <View style={{ width: box.w, height: box.h, overflow: "hidden", ...(Platform.OS === "web" ? ({ touchAction: "pan-y", userSelect: "none" } as object) : {}) }} {...pan.panHandlers}>
@@ -161,8 +168,8 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
             ))
           : null}
       </View>
-      {!cur ? <View style={[styles.info, compact && { minHeight: 0 }]} /> : null}
-      {cur ? (
+      {!cur && !hideInfo ? <View style={[styles.info, compact && { minHeight: 0 }]} /> : null}
+      {cur && !hideInfo ? (
         <Pressable onPress={() => setPreview(cur)} accessibilityRole="link" style={[styles.info, compact && { minHeight: 0 }]}>
           {hostLine(cur) ? (
             <AppText variant="caption" tone="muted" numberOfLines={2} style={info}>
@@ -202,6 +209,9 @@ function dotWindow(n: number, page: number, max: number): number[] {
   const start = Math.max(0, Math.min(n - len, page - Math.floor(len / 2)));
   return Array.from({ length: len }, (_, k) => start + k);
 }
+
+/** 海報下方資訊區佔的高度（minHeight 100＋欄位間距 4）：首頁用它推算「顯示資訊時海報還剩多高」。 */
+export const HOME_INFO_SPACE = 100 + space.xs;
 
 const styles = StyleSheet.create({
   col: { flex: 1, minWidth: 0, gap: space.xs, alignItems: "stretch" },
