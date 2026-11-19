@@ -55,11 +55,11 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   // 固定格式文字封面（銅章會議等，見 contract 的 textCoverLines）：咖啡色系底、固定「名稱（換行）X年X月」兩行。
   const fixed = textCoverLines(title);
   const [bg, fg] = fixed ? coverBronze[scheme] : courseThemes[names[seed % names.length]!]![scheme];
-  const pad = space.md;
+  const pad = box.h && box.h < 90 ? 3 : space.md; // 小縮圖（上拉選單列等）內距縮小，字才放得進去
   const hasTitle = !!title?.trim();
   const innerW = Math.max(0, box.w - pad * 2);
   const innerH = Math.max(0, box.h - pad * 2);
-  const fs = hasTitle && box.w ? (fixed ? fitLines(fixed, innerW, innerH) : fitFontSize(title!, innerW, innerH)) : 0;
+  const fs = hasTitle && box.w ? (fixed ? fitLines(fixed, innerW, innerH, 72, 8) : fitFontSize(title!, innerW, innerH)) : 0;
   return (
     <View
       style={[styles.cover, fill ? [StyleSheet.absoluteFill, { borderRadius: 0 }] : height ? { height } : { aspectRatio: 16 / 9 }, { backgroundColor: bg }]}
