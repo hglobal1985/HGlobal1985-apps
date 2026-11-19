@@ -127,7 +127,7 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
  * 清單編輯模式（業主 2026-11-18）：每個區塊一張卡（區塊標題列＋底下的教材＋「新增教材到這個區塊」），「新增區塊」獨立放在最下面。
  * 區塊的上下移動＝整個區塊（連同底下的教材）一起移；教材的上下移動只在區塊內。
  */
-export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, onPickMove, busy }: { onMoveTo: (l: Lesson) => void; onPickMove: (blockId: string) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
+export function BlockEditList({ extraMovable, items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, onPickMove, busy }: { /** 區塊外還有可以拉進區塊的項目（套裝課程的課程章節）。 */ extraMovable?: boolean; onMoveTo: (l: Lesson) => void; onPickMove: (blockId: string) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
   const { c } = useTheme();
   // 編輯模式的區塊預設全部收起，同一時間只展開一個（業主 2026-11-18）。
   const [openId, setOpenId] = useState<string | null>(null);
@@ -184,7 +184,7 @@ export function BlockEditList({ items, onEdit, onMoveItem, onMoveBlock, onCopy, 
                 <View style={{ flex: 1 }}>
                   <Button variant="secondary" label={head ? `新增教材` : "新增教材"} icon="add" onPress={() => onAddMaterial(head?.id)} fullWidth />
                 </View>
-                {head && rows.some((l) => !l.section) ? (
+                {head && (extraMovable || rows.some((l) => !l.section)) ? (
                   <View style={{ flex: 1 }}>
                     <Button variant="secondary" label="移動教材" icon="swap-vertical" onPress={() => onPickMove(head.id)} fullWidth />
                   </View>

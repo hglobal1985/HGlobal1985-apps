@@ -91,3 +91,23 @@ test("套裝課程：勾套裝才能新增區塊；每個區塊的教材各只�
   assert.deepEqual(marked, ["A2", "B1"], "區塊一只剩 A2、區塊二是 B1");
   assert.equal(now.blocks.length, 2, "套裝課程的區塊會列出");
 });
+
+test("套裝課程：章節可以排進區塊（整份順序一起送）；新章節放在第一個區塊前面", async () => {
+  const { call } = setup();
+  const token = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
+  const id = (await call<CourseDetail>("POST", "/admin/courses", token, { title: "章節進區塊", hostUnit: "寰宇總部" })).data.id;
+  await call("PATCH", `/admin/courses/${id}`, token, { isPackage: true });
+  const add = async (body: object) => (await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, body)).data;
+  await add({ title: "區塊甲", kind: "section" });
+  let d = await add({ title: "新章節", kind: "chapter" });
+  const idx = (t: string) => d.lessons.findIndex((l) => l.title === t);
+  assert.ok(idx("新章節") < idx("區塊甲"), "新章節在第一個區塊前面");
+  const ids = d.lessons.filter((l) => !l.full).map((l) => l.id);
+  const ch = d.lessons.find((l) => l.title === "新章節")!.id;
+  const sec = d.lessons.find((l) => l.title === "區塊甲")!.id;
+  const next = [...ids.filter((x) => x !== ch)];
+  next.splice(next.indexOf(sec) + 1, 0, ch);
+  assert.equal((await call("POST", `/admin/courses/${id}/lessons/order?lite=1`, token, { ids: next })).status, 200);
+  d = (await call<CourseDetail>("GET", `/courses/${id}`, token)).data;
+  assert.ok(idx("區塊甲") < idx("新章節"), "章節移進區塊");
+});
