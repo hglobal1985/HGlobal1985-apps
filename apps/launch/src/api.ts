@@ -3653,11 +3653,11 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       // 已處理的申請紀錄（保留，不會從通知頁消失）：自己處理過的；超級管理員看全部。
       const s = requireMember(ctx);
-      const sql = "SELECT id, field_label, applicant_name, from_text, to_text, status, decided_by_name, decided_at FROM review_log WHERE status <> 'pending'" + (s.role === "admin" ? "" : " AND decided_by_sub = ?") + " ORDER BY decided_at DESC LIMIT 100";
-      const { results } = await (s.role === "admin" ? ctx.db.prepare(sql) : ctx.db.prepare(sql).bind(s.sub)).all<{ id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; status: string; decided_by_name: string; decided_at: string }>();
+      const sql = "SELECT id, field_label, applicant_name, from_text, to_text, final_text, status, decided_by_name, decided_at FROM review_log WHERE status <> 'pending'" + (s.role === "admin" ? "" : " AND decided_by_sub = ?") + " ORDER BY decided_at DESC LIMIT 100";
+      const { results } = await (s.role === "admin" ? ctx.db.prepare(sql) : ctx.db.prepare(sql).bind(s.sub)).all<{ id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; final_text: string; status: string; decided_by_name: string; decided_at: string }>();
       // 獎銜顯示正式中文名稱（資料裡存的是代號）。
       const names = s.kind === "central" ? await rankOptions(s.token).catch(() => new Map<string, string>()) : new Map<string, string>();
-      return results.map((r) => (r.field_label === "獎銜" ? { ...r, from_text: names.get(r.from_text) ?? r.from_text, to_text: names.get(r.to_text) ?? r.to_text } : r));
+      return results.map((r) => (r.field_label === "獎銜" ? { ...r, from_text: names.get(r.from_text) ?? r.from_text, to_text: names.get(r.to_text) ?? r.to_text, final_text: names.get(r.final_text) ?? r.final_text } : r));
     },
   ],
   [
@@ -3666,43 +3666,50 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [id]) => {
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以審核");
-      const body = await readJson<{ decision?: unknown; item?: { display_name?: unknown; field_key?: unknown; field_label?: unknown; current_value?: unknown; requested_value?: unknown } }>(ctx.req);
+      const body = await readJson<{ decision?: unknown; value?: unknown; item?: { display_name?: unknown; field_key?: unknown; field_label?: unknown; current_value?: unknown; requested_value?: unknown } }>(ctx.req);
       if (body.decision !== "approve" && body.decision !== "reject") return fail(400, "invalid_decision", "請選擇通過或不通過");
-      const r = await centralDecide(s.token, id, body.decision);
+      // 「修改後通過」（業主 2026-11-20，中央串接指令 2026-11-20.1）：只有通過能帶修改後的值（文字，或 {option, custom_text}）。
+      const val = body.value;
+      const validVal = typeof val === "string" ? val.trim().length > 0 && val.length <= 200 : !!val && typeof val === "object" && typeof (val as { option?: unknown }).option === "string";
+      if (val !== undefined && (body.decision !== "approve" || !validVal)) return fail(422, "invalid_value", "修改後的內容格式不正確，只有「通過」可以修改內容");
+      const r = await centralDecide(s.token, id, body.decision, typeof val === "string" ? val.trim() : val);
       const code = r.status;
       if (code === 200) {
-        // 中央回應若帶了申請人（member_id）與欄位，就通知申請人；沒帶則靠 webhook（member.profile_changed）補發。
-        const who = typeof r.body?.member_id === "string" ? r.body.member_id : typeof r.body?.sub === "string" ? r.body.sub : null;
+        // 申請人（member_id）與欄位由中央回應直接提供（只在這次處理中使用，不另外保存）。
+        const who = typeof r.body?.member_id === "string" ? r.body.member_id : null;
         const key = typeof r.body?.field_key === "string" ? r.body.field_key : "";
-        if (who) await notifyReviewResult(ctx.db, who, REVIEW_FIELD_LABEL[key] ?? "獎銜或中心").catch(() => undefined);
-        // 審核紀錄（業主 2026-11-19）：保留在審核者的「已處理的申請」；找得到申請人（申請時留的紀錄）就通知他結果。
+        const modified = r.body?.modified === true;
         const it = body.item ?? {};
         const fkey = typeof it.field_key === "string" ? it.field_key : key;
         const flabel = typeof it.field_label === "string" && it.field_label ? it.field_label.slice(0, 20) : REVIEW_FIELD_LABEL[fkey] ?? "申請";
         const name = typeof it.display_name === "string" ? it.display_name.trim().slice(0, 60) : "";
         const to = reviewText(it.requested_value);
+        const final = modified ? reviewText(val) : "";
         const result = body.decision === "approve" ? "approved" : "rejected";
-        // 先用「欄位＋申請內容＋名稱」找；名稱對不上時，若同欄位、同內容的待審申請只有一筆就用它。
-        let found = await ctx.db
-          .prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND to_text = ? AND (applicant_name = ? OR ? = '') ORDER BY created_at LIMIT 1")
-          .bind(fkey, to, name, name)
-          .first<{ id: string; applicant_sub: string | null }>();
+        // 對應申請時留的待審紀錄：先用申請人編號，其次「欄位＋申請內容＋名稱」，最後同欄位同內容只有一筆時。
+        let found = who ? await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND applicant_sub = ? AND field_key = ? ORDER BY created_at DESC LIMIT 1").bind(who, fkey).first<{ id: string; applicant_sub: string | null }>() : null;
+        if (!found) found = await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND to_text = ? AND (applicant_name = ? OR ? = '') ORDER BY created_at LIMIT 1").bind(fkey, to, name, name).first<{ id: string; applicant_sub: string | null }>();
         if (!found) {
           const alt = (await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND to_text = ? LIMIT 2").bind(fkey, to).all<{ id: string; applicant_sub: string | null }>()).results;
           if (alt.length === 1) found = alt[0]!;
         }
-        const stmts = [];
-        if (found) {
-          stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ? WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), found.id));
-          const toName = fkey === "rank" && to ? ((await rankOptions(s.token).catch(() => new Map<string, string>())).get(to) ?? to) : to; // 獎銜用正式中文名稱，不用代號
-          if (found.applicant_sub) stmts.push(notify(ctx.db, { sub: found.applicant_sub }, `你的${flabel}申請${result === "approved" ? "已通過" : "未通過"}`, `${toName ? `申請內容：${toName}。` : ""}到「設定」頁看最新的資料`, "/settings"));
-        } else {
-          stmts.push(ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_name, from_text, to_text, status, decided_by_sub, decided_by_name, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), fkey, flabel, name, reviewText(it.current_value), to, result, s.sub, s.name, iso()));
+        const names = fkey === "rank" ? await rankOptions(s.token).catch(() => new Map<string, string>()) : new Map<string, string>();
+        const nameOf = (v: string) => (fkey === "rank" && v ? names.get(v) ?? v : v); // 獎銜用正式中文名稱，不用代號
+        const shown = nameOf(final || to);
+        const target = who ?? found?.applicant_sub ?? null;
+        const stmts: D1PreparedStatement[] = [];
+        if (found) stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ?, final_text = ?, applicant_sub = COALESCE(applicant_sub, ?) WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), final, who, found.id));
+        else stmts.push(ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name, from_text, to_text, final_text, status, decided_by_sub, decided_by_name, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), fkey, flabel, who, name, reviewText(it.current_value), to, final, result, s.sub, s.name, iso()));
+        if (target) {
+          const title = result === "approved" ? (modified ? `你的${flabel}申請經審核者修改後通過` : `你的${flabel}申請已通過`) : `你的${flabel}申請未通過`;
+          const note = result === "approved" ? `${modified ? `審核者把「${nameOf(to)}」修改為「${shown}」後通過。` : shown ? `申請內容：${shown}。` : ""}到「設定」頁看最新的資料` : `${shown ? `申請內容：${shown}。` : ""}到「設定」頁看最新的資料`;
+          stmts.push(notify(ctx.db, { sub: target }, title, note, "/settings"));
         }
         await ctx.db.batch(stmts).catch(() => undefined);
-        return { ok: true };
+        return { ok: true, modified };
       }
-      if (code === 403) return fail(403, "forbidden", "這個申請不屬於您負責的中心");
+      if (code === 422) return fail(422, "invalid_value", "修改後的內容不符合規則，請重新選擇");
+      if (code === 403) return fail(403, "forbidden", "這個申請不屬於您負責的中心，或不能改成其他中心");
       if (code === 404) return fail(404, "not_pending", "這筆申請已被處理過，請重新整理");
       return fail(502, "central_unavailable", "會員中心暫時無法連線，請稍後再試");
     },
