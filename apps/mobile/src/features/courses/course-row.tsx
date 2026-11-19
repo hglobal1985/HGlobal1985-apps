@@ -7,7 +7,8 @@ import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { BrandCover, AppText, CourseCover } from "@/ui";
+import { BrandCover, AppText, CountPill, CourseCover } from "@/ui";
+import { fadedStyle } from "@/ui/fade-style";
 import { styles } from "./chapter-list";
 import { shareLink } from "@/lib/share";
 import { RowShare } from "./lesson-list";
@@ -31,16 +32,16 @@ export function CourseRow({ course, last }: { course: CourseSummary; last?: bool
   const date = course.eventStart && !course.isList ? eventDays(course.eventStart, course.eventEnd) : "";
   const img = course.coverUrl || course.edmUrl;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${date} ${course.title}`} onPress={() => router.push(`/course/${course.id}`)} style={[styles.row, joined, { borderBottomColor: c.border }, last && { borderBottomWidth: 0 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${date} ${course.title}`} onPress={() => router.push(`/course/${course.id}`)} style={[styles.row, joined, { borderBottomColor: c.border }, last && { borderBottomWidth: 0 }, ...(course.materialCount === 0 ? fadedStyle : []), course.seriesHidden && { opacity: 0.4 }]}>
       <View style={styles.thumb}>
         {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: resolveUrl(img) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <CourseCover theme={course.theme} label="" title={displayName(course)} fill />}
       </View>
       <View style={styles.mid}>
         <AppText variant="callout" style={{ fontWeight: "800" }} numberOfLines={2}>
-          {date || course.title}
+          {course.title}
         </AppText>
         <AppText variant="caption" tone="muted" numberOfLines={1}>
-          {date ? course.title : course.hostCenter ? centerTitle(course.hostCenter) : ""}
+          {date || (course.hostCenter ? centerTitle(course.hostCenter) : "")}
         </AppText>
         {rb ? (
           <View style={[styles.chip, { backgroundColor: rb.bg }]}>
@@ -50,6 +51,7 @@ export function CourseRow({ course, last }: { course: CourseSummary; last?: bool
           </View>
         ) : null}
       </View>
+      <CountPill count={course.materialCount} />
       <RowShare label={`分享：${course.title}`} onShare={() => shareLink(course.title, course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`, course.isList ? undefined : { teacher: course.teacher, teacherTitle: course.teacherTitle, title: course.title }, undefined, undefined, course.isList ? { title: course.title } : undefined)} />
     </Pressable>
   );

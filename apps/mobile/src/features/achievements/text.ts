@@ -20,7 +20,7 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
       return f ? `${f.label}：${f.hint}` : "使用指定的網站功能";
     }
     case "material_video":
-      return lessonTitle ? `讀完素材影片「${lessonTitle}」` : "讀完指定的素材影片";
+      return lessonTitle ? `讀完清單影片「${lessonTitle}」` : "讀完指定的清單影片";
     case "streak_days":
       return `連續 ${threshold} 天都有完成章節`;
     case "watch_minutes":

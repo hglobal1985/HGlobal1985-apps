@@ -82,6 +82,11 @@ export type CenterArt = { centerKey: string; center: string; edmUrl: string; cov
 /** 系列頁上方的照片（與中心的 CenterArt 同一套：EDM＋16:9 封面＋裁切框＋預設停留位置）。 */
 export type SeriesArt = { series: string; edmUrl: string; coverUrl: string | null; coverRect: { x: number; y: number; w: number } | null; edmViewY: number };
 
+/** 沒有系列的課程卡一律放進這個系列：只有超級管理員看得到（業主 2026-11-19）。清單卡沒有系列照舊直接在第一層。 */
+export const UNCATEGORIZED = "未分類";
+/** 系列的設定（標題只改顯示，不動識別名稱 series）。 */
+export type SeriesSetting = { series: string; title: string; showInAll: boolean };
+
 export type EnrollmentState = "opened" | "pending" | null;
 
 /**
@@ -101,8 +106,8 @@ export function textCoverLines(title: string | null | undefined): string[] | nul
 /** 寰宇大學「所有系列」檢視的三個專區（業主 2026-11-18）。空字串＝沒指定：課程放 hglobal、清單放 amway_material。 */
 export type Zone = "hglobal" | "amway_material" | "amway_brand";
 export const ZONES: { id: Zone; label: string }[] = [
-  { id: "hglobal", label: "寰宇課程/活動/素材" },
-  { id: "amway_material", label: "安麗官方素材專區" },
+  { id: "hglobal", label: "寰宇課程/活動/清單" },
+  { id: "amway_material", label: "安麗官方清單專區" },
   { id: "amway_brand", label: "安麗品牌專區" },
 ];
 export const zoneOf = (raw: string | null | undefined, isList: boolean): Zone => (ZONES.some((z) => z.id === raw) ? (raw as Zone) : isList ? "amway_material" : "hglobal");
@@ -139,9 +144,11 @@ export type CourseSummary = {
   brand: BrandCover | null;
   /** 清單類別：勾了「顯示在上拉選單」的區塊（業主 2026-11-18）；課程類別永遠是空陣列。 */
   blocks: { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null }[];
-  /** 素材系列內的手動順序（0＝還沒排過）。 */
+  /** 系列內的手動順序（0＝還沒排過；沒排過的新卡自動排最前面）。 */
   seriesOrder: number;
-  /** 素材（教材）數量：有影音來源或外部連結的項目數（素材清單的上拉選單標籤用）。 */
+  /** 在系列頁隱藏（業主 2026-11-19）：只是不在系列頁顯示，仍可用網址、搜尋、單元找到。 */
+  seriesHidden: boolean;
+  /** 素材（教材）數量：有影音來源或外部連結的項目數（清單卡的上拉選單標籤用）。 */
   materialCount: number;
   totalMinutes: number;
   eligible: boolean;
@@ -183,7 +190,7 @@ export type CourseSummary = {
   centerCourse: boolean;
   /** 短影音專輯：這門課的章節與影音教材在「單元」頁歸類為短影音。 */
   isShorts: boolean;
-  /** 素材清單（業主 2026-11-16）：只有「其他教材」，沒有章節、時間地點、費用、主講人；影片教材在 App 內播放並計入學習進度。 */
+  /** 清單卡（業主 2026-11-16）：只有「其他教材」，沒有章節、時間地點、費用、主講人；影片教材在 App 內播放並計入學習進度。 */
   isList: boolean;
   /** 課程專屬網址路徑（中心縮寫/英譯姓名-編號）；缺資料時為 null，用 /course/編號。 */
   shortPath: string | null;
@@ -546,7 +553,7 @@ export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; 
   { key: "social", label: "社群互動", icon: "💬", desc: "在課程留言板的互動" },
   { key: "subscribe", label: "訂閱關注", icon: "🔔", desc: "訂閱中心、系列的數量" },
   { key: "feature", label: "功能體驗", icon: "🧰", desc: "第一次使用某個網站功能（新手教學）" },
-  { key: "zone", label: "素材影片", icon: "🎬", desc: "安麗官方素材專區、安麗品牌專區：每個區塊隨機挑 1～2 支影片，讀完（看完）就解鎖" },
+  { key: "zone", label: "清單影片", icon: "🎬", desc: "安麗官方清單專區、安麗品牌專區：每個區塊隨機挑 1～2 支影片，讀完（看完）就解鎖" },
 ];
 /** 條件類型：中文名稱、單位、分類、白話說明（後台挑選時顯示）。retired＝已停用的類型，後台不再提供。 */
 export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; category: AchievementCategory; hint: string; needsCourse?: boolean; needsFeature?: boolean; retired?: boolean; auto?: boolean }> = {
@@ -566,7 +573,7 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   series_subscribed: { label: "訂閱系列數", unit: "個", category: "subscribe", hint: "按過訂閱鈴鐺的系列數量" },
   subscriptions_total: { label: "訂閱總數（中心＋系列）", unit: "個", category: "subscribe", hint: "中心與系列加起來的訂閱數量" },
   feature_used: { label: "使用過某個網站功能", unit: "次", category: "feature", hint: "第一次用到指定功能就達成（需要選功能），達成數量通常填 1", needsFeature: true },
-  material_video: { label: "讀完指定的素材影片", unit: "支", category: "zone", hint: "由系統從素材專區、品牌專區隨機抽選影片產生（在「素材影片」分類按「重新抽選」），不能手動新增", auto: true },
+  material_video: { label: "讀完指定的清單影片", unit: "支", category: "zone", hint: "由系統從清單專區、品牌專區隨機抽選影片產生（在「清單影片」分類按「重新抽選」），不能手動新增", auto: true },
   course_completed: { label: "學完指定的某一門課程", unit: "門", category: "progress", hint: "已取消這類任務", needsCourse: true, retired: true },
 };
 /** 徽章圖固定用圖片時的代碼（存在 achievements.icon）：畫面用圖片、通知文字退回 🏅。 */
@@ -608,7 +615,7 @@ export type Achievement = {
   type: AchievementType;
   threshold: number;
   feature?: string | null;
-  /** 素材影片徽章：指定的影片名稱與所屬清單。 */
+  /** 清單影片徽章：指定的影片名稱與所屬清單。 */
   lessonTitle?: string | null;
   courseTitle: string | null;
   current: number;
@@ -626,7 +633,7 @@ export type AdminAchievement = {
   feature?: string | null;
   courseId: string | null;
   courseTitle: string | null;
-  /** 素材影片徽章指定的影片（章節編號與名稱）。 */
+  /** 清單影片徽章指定的影片（章節編號與名稱）。 */
   lessonId?: string | null;
   lessonTitle?: string | null;
   active: boolean;
@@ -733,9 +740,9 @@ export type ShareSettings = {
   materialText: string;
   /** 分享單一章節的文字範本（課程有兩堂以上章節時，章節清單每列右側的分享鈕）。{主講人}、{職稱}、{章節名稱} 一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不用課程的；{課程名稱} 是所屬課程。 */
   chapterText: string;
-  /** 分享「素材清單」（業主 2026-11-16：教材與課程分開設定）：清單頁右上角與課程列的分享，可用 {清單名稱}。 */
+  /** 分享「清單卡」（業主 2026-11-16：教材與課程分開設定）：清單頁右上角與課程列的分享，可用 {清單名稱}。 */
   listText: string;
-  /** 分享素材清單裡的單一影片（每列右側的分享鈕，點開直接播放這一段）：可用 {影片名稱}、{清單名稱}。 */
+  /** 分享清單卡裡的單一影片（每列右側的分享鈕，點開直接播放這一段）：可用 {影片名稱}、{清單名稱}。 */
   listItemText: string;
   /** 邀請特定會員擔任課程審核人員（24 小時有效的邀請網址）：可用 {課程名稱}；後面接 linkLead 與邀請網址。 */
   reviewerInviteText: string;
@@ -765,7 +772,7 @@ export function reviewerInviteMessage(s: ShareSettings, url: string, courseTitle
 
 /**
  * 組出分享選單的文字：一般分享＝邀請文字；單堂課程傳 course 用課程範本；其他教材傳 material；單一章節傳 chapter（姓名、職稱、章節名稱取章節自己的設定，課程只提供課程名稱）；
- * 素材清單傳 list（item＝清單裡某一段影片的名稱；沒有 item＝分享整個清單）。
+ * 清單卡傳 list（item＝清單裡某一段影片的名稱；沒有 item＝分享整個清單）。
  */
 export function shareMessage(s: ShareSettings, url: string, course?: { teacher: string; teacherTitle?: string; title: string }, material?: { title: string }, chapter?: { sharer: string; sharerTitle?: string; title: string }, list?: { title: string; item?: string }): string {
   if (list && !material) {

@@ -1,4 +1,5 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -61,8 +62,20 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const base = saved && saved.id === data?.id && (saved.admin?.updatedAt ?? "") > (data?.admin?.updatedAt ?? "") ? saved : data;
   // 章節排序、複製要「瞬間」有反應（業主 2026-11-17）：先在畫面上直接改，伺服器在背景處理，處理完再用正式資料換回來。
   // 點閱（業主 2026-11-17）：每進入／重新整理一次課程頁就 +1，算進主辦中心與所屬系列的封面點閱（訪客也算）。
+  // 封面的訂閱鈕與點閱次數只放在中心卡、清單卡、系列卡（業主 2026-11-19：課程卡不顯示）；課程頁載入仍照舊把點閱算進主辦中心與所屬系列。
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（進入頁面時點閱 +1，算進主辦中心、所屬系列與這門課自己的封面）。
   const stats = useCoverStats("course", data?.id ?? null, `/course/${id}`, data?.isList ? "清單" : "課程");
+  // 清單卡頁右上角「縮圖／詳細列表」切換（業主 2026-11-19，模仿系列頁）：記住上次的選擇。
+  const [listLayout, setListLayout] = useState<"thumb" | "detail">("thumb");
+  useEffect(() => {
+    AsyncStorage.getItem("hglobal:learn:list-layout")
+      .then((v) => (v === "thumb" || v === "detail") && setListLayout(v))
+      .catch(() => undefined);
+  }, []);
+  const pickLayout = (v: "thumb" | "detail") => {
+    setListLayout(v);
+    AsyncStorage.setItem("hglobal:learn:list-layout", v).catch(() => undefined);
+  };
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
   const opQueue = useRef<Promise<unknown>>(Promise.resolve());
@@ -105,7 +118,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
     if (lesson) setPlayingId(lesson);
   }, [lesson]);
   // 網址 ?N：播放第 N 章（章節清單前面顯示的編號）；章節資料載入後才找得到。
-  // 網址 ?N：一般課程＝第 N 章；素材清單＝第 N 段影片（清單只有教材）。
+  // 網址 ?N：一般課程＝第 N 章；清單卡＝第 N 段影片（清單只有教材）。
   const chapterLesson = chapter && course ? course.lessons.find((l) => (course.isList ? l.material && !l.full && !l.section : !l.material) && l.position === chapter)?.id : undefined;
   useEffect(() => {
     if (chapterLesson) setPlayingId(chapterLesson);
@@ -327,7 +340,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         list={course.isList ? { title: course.title } : undefined}
         // 直接從分享網址進來時，返回鍵回到「上一層」：中心主辦的課程＝該中心專屬頁；總部課程＝全部課程（業主 2026-11-17）。
         backTo={course.isList ? `/courses?focus=${encodeURIComponent(course.series ? `s:${course.series}` : `c:${course.id}`)}` : course.hostCenter ? `/courses?center=${encodeURIComponent(course.hostCenter)}` : "/courses"}
-        // 素材清單：返回一律回到寰宇大學的卡片清單並定位到這張卡（業主 2026-11-18），不會跑到主辦中心頁。
+        // 清單卡：返回一律回到寰宇大學的卡片清單並定位到這張卡（業主 2026-11-18），不會跑到主辦中心頁。
         backAlways={course.isList}
         extra={
           manages && mode === "view" ? (
@@ -370,7 +383,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         ) : (
           <>
             <View>
-              <EdmStage course={course} stats={stats} />
+              <EdmStage course={course} stats={course.isList ? stats : undefined} />
               {/* 影片中間不放任何按鈕（業主 2026-11-17）：播放一律從下面的控制列。 */}
             </View>
             {firstPlayable || playLesson ? (
@@ -434,7 +447,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
                 <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段。" />
               </Section>
             )}
-            {/* 素材清單（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
+            {/* 清單卡（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
             <Section title={course.isList ? "" : "其他教材"}>
               {course.isList ? (
                 <BlockEditList items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} busy={lessonBusy} />
@@ -468,7 +481,16 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         )}
         {!(editing && canEditContent) && course.lessons.some((l) => l.material) ? (
           <Section title={course.isList ? "" : "其他教材"}>
-            <FullVersionList course={course} openBlock={block} playingId={editing ? null : playingId} onPlay={playLesson_} />
+            {course.isList && course.lessons.some((l) => l.section) ? (
+              <View style={[styles.layoutToggle, { borderColor: c.border, backgroundColor: c.surface }]} accessibilityRole="radiogroup">
+                {(["detail", "thumb"] as const).map((v) => (
+                  <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected: listLayout === v }} accessibilityLabel={v === "detail" ? "詳細列表" : "縮圖"} onPress={() => pickLayout(v)} style={[styles.layoutBtn, listLayout === v && { backgroundColor: c.accent }]}>
+                    <Ionicons name={v === "detail" ? "list-outline" : "grid-outline"} size={22} color={listLayout === v ? c.textOnAccent : c.text} />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            <FullVersionList course={course} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
           </Section>
         ) : null}
         {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}
@@ -500,6 +522,8 @@ function BannerButton({ label, onPress, strong }: { label: string; onPress: () =
 }
 
 const styles = StyleSheet.create({
+  layoutToggle: { alignSelf: "flex-end", flexDirection: "row", borderWidth: 1, borderRadius: radius.md, overflow: "hidden", height: minTouch, marginBottom: space.sm },
+  layoutBtn: { width: 48, height: "100%", alignItems: "center", justifyContent: "center" },
   stack: { flex: 1 },
   split: { flex: 1, flexDirection: "row" },
   splitLeft: { alignSelf: "flex-start" },

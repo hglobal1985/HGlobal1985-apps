@@ -5,7 +5,7 @@ import { AppText, Icon } from "@/ui";
 
 /**
  * 編輯面板右上角的「素材／課程」二選一（業主 2026-11-18）：系統依選擇切換整個面板的編輯模式。
- * 單選勾勾；不能選的那一邊（例如沒有權限、素材不能轉回課程）由呼叫端攔截並提示。
+ * 單選勾勾；不能選的那一邊（例如沒有權限、清單卡不能轉回課程卡）由呼叫端攔截並提示。
  */
 export function KindToggle({ isList, onPick }: { isList: boolean; onPick: (toList: boolean) => void }) {
   const { c } = useTheme();
@@ -22,8 +22,8 @@ export function KindToggle({ isList, onPick }: { isList: boolean; onPick: (toLis
   };
   return (
     <View style={styles.row} accessibilityRole="radiogroup">
-      {item(true, "素材")}
-      {item(false, "課程")}
+      {item(true, "清單卡")}
+      {item(false, "課程卡")}
     </View>
   );
 }

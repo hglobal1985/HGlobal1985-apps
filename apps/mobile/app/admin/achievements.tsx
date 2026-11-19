@@ -113,11 +113,11 @@ export default function AdminAchievementsScreen() {
     api("PATCH", `/admin/achievements/${a.id}`, { difficulty: d }).then(() => list.reload()).catch((e: Error) => { setOver((o) => { const n = { ...o }; delete n[a.id]; return n; }); flashText(e.message); });
   };
   const draw = async () => {
-    if (!(await confirmAsk("重新抽選素材影片徽章", "會從「安麗官方素材專區」「安麗品牌專區」的每個區塊隨機挑影片（區塊裡影片超過 5 支挑 2 支，否則 1 支），新增尚未有徽章的區塊。已經有的徽章不會被換掉或刪除。", "開始抽選"))) return;
+    if (!(await confirmAsk("重新抽選清單影片徽章", "會從「安麗官方清單專區」「安麗品牌專區」的每個區塊隨機挑影片（區塊裡影片超過 5 支挑 2 支，否則 1 支），新增尚未有徽章的區塊。已經有的徽章不會被換掉或刪除。", "開始抽選"))) return;
     setBusy(true);
     try {
       const r = await api<{ added: number; total: number }>("POST", "/admin/achievements/draw-videos");
-      flashText(r.added ? `新增 ${r.added} 枚素材影片徽章，目前共 ${r.total} 枚` : `沒有需要新增的，目前共 ${r.total} 枚`);
+      flashText(r.added ? `新增 ${r.added} 枚清單影片徽章，目前共 ${r.total} 枚` : `沒有需要新增的，目前共 ${r.total} 枚`);
       list.reload();
     } catch (e) {
       flashText((e as Error).message);
@@ -157,7 +157,7 @@ export default function AdminAchievementsScreen() {
 
       <Button label="新增任務" icon="add-circle-outline" onPress={() => open(blank(filter === "all" ? "progress" : filter), filter === "all" ? "progress" : filter)} fullWidth />
 
-      <Button variant="secondary" label="🎬 重新抽選素材影片徽章" onPress={draw} disabled={busy} fullWidth />
+      <Button variant="secondary" label="🎬 重新抽選清單影片徽章" onPress={draw} disabled={busy} fullWidth />
 
       <Chips title="任務分類" label="任務分類" options={[{ key: "all", label: `全部（${rows.length}）` }, ...ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}（${rows.filter((a) => ACHIEVEMENT_TYPES[a.type].category === k.key).length}）` }))]} value={filter} onChange={(v) => setFilter(v as "all" | AchievementCategory)} />
       <Chips title="難易度" label="難易度" options={[{ key: "all", label: "全部" }, ...([1, 2, 3] as Diff[]).map((d) => ({ key: String(d), label: `${"★".repeat(d)} ${DIFF_LABEL[d]}（${rows.filter((a) => a.difficulty === d).length}）` }))]} value={diffF} onChange={(v) => setDiffF(v as typeof diffF)} />
@@ -194,7 +194,7 @@ export default function AdminAchievementsScreen() {
       {form ? (
         <EditSheet title={form.id ? "修改徽章任務" : "新增徽章任務"} onClose={() => setForm(null)} onSave={save} dirty={dirty} busy={busy} error={error}>
           {auto ? (
-            <NoticeBox tone="info" text={`素材影片徽章：會員讀完（看完）「${form.lessonTitle ?? "指定影片"}」就解鎖。影片由系統隨機抽選，這裡只能改名稱、說明、難易度與啟用狀態。`} />
+            <NoticeBox tone="info" text={`清單影片徽章：會員讀完（看完）「${form.lessonTitle ?? "指定影片"}」就解鎖。影片由系統隨機抽選，這裡只能改名稱、說明、難易度與啟用狀態。`} />
           ) : (
             <>
           <Chips title="① 任務分類" label="① 任務分類" options={ACHIEVEMENT_CATEGORIES.filter((k) => k.key !== "zone").map((k) => ({ key: k.key, label: `${k.icon} ${k.label}` }))} value={formCat} onChange={(v) => { setFormCat(v as AchievementCategory); const first = typesOf(v as AchievementCategory)[0]; if (first && ACHIEVEMENT_TYPES[form.type].category !== v) patch({ type: first, feature: "" }); }} />

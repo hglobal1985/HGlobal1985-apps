@@ -22,13 +22,13 @@ export function nearestFirst<T extends CourseSummary>(items: T[]): T[] {
 }
 
 /**
- * 系列頁／梯次選單的項目排序（業主 2026-11-18）：素材系列（全部是素材清單）＝超級管理員手動排的順序（還沒排過的維持原順序放後面）；
- * 課程系列＝日期最近優先（nearestFirst）。要在系列內排序一律用這個。
+ * 系列頁／梯次選單的項目排序（業主 2026-11-19）：還沒手動排過＝日期最近優先（nearestFirst）；
+ * 超級管理員手動排過之後＝依他排的順序，之後新增（還沒排過）的卡自動排最前面。課程卡與清單卡要分開各排各的（呼叫端各傳各的）。
  */
 export function seriesOrdered<T extends CourseSummary>(items: T[]): T[] {
-  if (!items.length || !items.every((x) => x.isList)) return nearestFirst(items);
-  const key = (x: T) => (x.seriesOrder > 0 ? x.seriesOrder : Number.POSITIVE_INFINITY);
-  return [...items].sort((a, b) => key(a) - key(b)); // 穩定排序：沒排過的維持原順序
+  const manual = items.filter((x) => x.seriesOrder > 0).sort((a, b) => a.seriesOrder - b.seriesOrder);
+  if (!manual.length) return nearestFirst(items);
+  return [...nearestFirst(items.filter((x) => x.seriesOrder <= 0)), ...manual];
 }
 
 /**

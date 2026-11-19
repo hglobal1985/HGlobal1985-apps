@@ -140,7 +140,7 @@ export async function flushPushes(env: Env, fetcher: typeof fetch = fetch): Prom
 }
 
 /**
- * 開課前一天提醒（業主 2026-11-17）：台灣時間每天 20:00 之後第一次執行時，替「明天開課」的已上架課程（素材清單除外），
+ * 開課前一天提醒（業主 2026-11-17）：台灣時間每天 20:00 之後第一次執行時，替「明天開課」的已上架課程（清單卡除外），
  * 通知每位已報名（已開通）的學員。同一門課同一天只發一次（course_reminders）。回傳發出幾則。
  */
 export async function courseReminders(env: Env, now = Date.now()): Promise<number> {

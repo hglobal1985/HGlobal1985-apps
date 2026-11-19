@@ -43,10 +43,10 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
   return (
     <BottomSheet onClose={onClose} onExpand={() => open()} expandLabel="繼續上拉進入清單">
       <View style={styles.head}>
-        <View style={styles.matTag} accessibilityLabel="素材">
+        <View style={styles.matTag} accessibilityLabel="清單卡">
           <Ionicons name="folder-open" size={14} color="#1D2A22" />
           <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
-            素材
+            清單卡
           </AppText>
         </View>
         <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
@@ -58,7 +58,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
         {course.blocks.map((b) => (
           <SheetRow
             key={b.id}
-            accessibilityLabel={`${b.title}，有${b.count}個素材`}
+            accessibilityLabel={`${b.title}，有${b.count}個教材`}
             onPress={() => open(b.id)}
             faded={b.count === 0}
             leading={
@@ -98,10 +98,10 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
       <View style={styles.head}>
         {/* 素材（清單類別）的標示放在標題左邊（業主 2026-11-17：從小卡右下角移到這裡）。 */}
         {items.length > 0 && items.every((x) => x.isList) ? (
-          <View style={styles.matTag} accessibilityLabel="素材">
+          <View style={styles.matTag} accessibilityLabel="清單卡">
             <Ionicons name="folder-open" size={14} color="#1D2A22" />
             <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
-              素材
+              清單卡
             </AppText>
           </View>
         ) : null}
@@ -125,7 +125,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
                 {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: resolveUrl((x.coverUrl || x.edmUrl) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <CourseCover theme={x.theme} label="" title={displayName(x)} fill />}
               </SheetThumb>
             }
-            // 素材：素材清單名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）
+            // 素材：清單卡名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）
             title={x.isList ? x.title : `${x.eventStart ? eventDays(x.eventStart, x.eventEnd) : "未設定日期"}${x.id === currentId ? "（目前顯示）" : ""}`}
             subtitle={x.isList ? undefined : x.title}
             count={x.isList ? x.materialCount : undefined}

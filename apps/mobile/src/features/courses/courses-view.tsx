@@ -17,6 +17,7 @@ import { flashText } from "@/ui/flash-notice";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
+import { useSeriesSettings } from "./series-settings";
 import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
@@ -176,7 +177,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const searchData = useApi<{ lessons: SearchLesson[] }>(wantIndex || chapterMode ? "/search-index" : null);
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
-  // 卡片排序模式（業主 2026-11-18：方案 2，◀ ▶ 與相鄰交換）：只有超級管理員、只在「所有系列」；課程系列與素材專區各排各的。
+  // 卡片排序模式（業主 2026-11-18：方案 2，◀ ▶ 與相鄰交換）：只有超級管理員、只在「所有系列」；課程系列與清單專區各排各的。
   const [sortMode, setSortMode] = useState(false);
   const [orderOverride, setOrderOverride] = useState<string[] | null>(null);
   // 公開清單只取「已上架」（學習中用的下架封存課程不放這裡）；管理者再加上自己能管的未上架課程。
@@ -252,11 +253,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   };
   // 選了某個中心：該中心的課程一門一張平鋪，同系列也不合併（業主 2026-11-15）。
   const flat = mode === "center" && center !== ALL;
-  const groups = useMemo(
-    () => (flat ? list.map((x) => ({ key: `c:${x.id}`, nearest: x, sessions: [x] })) : orderGroups(groupBySeries(list, pool), orderOverride ?? config.seriesOrder ?? [])),
-    [flat, list, pool, config.seriesOrder, orderOverride],
-  );
-  // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、素材專區（整組都是清單類別的）。
+  const seriesSettings = useSeriesSettings();
+  const groups = useMemo(() => {
+    if (flat) return list.map((x) => ({ key: `c:${x.id}`, nearest: x, sessions: [x] }));
+    // 系列卡（業主 2026-11-19）：「未分類」與關掉「顯示在所有系列」的系列只有超級管理員看得到；系列裡的卡都被隱藏就整張系列卡不出現。
+    // 搜尋時不受這些限制（搜得到所有課程）。
+    const all = groupBySeries(list, pool);
+    const shown = matched ? all : all.filter((g) => (!g.nearest.series || seriesSettings.listed(g.nearest.series)) && (seriesSettings.admin || g.sessions.some((x) => !x.seriesHidden)));
+    return orderGroups(shown, orderOverride ?? config.seriesOrder ?? []);
+  }, [flat, list, pool, config.seriesOrder, orderOverride, matched, seriesSettings]);
+  // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、清單專區（整組都是清單類別的）。
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
   const [folded, setFolded] = useState<Record<string, boolean>>({});
@@ -520,7 +526,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
-            {/* 三個專區（業主 2026-11-18）：寰宇課程活動與素材專區／安麗素材專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
+            {/* 三個專區（業主 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
             {tileW && flat ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat
               ? zoneSections.map(({ zone, items }) =>

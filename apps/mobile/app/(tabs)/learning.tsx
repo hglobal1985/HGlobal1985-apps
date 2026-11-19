@@ -35,7 +35,7 @@ export default function LearningScreen() {
   /** 免費課程可以隱藏；沒報名紀錄、只是播放過的課程（管理員或公開課程）也可以隱藏。 */
   const canHide = (c: CourseSummary) => (c.enrollment === "opened" && (c.watchFree || c.isPublic)) || (c.enrollment !== "opened" && c.started);
   // 學習中＝已開通的課程，或播放超過 1% 的課程（含免費、沒有報名紀錄的）；等待審核的另外顯示。
-  // 清單類別（素材清單）不列入學習中（業主 2026-11-16）。
+  // 清單類別（清單卡）不列入學習中（業主 2026-11-16）。
   const inLearning = (c: CourseSummary) => !c.isList && (c.enrollment === "opened" || c.started) && !c.hiddenFromLearning;
   const [kind, setKind] = useState("");
   const [seriesSel, setSeriesSel] = useState("");

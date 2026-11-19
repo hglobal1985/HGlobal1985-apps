@@ -166,7 +166,8 @@ test("系列：存系列名稱、列出系列；複製這門課建立下一梯�
   const { call, login } = setup();
   const [admin, student] = await Promise.all(["demo-admin", "demo-student"].map(login));
   assert.equal((await call("PATCH", "/admin/courses/share", { token: admin, body: { series: "分享達標班", eventStart: "2026-11-08" } })).status, 200);
-  assert.deepEqual((await call<string[]>("GET", "/admin/series", { token: admin })).data, ["分享達標班"]);
+  // 沒填系列的課程卡一律放進「未分類」（業主 2026-11-19），所以系列清單裡也會有它。
+  assert.deepEqual((await call<string[]>("GET", "/admin/series", { token: admin })).data, ["分享達標班", "未分類"]);
   assert.equal((await call("GET", "/admin/series", { token: student })).status, 403);
   assert.equal((await call("POST", "/admin/courses/share/duplicate", { token: student })).status, 403);
   const copy = (await call<CourseDetail>("POST", "/admin/courses/share/duplicate", { token: admin })).data;
