@@ -62,7 +62,7 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   const fs = hasTitle && box.w ? (fixed ? fitLines(fixed, innerW, innerH, 72, 8) : fitFontSize(title!, innerW, innerH)) : 0;
   return (
     <View
-      style={[styles.cover, fill ? [StyleSheet.absoluteFill, { borderRadius: 0 }] : height ? { height } : { aspectRatio: 16 / 9 }, { backgroundColor: bg }]}
+      style={[styles.cover, fill ? [StyleSheet.absoluteFill, { borderRadius: 0 }] : height ? { height } : { aspectRatio: 16 / 9 }, { backgroundColor: bg, padding: pad }]}
       onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}
       accessible
       accessibilityRole="image"
