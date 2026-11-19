@@ -2444,13 +2444,6 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
 }
 
 /** 把課程的「名稱、主講人、獎銜、職稱」套到這門課的主講人章節（沒有主講人章節就不動）。 */
-function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
-  return db
-    .prepare(
-      "UPDATE lessons SET title = (SELECT substr(c.title, 1, 120) FROM courses c WHERE c.id = lessons.course_id), sharer = (SELECT COALESCE(c.teacher, '') FROM courses c WHERE c.id = lessons.course_id), sharer_rank = (SELECT COALESCE(c.teacher_rank, '') FROM courses c WHERE c.id = lessons.course_id), sharer_title = (SELECT COALESCE(c.teacher_title, '') FROM courses c WHERE c.id = lessons.course_id) WHERE course_id = ? AND is_speaker = 1 AND kind = 'chapter'",
-    )
-    .bind(courseId);
-}
 
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
@@ -2521,7 +2514,6 @@ async function updateCourse(ctx: Ctx, id: string) {
     ...aliasStmts,
     ctx.db.prepare(`UPDATE courses SET ${sets.map(([c]) => `${c} = ?`).join(", ")}, updated_at = ?, edited_by_name = ?, edited_at = ? WHERE id = ?`).bind(...sets.map(([, v]) => v), iso(), admin.name.slice(0, 60), iso(), id),
     // 主講人章節的名稱、分享者、獎銜、職稱永遠等於課程基本資料：課程改了就一起同步。
-    ...(sets.some(([c]) => ["title", "teacher", "teacher_rank", "teacher_title"].includes(c)) ? [speakerSync(ctx.db, id)] : []),
     audit(ctx.db, admin.sub, "course.update", "course", id, sets.map(([c]) => c).join(",")),
   ]);
   const res = batchRes[matAlias.length + aliasStmts.length]!;
@@ -2653,17 +2645,14 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
   else if (minutes !== undefined) sets.push(["duration_minutes", minutes]);
   if (!sets.length) fail(400, "nothing_to_update", "沒有要更新的欄位");
   // 主講人章節的名稱、分享者、獎銜、職稱一律等於課程基本資料（不接受另外填的值）。
-  const nowSpeaker = cur.kind !== "chapter" ? false : body.isSpeaker === undefined ? body.isSummary === true ? false : cur.is_speaker === 1 : body.isSpeaker === true;
-  const speakerCols = ["title", "sharer", "sharer_rank", "sharer_title"];
   // 「總結」章節的名稱固定就是「總結」（業主 2026-11-16）：勾選當下與之後的每次修改，伺服器都強制。
   const nowSummary = body.isSummary === undefined ? cur.is_summary === 1 && body.isSpeaker !== true : body.isSummary === true;
-  const speakerSets = nowSpeaker ? sets.filter(([c]) => !speakerCols.includes(c)) : sets;
+  const speakerSets = sets;
   const finalSets: [string, unknown][] = nowSummary ? [...speakerSets.filter(([c]) => c !== "title"), ["title", SUMMARY_TITLE]] : speakerSets;
   await ctx.db.batch([
     ...clearSpeaker,
     ...clearSummary,
     ...(finalSets.length ? [ctx.db.prepare(`UPDATE lessons SET ${finalSets.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`).bind(...finalSets.map(([, v]) => v), id)] : []),
-    ...(nowSpeaker ? [speakerSync(ctx.db, cur.course_id)] : []),
     audit(ctx.db, admin.sub, "lesson.update", "lesson", id, sets.map(([c]) => c).join(",")),
   ]);
   if (cur.media_type === "audio" && type !== "audio" && cur.media_ref) await ctx.env.MEDIA?.delete(cur.media_ref).catch(() => undefined);
@@ -5653,7 +5642,7 @@ const routes: [string, RegExp, Handler][] = [
       const summaryNew = kind === "chapter" && body.isSummary === true;
       const title = summaryNew ? SUMMARY_TITLE : typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
       if (speakerNew && summaryNew) fail(400, "summary_speaker_exclusive", "主講人與總結與銷售課程不能同時勾選");
-      if (!title && !speakerNew) fail(400, "title_required", `請輸入${kind === "material" ? "教材" : "章節"}名稱`);
+      if (!title) fail(400, "title_required", `請輸入${kind === "material" ? "教材" : "章節"}名稱`);
       const eventDate = body.eventDate === undefined ? null : dayOrNull(body.eventDate);
       const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
       if (!course) return fail(404, "not_found", "找不到這門課程");
@@ -5678,7 +5667,6 @@ const routes: [string, RegExp, Handler][] = [
         ...(summaryNew ? [ctx.db.prepare("UPDATE lessons SET is_summary = 0 WHERE course_id = ?").bind(courseId)] : []),
         ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
         ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker, is_summary, brand_id, categories, in_sheet) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, courseId, insertAt, title || "主講人", sharer, sharerRank, sharerTitle, eventDate, 0, kind, speaker ? 1 : 0, summaryNew ? 1 : 0, kind === "section" ? await blockBrand(ctx, body.brandId) : null, kind === "section" ? blockCats(body.categories) : "", kind === "section" && body.inSheet === false ? 0 : 1),
-        ...(speaker ? [speakerSync(ctx.db, courseId)] : []),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);
       if (kind !== "section") await notifyNewContent(ctx, courseId, kind === "material" ? "教材" : "章節");
