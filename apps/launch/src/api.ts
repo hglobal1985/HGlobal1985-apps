@@ -326,6 +326,18 @@ function noticeCategory(title: string, link: string): NoticeCategory {
   return "other";
 }
 
+/**
+ * 中央的獎銜／中心申請有結果時，通知申請人（站內通知＋手機推播；業主 2026-11-19 回報申請人沒收到通知）。
+ * 中央自己的「已通知會員」只在會員中心，不會到行動大學，所以行動大學要自己發。兩個來源（審核回應、webhook）可能重複，2 分鐘內同一人只發一則。
+ */
+async function notifyReviewResult(db: D1Database, sub: string, what: string): Promise<void> {
+  const title = `你的${what}申請有結果了`;
+  const dup = await db.prepare("SELECT 1 AS x FROM notifications WHERE recipient_sub = ? AND title LIKE '你的%申請有結果了' AND created_at > ?").bind(sub, new Date(Date.now() - 120_000).toISOString()).first();
+  if (dup) return;
+  await notify(db, { sub }, title, "到「設定」頁看最新的獎銜與中心資料", "/settings").run();
+}
+const REVIEW_FIELD_LABEL: Record<string, string> = { rank: "獎銜", education_center: "中心", education_system: "系統" };
+
 /** 統計分析：超級管理員、總部秘書一定可以；其他職務要被超級管理員指定。 */
 async function canViewStats(ctx: Ctx, s: Session): Promise<boolean> {
   if (s.role === "admin") return true;
@@ -2929,7 +2941,16 @@ const routes: [string, RegExp, Handler][] = [
       const seen = await ctx.db.prepare("SELECT 1 AS x FROM central_events WHERE id = ?").bind(ev.id).first();
       if (seen) return { ok: true, duplicate: true };
       if (ev.type === "member.deleted" && typeof ev.member_id === "string") await purgeMember(ctx.db, ev.member_id, "central", "member.deleted_by_central");
-      else if (ev.type === "member.profile_changed" && typeof ev.member_id === "string") forgetMember(ev.member_id);
+      else if (ev.type === "member.profile_changed" && typeof ev.member_id === "string") {
+        forgetMember(ev.member_id);
+        // 獎銜、中心、系統被核准或改變時，通知本人。事件內容的欄位清單格式未確認，所以寬鬆讀取 fields／changed_fields／keys；
+        // 同時把「有哪些欄位名稱」（不含值）記進稽核紀錄，方便對照中央實際格式。
+        const evx = ev as Record<string, unknown>;
+        const raw = [evx.fields, evx.changed_fields, evx.keys, evx.changed].flat().filter((x): x is string => typeof x === "string");
+        await audit(ctx.db, "central", "webhook.profile_changed", "member", ev.member_id, Object.keys(evx).join(",").slice(0, 200) + "|" + raw.join(",").slice(0, 200)).run().catch(() => undefined);
+        const hit = raw.map((k) => k.replace(/^amway\./, "")).filter((k) => k in REVIEW_FIELD_LABEL);
+        if (hit.length) await notifyReviewResult(ctx.db, ev.member_id, [...new Set(hit.map((k) => REVIEW_FIELD_LABEL[k]!))].join("、")).catch(() => undefined);
+      }
       // webhook.test 與不認得的事件：只回 2xx（容忍未來新增的事件）。
       await ctx.db.batch([
         ctx.db.prepare("INSERT OR IGNORE INTO central_events (id) VALUES (?)").bind(ev.id),
@@ -3632,8 +3653,15 @@ const routes: [string, RegExp, Handler][] = [
       if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以審核");
       const body = await readJson<{ decision?: unknown }>(ctx.req);
       if (body.decision !== "approve" && body.decision !== "reject") return fail(400, "invalid_decision", "請選擇通過或不通過");
-      const code = await centralDecide(s.token, id, body.decision);
-      if (code === 200) return { ok: true };
+      const r = await centralDecide(s.token, id, body.decision);
+      const code = r.status;
+      if (code === 200) {
+        // 中央回應若帶了申請人（member_id）與欄位，就通知申請人；沒帶則靠 webhook（member.profile_changed）補發。
+        const who = typeof r.body?.member_id === "string" ? r.body.member_id : typeof r.body?.sub === "string" ? r.body.sub : null;
+        const key = typeof r.body?.field_key === "string" ? r.body.field_key : "";
+        if (who) await notifyReviewResult(ctx.db, who, REVIEW_FIELD_LABEL[key] ?? "獎銜或中心").catch(() => undefined);
+        return { ok: true };
+      }
       if (code === 403) return fail(403, "forbidden", "這個申請不屬於您負責的中心");
       if (code === 404) return fail(404, "not_pending", "這筆申請已被處理過，請重新整理");
       return fail(502, "central_unavailable", "會員中心暫時無法連線，請稍後再試");

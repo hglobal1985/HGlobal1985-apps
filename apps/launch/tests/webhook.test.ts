@@ -59,3 +59,15 @@ test("webhook：會員刪除帳號 → 清掉該會員在行動大學的資料�
   assert.equal((await post({ id: "p1", type: "member.profile_changed", app_id: "learn", member_id: sub, fields: ["contact_email"] })).status, 200);
   assert.equal((await post({ id: "x1", type: "future.event", app_id: "learn", member_id: sub })).status, 200);
 });
+
+test("webhook：獎銜、中心欄位變更 → 通知本人（2 分鐘內不重複）；Email 欄位變更不通知", async () => {
+  const { env, post } = setup();
+  const sub = "00000000-0000-4000-8000-000000000002";
+  const count = async () => Number((await env.DB.prepare("SELECT COUNT(*) AS n FROM notifications WHERE recipient_sub = ?").bind(sub).first<{ n: number }>())?.n);
+  await post({ id: "a1", type: "member.profile_changed", app_id: "learn", member_id: sub, fields: ["contact_email"] });
+  assert.equal(await count(), 0);
+  await post({ id: "a2", type: "member.profile_changed", app_id: "learn", member_id: sub, fields: ["rank", "education_center"] });
+  assert.equal(await count(), 1);
+  await post({ id: "a3", type: "member.profile_changed", app_id: "learn", member_id: sub, fields: ["rank"] });
+  assert.equal(await count(), 1, "短時間內不重複");
+});
