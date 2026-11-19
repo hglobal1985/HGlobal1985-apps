@@ -41,7 +41,7 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
         onPress={() => router.push(`/course/${course.id}`)}
         style={[styles.art, { width, height, backgroundColor: img ? "#fff" : c.surfaceMuted }, ...(empty ? fadedStyle : []), hidden && { opacity: 0.4 }]}
       >
-        {course.brand ? <BrandCover brand={course.brand} fill /> : img && cropped ? <Image source={{ uri: resolveUrl(img) }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : img ? <TopFill uri={resolveUrl(img)} w={width} h={height} viewY={list ? 0 : course.edmViewY} fillBlur /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
+        {course.brand ? <BrandCover brand={course.brand} fill /> : img && cropped ? <Image source={{ uri: resolveUrl(img) }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : img ? <TopFill uri={resolveUrl(img)} w={width} h={height} viewY={course.edmViewY} fillBlur /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         <View style={styles.count} pointerEvents="none">
