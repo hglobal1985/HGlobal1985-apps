@@ -12,21 +12,21 @@ import { AppText } from "@/ui";
  */
 
 /** 品牌（單選）：標題列＋直接列出所有品牌，沒有展開／收起。 */
-export function BrandField({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+export function BrandField({ value, onChange, collapsible }: { value: string; onChange: (id: string) => void; collapsible?: boolean }) {
   const brands = useApi<{ id: string; name: string }[]>("/brands");
   if (!brands.data?.length) return null;
   return (
-    <FormBlock title="品牌" hint="單選；沒上傳封面時，用品牌 logo 當封面">
+    <FormBlock collapsible={collapsible} title="品牌" hint="單選；沒上傳封面時，用品牌 logo 當封面">
       <Chips label="品牌" options={[{ key: "", label: "無" }, ...brands.data.map((b) => ({ key: b.id, label: b.name }))]} value={value} onChange={onChange} />
     </FormBlock>
   );
 }
 
 /** 分類（可複選，值是用「、」分隔的字串）：標題列＋已有分類的點選清單；withInput＝多一個可自己輸入新分類的欄位。 */
-export function CategoryField({ value, onChange, withInput = false }: { value: string; onChange: (v: string) => void; withInput?: boolean }) {
+export function CategoryField({ value, onChange, withInput = false, collapsible }: { value: string; onChange: (v: string) => void; withInput?: boolean; collapsible?: boolean }) {
   const categories = useApi<string[]>("/admin/categories");
   return (
-    <FormBlock title="分類" hint={withInput ? "可複選；點選加入或取消，也可以自己輸入（多個用「、」分開）" : "可複選"}>
+    <FormBlock collapsible={collapsible} title="分類" hint={withInput ? "可複選；點選加入或取消，也可以自己輸入（多個用「、」分開）" : "可複選"}>
       {withInput ? <Field label="" value={value} onChange={onChange} placeholder="例如：達標班、會議" /> : null}
       {categories.data?.length ? <MultiChips options={categories.data} value={value} onChange={onChange} /> : <AppText tone="muted">目前沒有分類</AppText>}
     </FormBlock>
