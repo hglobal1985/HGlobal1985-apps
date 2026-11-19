@@ -151,7 +151,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
             </>
           )}
           <DateSelect label="活動日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
-          {f.eventStart ? <DateSelect label="結束日期（連續 2～3 天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
+          {f.eventStart ? <DateSelect label="結束日期（連續多天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
         </>
       )}
       <CategoryField value={f.category} onChange={set("category")} withInput />
@@ -248,9 +248,9 @@ function WhenSheet({ course, onClose, onSaved }: SheetProps) {
   return (
     <EditSheet material={course.isList} title="時間與地點" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <DateSelect label="活動開始日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
-      {f.eventStart ? <DateSelect label="活動結束日期（連續 2～3 天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventEnd: v }))} /> : null}
+      {f.eventStart ? <DateSelect label="活動結束日期（連續多天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventEnd: v }))} /> : null}
       <AppText variant="caption" tone="muted">
-        顯示在課程卡、首頁與「全部課程」的排序（最多連續 3 天）。
+        顯示在課程卡、首頁與「全部課程」的排序。
       </AppText>
       <Field label="地點" value={f.location} onChange={(v) => setF((x) => ({ ...x, location: v }))} placeholder="例如：台北總部教室" />
       <Check label="不顯示地點" value={f.locationNone} onChange={(v) => setF((x) => ({ ...x, locationNone: v }))} />

@@ -2212,7 +2212,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     const start = day(body.eventStart);
     const end = day(body.eventEnd);
     if (end && !start) fail(400, "invalid_date", "請先填活動開始日期");
-    if (start && end && (end < start || Date.parse(end) - Date.parse(start) > 2 * 86400000)) fail(400, "invalid_date", "活動結束日要在開始日之後，且最多連續 3 天");
+    if (start && end && end < start) fail(400, "invalid_date", "活動結束日不能早於開始日"); // 連續天數不設上限（業主 2026-11-19）
     sets.push(["event_start", start], ["event_end", end && end !== start ? end : null]);
   }
   for (const [k, col] of [["freeFrom", "free_from"], ["freeUntil", "free_until"]] as const) {
