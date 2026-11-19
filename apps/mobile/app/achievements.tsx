@@ -8,6 +8,7 @@ import { dateOnly } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useLayout } from "@/theme/layout";
+import { BadgeIcon } from "@/features/achievements/badge-icon";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { GuestGate, AppText, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
@@ -70,12 +71,12 @@ export default function AchievementsScreen() {
       <View style={styles.grid} onLayout={(e) => setGridW(Math.floor(e.nativeEvent.layout.width))}>
         {(data ?? []).map((a) => (
           <View key={a.id} style={[styles.card, { width: cardW }, { backgroundColor: c.surface, borderColor: a.earned ? c.accent : c.border, opacity: a.earned ? 1 : 0.6 }]} accessibilityLabel={`${a.name}，${a.earned ? "已取得" : "尚未取得"}`}>
-            <AppText style={[styles.icon, !a.earned && { opacity: 0.35 }]}>{a.icon}</AppText>
+            <BadgeIcon icon={a.icon} size={44} dim={!a.earned} />
             <AppText variant="headline" style={{ textAlign: "center" }} numberOfLines={2}>
               {a.name}
             </AppText>
             <AppText variant="caption" tone="muted" style={{ textAlign: "center" }} numberOfLines={3}>
-              {a.description || conditionText(a.type, a.threshold, a.courseTitle, a.feature)}
+              {a.description || conditionText(a.type, a.threshold, a.courseTitle, a.feature, a.lessonTitle)}
             </AppText>
             {a.earned ? (
               <AppText variant="caption" style={{ color: c.accentText, fontWeight: "700" }}>

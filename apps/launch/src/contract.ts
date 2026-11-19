@@ -522,9 +522,9 @@ export type ProfileForm = {
 };
 
 // ---------- 學習成就（徽章）----------
-export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total";
+export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video";
 /** 任務分類（後台「徽章任務設定」用，業主 2026-11-18）。 */
-export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature";
+export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature" | "zone";
 export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; icon: string; desc: string }[] = [
   { key: "progress", label: "學習進度", icon: "📈", desc: "學了多少：完成的堂數、課程、學習時間" },
   { key: "habit", label: "學習習慣", icon: "🔥", desc: "有沒有持續：累計天數、連續天數" },
@@ -533,9 +533,10 @@ export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; 
   { key: "social", label: "社群互動", icon: "💬", desc: "在課程留言板的互動" },
   { key: "subscribe", label: "訂閱關注", icon: "🔔", desc: "訂閱中心、系列的數量" },
   { key: "feature", label: "功能體驗", icon: "🧰", desc: "第一次使用某個網站功能（新手教學）" },
+  { key: "zone", label: "素材影片", icon: "🎬", desc: "安麗官方素材專區、安麗品牌專區：每個區塊隨機挑 1～2 支影片，讀完（看完）就解鎖" },
 ];
 /** 條件類型：中文名稱、單位、分類、白話說明（後台挑選時顯示）。retired＝已停用的類型，後台不再提供。 */
-export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; category: AchievementCategory; hint: string; needsCourse?: boolean; needsFeature?: boolean; retired?: boolean }> = {
+export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; category: AchievementCategory; hint: string; needsCourse?: boolean; needsFeature?: boolean; retired?: boolean; auto?: boolean }> = {
   lessons_completed: { label: "累計完成章節數", unit: "堂", category: "progress", hint: "會員一共完成了幾個章節（每個章節只算一次）" },
   courses_completed: { label: "累計學完課程數", unit: "門", category: "progress", hint: "整門課的每個章節都完成，才算學完 1 門" },
   lessons_in_a_day: { label: "單日最多完成章節數", unit: "堂", category: "progress", hint: "同一天（台灣時間）內完成的章節數，取最高的一天" },
@@ -552,8 +553,14 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   series_subscribed: { label: "訂閱系列數", unit: "個", category: "subscribe", hint: "按過訂閱鈴鐺的系列數量" },
   subscriptions_total: { label: "訂閱總數（中心＋系列）", unit: "個", category: "subscribe", hint: "中心與系列加起來的訂閱數量" },
   feature_used: { label: "使用過某個網站功能", unit: "次", category: "feature", hint: "第一次用到指定功能就達成（需要選功能），達成數量通常填 1", needsFeature: true },
+  material_video: { label: "讀完指定的素材影片", unit: "支", category: "zone", hint: "由系統從素材專區、品牌專區隨機抽選影片產生（在「素材影片」分類按「重新抽選」），不能手動新增", auto: true },
   course_completed: { label: "學完指定的某一門課程", unit: "門", category: "progress", hint: "已取消這類任務", needsCourse: true, retired: true },
 };
+/** 徽章圖固定用圖片時的代碼（存在 achievements.icon）：畫面用圖片、通知文字退回 🏅。 */
+export const BADGE_IMAGE_ICONS = ["@amway"] as const;
+export const isImageIcon = (icon: string) => (BADGE_IMAGE_ICONS as readonly string[]).includes(icon);
+/** 通知、純文字場合用的圖示（圖片徽章退回 🏅）。 */
+export const iconText = (icon: string) => (isImageIcon(icon) ? "🏅" : icon);
 /** 網站功能清單（功能體驗徽章，類似新手教學）：key 是前端回報用的代碼，label 是功能名稱，hint 是怎麼用。 */
 export const FEATURES = {
   share: { label: "分享給朋友", hint: "在課程、章節或海報按分享鈕，傳給朋友" },
@@ -588,6 +595,8 @@ export type Achievement = {
   type: AchievementType;
   threshold: number;
   feature?: string | null;
+  /** 素材影片徽章：指定的影片名稱與所屬清單。 */
+  lessonTitle?: string | null;
   courseTitle: string | null;
   current: number;
   earned: boolean;
@@ -604,6 +613,9 @@ export type AdminAchievement = {
   feature?: string | null;
   courseId: string | null;
   courseTitle: string | null;
+  /** 素材影片徽章指定的影片（章節編號與名稱）。 */
+  lessonId?: string | null;
+  lessonTitle?: string | null;
   active: boolean;
   earnedCount: number;
   /** 難易度 1～3 顆星（後台設定）。 */
