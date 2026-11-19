@@ -159,7 +159,7 @@ export type CourseSummary = {
   /** 指導單位、主辦單位（空字串表示未設定）。 */
   guidanceUnit: string;
   hostUnit: string;
-  /** 活動日期（YYYY-MM-DD）；eventEnd 只有連續 2～3 天的活動才有。 */
+  /** 活動日期（YYYY-MM-DD）；eventEnd 只有連續多天的活動才有（天數不設上限）。 */
   eventStart: string | null;
   eventEnd: string | null;
   /** 完全公開：未登入的訪客也能瀏覽介紹與章節、觀看（只限免費課程）。 */
