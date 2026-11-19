@@ -36,7 +36,7 @@ function Label({ text, tag, note }: { text: string; tag?: string; note?: string 
   const { c } = useTheme();
   return (
     <View style={styles.labelRow}>
-      <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
+      <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
         {text}
       </AppText>
       {note ? <Text style={{ color: c.warning, fontSize: 12, fontWeight: "800" }}>{note}</Text> : null}
@@ -218,6 +218,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       setShowBad(false);
       setMsg(r.errors.length ? { ok: false, text: r.errors[0] } : { ok: true, text: r.pending ? "已儲存，部分欄位等待審核" : "已儲存到會員中心" });
       invalidate();
+      if (!r.errors.length) onClose(); // 儲存成功就自動關閉視窗（業主 2026-11-19）
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -284,7 +285,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
           {!data && !error ? <AppText tone="muted">讀取中…</AppText> : null}
           {data ? (
             <>
-              <View style={styles.line}>
+              <View style={[styles.line, { alignItems: "flex-end" }]}>
                 <View style={{ flex: 1 }}>
                   <Row>
                     <Label text="本名（購買付費課程時，給中心窗口對帳用途）" />
@@ -371,7 +372,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: space.sm, width: "100%" },
   btn: { minHeight: 44, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm },
   line: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  labelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  labelRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   req: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1 },
   input: { minHeight: FIELD_H, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
   none: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 40, minWidth: 60 },
