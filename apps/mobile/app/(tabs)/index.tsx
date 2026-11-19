@@ -1,11 +1,11 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, HQ_UNIT, type Announcement, type CourseSummary } from "@/api/client";
 import { MemberHeader } from "@/features/member-header";
 import { useProfileGate } from "@/features/profile-gate";
-import { HomeRail } from "@/features/courses/home-rail";
+import { HOME_INFO_SPACE, HomeRail } from "@/features/courses/home-rail";
 import { collapseSeries } from "@/features/courses/sort";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
@@ -35,6 +35,17 @@ export default function HomeScreen() {
   const { data, error, reload } = useApi<CourseSummary[]>("/courses");
   const [quote, setQuote] = useState<string | null>(null);
   const [noticeClosed, setNoticeClosed] = useState(false);
+  // 版面太擠（上面的安裝提醒、公告占掉空間）時，先隱藏左右海報下方的資訊；使用者關掉提醒騰出空間後自動恢復（業主 2026-11-19）。
+  // 判斷用「顯示資訊時海報還剩多高」：已隱藏時要扣掉資訊區的高度；加 12px 緩衝避免在邊界來回閃動。
+  const stageH = useRef({ a: 0, b: 0 });
+  const [tight, setTight] = useState(false);
+  const reportStage = (key: "a" | "b") => (h: number) => {
+    stageH.current[key] = h;
+    const hs = [stageH.current.a, stageH.current.b].filter((x) => x > 0);
+    if (!hs.length) return;
+    const stage = Math.min(...hs);
+    setTight((prev) => (prev ? stage - HOME_INFO_SPACE < HOME_MIN_POSTER + 12 : stage < HOME_MIN_POSTER));
+  };
   const gate = useProfileGate(member);
   const refreshControl = usePullRefresh(); // 首頁也能下拉：立刻更新名字旁的獎銜標籤
   // 每次進入首頁換一則學習金句。
@@ -106,6 +117,8 @@ export default function HomeScreen() {
               courses={mine}
               scale={k}
               compact={shortLand}
+              hideInfo={tight && !shortLand}
+              onStageHeight={reportStage("a")}
               autoSec={config.app.homeLeftSec}
               pauseSec={config.app.homePauseSec}
               note={quote ?? undefined}
@@ -131,6 +144,8 @@ export default function HomeScreen() {
               courses={recommended}
               scale={k}
               compact={shortLand}
+              hideInfo={tight && !shortLand}
+              onStageHeight={reportStage("b")}
               autoSec={config.app.homeRightSec}
               pauseSec={config.app.homePauseSec}
               note={rules.scope === "all" ? "顯示您可報名的課程" : "顯示您中心、您可報名的課程"}
@@ -148,6 +163,9 @@ export default function HomeScreen() {
     </>
   );
 }
+
+/** 海報區至少要有這麼高才算夠用（太矮就先隱藏海報下方的資訊）。 */
+const HOME_MIN_POSTER = 150;
 
 const styles = StyleSheet.create({
   page: { flexGrow: 1, alignItems: "center", paddingHorizontal: space.md, overflow: "hidden" },
