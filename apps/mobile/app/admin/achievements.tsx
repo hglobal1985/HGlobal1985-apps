@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_TYPES, FEATURES, api, type AchievementCategory, type AchievementType, type AdminAchievement } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
+import { BadgeIcon } from "@/features/achievements/badge-icon";
 import { BADGE_ICONS, conditionText } from "@/features/achievements/text";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { useApi, useSession } from "@/state/session";
@@ -22,12 +23,12 @@ const doneOf = (a: AdminAchievement): Exclude<Done, "all"> => {
   return r < 0.1 ? "low" : r < 0.4 ? "mid" : "high";
 };
 const pct = (a: AdminAchievement) => (a.memberTotal ? Math.round((a.earnedCount / a.memberTotal) * 100) : 0);
-type Form = { id: string | null; difficulty: Diff; name: string; description: string; icon: string; type: AchievementType; threshold: string; feature: string; active: boolean };
+type Form = { id: string | null; difficulty: Diff; name: string; description: string; icon: string; type: AchievementType; threshold: string; feature: string; active: boolean; lessonTitle?: string | null };
 const blank = (category: AchievementCategory): Form => {
-  const type = (Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).find((t) => ACHIEVEMENT_TYPES[t].category === category && !ACHIEVEMENT_TYPES[t].retired)!;
+  const type = (Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).find((t) => ACHIEVEMENT_TYPES[t].category === category && !ACHIEVEMENT_TYPES[t].retired && !ACHIEVEMENT_TYPES[t].auto)!;
   return { id: null, difficulty: 1, name: "", description: "", icon: "🏅", type, threshold: "1", feature: "", active: true };
 };
-const typesOf = (category: AchievementCategory) => (Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).filter((t) => ACHIEVEMENT_TYPES[t].category === category && !ACHIEVEMENT_TYPES[t].retired);
+const typesOf = (category: AchievementCategory) => (Object.keys(ACHIEVEMENT_TYPES) as AchievementType[]).filter((t) => ACHIEVEMENT_TYPES[t].category === category && !ACHIEVEMENT_TYPES[t].retired && !ACHIEVEMENT_TYPES[t].auto);
 
 /**
  * 設定 › 徽章任務設定（業主 2026-11-18）：超級管理員自由調整所有徽章任務。
@@ -84,13 +85,14 @@ export default function AdminAchievementsScreen() {
     setDirty(false);
     setError(null);
   };
-  const edit = (a: AdminAchievement) => open({ id: a.id, difficulty: a.difficulty, name: a.name, description: a.description, icon: a.icon, type: a.type, threshold: String(a.threshold), feature: a.feature ?? "", active: a.active }, ACHIEVEMENT_TYPES[a.type].category);
+  const edit = (a: AdminAchievement) => open({ id: a.id, difficulty: a.difficulty, name: a.name, description: a.description, icon: a.icon, type: a.type, threshold: String(a.threshold), feature: a.feature ?? "", active: a.active, lessonTitle: a.lessonTitle }, ACHIEVEMENT_TYPES[a.type].category);
   const patch = (p: Partial<Form>) => {
     setForm((f) => (f ? { ...f, ...p } : f));
     setDirty(true);
   };
   const t = form ? ACHIEVEMENT_TYPES[form.type] : null;
-  const autoDesc = form ? conditionText(form.type, Number(form.threshold) || 1, null, form.feature) : "";
+  const auto = !!t?.auto;
+  const autoDesc = form ? conditionText(form.type, Number(form.threshold) || 1, null, form.feature, form.lessonTitle) : "";
   const save = async () => {
     if (!form) return;
     const n = Number(form.threshold);
@@ -109,6 +111,19 @@ export default function AdminAchievementsScreen() {
     if (a.difficulty === d) return;
     setOver((o) => ({ ...o, [a.id]: d })); // 先直接換星星，背景再存
     api("PATCH", `/admin/achievements/${a.id}`, { difficulty: d }).then(() => list.reload()).catch((e: Error) => { setOver((o) => { const n = { ...o }; delete n[a.id]; return n; }); flashText(e.message); });
+  };
+  const draw = async () => {
+    if (!(await confirmAsk("重新抽選素材影片徽章", "會從「安麗官方素材專區」「安麗品牌專區」的每個區塊隨機挑影片（區塊裡影片超過 5 支挑 2 支，否則 1 支），新增尚未有徽章的區塊。已經有的徽章不會被換掉或刪除。", "開始抽選"))) return;
+    setBusy(true);
+    try {
+      const r = await api<{ added: number; total: number }>("POST", "/admin/achievements/draw-videos");
+      flashText(r.added ? `新增 ${r.added} 枚素材影片徽章，目前共 ${r.total} 枚` : `沒有需要新增的，目前共 ${r.total} 枚`);
+      list.reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   };
   const saveNeed = (v: number) => run(() => api("PUT", "/admin/ui-config", { app: { ...config.app, libraryKeyBadges: v } }).then(() => reloadConfig()), "已更新書櫃鑰匙門檻");
 
@@ -142,6 +157,8 @@ export default function AdminAchievementsScreen() {
 
       <Button label="新增任務" icon="add-circle-outline" onPress={() => open(blank(filter === "all" ? "progress" : filter), filter === "all" ? "progress" : filter)} fullWidth />
 
+      <Button variant="secondary" label="🎬 重新抽選素材影片徽章" onPress={draw} disabled={busy} fullWidth />
+
       <Chips title="任務分類" label="任務分類" options={[{ key: "all", label: `全部（${rows.length}）` }, ...ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}（${rows.filter((a) => ACHIEVEMENT_TYPES[a.type].category === k.key).length}）` }))]} value={filter} onChange={(v) => setFilter(v as "all" | AchievementCategory)} />
       <Chips title="難易度" label="難易度" options={[{ key: "all", label: "全部" }, ...([1, 2, 3] as Diff[]).map((d) => ({ key: String(d), label: `${"★".repeat(d)} ${DIFF_LABEL[d]}（${rows.filter((a) => a.difficulty === d).length}）` }))]} value={diffF} onChange={(v) => setDiffF(v as typeof diffF)} />
       <Chips title="會員完成度（取得人數 ÷ 會員總數）" label="會員完成度" options={[{ key: "all", label: "全部" }, { key: "none", label: `沒人取得（${rows.filter((a) => doneOf(a) === "none").length}）` }, { key: "low", label: `少數 <10%（${rows.filter((a) => doneOf(a) === "low").length}）` }, { key: "mid", label: `中等（${rows.filter((a) => doneOf(a) === "mid").length}）` }, { key: "high", label: `多數 ≥40%（${rows.filter((a) => doneOf(a) === "high").length}）` }]} value={doneF} onChange={(v) => setDoneF(v as Done)} />
@@ -156,13 +173,13 @@ export default function AdminAchievementsScreen() {
             {items.map((a) => (
               <View key={a.id} style={[styles.item, { borderBottomColor: c.border, opacity: a.active ? 1 : 0.55 }]}>
                 <Pressable accessibilityRole="button" accessibilityLabel={`修改 ${a.name}`} onPress={() => edit(a)} style={styles.itemMain}>
-                  <AppText style={{ fontSize: 24, lineHeight: 30 }}>{a.icon}</AppText>
+                  <BadgeIcon icon={a.icon} size={24} />
                   <View style={{ flex: 1 }}>
                     <AppText variant="callout" style={{ fontWeight: "800" }} numberOfLines={1}>
                       {a.name}{!a.active ? "（停用）" : ""}
                     </AppText>
                     <AppText variant="caption" tone="muted" numberOfLines={1}>
-                      {conditionText(a.type, a.threshold, a.courseTitle, a.feature)} · {a.earnedCount} 人（{pct(a)}%）
+                      {conditionText(a.type, a.threshold, a.courseTitle, a.feature, a.lessonTitle)} · {a.earnedCount} 人（{pct(a)}%）
                     </AppText>
                   </View>
                 </Pressable>
@@ -176,7 +193,11 @@ export default function AdminAchievementsScreen() {
 
       {form ? (
         <EditSheet title={form.id ? "修改徽章任務" : "新增徽章任務"} onClose={() => setForm(null)} onSave={save} dirty={dirty} busy={busy} error={error}>
-          <Chips title="① 任務分類" label="① 任務分類" options={ACHIEVEMENT_CATEGORIES.map((k) => ({ key: k.key, label: `${k.icon} ${k.label}` }))} value={formCat} onChange={(v) => { setFormCat(v as AchievementCategory); const first = typesOf(v as AchievementCategory)[0]; if (first && ACHIEVEMENT_TYPES[form.type].category !== v) patch({ type: first, feature: "" }); }} />
+          {auto ? (
+            <NoticeBox tone="info" text={`素材影片徽章：會員讀完（看完）「${form.lessonTitle ?? "指定影片"}」就解鎖。影片由系統隨機抽選，這裡只能改名稱、說明、難易度與啟用狀態。`} />
+          ) : (
+            <>
+          <Chips title="① 任務分類" label="① 任務分類" options={ACHIEVEMENT_CATEGORIES.filter((k) => k.key !== "zone").map((k) => ({ key: k.key, label: `${k.icon} ${k.label}` }))} value={formCat} onChange={(v) => { setFormCat(v as AchievementCategory); const first = typesOf(v as AchievementCategory)[0]; if (first && ACHIEVEMENT_TYPES[form.type].category !== v) patch({ type: first, feature: "" }); }} />
           <View style={{ gap: 6 }}>
             <AppText variant="callout" style={{ fontWeight: "700" }}>
               ② 任務種類
@@ -220,9 +241,19 @@ export default function AdminAchievementsScreen() {
               {form.type === "streak_days" && Number(form.threshold) > 7 ? <NoticeBox tone="warning" text="連續學習超過 7 天很難達成，建議不要設更高。" /> : null}
             </View>
           )}
+            </>
+          )}
           <Field label="④ 徽章名稱（最多 30 字）" value={form.name} onChange={(v) => patch({ name: v })} placeholder="例如：學習新星" />
           <Field label="說明（會員在成就頁看到；留空會自動用條件文字）" value={form.description} onChange={(v) => patch({ description: v })} placeholder={autoDesc} />
           <Button variant="ghost" label={`自動填入說明：${autoDesc}`} onPress={() => patch({ description: autoDesc })} />
+          {auto ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+              <BadgeIcon icon={form.icon} size={32} />
+              <AppText variant="caption" tone="muted">
+                ⑤ 徽章圖固定使用安麗圖示
+              </AppText>
+            </View>
+          ) : (
           <View style={{ gap: 6 }}>
             <AppText variant="callout" style={{ fontWeight: "700" }}>
               ⑤ 徽章圖示
@@ -241,6 +272,7 @@ export default function AdminAchievementsScreen() {
               <TextInput value={form.icon} onChangeText={(v) => patch({ icon: [...v].slice(-2).join("") })} accessibilityLabel="自訂圖示" style={[styles.iconInput, typo.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
             </View>
           </View>
+          )}
           <View style={{ gap: 6 }}>
             <AppText variant="callout" style={{ fontWeight: "700" }}>
               ⑥ 難易度：{DIFF_LABEL[form.difficulty]}

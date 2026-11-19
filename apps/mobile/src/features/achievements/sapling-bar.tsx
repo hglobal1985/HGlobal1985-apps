@@ -9,6 +9,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, SaplingIcon, showFlash } from "@/ui";
 import { FLASH_ICON } from "@/ui/flash-notice";
+import { BadgeIcon } from "./badge-icon";
 import { conditionText } from "./text";
 
 /**
@@ -54,10 +55,10 @@ export function SaplingBar({ saplings }: { saplings: number }) {
               key={a.id}
               accessibilityRole="button"
               accessibilityLabel={`${a.name}，已解鎖`}
-              onPress={() => showFlash({ icon: <AppText style={styles.emoji}>{a.icon}</AppText>, title: a.name, body: a.description || conditionText(a.type, a.threshold, a.courseTitle, a.feature), holdMs: 2200 })}
+              onPress={() => showFlash({ icon: <BadgeIcon icon={a.icon} size={40} />, title: a.name, body: a.description || conditionText(a.type, a.threshold, a.courseTitle, a.feature, a.lessonTitle), holdMs: 2200 })}
               style={[styles.badge, { backgroundColor: c.accentSoft, borderColor: c.accent }]}
             >
-              <AppText style={styles.badgeText}>{a.icon}</AppText>
+              <BadgeIcon icon={a.icon} size={26} />
             </Pressable>
           ))}
           {needMore ? (

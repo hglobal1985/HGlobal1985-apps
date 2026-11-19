@@ -1,7 +1,7 @@
 import { FEATURES, type AchievementType } from "@/api/client";
 
 /** 徽章條件的白話說明。 */
-export function conditionText(type: AchievementType, threshold: number, courseTitle: string | null, feature?: string | null): string {
+export function conditionText(type: AchievementType, threshold: number, courseTitle: string | null, feature?: string | null, lessonTitle?: string | null): string {
   switch (type) {
     case "lessons_completed":
       return `累計完成 ${threshold} 堂課`;
@@ -19,6 +19,8 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
       const f = feature ? FEATURES[feature as keyof typeof FEATURES] : undefined;
       return f ? `${f.label}：${f.hint}` : "使用指定的網站功能";
     }
+    case "material_video":
+      return lessonTitle ? `讀完素材影片「${lessonTitle}」` : "讀完指定的素材影片";
     case "streak_days":
       return `連續 ${threshold} 天都有完成章節`;
     case "watch_minutes":

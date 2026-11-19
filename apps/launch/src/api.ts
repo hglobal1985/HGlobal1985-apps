@@ -7,6 +7,7 @@ import {
   HQ_UNIT,
   REVIEW_REASONS,
   ACHIEVEMENT_TYPES,
+  iconText,
   applicantLabel,
   type AchievementType,
   type AdminAchievement,
@@ -68,6 +69,7 @@ import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
 import { ImportError, loadFileSettings, normalizeFileSettings, openUserDriveFile, saveFileSettings, streamToR2 } from "./material-files.ts";
 import { centerShareName } from "./og.ts";
 import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
+import { drawZoneVideoBadges } from "./zone-video-badges.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
@@ -331,7 +333,7 @@ async function canViewStats(ctx: Ctx, s: Session): Promise<boolean> {
 /** 重新計算會員的徽章；新取得的發站內通知，回傳完整清單。 */
 async function grantAchievements(ctx: Ctx, sub: string) {
   const { list, fresh } = await evaluateAchievements(ctx.db, sub);
-  if (fresh.length) await ctx.db.batch(fresh.map((a) => notify(ctx.db, { sub }, "獲得學習徽章", `${a.icon} ${a.name}：${a.description}`, "/achievements")));
+  if (fresh.length) await ctx.db.batch(fresh.map((a) => notify(ctx.db, { sub }, "獲得學習徽章", `${iconText(a.icon)} ${a.name}：${a.description}`, "/achievements")));
   return list;
 }
 
@@ -347,6 +349,7 @@ async function achievementBody(ctx: Ctx, body: Record<string, unknown>, creating
   if (desc !== undefined) sets.push(["description", desc]);
   const icon = text(body.icon, 8);
   if (icon !== undefined) sets.push(["icon", icon || "🏅"]);
+  if (creating && body.type === "material_video") fail(400, "auto_only", "素材影片徽章由系統抽選產生，請在「素材影片」分類按「重新抽選」");
   if (body.type !== undefined || creating) {
     if (typeof body.type !== "string" || !ACH_TYPES.includes(body.type as AchievementType)) fail(400, "invalid_type", "條件類型不正確");
     sets.push(["condition_type", body.type]);
@@ -385,9 +388,9 @@ async function listAchievements(ctx: Ctx): Promise<AdminAchievement[]> {
   for (const r of parts) for (const x of r.results as { member_sub: string }[]) subs.add(x.member_sub);
   const total = subs.size;
   const { results } = await ctx.db
-    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.difficulty, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
-    .all<{ difficulty: number; id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; active: number; course_title: string | null; earned_count: number }>();
-  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count, difficulty: (r.difficulty >= 1 && r.difficulty <= 3 ? r.difficulty : 2) as 1 | 2 | 3, memberTotal: total }));
+    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.lesson_id, a.difficulty, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT title FROM lessons WHERE id = a.lesson_id) AS lesson_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
+    .all<{ difficulty: number; id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; lesson_id: string | null; lesson_title: string | null; active: number; course_title: string | null; earned_count: number }>();
+  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, lessonId: r.lesson_id, lessonTitle: r.lesson_title, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count, difficulty: (r.difficulty >= 1 && r.difficulty <= 3 ? r.difficulty : 2) as 1 | 2 | 3, memberTotal: total }));
 }
 
 /** 刪除一位會員在本 App 的所有資料。 */
@@ -3271,11 +3274,21 @@ const routes: [string, RegExp, Handler][] = [
       // 只結算這個功能的徽章（便宜），達成就通知；其他徽章等會員打開學習成就頁再算。
       const defs = await ctx.db.prepare("SELECT a.id, a.name, a.icon, a.description FROM achievements a WHERE a.active = 1 AND a.condition_type = 'feature_used' AND a.feature = ? AND NOT EXISTS (SELECT 1 FROM member_achievements m WHERE m.member_sub = ? AND m.achievement_id = a.id) AND (SELECT count FROM feature_uses WHERE member_sub = ? AND feature = ?) >= a.threshold").bind(feature, s.sub, s.sub, feature).all<{ id: string; name: string; icon: string; description: string }>();
       if (defs.results.length)
-        await ctx.db.batch(defs.results.flatMap((a) => [ctx.db.prepare("INSERT OR IGNORE INTO member_achievements (member_sub, achievement_id) VALUES (?, ?)").bind(s.sub, a.id), notify(ctx.db, { sub: s.sub }, "獲得學習徽章", `${a.icon} ${a.name}：${a.description}`, "/achievements")]));
+        await ctx.db.batch(defs.results.flatMap((a) => [ctx.db.prepare("INSERT OR IGNORE INTO member_achievements (member_sub, achievement_id) VALUES (?, ?)").bind(s.sub, a.id), notify(ctx.db, { sub: s.sub }, "獲得學習徽章", `${iconText(a.icon)} ${a.name}：${a.description}`, "/achievements")]));
       return { ok: true };
     },
   ],
   ["GET", /^\/me\/achievements$/, async (ctx) => grantAchievements(ctx, requireMember(ctx).sub)],
+  [
+    "POST",
+    /^\/admin\/achievements\/draw-videos$/,
+    async (ctx) => {
+      const s = requireSuperAdmin(ctx);
+      const r = await drawZoneVideoBadges(ctx.db);
+      await ctx.db.batch([audit(ctx.db, s.sub, "achievement.draw_videos", "achievement", "-", `added=${r.added}`)]);
+      return r;
+    },
+  ],
   ["GET", /^\/admin\/achievements$/, async (ctx) => (requireSuperAdmin(ctx), listAchievements(ctx))],
   [
     "POST",
