@@ -14,8 +14,8 @@ test("素材的分類區域標題：只有清單能新增、不編號、不算�
   const admin = (await call<{ token: string }>("POST", "/auth/demo", { body: { sub: "demo-admin" } })).data.token;
   const list = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "素材", isList: true, status: "published" } })).data;
   const normal = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "一般課", teacher: "王小明" } })).data;
-  // 一般課程不能新增分類標題（會被當成章節）
-  assert.equal((await call("POST", `/admin/courses/${normal.id}/lessons`, { token: admin, body: { kind: "section", title: "x" } })).status, 400);
+  // 一般課程也可以新增區塊（業主 2026-11-19）
+  assert.equal((await call("POST", `/admin/courses/${normal.id}/lessons`, { token: admin, body: { kind: "section", title: "x" } })).status, 200);
   let d = (await call<CourseDetail>("POST", `/admin/courses/${list.id}/lessons`, { token: admin, body: { kind: "section", title: "簡報與文件" } })).data;
   d = (await call<CourseDetail>("POST", `/admin/courses/${list.id}/materials`, { token: admin, body: { url: "https://docs.google.com/presentation/d/abc/edit", title: "第一屆簡報" } })).data;
   d = (await call<CourseDetail>("POST", `/admin/courses/${list.id}/lessons`, { token: admin, body: { kind: "section", title: "影片精華" } })).data;

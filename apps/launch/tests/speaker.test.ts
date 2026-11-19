@@ -50,20 +50,17 @@ test("章節日期預設跟著課程日期：沒設定的章節日期＝課程�
   assert.equal(d.find((l) => l.id === b.id)!.eventDate, "2026-12-05", "自己設定的不變");
 });
 
-test("套裝課程：勾套裝才能新增區塊；每個區塊的教材各只能有一個主題；章節的主題不受影響", async () => {
+test("課程卡：任何課程都能新增區塊；每個區塊的教材各只能有一個主題；章節的主題不受影響", async () => {
   const { call } = setup();
   const token = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
   const made = await call<CourseDetail>("POST", "/admin/courses", token, { title: "套裝測試", hostUnit: "寰宇總部", status: "published" });
   const id = made.data.id;
-  assert.equal((await call("POST", `/admin/courses/${id}/lessons`, token, { title: "區塊一", kind: "section" })).status, 400, "沒勾套裝不能新增區塊");
-  assert.equal((await call("PATCH", `/admin/courses/${id}`, token, { isPackage: true })).status, 200);
   const add = async (body: object) => (await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, body)).data;
   await add({ title: "區塊一", kind: "section" });
   await add({ title: "A1", kind: "material" });
   await add({ title: "A2", kind: "material" });
   await add({ title: "區塊二", kind: "section" });
   const d = await add({ title: "B1", kind: "material" });
-  assert.equal(d.isPackage, true);
   const idOf = (t: string) => d.lessons.find((l) => l.title === t)!.id;
   await call("PATCH", `/admin/lessons/${idOf("A1")}`, token, { isSpeaker: true });
   await call("PATCH", `/admin/lessons/${idOf("B1")}`, token, { isSpeaker: true });
@@ -78,7 +75,6 @@ test("套裝課程：章節可以排進區塊（整份順序一起送）；新�
   const { call } = setup();
   const token = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
   const id = (await call<CourseDetail>("POST", "/admin/courses", token, { title: "章節進區塊", hostUnit: "寰宇總部" })).data.id;
-  await call("PATCH", `/admin/courses/${id}`, token, { isPackage: true });
   const add = async (body: object) => (await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, body)).data;
   await add({ title: "區塊甲", kind: "section" });
   let d = await add({ title: "新章節", kind: "chapter" });

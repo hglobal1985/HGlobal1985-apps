@@ -1,5 +1,5 @@
 import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
-import { BLOCK_BEHAVIOR, hasBlocks } from "@/features/courses/block-module";
+import { BLOCK_BEHAVIOR } from "@/features/courses/block-module";
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
@@ -80,7 +80,7 @@ function themeBadge(lesson: Lesson, icon: React.ReactElement | undefined, color:
  */
 export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb" }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（業主 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" } & LessonPlayProps) {
   const { c } = useTheme();
-  const isBlocks = hasBlocks(course) && course.lessons.some((l) => l.section);
+  const isBlocks = course.lessons.some((l) => l.section);
   // 清單的區塊：預設全部收起（業主 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
   const [openId, setOpenId] = useState<string | null>(openBlock ?? null);
   const [gridW, setGridW] = useState(0);
