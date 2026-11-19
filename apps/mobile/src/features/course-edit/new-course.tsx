@@ -19,7 +19,7 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: li
   const [list, setList] = useState(listProp); // 右上「素材／課程」切換（業主 2026-11-18）：新增畫面可自由切換，整個面板的欄位跟著變
   const isHq = member?.role === "admin";
   const isSuper = isSuperAdmin(member);
-  const [f, setF] = useState<BasicsForm>({ isShorts: false, title: "", noSpeaker: false, isPackage: false, teacher: "", teacherRank: "", teacherTitle: "", eventStart: "", eventEnd: "", category: "", series: defaultSeries ?? "", brandId: "", zone: listProp ? "amway_material" : "hglobal" });
+  const [f, setF] = useState<BasicsForm>({ isShorts: false, title: "", noSpeaker: false, teacher: "", teacherRank: "", teacherTitle: "", eventStart: "", eventEnd: "", category: "", series: defaultSeries ?? "", brandId: "", zone: listProp ? "amway_material" : "hglobal" });
   const pickKind = (toList: boolean) => {
     setList(toList);
     // 專區還是預設值就跟著類型換（課程→寰宇、素材→安麗素材）；自己改過的不動。

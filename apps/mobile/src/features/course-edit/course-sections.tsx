@@ -125,7 +125,7 @@ const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.st
 
 // ---------- 基本資料：名稱、主講人、分類、系列（封面顏色已刪除，無 EDM 時文字封面顏色自動隨機） ----------
 /** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
-export type BasicsForm = { isShorts: boolean; title: string; /** 勾了「無」：沒有主講人、獎銜、職稱（業主 2026-11-19）。 */ noSpeaker: boolean; /** 套裝課程（業主 2026-11-19）：勾了才能新增「區塊」（功能同清單卡的區塊）。 */ isPackage: boolean; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
+export type BasicsForm = { isShorts: boolean; title: string; /** 勾了「無」：沒有主講人、獎銜、職稱（業主 2026-11-19）。 */ noSpeaker: boolean; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
 export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
@@ -150,8 +150,6 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
               <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
             </>
           )}
-          {/* 套裝課程（業主 2026-11-19）：勾了之後，課程頁編輯模式才有「新增區塊」，區塊底下可以放教材。 */}
-          <Check label="套裝課程（可以新增區塊，把教材分組）" value={f.isPackage} onChange={set("isPackage")} />
           <DateSelect label="活動日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
           {f.eventStart ? <DateSelect label="結束日期（連續多天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
         </>
@@ -175,7 +173,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
 function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, noSpeaker: course.noSpeaker ?? false, isPackage: course.isPackage ?? false, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
+  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, noSpeaker: course.noSpeaker ?? false, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
   const [f, setF] = useState(init);
   // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");

@@ -124,7 +124,7 @@ function brandFor(ctx: Ctx, row: { brand_id?: string | null; edm_key?: string | 
 type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null; /** 連結區塊：內容在另一份清單（不算在這份清單自己的教材數裡）。 */ linked?: boolean };
 async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
   const { results } = await db
-    .prepare("SELECT l.id, l.course_id, l.kind, l.title, l.cover_key, l.art_version, l.brand_id, l.categories, l.in_sheet, l.link_block_id, (l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id) AS has FROM lessons l JOIN courses c ON c.id = l.course_id WHERE (c.is_list = 1 OR c.is_package = 1) AND l.is_full = 0 ORDER BY l.course_id, l.position")
+    .prepare("SELECT l.id, l.course_id, l.kind, l.title, l.cover_key, l.art_version, l.brand_id, l.categories, l.in_sheet, l.link_block_id, (l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id) AS has FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.course_id IN (SELECT course_id FROM lessons WHERE kind = 'section') AND l.is_full = 0 ORDER BY l.course_id, l.position")
     .all<{ id: string; course_id: string; kind: string; title: string; cover_key: string | null; art_version: number; brand_id: string | null; categories: string; in_sheet: number; link_block_id: string | null; has: number }>();
   const brands = await loadBrands(db);
   const counts = new Map<string, number>(); // 每個區塊底下有內容的素材數（連結區塊要用來源區塊的數字）
@@ -444,7 +444,6 @@ type CourseRow = {
   host_center_key: string | null;
   is_shorts: number;
   is_list: number;
-  is_package: number;
   url_name: string | null;
   mat_url: string | null;
   free_from: string | null;
@@ -493,7 +492,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -592,7 +591,6 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     centerCourse: row.host_center_key != null,
     isShorts: row.is_shorts === 1,
     isList: row.is_list === 1,
-    isPackage: row.is_package === 1,
     // 素材（清單）有第二層網址且系列有短網址：/系列縮寫/素材名稱；否則沿用原本的課程專屬網址。
     shortPath: row.is_list === 1 && row.mat_url && row.series && ctx.seriesSlugs?.get(row.series) ? `${ctx.seriesSlugs.get(row.series)}/${row.mat_url}` : row.url_name ? (row.host_center_key ? (ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null) : `${HQ_SLUG}/${row.url_name}`) : null,
     matUrl: row.mat_url,
@@ -615,7 +613,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     brandId: row.brand_id,
     brandName: ctx.brands?.find((x) => x.id === row.brand_id)?.name ?? null,
     brand: brandFor(ctx, row),
-    blocks: row.is_list === 1 || row.is_package === 1 ? (ctx.blocks?.get(row.id) ?? []) : [],
+    blocks: ctx.blocks?.get(row.id) ?? [],
     series: row.series,
     seriesEdmUrl: row.series_edm_key ? pubUrl(row.series_edm_key, row.series_art_version ?? 1) : null,
     seriesCoverUrl: row.series_cover_key ? pubUrl(row.series_cover_key, row.series_art_version ?? 1) : null,
@@ -2098,7 +2096,6 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     sets.push(["teacher_rank", teacherRank]);
   }
   // 勾了「無」（沒有主講人、獎銜、職稱；業主 2026-11-19）：三個欄位一律清空；取消勾選就回到可以填。
-  if (body.isPackage !== undefined && !(creating && body.isList === true)) sets.push(["is_package", body.isPackage === true ? 1 : 0]);
   if (body.noSpeaker !== undefined) {
     const no = body.noSpeaker === true;
     for (let i = sets.length - 1; i >= 0 && no; i--) if (["teacher", "teacher_rank", "teacher_title"].includes(sets[i]![0])) sets.splice(i, 1);
@@ -2425,7 +2422,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["zone", "view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "no_speaker", "is_package", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
+  const keep = ["zone", "view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "no_speaker", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
@@ -5629,9 +5626,7 @@ const routes: [string, RegExp, Handler][] = [
       const admin = await requireCourseManager(ctx, courseId);
       const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
       const isList = await isListCourse(ctx, courseId);
-      const hasBlocks = isList || (await ctx.db.prepare("SELECT is_package FROM courses WHERE id = ?").bind(courseId).first<{ is_package: number }>())?.is_package === 1;
-      if (body.kind === "section" && !hasBlocks) fail(400, "section_list_only", "只有清單卡或套裝課程可以新增區塊");
-      const kind = body.kind === "section" && hasBlocks ? "section" : body.kind === "material" ? "material" : "chapter";
+      const kind = body.kind === "section" ? "section" : body.kind === "material" ? "material" : "chapter";
       if (kind === "chapter" && isList) fail(400, "list_no_chapter", "清單卡沒有章節，請用「新增教材」");
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
@@ -5779,8 +5774,7 @@ const routes: [string, RegExp, Handler][] = [
       }
       if (ids.length) {
         // 套裝課程（業主 2026-11-19）：章節也可以放進區塊，所以傳進全部項目（章節、區塊、教材）時當成同一組一起排序。
-        const pkg = (await ctx.db.prepare("SELECT is_package FROM courses WHERE id = ?").bind(courseId).first<{ is_package: number }>())?.is_package === 1;
-        const mixed = pkg && ids.length === current.results.length;
+        const mixed = ids.length === current.results.length;
         // 分類區域標題（section）和教材（material）同一組一起排序。
         const grp = (k: string | undefined) => (mixed ? "all" : k === "chapter" || k === undefined ? "chapter" : "material");
         const first = byId.get(ids[0]!)!;
