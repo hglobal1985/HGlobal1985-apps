@@ -25,10 +25,13 @@ const text = (v: unknown): string => {
   return JSON.stringify(v);
 };
 
+type HistoryRow = { id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; status: string; decided_by_name: string; decided_at: string };
+
 export function CentralReviewList({ data, onChanged }: { data: CentralReviews; onChanged: () => void }) {
   const { c } = useTheme();
   const ranks = useApi<Rank[]>("/ranks");
   const [busy, setBusy] = useState<string | null>(null);
+  const history = useApi<HistoryRow[]>(data.available ? "/central-reviews/history" : null);
   if (!data.available) return null;
   const rankName = (code: unknown) => ranks.data?.find((r) => r.code === code)?.name ?? text(code);
   const show = (r: CentralReview, v: unknown) => (r.field_key === "rank" ? rankName(v) : text(v));
@@ -38,7 +41,8 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
     if (!ok) return;
     setBusy(r.id);
     try {
-      await api("POST", `/central-reviews/${r.id}/decision`, { decision });
+      await api("POST", `/central-reviews/${r.id}/decision`, { decision, item: { display_name: r.display_name, field_key: r.field_key, field_label: r.field_label, current_value: r.current_value, requested_value: r.requested_value } });
+      history.reload();
       flashText(decision === "approve" ? "已通過" : "已不通過");
     } catch (e) {
       flashText((e as Error).message);
@@ -89,6 +93,24 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
           目前沒有等待審核的申請。
         </AppText>
       )}
+      {/* 已處理的申請紀錄（業主 2026-11-19）：審核完成後保留在這裡，不會消失。 */}
+      {history.data?.length ? (
+        <View style={{ gap: space.xs, marginTop: space.sm }}>
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            已處理的申請
+          </AppText>
+          {history.data.map((h) => (
+            <Card key={h.id} style={{ gap: 2 }}>
+              <AppText variant="body" style={{ fontWeight: "700" }}>
+                {h.applicant_name || "會員"}　{h.field_label}　{h.status === "approved" ? "✅ 已通過" : "❌ 不通過"}
+              </AppText>
+              <AppText variant="caption" tone="muted">
+                {[h.to_text ? `申請內容：${h.to_text}` : "", h.decided_by_name ? `審核：${h.decided_by_name}` : "", dateTime(h.decided_at)].filter(Boolean).join("　")}
+              </AppText>
+            </Card>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }

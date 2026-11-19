@@ -322,7 +322,7 @@ function notify(db: D1Database, to: { sub: string } | { role: "admin" } | { role
 function noticeCategory(title: string, link: string): NoticeCategory {
   if (/留言|回覆/.test(title)) return "comment";
   if (/有新(課程|清單|章節|教材)|廣播公告|已送出「新/.test(title)) return "subscribe";
-  if (/審核|等待|報名已|課程已開通|繳費確認|開通已撤銷|報名有|已成為課程報名/.test(title) || link.startsWith("/admin/orders")) return "review";
+  if (/審核|等待|報名已|課程已開通|繳費確認|開通已撤銷|報名有|已成為課程報名|^你的.{1,6}申請|^已送出.{1,6}申請/.test(title) || link.startsWith("/admin/orders")) return "review";
   return "other";
 }
 
@@ -336,6 +336,8 @@ async function notifyReviewResult(db: D1Database, sub: string, what: string): Pr
   if (dup) return;
   await notify(db, { sub }, title, "到「設定」頁看最新的獎銜與中心資料", "/settings").run();
 }
+/** 申請內容轉成文字（中央的值可能是字串或 {option, custom_text}）。 */
+const reviewText = (v: unknown): string => (v == null || v === "" ? "" : typeof v === "string" ? v : typeof v === "object" && "option" in (v as object) ? String((v as { option: unknown }).option ?? "") : String(v)).slice(0, 80);
 const REVIEW_FIELD_LABEL: Record<string, string> = { rank: "獎銜", education_center: "中心", education_system: "系統" };
 
 /** 統計分析：超級管理員、總部秘書一定可以；其他職務要被超級管理員指定。 */
@@ -3646,12 +3648,23 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/central-reviews\/history$/,
+    async (ctx) => {
+      // 已處理的申請紀錄（保留，不會從通知頁消失）：自己處理過的；超級管理員看全部。
+      const s = requireMember(ctx);
+      const sql = "SELECT id, field_label, applicant_name, from_text, to_text, status, decided_by_name, decided_at FROM review_log WHERE status <> 'pending'" + (s.role === "admin" ? "" : " AND decided_by_sub = ?") + " ORDER BY decided_at DESC LIMIT 100";
+      const { results } = await (s.role === "admin" ? ctx.db.prepare(sql) : ctx.db.prepare(sql).bind(s.sub)).all<{ id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; status: string; decided_by_name: string; decided_at: string }>();
+      return results;
+    },
+  ],
+  [
     "POST",
     /^\/central-reviews\/([\w-]{1,64})\/decision$/,
     async (ctx, [id]) => {
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以審核");
-      const body = await readJson<{ decision?: unknown }>(ctx.req);
+      const body = await readJson<{ decision?: unknown; item?: { display_name?: unknown; field_key?: unknown; field_label?: unknown; current_value?: unknown; requested_value?: unknown } }>(ctx.req);
       if (body.decision !== "approve" && body.decision !== "reject") return fail(400, "invalid_decision", "請選擇通過或不通過");
       const r = await centralDecide(s.token, id, body.decision);
       const code = r.status;
@@ -3660,6 +3673,30 @@ const routes: [string, RegExp, Handler][] = [
         const who = typeof r.body?.member_id === "string" ? r.body.member_id : typeof r.body?.sub === "string" ? r.body.sub : null;
         const key = typeof r.body?.field_key === "string" ? r.body.field_key : "";
         if (who) await notifyReviewResult(ctx.db, who, REVIEW_FIELD_LABEL[key] ?? "獎銜或中心").catch(() => undefined);
+        // 審核紀錄（業主 2026-11-19）：保留在審核者的「已處理的申請」；找得到申請人（申請時留的紀錄）就通知他結果。
+        const it = body.item ?? {};
+        const fkey = typeof it.field_key === "string" ? it.field_key : key;
+        const flabel = typeof it.field_label === "string" && it.field_label ? it.field_label.slice(0, 20) : REVIEW_FIELD_LABEL[fkey] ?? "申請";
+        const name = typeof it.display_name === "string" ? it.display_name.trim().slice(0, 60) : "";
+        const to = reviewText(it.requested_value);
+        const result = body.decision === "approve" ? "approved" : "rejected";
+        // 先用「欄位＋申請內容＋名稱」找；名稱對不上時，若同欄位、同內容的待審申請只有一筆就用它。
+        let found = await ctx.db
+          .prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND to_text = ? AND (applicant_name = ? OR ? = '') ORDER BY created_at LIMIT 1")
+          .bind(fkey, to, name, name)
+          .first<{ id: string; applicant_sub: string | null }>();
+        if (!found) {
+          const alt = (await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND to_text = ? LIMIT 2").bind(fkey, to).all<{ id: string; applicant_sub: string | null }>()).results;
+          if (alt.length === 1) found = alt[0]!;
+        }
+        const stmts = [];
+        if (found) {
+          stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ? WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), found.id));
+          if (found.applicant_sub) stmts.push(notify(ctx.db, { sub: found.applicant_sub }, `你的${flabel}申請${result === "approved" ? "已通過" : "未通過"}`, `${to ? `申請內容：${to}。` : ""}到「設定」頁看最新的資料`, "/settings"));
+        } else {
+          stmts.push(ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_name, from_text, to_text, status, decided_by_sub, decided_by_name, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), fkey, flabel, name, reviewText(it.current_value), to, result, s.sub, s.name, iso()));
+        }
+        await ctx.db.batch(stmts).catch(() => undefined);
         return { ok: true };
       }
       if (code === 403) return fail(403, "forbidden", "這個申請不屬於您負責的中心");
@@ -4103,6 +4140,7 @@ const routes: [string, RegExp, Handler][] = [
         const msg = await centralEnableAmway(s.token);
         if (msg) errors.push(msg);
       }
+      const pendingKeys: Change[] = [];
       const write = async (c: Change) => {
         if (c.key === "contact_email") {
           if (!(await saveContactEmail(s.sub, s.token, c.value))) errors.push("Email：會員中心暫時無法儲存");
@@ -4110,12 +4148,24 @@ const routes: [string, RegExp, Handler][] = [
         }
         const r = await centralWriteField(s.token, c.key, c.value);
         if (!r.ok) errors.push(r.message);
-        else if (r.status === "pending") pending = true;
+        else if (r.status === "pending") {
+          pending = true;
+          pendingKeys.push(c);
+        }
       };
       if (!errors.length) {
         await Promise.all(changes.filter((c) => c.key !== "rank").map(write));
         const rank = changes.find((c) => c.key === "rank");
         if (rank) await write(rank);
+      }
+      // 送出申請的紀錄（業主 2026-11-19）：每個需要審核的欄位留一筆，申請人的通知頁也留一則「已送出」。
+      for (const c of pendingKeys) {
+        const label = REVIEW_FIELD_LABEL[c.key];
+        if (!label || !c.value) continue;
+        await ctx.db.batch([
+          ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name, to_text) VALUES (?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), c.key, label, s.sub, s.name, c.value.slice(0, 80)),
+          notify(ctx.db, { sub: s.sub }, `已送出「${label}」申請，等待審核`, "審核結果會通知你，也會保留在這裡", "/notices"),
+        ]).catch(() => undefined);
       }
       forgetMember(s.sub);
       // 把最新的欄位狀態一起回傳，畫面不用再多問一趟。
