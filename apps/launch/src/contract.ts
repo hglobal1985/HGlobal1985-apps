@@ -194,6 +194,8 @@ export type CourseSummary = {
   isShorts: boolean;
   /** 清單卡（業主 2026-11-16）：只有「其他教材」，沒有章節、時間地點、費用、主講人；影片教材在 App 內播放並計入學習進度。 */
   isList: boolean;
+  /** 套裝課程（業主 2026-11-19）：課程卡勾選後可以新增「區塊」（功能同清單卡的區塊）。 */
+  isPackage: boolean;
   /** 課程專屬網址路徑（中心縮寫/英譯姓名-編號）；缺資料時為 null，用 /course/編號。 */
   shortPath: string | null;
   /** 素材的第二層網址名稱（/系列縮寫/這個名稱）；沒設定為 null。 */

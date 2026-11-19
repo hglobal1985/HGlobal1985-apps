@@ -1,4 +1,5 @@
 import { isDownloadUrl } from "@/lib/download-material";
+import { Check } from "@/features/course-edit/course-sections";
 import { isSuperAdmin } from "@/lib/roles";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
@@ -41,6 +42,7 @@ function FileMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
   const { invalidate } = useSession();
   const [title, setTitle] = useState(lesson.title);
   const [evDate, setEvDate] = useState(lesson.eventDate ?? "");
+  const [theme, setTheme] = useState(!!lesson.isSpeaker);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
@@ -48,7 +50,7 @@ function FileMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
     setBusy(true);
     setError(null);
     try {
-      await api("PATCH", `/admin/lessons/${lesson.id}`, { title: title.trim(), eventDate: evDate || null });
+      await api("PATCH", `/admin/lessons/${lesson.id}`, { title: title.trim(), eventDate: evDate || null, ...(theme !== !!lesson.isSpeaker ? { isSpeaker: theme } : {}) });
       invalidate();
       onClose();
     } catch (e) {
@@ -59,7 +61,7 @@ function FileMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
   };
   const info = lesson.linkType ? TYPE_INFO[lesson.linkType] : null;
   return (
-    <EditSheet material={course.isList} title={`教材 ${lesson.position}：${lesson.title}`} onClose={onClose} onSave={submit} dirty={title !== lesson.title || evDate !== (lesson.eventDate ?? "")} busy={busy} error={error}>
+    <EditSheet material={course.isList} title={`教材 ${lesson.position}：${lesson.title}`} onClose={onClose} onSave={submit} dirty={title !== lesson.title || evDate !== (lesson.eventDate ?? "") || theme !== !!lesson.isSpeaker} busy={busy} error={error}>
       <FormBlock title="檔案" hint="要換檔案，請刪除這個教材後重新上傳">
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
           {lesson.linkType ? <BrandIcon type={lesson.linkType} fallback={info!.icon as never} size={32} /> : null}
@@ -71,7 +73,20 @@ function FileMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
       </AppText>
       <TextInput value={title} onChangeText={setTitle} accessibilityLabel="教材名稱" maxLength={80} style={[{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
       <DateSelect label="日期（選填）" value={evDate} onChange={setEvDate} />
+      <ThemeCheck value={theme} onChange={setTheme} />
     </EditSheet>
+  );
+}
+
+/** 「主題」勾選（業主 2026-11-19）：每個區塊（沒有區塊就整份）只能有一個，勾新的會取代原本那個。 */
+function ThemeCheck({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <>
+      <Check label="主題" value={value} onChange={onChange} />
+      <AppText variant="caption" tone="muted">
+        每個區塊只能有一個主題，勾選後會取代原本的主題。
+      </AppText>
+    </>
   );
 }
 
@@ -99,6 +114,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const [fetching, setFetching] = useState<Fetch>("idle");
   // 素材項目自己的日期（選填）與影片時間軸區間（只有清單裡的 YouTube 影片；業主 2026-11-17）。
   const [evDate, setEvDate] = useState(lesson?.eventDate ?? "");
+  const [theme, setTheme] = useState(!!lesson?.isSpeaker);
   const [trim, setTrim] = useState<{ start: Hms; end: Hms }>({ start: toHms(lesson?.start ?? null), end: toHms(lesson?.end ?? null) });
   const [toEnd, setToEnd] = useState(false);
   const secOf = (h: Hms) => (fromHms(h) === "invalid" ? null : (fromHms(h) as number | null));
@@ -108,7 +124,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const parsed = parseHttpsUrl(url);
   const fileType = parsed ? classifyLink(parsed) : null;
   const ytId = course.isList && fileType === "youtube" ? ytIdOfUrl(parsed) : null;
-  const dirty = lesson ? url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
+  const dirty = lesson ? theme !== !!lesson.isSpeaker || url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
 
   // 連結一變（貼上或手動輸入，停下來 0.6 秒後），請伺服器代為讀取網頁標題。
   useEffect(() => {
@@ -196,6 +212,8 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
           }
         }
       }
+      // 主題（業主 2026-11-19）：每個區塊（沒有區塊就整份）只能有一個，勾新的伺服器會取消原本那個。
+      if (lesson && theme !== !!lesson.isSpeaker) await api("PATCH", `/admin/lessons/${lesson.id}`, { isSpeaker: theme });
       // 影片時間軸區間：連結換成別支影片時伺服器會清空區間，所以一律在儲存連結之後再寫入。
       if (ytId && lessonId && (secOf(trim.start) !== null || secOf(trim.end) !== null || lesson?.start != null || lesson?.end != null)) await api("PATCH", `/admin/lessons/${lessonId}`, { startSeconds: secOf(trim.start), endSeconds: secOf(trim.end) });
       invalidate();
@@ -274,6 +292,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
         ) : null}
       </View>
       <DateSelect label="日期（選填；貼上連結會自動帶入連結的日期，可自行修改）" value={evDate} onChange={setEvDate} />
+      {lesson ? <ThemeCheck value={theme} onChange={setTheme} /> : null}
       {ytId ? (
         <TimeRangeFields
           draft={{ kind: "youtube", ref: ytId, start: trim.start, end: trim.end, audio: null, toEnd: toEnd }}

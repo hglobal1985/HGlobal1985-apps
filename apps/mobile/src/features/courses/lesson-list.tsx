@@ -1,4 +1,5 @@
 import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
+import { BLOCK_BEHAVIOR, hasBlocks } from "@/features/courses/block-module";
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
@@ -17,7 +18,7 @@ import { AppText, BrandCover, Card, CountPill, ListRow, SaplingIcon, ShareIcon }
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 import { fadedStyle } from "@/ui/fade-style";
-import { SpeakerLead } from "./speaker-mark";
+import { SpeakerLead, SpeakerMark } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 
 /**
@@ -60,13 +61,26 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
   );
 }
 
+/** 教材標了「主題」（業主 2026-11-19）：圖示右下角加學士帽小徽章；沒有自訂圖示時用預設播放圖示加徽章。 */
+function themeBadge(lesson: Lesson, icon: React.ReactElement | undefined, color: string): React.ReactElement | undefined {
+  if (!lesson.isSpeaker || lesson.full) return icon;
+  return (
+    <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center" }}>
+      {icon ?? <Ionicons name={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"} size={32} color={color} />}
+      <View style={{ position: "absolute", right: -6, bottom: -6, backgroundColor: "#fff", borderRadius: 11, padding: 2 }}>
+        <SpeakerMark size={14} />
+      </View>
+    </View>
+  );
+}
+
 /**
  * 「其他教材」區塊的清單：外部連結教材（業主 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
  */
 export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb" }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（業主 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" } & LessonPlayProps) {
   const { c } = useTheme();
-  const isBlocks = course.isList && course.lessons.some((l) => l.section);
+  const isBlocks = hasBlocks(course) && course.lessons.some((l) => l.section);
   // 清單的區塊：預設全部收起（業主 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
   const [openId, setOpenId] = useState<string | null>(openBlock ?? null);
   const [gridW, setGridW] = useState(0);
@@ -85,7 +99,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
       <ListRow
         key={lesson.id}
         icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-        leading={lesson.iconType && !lesson.locked ? <BrandIcon type={lesson.iconType} fallback={TYPE_INFO[lesson.iconType].icon as never} size={36} /> : undefined}
+        leading={themeBadge(lesson, lesson.iconType && !lesson.locked ? <BrandIcon type={lesson.iconType} fallback={TYPE_INFO[lesson.iconType].icon as never} size={36} /> : undefined, c.accent)}
         compact
         playing={!link && playingId === lesson.id}
         playingLesson={lesson.id}
@@ -127,7 +141,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
     const leadShown = lead.filter(shown);
     if (!visibleBlocks.length && !leadShown.length && !full.length) return null;
     // 欄數隨螢幕寬度自動變：手機 2 欄，越寬越多，最多 5 欄（業主 2026-11-18）。
-    const cols = gridW < 440 ? 2 : gridW < 660 ? 3 : gridW < 880 ? 4 : 5;
+    const cols = BLOCK_BEHAVIOR.columns(gridW);
     const GAP = space.sm;
     const cell = gridW ? Math.floor((gridW - GAP * (cols - 1)) / cols) : 0;
     if (layout === "detail") {
