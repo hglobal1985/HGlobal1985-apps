@@ -136,6 +136,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const [terms, setTerms] = useState<{ education_system: string[]; education_center: string[] }>({ education_system: [], education_center: [] });
   const [otherPick, setOtherPick] = useState<{ education_system?: boolean; education_center?: boolean }>({});
   const [openKey, setOpenKey] = useState<string | null>(null); // 目前展開的下拉選單：展開中的那一列要蓋在所有列的上面
+  const [wantAmway, setWantAmway] = useState(false); // 剛勾選「我是 Amway 會員」、還沒儲存
   const [busy, setBusy] = useState(false);
   const [showBad, setShowBad] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -145,6 +146,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     setData(d);
     setVals(formVals(d));
     setOtherPick({});
+    setWantAmway(false);
     setError(null);
   }, []);
   const load = useCallback(() => {
@@ -159,22 +161,23 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   }, [load]); // eslint-disable-line react-hooks/exhaustive-deps
   // 系統、中心的清單（中央的關聯詞庫，空字串＝整份清單）。
   useEffect(() => {
-    if (!data?.enabled) return;
+    if (!data?.enabled && !wantAmway) return;
     for (const pool of ["education_system", "education_center"] as const)
       api<string[]>("GET", `/me/vocab?pool=${pool}&q=`)
         .then((s) => setTerms((t) => ({ ...t, [pool]: s })))
         .catch(() => undefined);
-  }, [data?.enabled]);
+  }, [data?.enabled, wantAmway]);
 
+  const amway = !!data?.enabled || wantAmway;
   const initial = data ? formVals(data) : null;
-  const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (data!.enabled || k === "legal_name" || k === "display_name" || k === "contact_email") && vals[k].trim() !== initial[k].trim()) : [];
+  const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name" || k === "contact_email") && vals[k].trim() !== initial[k].trim()) : [];
   const canRank = !!vals.education_system.trim() && !!vals.education_center.trim();
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
   /** 目前（還沒儲存）選的系統是不是寰宇：沒選就看中央判斷的整體狀態。 */
   const systemHg = data ? (vals.education_system.trim() && vals.education_system !== NONE_TERM ? data.hglobalSystems.some((t) => norm(t) === norm(vals.education_system)) : data.hglobal) : false;
   const centerListed = systemHg && terms.education_center.length > 0 && vals.education_center !== undefined;
-  const missing: Key[] = data ? ([!vals.display_name.trim() && "display_name", data.enabled && !vals.education_system.trim() && "education_system", data.enabled && !vals.education_center.trim() && "education_center", data.enabled && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
+  const missing: Key[] = data ? ([!vals.display_name.trim() && "display_name", amway && !vals.education_system.trim() && "education_system", amway && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
 
   /** 標籤：沒填 → 「必填」；填了就隱藏；中心、獎銜（沒被改動時）等待審核 → 「審核中...」、已通過審核 → 「審核通過」（外觀都同必填）。 */
   const tagFor = (key: "education_system" | "education_center" | "rank" | "display_name", reviewed = false): string | undefined => {
@@ -208,7 +211,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     setMsg(null);
     try {
       // 所有改過的欄位一次送出（伺服器同時寫給會員中心），並把最新狀態一起帶回來。
-      const r = await api<{ ok: boolean; errors: string[]; pending: boolean; form: View_ | null }>("PUT", "/me/central-profile", { changes: changed.map((key) => ({ key, value: vals[key] })) });
+      const r = await api<{ ok: boolean; errors: string[]; pending: boolean; form: View_ | null }>("PUT", "/me/central-profile", { changes: changed.map((key) => ({ key, value: vals[key] })), ...(wantAmway && !data?.enabled ? { enableAmway: true } : {}) });
       if (r.form) apply(r.form);
       else load();
       if (!r.errors.length) trackFeature("profile_edit");
@@ -299,7 +302,17 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                 <Label text="Email" />
                 <Input value={vals.contact_email} onChange={set("contact_email")} />
               </Row>
+              {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上在下面出現系統、中心、獎銜三個欄位；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
+              <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={styles.none}>
+                <Icon name={amway ? "checkbox" : "square-outline"} size={30} color={amway ? c.accentText : c.textMuted} />
+                <AppText style={{ fontWeight: "700" }}>我是 Amway 會員</AppText>
+              </Pressable>
               {data.enabled ? (
+                <AppText variant="caption" tone="muted">
+                  已勾選；要取消請到會員中心。
+                </AppText>
+              ) : null}
+              {amway ? (
                 <>
                   {listedRow("education_system", "系統")}
                   {centerListed ? (
@@ -337,11 +350,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                     </View>
                   </Row>
                 </>
-              ) : (
-                <AppText variant="caption" tone="muted" numberOfLines={3}>
-                  系統、中心、獎銜屬於「我是 Amway 會員」的資料，請先到會員中心勾選。
-                </AppText>
-              )}
+              ) : null}
             </>
           ) : null}
       </ScrollView>
@@ -350,7 +359,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
           <Button variant="cancel" label="關閉" icon="close" onPress={onClose} fullWidth />
         </View>
         <View style={{ flex: 1 }}>
-          <Button label="儲存" icon="save-outline" onPress={save} disabled={busy || !changed.length} loading={busy} fullWidth />
+          <Button label="儲存" icon="save-outline" onPress={save} disabled={busy || (!changed.length && !(wantAmway && !data?.enabled))} loading={busy} fullWidth />
         </View>
       </View>
     </BottomSheet>

@@ -64,7 +64,7 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
-import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -4063,11 +4063,12 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(400, "central_only", "只有中央會員可以使用");
-      const body = await readJson<{ changes?: unknown; key?: unknown; value?: unknown }>(ctx.req);
+      const body = await readJson<{ changes?: unknown; key?: unknown; value?: unknown; enableAmway?: unknown }>(ctx.req);
       type Change = { key: "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank"; value: string | null };
       const keys = ["legal_name", "display_name", "contact_email", "education_system", "education_center", "rank"] as const;
-      const raw = Array.isArray(body.changes) ? body.changes : [{ key: body.key, value: body.value }];
-      if (!raw.length || raw.length > 8) return fail(400, "invalid_request", "沒有要儲存的內容");
+      const enable = body.enableAmway === true;
+      const raw = Array.isArray(body.changes) ? body.changes : enable ? [] : [{ key: body.key, value: body.value }];
+      if ((!raw.length && !enable) || raw.length > 8) return fail(400, "invalid_request", "沒有要儲存的內容");
       const changes: Change[] = [];
       for (const r of raw as { key?: unknown; value?: unknown }[]) {
         const key = keys.find((k) => k === r?.key);
@@ -4080,6 +4081,11 @@ const routes: [string, RegExp, Handler][] = [
       // 資料正本在會員中心：直接寫過去（不保存、不寫日誌）。除了獎銜（要先有系統與中心）以外同時送出，最後再送獎銜。
       const errors: string[] = [];
       let pending = false;
+      // 勾選「我是 Amway 會員」（業主 2026-11-19：資料視窗內直接勾）：先開啟，後面的系統、中心、獎銜才寫得進去。
+      if (enable) {
+        const msg = await centralEnableAmway(s.token);
+        if (msg) errors.push(msg);
+      }
       const write = async (c: Change) => {
         if (c.key === "contact_email") {
           if (!(await saveContactEmail(s.sub, s.token, c.value))) errors.push("Email：會員中心暫時無法儲存");
@@ -4089,9 +4095,11 @@ const routes: [string, RegExp, Handler][] = [
         if (!r.ok) errors.push(r.message);
         else if (r.status === "pending") pending = true;
       };
-      await Promise.all(changes.filter((c) => c.key !== "rank").map(write));
-      const rank = changes.find((c) => c.key === "rank");
-      if (rank) await write(rank);
+      if (!errors.length) {
+        await Promise.all(changes.filter((c) => c.key !== "rank").map(write));
+        const rank = changes.find((c) => c.key === "rank");
+        if (rank) await write(rank);
+      }
       forgetMember(s.sub);
       // 把最新的欄位狀態一起回傳，畫面不用再多問一趟。
       const form = await centralProfileView(s.sub, s.token).catch(() => null);
