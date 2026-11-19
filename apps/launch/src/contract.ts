@@ -84,6 +84,19 @@ export type SeriesArt = { series: string; edmUrl: string; coverUrl: string | nul
 
 export type EnrollmentState = "opened" | "pending" | null;
 
+/**
+ * 固定格式的文字封面（業主 2026-11-19）：名稱以這些字開頭的課程，封面一律只有文字＋咖啡色系底，且固定「名稱（換行）X年X月」兩行，
+ * 不用 YouTube 縮圖當封面（後端 courseArt）。例：「銅章會議2026年10月」→ ["銅章會議", "2026年10月"]。要新增別的固定格式封面只改這張表。
+ */
+export const TEXT_COVER_PREFIXES = ["銅章會議"] as const;
+export function textCoverLines(title: string | null | undefined): string[] | null {
+  const t = (title ?? "").trim();
+  const head = TEXT_COVER_PREFIXES.find((p) => t.startsWith(p));
+  if (!head) return null;
+  const rest = t.slice(head.length).trim();
+  return rest ? [head, rest] : [head];
+}
+
 /** 誰可以瀏覽：所有人含訪客／所有會員／寰宇夥伴／中心會員。 */
 /** 寰宇大學「所有系列」檢視的三個專區（業主 2026-11-18）。空字串＝沒指定：課程放 hglobal、清單放 amway_material。 */
 export type Zone = "hglobal" | "amway_material" | "amway_brand";

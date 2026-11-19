@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Image, StyleSheet, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 import { useTheme } from "@/theme/theme";
-import { courseThemes, radius, space } from "@/theme/tokens";
+import { textCoverLines } from "@/api/client";
+import { courseThemes, coverBronze, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
 
 /** 估算文字寬度（以字級為單位）：中日韓全形字算 1，英數與標點約 0.58。 */
@@ -29,6 +30,13 @@ export function fitFontSize(title: string, w: number, h: number, max = 72, min =
   return min;
 }
 
+/** 固定分行的字級：每一行都塞得進寬度，總高度也塞得進方框。 */
+function fitLines(lines: string[], w: number, h: number, max = 72, min = 14): number {
+  const widest = Math.max(...lines.map(textUnits), 1);
+  for (let fs = max; fs > min; fs -= 2) if (widest * fs <= w && lines.length * fs * 1.25 <= h) return fs;
+  return min;
+}
+
 /**
  * 課程封面（課程清單縮圖）：有 16:9 封面圖就顯示圖片（管理員從 EDM 裁切出來的）；
  * 沒有就由系統自動產生（字級已依封面大小算好，不吃全站字體放大 noScale，否則平板／電腦會爆版，業主 2026-11-18）：在主題色底上放大大的標題文字（程式排版，不是 AI 生成）；不顯示系列與分類標籤（業主 2026-11-14 指示）。
@@ -43,12 +51,14 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   // 沒有封面圖時的文字封面顏色：自動隨機（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（業主 2026-11-18）。
   const names = Object.keys(courseThemes);
   const seed = [...(title || label || theme || "")].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const [bg, fg] = courseThemes[names[seed % names.length]!]![scheme];
+  // 固定格式文字封面（銅章會議等，見 contract 的 textCoverLines）：咖啡色系底、固定「名稱（換行）X年X月」兩行。
+  const fixed = textCoverLines(title);
+  const [bg, fg] = fixed ? coverBronze[scheme] : courseThemes[names[seed % names.length]!]![scheme];
   const pad = space.md;
   const hasTitle = !!title?.trim();
   const innerW = Math.max(0, box.w - pad * 2);
   const innerH = Math.max(0, box.h - pad * 2);
-  const fs = hasTitle && box.w ? fitFontSize(title!, innerW, innerH) : 0;
+  const fs = hasTitle && box.w ? (fixed ? fitLines(fixed, innerW, innerH) : fitFontSize(title!, innerW, innerH)) : 0;
   return (
     <View
       style={[styles.cover, fill ? [StyleSheet.absoluteFill, { borderRadius: 0 }] : height ? { height } : { aspectRatio: 16 / 9 }, { backgroundColor: bg }]}
@@ -63,7 +73,7 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
         <View style={styles.titleBox}>
           {fs ? (
             <AppText style={{ color: fg, fontSize: fs, lineHeight: Math.round(fs * 1.18), fontWeight: "900", textAlign: "center" }} {...({ dataSet: { noScale: "" } } as object)}>
-              {title}
+              {fixed ? fixed.join("\n") : title}
             </AppText>
           ) : null}
         </View>

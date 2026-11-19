@@ -32,27 +32,96 @@ async function fetchImage(url: string, side: number): Promise<{ data: ArrayBuffe
   return data.byteLength > 0 && data.byteLength <= 8 * 1024 * 1024 ? { data, type } : null;
 }
 
+type PlItem = { id: string; title: string; date: string | null };
+/** 讀 YouTube 播放清單（官方 API，最多 300 支）：略過私人／已刪除與 skip 裡已有的影片（讀到的也加進 skip，清單內重複的只留一支）。 */
+async function readPlaylist(key: string, playlistId: string, skip: Set<string>): Promise<{ items: PlItem[] } | { error: string }> {
+  const items: PlItem[] = [];
+  let token = "";
+  for (let page = 0; page < 6; page++) {
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(playlistId)}&key=${encodeURIComponent(key)}${token ? `&pageToken=${token}` : ""}`, { headers: { accept: "application/json" } }).catch(() => null);
+    if (!res?.ok) return { error: `讀取播放清單失敗（${res?.status ?? "連線錯誤"}）` };
+    const data = (await res.json()) as { items?: { snippet?: { title?: string }; contentDetails?: { videoId?: string; videoPublishedAt?: string } }[]; nextPageToken?: string };
+    for (const it of data.items ?? []) {
+      const id = it.contentDetails?.videoId;
+      const title = it.snippet?.title ?? "";
+      if (!id || /^(private video|deleted video)$/i.test(title) || skip.has(id)) continue;
+      skip.add(id);
+      items.push({ id, title: title.slice(0, 120), date: taipeiDay(it.contentDetails?.videoPublishedAt) });
+    }
+    if (!data.nextPageToken) break;
+    token = data.nextPageToken;
+  }
+  return { items };
+}
+
+/**
+ * 依影片標題判讀主辦中心（業主 2026-11-19）：標題裡有中央清單某中心的名稱（去掉尾巴代碼與「中心」二字）就算；
+ * 先比完整名稱（取最長的唯一一個），沒有再比名稱最後兩個字（例：標題寫「屏東」→「圓滿屏東中心 221」），只有唯一符合才採用；
+ * 沒寫或有歧義就回空字串（不勾任何中心）。centers 只能是中央清單（central_snapshots），不混入本地資料。
+ */
+export function guessCenter(title: string, centers: string[]): string {
+  const core = (c: string) => c.replace(/\s*\d+\s*$/, "").replace(/中心$/, "").replace(/\s+/g, "");
+  const t = title.replace(/\s+/g, "");
+  const pick = (hits: string[]) => (hits.length === 1 ? hits[0]! : "");
+  const full = centers.filter((c) => core(c).length >= 2 && t.includes(core(c)));
+  if (full.length) {
+    const longest = Math.max(...full.map((c) => core(c).length));
+    return pick(full.filter((c) => core(c).length === longest));
+  }
+  const tail = centers.filter((c) => core(c).length >= 3 && t.includes(core(c).slice(-2)));
+  return pick(tail);
+}
+
+/** 銅章會議這類「課程播放清單」匯入的欄位不照抄（其餘全部照示範課程的設定，包含費用、獎銜、審核群組、誰能瀏覽…）。 */
+const NOT_COPIED = new Set(["id", "title", "subtitle", "teacher", "host_unit", "host_center_key", "event_start", "event_end", "created_at", "updated_at", "edited_by_name", "edited_at", "created_by_sub", "sort_order", "series_order", "edm_key", "cover_key", "cover_bg_id", "art_version", "cover_rect", "edm_view_y", "url_name", "status", "teacher_rank", "teacher_title", "mat_url"]);
+
+/**
+ * 播放清單 → 課程（業主 2026-11-19）：每支影片建一門課，設定照「示範課程」（job.course_id）複製；
+ * 名稱＝「銅章會議X年X月」（X 取影片上傳日期），日期＝影片上傳日期，一個章節＝這支影片，主辦中心依標題判讀。
+ * 先建成「草稿」，確認後再上架（note 會列出每支影片判讀的中心）。已經在同系列課程裡的影片不重複建立。
+ */
+async function runCoursePlaylist(db: D1Database, job: Job, key: string, have: Set<string>): Promise<{ imported: number; note: string }> {
+  const tplId = job.block_id.slice("course:".length);
+  const tpl = await db.prepare("SELECT * FROM courses WHERE id = ?").bind(tplId).first<Record<string, unknown>>();
+  if (!tpl) return { imported: 0, note: "找不到示範課程" };
+  const series = String(tpl.series ?? "");
+  const dupes = await db.prepare("SELECT l.media_ref FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.series = ? AND l.media_ref IS NOT NULL").bind(series).all<{ media_ref: string }>();
+  for (const r of dupes.results) have.add(r.media_ref);
+  const read = await readPlaylist(key, job.url, have);
+  if ("error" in read) return { imported: 0, note: read.error };
+  if (!read.items.length) return { imported: 0, note: "沒有新的影片可匯入（可能都已存在，或清單是空的／非公開）" };
+  const snap = await db.prepare("SELECT value FROM central_snapshots WHERE key = 'centers'").first<{ value: string }>();
+  const centers: string[] = (() => { try { return (JSON.parse(snap?.value ?? "[]") as unknown[]).filter((x): x is string => typeof x === "string"); } catch { return []; } })();
+  const cols = (await db.prepare("SELECT name FROM pragma_table_info('courses')").all<{ name: string }>()).results.map((c) => c.name).filter((c) => !NOT_COPIED.has(c));
+  const prefix = String(tpl.title ?? "").replace(/\s*\d{4}\s*年.*$/, "").trim() || series;
+  const lines: string[] = [];
+  const stmts = [];
+  for (const it of [...read.items].reverse()) {
+    const date = it.date ?? "";
+    const m = /^(\d{4})-(\d{2})/.exec(date);
+    const name = m ? `${prefix}${m[1]}年${Number(m[2])}月` : prefix;
+    const center = guessCenter(it.title, centers);
+    const id = `c${short()}${short().slice(0, 1)}`;
+    const base: Record<string, unknown> = { id, title: name, host_unit: center, host_center_key: center, event_start: date || null, status: "draft" };
+    for (const c of cols) base[c] = tpl[c];
+    const keys = Object.keys(base);
+    stmts.push(db.prepare(`INSERT INTO courses (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`).bind(...keys.map((k) => base[k] ?? null)));
+    stmts.push(db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, kind) VALUES (?, ?, 1, ?, 0, 'youtube', ?, 'chapter')").bind(`${id}-${short()}`, id, name, it.id));
+    lines.push(`${name}｜${center || "（未判讀）"}｜${it.title}`);
+  }
+  for (let i = 0; i < stmts.length; i += 50) await db.batch(stmts.slice(i, i + 50));
+  return { imported: read.items.length, note: lines.join("\n").slice(0, 4000) };
+}
+
 async function runJob(env: Env, job: Job, key: string | undefined, side: number): Promise<{ imported: number; note: string }> {
   const db = env.DB;
   if (job.kind === "playlist") {
     if (!key) return { imported: 0, note: "尚未設定 YouTube 金鑰" };
     const have = new Set((await db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_ref IS NOT NULL").bind(job.course_id).all<{ media_ref: string }>()).results.map((r) => r.media_ref));
-    const items: { id: string; title: string; date: string | null }[] = [];
-    let token = "";
-    for (let page = 0; page < 6; page++) {
-      const res = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,contentDetails&maxResults=50&playlistId=${encodeURIComponent(job.url)}&key=${encodeURIComponent(key)}${token ? `&pageToken=${token}` : ""}`, { headers: { accept: "application/json" } }).catch(() => null);
-      if (!res?.ok) return { imported: 0, note: `讀取播放清單失敗（${res?.status ?? "連線錯誤"}）` };
-      const data = (await res.json()) as { items?: { snippet?: { title?: string }; contentDetails?: { videoId?: string; videoPublishedAt?: string } }[]; nextPageToken?: string };
-      for (const it of data.items ?? []) {
-        const id = it.contentDetails?.videoId;
-        const title = it.snippet?.title ?? "";
-        if (!id || /^(private video|deleted video)$/i.test(title) || have.has(id)) continue;
-        have.add(id);
-        items.push({ id, title: title.slice(0, 120), date: taipeiDay(it.contentDetails?.videoPublishedAt) });
-      }
-      if (!data.nextPageToken) break;
-      token = data.nextPageToken;
-    }
+    if (job.block_id.startsWith("course:")) return runCoursePlaylist(db, job, key, have);
+    const read = await readPlaylist(key, job.url, have);
+    if ("error" in read) return { imported: 0, note: read.error };
+    const items = read.items;
     if (!items.length) return { imported: 0, note: "沒有新的影片可匯入（可能都已存在，或清單是空的／非公開）" };
     let pos = await nextPos(db, job.course_id);
     const ids = items.map(() => `${job.course_id}-${short()}`);
