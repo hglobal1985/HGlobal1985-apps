@@ -429,9 +429,9 @@ export type CourseComment = {
 };
 
 /** 品牌 logo 封面的組成：底圖（優先）或底色（沒有就白色）＋ logo 置中、四周留安全距離。 */
-export type BrandCover = { logoUrl: string; bgColor: string | null; bgUrl: string | null };
+export type BrandCover = { logoUrl: string; bgColor: string | null; /** 深色模式的底色（業主 2026-11-18）：使用者切換成深色模式時優先於底色與底圖；沒設定＝null。 */ bgColorDark: string | null; bgUrl: string | null };
 /** 後台品牌 logo 管理用。 */
-export type BrandLogo = { id: string; name: string; logoUrl: string | null; bgColor: string | null; bgUrl: string | null };
+export type BrandLogo = { id: string; name: string; logoUrl: string | null; bgColor: string | null; bgColorDark: string | null; bgUrl: string | null };
 
 /** 通知情境（Email 可逐項開關，業主 2026-11-18）：預設只有「付費課程相關的審核通知」要寄 Email，其餘預設不寄；手機推播不看這個，全部都推。 */
 export type NoticeKind = "paid_review" | "role" | "course_update" | "subscribe_new" | "broadcast" | "reminder" | "comment" | "badge" | "other";

@@ -11,12 +11,12 @@ import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
 /**
  * 訂閱模組（業主 2026-11-17：中心首頁圖、系列首頁圖的訂閱鈕設計、尺寸、樣式統一，之後要調整只改這個檔案）：
  *  - `SubscribeButton`：訂閱鈕本體（高 44、鈴鐺＋下面小字「訂閱／已訂閱」＋人數；已訂閱＝深綠底＋黃色實心鈴鐺、未訂閱＝白底＋綠色空心鈴鐺）。
- *  - `useSubscribe(kind, name, loginNext)`：讀取人數與狀態、按一下訂閱／取消（訪客先去登入）、全螢幕提醒，回傳給 `CenterHero` 的 `subscribe`。
- * 中心與系列共用同一張資料表（系列用 `series:` 開頭的鍵）；顯示人數都從 688 開始算。
+ *  - `useSubscribe(kind, name, loginNext)`：讀取人數與狀態、按一下訂閱／取消（訪客先去登入）、全螢幕提醒，由封面統計模組（`cover-stats.tsx`）使用，不要直接在頁面呼叫。
+ * 中心、系列、課程與教材清單共用同一張資料表（系列用 `series:`、課程用 `course:` 開頭的鍵）；顯示人數都從 688 開始算（後端 `SUBSCRIBER_BASE`）。
  */
 export type SubState = { count: number; subscribed: boolean };
 export type SubscribeProps = SubState & { onPress: () => void; noun: string };
-export type SubKind = "center" | "series";
+export type SubKind = "center" | "series" | "course";
 
 const GREEN = "#0C603C";
 const YELLOW = "#FFD43B";
@@ -40,9 +40,9 @@ export function SubscribeButton({ count, subscribed, onPress, noun }: SubscribeP
   );
 }
 
-export function useSubscribe(kind: SubKind, name: string | null, loginNext: string): SubscribeProps | undefined {
+export function useSubscribe(kind: SubKind, name: string | null, loginNext: string, nounOverride?: string): SubscribeProps | undefined {
   const { member } = useSession();
-  const noun = kind === "center" ? "中心" : "系列";
+  const noun = nounOverride ?? (kind === "center" ? "中心" : kind === "series" ? "系列" : "課程");
   const path = `/${kind}-subscription`;
   const [sub, setSub] = useState<SubState | null>(null);
   useEffect(() => {
@@ -62,7 +62,7 @@ export function useSubscribe(kind: SubKind, name: string | null, loginNext: stri
       showFlash({
         icon: <Ionicons name={r.subscribed ? "notifications" : "notifications-off-outline"} size={FLASH_ICON - 3} color={r.subscribed ? "#E0A800" : "#8A8A8A"} />,
         title: r.subscribed ? "已訂閱" : "已取消訂閱",
-        body: r.subscribed ? "新課程或新公告都會通知你" : `不會再收到這個${noun}的通知`,
+        body: r.subscribed ? (kind === "course" ? `這個${noun}有新章節或新教材會通知你` : "新課程或新公告都會通知你") : `不會再收到這個${noun}的通知`,
       });
     } catch (e) {
       showFlash({ icon: <Ionicons name="alert-circle-outline" size={FLASH_ICON - 3} color="#B3261E" />, title: "操作失敗", body: (e as Error).message });

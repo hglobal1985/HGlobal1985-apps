@@ -6,6 +6,7 @@ import { api, type CourseDetail, type Lesson, type Order } from "@/api/client";
 import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { EdmStage } from "@/features/courses/edm-viewer";
+import { useCoverStats } from "@/features/courses/cover-stats";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { InlineAudio } from "@/features/player/audio-bar";
 import { engine } from "@/features/player/engine";
@@ -60,12 +61,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const base = saved && saved.id === data?.id && (saved.admin?.updatedAt ?? "") > (data?.admin?.updatedAt ?? "") ? saved : data;
   // 章節排序、複製要「瞬間」有反應（業主 2026-11-17）：先在畫面上直接改，伺服器在背景處理，處理完再用正式資料換回來。
   // 點閱（業主 2026-11-17）：每進入／重新整理一次課程頁就 +1，算進主辦中心與所屬系列的封面點閱（訪客也算）。
-  const counted = useRef<string | null>(null);
-  useEffect(() => {
-    if (!data || counted.current === data.id) return;
-    counted.current = data.id;
-    api("POST", "/course-views", { courseId: data.id }).catch(() => undefined);
-  }, [data?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 封面的訂閱鈕與點閱次數：統一用封面統計模組（進入頁面時點閱 +1，算進主辦中心、所屬系列與這門課自己的封面）。
+  const stats = useCoverStats("course", data?.id ?? null, `/course/${id}`, data?.isList ? "清單" : "課程");
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
   const opQueue = useRef<Promise<unknown>>(Promise.resolve());
@@ -373,7 +370,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         ) : (
           <>
             <View>
-              <EdmStage course={course} />
+              <EdmStage course={course} stats={stats} />
               {/* 影片中間不放任何按鈕（業主 2026-11-17）：播放一律從下面的控制列。 */}
             </View>
             {firstPlayable || playLesson ? (

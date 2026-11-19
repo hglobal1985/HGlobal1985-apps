@@ -17,7 +17,7 @@ import { flashText } from "@/ui/flash-notice";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
-import { useSubscribe } from "./subscribe";
+import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
@@ -440,24 +440,17 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       return () => sub.remove();
     }, [activeCenter]), // eslint-disable-line react-hooks/exhaustive-deps
   );
-  // 中心頁上方的照片：透明小標籤「N 門課・N 章節・N 點閱」；往上滑時縮成窄橫幅（CenterHero）。
+  // 中心頁上方的照片：訂閱鈕＋點閱次數；往上滑時縮成窄橫幅（CenterHero）。
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [centerViews, setCenterViews] = useState<number | null>(null);
   useEffect(() => {
-    if (activeCenter === ALL) return;
-    trackFeature("center_page");
-    setCenterViews(null);
-    api<{ total: number }>("POST", "/center-views", { center: activeCenter })
-      .then((r) => setCenterViews(r.total))
-      .catch(() => undefined);
-  }, [activeCenter]); // eslint-disable-line react-hooks/exhaustive-deps
-  // 訂閱：統一用訂閱模組（subscribe.tsx，中心與系列同一套）。
-  const sub = useSubscribe("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
+    if (activeCenter !== ALL) trackFeature("center_page");
+  }, [activeCenter]);
+  // 封面的訂閱鈕與點閱次數：統一用封面統計模組（cover-stats.tsx，中心、系列、課程、清單同一套）。
+  const stats = useCoverStats("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
   const bc = useCenterBroadcasts(activeCenter === ALL ? "" : activeCenter);
   const [bcOpen, setBcOpen] = useState(false);
-  const heroCourses = activeCenter !== ALL ? courses.filter((x) => x.status === "published" && x.centerCourse && normCenter(x.hostCenter) === normCenter(activeCenter)) : [];
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} courses={heroCourses.length} lessons={lessonsOf(heroCourses)} views={centerViews} title={centerTitle(activeCenter)} subscribe={sub} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const archivedBlock =
@@ -593,16 +586,20 @@ function SortableTile({ group, width, index, count, onSwap }: { group: SeriesGro
   );
 }
 
+/** 專區色帶的顏色：寰宇專區沿用站內主色（c.accentSoft／c.accentText，本來就有深色），其他專區各有淺色與深色兩組。 */
+const ZONE_PALETTE: Record<string, Record<"light" | "dark", { bg: string; fg: string }> | null> = {
+  hglobal: null,
+  material: { light: { bg: "#FFF3C4", fg: "#5A4300" }, dark: { bg: "#3A3112", fg: "#F2D675" } },
+  brand: { light: { bg: "#DCEBFA", fg: "#0F3D6E" }, dark: { bg: "#15283D", fg: "#8EC1F0" } },
+  centers: { light: { bg: "#FCE1DE", fg: "#8F1D18" }, dark: { bg: "#3B1B19", fg: "#F0A8A2" } },
+};
+
 /** 系列檢視的專區標題色帶：寰宇＝深綠淡底、安麗素材＝亮黃淡底、安麗品牌＝淡藍底、教育中心＝紅色淡底；右邊可放「移動」鈕（超級管理員）。 */
 function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zone?: Zone; text?: string; icon?: "library" | "folder-open" | "business" | "pricetag"; count: number; red?: boolean; onMove?: () => void; folded?: boolean; onFold?: () => void }) {
-  const { c } = useTheme();
-  const look = red
-    ? { bg: "#FCE1DE", fg: "#8F1D18", icon: "business" as const }
-    : zone === "amway_material"
-      ? { bg: "#FFF3C4", fg: "#5A4300", icon: "folder-open" as const }
-      : zone === "amway_brand"
-        ? { bg: "#DCEBFA", fg: "#0F3D6E", icon: "pricetag" as const }
-        : { bg: c.accentSoft, fg: c.accentText, icon: "library" as const };
+  const { c, scheme } = useTheme();
+  // 專區色帶顏色（業主 2026-11-18：深色模式的色帶也要變暗色）：每個專區一組「淺色／深色」，深色模式底色暗、文字與按鈕用亮色，全部集中在這裡。
+  const pal = ZONE_PALETTE[red ? "centers" : zone === "amway_material" ? "material" : zone === "amway_brand" ? "brand" : "hglobal"];
+  const look = pal ? { ...pal[scheme], icon: red ? ("business" as const) : zone === "amway_material" ? ("folder-open" as const) : ("pricetag" as const) } : { bg: c.accentSoft, fg: c.accentText, icon: "library" as const };
   const label = text ?? (zone ? zoneLabel(zone) : "");
   return (
     // 點標題列任意處都能收合／展開（業主 2026-11-18）；裡面的「移動」「收合」鈕各自處理自己的點擊。

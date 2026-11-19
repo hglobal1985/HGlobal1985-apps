@@ -63,4 +63,5 @@ test("品牌資訊卡：每個品牌一張、6 個預設區塊、第一區塊連
   // 寰宇大學清單的區塊數量（連結區塊用來源數字）
   const list = (await call<CourseSummary[]>("GET", "/courses", { token: admin })).data.find((c) => c.id === "cbbn")!;
   assert.equal(list.blocks[0]!.count, 2);
+  assert.equal(list.materialCount, 2, "品牌卡的教材數含連結區塊來源清單裡的教材");
 });

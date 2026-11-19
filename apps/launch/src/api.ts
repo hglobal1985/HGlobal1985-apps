@@ -108,16 +108,16 @@ type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
 type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 品牌 logo（組課程封面用，列表／詳情載入）。 */ brands?: BrandRow[]; /** 清單的區塊（顯示在上拉選單的）：courseId → 區塊。 */ blocks?: Map<string, SheetBlock[]>; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
 
-type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; categories: string; art_version: number };
-const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
+type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; bg_color_dark: string | null; categories: string; art_version: number };
+const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, bg_color_dark, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
 /** 課程的品牌封面（業主 2026-11-18）：選了品牌、而且沒有手動上傳封面／EDM 才用品牌 logo（手動上傳 > 品牌 logo > 文字封面）。 */
 function brandFor(ctx: Ctx, row: { brand_id?: string | null; edm_key?: string | null; cover_key?: string | null }): BrandCover | null {
   if (!row.brand_id || row.edm_key || row.cover_key) return null;
   const b = ctx.brands?.find((x) => x.id === row.brand_id);
-  return b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
+  return b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgColorDark: b.bg_color_dark, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
 }
 /** 清單的區塊（只列勾了「顯示在上拉選單」的）：上拉選單用；count＝底下有內容的素材數。 */
-type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null };
+type SheetBlock = { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null; /** 連結區塊：內容在另一份清單（不算在這份清單自己的教材數裡）。 */ linked?: boolean };
 async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
   const { results } = await db
     .prepare("SELECT l.id, l.course_id, l.kind, l.title, l.cover_key, l.art_version, l.brand_id, l.categories, l.in_sheet, l.link_block_id, (l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id) AS has FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.is_list = 1 AND l.is_full = 0 ORDER BY l.course_id, l.position")
@@ -141,8 +141,8 @@ async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
       cur = null;
       if (curShown) {
         const b = r.brand_id ? brands.find((x) => x.id === r.brand_id) : undefined;
-        const brand: BrandCover | null = !r.cover_key && b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
-        cur = { id: r.id, title: r.title, coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null, brand, count: 0, categories: r.categories, brandId: r.brand_id };
+        const brand: BrandCover | null = !r.cover_key && b?.logo_key ? { logoUrl: brandUrl(b.logo_key, b.art_version), bgColor: b.bg_color, bgColorDark: b.bg_color_dark, bgUrl: b.bg_key ? brandUrl(b.bg_key, b.art_version) : null } : null;
+        cur = { id: r.id, title: r.title, coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null, brand, count: 0, categories: r.categories, brandId: r.brand_id, ...(r.link_block_id ? { linked: true } : {}) };
         if (r.link_block_id) links.push({ block: cur, src: r.link_block_id });
         const list = map.get(r.course_id) ?? [];
         list.push(cur);
@@ -624,7 +624,8 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     chapterCovers: row.chapter_covers === 1,
     lessonCount: row.lesson_count,
     hasMaterial: row.material_count > 0,
-    materialCount: row.material_count,
+    // 教材數：自己的教材，加上連結區塊（品牌資訊卡的「新品特惠培訓直播」）來源清單裡的教材。
+    materialCount: row.material_count + (row.is_list === 1 ? (ctx.blocks?.get(row.id) ?? []).reduce((n, b) => n + (b.linked ? b.count : 0), 0) : 0),
     totalMinutes: row.total_minutes,
     eligible: eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row),
     allowPresident: row.allow_president === 1,
@@ -1100,11 +1101,13 @@ async function courseDeleteImpact(db: D1Database, id: string): Promise<CourseDel
 
 /** 公開圖片（封面、EDM）的網址；版本號讓更新後瀏覽器改抓新圖。 */
 /** 頁面瀏覽次數 +1 並回傳累計（中心頁、系列頁共用；業主 2026-11-16：每進入一次就算一次，不分是否同一人）。 */
-const CENTER_VIEW_BASE = 688; // 所有中心的點閱數都加 688（業主 2026-11-17，只影響顯示）
+const VIEW_BASE = 688; // 所有封面（中心、系列、課程、教材清單）顯示的點閱數都加 688（業主 2026-11-17 中心、2026-11-18 擴大到全部封面，只影響顯示）
 const SUBSCRIBER_BASE = 688; // 每個中心顯示的訂閱人數從 688 開始算（業主 2026-11-17）
 
 /** 系列的訂閱沿用中心訂閱表，用「series:」開頭的鍵區分。 */
 const seriesSubKey = (name: string) => `series:${name.trim()}`;
+/** 課程／清單頁的訂閱（業主 2026-11-18：所有課程與教材清單的封面都有訂閱鈕）：同一張表，用「course:」開頭的鍵。 */
+const courseSubKey = (id: string) => `course:${id}`;
 
 async function subscriptionState(ctx: Ctx, key: string): Promise<{ count: number; subscribed: boolean }> {
   const n = await ctx.db.prepare("SELECT COUNT(*) AS n FROM center_subscriptions WHERE center_key = ?").bind(key).first<{ n: number }>();
@@ -1166,6 +1169,20 @@ async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "�
     let enrolledSent = 0;
     if (c.is_list !== 1 && !merged) enrolledSent = await notifyEnrolled(ctx.db, courseId, `${c.title.slice(0, 40)}有新${what}`, "你已報名這門課程，有新內容可以看了", link, me, c.series && !isPrivate(c.view_scope) ? seriesSubKey(c.series) : null);
     sent += enrolledSent;
+    // 這門課程／清單自己的訂閱者（業主 2026-11-18）：已經以系列訂閱者或已報名學員身分收過通知的人不重複；30 分鐘內同一類型只通知一次。
+    if (!merged && !isPrivate(c.view_scope)) {
+      const ctitle = `${c.title.slice(0, 40)}有新${what}`;
+      const recent = await ctx.db.prepare("SELECT 1 AS ok FROM notifications WHERE link = ? AND title = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') LIMIT 1").bind(link, ctitle).first();
+      if (!recent) {
+        const { results } = await ctx.db
+          .prepare("SELECT member_sub FROM center_subscriptions WHERE center_key = ?1 AND (?2 IS NULL OR member_sub NOT IN (SELECT member_sub FROM center_subscriptions WHERE center_key = ?2)) AND member_sub NOT IN (SELECT member_sub FROM enrollments WHERE course_id = ?3)")
+          .bind(courseSubKey(courseId), c.series && !isPrivate(c.view_scope) ? seriesSubKey(c.series) : null, courseId)
+          .all<{ member_sub: string }>();
+        const subs = results.filter((r) => r.member_sub !== me);
+        for (let i = 0; i < subs.length; i += 40) await ctx.db.batch(subs.slice(i, i + 40).map((r) => notify(ctx.db, { sub: r.member_sub }, ctitle, `${c.is_list === 1 ? "清單" : "課程"}有新內容可以看了`, link)));
+        sent += subs.length;
+      }
+    }
     if (me) await notify(ctx.db, { sub: me }, `已送出「新${what}」通知`, merged ? `${c.title.slice(0, 80)}（30 分鐘內已通知過，這次合併不重複發送）` : `${c.title.slice(0, 80)}（通知了 ${sent} 位系列訂閱者）`, link).run();
   } catch {
     /* 通知失敗不影響新增 */
@@ -1188,7 +1205,7 @@ async function notifySubscribers(db: D1Database, key: string, title: string, bod
   return subs.length;
 }
 
-async function bumpView(db: D1Database, kind: "center" | "series", key: string): Promise<number> {
+async function bumpView(db: D1Database, kind: "center" | "series" | "course", key: string): Promise<number> {
   const row = await db.prepare("INSERT INTO page_views (kind, key, total) VALUES (?, ?, 1) ON CONFLICT(kind, key) DO UPDATE SET total = total + 1 RETURNING total").bind(kind, key).first<{ total: number }>();
   return row?.total ?? 0;
 }
@@ -3055,6 +3072,32 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/course-subscription$/,
+    async (ctx) => {
+      // 課程／教材清單頁的訂閱人數與自己有沒有訂閱（訪客也看得到人數）。
+      const id = (ctx.url.searchParams.get("course") ?? "").trim().slice(0, 40);
+      if (!id || !(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(id).first())) return fail(404, "not_found", "找不到這門課程");
+      return subscriptionState(ctx, courseSubKey(id));
+    },
+  ],
+  [
+    "POST",
+    /^\/course-subscription$/,
+    async (ctx) => {
+      // 按一下訂閱、再按一下取消。
+      const s = requireMember(ctx);
+      const body = await readJson<{ course?: unknown }>(ctx.req);
+      const id = typeof body.course === "string" ? body.course.trim().slice(0, 40) : "";
+      if (!id || !(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(id).first())) return fail(404, "not_found", "找不到這門課程");
+      const key = courseSubKey(id);
+      const had = await ctx.db.prepare("SELECT 1 AS ok FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).first();
+      if (had) await ctx.db.prepare("DELETE FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).run();
+      else await ctx.db.prepare("INSERT OR IGNORE INTO center_subscriptions (member_sub, center_key) VALUES (?, ?)").bind(s.sub, key).run();
+      return subscriptionState(ctx, key);
+    },
+  ],
+  [
+    "GET",
     /^\/center-broadcasts$/,
     async (ctx) => {
       // 廣播公告（公開）：輪播秒數＋全部公告（新的在前）。
@@ -3120,7 +3163,7 @@ const routes: [string, RegExp, Handler][] = [
       const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
       if (!label) fail(400, "invalid_center", "請指定中心");
       const key = centerKey(label);
-      return { total: CENTER_VIEW_BASE + (await bumpView(ctx.db, "center", key)) };
+      return { total: VIEW_BASE + (await bumpView(ctx.db, "center", key)) };
     },
   ],
   [
@@ -3130,7 +3173,7 @@ const routes: [string, RegExp, Handler][] = [
       requireMember(ctx);
       const label = (ctx.url.searchParams.get("center") ?? "").trim();
       const n = label ? await ctx.db.prepare("SELECT total AS n FROM page_views WHERE kind = 'center' AND key = ?").bind(centerKey(label)).first<{ n: number }>() : null;
-      return { total: CENTER_VIEW_BASE + (n?.n ?? 0) };
+      return { total: VIEW_BASE + (n?.n ?? 0) };
     },
   ],
   [
@@ -4852,8 +4895,8 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/brand-logos$/,
     async (ctx): Promise<BrandLogo[]> => {
       requireSuperAdmin(ctx);
-      const { results } = await ctx.db.prepare("SELECT id, name, logo_key, bg_key, bg_color, categories, art_version FROM brand_logos ORDER BY sort_order, created_at").all<BrandRow>();
-      return results.map((r) => ({ id: r.id, name: r.name, logoUrl: r.logo_key ? brandUrl(r.logo_key, r.art_version) : null, bgColor: r.bg_color, bgUrl: r.bg_key ? brandUrl(r.bg_key, r.art_version) : null}));
+      const { results } = await ctx.db.prepare("SELECT id, name, logo_key, bg_key, bg_color, bg_color_dark, categories, art_version FROM brand_logos ORDER BY sort_order, created_at").all<BrandRow>();
+      return results.map((r) => ({ id: r.id, name: r.name, logoUrl: r.logo_key ? brandUrl(r.logo_key, r.art_version) : null, bgColor: r.bg_color, bgColorDark: r.bg_color_dark, bgUrl: r.bg_key ? brandUrl(r.bg_key, r.art_version) : null}));
     },
   ],
   [
@@ -4876,7 +4919,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/brand-logos\/([\w-]+)$/,
     async (ctx, [id]) => {
       const s = requireSuperAdmin(ctx);
-      const body = await readJson<{ name?: unknown; bgColor?: unknown }>(ctx.req);
+      const body = await readJson<{ name?: unknown; bgColor?: unknown; bgColorDark?: unknown }>(ctx.req);
       const sets: [string, unknown][] = [];
       if (body.name !== undefined) {
         const n = text(body.name, 40);
@@ -4888,6 +4931,12 @@ const routes: [string, RegExp, Handler][] = [
         if (body.bgColor === null || body.bgColor === "") sets.push(["bg_color", null]);
         else if (typeof body.bgColor === "string" && /^#[0-9a-fA-F]{6}$/.test(body.bgColor)) sets.push(["bg_color", body.bgColor.toUpperCase()]);
         else return fail(400, "invalid_color", "底色請用 #RRGGBB 格式");
+      }
+      if (body.bgColorDark !== undefined) {
+        // 深色模式底色（業主 2026-11-18）：空白＝不設定（深色模式照原本的底色或底圖）。
+        if (body.bgColorDark === null || body.bgColorDark === "") sets.push(["bg_color_dark", null]);
+        else if (typeof body.bgColorDark === "string" && /^#[0-9a-fA-F]{6}$/.test(body.bgColorDark)) sets.push(["bg_color_dark", body.bgColorDark.toUpperCase()]);
+        else return fail(400, "invalid_color", "深色模式底色請用 #RRGGBB 格式");
       }
       if (!sets.length) return { ok: true };
       const r = await ctx.db.prepare(`UPDATE brand_logos SET ${sets.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`).bind(...sets.map(([, v]) => v), id).run();
@@ -5370,7 +5419,8 @@ const routes: [string, RegExp, Handler][] = [
       if (!row) return { ok: false };
       if (row.hk) await bumpView(ctx.db, "center", row.hk);
       if (row.series?.trim()) await bumpView(ctx.db, "series", row.series.trim());
-      return { ok: true };
+      // 課程／清單自己頁面的點閱（封面統一顯示；業主 2026-11-18）。
+      return { ok: true, total: VIEW_BASE + (await bumpView(ctx.db, "course", id)) };
     },
   ],
   [
@@ -5381,7 +5431,7 @@ const routes: [string, RegExp, Handler][] = [
       const body = await readJson<{ series?: unknown }>(ctx.req);
       const name = typeof body.series === "string" ? body.series.trim().slice(0, 60) : "";
       if (!name) fail(400, "invalid_series", "請指定系列");
-      return { total: await bumpView(ctx.db, "series", name) };
+      return { total: VIEW_BASE + (await bumpView(ctx.db, "series", name)) };
     },
   ],
   [
@@ -5443,6 +5493,8 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("DELETE FROM order_items WHERE course_id = ?").bind(id),
         audit(ctx.db, admin.sub, "course.delete", "course", id, JSON.stringify({ title: impact.title, registrations: impact.registrations, students: impact.students, paidTwd: impact.paidTwd })),
         ctx.db.prepare("DELETE FROM courses WHERE id = ?").bind(id),
+        ctx.db.prepare("DELETE FROM center_subscriptions WHERE center_key = ?").bind(courseSubKey(id)), // 這門課程自己的訂閱與點閱一併清掉
+        ctx.db.prepare("DELETE FROM page_views WHERE kind = 'course' AND key = ?").bind(id),
       ]);
       if (res.meta?.changes === 0) fail(404, "not_found", "找不到這門課程");
       await deleteR2Files(ctx.env, [...files, art?.edm_key, art?.cover_key]);
@@ -5649,7 +5701,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
     if (e instanceof HttpError) res = json({ error: { code: e.code, message: e.message } }, e.status);
     else {
       console.error("api error", e);
-      res = json({ error: { code: "internal", message: "系統忙碌，請稍後再試" } }, 500);
+      res = json({ error: { code: "internal", message: "系統功能正在升級中，請稍後幾分鐘後再試" } }, 500);
     }
   }
   for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);

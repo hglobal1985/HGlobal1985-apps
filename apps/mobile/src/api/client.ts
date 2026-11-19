@@ -104,6 +104,9 @@ export class RequestError extends Error {
 }
 
 /** 上傳檔案並回報進度 0～100（網頁版用 XMLHttpRequest，fetch 拿不到上傳進度）。 */
+/** 伺服器暫時回不出正常結果（部署更新、系統忙碌…）時，全站統一顯示的白話提示（業主 2026-11-18）。 */
+export const UPGRADING_MSG = "系統功能正在升級中，請稍後幾分鐘後再試";
+
 export async function apiUpload<T>(method: "POST" | "PUT", path: string, body: Blob, onProgress: (pct: number) => void, retried = false): Promise<T> {
   await (tokenInit ??= loadToken());
   const central = token ? null : await centralToken();
@@ -126,7 +129,7 @@ export async function apiUpload<T>(method: "POST" | "PUT", path: string, body: B
   } catch {
     data = null;
   }
-  if (done.status < 200 || done.status >= 300) throw new RequestError(done.status, data?.error?.code ?? "http_error", data?.error?.message ?? "系統忙碌，請稍後再試");
+  if (done.status < 200 || done.status >= 300) throw new RequestError(done.status, data?.error?.code ?? "http_error", data?.error?.message ?? UPGRADING_MSG);
   return data as T;
 }
 
@@ -149,7 +152,7 @@ export async function api<T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
   const data = (await res.json().catch(() => null)) as T | ApiError | null;
   if (!res.ok) {
     const err = (data as ApiError | null)?.error;
-    throw new RequestError(res.status, err?.code ?? "http_error", err?.message ?? "系統忙碌，請稍後再試");
+    throw new RequestError(res.status, err?.code ?? "http_error", err?.message ?? UPGRADING_MSG);
   }
   return data as T;
 }
