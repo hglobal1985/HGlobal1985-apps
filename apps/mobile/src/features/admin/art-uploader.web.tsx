@@ -7,12 +7,13 @@ import { AppText, Button } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { useSheetSave } from "@/features/course-edit/edit-sheet";
 import { EdmCropper } from "./edm-cropper.web";
+import { CoverLibraryPicker, deleteUnusedCover, type PickedCover } from "./cover-library.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
 import { useUiConfig } from "@/state/ui-config";
 import { EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
-type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode };
+type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode; /** 從封面庫挑了「未使用的封面檔」：儲存成功後把它刪掉。 */ consumeKey?: string };
 
 /** 預設的 16:9 封面裁切框：水平垂直置中、盡量大。 */
 function defaultCover(img: HTMLImageElement): Rect {
@@ -83,6 +84,8 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", ce
       setBusy(false);
     }
   };
+  /** 從封面庫挑一張現有的圖：等同剛選了檔案，走同樣的裁切與儲存流程。 */
+  const fromLibrary = ({ img, consumeKey }: PickedCover) => setJob({ img, src: img.src, isNew: true, cover: defaultCover(img), mode: defaultCoverMode(img), consumeKey });
   /** 不換圖，只重新調整目前 EDM 的封面與預設位置。 */
   const adjust = async () => {
     if (!art) return;
@@ -109,6 +112,7 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", ce
       const contain = job.mode === "contain";
       await api("PUT", endpoints.cover, contain ? await composeContain(job.img, coverSide, quality) : await cropCompress(job.img, job.cover, coverSide, quality));
       await api("PATCH", endpoints.edm, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
+      await deleteUnusedCover(job.consumeKey);
       setJob(null);
       setMsg(null);
       flashText(`已更新${label}${noun}`);
@@ -143,6 +147,7 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", ce
           </AppText>
           <View style={styles.buttons}>
             <Button label={art ? `更換${noun}` : `上傳${noun}`} icon="image-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} />
+            <CoverLibraryPicker disabled={busy} onPick={fromLibrary} />
             {art ? <Button variant="secondary" label="調整裁切位置" icon="crop-outline" disabled={busy} onPress={adjust} /> : null}
             {art ? <Button variant="ghost" label={`移除${noun}`} disabled={busy} onPress={remove} /> : null}
           </View>
