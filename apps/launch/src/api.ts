@@ -1,7 +1,7 @@
 import { ensureBrandCards } from "./brand-cards.ts";
 import { flushPushes, vapidPublicKey } from "./push.ts";
 import { HQ_SLUG, RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
-import { romanizeName, urlNameVariants } from "./romanize.ts";
+import { romanizeName, romanizeTitle, urlNameVariants } from "./romanize.ts";
 import {
   DEMO_MEMBERS,
   HQ_UNIT,
@@ -432,6 +432,7 @@ type CourseRow = {
   teacher: string;
   teacher_rank: string;
   teacher_title: string;
+  no_speaker: number;
   category: string;
   price_twd: number;
   min_rank_code: string;
@@ -491,7 +492,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -573,6 +574,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     teacherRank: row.teacher_rank,
     teacherRankName: rankMap.get(row.teacher_rank)?.name ?? "",
     teacherTitle: row.teacher_title,
+    noSpeaker: row.no_speaker === 1,
     category: row.category,
     priceTwd: web ? price : null,
     originalPriceTwd: web ? row.price_twd : null,
@@ -848,11 +850,12 @@ function inviteState(inv: InviteRow, sub: string): "open" | "mine" | "used" | "e
 
 async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
   try {
-    const c = await ctx.db.prepare("SELECT teacher, host_center_key, url_name FROM courses WHERE id = ?").bind(courseId).first<{ teacher: string | null; host_center_key: string | null; url_name: string | null }>();
-    if (!c || c.url_name || !c.teacher?.trim()) return;
+    const c = await ctx.db.prepare("SELECT teacher, title, no_speaker, host_center_key, url_name FROM courses WHERE id = ?").bind(courseId).first<{ teacher: string | null; title: string; no_speaker: number; host_center_key: string | null; url_name: string | null }>();
+    // 專屬網址的名字：有主講人＝主講人英譯；勾了「無」＝課程名稱英譯（業主 2026-11-19）。
+    if (!c || c.url_name || (c.no_speaker !== 1 && !c.teacher?.trim())) return;
     // 有主辦中心：要用中心的縮寫（中心還沒設定縮寫就先不產生）；沒有主辦中心（總部）：用保留縮寫 hq。
     if (c.host_center_key && !(await centerSlugMap(ctx.db)).has(c.host_center_key)) return;
-    const base = romanizeName(c.teacher);
+    const base = c.no_speaker === 1 ? romanizeTitle(c.title) : romanizeName(c.teacher ?? "");
     if (!base) return;
     const like = `${base.replace(/[%_\\]/g, "")}-%`;
     const used = c.host_center_key
@@ -888,7 +891,7 @@ async function backfillCourseUrls(ctx: Ctx, centerKeyOnly?: string): Promise<num
     /* 不影響補網址 */
   }
   const { results } = await ctx.db
-    .prepare(`SELECT id FROM courses WHERE url_name IS NULL AND teacher <> ''${centerKeyOnly ? " AND host_center_key = ?" : ""} ORDER BY created_at, id`)
+    .prepare(`SELECT id FROM courses WHERE url_name IS NULL AND (teacher <> '' OR no_speaker = 1)${centerKeyOnly ? " AND host_center_key = ?" : ""} ORDER BY created_at, id`)
     .bind(...(centerKeyOnly ? [centerKeyOnly] : []))
     .all<{ id: string }>();
   for (const r of results) await ensureCourseUrl(ctx, r.id);
@@ -2092,6 +2095,13 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     await assertCentralRank(ctx, teacherRank);
     sets.push(["teacher_rank", teacherRank]);
   }
+  // 勾了「無」（沒有主講人、獎銜、職稱；業主 2026-11-19）：三個欄位一律清空；取消勾選就回到可以填。
+  if (body.noSpeaker !== undefined) {
+    const no = body.noSpeaker === true;
+    for (let i = sets.length - 1; i >= 0 && no; i--) if (["teacher", "teacher_rank", "teacher_title"].includes(sets[i]![0])) sets.splice(i, 1);
+    sets.push(["no_speaker", no ? 1 : 0]);
+    if (no) sets.push(["teacher", ""], ["teacher_rank", ""], ["teacher_title", ""]);
+  }
   if (body.priceTwd !== undefined) {
     const n = Number(body.priceTwd);
     if (!Number.isInteger(n) || n < 0 || n > 10_000_000) fail(400, "invalid_price", "費用請輸入 0 以上的整數");
@@ -2412,7 +2422,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["zone", "view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
+  const keep = ["zone", "view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "no_speaker", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
@@ -2442,7 +2452,7 @@ function speakerSync(db: D1Database, courseId: string): D1PreparedStatement {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list FROM courses WHERE id = ?").bind(id).first<{ event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list, teacher, no_speaker FROM courses WHERE id = ?").bind(id).first<{ event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; teacher: string | null; no_speaker: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -2468,12 +2478,15 @@ async function updateCourse(ctx: Ctx, id: string) {
   };
   if (newHost && newHost[1] !== cur.host_center_key) keepOld("host");
   else {
-    // 主講人改了：專屬網址（/中心縮寫/英譯姓名-編號）跟著換；英譯結果一樣（只是改錯字等）就不動。
-    const newTeacher = sets.find(([c]) => c === "teacher")?.[1];
-    if (typeof newTeacher === "string" && newTeacher.trim() && cur.url_name) {
-      const base = romanizeName(newTeacher);
+    // 主講人改了（或勾了「無」改用課程名稱）：專屬網址（/中心縮寫/英譯-編號）跟著換；英譯結果一樣（只是改錯字等）就不動。
+    const setVal = (col: string) => sets.find(([c]) => c === col)?.[1];
+    const noNow = (setVal("no_speaker") ?? cur.no_speaker) === 1;
+    const touched = sets.some(([c]) => c === "teacher" || c === "no_speaker" || (c === "title" && noNow));
+    if (touched && cur.url_name) {
+      const src = noNow ? String(setVal("title") ?? cur.title) : String(setVal("teacher") ?? cur.teacher ?? "");
+      const base = noNow ? romanizeTitle(src) : src.trim() ? romanizeName(src) : "";
       const oldBase = cur.url_name.replace(/-\d+$/, "");
-      if (base && base.toLowerCase() !== oldBase.toLowerCase()) keepOld("teacher");
+      if (base && base.toLowerCase() !== oldBase.toLowerCase()) keepOld("name");
     }
   }
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];

@@ -125,6 +125,8 @@ export type CourseSummary = {
   teacherRank: string;
   teacherRankName: string;
   teacherTitle: string;
+  /** 勾了「無」：沒有主講人、獎銜、職稱（畫面隱藏這三個欄位），專屬網址用課程名稱的英譯。 */
+  noSpeaker: boolean;
   category: string;
   /** iOS/Android 請求時一律為 null（商店規範：App 內不顯示價格）。 */
   priceTwd: number | null;

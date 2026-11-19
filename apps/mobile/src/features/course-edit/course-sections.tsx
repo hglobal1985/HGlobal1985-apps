@@ -125,7 +125,7 @@ const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.st
 
 // ---------- 基本資料：名稱、主講人、分類、系列（封面顏色已刪除，無 EDM 時文字封面顏色自動隨機） ----------
 /** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
-export type BasicsForm = { isShorts: boolean; title: string; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
+export type BasicsForm = { isShorts: boolean; title: string; /** 勾了「無」：沒有主講人、獎銜、職稱（業主 2026-11-19）。 */ noSpeaker: boolean; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
 export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
@@ -138,8 +138,18 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
       {/* 清單卡沒有主講人、職稱、獎銜（業主 2026-11-16）。 */}
       {isList ? null : (
         <>
-          <Field label="主講人" value={f.teacher} onChange={set("teacher")} placeholder="例如：王大明（選填）" />
-          <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
+          {/* 沒有主講人（業主 2026-11-19）：勾「無」＝主講人、獎銜、職稱三個欄位隱藏並清空，專屬網址改用課程名稱的英譯＋編號。 */}
+          <Check label="無（這門課沒有主講人、獎銜、職稱）" value={f.noSpeaker} onChange={(v) => setF((x) => ({ ...x, noSpeaker: v, ...(v ? { teacher: "", teacherRank: "", teacherTitle: "" } : {}) }))} />
+          {f.noSpeaker ? (
+            <AppText variant="caption" tone="muted">
+              分享用的短網址會用課程名稱的英譯加上編號。
+            </AppText>
+          ) : (
+            <>
+              <Field label="主講人" value={f.teacher} onChange={set("teacher")} placeholder="例如：王大明（選填）" />
+              <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
+            </>
+          )}
           <DateSelect label="活動日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
           {f.eventStart ? <DateSelect label="結束日期（連續 2～3 天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
         </>
@@ -163,7 +173,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
 function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
+  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, noSpeaker: course.noSpeaker ?? false, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
   const [f, setF] = useState(init);
   // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");
