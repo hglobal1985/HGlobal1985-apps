@@ -402,9 +402,9 @@ test("系列封面（比照中心）：先有 EDM 才能上傳封面、裁切框
   assert.equal(art.edmViewY, 0.2);
   const v1 = await call<{ total: number }>("POST", "/series-views", { token: student, body: { series: "封面系列" } });
   const v2 = await call<{ total: number }>("POST", "/series-views", { token: student, body: { series: "封面系列" } });
-  assert.equal(v1.data.total, 1);
-  assert.equal(v2.data.total, 2, "每進入一次就 +1（同一人也算）");
-  assert.equal((await call<{ total: number }>("POST", "/series-views", { token: admin, body: { series: "封面系列" } })).data.total, 3);
+  assert.equal(v1.data.total, 688 + 1);
+  assert.equal(v2.data.total, 688 + 2, "每進入一次就 +1（同一人也算）；所有封面的點閱數都加 688");
+  assert.equal((await call<{ total: number }>("POST", "/series-views", { token: admin, body: { series: "封面系列" } })).data.total, 688 + 3);
   await call("DELETE", `/admin/series/edm${q}`, { token: admin });
   assert.equal([...r2.objects.keys()].filter((k) => k.startsWith("series/")).length, 0, "EDM 與封面都清掉");
 });

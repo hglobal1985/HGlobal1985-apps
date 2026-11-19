@@ -8,11 +8,13 @@ import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, BrandCover, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, Screen } from "@/ui";
+import { AppText, BrandCover, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen, Slider } from "@/ui";
+import { hexToHsl, hslToHex, type Hsl } from "@/lib/color-utils";
 import { flashText } from "@/ui/flash-notice";
 
 const SWATCHES = ["#FFFFFF", "#F6F5F0", "#111111", "#1F4D3A", "#B3261E", "#F0B323", "#1F3A6B", "#7A4B2A"];
-type BgMode = "white" | "color" | "image";
+/** 深色模式底色的常用選項（比 App 深色背景稍亮或同色，logo 才看得清楚）。 */
+const DARK_SWATCHES = ["#000000", "#111111", "#1B1F1E", "#23302B", "#2A2A2E", "#1A2540", "#3A2A24", "#FFFFFF"];
 
 /**
  * 設定 › 品牌 Logo（業主 2026-11-18，超級管理員）：上傳／更換 logo，每個 logo 可選底色或底圖（透明背景、長寬不合時用），
@@ -49,7 +51,7 @@ export default function BrandLogosScreen() {
       {list.data.map((b) => (
         <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`編輯 ${b.name}`} onPress={() => setEditId(b.id)}>
           <Card>
-            {b.logoUrl ? <BrandCover brand={{ logoUrl: b.logoUrl, bgColor: b.bgColor, bgUrl: b.bgUrl }} style={{ borderRadius: radius.md }} /> : <View style={[styles.empty, { borderColor: c.border }]}><AppText tone="muted">還沒有上傳 logo</AppText></View>}
+            {b.logoUrl ? <BrandCover brand={{ logoUrl: b.logoUrl, bgColor: b.bgColor, bgColorDark: b.bgColorDark, bgUrl: b.bgUrl }} style={{ borderRadius: radius.md }} /> : <View style={[styles.empty, { borderColor: c.border }]}><AppText tone="muted">還沒有上傳 logo</AppText></View>}
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: space.xs }}>
               <View style={{ paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: c.accentSoft }} accessibilityLabel={`品牌標籤 ${b.name}`}>
                 <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>
@@ -66,11 +68,60 @@ export default function BrandLogosScreen() {
   );
 }
 
+type Tab = "light" | "dark" | "image";
+
+/**
+ * 顏色選擇（業主 2026-11-18）：先點常用色塊（或 logo 常用色）當基底，再用兩條滑桿微調——「變淡」（往右越淡）與「色彩飽和度」（往右越鮮豔）。
+ * 沒有手動輸入色碼。淺色、深色底色共用同一個。
+ */
+function ColorPicker({ value, onChange, swatches, picks }: { value: string; onChange: (hex: string) => void; swatches: string[]; picks: string[] }) {
+  const { c } = useTheme();
+  const [hsl, setHsl] = useState<Hsl>(() => hexToHsl(value));
+  const set = (next: Hsl) => {
+    setHsl(next);
+    onChange(hslToHex(next));
+  };
+  const choose = (hex: string) => {
+    const n = hexToHsl(hex);
+    setHsl(n);
+    onChange(hex.toUpperCase());
+  };
+  const row = (list: string[], label: string) => (
+    <View style={styles.swatches}>
+      {list.map((x) => (
+        <Pressable key={x} accessibilityRole="button" accessibilityLabel={`${label} ${x}`} onPress={() => choose(x)} style={[styles.swatch, { backgroundColor: x, borderColor: value.toUpperCase() === x.toUpperCase() ? c.accent : c.border, borderWidth: value.toUpperCase() === x.toUpperCase() ? 3 : 1 }]} />
+      ))}
+    </View>
+  );
+  return (
+    <View style={{ gap: space.xs }}>
+      {row(swatches, "底色")}
+      {picks.length ? (
+        <View style={{ gap: space.xs }}>
+          <AppText variant="caption" tone="muted">
+            logo 常用的顏色（點一下套用）
+          </AppText>
+          {row(picks, "logo 常用色")}
+        </View>
+      ) : null}
+      <AppText variant="callout" style={{ fontWeight: "700" }}>
+        變淡（往右越淡）
+      </AppText>
+      <Slider label="變淡，往右拉顏色變淡、往左變深" value={hsl.l / 100} onChange={(v) => set({ ...hsl, l: v * 100 })} />
+      <AppText variant="callout" style={{ fontWeight: "700" }}>
+        色彩飽和度（往右越鮮豔）
+      </AppText>
+      <Slider label="色彩飽和度，往右拉顏色更鮮豔、往左變灰" value={hsl.s / 100} onChange={(v) => set({ ...hsl, s: v * 100 })} />
+    </View>
+  );
+}
+
 function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () => void; onChanged: () => void }) {
   const { c } = useTheme();
   const [name, setName] = useState(logo.name);
-  const [mode, setMode] = useState<BgMode>(logo.bgUrl ? "image" : logo.bgColor && logo.bgColor !== "#FFFFFF" ? "color" : "white");
-  const [color, setColor] = useState(logo.bgColor ?? "#FFFFFF");
+  const [tab, setTab] = useState<Tab>("light"); // 預覽圖共用：切到哪一顆按鈕，預覽就顯示那個模式的樣子
+  const [lightColor, setLightColor] = useState(logo.bgColor ?? "#FFFFFF");
+  const [darkColor, setDarkColor] = useState<string | null>(logo.bgColorDark); // 深色模式底色：null＝沒設定，深色模式照淺色模式的底色或底圖；一選顏色就設定了
   const [logoPicks, setLogoPicks] = useState<string[]>([]);
   useEffect(() => {
     if (logo.logoUrl) void logoColors(resolveUrl(logo.logoUrl)).then(setLogoPicks);
@@ -92,10 +143,11 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
       setBusy(false);
     }
   };
-  const upload = (part: "logo" | "bg") => (file: File) => run(() => api("PUT", `/admin/brand-logos/${logo.id}/${part}`, file), part === "logo" ? "已更新 logo" : "已更新底圖");
+  const hasImage = !!logo.bgUrl;
+  const upload = (part: "logo" | "bg") => (file: File) => run(() => api("PUT", `/admin/brand-logos/${logo.id}/${part}`, file), part === "logo" ? "已更新 logo" : "已更新背景圖");
   const save = async () => {
-    const body: Record<string, unknown> = { name: name.trim(), bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null };
-    if (mode !== "image" && logo.bgUrl) await api("DELETE", `/admin/brand-logos/${logo.id}/bg`).catch(() => undefined);
+    // 有自訂背景圖時，淺色模式用背景圖（底色只是墊在下面）；沒有就用淺色底色。深色底色另外存。
+    const body: Record<string, unknown> = { name: name.trim(), bgColor: hasImage ? null : lightColor, bgColorDark: darkColor };
     if (await run(() => api("PATCH", `/admin/brand-logos/${logo.id}`, body), "已儲存")) onClose();
   };
   const remove = async () => {
@@ -103,43 +155,44 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
       if (await run(() => api("DELETE", `/admin/brand-logos/${logo.id}`), "已刪除")) onClose();
     }
   };
-  const preview = { logoUrl: logo.logoUrl ?? "", bgColor: mode === "color" ? color : mode === "white" ? "#FFFFFF" : null, bgUrl: mode === "image" ? logo.bgUrl : null };
+  const preview = { logoUrl: logo.logoUrl ?? "", bgColor: hasImage ? null : lightColor, bgColorDark: darkColor, bgUrl: logo.bgUrl };
   return (
     <EditSheet title="品牌 Logo" onClose={onClose} onSave={save} dirty busy={busy} error={error}>
-      <Field label="品牌標籤名稱（課程、清單選品牌時顯示的名稱）" value={name} onChange={setName} />
-      <AppText variant="callout" style={{ fontWeight: "700" }}>
-        封面預覽
+      {/* 品牌名稱欄位的右邊就是 logo 上傳／更換鈕（業主 2026-11-18）。 */}
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: space.sm }}>
+        <View style={{ flex: 1 }}>
+          <Field label="品牌標籤名稱" value={name} onChange={setName} />
+        </View>
+        <PickImageButton label={logo.logoUrl ? "更換 logo" : "上傳 logo"} onPick={upload("logo")} busy={busy} variant="primary" />
+      </View>
+      <AppText variant="caption" tone="muted">
+        品牌標籤名稱＝課程、清單選品牌時顯示的名稱。
       </AppText>
-      {logo.logoUrl ? <BrandCover brand={preview} style={{ borderRadius: radius.md }} /> : <AppText tone="muted">先上傳 logo 才看得到預覽</AppText>}
-      <PickImageButton label={logo.logoUrl ? "更換 logo 圖檔" : "上傳 logo 圖檔"} onPick={upload("logo")} busy={busy} variant="primary" />
-      <Chips title="封面底" label="底" options={[{ key: "white", label: "白色（預設）" }, { key: "color", label: "指定底色" }, { key: "image", label: "底圖" }]} value={mode} onChange={(v) => setMode(v as BgMode)} />
-      {mode === "color" ? (
+      {/* 預覽圖只有一張：下面三顆按鈕切換要調整的模式，預覽就顯示那個模式的樣子，淺色、深色可以來回調整。 */}
+      {logo.logoUrl ? <BrandCover brand={preview} scheme={tab === "dark" ? "dark" : "light"} style={{ borderRadius: radius.md }} /> : <AppText tone="muted">先上傳 logo 才看得到預覽</AppText>}
+      <Chips title="調整" label="調整" options={[{ key: "light", label: "淺色模式" }, { key: "dark", label: "深色模式" }, { key: "image", label: "自訂背景" }]} value={tab} onChange={(v) => setTab(v as Tab)} />
+      {tab === "light" ? (
+        hasImage ? (
+          <NoticeBox text="目前淺色模式用的是自訂背景圖。要改成純色，請到「自訂背景」移除背景圖。" />
+        ) : (
+          <ColorPicker value={lightColor} onChange={setLightColor} swatches={SWATCHES} picks={logoPicks} />
+        )
+      ) : null}
+      {tab === "dark" ? (
         <View style={{ gap: space.xs }}>
-          <View style={styles.swatches}>
-            {SWATCHES.map((x) => (
-              <Pressable key={x} accessibilityRole="button" accessibilityLabel={`底色 ${x}`} onPress={() => setColor(x)} style={[styles.swatch, { backgroundColor: x, borderColor: color === x ? c.accent : c.border, borderWidth: color === x ? 3 : 1 }]} />
-            ))}
-          </View>
-          {logoPicks.length ? (
-            <View style={{ gap: space.xs }}>
-              <AppText variant="caption" tone="muted">
-                logo 常用的顏色（點一下套用）
-              </AppText>
-              <View style={styles.swatches}>
-                {logoPicks.map((x) => (
-                  <Pressable key={x} accessibilityRole="button" accessibilityLabel={`logo 常用色 ${x}`} onPress={() => setColor(x)} style={[styles.swatch, { backgroundColor: x, borderColor: color === x ? c.accent : c.border, borderWidth: color === x ? 3 : 1 }]} />
-                ))}
-              </View>
-            </View>
-          ) : null}
-          <Field label="自訂底色（#RRGGBB）" value={color} onChange={setColor} placeholder="#FFFFFF" />
+          <AppText variant="caption" tone="muted">
+            只有使用者切換成「深色模式」時才套用，全站所有品牌 logo 出現的地方都一起變。還沒選顏色之前，深色模式照淺色模式的底色或背景圖。
+          </AppText>
+          <ColorPicker value={darkColor ?? "#1B1F1E"} onChange={setDarkColor} swatches={DARK_SWATCHES} picks={logoPicks} />
+          {darkColor ? <Button variant="cancel" label="清除深色底色（深色模式照淺色）" icon="close-circle-outline" disabled={busy} onPress={() => setDarkColor(null)} /> : null}
         </View>
       ) : null}
-      {mode === "image" ? (
+      {tab === "image" ? (
         <View style={{ gap: space.xs }}>
-          <PickImageButton label={logo.bgUrl ? "更換底圖" : "上傳底圖"} onPick={upload("bg")} busy={busy} />
+          <PickImageButton label={hasImage ? "更換背景圖" : "上傳背景圖"} onPick={upload("bg")} busy={busy} />
+          {hasImage ? <Button variant="cancel" label="移除背景圖（改回純色）" icon="trash-outline" disabled={busy} onPress={() => void run(() => api("DELETE", `/admin/brand-logos/${logo.id}/bg`), "已移除背景圖")} /> : null}
           <AppText variant="caption" tone="muted">
-            底圖會填滿整個封面，logo 放在中間（建議用 16:9 的圖）。
+            背景圖會填滿整個封面，logo 放在中間（建議用 16:9 的圖）。
           </AppText>
         </View>
       ) : null}

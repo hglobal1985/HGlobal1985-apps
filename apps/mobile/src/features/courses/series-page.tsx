@@ -22,7 +22,7 @@ import { lessonsOf } from "./category-sheet";
 import { CourseRow } from "./course-row";
 import { seriesOrdered } from "./sort";
 import { SeriesTile } from "./series-tile";
-import { useSubscribe } from "./subscribe";
+import { useCoverStats } from "./cover-stats";
 
 type View_ = "list" | "edm";
 const KEY = "hglobal:learn:series-view";
@@ -30,7 +30,7 @@ const GAP = space.md;
 
 /**
  * 系列單頁（全部課程 > 系列 > 顯示全部；業主 2026-11-16 改版，版面比照中心頁）：
- * 上方工具列（返回、標題、超級管理員的「編輯」、分享）→ 照片區（封面圖＋「N 門課・N 章節・N 點閱」，可上滑縮小）→
+ * 上方工具列（返回、標題、超級管理員的「編輯」、分享）→ 照片區（封面圖＋訂閱鈕＋點閱次數，可上滑縮小）→
  * 右上角切換「詳細清單」（每堂課一行，右側有分享）與「圖片 EDM」（一列三張，同中心頁的呈現）。
  * 照片與封面上傳都跟中心共用同一套（CenterHero、ArtUploader）。
  */
@@ -40,7 +40,6 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
   const artList = useApi<SeriesArt[]>("/series-art");
   const adminList = useApi<CourseSummary[]>(member?.courseRights ? "/admin/courses" : null);
-  const [views, setViews] = useState<number | null>(null);
   const [view, setView] = useState<View_>("list");
   const [editOpen, setEditOpen] = useState(false);
   const [newOpen, setNewOpen] = useState<AddKind | null>(null);
@@ -54,9 +53,6 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   }, []);
   useEffect(() => {
     trackFeature("series_page");
-    api<{ total: number }>("POST", "/series-views", { series })
-      .then((r) => setViews(r.total))
-      .catch(() => undefined);
   }, [series]); // eslint-disable-line react-hooks/exhaustive-deps
   const courses = useMemo(() => {
     const pub = (data ?? []).filter((x) => x.status === "published" && x.viewScope !== "link_login" && x.viewScope !== "link_guest");
@@ -81,7 +77,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       });
   };
   useEffect(() => setLocalIds(null), [data]); // 重新讀回伺服器資料後，以伺服器順序為準
-  const sub = useSubscribe("series", series, path);
+  const stats = useCoverStats("series", series, path); // 封面的訂閱鈕與點閱次數（封面統計模組，全站同一套）
   // 分享網址一律用系列短網址（/Beauty-Starry），沒設定才用 /series/名稱（業主 2026-11-17）；網頁版網址列也換成短網址。
   const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
   const slug = links.data?.find((l) => l.kind === "series" && l.value === series)?.slug;
@@ -108,7 +104,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         path={sharePath}
         extra={isSuperAdmin(member) ? <TopBarButton label="編輯" accessibilityLabel="編輯系列封面" iconName="create-outline" onPress={() => setEditOpen(true)} /> : undefined}
       />
-      <Screen wide header={false} hero={<CenterHero art={art} scrollY={scrollY} courses={courses.length} lessons={lessonsOf(courses)} views={views} title={series} subscribe={sub} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
+      <Screen wide header={false} hero={<CenterHero art={art} scrollY={scrollY} stats={stats} title={series} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}

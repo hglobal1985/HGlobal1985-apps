@@ -61,6 +61,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   // 系列小卡：有管理員裁切好的系列封面就用封面（16:9），沒有才用系列 EDM（業主 2026-11-17：新上傳的高 EDM 沒用裁切後的封面，字被切掉）。
   const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesCoverUrl || rep.seriesEdmUrl : rep.edmUrl;
   const ribbons = ribbonsFor(rep, member, config);
+  const count = group.sessions.reduce((n, x) => n + x.materialCount, 0);
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
   // 系列裡只有一份清單：有勾「顯示在上拉選單」的區塊就彈出區塊選單，沒有區塊就直接進清單頁（業主 2026-11-18）。
   const soloList = !flat && group.sessions.length === 1 && rep.isList;
@@ -71,6 +72,14 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
         {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? rep.series : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
+        {/* 安麗品牌專區的每張卡片：右下角統一用淡灰色膠囊顯示教材數量（業主 2026-11-18）。 */}
+        {!flat && rep.zone === "amway_brand" ? (
+          <View style={styles.count} pointerEvents="none" accessibilityLabel={`${count}個教材`}>
+            <Text style={styles.countText} {...({ dataSet: { noScale: "" } } as object)}>
+              {count}
+            </Text>
+          </View>
+        ) : null}
         {/* 管理者才看得到的未上架課程：左下角標「未上架」（學員的清單裡不會有這些課）。 */}
         {group.sessions.some((x) => x.status === "draft") ? (
           <View style={[styles.draft, { backgroundColor: c.warning }]}>
@@ -87,5 +96,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
 const styles = StyleSheet.create({
   art: { borderRadius: radius.md, overflow: "hidden" },
   draft: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  count: { position: "absolute", right: 6, bottom: 6, minWidth: 22, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999, alignItems: "center", backgroundColor: "rgba(232,232,230,0.96)" },
+  countText: { color: "#5A5A57", fontSize: 12, fontWeight: "700" },
   draftText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });

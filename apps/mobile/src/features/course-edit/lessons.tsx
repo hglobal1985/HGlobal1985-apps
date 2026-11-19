@@ -12,7 +12,7 @@ import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
-import { AppText, Button, Card, DateSelect, Icon, NoticeBox, todayStr } from "@/ui";
+import { AppText, Button, Card, DateSelect, Icon, NoticeBox, SheetRow, todayStr } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { Check } from "./course-sections";
@@ -506,12 +506,7 @@ export function MoveToBlockSheet({ items, lesson, onPick, onClose }: { items: Le
       </AppText>
       <SheetScroll>
         {heads.map((h) => (
-          <Pressable key={h.id} accessibilityRole="button" disabled={h.id === current} onPress={() => onPick(h.id)} style={{ minHeight: minTouch + 8, flexDirection: "row", alignItems: "center", gap: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, opacity: h.id === current ? 0.4 : 1 }}>
-            <AppText variant="body" style={{ flex: 1, fontWeight: "700" }}>
-              📂 {h.title}
-            </AppText>
-            <AppText tone="muted">{h.id === current ? "目前所在" : "›"}</AppText>
-          </Pressable>
+          <SheetRow key={h.id} title={`📂 ${h.title}`} disabled={h.id === current} onPress={() => onPick(h.id)} chevron={h.id !== current} right={h.id === current ? <AppText tone="muted">目前所在</AppText> : undefined} />
         ))}
       </SheetScroll>
       <Button variant="cancel" label="取消" onPress={onClose} fullWidth />
