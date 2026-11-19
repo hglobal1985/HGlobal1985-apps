@@ -32,7 +32,8 @@ export function fitFontSize(title: string, w: number, h: number, max = 72, min =
 
 /** 固定分行的字級：每一行都塞得進寬度，總高度也塞得進方框。 */
 function fitLines(lines: string[], w: number, h: number, max = 72, min = 14): number {
-  const widest = Math.max(...lines.map(textUnits), 1);
+  // 每一行都不可換行（業主 2026-11-19：日期 X年X月 強制同一行）：寬度估算多留 15% 安全邊界，字寧可小一點。
+  const widest = Math.max(...lines.map(textUnits), 1) * 1.15;
   for (let fs = max; fs > min; fs -= 2) if (widest * fs <= w && lines.length * fs * 1.25 <= h) return fs;
   return min;
 }
@@ -72,9 +73,20 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
       {hasTitle ? (
         <View style={styles.titleBox}>
           {fs ? (
-            <AppText style={{ color: fg, fontSize: fs, lineHeight: Math.round(fs * 1.18), fontWeight: "900", textAlign: "center" }} {...({ dataSet: { noScale: "" } } as object)}>
-              {fixed ? fixed.join("\n") : title}
-            </AppText>
+            fixed ? (
+              // 固定格式：每一行各自一個文字、強制單行不換行。
+              <>
+                {fixed.map((ln, i) => (
+                  <AppText key={i} numberOfLines={1} style={[{ color: fg, fontSize: fs, lineHeight: Math.round(fs * 1.25), fontWeight: "900", textAlign: "center" }, { whiteSpace: "nowrap" } as object]} {...({ dataSet: { noScale: "" } } as object)}>
+                    {ln}
+                  </AppText>
+                ))}
+              </>
+            ) : (
+              <AppText style={{ color: fg, fontSize: fs, lineHeight: Math.round(fs * 1.18), fontWeight: "900", textAlign: "center" }} {...({ dataSet: { noScale: "" } } as object)}>
+                {title}
+              </AppText>
+            )
           ) : null}
         </View>
       ) : null}
