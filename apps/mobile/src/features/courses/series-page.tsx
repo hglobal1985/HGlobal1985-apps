@@ -14,7 +14,7 @@ import { useApi, useSession } from "@/state/session";
 import { portraitColumns } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { CardGrid, EmptyState, ErrorView, LoadingView, LoginPrompt, Screen } from "@/ui";
+import { Card, EmptyState, ErrorView, LoadingView, LoginPrompt, Screen } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
@@ -115,12 +115,14 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
             {toggle("edm", "grid-outline", "圖片 EDM")}
           </View>
         ) : null}
-        {view === "list" && canOrder
-          ? shown.map((x, i) => (
-              <View key={x.id} style={styles.orderRow}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <CourseRow course={x} />
-                </View>
+        {view === "list" ? (
+          <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+            {canOrder
+              ? shown.map((x, i) => (
+                  <View key={x.id} style={styles.orderRow}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <CourseRow course={x} last={i === shown.length - 1} />
+                    </View>
                 <View style={styles.arrows}>
                   <Pressable accessibilityRole="button" accessibilityLabel={`上移 ${x.title}`} disabled={i === 0} onPress={() => move(i, i - 1)} style={[styles.arrow, { borderColor: c.border, backgroundColor: c.surface, opacity: i === 0 ? 0.3 : 1 }]}>
                     <Ionicons name="arrow-up" size={22} color={c.text} />
@@ -129,10 +131,11 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
                     <Ionicons name="arrow-down" size={22} color={c.text} />
                   </Pressable>
                 </View>
-              </View>
-            ))
-          : null}
-        {view === "list" && !canOrder ? <CardGrid>{courses.map((x) => <CourseRow key={x.id} course={x} />)}</CardGrid> : null}
+                  </View>
+                ))
+              : courses.map((x, i) => <CourseRow key={x.id} course={x} last={i === courses.length - 1} />)}
+          </Card>
+        ) : null}
         {view === "edm" ? (
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW ? courses.map((x) => <SeriesTile key={x.id} group={{ key: `c:${x.id}`, nearest: x, sessions: [x] }} width={tileW} flat />) : null}
