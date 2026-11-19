@@ -220,8 +220,18 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const stickyNotice = registerNode && !registerIsAction ? registerNode : null;
   const needRank = member && !course.eligible ? `限${course.minRank.name}獎銜以上報名${course.allowPresident ? "（會長也可報名）" : ""}` : null;
 
-  const lessons = course.lessons.filter((l) => !l.material);
-  const materials = course.lessons.filter((l) => l.material);
+  // 套裝課程（業主 2026-11-19）：第一個區塊之前的章節仍在「課程章節」；從第一個區塊起（含放進區塊的章節）都歸區塊管理。
+  const nonFull = course.lessons.filter((l) => !l.full);
+  const firstSec = course.isPackage && !course.isList ? nonFull.findIndex((l) => l.section) : -1;
+  const pkgBlocks = firstSec >= 0;
+  const lessons = pkgBlocks ? nonFull.slice(0, firstSec).filter((l) => !l.material) : course.lessons.filter((l) => !l.material);
+  const materials = pkgBlocks ? [...nonFull.slice(0, firstSec).filter((l) => l.material), ...nonFull.slice(firstSec), ...course.lessons.filter((l) => l.full)] : course.lessons.filter((l) => l.material);
+  /** 區塊移動時的整組項目（套裝課程含章節，才能把章節拉進區塊）。 */
+  const blockGroup = pkgBlocks ? nonFull : materials.filter((l) => !l.full);
+  // 學員看的版面：區塊裡的章節要顯示在區塊格子裡（當成教材列），課程章節清單只剩區塊前面的章節。
+  const inBlockChapters = new Set(pkgBlocks ? nonFull.slice(firstSec).filter((l) => !l.material).map((l) => l.id) : []);
+  const blockView: CourseDetail = pkgBlocks ? { ...course, lessons: course.lessons.filter((l) => l.material || inBlockChapters.has(l.id)).map((l) => (inBlockChapters.has(l.id) ? { ...l, material: true } : l)) } : course;
+  const chapterView: CourseDetail = pkgBlocks ? { ...course, lessons: lessons } : course;
   /** 重新編號：章節、教材各自從 1 開始（完整版課程影片不編號）。 */
   const renumber = (list: Lesson[]): Lesson[] => {
     const n = { chapter: 0, material: 0 };
@@ -247,13 +257,14 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   };
   /** 把一組項目依新順序放回它們原本佔的位置（畫面先改、背景存檔）。 */
   const applyOrder = (group: Lesson[], next: Lesson[]) => {
-    const ids = next.map((l) => l.id);
     const groupIds = new Set(group.map((l) => l.id));
     // 這一組在整份清單裡原本佔的位置，依新順序放回去。
     const all = course!.lessons;
     const slots = all.map((l, i) => (groupIds.has(l.id) && !l.full ? i : -1)).filter((i) => i >= 0);
     const merged = [...all];
     slots.forEach((slot, k) => (merged[slot] = next[k]!));
+    // 套裝課程有區塊時，章節與教材混在一起排，一律送整份順序。
+    const ids = (pkgBlocks ? merged.filter((l) => !l.full) : next).map((l) => l.id);
     optimistic(renumber(merged), () => api("POST", `/admin/courses/${course!.id}/lessons/order?lite=1`, { ids }));
   };
   const moveLesson = async (group: Lesson[], from: number, to: number) => {
@@ -265,7 +276,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   };
   /** 把教材移到另一個區塊的最後面。 */
   const moveToBlock = (lesson: Lesson, blockId: string) => {
-    const group = materials.filter((l) => !l.full);
+    const group = blockGroup;
     const rest = group.filter((l) => l.id !== lesson.id);
     const at = rest.findIndex((l) => l.id === blockId);
     if (at < 0) return;
@@ -275,7 +286,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   };
   /** 勾選的多個教材一起移到某區塊的最後面（保持它們原本的先後順序）。 */
   const moveManyToBlock = (ids: string[], blockId: string) => {
-    const group = materials.filter((l) => !l.full);
+    const group = blockGroup;
     const pick = new Set(ids);
     const moved = group.filter((l) => pick.has(l.id));
     const rest = group.filter((l) => !pick.has(l.id));
@@ -443,7 +454,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           <>
             {course.isList ? null : (
               <Section title="課程章節">
-                <EditLessonRows group={lessons} word="章節" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(lessons, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} />
+                <EditLessonRows group={lessons} word="章節" onMoveTo={pkgBlocks ? setMoveTarget : undefined} onEdit={setLessonSheet} onMove={(i, j) => moveLesson(lessons, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} />
                 <Button variant="secondary" label="新增章節" icon="add" onPress={() => setSheet("newLesson")} fullWidth />
                 <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段。" />
               </Section>
@@ -453,7 +464,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
               {hasBlocks(course) ? (
                 <>
                 {course.isList ? null : <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
-                <BlockEditList items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} busy={lessonBusy} />
+                <BlockEditList extraMovable={lessons.length > 0 && pkgBlocks} items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} busy={lessonBusy} />
                 </>
               ) : (
                 <>
@@ -465,9 +476,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
             </Section>
           </>
         ) : null}
-        {(editing && canEditContent) || course.isList ? null : (
+        {(editing && canEditContent) || course.isList || (pkgBlocks && !lessons.length) ? null : (
           <View>
-          <ChapterList course={course} style={allLocked ? { minHeight: 230 } : undefined} playingId={editing ? null : playingId} onPlay={playLesson_} />
+          <ChapterList course={chapterView} style={allLocked ? { minHeight: 230 } : undefined} playingId={editing ? null : playingId} onPlay={playLesson_} />
           {allLocked ? (
             <View style={styles.mask} accessibilityRole="alert" accessibilityLabel={lockedText}>
               <Ionicons name="lock-closed" size={48} color="#fff" />
@@ -483,7 +494,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           ) : null}
           </View>
         )}
-        {!(editing && canEditContent) && course.lessons.some((l) => l.material) ? (
+        {!(editing && canEditContent) && blockView.lessons.some((l) => l.material) ? (
           <Section title={course.isList ? "" : "其他教材"}>
             {hasBlocks(course) && course.lessons.some((l) => l.section) ? (
               <View style={[styles.layoutToggle, { borderColor: c.border, backgroundColor: c.surface }]} accessibilityRole="radiogroup">
@@ -494,7 +505,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
                 ))}
               </View>
             ) : null}
-            <FullVersionList course={course} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
+            <FullVersionList course={blockView} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
           </Section>
         ) : null}
         {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}
@@ -510,8 +521,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
-      {pickBlock ? <PickMaterialsSheet items={materials.filter((l) => !l.full)} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
-      {moveTarget ? <MoveToBlockSheet items={materials.filter((l) => !l.full)} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
+      {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
+      {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
       {lessonSheet ? <LessonSheet course={course} lesson={course.lessons.find((l) => l.id === lessonSheet.id) ?? lessonSheet} onClose={() => setLessonSheet(null)} /> : null}
     </View>
   );

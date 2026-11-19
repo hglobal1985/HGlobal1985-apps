@@ -152,8 +152,8 @@ async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
         list.push(cur);
         map.set(r.course_id, list);
       }
-    } else if (r.has && any && r.kind === "material") counts.set(any, (counts.get(any) ?? 0) + 1);
-    if (r.kind === "material" && cur && r.has) cur.count++;
+    } else if (r.has && any) counts.set(any, (counts.get(any) ?? 0) + 1);
+    if (r.kind !== "section" && cur && r.has) cur.count++;
   }
   if (links.length) {
     // 連結區塊（品牌資訊卡）：數量用來源區塊的；封面＝來源清單的系列封面。
@@ -5653,11 +5653,23 @@ const routes: [string, RegExp, Handler][] = [
       // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
       const full = kind !== "chapter" ? await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>() : null;
       const speaker = speakerNew;
+      // 套裝課程：新章節放在第一個區塊的前面（不要掉進最後一個區塊裡）。
+      let insertAt = full ? full.position : course.maxpos + 1;
+      const shift: D1PreparedStatement[] = [];
+      if (kind === "chapter" && !isList) {
+        const firstSec = await ctx.db.prepare("SELECT MIN(position) AS p FROM lessons WHERE course_id = ? AND kind = 'section'").bind(courseId).first<{ p: number | null }>();
+        if (firstSec?.p != null) {
+          insertAt = firstSec.p;
+          const rows = (await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND position >= ? ORDER BY position DESC").bind(courseId, insertAt).all<{ id: string; position: number }>()).results;
+          shift.push(...rows.map((r) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(-r.position - 1, r.id)), ...rows.map((r) => ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(r.position + 1, r.id)));
+        }
+      }
       await ctx.db.batch([
+        ...shift,
         ...(speaker ? [ctx.db.prepare("UPDATE lessons SET is_speaker = 0 WHERE course_id = ? AND kind = 'chapter'").bind(courseId)] : []),
         ...(summaryNew ? [ctx.db.prepare("UPDATE lessons SET is_summary = 0 WHERE course_id = ?").bind(courseId)] : []),
         ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker, is_summary, brand_id, categories, in_sheet) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, courseId, full ? full.position : course.maxpos + 1, title || "主講人", sharer, sharerRank, sharerTitle, eventDate, 0, kind, speaker ? 1 : 0, summaryNew ? 1 : 0, kind === "section" ? await blockBrand(ctx, body.brandId) : null, kind === "section" ? blockCats(body.categories) : "", kind === "section" && body.inSheet === false ? 0 : 1),
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind, is_speaker, is_summary, brand_id, categories, in_sheet) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 'demo', ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, courseId, insertAt, title || "主講人", sharer, sharerRank, sharerTitle, eventDate, 0, kind, speaker ? 1 : 0, summaryNew ? 1 : 0, kind === "section" ? await blockBrand(ctx, body.brandId) : null, kind === "section" ? blockCats(body.categories) : "", kind === "section" && body.inSheet === false ? 0 : 1),
         ...(speaker ? [speakerSync(ctx.db, courseId)] : []),
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);
@@ -5770,8 +5782,11 @@ const routes: [string, RegExp, Handler][] = [
         }
       }
       if (ids.length) {
+        // 套裝課程（業主 2026-11-19）：章節也可以放進區塊，所以傳進全部項目（章節、區塊、教材）時當成同一組一起排序。
+        const pkg = (await ctx.db.prepare("SELECT is_package FROM courses WHERE id = ?").bind(courseId).first<{ is_package: number }>())?.is_package === 1;
+        const mixed = pkg && ids.length === current.results.length;
         // 分類區域標題（section）和教材（material）同一組一起排序。
-        const grp = (k: string | undefined) => (k === "chapter" || k === undefined ? "chapter" : "material");
+        const grp = (k: string | undefined) => (mixed ? "all" : k === "chapter" || k === undefined ? "chapter" : "material");
         const first = byId.get(ids[0]!)!;
         const group = current.results.filter((r) => grp(r.kind) === grp(first.kind));
         if (ids.length !== group.length || new Set(ids).size !== ids.length || ids.some((i) => grp(byId.get(i)?.kind) !== grp(first.kind))) fail(400, "invalid_order", "順序不正確，請重新整理後再試");
