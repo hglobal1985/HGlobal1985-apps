@@ -178,7 +178,7 @@ export function MediaUploadModule({
 
 /**
  * 時間軸區間欄位（業主 2026-11-18 模組化）：拖曳時間軸（TimeRangePicker）＋手動輸入開始／結束時間＋「到影片結尾」勾選＋長度提示。
- * 章節、完整版課程影片（透過 MediaUploadModule）與「素材清單」的 YouTube 教材都用這一個元件，不可在別處另做。
+ * 章節、完整版課程影片（透過 MediaUploadModule）與「清單卡」的 YouTube 教材都用這一個元件，不可在別處另做。
  */
 export function TimeRangeFields({ draft, set, lesson, lengthLabel = "本段長度", showHint = true }: { draft: MediaDraft; set: (patch: Partial<MediaDraft>) => void; lesson?: Lesson; lengthLabel?: string; showHint?: boolean }) {
   const { c } = useTheme();

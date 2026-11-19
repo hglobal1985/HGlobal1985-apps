@@ -90,7 +90,7 @@ function ytIdOfUrl(u: URL | null): string | null {
 function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: CourseDetail; lesson?: Lesson; onClose: () => void; afterBlock?: string }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
-  // 素材清單的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
+  // 清單卡的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
   const baseLink = lesson?.linkUrl ?? (course.isList && lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
   const [url, setUrl] = useState(baseLink);
   const [title, setTitle] = useState(lesson?.title ?? "");

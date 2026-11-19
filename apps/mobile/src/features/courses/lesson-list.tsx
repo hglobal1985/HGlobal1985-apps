@@ -3,7 +3,7 @@ import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Image, Linking, Pressable, View, type ViewStyle } from "react-native";
+import { Image, Linking, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import { resolveUrl, type CourseDetail, type Lesson } from "@/api/client";
 import { TYPE_INFO } from "@/features/link-types";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
@@ -13,7 +13,7 @@ import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { CourseCover } from "@/ui/course-cover";
-import { AppText, BrandCover, Card, ListRow, SaplingIcon, ShareIcon } from "@/ui";
+import { AppText, BrandCover, Card, CountPill, ListRow, SaplingIcon, ShareIcon } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 import { fadedStyle } from "@/ui/fade-style";
@@ -64,7 +64,7 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
  * 「其他教材」區塊的清單：外部連結教材（業主 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
  */
-export function FullVersionList({ course, playingId, onPlay, openBlock }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string } & LessonPlayProps) {
+export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb" }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（業主 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" } & LessonPlayProps) {
   const { c } = useTheme();
   const isBlocks = course.isList && course.lessons.some((l) => l.section);
   // 清單的區塊：預設全部收起（業主 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
@@ -130,6 +130,25 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
     const cols = gridW < 440 ? 2 : gridW < 660 ? 3 : gridW < 880 ? 4 : 5;
     const GAP = space.sm;
     const cell = gridW ? Math.floor((gridW - GAP * (cols - 1)) / cols) : 0;
+    if (layout === "detail") {
+      return (
+        <View style={{ gap: space.sm }}>
+          {leadShown.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{leadShown.map(itemRow)}</Card> : null}
+          {visibleBlocks.map((b) => (
+            <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+              <View style={[{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }, b.items.filter(shown).length === 0 && fadedStyle]}>
+                <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
+                  {b.head.title}
+                </AppText>
+                <CountPill count={b.items.filter(shown).length} />
+              </View>
+              {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
+            </Card>
+          ))}
+          {full.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{full.map(itemRow)}</Card> : null}
+        </View>
+      );
+    }
     const rows: (typeof visibleBlocks)[] = [];
     for (let i = 0; i < visibleBlocks.length; i += cols) rows.push(visibleBlocks.slice(i, i + cols));
     return (
@@ -156,7 +175,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock }: { cour
                                 <CourseCover theme="" label="" title={b.head.title} fill />
                               )}
                               {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
-                              <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個素材，${on ? "已展開" : "已收起"}`}>
+                              <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
                                 <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
                                   {b.items.filter(shown).length}
                                 </AppText>
@@ -210,7 +229,7 @@ function MaterialShare({ course, lesson }: { course: CourseDetail; lesson: Lesso
   return <RowShare label={`分享教材：${lesson.title}`} onShare={() => shareLink(lesson.title, lesson.linkUrl!, { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }, { title: lesson.title })} />;
 }
 
-/** 素材清單裡每段影片最右側的「分享」鈕：網址＝清單網址?N（點開直接播放這一段），文字用「設定 > 分享預設值」的清單影片範本。 */
+/** 清單卡裡每段影片最右側的「分享」鈕：網址＝清單網址?N（點開直接播放這一段），文字用「設定 > 分享預設值」的清單影片範本。 */
 function ListItemShare({ course, lesson }: { course: CourseDetail; lesson: Lesson }) {
   return <RowShare label={`分享影片：${lesson.title}`} onShare={() => shareLink(lesson.title, lessonShareHref(course, lesson.position), undefined, undefined, undefined, { title: course.title, item: lesson.title })} />;
 }

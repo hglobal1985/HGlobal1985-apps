@@ -34,7 +34,7 @@ export function CourseCard({ course, siblings = [], footer, onPress, onPickSibli
           左邊最多三個標籤＝主講人姓名、主辦、價格（或已開通等狀態），日期靠右在同一列。 */}
       <View style={styles.infoRow}>
         <View style={styles.meta}>
-          {/* 素材清單沒有主講人、費用、日期與地點（業主 2026-11-16），只留主辦。 */}
+          {/* 清單卡沒有主講人、費用、日期與地點（業主 2026-11-16），只留主辦。 */}
           {course.teacher.trim() && !course.isList ? <Pill label={course.teacher.trim()} /> : null}
           {hostLine(course) ? (
             course.hostCenter ? (

@@ -1,6 +1,6 @@
 import type { D1Database, Env } from "./d1.ts";
 
-/** 品牌資訊卡（業主 2026-11-18）：每個品牌 logo 一張素材清單卡，放在「安麗品牌專區」，封面用品牌 logo。 */
+/** 品牌資訊卡（業主 2026-11-18）：每個品牌 logo 一張清單卡卡，放在「安麗品牌專區」，封面用品牌 logo。 */
 /** 業主可能改過清單名稱，所以優先用固定編號找。 */
 export const NEW_PRODUCT_LIST_ID = "cxnfbadr";
 export const NEW_PRODUCT_LIST_TITLE = "安麗新品與特惠直播培訓";

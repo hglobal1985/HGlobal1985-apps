@@ -134,8 +134,8 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
   const series = useApi<string[]>(isSuper ? "/admin/series" : null);
   return (
     <>
-      <Field label={isList ? "素材清單名稱（必填）" : "課程名稱（必填）"} value={f.title} onChange={set("title")} placeholder={isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
-      {/* 素材清單沒有主講人、職稱、獎銜（業主 2026-11-16）。 */}
+      <Field label={isList ? "清單卡名稱（必填）" : "課程名稱（必填）"} value={f.title} onChange={set("title")} placeholder={isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
+      {/* 清單卡沒有主講人、職稱、獎銜（業主 2026-11-16）。 */}
       {isList ? null : (
         <>
           <Field label="主講人" value={f.teacher} onChange={set("teacher")} placeholder="例如：王大明（選填）" />
@@ -171,19 +171,19 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const seriesSlug = links.data?.find((l) => l.kind === "series" && l.value === (course.series || f.series))?.slug;
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const submit = async () => {
-    if (!f.title.trim()) return setError(course.isList ? "請輸入素材清單名稱" : "請輸入課程名稱");
+    if (!f.title.trim()) return setError(course.isList ? "請輸入清單卡名稱" : "請輸入課程名稱");
     const { series: _series, zone, eventStart, eventEnd, ...rest } = f;
-    // 日期與「時間與地點」面板是同一份資料；素材清單沒有日期，不送。
+    // 日期與「時間與地點」面板是同一份資料；清單卡沒有日期，不送。
     const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
     const important = !course.isList && (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
     const matBody = course.isList && isSuper && matUrl.trim().toLowerCase() !== (course.matUrl ?? "") ? { matUrl: matUrl.trim() } : {};
     if (await save({ ...(isSuper ? { ...rest, series: f.series, ...(zone !== init.zone ? { zone } : {}) } : rest), ...dates, ...matBody }, { important })) onClose();
   };
-  // 右上「素材／課程」（業主 2026-11-18）：課程→素材要確認且不可逆（只有超級管理員）；素材不能轉回課程。
+  // 右上「素材／課程」（業主 2026-11-18）：課程→素材要確認且不可逆（只有超級管理員）；清單卡不能轉回課程卡。
   const pickKind = async (toList: boolean) => {
-    if (!toList) return flashText("素材不能轉回課程，請另外新增一門課程");
-    if (!isSuper) return flashText("只有超級管理員可以把課程轉成素材");
-    if (!(await confirmAsk("轉成素材", `確定把「${course.title}」轉成素材？轉換後費用、獎銜、報名與審核、主講人、日期地點都會消失，無法復原。`, "轉成素材"))) return;
+    if (!toList) return flashText("清單卡不能轉回課程卡，請另外新增一門課程");
+    if (!isSuper) return flashText("只有超級管理員可以把課程轉成清單卡");
+    if (!(await confirmAsk("轉成清單卡", `確定把「${course.title}」轉成清單卡？轉換後費用、獎銜、報名與審核、主講人、日期地點都會消失，無法復原。`, "轉成清單卡"))) return;
     try {
       onSaved(await api<CourseDetail>("POST", `/admin/courses/${course.id}/convert-to-list`));
       onClose();
@@ -199,7 +199,7 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
       onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
       {course.isList && isSuper ? (
         <View style={{ gap: space.xs }}>
-          <Label>素材網址（只有超級管理員能設定）</Label>
+          <Label>清單網址（只有超級管理員能設定）</Label>
           {seriesSlug ? (
             <>
               <AppText variant="caption" tone="muted">
@@ -216,7 +216,7 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
               </AppText>
             </>
           ) : (
-            <NoticeBox text="這份素材還沒有系列短網址。請先把素材放進系列，並到「設定 › 短網址設定」替這個系列設定英文短網址，才能設定素材網址。" />
+            <NoticeBox text="這份清單卡還沒有系列短網址。請先把清單卡放進系列，並到「設定 › 短網址設定」替這個系列設定英文短網址，才能設定清單網址。" />
           )}
         </View>
       ) : null}
@@ -499,7 +499,7 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
   return (
     <Card style={{ paddingVertical: 0 }}>
       <ListRow icon="create-outline" title="基本資料" subtitle={[course.title, !course.isList && course.teacher && `主講 ${course.teacher}`, course.category, course.series && `系列 ${course.series}`].filter(Boolean).join("・")} onPress={() => onOpen("basics")} />
-      {/* 素材清單沒有時間地點與費用（一律公開免費）。 */}
+      {/* 清單卡沒有時間地點與費用（一律公開免費）。 */}
       {course.isList ? null : <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />}
       {course.isList ? null : <ListRow icon="pricetag-outline" title="費用與審核" subtitle={priceText} onPress={() => onOpen("price")} />}
       <ListRow icon="people-outline" title="報名資格條件" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}・${VIEW_SCOPE_LABEL[course.viewScope]}`} onPress={() => onOpen("enroll")} />

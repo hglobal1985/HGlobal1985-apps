@@ -112,7 +112,7 @@ export default function ShareDefaultsScreen() {
 
       <Section title="③ 清單（影片／檔案）的分享">
         <Card>
-          {input("素材清單分享的文字", "「新增清單（影片／檔案）」建立的清單：清單頁右上角與清單列的分享，可用 {清單名稱}", s.listText, (v) => set("listText", v), { multiline: true })}
+          {input("清單卡分享的文字", "「新增清單（影片／檔案）」建立的清單：清單頁右上角與清單列的分享，可用 {清單名稱}", s.listText, (v) => set("listText", v), { multiline: true })}
           {input("清單裡單一影片分享的文字", "清單每段影片右側的分享鈕（點開直接播放這一段）：可用 {影片名稱}、{清單名稱}", s.listItemText, (v) => set("listItemText", v), { multiline: true })}
           {input("外部連結教材分享的文字", "課程與清單裡「外部連結」（簡報、PDF、雲端檔案…）右側的分享鈕：可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}；分享出去的網址是外部連結本身", s.materialText, (v) => set("materialText", v), { multiline: true })}
         </Card>
@@ -166,7 +166,7 @@ export default function ShareDefaultsScreen() {
             <AppText variant="body">{shareMessage(s, "https://learn.hglobal1985.com/136/wang-xiaoming-001?lesson=c1", { teacher: "王小明", title: "翡翠達標班" }, undefined, { sharer: "李華", sharerTitle: "白金經理", title: "第 2 堂 溝通技巧" })}</AppText>
           </View>
           <AppText variant="callout" tone="muted">
-            素材清單的分享文字（清單「美力之星精彩回顧」）
+            清單卡的分享文字（清單「美力之星精彩回顧」）
           </AppText>
           <View style={[styles.line, { borderColor: c.border, backgroundColor: c.surfaceMuted }]}>
             <AppText variant="body">{shareMessage(s, "https://learn.hglobal1985.com/course/ctp7xt2y", undefined, undefined, undefined, { title: "美力之星精彩回顧" })}</AppText>

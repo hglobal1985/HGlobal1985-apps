@@ -14,7 +14,7 @@ import { KindToggle } from "./kind-toggle";
  * 直接進入該課程介紹頁的編輯模式，其餘欄位在頁面上一區一區補（手機不用一口氣填完一大張表）。
  * 總部可以選主辦中心；中心的會長、音控、小編固定是自己的中心。
  */
-export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: listProp = false }: { onClose: () => void; defaultCenter?: string; /** 從系列頁新增：系列預先填好（業主 2026-11-18）。 */ defaultSeries?: string; /** 新增「素材清單」：只有名稱、主辦、系列，沒有主講人。 */ list?: boolean }) {
+export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: listProp = false }: { onClose: () => void; defaultCenter?: string; /** 從系列頁新增：系列預先填好（業主 2026-11-18）。 */ defaultSeries?: string; /** 新增「清單卡」：只有名稱、主辦、系列，沒有主講人。 */ list?: boolean }) {
   const { member, invalidate } = useSession();
   const [list, setList] = useState(listProp); // 右上「素材／課程」切換（業主 2026-11-18）：新增畫面可自由切換，整個面板的欄位跟著變
   const isHq = member?.role === "admin";
@@ -29,7 +29,7 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: li
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
-    if (!f.title.trim()) return setError(list ? "請輸入素材清單名稱" : "請輸入課程名稱");
+    if (!f.title.trim()) return setError(list ? "請輸入清單卡名稱" : "請輸入課程名稱");
     if (!list && !f.teacher.trim()) return setError("請輸入主講人姓名（課程專屬網址要用）");
     setBusy(true);
     setError(null);

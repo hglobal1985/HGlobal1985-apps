@@ -1,5 +1,5 @@
 /**
- * 素材影片徽章（業主 2026-11-19）：從「安麗官方素材專區」「安麗品牌專區」的每個區塊隨機挑 1～2 支影片（區塊裡影片多於 5 支挑 2 支，否則 1 支），
+ * 清單影片徽章（業主 2026-11-19）：從「安麗官方清單專區」「安麗品牌專區」的每個區塊隨機挑 1～2 支影片（區塊裡影片多於 5 支挑 2 支，否則 1 支），
  * 每支影片建立一枚徽章（condition_type = material_video），會員讀完（看完）該影片就解鎖；徽章圖固定用安麗 A 圖示（icon = "@amway"）。
  * 可重複執行：已經有徽章的區塊只補不足的數量，不會重抽、不會刪除既有徽章（避免會員已取得的徽章消失）。
  */
@@ -10,7 +10,7 @@ type Row = { id: string; course_id: string; kind: string; title: string; media_t
 const randomId = (n: number) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => (b % 36).toString(36)).join("");
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** 抽選：回傳這次新增的徽章數與全部素材影片徽章數。 */
+/** 抽選：回傳這次新增的徽章數與全部清單影片徽章數。 */
 export async function drawZoneVideoBadges(db: D1Database): Promise<{ added: number; total: number; groups: number }> {
   const { results } = await db
     .prepare(
