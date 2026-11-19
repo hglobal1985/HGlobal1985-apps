@@ -7,6 +7,7 @@ import {
   HQ_UNIT,
   REVIEW_REASONS,
   ACHIEVEMENT_TYPES,
+  textCoverLines,
   iconText,
   applicantLabel,
   type AchievementType,
@@ -539,7 +540,7 @@ const inFreeWindow = (row: { free_from: string | null; free_until: string | null
 
 /** 課程的 EDM／封面網址（含 YouTube 縮圖的自動與臨時封面）。 */
 function courseArt(row: CourseRow) {
-  const thumb = row.yt_ref ? ytThumbUrl(row.yt_ref) : null;
+  const thumb = row.yt_ref && !textCoverLines(row.title) ? ytThumbUrl(row.yt_ref) : null; // 銅章會議等固定文字封面不用 YouTube 縮圖
   const forced = row.auto_cover === 1 && !!thumb;
   const none = !row.edm_key && !row.cover_key && !!thumb;
   if (forced || none) return { edmUrl: thumb, coverUrl: thumb, edmViewY: 0, coverRect: null };

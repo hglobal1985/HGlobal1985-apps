@@ -63,6 +63,9 @@ export const courseThemes: Record<
   violet: { light: ["#E3DCF1", "#5A4389"], dark: ["#2C2540", "#C8B7EE"] },
 };
 
+/** 固定格式文字封面的咖啡色系（業主 2026-11-19，銅章會議）：[底色, 文字色]。不在 courseThemes 的隨機色裡。 */
+export const coverBronze: { light: [string, string]; dark: [string, string] } = { light: ["#6B4226", "#F7E7C6"], dark: ["#4A2E1B", "#F0D9A8"] };
+
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const radius = { sm: 8, md: 12, lg: 16, pill: 999 } as const;
 
