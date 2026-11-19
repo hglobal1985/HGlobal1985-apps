@@ -279,6 +279,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   useEffect(() => setOrderOverride(null), [config.seriesOrder]);
   const canSort = isSuperAdmin(member) && mode === "series" && !flat && !matched;
   const canMove = canSort;
+  const latestOrder = useRef<string[] | null>(null);
+  const saving = useRef(false);
   const swapCard = (zone: typeof groups, i: number, dir: -1 | 1) => {
     const j = i + dir;
     if (j < 0 || j >= zone.length) return;
@@ -288,12 +290,31 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     let k = 0;
     const full = groups.map((g) => (inZone.has(g.key) ? zoneKeys[k++]! : g.key));
     setOrderOverride(full);
-    void api("PUT", "/admin/ui-config", { seriesOrder: full, ribbons: config.ribbons })
-      .then(() => reloadConfig())
-      .catch((e: Error) => {
+    // 連續按很多下時不同時送出多個請求（會互相蓋掉、也容易失敗）：只記最新順序，前一次送完才送下一次；失敗自動重試一次。
+    latestOrder.current = full;
+    if (saving.current) return;
+    saving.current = true;
+    void (async () => {
+      try {
+        while (latestOrder.current) {
+          const send = latestOrder.current;
+          latestOrder.current = null;
+          try {
+            await api("PUT", "/admin/ui-config", { seriesOrder: send });
+          } catch {
+            await new Promise((r) => setTimeout(r, 800));
+            await api("PUT", "/admin/ui-config", { seriesOrder: send });
+          }
+        }
+        reloadConfig();
+      } catch (e) {
+        latestOrder.current = null;
         setOrderOverride(null);
-        flashText(e.message);
-      });
+        flashText((e as Error).message);
+      } finally {
+        saving.current = false;
+      }
+    })();
   };
   // 章節模式：符合條件的章節，不分組、不顯示系列標題，順序隨機（每次打開頁面、切到章節模式就重新洗牌；
   // 同一次瀏覽中打字搜尋、換分類時，相對順序保持不變，畫面不會跳動）。
