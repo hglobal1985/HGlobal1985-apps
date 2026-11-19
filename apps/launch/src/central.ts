@@ -272,9 +272,10 @@ export async function centralReviews(token: string): Promise<CentralReviews> {
 }
 
 /** 處理一筆申請；回傳中央的狀態碼（200 成功；403 不是你的中心；404 已被處理過）。 */
-export async function centralDecide(token: string, id: string, decision: "approve" | "reject"): Promise<number> {
+export async function centralDecide(token: string, id: string, decision: "approve" | "reject"): Promise<{ status: number; body: Record<string, unknown> | null }> {
   const res = await callCentral(token, `/v1/eligibility/reviews/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify({ decision }) });
-  return res?.status ?? 503;
+  const body = res?.ok ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
+  return { status: res?.status ?? 503, body };
 }
 
 /** 會員在會員中心的第一組會員編號（安麗會員編號，用來當「我的書櫃」網址）；查不到回 null。只在建立書櫃那一刻讀一次。 */
