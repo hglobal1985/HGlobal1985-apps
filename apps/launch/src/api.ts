@@ -73,6 +73,7 @@ import { ImportError, loadFileSettings, normalizeFileSettings, openUserDriveFile
 import { centerShareName } from "./og.ts";
 import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
 import { drawZoneVideoBadges } from "./zone-video-badges.ts";
+import { isCoverKey, isKeyInUse, listInUseCards, listUnusedCovers, type InUseCard } from "./cover-library.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
@@ -4469,6 +4470,45 @@ const routes: [string, RegExp, Handler][] = [
         total += size;
       }
       return { totalBytes: total, objectCount: sizes.size, byType: totals, byCenter: [...rows.values()].sort((a, b) => b.total - a.total), fileSettings: await loadFileSettings(ctx.db) };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/cover-library$/,
+    async (ctx) => {
+      // 封面庫（業主 2026-11-19，超級管理員）：未使用的封面檔＋正在使用中的系列卡／課程卡／清單卡封面（三種分開）。
+      requireSuperAdmin(ctx);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const [unused, cards] = await Promise.all([listUnusedCovers(ctx.db, bucket), listInUseCards(ctx.db)]);
+      const card = (c: InUseCard) => ({ kind: c.kind, id: c.id, title: c.title, edmUrl: c.edmKey ? pubUrl(c.edmKey, c.version) : null, coverUrl: c.coverKey ? pubUrl(c.coverKey, c.version) : null });
+      return { unused: unused.items, unusedTotal: unused.total, series: cards.filter((c) => c.kind === "series").map(card), courses: cards.filter((c) => c.kind === "course").map(card), lists: cards.filter((c) => c.kind === "list").map(card) };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/cover-library\/file$/,
+    async (ctx) => {
+      // 未使用的封面檔的預覽圖（一般的公開圖片網址只服務使用中的檔案，所以另外給超級管理員看）。
+      requireSuperAdmin(ctx);
+      const key = ctx.url.searchParams.get("k") ?? "";
+      if (!isCoverKey(key)) return fail(400, "invalid_key", "檔案名稱不正確");
+      const obj = (await ctx.env.MEDIA?.get(key)) ?? fail(404, "not_found", "找不到這個檔案");
+      return new Response(obj.body, { headers: { "content-type": obj.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "private, max-age=300", "x-content-type-options": "nosniff" } });
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/cover-library$/,
+    async (ctx) => {
+      // 永久刪除一個「未使用」的封面檔：真的從雲端儲存（R2）刪除，無法復原；還在使用中的一律不准刪。
+      const s = requireSuperAdmin(ctx);
+      const key = ctx.url.searchParams.get("k") ?? "";
+      if (!isCoverKey(key)) return fail(400, "invalid_key", "檔案名稱不正確");
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      if (await isKeyInUse(ctx.db, key)) return fail(409, "in_use", "這個封面檔還在使用中，不能刪除");
+      await bucket.delete(key);
+      await ctx.db.batch([audit(ctx.db, s.sub, "cover_library.delete", "r2", key)]);
+      return { ok: true };
     },
   ],
   [

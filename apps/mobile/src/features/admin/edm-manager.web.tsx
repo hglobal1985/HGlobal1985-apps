@@ -4,12 +4,13 @@ import { confirmAsk } from "@/features/confirm";
 import { AppText, Button, Card, NoticeBox, Section } from "@/ui";
 import { useSheetSave } from "@/features/course-edit/edit-sheet";
 import { EdmCropper } from "./edm-cropper.web";
+import { CoverLibraryPicker, deleteUnusedCover, type PickedCover } from "./cover-library.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
 import { useUiConfig } from "@/state/ui-config";
 import { EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 import { locateCover } from "./cover-match.web";
 
-type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode };
+type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode; /** 從封面庫挑了「未使用的封面檔」：儲存成功後把它刪掉。 */ consumeKey?: string };
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 
 /** 預設的 16:9 封面裁切框：水平垂直置中、盡量大。 */
@@ -107,6 +108,9 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
     }
   };
 
+  /** 從封面庫挑一張現有的圖：等同剛選了檔案，走同樣的裁切與儲存流程。 */
+  const fromLibrary = ({ img, consumeKey }: PickedCover) => setJob({ img, src: img.src, isNew: true, cover: defaultCover(img), mode: defaultCoverMode(img), consumeKey });
+
   const save = async () => {
     if (!job) return;
     setBusy(true);
@@ -117,6 +121,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
       await api("PUT", `/admin/courses/${course.id}/cover`, contain ? await composeContain(job.img, config.app.imageMaxSide, config.app.imageQuality / 100) : await cropCompress(job.img, job.cover, config.app.imageMaxSide, config.app.imageQuality / 100));
       // 封面框（占圖片寬高的比例）一併存起來；後端用它算出「預設停留位置＝封面框上緣」，兩者永遠同步。
       await api("PATCH", `/admin/courses/${course.id}`, { coverRect: contain ? { x: 0, y: 0, w: 1 } : { x: job.cover.x / job.img.naturalWidth, y: job.cover.y / job.img.naturalHeight, w: job.cover.w / job.img.naturalWidth } });
+      await deleteUnusedCover(job.consumeKey);
       setJob(null);
       setMsg({ tone: "success", text: "已儲存" });
       onChanged();
@@ -165,6 +170,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
         {!job ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <Button label={course.edmUrl ? "更換 EDM" : "上傳 EDM"} icon="image-outline" disabled={busy} onPress={() => input.current?.click()} />
+            <CoverLibraryPicker disabled={busy} onPick={fromLibrary} />
             {course.edmUrl ? <Button variant="secondary" label="調整封面與預設位置" icon="crop-outline" disabled={busy} onPress={adjust} /> : null}
             {course.edmUrl ? <Button variant="ghost" label="移除 EDM" disabled={busy} onPress={() => remove("edm")} /> : null}
             {course.coverUrl ? <Button variant="ghost" label="移除封面" disabled={busy} onPress={() => remove("cover")} /> : null}

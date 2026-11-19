@@ -6,6 +6,7 @@ import { radius, space } from "@/theme/tokens";
 import { AppText, Button } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
 import { EdmCropper } from "./edm-cropper.web";
+import { CoverLibraryPicker, deleteUnusedCover, type PickedCover } from "./cover-library.web";
 import { useUiConfig } from "@/state/ui-config";
 import { cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 
@@ -24,7 +25,7 @@ function defaultRect(img: HTMLImageElement, aspect: number): Rect {
   return { x: Math.round((img.naturalWidth - w) / 2), y: Math.round((img.naturalHeight - h) / 2), w: Math.round(w), h: Math.round(h) };
 }
 
-type Job = { img: HTMLImageElement; cover: Rect; poster: Rect; step: "cover" | "poster"; usePoster: boolean };
+type Job = { img: HTMLImageElement; cover: Rect; poster: Rect; step: "cover" | "poster"; usePoster: boolean; /** 從封面庫挑了「未使用的封面檔」：儲存成功後把它刪掉。 */ consumeKey?: string };
 
 const mmss = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
@@ -78,7 +79,8 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
   const media = lesson.media;
   const canFrames = media?.type === "youtube" || media?.type === "mux";
 
-  const start = (img: HTMLImageElement) => setJob({ img, cover: defaultRect(img, 16 / 9), poster: defaultRect(img, POSTER_ASPECT), step: "cover", usePoster: true });
+  const start = (img: HTMLImageElement, consumeKey?: string) => setJob({ img, cover: defaultRect(img, 16 / 9), poster: defaultRect(img, POSTER_ASPECT), step: "cover", usePoster: true, consumeKey });
+  const fromLibrary = ({ img, consumeKey }: PickedCover) => start(img, consumeKey);
   const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = "";
@@ -118,6 +120,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
     try {
       await api("PUT", `/admin/lessons/${lesson.id}/art?part=cover`, await cropCompress(job.img, job.cover, config.app.imageMaxSide, config.app.imageQuality / 100));
       if (job.usePoster) await api("PUT", `/admin/lessons/${lesson.id}/art?part=poster`, await cropCompress(job.img, job.poster, POSTER_MAX_SIDE, 0.9));
+      await deleteUnusedCover(job.consumeKey);
       setJob(null);
       setMsg(null);
       onChanged();
@@ -157,6 +160,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
       </View>
       <View style={styles.buttons}>
         <Button variant="secondary" label="上傳圖片" icon="image-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} />
+        <CoverLibraryPicker disabled={busy} onPick={fromLibrary} />
         {canFrames ? <Button variant="secondary" label="從影片選畫面" icon="film-outline" disabled={busy} onPress={() => setFrames(true)} /> : null}
       </View>
       {msg ? (
@@ -211,6 +215,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
     setMsg("上傳中…");
     try {
       await api("PUT", `/admin/lessons/${lesson.id}/art?part=cover`, await cropCompress(job.img, job.cover, config.app.imageMaxSide, config.app.imageQuality / 100));
+      await deleteUnusedCover(job.consumeKey);
       setJob(null);
       setMsg(null);
       onChanged();
