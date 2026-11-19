@@ -137,3 +137,15 @@ export function urlNameVariants(name: string): string[] {
   const n = String(Number(m[2]));
   return [...new Set([name, `${m[1]}${n}`, `${m[1]}${n.padStart(3, "0")}`])];
 }
+
+/**
+ * 沒有主講人的課程（勾了「無」）：專屬網址用課程名稱的英譯（規則同主講人姓名；業主 2026-11-19）。
+ * 名稱很長時只取前 40 個字元（在連字號處斷開），避免網址過長；轉不出英文字母就回空字串（＝不產生專屬網址）。
+ */
+export function romanizeTitle(title: string): string {
+  const base = romanizeName(title);
+  if (base.length <= 40) return base;
+  const cut = base.slice(0, 40);
+  const at = cut.lastIndexOf("-");
+  return (at >= 12 ? cut.slice(0, at) : cut).replace(/-+$/, "");
+}
