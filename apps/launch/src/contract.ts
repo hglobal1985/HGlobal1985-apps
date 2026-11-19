@@ -403,7 +403,7 @@ export type NoticeCategory = "review" | "subscribe" | "comment" | "other";
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string; category: NoticeCategory };
 
 /** 中央的一筆「獎銜、中心」新申請（只即時顯示，不保存）。 */
-export type CentralReview = { id: string; display_name: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
+export type CentralReview = { id: string; /** 申請人（只在審核者本人開啟時即時讀取，不保存）。 */ member_id?: string; display_name: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
 /** available＝false：這位會員沒有審核權限、或中央暫時不可用（畫面直接不顯示審核區）。 */
 export type CentralReviews = { available: boolean; scope: "all" | "center" | null; reviews: CentralReview[] };
 

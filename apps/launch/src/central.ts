@@ -272,9 +272,9 @@ export async function centralReviews(token: string): Promise<CentralReviews> {
 }
 
 /** 處理一筆申請；回傳中央的狀態碼（200 成功；403 不是你的中心；404 已被處理過）。 */
-export async function centralDecide(token: string, id: string, decision: "approve" | "reject"): Promise<{ status: number; body: Record<string, unknown> | null }> {
-  const res = await callCentral(token, `/v1/eligibility/reviews/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify({ decision }) });
-  const body = res?.ok ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
+export async function centralDecide(token: string, id: string, decision: "approve" | "reject", value?: unknown): Promise<{ status: number; body: Record<string, unknown> | null }> {
+  const res = await callCentral(token, `/v1/eligibility/reviews/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify(value === undefined ? { decision } : { decision, value }) });
+  const body = res ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
   return { status: res?.status ?? 503, body };
 }
 
