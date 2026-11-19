@@ -63,9 +63,12 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
   const inSeries = !flat && !!rep.series && sessions.length >= 2;
   // 平鋪（flat，中心頁）：統一用直式 4:3 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始；圖太小／太矮就完整顯示，用同一張圖模糊填滿背景）；沒有 EDM 才退回封面。
-  const cropped = (flat && !rep.edmUrl && !!rep.coverUrl) || (!flat && inSeries && !!rep.seriesCoverUrl);
+  // 第一層的卡（業主 2026-11-19 更正：指定的封面裁切位置沒生效）：
+  // 系列卡＝系列的封面（橫式裁切）；單張卡／獨立清單卡＝這張卡自己裁好的封面 > 系列封面 > EDM（照「預設顯示位置」從該處開始顯示）。中心頁（flat）照舊。
+  const ownCover = !flat && !inSeries ? rep.coverUrl || rep.seriesCoverUrl : null;
+  const cropped = (flat && !rep.edmUrl && !!rep.coverUrl) || (!flat && inSeries && !!rep.seriesCoverUrl) || !!ownCover;
   // 系列小卡：有管理員裁切好的系列封面就用封面（16:9），沒有才用系列 EDM（業主 2026-11-17：新上傳的高 EDM 沒用裁切後的封面，字被切掉）。
-  const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesCoverUrl || rep.seriesEdmUrl : rep.edmUrl;
+  const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesCoverUrl || rep.seriesEdmUrl : ownCover || rep.edmUrl;
   const ribbons = ribbonsFor(rep, member, config);
   const count = sessions.reduce((n, x) => n + x.materialCount, 0);
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
@@ -78,7 +81,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   return (
     <View style={{ width }} nativeID={`tile-${group.key}`}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? settings.titleOf(rep.series) : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: edm ? "#fff" : c.surfaceMuted }, unlisted && { opacity: 0.55 }]}>
-        {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? settings.titleOf(rep.series) : rep.title} fill />}
+        {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat || !inSeries ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? settings.titleOf(rep.series) : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         {/* 安麗品牌專區的每張卡片：右下角統一用淡灰色膠囊顯示教材數量（業主 2026-11-18）。 */}
