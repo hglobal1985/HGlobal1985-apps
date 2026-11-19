@@ -11,7 +11,7 @@ import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
-import { seriesOrdered } from "./sort";
+import { displayName, seriesOrdered } from "./sort";
 
 
 /** 狀態標籤：與課程卡左邊緞帶同步的文字與顏色；沒有左緞帶時用右邊緞帶（倒數、進行中…）。 */
@@ -122,7 +122,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             }}
             leading={
               <SheetThumb>
-                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: resolveUrl((x.coverUrl || x.edmUrl) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <Image source={require("../../../assets/icon.png")} style={StyleSheet.absoluteFill} resizeMode="cover" />}
+                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: resolveUrl((x.coverUrl || x.edmUrl) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <CourseCover theme={x.theme} label="" title={displayName(x)} fill />}
               </SheetThumb>
             }
             // 素材：素材清單名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）
