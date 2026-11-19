@@ -28,7 +28,8 @@ test("主講人章節：同一門課最多一堂（勾新的自動轉移）、�
   await call("PATCH", `/admin/lessons/${l1}`, token, { isSpeaker: false });
   assert.deepEqual(await speakers(), [], "可以全部不勾");
   const mat = (await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, { title: "講義", kind: "material" })).data.lessons.find((l) => l.title === "講義")!.id;
-  assert.equal((await call("PATCH", `/admin/lessons/${mat}`, token, { isSpeaker: true })).status, 400, "教材不能當主講人");
+  assert.equal((await call("PATCH", `/admin/lessons/${mat}`, token, { isSpeaker: true })).status, 200, "教材也可以勾主題");
+  await call("PATCH", `/admin/lessons/${mat}`, token, { isSpeaker: false });
   await call("PATCH", `/admin/lessons/${l2}`, token, { isSpeaker: true });
   const idx = (await call<{ lessons: { id: string; isSpeaker: boolean }[] }>("GET", "/search-index", token)).data.lessons.filter((l) => l.isSpeaker).map((l) => l.id);
   assert.deepEqual(idx, [l2]);
@@ -65,4 +66,28 @@ test("主講人章節：名稱、分享者、獎銜、職稱一律等於課程�
   const n = (await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, { isSpeaker: true })).data.lessons.find((x) => x.isSpeaker)!;
   assert.deepEqual([n.title, n.sharer], ["新課程名", "李老師"], "新增章節直接勾主講人，不用填名稱");
   assert.equal((await get()).isSpeaker, false, "原本那堂已轉移");
+});
+
+test("套裝課程：勾套裝才能新增區塊；每個區塊的教材各只能有一個主題；章節的主題不受影響", async () => {
+  const { call } = setup();
+  const token = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
+  const made = await call<CourseDetail>("POST", "/admin/courses", token, { title: "套裝測試", hostUnit: "寰宇總部", status: "published" });
+  const id = made.data.id;
+  assert.equal((await call("POST", `/admin/courses/${id}/lessons`, token, { title: "區塊一", kind: "section" })).status, 400, "沒勾套裝不能新增區塊");
+  assert.equal((await call("PATCH", `/admin/courses/${id}`, token, { isPackage: true })).status, 200);
+  const add = async (body: object) => (await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, body)).data;
+  await add({ title: "區塊一", kind: "section" });
+  await add({ title: "A1", kind: "material" });
+  await add({ title: "A2", kind: "material" });
+  await add({ title: "區塊二", kind: "section" });
+  const d = await add({ title: "B1", kind: "material" });
+  assert.equal(d.isPackage, true);
+  const idOf = (t: string) => d.lessons.find((l) => l.title === t)!.id;
+  await call("PATCH", `/admin/lessons/${idOf("A1")}`, token, { isSpeaker: true });
+  await call("PATCH", `/admin/lessons/${idOf("B1")}`, token, { isSpeaker: true });
+  await call("PATCH", `/admin/lessons/${idOf("A2")}`, token, { isSpeaker: true });
+  const now = (await call<CourseDetail>("GET", `/courses/${id}`, token)).data;
+  const marked = now.lessons.filter((l) => l.material && l.isSpeaker).map((l) => l.title).sort();
+  assert.deepEqual(marked, ["A2", "B1"], "區塊一只剩 A2、區塊二是 B1");
+  assert.equal(now.blocks.length, 2, "套裝課程的區塊會列出");
 });

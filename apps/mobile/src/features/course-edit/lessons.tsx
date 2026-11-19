@@ -337,16 +337,16 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       busy={busy === "create" || busy === "save"}
       error={msg?.tone === "danger" ? msg.text : null}
     >
-      {/* 「主講」「總結」兩個勾選同一列（業主 2026-11-16）；每門課各只能一堂、兩者互斥。 */}
+      {/* 「主題」（原「主講」）「總結」兩個勾選同一列（業主 2026-11-16）；每門課各只能一堂、兩者互斥。 */}
       <View style={styles.checkRow}>
         <View style={{ flex: 1 }}>
-          <Check label="主講" value={isSpeaker} onChange={pickSpeaker} />
+          <Check label="主題" value={isSpeaker} onChange={pickSpeaker} />
         </View>
         <View style={{ flex: 1 }}>
           <Check label="總結" value={isSummary} onChange={pickSummary} />
         </View>
       </View>
-      {isSpeaker && otherSpeaker ? <NoticeBox text={`目前「${otherSpeaker.title}」是主講，儲存後會改成這一堂。`} /> : null}
+      {isSpeaker && otherSpeaker ? <NoticeBox text={`目前「${otherSpeaker.title}」是主題，儲存後會改成這一堂。`} /> : null}
       {isSummary && otherSummary ? <NoticeBox text={`目前「${otherSummary.title}」是總結，儲存後會改成這一堂。`} /> : null}
       {isSpeaker ? (
         <SpeakerApplied course={{ title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "" }} />

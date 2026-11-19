@@ -8,6 +8,7 @@ import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { EdmStage } from "@/features/courses/edm-viewer";
 import { useCoverStats } from "@/features/courses/cover-stats";
+import { hasBlocks } from "@/features/courses/block-module";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { InlineAudio } from "@/features/player/audio-bar";
 import { engine } from "@/features/player/engine";
@@ -449,8 +450,11 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
             )}
             {/* 清單卡（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
             <Section title={course.isList ? "" : "其他教材"}>
-              {course.isList ? (
+              {hasBlocks(course) ? (
+                <>
+                {course.isList ? null : <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
                 <BlockEditList items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} busy={lessonBusy} />
+                </>
               ) : (
                 <>
                   {materials.length ? <EditLessonRows group={materials} word="教材" onEdit={setLessonSheet} onMove={(i, j) => moveLesson(materials, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} /> : null}
@@ -481,7 +485,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         )}
         {!(editing && canEditContent) && course.lessons.some((l) => l.material) ? (
           <Section title={course.isList ? "" : "其他教材"}>
-            {course.isList && course.lessons.some((l) => l.section) ? (
+            {hasBlocks(course) && course.lessons.some((l) => l.section) ? (
               <View style={[styles.layoutToggle, { borderColor: c.border, backgroundColor: c.surface }]} accessibilityRole="radiogroup">
                 {(["detail", "thumb"] as const).map((v) => (
                   <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected: listLayout === v }} accessibilityLabel={v === "detail" ? "詳細列表" : "縮圖"} onPress={() => pickLayout(v)} style={[styles.layoutBtn, listLayout === v && { backgroundColor: c.accent }]}>
