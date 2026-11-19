@@ -127,6 +127,8 @@ export type CourseSummary = {
   teacherTitle: string;
   /** 勾了「無」：沒有主講人、獎銜、職稱（畫面隱藏這三個欄位），專屬網址用課程名稱的英譯。 */
   noSpeaker: boolean;
+  /** 套裝課程（業主 2026-11-19）：只是分類篩選用途，不改變版面與功能；日期區間 7 天以上時編輯畫面會自動勾選。 */
+  isPackage: boolean;
   category: string;
   /** iOS/Android 請求時一律為 null（商店規範：App 內不顯示價格）。 */
   priceTwd: number | null;

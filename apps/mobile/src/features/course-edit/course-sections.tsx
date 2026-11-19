@@ -125,7 +125,51 @@ const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.st
 
 // ---------- 基本資料：名稱、主講人、分類、系列（封面顏色已刪除，無 EDM 時文字封面顏色自動隨機） ----------
 /** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
-export type BasicsForm = { isShorts: boolean; title: string; /** 勾了「無」：沒有主講人、獎銜、職稱（業主 2026-11-19）。 */ noSpeaker: boolean; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
+export type BasicsForm = { isShorts: boolean; title: string; /** 勾了「無」：沒有主講人、獎銜、職稱（業主 2026-11-19）。 */ noSpeaker: boolean; /** 套裝課程（業主 2026-11-19）：只是分類篩選用途；日期區間 7 天以上自動勾選，可手動取消。 */ isPackage: boolean; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
+const DAY_MS = 86_400_000;
+/** 開始到結束相差幾天（沒有結束日期＝0）。 */
+const spanDays = (start: string, end: string) => (start && end ? Math.round((Date.parse(end) - Date.parse(start)) / DAY_MS) : 0);
+
+/**
+ * 課程日期（業主 2026-11-19）：勾「修改日期」才顯示開始日期欄位；填了開始日期才出現「＋輸入結束日期」；有日期就有「清除日期」；
+ * 取消勾選＝清除日期。已經讀到日期（影片或素材系統帶入）時，日期以純文字顯示在勾選框右邊，勾了「修改日期」才能改。
+ * 日期區間從不到 7 天變成 7 天以上時，自動勾選「套裝課程」（之後可手動取消）。
+ */
+function DateEditor({ f, setF }: { f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
+  const { c } = useTheme();
+  const [editing, setEditing] = useState(false);
+  const [showEnd, setShowEnd] = useState(false);
+  const apply = (start: string, end: string) =>
+    setF((x) => ({ ...x, eventStart: start, eventEnd: start ? end : "", ...(spanDays(start, end) >= 7 && spanDays(x.eventStart, x.eventEnd) < 7 ? { isPackage: true } : {}) }));
+  const toggle = () => {
+    if (editing) {
+      apply("", ""); // 取消勾選＝清除日期
+      setShowEnd(false);
+    }
+    setEditing(!editing);
+  };
+  const shown = f.eventStart ? `${f.eventStart}${f.eventEnd ? ` ～ ${f.eventEnd}` : ""}` : "";
+  return (
+    <View style={{ gap: space.sm }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, flexWrap: "wrap" }}>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: editing }} onPress={toggle} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 44 }}>
+          <Ionicons name={editing ? "checkbox" : "square-outline"} size={28} color={editing ? c.accent : c.textMuted} />
+          <AppText variant="body">修改日期</AppText>
+        </Pressable>
+        {!editing && shown ? <AppText variant="body" tone="muted">{shown}</AppText> : null}
+      </View>
+      {editing ? (
+        <>
+          <DateSelect label="開始日期" value={f.eventStart} onChange={(v) => apply(v, f.eventEnd)} />
+          {f.eventStart && (showEnd || f.eventEnd) ? <DateSelect label="結束日期" value={f.eventEnd} defaultValue={f.eventStart} onChange={(v) => apply(f.eventStart, v)} /> : null}
+          {f.eventStart && !showEnd && !f.eventEnd ? <Button variant="secondary" label="＋輸入結束日期" onPress={() => setShowEnd(true)} fullWidth /> : null}
+          {f.eventStart ? <Button variant="cancel" label="清除日期" onPress={() => (apply("", ""), setShowEnd(false))} fullWidth /> : null}
+        </>
+      ) : null}
+    </View>
+  );
+}
+
 export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsForm; setF: React.Dispatch<React.SetStateAction<BasicsForm>> }) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
@@ -150,22 +194,22 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
               <RankTitleRow rank={f.teacherRank} title={f.teacherTitle} onRank={set("teacherRank")} onTitle={set("teacherTitle")} rankOptions={rankOptions} who="主講人" />
             </>
           )}
-          <DateSelect label="活動日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
-          {f.eventStart ? <DateSelect label="結束日期（連續多天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={set("eventEnd")} /> : null}
+          <DateEditor f={f} setF={setF} />
+          <Check label="套裝課程（分類用途，不影響版面與功能）" value={f.isPackage} onChange={set("isPackage")} />
         </>
       )}
-      <CategoryField value={f.category} onChange={set("category")} withInput />
-      <BrandField value={f.brandId} onChange={set("brandId")} />
       {isSuper ? <Chips title="專區（寰宇大學「所有系列」顯示在哪一區）" options={ZONES.map((z) => ({ key: z.id, label: z.label }))} value={f.zone} onChange={set("zone")} /> : null}
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
-          <FormBlock title="系列" hint="同系列合併成一張卡；沒指定系列，就自己單獨一張卡">
+          <FormBlock collapsible title="系列" hint="同系列合併成一張卡；沒指定系列，就自己單獨一張卡">
             <Field label="" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
             {series.data?.length ? <Chips label="已有的系列" options={[{ key: "", label: "無" }, ...series.data.map((x) => ({ key: x, label: x }))]} value={f.series} onChange={set("series")} /> : null}
           </FormBlock>
         </>
       ) : null}
+      <CategoryField collapsible value={f.category} onChange={set("category")} withInput />
+      <BrandField collapsible value={f.brandId} onChange={set("brandId")} />
     </>
   );
 }
@@ -173,7 +217,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
 function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isSuper = isSuperAdmin(member);
-  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, noSpeaker: course.noSpeaker ?? false, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
+  const init: BasicsForm = { isShorts: course.isShorts, title: course.title, noSpeaker: course.noSpeaker ?? false, isPackage: course.isPackage ?? false, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
   const [f, setF] = useState(init);
   // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");

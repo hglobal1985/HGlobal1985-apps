@@ -433,6 +433,7 @@ type CourseRow = {
   teacher_rank: string;
   teacher_title: string;
   no_speaker: number;
+  is_package: number;
   category: string;
   price_twd: number;
   min_rank_code: string;
@@ -492,7 +493,7 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -575,6 +576,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     teacherRankName: rankMap.get(row.teacher_rank)?.name ?? "",
     teacherTitle: row.teacher_title,
     noSpeaker: row.no_speaker === 1,
+    isPackage: row.is_package === 1,
     category: row.category,
     priceTwd: web ? price : null,
     originalPriceTwd: web ? row.price_twd : null,
@@ -2096,6 +2098,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     sets.push(["teacher_rank", teacherRank]);
   }
   // 勾了「無」（沒有主講人、獎銜、職稱；業主 2026-11-19）：三個欄位一律清空；取消勾選就回到可以填。
+  if (body.isPackage !== undefined && !(creating && body.isList === true)) sets.push(["is_package", body.isPackage === true ? 1 : 0]);
   if (body.noSpeaker !== undefined) {
     const no = body.noSpeaker === true;
     for (let i = sets.length - 1; i >= 0 && no; i--) if (["teacher", "teacher_rank", "teacher_title"].includes(sets[i]![0])) sets.splice(i, 1);
@@ -2422,7 +2425,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
   const newId = `c${randomId(7)}`;
   const series = String(row.series || "").trim() || String(row.title ?? "").slice(0, 60);
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
-  const keep = ["zone", "view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "no_speaker", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
+  const keep = ["zone", "view_scope", "subtitle", "teacher", "teacher_rank", "teacher_title", "no_speaker", "is_package", "category", "price_twd", "min_rank_code", "theme", "description", "guidance_unit", "host_unit", "host_center_key", "review_group_id", "allow_president", "is_public", "price_tba", "hide_home", "brand_id", "diamond_free", "location", "location_none", "is_online", "chapter_covers", "auto_cover", "center_course"];
   const cols = ["id", "sort_order", "status", "title", "series", "created_by_sub", "edited_by_name", "edited_at", ...keep];
   const vals = [newId, (max?.m ?? 0) + 1, "draft", `${String(row.title ?? "")}（複製）`.slice(0, 120), series, admin.sub, admin.name.slice(0, 60), iso(), ...keep.map((k) => row[k] ?? null)];
   const stmts: D1PreparedStatement[] = [
