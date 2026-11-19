@@ -257,7 +257,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   const rangeError = mediaDraftError(media);
   const currentKind = lesson?.media?.type ?? "demo";
   const dirty = lesson
-    ? (!isSpeaker && (title !== lesson.title || sharer !== (lesson.sharer ?? "") || sharerRank !== (lesson.sharerRank ?? "") || sharerTitle !== (lesson.sharerTitle ?? ""))) ||
+    ? ((title !== lesson.title || sharer !== (lesson.sharer ?? "") || sharerRank !== (lesson.sharerRank ?? "") || sharerTitle !== (lesson.sharerTitle ?? ""))) ||
       ownDate !== (lesson.dateFollows ? "" : lesson.eventDate ?? "") ||
       isSpeaker !== !!lesson.isSpeaker ||
       isSummary !== !!lesson.isSummary ||
@@ -270,7 +270,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
     setBusy("save");
     setMsg(null);
     try {
-      const body: Record<string, unknown> = { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), eventDate: ownDate || null, isSpeaker, isSummary, ...mediaDraftBody(media) };
+      const body: Record<string, unknown> = { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle, eventDate: ownDate || null, isSpeaker, isSummary, ...mediaDraftBody(media) };
       await api("PATCH", `/admin/lessons/${lesson.id}`, body);
       invalidate();
       return true;
@@ -284,7 +284,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
 
   // 新增：先建立章節，再依序送出影音設定與音檔。中途失敗時章節已建立，再按「新增」只補沒完成的部分（不會重複建立）。
   const create = async () => {
-    if (!isSpeaker && !isSummary && !title.trim()) return setMsg({ tone: "danger", text: "請輸入章節名稱" });
+    if (!isSummary && !title.trim()) return setMsg({ tone: "danger", text: "請輸入章節名稱" });
     if (rangeError) return setMsg({ tone: "danger", text: rangeError });
     setBusy("create");
     setMsg(null);
@@ -293,7 +293,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       let lessonId = createdId ?? undefined;
       if (!lessonId) {
         const before = new Set(course.lessons.map((l) => l.id));
-        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { ...(isSpeaker ? {} : { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle }), ...(ownDate ? { eventDate: ownDate } : {}), isSpeaker, isSummary });
+        const detail = await api<CourseDetail>("POST", `/admin/courses/${course.id}/lessons`, { title: isSummary ? SUMMARY_TITLE : title, sharer, sharerRank, sharerTitle, ...(ownDate ? { eventDate: ownDate } : {}), isSpeaker, isSummary });
         lessonId = detail.lessons.find((l) => !before.has(l.id))?.id;
         if (!lessonId) throw Error("新增失敗，請重新整理後再試");
         setCreatedId(lessonId);
@@ -348,9 +348,6 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       </View>
       {isSpeaker && otherSpeaker ? <NoticeBox text={`目前「${otherSpeaker.title}」是主題，儲存後會改成這一堂。`} /> : null}
       {isSummary && otherSummary ? <NoticeBox text={`目前「${otherSummary.title}」是總結，儲存後會改成這一堂。`} /> : null}
-      {isSpeaker ? (
-        <SpeakerApplied course={{ title: course.title, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "" }} />
-      ) : (
         <>
           <View style={styles.twoCol}>
             <View style={{ flex: 2, gap: space.xs }}>
@@ -377,7 +374,6 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
           {sharerFocus ? <SuggestList list={sharerHints} q={sharer} onPick={(x) => (setSharer(x), setSharerFocus(false))} /> : null}
           <RankTitleRow rank={sharerRank} title={sharerTitle} onRank={setSharerRank} onTitle={setSharerTitle} rankOptions={rankOptions} who={`${who}分享者`} />
         </>
-      )}
       {lesson && course.chapterCovers ? <LessonArt lesson={lesson} onChanged={invalidate} /> : null}
       <View style={styles.dateHead}>
         <AppText variant="callout" style={{ flex: 1 }}>
@@ -414,12 +410,6 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
 /** 勾了「總結」的章節，名稱固定為這兩個字（伺服器也會強制）。 */
 const SUMMARY_TITLE = "總結";
 
-/** 勾了主講人：名稱、分享者、獎銜、職稱欄位隱藏，直接套用課程基本資料（伺服器也會強制同步），這裡只顯示套用結果。 */
-function SpeakerApplied({ course }: { course: { title: string; teacher: string; teacherRank: string; teacherTitle: string } }) {
-  // 課程基本資料沒填主講人時，章節就沒有名字、獎銜、職稱可以顯示：直接提醒去填。
-  if (!course.teacher.trim()) return <NoticeBox tone="danger" text="課程基本資料還沒填「主講人」，所以這一堂不會顯示名字、獎銜、職稱。請先到課程的「基本資料」填寫主講人，章節會自動同步。" />;
-  return <NoticeBox text={`章節名稱、分享者、獎銜、職稱直接套用課程基本資料：${[course.title, course.teacher, course.teacherTitle].filter(Boolean).join("・")}`} />;
-}
 
 /** 課程頁編輯模式的章節／教材清單（同一個元件，兩組共用）：每列＝名稱（點了編輯）＋小按鈕 ↑ ↓ 複製 編輯 刪除（32px，讓名稱有空間）。 */
 export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, busy, bare, onMoveTo }: { /** 放在區塊卡片裡時不再自己畫外框。 */ bare?: boolean; /** 有傳＝每列多一個「移到其他區塊」鈕。 */ onMoveTo?: (l: Lesson) => void; group: Lesson[]; word: string; onEdit: (l: Lesson) => void; onMove: (from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; busy: boolean }) {

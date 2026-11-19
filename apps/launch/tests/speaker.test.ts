@@ -50,24 +50,6 @@ test("章節日期預設跟著課程日期：沒設定的章節日期＝課程�
   assert.equal(d.find((l) => l.id === b.id)!.eventDate, "2026-12-05", "自己設定的不變");
 });
 
-test("主講人章節：名稱、分享者、獎銜、職稱一律等於課程基本資料，課程改了跟著變", async () => {
-  const { call } = setup();
-  const token = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
-  const made = await call<CourseDetail>("POST", "/admin/courses", token, { title: "課程名", teacher: "王老師", teacherTitle: "區域經理", hostUnit: "寰宇總部" });
-  const id = made.data.id;
-  const l1 = made.data.lessons[0]!.id;
-  const get = async () => (await call<CourseDetail>("GET", `/courses/${id}`, token)).data.lessons.find((l) => l.id === l1)!;
-  await call("PATCH", `/admin/lessons/${l1}`, token, { isSpeaker: true, title: "亂填", sharer: "別人" });
-  let l = await get();
-  assert.deepEqual([l.title, l.sharer, l.sharerTitle], ["課程名", "王老師", "區域經理"], "勾主講人＝套用課程基本資料，另外填的值不採用");
-  await call("PATCH", `/admin/courses/${id}`, token, { title: "新課程名", teacher: "李老師" });
-  l = await get();
-  assert.deepEqual([l.title, l.sharer], ["新課程名", "李老師"], "課程改了，主講人章節跟著變");
-  const n = (await call<CourseDetail>("POST", `/admin/courses/${id}/lessons`, token, { isSpeaker: true })).data.lessons.find((x) => x.isSpeaker)!;
-  assert.deepEqual([n.title, n.sharer], ["新課程名", "李老師"], "新增章節直接勾主講人，不用填名稱");
-  assert.equal((await get()).isSpeaker, false, "原本那堂已轉移");
-});
-
 test("套裝課程：勾套裝才能新增區塊；每個區塊的教材各只能有一個主題；章節的主題不受影響", async () => {
   const { call } = setup();
   const token = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-admin" })).data.token;
