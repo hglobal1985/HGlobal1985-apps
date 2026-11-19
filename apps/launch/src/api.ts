@@ -3655,7 +3655,9 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       const sql = "SELECT id, field_label, applicant_name, from_text, to_text, status, decided_by_name, decided_at FROM review_log WHERE status <> 'pending'" + (s.role === "admin" ? "" : " AND decided_by_sub = ?") + " ORDER BY decided_at DESC LIMIT 100";
       const { results } = await (s.role === "admin" ? ctx.db.prepare(sql) : ctx.db.prepare(sql).bind(s.sub)).all<{ id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; status: string; decided_by_name: string; decided_at: string }>();
-      return results;
+      // 獎銜顯示正式中文名稱（資料裡存的是代號）。
+      const names = s.kind === "central" ? await rankOptions(s.token).catch(() => new Map<string, string>()) : new Map<string, string>();
+      return results.map((r) => (r.field_label === "獎銜" ? { ...r, from_text: names.get(r.from_text) ?? r.from_text, to_text: names.get(r.to_text) ?? r.to_text } : r));
     },
   ],
   [
@@ -3692,7 +3694,8 @@ const routes: [string, RegExp, Handler][] = [
         const stmts = [];
         if (found) {
           stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ? WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), found.id));
-          if (found.applicant_sub) stmts.push(notify(ctx.db, { sub: found.applicant_sub }, `你的${flabel}申請${result === "approved" ? "已通過" : "未通過"}`, `${to ? `申請內容：${to}。` : ""}到「設定」頁看最新的資料`, "/settings"));
+          const toName = fkey === "rank" && to ? ((await rankOptions(s.token).catch(() => new Map<string, string>())).get(to) ?? to) : to; // 獎銜用正式中文名稱，不用代號
+          if (found.applicant_sub) stmts.push(notify(ctx.db, { sub: found.applicant_sub }, `你的${flabel}申請${result === "approved" ? "已通過" : "未通過"}`, `${toName ? `申請內容：${toName}。` : ""}到「設定」頁看最新的資料`, "/settings"));
         } else {
           stmts.push(ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_name, from_text, to_text, status, decided_by_sub, decided_by_name, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), fkey, flabel, name, reviewText(it.current_value), to, result, s.sub, s.name, iso()));
         }
