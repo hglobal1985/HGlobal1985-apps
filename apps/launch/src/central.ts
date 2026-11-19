@@ -453,6 +453,15 @@ export async function centralWriteField(token: string, key: "legal_name" | "disp
   return { ok: true, status: b?.status ?? null };
 }
 
+/** 勾選「我是 Amway 會員」（只開不關：關閉會讓中央換掉會員編號，要關請到會員中心）。成功回 null，失敗回中央的錯誤訊息。 */
+export async function centralEnableAmway(token: string): Promise<string | null> {
+  const res = await callCentral(token, "/v1/me/amway/enabled", { method: "PUT", body: JSON.stringify({ enabled: true }) });
+  if (!res) return "會員中心暫時無法連線，請稍後再試";
+  if (res.ok) return null;
+  const b = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return b?.error?.message ?? "會員中心拒絕了這次修改";
+}
+
 /** 關聯詞建議（培訓系統、地區教育中心、職稱）。職稱不強迫選，只是建議，會員可自己輸入。 */
 export async function centralSuggest(token: string, pool: "education_system" | "education_center" | "job_title", q: string): Promise<string[]> {
   const res = await callCentral(token, `/v1/vocab/suggestions?pool=${pool}&q=${encodeURIComponent(q.slice(0, 30))}`);
