@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, UNCATEGORIZED, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type InviteInfo, type Rank } from "@/api/client";
+import { api, HQ_UNIT, UNCATEGORIZED, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type InviteInfo, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";

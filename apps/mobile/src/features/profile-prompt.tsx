@@ -7,7 +7,7 @@ import { openAccountCenter } from "@/features/account-link";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Icon, LoadingLadybug, type IconName } from "@/ui";
+import { AppText, Icon } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
 
 type FieldView = { value: string; pending: string | null; status: string };

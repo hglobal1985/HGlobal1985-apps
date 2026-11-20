@@ -1,4 +1,3 @@
-import { UNCATEGORIZED, textCoverLines } from "@/api/client";
 import type { CourseSummary, Member, SortGroup } from "@/api/client";
 import { todayStr } from "@/ui/date-select";
 import { classify } from "./ribbons";

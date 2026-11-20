@@ -32,12 +32,12 @@ export function NewMaterialSheet({ course, onClose, afterBlock }: { course: Cour
 
 export function EditMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
   if (lesson.full) return <FullVersionSheet lesson={lesson} onClose={onClose} />;
-  if (isDownloadUrl(lesson.linkUrl)) return <FileMaterialSheet course={course} lesson={lesson} onClose={onClose} />;
+  if (isDownloadUrl(lesson.linkUrl)) return <FileMaterialSheet lesson={lesson} onClose={onClose} />;
   return <LinkMaterialSheet course={course} lesson={lesson} onClose={onClose} />;
 }
 
 /** 上傳的檔案教材：只能改名稱與日期（要換檔案就刪掉重新上傳）。 */
-function FileMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
+function FileMaterialSheet({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
   const [title, setTitle] = useState(lesson.title);

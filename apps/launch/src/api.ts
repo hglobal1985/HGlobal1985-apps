@@ -81,7 +81,6 @@ import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
 import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
 import { ImportError, loadFileSettings, normalizeFileSettings, openUserDriveFile, saveFileSettings, streamToR2 } from "./material-files.ts";
-import { centerShareName } from "./og.ts";
 import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
 import { drawZoneVideoBadges } from "./zone-video-badges.ts";
 import { isCoverKey, isKeyInUse, listInUseCards, listUnusedCovers, type InUseCard } from "./cover-library.ts";
@@ -185,14 +184,6 @@ function brandForBlock(ctx: Ctx, brandId: string | null, coverKey: string | null
 }
 const brandUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 
-const safeList = (raw: string): string[] => {
-  try {
-    const v = JSON.parse(raw) as unknown;
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-};
 
 // ---------- helpers ----------
 

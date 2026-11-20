@@ -1,5 +1,5 @@
 import { fetchYoutubeMeta } from "./youtube.ts";
-import { classifyLink, LINK_DEFAULT_TITLE, parseHttpsUrl } from "./links.ts";
+import { classifyLink, parseHttpsUrl } from "./links.ts";
 
 /**
  * 教材連結的名稱自動抓取（超級管理員／管理者貼上連結時用）：伺服器代為連線讀取網頁標題。

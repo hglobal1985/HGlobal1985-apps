@@ -1,7 +1,7 @@
 import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, type ElementRef } from "react";
-import { Animated, Easing, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, TextInput } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 

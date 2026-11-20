@@ -229,7 +229,6 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
 
 /** 從影片選畫面：YouTube＝拖時間軸＋截取目前畫面；Mux＝指定秒數，伺服器直接給該秒的截圖。 */
 function FramePicker({ lesson, onClose, onPicked }: { lesson: Lesson; onClose: () => void; onPicked: (img: HTMLImageElement) => void }) {
-  const { config } = useUiConfig();
   const media = lesson.media!;
   const isYt = media.type === "youtube";
   const lo = lesson.start ?? 0;

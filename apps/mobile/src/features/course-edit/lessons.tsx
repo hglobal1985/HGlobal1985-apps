@@ -92,7 +92,7 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
     }
   };
   return (
-    <EditSheet material title={lesson ? "編輯區塊" : "新增區塊"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
+    <EditSheet title={lesson ? "編輯區塊" : "新增區塊"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
       <AppText variant="callout" tone="muted">
         區塊名稱
       </AppText>
@@ -479,7 +479,6 @@ const styles = StyleSheet.create({
 
 /** 把教材移到另一個區塊（業主 2026-11-18）：列出所有區塊，點一個就搬到那個區塊的最後面。 */
 export function MoveToBlockSheet({ items, lesson, onPick, onClose }: { items: Lesson[]; lesson: Lesson; onPick: (blockId: string) => void; onClose: () => void }) {
-  const { c } = useTheme();
   const heads = items.filter((l) => l.section);
   const current = (() => {
     let cur: string | null = null;
