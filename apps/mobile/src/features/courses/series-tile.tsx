@@ -63,6 +63,8 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const height = flat ? Math.round((width * 4) / 3) : Math.round((width * 9) / 16);
   // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
   const inSeries = !flat && !!rep.series && sessions.length >= 2;
+  // 只要有系列（中心卡除外），不論裡面幾張卡，點了一律先彈上拉選單（業主 2026-11-20：單張卡的系列也要有）。封面顯示仍用 inSeries。
+  const hasSeries = !flat && !!rep.series;
   // 平鋪（flat，中心頁）：統一用直式 4:3 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始；圖太小／太矮就完整顯示，用同一張圖模糊填滿背景）；沒有 EDM 才退回封面。
   // 第一層的卡（業主 2026-11-19 更正：指定的封面裁切位置沒生效）：
   // 系列卡＝系列的封面（橫式裁切）；單張卡／獨立清單卡＝這張卡自己裁好的封面 > 系列封面 > EDM（照「預設顯示位置」從該處開始顯示）。中心頁（flat）照舊。
@@ -76,7 +78,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   // 系列裡只有一份清單：有勾「顯示在上拉選單」的區塊就彈出區塊選單，沒有區塊就直接進清單頁（業主 2026-11-18）。
   const soloList = !flat && sessions.length === 1 && rep.isList;
   // 系列卡（業主 2026-11-20 改回）：點了先彈出上拉選單（列出系列內的卡，右上「顯示全部」或繼續上拉才進系列頁）；單張卡直接進該卡；中心頁的課程卡照舊彈章節選單。
-  const open = () => (inSeries ? setSheet(true) : soloList && !rep.blocks.length ? router.push(`/course/${rep.id}`) : flat || soloList ? setSheet(true) : router.push(`/course/${rep.id}`));
+  const open = () => (hasSeries ? setSheet(true) : soloList && !rep.blocks.length ? router.push(`/course/${rep.id}`) : flat || soloList ? setSheet(true) : router.push(`/course/${rep.id}`));
   const unlisted = inSeries && !settings.listed(rep.series); // 只有超級管理員會看到：關掉了「顯示在所有系列」或是「未分類」
   return (
     <View style={{ width }} nativeID={`tile-${group.key}`}>
@@ -104,9 +106,9 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
           </View>
         ) : null}
       </Pressable>
-      {sheet && inSeries ? <SeriesSheet title={settings.titleOf(rep.series)} items={sessions} showAllSeries={rep.series} onClose={() => setSheet(false)} /> : null}
+      {sheet && hasSeries ? <SeriesSheet title={settings.titleOf(rep.series)} items={sessions} showAllSeries={rep.series} onClose={() => setSheet(false)} /> : null}
       {sheet && flat ? <CourseLessonsSheet course={rep} onClose={() => setSheet(false)} /> : null}
-      {sheet && !flat && soloList && rep.blocks.length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : null}
+      {sheet && !flat && !hasSeries && soloList && rep.blocks.length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : null}
     </View>
   );
 }
