@@ -32,6 +32,8 @@ export default function AiModelsScreen() {
   const [sel, setSel] = useState<Record<string, string> | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
   if (!isSuper)
     return (
       <Screen header={false}>
@@ -40,8 +42,6 @@ export default function AiModelsScreen() {
     );
   const current = sel ?? data?.selection ?? {};
   const u = usage ?? data?.usage;
-  const [testing, setTesting] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
   const testKey = async (k: KeyInfo) => {
     setTesting(k.key);
     setMsg(null);
