@@ -231,7 +231,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     () =>
       centers
         .filter((name) => !HIDDEN_FROM_CENTER_LIST.has(normCenter(name))) // 業主 2026-11-17：「安麗公司」不顯示在中心清單（仍可當主辦單位）
-        .map((name) => ({ name, count: courses.filter((x) => x.centerCourse && x.hasMaterial && normCenter(x.hostCenter) === normCenter(name) && inCategory(x)).length }))
+        .map((name) => {
+          const mine = courses.filter((x) => x.centerCourse && x.hasMaterial && normCenter(x.hostCenter) === normCenter(name) && inCategory(x));
+          return { name, count: mine.length, materials: mine.reduce((n, x) => n + x.materialCount, 0) }; // materials＝該中心所有課程內含的教材總數（專區標題列數字用）
+        })
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
     [centers, courses, category, brandSel], // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -553,14 +556,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               ? zoneSections.map(({ zone, items }) =>
                   items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
                     <Fragment key={zone}>
-                      <ZoneBand zone={zone} count={items.length} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!!folded[zone]} onFold={() => toggleFold(zone)} />
+                      <ZoneBand zone={zone} count={items.reduce((n, g) => n + g.sessions.reduce((m, x) => m + x.materialCount, 0), 0)} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!!folded[zone]} onFold={() => toggleFold(zone)} />
                       {folded[zone] ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
                     </Fragment>
                   ) : null,
                 )
               : null}
             {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
-            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.length} red folded={!!folded.centers} onFold={() => toggleFold("centers")} /> : null}
+            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!!folded.centers} onFold={() => toggleFold("centers")} /> : null}
             {tileW && mode === "series" && !matched && !folded.centers
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
               : null}
