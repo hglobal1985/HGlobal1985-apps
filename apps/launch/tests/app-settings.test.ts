@@ -39,3 +39,20 @@ test("APP 數值設定：學習紀錄三項的預設值、夾範圍，完成比�
   const eq = normalizeApp({ learnStartPct: 60, learnDonePct: 50 });
   assert.deepEqual([eq.learnStartPct, eq.learnDonePct], [50, 51], "開始最多 50%，完成至少比開始多 1");
 });
+
+test("即時縮圖設定：壞資料退回預設、數值夾在合法範圍、寬度只收固定幾種", async () => {
+  const { normalizeThumb } = await import("../src/ui-config.ts");
+  const d = normalizeThumb(undefined);
+  assert.equal(d.enabled, false);
+  assert.deepEqual(d.widths, [320, 480, 640]);
+  const t = normalizeThumb({ enabled: true, widths: [480, 481, 960, 960], quality: 500, blur: -3, fit: "nope", format: "webp", background: "red", borderColor: "#ABCDEF", rotate: 45 });
+  assert.equal(t.enabled, true);
+  assert.deepEqual(t.widths, [480, 960]);
+  assert.equal(t.quality, 100);
+  assert.equal(t.blur, 0);
+  assert.equal(t.fit, "scale-down");
+  assert.equal(t.format, "webp");
+  assert.equal(t.background, "");
+  assert.equal(t.borderColor, "#abcdef");
+  assert.equal(t.rotate, 0);
+});

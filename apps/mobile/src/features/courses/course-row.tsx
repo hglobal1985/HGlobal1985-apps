@@ -5,6 +5,7 @@ import { centerTitle, eventDays } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
+import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
 import { BrandCover, AppText, CountPill, CourseCover } from "@/ui";
@@ -26,6 +27,7 @@ export function CourseRow({ course, last }: { course: CourseSummary; last?: bool
   const { c } = useTheme();
   const { member } = useSession();
   const { config } = useUiConfig();
+  const thumb = useThumb();
   useCenterNames();
   const r = ribbonsFor(course, member, config);
   const rb = r.left ?? r.right;
@@ -34,7 +36,7 @@ export function CourseRow({ course, last }: { course: CourseSummary; last?: bool
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${date} ${course.title}`} onPress={() => router.push(`/course/${course.id}`)} style={[styles.row, joined, { borderBottomColor: c.border }, last && { borderBottomWidth: 0 }, ...(course.materialCount === 0 ? fadedStyle : []), course.seriesHidden && { opacity: 0.4 }]}>
       <View style={styles.thumb}>
-        {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: resolveUrl(img) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <CourseCover theme={course.theme} label="" title={displayName(course)} fill />}
+        {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: thumb(resolveUrl(img), 96) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <CourseCover theme={course.theme} label="" title={displayName(course)} fill />}
       </View>
       <View style={styles.mid}>
         <AppText variant="callout" style={{ fontWeight: "800" }} numberOfLines={2}>

@@ -60,6 +60,7 @@ import {
   type ViewScope,
   ZONES,
   zoneOf,
+  type ThumbSettings,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
@@ -1234,8 +1235,31 @@ async function bumpView(db: D1Database, kind: "center" | "series" | "course", ke
   const row = await db.prepare("INSERT INTO page_views (kind, key, total) VALUES (?, ?, 1) ON CONFLICT(kind, key) DO UPDATE SET total = total + 1 RETURNING total").bind(kind, key).first<{ total: number }>();
   return row?.total ?? 0;
 }
-/** 縮圖允許的寬度（像素）：固定幾種，每張圖每月最多這幾次「不重複縮圖」。 */
-const THUMB_WIDTHS = [320, 480, 640, 800];
+/** 即時縮圖：輸出格式、設定簽名（改設定後舊快取自然失效）、送給 Cloudflare 的參數（只送非預設值）。 */
+const thumbFormat = (f: ThumbSettings["format"], accept: string): "avif" | "webp" | "jpeg" | "png" => (f === "auto" ? (/image\/avif/.test(accept) ? "avif" : /image\/webp/.test(accept) ? "webp" : "jpeg") : f === "avif" ? (/image\/avif/.test(accept) ? "avif" : /image\/webp/.test(accept) ? "webp" : "jpeg") : f);
+const thumbSig = (t: ThumbSettings): string => {
+  let h = 5381;
+  for (const ch of JSON.stringify({ ...t, enabled: undefined })) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0;
+  return h.toString(36);
+};
+function thumbTransform(t: ThumbSettings, w: number): Record<string, unknown> {
+  const o: Record<string, unknown> = { width: w, fit: t.fit };
+  if (t.height > 0) o.height = Math.round(w * t.height);
+  if (t.gravity !== "auto") o.gravity = t.gravity;
+  if (t.rotate) o.rotate = t.rotate;
+  if (t.flip) o.flip = t.flip === "hv" ? "hv" : t.flip;
+  if (t.blur) o.blur = t.blur;
+  if (t.sharpen) o.sharpen = t.sharpen;
+  if (t.brightness !== 1) o.brightness = t.brightness;
+  if (t.contrast !== 1) o.contrast = t.contrast;
+  if (t.gamma !== 1) o.gamma = t.gamma;
+  if (t.saturation !== 1) o.saturation = t.saturation;
+  if (t.background) o.background = t.background;
+  if (t.trim) o.trim = { top: t.trim, right: t.trim, bottom: t.trim, left: t.trim };
+  if (t.borderWidth) o.border = { color: t.borderColor, width: t.borderWidth };
+  return o;
+}
+const thumbOutput = (t: ThumbSettings): Record<string, unknown> => ({ quality: t.qualityLevel || t.quality, ...(t.anim ? {} : { anim: false }), ...(t.metadata !== "none" ? { metadata: t.metadata } : {}) });
 const pubUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 const cleanAnnouncement = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, 120) : "");
 const ART_TYPES = new Set(["president", "sound"]);
@@ -4638,31 +4662,64 @@ const routes: [string, RegExp, Handler][] = [
       const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first();
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
-      // 小螢幕縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受固定幾種，避免縮圖次數暴增）。縮不了或超過免費額度就回原圖，網站不會壞。
+      // 即時縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受設定頁勾選的幾種，避免縮圖次數暴增）。
+      // 縮不了、超過免費額度或設定有問題，一律回原圖，網站不會壞；錯誤原因記下來給「設定 › Cloudflare即時縮圖」顯示。
       const w = Number(ctx.url.searchParams.get("w"));
-      if (ctx.env.IMAGES && THUMB_WIDTHS.includes(w) && /^image\/(jpeg|png|webp)$/.test(obj.httpMetadata?.contentType ?? "image/jpeg")) {
-        const q = (await loadConfig(ctx.db)).app.thumbQuality;
-        const webp = /image\/webp/.test(ctx.req.headers.get("accept") ?? "");
-        const cacheKey = new Request(`${ctx.url.origin}/__thumb/${encodeURIComponent(key)}?v=${ctx.url.searchParams.get("v") ?? ""}&w=${w}&q=${q}&f=${webp ? "webp" : "jpeg"}`);
-        const cache = (caches as unknown as { default: Cache }).default;
-        const hit = await cache.match(cacheKey);
-        if (hit) return hit;
-        try {
-          const out = await ctx.env.IMAGES.input(obj.body).transform({ width: w, fit: "scale-down" }).output({ format: webp ? "image/webp" : "image/jpeg", quality: q });
-          const body = await out.response().arrayBuffer();
-          const done = new Response(body, { headers: { "content-type": webp ? "image/webp" : "image/jpeg", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", vary: "Accept", "x-thumb": `w=${w},q=${q},kb=${Math.round(body.byteLength / 1024)}` } });
-          await cache.put(cacheKey, done.clone()).catch(() => undefined);
-          return done;
-        } catch (e) {
-          console.log("thumb_failed", key, w, (e as Error).message);
-          const again = await bucket.get(key);
-          if (!again) return new Response("Not found", { status: 404 });
-          return new Response(again.body, { headers: { "content-type": again.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff", "x-thumb": "fallback" } });
+      const type = obj.httpMetadata?.contentType ?? "image/jpeg";
+      if (ctx.env.IMAGES && w && /^image\/(jpeg|png|webp)$/.test(type)) {
+        const t = (await loadConfig(ctx.db)).app.thumb;
+        if (t.widths.includes(w)) {
+          const accept = ctx.req.headers.get("accept") ?? "";
+          const fmt = thumbFormat(t.format, accept);
+          const cacheKey = new Request(`${ctx.url.origin}/__thumb/${encodeURIComponent(key)}?v=${ctx.url.searchParams.get("v") ?? ""}&w=${w}&s=${thumbSig(t)}&f=${fmt}`);
+          const cache = (caches as unknown as { default: Cache }).default;
+          const hit = await cache.match(cacheKey);
+          if (hit) return hit;
+          try {
+            const src = await ctx.env.IMAGES.input(obj.body).transform(thumbTransform(t, w)).output({ format: `image/${fmt}`, ...thumbOutput(t) });
+            const body = await src.response().arrayBuffer();
+            const done = new Response(body, { headers: { "content-type": `image/${fmt}`, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", vary: "Accept", "x-thumb": `w=${w},f=${fmt},kb=${Math.round(body.byteLength / 1024)}` } });
+            await cache.put(cacheKey, done.clone()).catch(() => undefined);
+            return done;
+          } catch (e) {
+            const message = String((e as Error).message ?? e).slice(0, 300);
+            console.log("thumb_failed", key, w, message);
+            await ctx.db.prepare("INSERT INTO ui_settings (key, value, updated_at) VALUES ('thumb_health', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(JSON.stringify({ at: new Date().toISOString(), key, w, message })).run().catch(() => undefined);
+            const again = await bucket.get(key);
+            if (!again) return new Response("Not found", { status: 404 });
+            return new Response(again.body, { headers: { "content-type": again.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff", "x-thumb": "fallback" } });
+          }
         }
       }
       return new Response(obj.body, {
         headers: { "content-type": obj.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
       });
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/thumb\/status$/,
+    async (ctx) => {
+      // 設定 › Cloudflare即時縮圖：綁定是否可用、最近一次縮圖失敗的原因、試算用的範例封面。
+      requireSuperAdmin(ctx);
+      const row = await ctx.db.prepare("SELECT value FROM ui_settings WHERE key = 'thumb_health'").first<{ value: string }>();
+      let lastError: unknown = null;
+      try {
+        lastError = row ? JSON.parse(row.value) : null;
+      } catch {
+        lastError = null;
+      }
+      const { results } = await ctx.db.prepare("SELECT cover_key AS k, art_version AS v FROM courses WHERE cover_key IS NOT NULL AND status = 'published' ORDER BY updated_at DESC LIMIT 8").all<{ k: string; v: number }>();
+      return { binding: !!ctx.env.IMAGES, lastError, samples: results.map((r) => pubUrl(r.k, r.v)), totalCovers: Number((await ctx.db.prepare("SELECT (SELECT COUNT(*) FROM courses WHERE cover_key IS NOT NULL) + (SELECT COUNT(*) FROM courses WHERE edm_key IS NOT NULL AND cover_key IS NULL) + (SELECT COUNT(*) FROM series_art WHERE cover_key IS NOT NULL OR edm_key IS NOT NULL) + (SELECT COUNT(*) FROM lessons WHERE cover_key IS NOT NULL) AS n").first<{ n: number }>())?.n ?? 0) };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/thumb\/status$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      await ctx.db.prepare("DELETE FROM ui_settings WHERE key = 'thumb_health'").run();
+      return { ok: true };
     },
   ],
   [

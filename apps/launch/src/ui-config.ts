@@ -1,5 +1,5 @@
 /** 超級管理員可調整的畫面設定：存在 ui_settings 一筆 JSON；讀取時和預設值合併，缺的欄位自動補上。 */
-import { DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, type AppSettings, type ShareSettings, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUPS, STATS_ROLE_OPTIONS, type RibbonColor, type SortGroup, type UiConfig } from "./contract.ts";
+import { THUMB_WIDTH_CHOICES, type ThumbSettings, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, type AppSettings, type ShareSettings, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUPS, STATS_ROLE_OPTIONS, type RibbonColor, type SortGroup, type UiConfig } from "./contract.ts";
 import type { D1Database } from "./d1.ts";
 
 const KEY = "ui_config";
@@ -77,6 +77,40 @@ function learnPct(r: Record<string, unknown>, d: AppSettings): { learnStartPct: 
   return { learnStartPct: start, learnDonePct: done };
 }
 
+const pick = <T extends string | number>(v: unknown, allowed: readonly T[], def: T): T => (allowed.includes(v as T) ? (v as T) : def);
+const hex = (v: unknown, def: string) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : def);
+/** 即時縮圖設定：每個欄位都限制在合法範圍內，壞資料一律退回預設。 */
+export function normalizeThumb(raw: unknown): ThumbSettings {
+  const d = DEFAULT_APP_SETTINGS.thumb;
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const n = (v: unknown, def: number, min: number, max: number) => (typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : def);
+  const widths = Array.isArray(r.widths) ? [...new Set((r.widths as unknown[]).filter((x): x is number => THUMB_WIDTH_CHOICES.includes(x as number)))].sort((a, b) => a - b) : d.widths;
+  return {
+    enabled: r.enabled === true,
+    widths: widths.length ? widths : d.widths,
+    height: n(r.height, d.height, 0, 3),
+    fit: pick(r.fit, ["scale-down", "contain", "cover", "crop", "pad", "squeeze"] as const, d.fit),
+    gravity: pick(r.gravity, ["auto", "center", "face", "left", "right", "top", "bottom"] as const, d.gravity),
+    format: pick(r.format, ["auto", "avif", "webp", "jpeg", "png"] as const, d.format),
+    quality: Math.round(n(r.quality, d.quality, 1, 100)),
+    qualityLevel: pick(r.qualityLevel, ["", "high", "medium-high", "medium-low", "low"] as const, d.qualityLevel),
+    anim: r.anim === undefined ? d.anim : r.anim === true,
+    metadata: pick(r.metadata, ["none", "keep", "copyright"] as const, d.metadata),
+    rotate: pick(r.rotate, [0, 90, 180, 270] as const, d.rotate),
+    flip: pick(r.flip, ["", "h", "v", "hv"] as const, d.flip),
+    blur: n(r.blur, d.blur, 0, 250),
+    sharpen: n(r.sharpen, d.sharpen, 0, 10),
+    brightness: n(r.brightness, d.brightness, 0, 4),
+    contrast: n(r.contrast, d.contrast, 0, 4),
+    gamma: n(r.gamma, d.gamma, 0.1, 4),
+    saturation: n(r.saturation, d.saturation, 0, 4),
+    background: r.background === "" || r.background === undefined ? "" : hex(r.background, ""),
+    trim: Math.round(n(r.trim, d.trim, 0, 500)),
+    borderWidth: Math.round(n(r.borderWidth, d.borderWidth, 0, 50)),
+    borderColor: hex(r.borderColor, d.borderColor),
+  };
+}
+
 /** 整理 APP 數值設定：數字夾在合理範圍（四捨五入成整數）、選項不合法退回預設、缺的欄位用預設補。 */
 export function normalizeApp(raw: unknown): AppSettings {
   const d = DEFAULT_APP_SETTINGS;
@@ -110,8 +144,7 @@ export function normalizeApp(raw: unknown): AppSettings {
     imageQuality: num(r.imageQuality, d.imageQuality, 50, 100),
     centerMaxSide: num(r.centerMaxSide, d.centerMaxSide, 800, 4096),
     centerQuality: num(r.centerQuality, d.centerQuality, 70, 100),
-    thumbEnabled: bool(r.thumbEnabled, d.thumbEnabled),
-    thumbQuality: num(r.thumbQuality, d.thumbQuality, 30, 95),
+    thumb: normalizeThumb(r.thumb),
   };
 }
 

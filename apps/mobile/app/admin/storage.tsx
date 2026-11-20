@@ -39,7 +39,7 @@ function StackBar({ parts, total }: { parts: { color: string; value: number }[];
  * 各類型檔案的佔比，以及各中心（含寰宇總部）各自佔用多少、裡面各類型各多少。大小是雲端的實際大小。
  */
 /** 一個「減／數字／加」的調整列。 */
-function Stepper({ label, hint, value, min, max, step, unit, onChange }: { label: string; hint: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
+export function Stepper({ label, hint, value, min, max, step, unit, onChange }: { label: string; hint: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
   const { c } = useTheme();
   return (
     <View style={styles.legend}>
