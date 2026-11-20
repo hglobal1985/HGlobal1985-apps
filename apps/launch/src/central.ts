@@ -80,32 +80,68 @@ export async function verifyAccessToken(token: string): Promise<string | null> {
   }
 }
 
+/** 背景工作執行器（handleApi 每個請求設定為該請求的 waitUntil；沒有時照舊等完成）。 */
+let background: ((p: Promise<unknown>) => void) | null = null;
+export function setBackground(fn: ((p: Promise<unknown>) => void) | null): void {
+  background = fn;
+}
+
+/** 向中央每次呼叫花的時間（依會員 Token 分開記，handleApi 回應時取出寫進 Server-Timing，方便在瀏覽器 Network → Timing 看哪個慢）。 */
+const callLog = new Map<string, { path: string; ms: number }[]>();
+function logCall(token: string, path: string, ms: number): void {
+  const list = callLog.get(token) ?? [];
+  if (list.length < 12) list.push({ path: path.split("?")[0], ms });
+  callLog.set(token, list);
+  if (callLog.size > 500) callLog.delete(callLog.keys().next().value!);
+}
+export function takeCentralTimings(token: string | undefined): string {
+  if (!token) return "";
+  const list = callLog.get(token);
+  callLog.delete(token);
+  return (list ?? []).map((c, i) => `central${i};desc="${c.path.replace(/[^\w/.-]/g, "")}";dur=${c.ms}`).join(", ");
+}
+
 /** 短時效記憶體快取（只在單一 Worker 執行個體內，不落地）。 */
 const memo = new Map<string, { value: unknown; until: number }>();
 const inflight = new Map<string, Promise<unknown>>();
-/** 查詢結果短暫放記憶體；同一時間同樣的查詢只送一次（同一個請求裡好幾個地方都要同一份資料時，不會重複問會員中心）；查不到（undefined）不快取。 */
-async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+/**
+ * 查詢結果短暫放記憶體；同一時間同樣的查詢只送一次；查不到（undefined）不快取。
+ * staleMs＞0＝「先給舊的、背景更新」（業主 2026-11-20）：過期後在 staleMs 內，這次先立刻回舊資料、背景去問中央換新的；
+ * 超過 staleMs 才會站著等。權限相關（職務、資格）舊資料最長可用 5 分鐘（ttl＋staleMs）。
+ */
+async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>, staleMs = 0): Promise<T> {
   const hit = memo.get(key);
-  if (hit && hit.until > Date.now()) return hit.value as T;
-  const running = inflight.get(key);
-  if (running) return (await running) as T;
-  const p = (async () => {
-    const value = await load();
-    if (value !== undefined) {
-      memo.set(key, { value, until: Date.now() + ttlMs });
-      if (memo.size > 2000) memo.delete(memo.keys().next().value!);
+  const now = Date.now();
+  if (hit && hit.until > now) return hit.value as T;
+  const start = (): Promise<unknown> => {
+    const running = inflight.get(key);
+    if (running) return running;
+    const p = (async () => {
+      const value = await load();
+      if (value !== undefined) {
+        memo.set(key, { value, until: Date.now() + ttlMs });
+        if (memo.size > 2000) memo.delete(memo.keys().next().value!);
+      }
+      return value;
+    })();
+    inflight.set(key, p);
+    p.then(() => inflight.delete(key), () => inflight.delete(key));
+    return p;
+  };
+  if (hit && staleMs > 0 && hit.until + staleMs > now && background) {
+    const job = start().catch(() => undefined);
+    try {
+      background(job);
+    } catch {
+      /* 沒有可用的背景執行環境：照樣會在背景跑完 */
     }
-    return value;
-  })();
-  inflight.set(key, p);
-  try {
-    return await p;
-  } finally {
-    inflight.delete(key);
+    return hit.value as T;
   }
+  return (await start()) as T;
 }
 
 async function callCentral(token: string, path: string, init: RequestInit = {}): Promise<Response | null> {
+  const t0 = Date.now();
   try {
     return await centralFetch(`${CENTRAL}${path}`, {
       ...init,
@@ -114,6 +150,8 @@ async function callCentral(token: string, path: string, init: RequestInit = {}):
     });
   } catch {
     return null;
+  } finally {
+    logCall(token, path, Date.now() - t0);
   }
 }
 
@@ -126,7 +164,7 @@ async function profileDoc(sub: string, token: string): Promise<ProfileDoc | unde
     if (!res?.ok) return undefined;
     const b = (await res.json().catch(() => null)) as ProfileDoc | null;
     return b?.fields ? b : undefined;
-  });
+  }, 180_000);
 }
 
 export async function profileSummary(sub: string, token: string): Promise<{ name: string; avatarUrl: string | null }> {
@@ -146,7 +184,7 @@ export async function amwayMe(sub: string, token: string): Promise<AmwayMe | und
     const res = await callCentral(token, "/v1/me/amway");
     if (!res?.ok) return undefined;
     return ((await res.json().catch(() => null)) as AmwayMe | null) ?? undefined;
-  });
+  }, 180_000);
 }
 
 export async function rankValue(sub: string, token: string): Promise<string | null | undefined> {
@@ -194,18 +232,28 @@ export async function profileGaps(sub: string, token: string, email: string | nu
   });
 }
 
-/** 獎銜選項（代碼→名稱）：向中央 GET /v1/amway/field-definitions 讀取 key=rank 的 options，不寫死；快取 1 天、只放記憶體。讀不到回空 Map。 */
-export async function rankOptions(token: string): Promise<Map<string, string>> {
-  return cached("rank-options", 300_000, async () => {
-    const out = new Map<string, string>();
+/**
+ * GET /v1/amway/field-definitions 全站只問這一次（獎銜名稱、獎銜選項、獎銜徽章共用；業主 2026-11-20：以前三個函式各問一次）。
+ * 快取最長 5 分鐘（串接指令 2026-11-15.5 標準 13）、只放記憶體；讀不到回 undefined（不快取）。
+ */
+async function fieldDefinitions(token: string): Promise<unknown | undefined> {
+  return cached("field-defs", 300_000, async () => {
     const res = await callCentral(token, "/v1/amway/field-definitions");
-    if (!res?.ok) return out;
-    const b = (await res.json().catch(() => null)) as unknown;
-    const list: unknown[] = Array.isArray(b) ? b : b && typeof b === "object" ? Object.values((b as { fields?: unknown }).fields ?? b) : [];
-    const rank = list.find((f) => f && typeof f === "object" && (f as { key?: unknown }).key === "rank") as { options?: { value?: unknown; label?: unknown }[] } | undefined;
-    for (const o of rank?.options ?? []) if (typeof o.value === "string" && typeof o.label === "string") out.set(o.value, o.label);
-    return out;
+    if (!res?.ok) return undefined;
+    return (await res.json().catch(() => null)) ?? undefined;
   });
+}
+type RankFieldDef = { options?: { value?: unknown; label?: unknown }[] };
+function rankFieldOf(b: unknown): RankFieldDef | undefined {
+  const list: unknown[] = Array.isArray(b) ? b : b && typeof b === "object" ? Object.values((b as { fields?: unknown }).fields ?? b) : [];
+  return list.find((f) => f && typeof f === "object" && (f as { key?: unknown }).key === "rank") as RankFieldDef | undefined;
+}
+
+/** 獎銜選項（代碼→名稱）：不寫死，向中央讀取 key=rank 的 options。讀不到回空 Map。 */
+export async function rankOptions(token: string): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const o of rankFieldOf(await fieldDefinitions(token))?.options ?? []) if (typeof o.value === "string" && typeof o.label === "string") out.set(o.value, o.label);
+  return out;
 }
 
 /** 顯示名稱（供訂單審核辨識）。 */
@@ -225,35 +273,51 @@ export async function isAdmin(sub: string, token: string, extraAdmins = ""): Pro
 }
 
 /** 獎銜資格（批次）：min_rank 為 none 的課程只需登入；其餘向中央查詢，失敗一律不符合。 */
+async function askEligibility(sub: string, token: string, rules: string[]): Promise<Map<string, boolean> | null> {
+  const res = await callCentral(token, "/v1/eligibility/check-batch", {
+    method: "POST",
+    body: JSON.stringify({ rules: rules.map((min_rank) => ({ audience: "hglobal_verified", min_rank })) }),
+  });
+  if (!res?.ok) return null;
+  const body = (await res.json().catch(() => null)) as { results?: { allowed?: unknown }[] } | null;
+  const results = Array.isArray(body?.results) ? body!.results : [];
+  const out = new Map<string, boolean>();
+  rules.forEach((r, i) => {
+    const allowed = results[i]?.allowed === true;
+    out.set(r, allowed);
+    // 只快取成功的結果 10 分鐘（規範上限 1 日）；失敗不快取，下次重試。
+    memo.set(`elig:${sub}:${r}`, { value: allowed, until: Date.now() + 600_000 });
+  });
+  return out;
+}
 export async function rankEligibility(sub: string, token: string, minRanks: string[]): Promise<Map<string, boolean>> {
   const out = new Map<string, boolean>();
   const need = [...new Set(minRanks.filter((r) => r !== "none"))];
   for (const r of minRanks) if (r === "none") out.set(r, true);
   if (!need.length) return out;
-  const missing = need.filter((r) => {
+  // 快取過期後 5 分鐘內：這次先用舊結果、背景更新（業主 2026-11-20；權限舊資料最長可用 5 分鐘）。
+  const now = Date.now();
+  const missing: string[] = [];
+  const stale: string[] = [];
+  for (const r of need) {
     const hit = memo.get(`elig:${sub}:${r}`);
-    if (hit && hit.until > Date.now()) {
+    if (hit && hit.until > now) out.set(r, hit.value as boolean);
+    else if (hit && hit.until + 300_000 > now && background) {
       out.set(r, hit.value as boolean);
-      return false;
-    }
-    return true;
-  });
-  if (!missing.length) return out;
-  const res = await callCentral(token, "/v1/eligibility/check-batch", {
-    method: "POST",
-    body: JSON.stringify({ rules: missing.map((min_rank) => ({ audience: "hglobal_verified", min_rank })) }),
-  });
-  let results: { allowed?: unknown }[] = [];
-  if (res?.ok) {
-    const body = (await res.json().catch(() => null)) as { results?: { allowed?: unknown }[] } | null;
-    results = Array.isArray(body?.results) ? body!.results : [];
+      stale.push(r);
+    } else missing.push(r);
   }
-  missing.forEach((r, i) => {
-    const allowed = results[i]?.allowed === true;
-    out.set(r, allowed);
-    // 只快取成功的結果 10 分鐘（規範上限 1 日）；失敗不快取，下次重試。
-    if (res?.ok) memo.set(`elig:${sub}:${r}`, { value: allowed, until: Date.now() + 600_000 });
-  });
+  if (stale.length) {
+    const job = askEligibility(sub, token, stale).catch(() => null);
+    try {
+      background!(job);
+    } catch {
+      /* 照樣在背景跑完 */
+    }
+  }
+  if (!missing.length) return out;
+  const got = await askEligibility(sub, token, missing);
+  for (const r of missing) out.set(r, got?.get(r) === true);
   return out;
 }
 
@@ -312,7 +376,7 @@ export async function memberContext(sub: string, token: string): Promise<MemberC
     lastGoodContext.set(sub, ctx);
     if (lastGoodContext.size > 2000) lastGoodContext.delete(lastGoodContext.keys().next().value!);
     return ctx;
-  });
+  }, 240_000);
   return fresh ?? lastGoodContext.get(sub) ?? NO_CONTEXT;
 }
 
@@ -390,16 +454,9 @@ export function forgetMember(sub: string): void {
 }
 
 export type RankOption = { value: string; label: string };
-/** 獎銜選項清單（依階梯順序）；快取 1 天。 */
+/** 獎銜選項清單（依階梯順序）。 */
 export async function rankOptionList(token: string): Promise<RankOption[]> {
-  return cached("rank-option-list", 300_000, async () => {
-    const res = await callCentral(token, "/v1/amway/field-definitions");
-    if (!res?.ok) return [];
-    const b = (await res.json().catch(() => null)) as unknown;
-    const list: unknown[] = Array.isArray(b) ? b : b && typeof b === "object" ? Object.values((b as { fields?: unknown }).fields ?? b) : [];
-    const rank = list.find((f) => f && typeof f === "object" && (f as { key?: unknown }).key === "rank") as { options?: { value?: unknown; label?: unknown }[] } | undefined;
-    return (rank?.options ?? []).filter((o): o is RankOption => typeof o.value === "string" && typeof o.label === "string");
-  });
+  return (rankFieldOf(await fieldDefinitions(token))?.options ?? []).filter((o): o is RankOption => typeof o.value === "string" && typeof o.label === "string");
 }
 
 /** 中央提供的獎銜徽章：公開完整網址＋圖案範圍（畫布 width×height 內，圖案的上下緣）。 */
@@ -419,14 +476,12 @@ export function parseRankBadges(b: unknown): Map<string, RankBadgeInfo | null> {
   return out;
 }
 
-/** 獎銜徽章清單（中央是唯一來源）；快取最長 5 分鐘（串接指令 2026-11-15.5 標準 13）、只放記憶體；讀不到回 undefined（不快取，呼叫端暫用備援）。 */
+/** 獎銜徽章清單（中央是唯一來源）；讀不到回 undefined（呼叫端暫用備援）。 */
 export async function rankBadges(token: string): Promise<Map<string, RankBadgeInfo | null> | undefined> {
-  return cached<Map<string, RankBadgeInfo | null> | undefined>("rank-badges", 300_000, async () => {
-    const res = await callCentral(token, "/v1/amway/field-definitions");
-    if (!res?.ok) return undefined;
-    const m = parseRankBadges(await res.json().catch(() => null));
-    return m.size ? m : undefined;
-  });
+  const b = await fieldDefinitions(token);
+  if (b === undefined) return undefined;
+  const m = parseRankBadges(b);
+  return m.size ? m : undefined;
 }
 
 export type AmwayFieldView = { value: string; pending: string | null; status: string };
