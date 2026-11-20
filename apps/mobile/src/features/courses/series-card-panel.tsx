@@ -3,7 +3,7 @@ import { View } from "react-native";
 import type { CourseDetail, CourseSummary } from "@/api/client";
 import { useApi } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { ErrorView, LoadingLadybug } from "@/ui";
+import { ErrorView, LoadingLadybug, LockMask } from "@/ui";
 import { ChapterList } from "./lesson-list";
 import { MaterialRows } from "./material-rows";
 
@@ -14,6 +14,8 @@ import { MaterialRows } from "./material-rows";
 export function SeriesCardPanel({ course }: { course: CourseSummary }) {
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${course.id}`);
   const goCourse = () => router.push(`/course/${course.id}`); // 沒有權限時點任何教材標題，都跳到該課程詳細頁（業主 2026-11-21）
+  const items = (data?.lessons ?? []).filter((l) => !l.section && !l.full);
+  const allLocked = !data?.can?.edit && items.length > 0 && items.every((l) => l.locked);
   const hasChapters = !!data?.lessons.some((l) => !l.material);
   const hasMaterials = !!data?.lessons.some((l) => l.material && !l.section && !l.full && (l.ready || data.can?.edit));
   return (
@@ -21,10 +23,12 @@ export function SeriesCardPanel({ course }: { course: CourseSummary }) {
       {loading && !data ? <LoadingLadybug /> : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {data ? (
-        <>
+        // 全部沒有權限：蓋一個半透明灰色大鎖頭（共用 LockMask），點整片進該課程頁（業主 2026-11-21）
+        <View style={allLocked ? { minHeight: 230, gap: space.sm } : { gap: space.sm }}>
           {hasChapters || !hasMaterials ? <ChapterList course={data} onBlockedPress={goCourse} /> : null}
           <MaterialRows course={data} onBlockedPress={goCourse} />
-        </>
+          {allLocked ? <LockMask lines={["按此開啟課程頁面", "開通報名"]} onPress={goCourse} /> : null}
+        </View>
       ) : null}
     </View>
   );

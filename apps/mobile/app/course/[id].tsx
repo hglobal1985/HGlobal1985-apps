@@ -30,7 +30,7 @@ import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { StageWidth } from "@/ui/stage-frame";
-import { AppText, Button, Card, LoadingLadybug, LoginPrompt, ErrorView, ListRow, LoadingView, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
+import { AppText, Button, Card, LoadingLadybug, LoginPrompt, ErrorView, ListRow, LoadingView, LockMask, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
 
@@ -482,17 +482,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           <View>
           <ChapterList course={chapterView} style={allLocked ? { minHeight: 230 } : undefined} playingId={editing ? null : playingId} onPlay={playLesson_} />
           {allLocked ? (
-            <View style={styles.mask} accessibilityRole="alert" accessibilityLabel={lockedText}>
-              <Ionicons name="lock-closed" size={48} color="#fff" />
-              <AppText variant="title" style={{ color: "#fff", textAlign: "center" }}>
-                {lockedText}
-              </AppText>
-              {needRank ? (
-                <AppText variant="headline" style={{ color: "#fff", textAlign: "center" }}>
-                  {needRank}
-                </AppText>
-              ) : null}
-            </View>
+            <LockMask lines={[lockedText, ...(needRank ? [needRank] : [])]} />
           ) : null}
           </View>
         )}
@@ -511,12 +501,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
               <FullVersionList course={blockView} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
               {/* 沒有權限時，其他教材也蓋上同一個大鎖頭（業主 2026-11-20）。 */}
               {!editing && materialsLocked ? (
-                <View style={styles.mask} accessibilityRole="alert" accessibilityLabel={lockedText}>
-                  <Ionicons name="lock-closed" size={48} color="#fff" />
-                  <AppText variant="title" style={{ color: "#fff", textAlign: "center" }}>
-                    {lockedText}
-                  </AppText>
-                </View>
+                <LockMask lines={[lockedText]} />
               ) : null}
             </View>
           </Section>
@@ -565,7 +550,6 @@ const styles = StyleSheet.create({
   edmEdit: { position: "absolute", right: space.sm, bottom: space.sm, flexDirection: "row", alignItems: "center", gap: 6, minHeight: minTouch, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: "rgba(0,0,0,0.6)" },
   lessonRow: { flexDirection: "row", alignItems: "center", gap: space.xs, paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   lessonMain: { flex: 1, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm },
-  mask: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, borderRadius: 16, backgroundColor: "rgba(70,76,72,0.72)", alignItems: "center", justifyContent: "flex-start", gap: space.sm, padding: space.md, paddingTop: space.xl }, // 鎖頭文字靠上對齊（教材很長時才看得到）
   pending: { flexDirection: "row", alignItems: "center", gap: space.sm },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
 });
