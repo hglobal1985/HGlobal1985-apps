@@ -11,7 +11,7 @@ import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
 
 /** 底部分頁列高度（業主 2026-11-20：比一般工具列矮一點）。 */
-const navHeight = Math.round((UI_SCALE > 1 ? 62 : 50) * UI_SCALE);
+const navHeight = Math.round((UI_SCALE > 1 ? 58 : 50) * UI_SCALE);
 import { AppText } from "./text";
 import { UniversityIcon } from "./university-icon";
 
@@ -38,7 +38,7 @@ export function BottomBar() {
   const unread = useUnreadCount();
   const lib = useLibraryMode();
   const [keyboard, setKeyboard] = useState(false);
-  // 加到主畫面的 App 底部多出的一塊（lib/bottom-gap.ts）：選單貼齊螢幕底邊，這一塊當成底部留白。
+  // 加到主畫面的 App 底部多出的一塊（lib/bottom-gap.ts）：它本身就是底部安全距離，選單不再額外留白；一般瀏覽器分頁沒有這一塊，才自己留一點。
   const [edge, setEdge] = useState(getBottomGap());
   useEffect(() => onBottomGap(setEdge), []);
   // 大螢幕（業主 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
@@ -65,7 +65,7 @@ export function BottomBar() {
   }, [barBg, hidden]);
   if (hidden) return null;
   return (
-    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.navBar, paddingBottom: edge || Math.min(insets.bottom, 20) }]} accessibilityRole="tablist">
+    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.navBar, paddingBottom: edge > 0 ? 0 : Math.min(insets.bottom, UI_SCALE > 1 ? 8 : 20) }]} accessibilityRole="tablist">
       <View style={[styles.row, large && styles.rowLarge]}>
       {tabs.map((t) => {
         const on = !lib && t.match(pathname);
