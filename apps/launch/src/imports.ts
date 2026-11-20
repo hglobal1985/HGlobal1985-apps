@@ -1,6 +1,7 @@
 import { classifyLink } from "./links.ts";
 import type { D1Database, Env } from "./d1.ts";
 import { loadConfig } from "./ui-config.ts";
+import { shrinkImage } from "./image-store.ts";
 import { youtubeId } from "./api.ts";
 import { taipeiDay } from "./youtube.ts";
 
@@ -150,8 +151,10 @@ async function runJob(env: Env, job: Job, key: string | undefined, side: number)
   // cover / photo：下載圖片（依「圖片壓縮長邊」設定向來源要求縮小版）存進 R2
   const bucket = env.MEDIA;
   if (!bucket) return { imported: 0, note: "檔案儲存空間尚未啟用" };
-  const img = await fetchImage(job.url, side);
-  if (!img) return { imported: 0, note: "圖片下載失敗" };
+  const raw = await fetchImage(job.url, side);
+  if (!raw) return { imported: 0, note: "圖片下載失敗" };
+  const shr = await shrinkImage(env, raw.data, raw.type, "general");
+  const img = { data: shr.data, type: shr.type };
   const ext = EXT[img.type]!;
   if (job.kind === "cover") {
     const k = `lesson/${job.block_id}/${crypto.randomUUID()}.${ext}`;

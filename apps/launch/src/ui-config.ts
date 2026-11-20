@@ -144,6 +144,8 @@ export function normalizeApp(raw: unknown): AppSettings {
     imageQuality: num(r.imageQuality, d.imageQuality, 50, 100),
     centerMaxSide: num(r.centerMaxSide, d.centerMaxSide, 800, 4096),
     centerQuality: num(r.centerQuality, d.centerQuality, 70, 100),
+    edmMaxSide: num(r.edmMaxSide, d.edmMaxSide, 800, 4096),
+    edmQuality: num(r.edmQuality, d.edmQuality, 70, 100),
     thumb: normalizeThumb(r.thumb),
   };
 }
