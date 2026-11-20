@@ -681,8 +681,11 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
       if (res.status === 401) svcToken = null;
       if (!res.ok) {
         failed = true;
-        const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
-        lastUplineError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}`;
+        const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown; message?: unknown; details?: unknown } } | null;
+        // 只顯示狀態碼、錯誤代碼與中央的錯誤說明（欄位名稱等，不含會員資料）；除錯用，長度有限制。
+        const msg = typeof eb?.error?.message === "string" ? eb.error.message.slice(0, 200) : "";
+        const det = eb?.error?.details !== undefined ? JSON.stringify(eb.error.details).slice(0, 200) : "";
+        lastUplineError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}${msg ? `：${msg}` : ""}${det && det !== "{}" ? ` ${det}` : ""}`;
         continue;
       }
       const b = (await res.json().catch(() => null)) as { members?: unknown[]; not_found?: unknown[] } | null;
