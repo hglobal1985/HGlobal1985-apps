@@ -17,16 +17,6 @@ function inScrolledList(target: unknown): boolean {
   return false;
 }
 
-/** 網頁：手指往上拉時，如果按的位置在「還能往下捲的清單」裡，就不攔截（讓清單自己捲）；清單已捲到底或沒有清單才攔截。 */
-function inUnfinishedList(target: unknown): boolean {
-  if (Platform.OS !== "web" || typeof document === "undefined") return false;
-  for (let n = target as Element | null; n && n !== document.body; n = n.parentElement) {
-    const st = getComputedStyle(n);
-    if ((st.overflowY === "auto" || st.overflowY === "scroll") && n.scrollHeight > n.clientHeight && n.scrollTop + n.clientHeight < n.scrollHeight - 2) return true;
-  }
-  return false;
-}
-
 /**
  * 底部彈出面板的外框（從螢幕下方向上滑出、背後半透明、點外面等於取消）。
  * 「確認視窗」「改播詢問」等所有從下方彈出的面板都用它，樣式與手勢只在這裡改一次。
@@ -34,7 +24,7 @@ function inUnfinishedList(target: unknown): boolean {
  * 內建手勢（業主 2026-11-15 永久指示，所有上拉式選單一律有）：在面板或背景上往下滑，面板跟著手指移動；
  * 放開時滑過一小段就順勢滑出畫面並關閉（等同按取消），沒滑夠就彈回原位。
  * swipeUpClose＝連往上滑一小段也算關閉（分類篩選用：滑動等於確定套用）。
- * onExpand＝「上拉進入完整內容」（業主 2026-11-16）：按住面板任何位置往上拉，面板跟著手指長高；拉過約一半距離放開、或一路拉到最高處，
+ * onExpand＝「上拉進入完整內容」（業主 2026-11-16）：按住面板上方的灰色膠囊（`handleHit`）往上拉（面板其他地方只能下滑收起，業主 2026-11-20 改），面板跟著手指長高；拉過約一半距離放開、或一路拉到最高處，
  * 就直接進入右上角那個按鈕對應的內頁（呼叫 onExpand）；沒拉夠就彈回。expandLabel＝上拉時顯示的提示文字。右上角按鈕請用 SheetAction。
  * 新增任何上拉式選單都必須用這個元件，不要自己用 Modal 重做。
  */
@@ -62,10 +52,12 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
   expandFn.current = onExpand;
   const expanding = useRef(false);
   const finishExpand = () => expandFn.current?.();
-  const pan = useRef(
+  // 上拉進入完整內容只有「按住上方灰色膠囊再往上拉」才會觸發（業主 2026-11-20，原本整個面板都能拉太容易誤觸）；
+  // 面板其他地方只負責下滑收起。膠囊有自己的一組手勢（allowExpand），範圍放大到整條寬、好按。
+  const makePan = (allowExpand: boolean) =>
     PanResponder.create({
       onMoveShouldSetPanResponder: (e, g) =>
-        Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.2 && !(g.dy > 0 && inScrolledList(e.target)) && !(g.dy < 0 && (!expandRef.current || inUnfinishedList(e.target))),
+        Math.abs(g.dy) > 12 && Math.abs(g.dy) > Math.abs(g.dx) * 1.2 && !(g.dy > 0 && !allowExpand && inScrolledList(e.target)) && !(g.dy < 0 && (!allowExpand || !expandRef.current)),
       onPanResponderMove: (_e, g) => {
         if (expanding.current) return;
         if (g.dy > 0) ty.setValue(g.dy);
@@ -97,8 +89,9 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
       onPanResponderTerminate: () => {
         if (!expanding.current) back();
       },
-    }),
-  ).current;
+    });
+  const pan = useRef(makePan(false)).current;
+  const handlePan = useRef(makePan(true)).current;
   const swipe = pan.panHandlers;
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
@@ -123,7 +116,9 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
               </Animated.View>
             </>
           ) : null}
-          <View style={[styles.handle, { backgroundColor: c.border }]} />
+          <View {...handlePan.panHandlers} style={[styles.handleHit, Platform.OS === "web" && onExpand ? ({ cursor: "grab", touchAction: "none" } as object) : null]} accessibilityLabel={onExpand ? "按住往上拉進入完整內容" : undefined}>
+            <View style={[styles.handle, { backgroundColor: c.border }]} />
+          </View>
           {children}
         </Animated.View>
       </View>
@@ -137,6 +132,7 @@ const styles = StyleSheet.create({
   fill: { position: "absolute", left: 0, right: 0, top: "100%", height: 1200 },
   hint: { position: "absolute", left: 0, right: 0, top: -40, alignItems: "center" },
   hintPill: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.6)" },
+  handleHit: { alignSelf: "stretch", alignItems: "center", paddingVertical: 12, marginTop: -12, marginBottom: -12 + space.xs },
   handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, marginBottom: space.xs },
 });
 
