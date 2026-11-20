@@ -14,6 +14,6 @@ export function useThumb(): (url: string, cssWidth: number) => string {
     const need = cssWidth * Math.min(PixelRatio.get(), 2);
     const sorted = [...t.widths].sort((a, b) => a - b);
     const w = sorted.find((x) => x >= need) ?? sorted[sorted.length - 1];
-    return w ? `${url}${url.includes("?") ? "&" : "?"}w=${w}&r=2` : url; // r＝縮圖版本，改版時加一，避開手機瀏覽器裡舊的快取
+    return w ? `${url}${url.includes("?") ? "&" : "?"}w=${w}&r=3` : url; // r＝縮圖版本，改版時加一，避開手機瀏覽器裡舊的快取
   };
 }

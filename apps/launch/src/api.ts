@@ -1237,8 +1237,8 @@ async function bumpView(db: D1Database, kind: "center" | "series" | "course", ke
   return row?.total ?? 0;
 }
 /** 即時縮圖：輸出格式、設定簽名（改設定後舊快取自然失效）、送給 Cloudflare 的參數（只送非預設值）。 */
-// 格式不再依瀏覽器 Accept 變化（業主 2026-11-20 回報 Android 長按下載圖片後該圖變空白）：同一個網址永遠同一種格式，不用 Vary: Accept，瀏覽器快取才不會被不同請求搞混。auto＝WebP（所有手機瀏覽器都支援）。
-const thumbFormat = (f: ThumbSettings["format"]): "avif" | "webp" | "jpeg" | "png" => (f === "auto" ? "webp" : f);
+// 格式不再依瀏覽器 Accept 變化（業主 2026-11-20 回報 Android 長按下載圖片後該圖變空白）：同一個網址永遠同一種格式，不用 Vary: Accept，瀏覽器快取才不會被不同請求搞混。auto＝JPEG（相容性最好；業主 2026-11-20 Android 手機顯示 WebP 縮圖會整片空白）。
+const thumbFormat = (f: ThumbSettings["format"]): "avif" | "webp" | "jpeg" | "png" => (f === "auto" ? "jpeg" : f);
 const thumbSig = (t: ThumbSettings): string => {
   let h = 5381;
   for (const ch of JSON.stringify({ ...t, enabled: undefined })) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0;
