@@ -8,9 +8,8 @@ import { AppText, dimStyle } from "@/ui";
 export type AddKind = "course" | "list";
 
 const OPTIONS: { key: AddKind; label: string; sub?: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
-  // 業主 2026-11-16：「新增清單」一行，「(影片/檔案)」換行、字小一點。
-  { key: "list", label: "新增清單", sub: "(影片/檔案)", icon: "list-outline" },
-  { key: "course", label: "新增課程", icon: "school-outline" },
+  // 業主 2026-11-20：只剩一種「教材卡」（不再分清單卡／課程卡）。
+  { key: "course", label: "新增教材卡", icon: "school-outline" },
 ];
 
 /**

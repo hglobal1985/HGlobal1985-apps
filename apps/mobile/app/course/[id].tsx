@@ -451,7 +451,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
 
         {editing && canEditContent ? (
           <>
-            {course.isList ? null : (
+            {(
               <Section title="課程章節">
                 <EditLessonRows group={lessons} word="章節" onMoveTo={pkgBlocks ? setMoveTarget : undefined} onEdit={setLessonSheet} onMove={(i, j) => moveLesson(lessons, i, j)} onCopy={duplicateLesson} onDelete={deleteLesson} busy={lessonBusy} />
                 <Button variant="secondary" label="新增章節" icon="add" onPress={() => setSheet("newLesson")} fullWidth />
@@ -459,9 +459,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
               </Section>
             )}
             {/* 清單卡（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
-            <Section title={course.isList ? "" : "其他教材"}>
+            <Section title="其他教材">
                 <>
-                {course.isList ? null : <Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
+                {<Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
                 <BlockEditList extraMovable={lessons.length > 0 && pkgBlocks} items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} busy={lessonBusy} />
                 </>
             </Section>

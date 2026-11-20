@@ -33,6 +33,6 @@ test("排程補齊：教材日期空白就填發布日期、0 分鐘就填長度
   const r = await backfillYoutube(env, 50, fake);
   assert.equal(r.checked, 2);
   const rows = (await db.prepare("SELECT title, event_date, duration_minutes FROM lessons WHERE course_id = ? AND kind = 'material' ORDER BY position").bind(c.id).all<{ title: string; event_date: string | null; duration_minutes: number }>()).results;
-  assert.deepEqual(rows.map((x) => [x.title, x.event_date, x.duration_minutes]), [["A", "2024-03-25", 11], ["B", "2020-01-01", 11]]);
+  assert.deepEqual(rows.map((x) => [x.title, x.event_date, x.duration_minutes]), [["B", "2020-01-01", 11], ["A", "2024-03-25", 11]]);
   assert.deepEqual(await backfillYoutube(env, 50, fake), { checked: 0, updated: 0 }, "每個教材只查一次");
 });

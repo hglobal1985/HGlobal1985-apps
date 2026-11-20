@@ -21,6 +21,18 @@ async function placeInBlock(db: D1Database, courseId: string, blockId: string, n
   await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
 }
 
+/** 把新建的教材放到這份清單所有教材（含區塊）的最前面，完整版課程影片永遠在最後；順序重新編號。 */
+async function placeOnTop(db: D1Database, courseId: string, newIds: string[]): Promise<void> {
+  if (!newIds.length) return;
+  const { results } = await db.prepare("SELECT id, kind, is_full FROM lessons WHERE course_id = ? ORDER BY position").bind(courseId).all<{ id: string; kind: string; is_full: number }>();
+  const fresh = new Set(newIds);
+  const rest = results.filter((r) => !fresh.has(r.id) && r.is_full !== 1);
+  let at = rest.findIndex((r) => r.kind === "material" || r.kind === "section");
+  if (at < 0) at = rest.length;
+  const order = [...rest.slice(0, at).map((r) => r.id), ...newIds, ...rest.slice(at).map((r) => r.id), ...results.filter((r) => r.is_full === 1).map((r) => r.id)];
+  await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
+}
+
 const nextPos = async (db: D1Database, courseId: string) => ((await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0) + 1;
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
 
@@ -190,5 +202,73 @@ export async function processImportJobs(env: Env, limit = 8): Promise<number> {
     if (job.kind === "playlist" && !env.YOUTUBE_API_KEY) continue;
     await env.DB.prepare("UPDATE import_jobs SET status = ?, imported = ?, note = ?, done_at = ? WHERE id = ?").bind(out.imported > 0 || out.note.startsWith("沒有新的") ? "done" : "failed", out.imported, out.note, new Date().toISOString(), job.id).run();
   }
+  return results.length;
+}
+
+/** 從 YouTube 播放清單網址取出清單編號（list= 參數，或直接貼清單編號）；不是清單網址回 null。 */
+export function playlistIdOf(input: string): string | null {
+  const t = input.trim();
+  if (/^[A-Za-z0-9_-]{10,60}$/.test(t) && /^(PL|UU|OL|FL|RD)/.test(t)) return t;
+  try {
+    const u = new URL(t);
+    if (!/(^|\.)youtube\.com$|(^|\.)youtu\.be$/.test(u.hostname)) return null;
+    const id = u.searchParams.get("list");
+    return id && /^[A-Za-z0-9_-]{10,60}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 同步清單產生的教材名稱（業主 2026-11-20）：「2026年11月 會長翡翠鑽石會議（主持王大明）」。
+ * 年月先看影片標題裡寫的「2026年11月」，沒有就用影片日期；「主持」從標題判讀，判讀不到就不加括號。
+ */
+export function syncTitle(prefix: string, videoTitle: string, date: string | null): string {
+  const t = videoTitle.replace(/\s+/g, " ");
+  const ym = /(\d{4})\s*年\s*(\d{1,2})\s*月/.exec(t);
+  const d = /^(\d{4})-(\d{2})/.exec(date ?? "");
+  const when = ym ? `${ym[1]}年${Number(ym[2])}月` : d ? `${d[1]}年${Number(d[2])}月` : "";
+  const host = /主持(?:人)?\s*[:：]?\s*([^\s（）()【】[\]|｜,，、/／\-－—~～]{1,8})/.exec(t)?.[1] ?? "";
+  return `${when ? `${when} ` : ""}${prefix}${host ? `（主持${host}）` : ""}`.trim();
+}
+
+/**
+ * 同步一份 YouTube 播放清單到教材卡（業主 2026-11-20）：只加還沒有的影片（用影片編號比對，已存在的不重複），
+ * 每支影片一個教材（不開區塊），名稱依 syncTitle，日期＝影片日期，分鐘數由排程補。結果記在這份同步設定上。
+ */
+export async function runYoutubeSync(env: Env, syncId: string): Promise<{ imported: number; note: string }> {
+  const db = env.DB;
+  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ id: string; url: string; playlist_id: string; course_id: string; title_prefix: string }>();
+  if (!sync) return { imported: 0, note: "找不到這個同步設定" };
+  const finish = async (out: { imported: number; note: string }) => {
+    await db.prepare("UPDATE youtube_syncs SET last_synced_at = ?, last_imported = ?, last_note = ? WHERE id = ?").bind(new Date().toISOString(), out.imported, out.note.slice(0, 600), syncId).run();
+    return out;
+  };
+  if (!env.YOUTUBE_API_KEY) return finish({ imported: 0, note: "尚未設定 YouTube 金鑰" });
+  const have = new Set((await db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_ref IS NOT NULL").bind(sync.course_id).all<{ media_ref: string }>()).results.map((r) => r.media_ref));
+  const read = await readPlaylist(env.YOUTUBE_API_KEY, sync.playlist_id, have);
+  if ("error" in read) return finish({ imported: 0, note: read.error });
+  if (!read.items.length) return finish({ imported: 0, note: "沒有新的影片（都已經同步過了）" });
+  // 最新的在最上面（業主 2026-11-20）：新影片依日期由新到舊，加在這份清單所有教材的最前面。
+  const items = [...read.items].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  const pos = await nextPos(db, sync.course_id);
+  const ids = items.map(() => `${sync.course_id}-${short()}`);
+  const lines: string[] = [];
+  await db.batch(
+    items.map((it, i) => {
+      const name = syncTitle(sync.title_prefix, it.title, it.date).slice(0, 120) || it.title;
+      lines.push(`${name}｜${it.title}`);
+      return db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, event_date, kind) VALUES (?, ?, ?, ?, 0, 'youtube', ?, ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.id, it.date);
+    }),
+  );
+  await placeOnTop(db, sync.course_id, ids);
+  return finish({ imported: items.length, note: lines.join("\n").slice(0, 600) });
+}
+
+/** 排程：還沒同步過的同步設定，自動做第一次同步（之後都是手動按「同步」；每次最多 2 份）。 */
+export async function processFirstSyncs(env: Env): Promise<number> {
+  if (!env.YOUTUBE_API_KEY) return 0;
+  const { results } = await env.DB.prepare("SELECT id FROM youtube_syncs WHERE last_synced_at IS NULL ORDER BY created_at LIMIT 2").all<{ id: string }>();
+  for (const r of results) await runYoutubeSync(env, r.id);
   return results.length;
 }

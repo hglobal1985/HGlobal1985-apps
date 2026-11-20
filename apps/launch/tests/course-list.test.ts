@@ -5,7 +5,7 @@ import type { CourseDetail, CourseSummary } from "../src/contract.ts";
 import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 App 內播放（不累積小樹苗與學習進度）；其他連結開外部；不能新增章節與完整版", async () => {
+test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 App 內播放（不累積小樹苗與學習進度）；其他連結開外部", async () => {
   const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on" };
   const call = async <T,>(method: string, path: string, token?: string, body?: unknown) => {
     const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env);
@@ -20,9 +20,6 @@ test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 Ap
   assert.equal(made.data.isList, true);
   assert.equal(made.data.isPublic, true, "清單一律完全公開");
   assert.equal(made.data.lessons.length, 0, "清單沒有預設的第 1 堂章節");
-
-  assert.equal((await call("POST", `/admin/courses/${id}/lessons`, admin, { title: "第 1 堂" })).status, 400, "清單不能新增章節");
-  assert.equal((await call("POST", `/admin/courses/${id}/full-version`, admin)).status, 400, "清單沒有完整版課程影片");
 
   const v = await call<CourseDetail>("POST", `/admin/courses/${id}/materials`, admin, { url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", title: "走秀花絮" });
   assert.equal(v.status, 200);
@@ -58,11 +55,11 @@ test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 Ap
   assert.equal(l2.linkUrl, undefined);
   assert.equal(l2.media?.ref, "dQw4w9WgXcQ");
 
-  // 一般課程貼 YouTube 仍是外部連結（行為不變）
+  // 教材卡只剩一種（業主 2026-11-20）：一般課程貼 YouTube 也存成影片來源（App 內播放）
   const normal = (await call<CourseDetail>("POST", "/admin/courses", admin, { title: "一般課", teacher: "王小明" })).data;
   assert.equal(normal.isList, false);
   const n = await call<CourseDetail>("POST", `/admin/courses/${normal.id}/materials`, admin, { url: "https://youtu.be/dQw4w9WgXcQ", title: "影片連結" });
-  assert.ok(n.data.lessons.find((l) => l.title === "影片連結")!.linkUrl);
+  assert.equal(n.data.lessons.find((l) => l.title === "影片連結")!.media?.ref, "dQw4w9WgXcQ");
 });
 
 test("分享文字：素材清單與清單影片各有自己的範本（和課程分開設定），空白退回預設", async () => {

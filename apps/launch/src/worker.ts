@@ -1,7 +1,7 @@
 import { revokeLegacyDriveLink } from "./material-files.ts";
 import { ensureBrandCards } from "./brand-cards.ts";
 import { backfillYoutube } from "./youtube.ts";
-import { processImportJobs } from "./imports.ts";
+import { processFirstSyncs, processImportJobs } from "./imports.ts";
 import { handleApi } from "./api.ts";
 import type { Env } from "./d1.ts";
 import { resolveShareMeta, withShareMeta } from "./og.ts";
@@ -40,6 +40,7 @@ export function createWorker(staticFiles: StaticFiles) {
         await revokeLegacyDriveLink(env.DB).catch((e) => console.error("legacy drive cleanup", e instanceof Error ? e.message : "error")); // 舊的「業主雲端硬碟上傳」授權：撤銷並刪除（業主 2026-11-18 取消該功能）
         await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));
         await processImportJobs(env).catch((e) => console.error("import jobs", e instanceof Error ? e.message : "error"));
+        await processFirstSyncs(env).catch((e) => console.error("first syncs", e instanceof Error ? e.message : "error"));
         await ensureBrandCards(env).catch((e) => console.error("brand cards", e instanceof Error ? e.message : "error"));
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));

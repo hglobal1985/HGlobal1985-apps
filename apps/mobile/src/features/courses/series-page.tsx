@@ -142,9 +142,8 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       <Ionicons name={icon} size={22} color={view === v ? c.textOnAccent : c.text} />
     </Pressable>
   );
-  const both = courseCards.length > 0 && listCards.length > 0;
   const hiddenFromMember = series === UNCATEGORIZED && !admin; // 「未分類」只有超級管理員看得到
-  const section = (title: string, n: number) => (both ? <AppText variant="headline" style={{ marginTop: space.sm }}>{`${title}　${n}`}</AppText> : null);
+  const section = (_title: string, _n: number) => null; // 業主 2026-11-20：只剩「教材卡」一種，不再分「課程卡／清單卡」兩區標題（版型仍依內容自動排）
   const ctrl = (items: CourseSummary[], x: CourseSummary, i: number) => (
     <View style={styles.arrows}>
       <Pressable accessibilityRole="button" accessibilityLabel={`上移 ${x.title}`} disabled={i === 0} onPress={() => move(items, i, -1)} style={[styles.arrow, { borderColor: c.border, backgroundColor: c.surface, opacity: i === 0 ? 0.3 : 1 }]}>
@@ -205,7 +204,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
           <Card style={{ gap: space.md }}>
             <AppText variant="headline">編輯系列卡</AppText>
             {series === UNCATEGORIZED ? (
-              <NoticeBox tone="info" text="「未分類」放的是還沒指定系列的課程卡，只有超級管理員看得到。把課程的「系列」改成其他系列，它就會移到那個系列。" />
+              <NoticeBox tone="info" text="「未分類」放的是還沒指定系列的教材卡，只有超級管理員看得到。把課程的「系列」改成其他系列，它就會移到那個系列。" />
             ) : (
               <>
                 <View style={styles.switchRow}>

@@ -188,8 +188,8 @@ function CoverLibrarySheet({ onClose, onPick }: { onClose: () => void; onPick: (
               </AppText>
             ) : null}
             {cards("系列卡的封面", lib.series)}
-            {cards("課程卡的封面", lib.courses)}
-            {cards("清單卡的封面", lib.lists)}
+            {cards("教材卡的封面（課程型）", lib.courses)}
+            {cards("教材卡的封面（清單型）", lib.lists)}
           </>
         ) : null}
       </SheetScroll>

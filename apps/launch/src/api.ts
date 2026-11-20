@@ -462,6 +462,7 @@ type CourseRow = {
   host_center_key: string | null;
   is_shorts: number;
   is_list: number;
+  chapter_n: number;
   url_name: string | null;
   mat_url: string | null;
   free_from: string | null;
@@ -510,7 +511,16 @@ type CourseRow = {
   material_count: number;
 };
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+/**
+ * 「純教材」判斷（業主 2026-11-20：教材卡只剩一種）：舊的清單型卡片（is_list=1），或是「沒有章節、免費、沒有日期」的教材卡。
+ * 純教材卡沿用清單的規則：不需要報名、不顯示緞帶與費用、不列入學習中；一加上章節、日期或費用，就自動變成一般課程的規則。
+ */
+const materialLike = (r: { is_list: number; chapter_n: number; price_twd: number; price_tba: number; event_start: string | null; event_end: string | null }): boolean =>
+  r.is_list === 1 || (r.chapter_n === 0 && r.price_twd === 0 && r.price_tba !== 1 && !r.event_start && !r.event_end);
+/** 同一個判斷的 SQL 版（FROM courses 的查詢用）。 */
+const MATERIAL_LIKE_SQL = `(is_list = 1 OR (NOT EXISTS (SELECT 1 FROM lessons ch WHERE ch.course_id = courses.id AND ch.kind = 'chapter') AND price_twd = 0 AND price_tba <> 1 AND COALESCE(event_start, '') = '' AND COALESCE(event_end, '') = ''))`;
+
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -609,7 +619,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     // 中心課程＝主辦單位含某個中心（自動，不再手動勾選）；只有總部主辦的是一般課程。
     centerCourse: row.host_center_key != null,
     isShorts: row.is_shorts === 1,
-    isList: row.is_list === 1,
+    isList: materialLike(row),
     // 素材（清單）有第二層網址且系列有短網址：/系列縮寫/素材名稱；否則沿用原本的課程專屬網址。
     shortPath: row.is_list === 1 && row.mat_url && row.series && ctx.seriesSlugs?.get(row.series) ? `${ctx.seriesSlugs.get(row.series)}/${row.mat_url}` : row.url_name ? (row.host_center_key ? (ctx.centerSlugs?.get(row.host_center_key) ? `${ctx.centerSlugs.get(row.host_center_key)}/${row.url_name}` : null) : `${HQ_SLUG}/${row.url_name}`) : null,
     matUrl: row.mat_url,
@@ -641,7 +651,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     lastLearnedAt: state.lastLearned.get(row.id) ?? null,
     started: state.started.has(row.id) || (state.done.get(row.id) ?? 0) > 0,
     // 只有清單／素材類「符合獎銜就能直接使用」；課程類一律要手動報名（業主 2026-11-18）。
-    watchFree: !!ctx.session && row.is_list === 1 && row.status === "published" && row.price_twd === 0 && row.price_tba !== 1 && (eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row)),
+    watchFree: !!ctx.session && materialLike(row) && row.status === "published" && row.price_twd === 0 && row.price_tba !== 1 && (eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row)),
     diamondFree: row.diamond_free === 1,
     diamondFreeNow: diamondNow,
     earlyBird: row.early_bird === 1 && row.early_price_twd != null && !!row.early_until ? { priceTwd: web ? row.early_price_twd : null, until: row.early_until, active: earlyNow } : null,
@@ -652,7 +662,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     lessonCount: row.lesson_count,
     hasMaterial: row.material_count > 0,
     // 教材數：自己的教材，加上連結區塊（品牌資訊卡的「新品特惠培訓直播」）來源清單裡的教材。
-    materialCount: row.material_count + (row.is_list === 1 ? (ctx.blocks?.get(row.id) ?? []).reduce((n, b) => n + (b.linked ? b.count : 0), 0) : 0),
+    materialCount: row.material_count + (materialLike(row) ? (ctx.blocks?.get(row.id) ?? []).reduce((n, b) => n + (b.linked ? b.count : 0), 0) : 0),
     totalMinutes: row.total_minutes,
     eligible: eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row),
     allowPresident: row.allow_president === 1,
@@ -1017,15 +1027,15 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       sharerTitle: l.sharer_title,
       // 章節封面：勾了「自動使用 YouTube 畫面」＝影片縮圖；沒勾但沒上傳封面＝臨時用縮圖（非 YouTube 章節維持 null＝用課程封面）。
       // 清單卡裡的影片一律用 YouTube 縮圖（業主 2026-11-17）；一般課程：有上傳章節封面用上傳的，沒有才用 YouTube 縮圖。
-      coverUrl: linkCover.has(l.id) ? linkCover.get(l.id)! : l.media_type === "youtube" && l.media_ref && (row.is_list === 1 || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
-      posterUrl: l.media_type === "youtube" && l.media_ref && (row.is_list === 1 || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
+      coverUrl: linkCover.has(l.id) ? linkCover.get(l.id)! : l.media_type === "youtube" && l.media_ref && (materialLike(row) || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
+      posterUrl: l.media_type === "youtube" && l.media_ref && (materialLike(row) || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
       autoCover: l.auto_cover === 1,
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
       // 完全公開的課程：任何人（含訪客與會員）都可以看章節，不需要報名。
       locked: lockedAll,
       // 清單項目的圖示類型（連結類型，或清單裡的 YouTube 影片）；規則在 link-rules.ts（業主 2026-11-18）。
-      ...(l.kind === "material" && !l.is_full && itemIconType(linkOf.get(l.id)?.type, l.media_type, row.is_list === 1) ? { iconType: itemIconType(linkOf.get(l.id)?.type, l.media_type, row.is_list === 1) } : {}),
+      ...(l.kind === "material" && !l.is_full && itemIconType(linkOf.get(l.id)?.type, l.media_type, true) ? { iconType: itemIconType(linkOf.get(l.id)?.type, l.media_type, true) } : {}),
       ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...(lockedAll ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
       ...(admin ? { media: { type: l.media_type, ref: l.media_ref } } : {}),
@@ -1089,7 +1099,7 @@ async function freeWatchable(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) return false;
   const c = await ctx.db
-    .prepare("SELECT min_rank_code, allow_president, price_twd, price_tba FROM courses WHERE id = ? AND status = 'published' AND is_list = 1")
+    .prepare(`SELECT min_rank_code, allow_president, price_twd, price_tba FROM courses WHERE id = ? AND status = 'published' AND ${MATERIAL_LIKE_SQL}`)
     .bind(courseId)
     .first<{ min_rank_code: string; allow_president: number; price_twd: number; price_tba: number }>();
   if (!c || c.price_twd !== 0 || c.price_tba === 1) return false;
@@ -1341,16 +1351,29 @@ async function deleteR2Files(env: Env, keys: (string | null | undefined)[]): Pro
   }
 }
 
+/**
+ * 新教材放哪裡（業主 2026-11-20：最新的在最上面）：放在這份清單「第一個教材／區塊」的位置，原本的往後挪一格；
+ * 還沒有任何教材就放最後（完整版課程影片永遠在最後）。回傳要放的順序位置與要先執行的搬移指令。
+ */
+async function materialSlot(db: D1Database, courseId: string): Promise<{ at: number; pre: D1PreparedStatement[] }> {
+  const first = await db.prepare("SELECT MIN(position) AS p FROM lessons WHERE course_id = ? AND is_full = 0 AND kind IN ('material', 'section')").bind(courseId).first<{ p: number | null }>();
+  if (first?.p != null)
+    return { at: first.p, pre: [db.prepare("UPDATE lessons SET position = -(position + 1) WHERE course_id = ? AND position >= ?").bind(courseId, first.p), db.prepare("UPDATE lessons SET position = -position WHERE course_id = ? AND position < 0").bind(courseId)] };
+  const max = (await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0;
+  const full = await db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+  return full ? { at: full.position, pre: [db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(max + 1, full.id)] } : { at: max + 1, pre: [] };
+}
+
 /** 把已存進 R2 的檔案建成一個「其他教材」（放在完整版課程影片之前），並通知訂閱者。回傳教材編號。 */
 async function createFileMaterial(ctx: Ctx, admin: Session, courseId: string, f: { name: string; key: string; size: number; contentType: string; attType: AttachmentType; audit: string }): Promise<string> {
   const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
   if (!course) return fail(404, "not_found", "找不到這門課程");
   const id = `${courseId}-${randomId(6)}`;
-  const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+  const slot = await materialSlot(ctx.db, courseId);
   const title = cleanTitle(f.name.replace(/\.[^.]+$/, "")) || "檔案";
   await ctx.db.batch([
-    ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title),
+    ...slot.pre,
+    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, slot.at, title),
     ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, att_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?)").bind(crypto.randomUUID(), id, courseId, f.name, f.key, f.size, f.contentType, f.attType, admin.sub),
     audit(ctx.db, admin.sub, f.audit, "lesson", id, `${f.attType}:${f.name}:${f.size}`),
   ]);
@@ -1599,7 +1622,7 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
   {
     const { results: scopes } = await ctx.db.prepare(`SELECT id, view_scope FROM courses WHERE id IN (${marks})`).bind(...ids).all<{ id: string; view_scope: string }>();
     if (scopes.some((c) => !scopeAllows(c.view_scope, s))) fail(403, "not_visible", "這門課程不開放你報名");
-    if ((await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE is_list = 1 AND id IN (${marks}) LIMIT 1`).bind(...ids).first())) fail(400, "list_no_enroll", "清單卡不需要報名，打開就能看");
+    if ((await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE ${MATERIAL_LIKE_SQL} AND id IN (${marks}) LIMIT 1`).bind(...ids).first())) fail(400, "list_no_enroll", "這張教材卡不需要報名，打開就能看");
   }
   if (courses.some((c) => c.price_tba === 1)) fail(409, "price_tba", "這門課程的費用尚未公布，暫不開放報名");
   const eligibility = await eligibilityFor(s, rankMap, [...courses.map((c) => c.min_rank_code), DIAMOND]);
@@ -3384,6 +3407,66 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/admin\/youtube-syncs$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      const { results } = await ctx.db
+        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id ORDER BY y.created_at")
+        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
+      return { syncs: results, keyReady: !!ctx.env.YOUTUBE_API_KEY };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/youtube-syncs$/,
+    async (ctx) => {
+      // 新增一份同步設定（業主 2026-11-20，超級管理員）：貼播放清單網址，選「放進哪一張教材卡」（或直接新建一張）與教材名稱前綴。
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; label?: unknown }>(ctx.req);
+      const { playlistIdOf } = await import("./imports.ts");
+      const playlistId = typeof body.url === "string" ? playlistIdOf(body.url) : null;
+      if (!playlistId) return fail(400, "invalid_playlist", "請貼上 YouTube 播放清單的網址（網址裡要有 list=…）");
+      let courseId = typeof body.courseId === "string" ? body.courseId : "";
+      const newTitle = typeof body.newCardTitle === "string" ? body.newCardTitle.trim().slice(0, 80) : "";
+      if (!courseId && !newTitle) return fail(400, "card_required", "請選擇要放進的教材卡，或輸入新教材卡的名稱");
+      if (courseId && !(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這張教材卡");
+      if (!courseId) {
+        // 新建一張教材卡：獨立一張（沒有系列）、已上架、所有會員可看、免費；其餘到教材卡的設定裡調整。
+        courseId = `c${randomId(7)}`;
+        const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
+        await ctx.db.batch([
+          ctx.db.prepare("INSERT INTO courses (id, sort_order, status, created_by_sub, edited_by_name, edited_at, title, is_list, view_scope, is_public, allow_president, zone, price_twd, min_rank_code, series) VALUES (?, ?, 'published', ?, ?, ?, ?, 0, 'members', 0, 1, 'hglobal', 0, 'none', '')").bind(courseId, (max?.m ?? 0) + 1, s.sub, s.name.slice(0, 60), iso(), newTitle),
+          audit(ctx.db, s.sub, "course.create", "course", courseId, newTitle),
+        ]);
+      }
+      const prefix = (typeof body.titlePrefix === "string" ? body.titlePrefix.trim() : "").slice(0, 80) || newTitle;
+      const id = `ys${randomId(8)}`;
+      await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix) VALUES (?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix).run();
+      await audit(ctx.db, s.sub, "youtube_sync.create", "youtube_sync", id, playlistId).run();
+      return { id, courseId };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/youtube-syncs\/([\w-]+)\/sync$/,
+    async (ctx, [id]) => {
+      requireSuperAdmin(ctx);
+      const { runYoutubeSync } = await import("./imports.ts");
+      const out = await runYoutubeSync(ctx.env, id!);
+      return out;
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/youtube-syncs\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      requireSuperAdmin(ctx);
+      await ctx.db.prepare("DELETE FROM youtube_syncs WHERE id = ?").bind(id).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "GET",
     /^\/admin\/stats\/cloudflare$/,
     async (ctx) => {
       const s = requireMember(ctx);
@@ -4100,13 +4183,13 @@ const routes: [string, RegExp, Handler][] = [
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;
       // 清單卡貼 YouTube 影片：存成影片來源，在 App 內原地播放（計入學習進度）；其他連結照常開外部網頁。
-      const yt = course.is_list === 1 ? youtubeId(u.toString()) : null;
+      const yt = youtubeId(u.toString());
       // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
-      const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+      const slot = await materialSlot(ctx.db, courseId);
       const attId = crypto.randomUUID();
       await ctx.db.batch([
-        ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, ?, ?, ?, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title, yt ? "youtube" : "demo", yt, itemDate),
+        ...slot.pre,
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, ?, ?, ?, 0, 'material')").bind(id, courseId, slot.at, title, yt ? "youtube" : "demo", yt, itemDate),
         ...(yt ? [] : [ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, courseId, title, u.toString(), classifyLink(u), admin.sub)]),
         audit(ctx.db, admin.sub, "material.create", "lesson", id, `${classifyLink(u)}:${title}`),
       ]);
@@ -4128,14 +4211,14 @@ const routes: [string, RegExp, Handler][] = [
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
       // 清單卡：YouTube 影片存成影片來源（App 內播放；同一支影片保留原本的分鐘數與區間），其他連結存成外部連結。
-      const yt = lesson.is_list === 1 ? youtubeId(u.toString()) : null;
+      const yt = youtubeId(u.toString());
       const sameVideo = !!yt && lesson.media_type === "youtube" && lesson.media_ref === yt;
       await ctx.db.batch([
         ctx.db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(title, id),
         ...(body.eventDate !== undefined ? [ctx.db.prepare("UPDATE lessons SET event_date = ? WHERE id = ?").bind(dayOrNull(body.eventDate), id)] : []),
         ctx.db.prepare("UPDATE lessons SET yt_checked_at = NULL WHERE id = ?").bind(id),
         ...(yt && !sameVideo ? [ctx.db.prepare("UPDATE lessons SET media_type = 'youtube', media_ref = ?, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(yt, id)] : []),
-        ...(!yt && lesson.is_list === 1 && lesson.media_type !== "demo" ? [ctx.db.prepare("UPDATE lessons SET media_type = 'demo', media_ref = NULL, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(id)] : []),
+        ...(!yt && lesson.media_type === "youtube" ? [ctx.db.prepare("UPDATE lessons SET media_type = 'demo', media_ref = NULL, duration_minutes = 0, start_seconds = NULL, end_seconds = NULL WHERE id = ?").bind(id)] : []),
         ctx.db.prepare("DELETE FROM lesson_attachments WHERE lesson_id = ? AND kind = 'link'").bind(id),
         ...(yt ? [] : [ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(crypto.randomUUID(), id, lesson.course_id, title, u.toString(), classifyLink(u), admin.sub)]),
         audit(ctx.db, admin.sub, "material.update", "lesson", id, `${classifyLink(u)}:${title}`),
@@ -5842,7 +5925,6 @@ const routes: [string, RegExp, Handler][] = [
       const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
       const isList = await isListCourse(ctx, courseId);
       const kind = body.kind === "section" ? "section" : body.kind === "material" ? "material" : "chapter";
-      if (kind === "chapter" && isList) fail(400, "list_no_chapter", "清單卡沒有章節，請用「新增教材」");
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
       const sharerTitle = typeof body.sharerTitle === "string" ? body.sharerTitle.trim().slice(0, 50) : "";
       const sharerRank = typeof body.sharerRank === "string" ? body.sharerRank.trim().slice(0, 40) : "";
@@ -5912,7 +5994,6 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [courseId]) => {
       // 勾選「完整版課程影片」：在教材最後新增一列；章節都用同一支影片時自動帶入（秒數留空＝播整支）。已存在就直接回傳。
       const admin = await requireCourseManager(ctx, courseId);
-      if (await isListCourse(ctx, courseId)) fail(400, "list_no_full", "清單卡沒有完整版課程影片");
       if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這門課程");
       if (!(await ctx.db.prepare("SELECT 1 AS ok FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first())) {
         const chapters = await ctx.db

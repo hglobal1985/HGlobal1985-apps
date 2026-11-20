@@ -61,7 +61,7 @@ function FileMaterialSheet({ course, lesson, onClose }: { course: CourseDetail; 
   };
   const info = lesson.linkType ? TYPE_INFO[lesson.linkType] : null;
   return (
-    <EditSheet material={course.isList} title={`教材 ${lesson.position}：${lesson.title}`} onClose={onClose} onSave={submit} dirty={title !== lesson.title || evDate !== (lesson.eventDate ?? "") || theme !== !!lesson.isSpeaker} busy={busy} error={error}>
+    <EditSheet title={`教材 ${lesson.position}：${lesson.title}`} onClose={onClose} onSave={submit} dirty={title !== lesson.title || evDate !== (lesson.eventDate ?? "") || theme !== !!lesson.isSpeaker} busy={busy} error={error}>
       <FormBlock title="檔案" hint="要換檔案，請刪除這個教材後重新上傳">
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
           {lesson.linkType ? <BrandIcon type={lesson.linkType} fallback={info!.icon as never} size={32} /> : null}
@@ -106,7 +106,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const { c } = useTheme();
   const { invalidate } = useSession();
   // 清單卡的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
-  const baseLink = lesson?.linkUrl ?? (course.isList && lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
+  const baseLink = lesson?.linkUrl ?? (lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
   const [url, setUrl] = useState(baseLink);
   const [title, setTitle] = useState(lesson?.title ?? "");
   const lastAuto = useRef<string>(lesson?.title ?? ""); // 最近一次自動填入的名稱：名稱還是這個（或空白）時，換連結才會自動換名稱；自己改過的不會被蓋掉
@@ -123,7 +123,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
 
   const parsed = parseHttpsUrl(url);
   const fileType = parsed ? classifyLink(parsed) : null;
-  const ytId = course.isList && fileType === "youtube" ? ytIdOfUrl(parsed) : null;
+  const ytId = fileType === "youtube" ? ytIdOfUrl(parsed) : null;
   const dirty = lesson ? theme !== !!lesson.isSpeaker || url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
 
   // 連結一變（貼上或手動輸入，停下來 0.6 秒後），請伺服器代為讀取網頁標題。
@@ -171,7 +171,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   };
 
   const before = useRef(new Set(course.lessons.map((l) => l.id)));
-  // 上傳檔案完成：新建的教材（可能多個）搬到指定區塊的最後面，然後關閉。
+  // 上傳檔案完成：新建的教材（可能多個）搬到指定區塊的最上面，然後關閉。
   const onFiles = async (d: CourseDetail, hadErrors: boolean) => {
     const fresh = d.lessons.filter((l) => l.material && !l.full && !before.current.has(l.id));
     if (afterBlock && fresh.length) {
@@ -179,9 +179,8 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
       const rest = all.filter((l) => !fresh.some((f) => f.id === l.id));
       const at = rest.findIndex((l) => l.id === afterBlock);
       if (at >= 0) {
-        let end = at + 1;
-        while (end < rest.length && !rest[end]!.section) end++;
-        await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: [...rest.slice(0, end), ...fresh, ...rest.slice(end)].map((l) => l.id) }).catch(() => undefined);
+        // 最新的在最上面（業主 2026-11-20）：放在區塊標題的正下方。
+        await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: [...rest.slice(0, at + 1), ...fresh, ...rest.slice(at + 1)].map((l) => l.id) }).catch(() => undefined);
       }
     }
     invalidate();
@@ -199,15 +198,13 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
         const before = new Set(course.lessons.map((l) => l.id));
         const d = await api<CourseDetail>("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title, ...dateBody });
         lessonId = d.lessons.find((l) => !before.has(l.id))?.id;
-        // 指定區塊：把新教材移到該區塊的最後面（區塊底下＝到下一個區塊標題之前）。
+        // 指定區塊：把新教材移到該區塊的最上面（區塊標題的正下方）。
         if (afterBlock && lessonId) {
           const all = d.lessons.filter((l) => l.material && !l.full);
           const rest = all.filter((l) => l.id !== lessonId);
           const at = rest.findIndex((l) => l.id === afterBlock);
           if (at >= 0) {
-            let end = at + 1;
-            while (end < rest.length && !rest[end]!.section) end++;
-            const next = [...rest.slice(0, end), all.find((l) => l.id === lessonId)!, ...rest.slice(end)];
+            const next = [...rest.slice(0, at + 1), all.find((l) => l.id === lessonId)!, ...rest.slice(at + 1)]; // 區塊標題的正下方（最新的在最上面）
             await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: next.map((l) => l.id) });
           }
         }
@@ -228,7 +225,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const input = [{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, bodyFont, { color: c.text, borderColor: c.border, backgroundColor: c.surface }];
   const info = fileType ? TYPE_INFO[fileType] : null;
   return (
-    <EditSheet material={course.isList} title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
+    <EditSheet title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
       {!lesson ? (
         <FormBlock title="上傳檔案" hint="圖片、照片、文件（PDF、Word、PowerPoint、Excel、文字檔）；不可上傳影片。可以從這支手機或電腦選檔案，也可以從你自己的 Google 雲端硬碟選擇（系統會幫你轉存到行動大學的儲存空間）。單檔大小有上限，選好就會直接上傳並建立教材；之後誰能下載，跟著這份課程或清單的規則。">
           <FileUploadModule courseId={course.id} onUploaded={onFiles} onBusyChange={setBusy} />
@@ -283,13 +280,11 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
         </AppText>
         <View style={{ flexDirection: "row", alignItems: "center", gap: space.md, minHeight: minTouch }}>
           {fileType ? <BrandIcon type={fileType} fallback={info!.icon as never} size={36} /> : <Icon name="link-outline" size={36} color={c.textMuted} />}
-          <AppText variant="body">{info ? `${info.label}${course.isList && fileType === "youtube" ? "（在 App 內播放）" : ""}` : "貼上連結後自動判斷"}</AppText>
+          <AppText variant="body">{info ? `${info.label}${fileType === "youtube" ? "（在 App 內播放）" : ""}` : "貼上連結後自動判斷"}</AppText>
         </View>
-        {course.isList ? (
-          <AppText variant="caption" tone="muted">
-            YouTube 影片會在 App 內播放；其他連結（簡報、PDF、雲端檔案…）點了開啟外部網頁。
-          </AppText>
-        ) : null}
+        <AppText variant="caption" tone="muted">
+          YouTube 影片會在 App 內播放；其他連結（簡報、PDF、雲端檔案…）點了開啟外部網頁。
+        </AppText>
       </View>
       <DateSelect label="日期（選填；貼上連結會自動帶入連結的日期，可自行修改）" value={evDate} onChange={setEvDate} />
       {lesson ? <ThemeCheck value={theme} onChange={setTheme} /> : null}
