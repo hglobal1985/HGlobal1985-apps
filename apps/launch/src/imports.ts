@@ -4,6 +4,7 @@ import { loadConfig } from "./ui-config.ts";
 import { shrinkImage } from "./image-store.ts";
 import { youtubeId } from "./api.ts";
 import { taipeiDay } from "./youtube.ts";
+import { runPlaylistCourse } from "./u40-import.ts";
 
 type Job = { id: string; course_id: string; block_id: string; kind: "playlist" | "video" | "cover" | "photo" | "link"; url: string; title: string; start_sec: number | null };
 const short = () => crypto.randomUUID().slice(0, 6);
@@ -105,9 +106,9 @@ async function fetchImage(url: string, side: number): Promise<{ data: ArrayBuffe
   return data.byteLength > 0 && data.byteLength <= 8 * 1024 * 1024 ? { data, type } : null;
 }
 
-type PlItem = { id: string; title: string; date: string | null };
+export type PlItem = { id: string; title: string; date: string | null };
 /** 讀 YouTube 播放清單（官方 API，最多 300 支）：略過私人／已刪除與 skip 裡已有的影片（讀到的也加進 skip，清單內重複的只留一支）。 */
-async function readPlaylist(key: string, playlistId: string, skip: Set<string>): Promise<{ items: PlItem[] } | { error: string }> {
+export async function readPlaylist(key: string, playlistId: string, skip: Set<string>): Promise<{ items: PlItem[] } | { error: string }> {
   const items: PlItem[] = [];
   let token = "";
   for (let page = 0; page < 6; page++) {
@@ -192,6 +193,7 @@ async function runJob(env: Env, job: Job, key: string | undefined, side: number)
     if (!key) return { imported: 0, note: "尚未設定 YouTube 金鑰" };
     const have = new Set((await db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_ref IS NOT NULL").bind(job.course_id).all<{ media_ref: string }>()).results.map((r) => r.media_ref));
     if (job.block_id.startsWith("course:")) return runCoursePlaylist(db, job, key, have);
+    if (job.block_id.startsWith("pcourse:")) return runPlaylistCourse(db, job, key); // 一個播放清單＝一門課（U40創業學院，一次性）
     const read = await readPlaylist(key, job.url, have);
     if ("error" in read) return { imported: 0, note: read.error };
     const items = read.items;
