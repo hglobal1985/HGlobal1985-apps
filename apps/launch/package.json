@@ -8,7 +8,7 @@
     "test": "node --no-warnings --test tests/*.test.ts",
     "dev": "npm run embed && wrangler dev",
     "embed": "node scripts/embed-static.mjs",
-    "deploy": "npm run build:web -w @learn/mobile && npm run embed && wrangler d1 migrations apply learn-v2 --remote && wrangler deploy"
+    "deploy": "node scripts/safe-deploy.mjs"
   },
   "dependencies": {
     "pinyin-pro": "^3.29.5"
