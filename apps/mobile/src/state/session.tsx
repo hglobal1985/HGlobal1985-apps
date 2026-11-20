@@ -215,7 +215,16 @@ export function useApi<T>(path: string | null, opts: { early?: boolean } = {}): 
   const wasReady = useRef(ready);
   const loadedOnce = useRef(false);
   // member?.sub 與 version 變動時重新抓取；「登入檢查剛完成」那一刻不重抓（第一次請求已經帶著憑證）。
+  // 會員中心太慢（2.5 秒還沒決定要不要跳轉）就不等了，照常抓資料。
+  const [ssoGiveUp, setSsoGiveUp] = useState(false);
   useEffect(() => {
+    if (ready) return;
+    const t = setTimeout(() => !loadedOnce.current && setSsoGiveUp(true), 2500);
+    return () => clearTimeout(t);
+  }, [ready]);
+  useEffect(() => {
+    // 這次開頁面會先整頁跳去會員中心做共用登入檢查：先不抓（跳回來會重新載入，現在抓的都白費，2026-11-21）。
+    if (!ready && !ssoGiveUp && !loadedOnce.current && webSsoCheckDue()) return;
     if (!wasReady.current && ready && loadedOnce.current) {
       wasReady.current = true;
       return;
@@ -224,7 +233,7 @@ export function useApi<T>(path: string | null, opts: { early?: boolean } = {}): 
     const first = !loadedOnce.current;
     loadedOnce.current = true;
     load(!first);
-  }, [load, version, member?.sub, ready]);
+  }, [load, version, member?.sub, ready, ssoGiveUp]);
   const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
