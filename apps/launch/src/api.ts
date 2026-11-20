@@ -1,4 +1,5 @@
 import { ensureBrandCards } from "./brand-cards.ts";
+import { shrinkImage, shrinkStored } from "./image-store.ts";
 import { flushPushes, vapidPublicKey } from "./push.ts";
 import { HQ_SLUG, RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
 import { romanizeName, romanizeTitle, urlNameVariants } from "./romanize.ts";
@@ -4379,8 +4380,9 @@ const routes: [string, RegExp, Handler][] = [
       if (data.byteLength > maxBytes) return fail(413, "file_too_large", fileTooBig(maxMb));
       if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這門課程");
       const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(name)}`;
-      await bucket.put(key, data, { httpMetadata: { contentType: kind.ct } });
-      const id = await createFileMaterial(ctx, admin, courseId, { name, key, size: data.byteLength, contentType: kind.ct, attType: kind.type, audit: "material.file_upload" });
+      const shrunk = kind.type === "image" ? await shrinkImage(ctx.env, data, kind.ct, "general") : { data, type: kind.ct, size: data.byteLength };
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
+      const id = await createFileMaterial(ctx, admin, courseId, { name, key, size: shrunk.size, contentType: kind.ct, attType: kind.type, audit: "material.file_upload" });
       return ctx.url.searchParams.get("lite") === "1" ? { id } : courseDetail(ctx, courseId);
     },
   ],
@@ -4457,6 +4459,7 @@ const routes: [string, RegExp, Handler][] = [
         } finally {
           if (progressId) await ctx.db.prepare("DELETE FROM import_progress WHERE id = ?").bind(progressId).run().catch(() => undefined);
         }
+        if (kind.type === "image") size = (await shrinkStored(ctx.env, key, kind.ct)) ?? size;
         const id = await createFileMaterial(ctx, admin, courseId, { name: src.name, key, size, contentType: kind.ct, attType: kind.type, audit: "material.drive_import" });
         return { id };
       } catch (e) {
@@ -4736,7 +4739,8 @@ const routes: [string, RegExp, Handler][] = [
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const old = await ctx.db.prepare("SELECT edm_key AS k FROM courses WHERE id = ?").bind(id).first<{ k: string | null }>();
       const key = `${part}/${id}/${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "edm");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([
         ctx.db.prepare("UPDATE courses SET edm_key = ?, cover_rect = NULL, art_version = art_version + 1 WHERE id = ?").bind(key, id),
         audit(ctx.db, s.sub, "course.edm_upload", "course", id, key),
@@ -4773,7 +4777,8 @@ const routes: [string, RegExp, Handler][] = [
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const old = await ctx.db.prepare("SELECT cover_key AS k FROM courses WHERE id = ?").bind(id).first<{ k: string | null }>();
       const key = `cover/${id}/${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([ctx.db.prepare("UPDATE courses SET cover_key = ?, art_version = art_version + 1 WHERE id = ?").bind(key, id), audit(ctx.db, s.sub, "course.cover_upload", "course", id, key)]);
       if (old?.k) await bucket.delete(old.k).catch(() => undefined);
       return { ok: true, url: pubUrl(key, 0) };
@@ -4808,7 +4813,8 @@ const routes: [string, RegExp, Handler][] = [
       if (!data.byteLength || data.byteLength > 3 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 3MB 以內（上傳時會自動壓縮）");
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const key = `lesson/${id}/${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       const col = part === "cover" ? "cover_key" : "poster_key";
       const old = part === "cover" ? lesson.cover_key : lesson.poster_key;
       await ctx.db.batch([ctx.db.prepare(`UPDATE lessons SET ${col} = ?, art_version = art_version + 1 WHERE id = ?`).bind(key, id), audit(ctx.db, s.sub, `lesson.${part}_upload`, "lesson", id, key)]);
@@ -5014,7 +5020,8 @@ const routes: [string, RegExp, Handler][] = [
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const old = await ctx.db.prepare("SELECT edm_key AS k FROM center_art WHERE center_key = ?").bind(center.key).first<{ k: string }>();
       const key = `center/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "center");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([
         ctx.db
           .prepare("INSERT INTO center_art (center_key, center_label, edm_key) VALUES (?, ?, ?) ON CONFLICT(center_key) DO UPDATE SET edm_key = excluded.edm_key, center_label = excluded.center_label, cover_rect = NULL, edm_view_y = 0, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
@@ -5100,7 +5107,8 @@ const routes: [string, RegExp, Handler][] = [
       if (!data.byteLength || data.byteLength > 8 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 8MB 以內（上傳時會自動壓縮）"); // 中心封面照片畫質高，上限放寬
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const key = `center/${crypto.randomUUID().slice(0, 8)}/cover-${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "center");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([
         ctx.db.prepare("UPDATE center_art SET cover_key = ?, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE center_key = ?").bind(key, center.key),
         audit(ctx.db, s.sub, "center.cover_upload", "center", center.key, key),
@@ -5208,7 +5216,8 @@ const routes: [string, RegExp, Handler][] = [
       const old = await ctx.db.prepare(`SELECT ${col} AS k FROM brand_logos WHERE id = ?`).bind(id).first<{ k: string | null }>();
       if (!old) return fail(404, "not_found", "找不到這個品牌");
       const key = `brand/${id}/${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([ctx.db.prepare(`UPDATE brand_logos SET ${col} = ?, art_version = art_version + 1 WHERE id = ?`).bind(key, id), audit(ctx.db, s.sub, `brand.${part}_upload`, "brand", id, key)]);
       if (old.k) await bucket.delete(old.k).catch(() => undefined);
       return { ok: true };
@@ -5507,7 +5516,8 @@ const routes: [string, RegExp, Handler][] = [
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const old = await ctx.db.prepare("SELECT edm_key AS k FROM series_art WHERE series = ?").bind(series).first<{ k: string }>();
       const key = `series/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "edm");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([
         ctx.db
           .prepare("INSERT INTO series_art (series, edm_key) VALUES (?, ?) ON CONFLICT(series) DO UPDATE SET edm_key = excluded.edm_key, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
@@ -5549,7 +5559,8 @@ const routes: [string, RegExp, Handler][] = [
       if (!data.byteLength || data.byteLength > 3 * 1024 * 1024) fail(413, "invalid_size", "封面大小需在 3MB 以內（上傳時會自動壓縮）");
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       const key = `series/${crypto.randomUUID().slice(0, 8)}/cover-${crypto.randomUUID()}.${img.ext}`;
-      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([
         ctx.db.prepare("UPDATE series_art SET cover_key = ?, art_version = art_version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE series = ?").bind(key, series),
         audit(ctx.db, s.sub, "series.cover_upload", "series", series, key),
