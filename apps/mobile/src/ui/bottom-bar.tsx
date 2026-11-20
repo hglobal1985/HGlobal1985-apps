@@ -4,15 +4,14 @@ import { useEffect, useState, type ComponentProps } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
+import { getBottomGap, onBottomGap } from "@/lib/bottom-gap";
 import { useUnreadCount } from "@/state/unread";
 import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
 
 /** 底部分頁列高度（業主 2026-11-20：比一般工具列矮一點）。 */
-const navHeight = Math.round((UI_SCALE > 1 ? 66 : 50) * UI_SCALE);
-/** 平板（加到主畫面的 App）：畫面底部有一塊不屬於網頁的綠色區域（約 20），內容要往下挪才會在整片綠色裡置中（業主 2026-11-20）。 */
-const EDGE_GAP = UI_SCALE > 1 ? 20 : 0;
+const navHeight = Math.round((UI_SCALE > 1 ? 62 : 50) * UI_SCALE);
 import { AppText } from "./text";
 import { UniversityIcon } from "./university-icon";
 
@@ -39,9 +38,12 @@ export function BottomBar() {
   const unread = useUnreadCount();
   const lib = useLibraryMode();
   const [keyboard, setKeyboard] = useState(false);
+  // 加到主畫面的 App 底部多出的一塊（lib/bottom-gap.ts）：選單貼齊螢幕底邊，這一塊當成底部留白。
+  const [edge, setEdge] = useState(getBottomGap());
+  useEffect(() => onBottomGap(setEdge), []);
   // 大螢幕（業主 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
   const { large } = useLayout();
-  const iconSize = UI_SCALE > 1 ? 32 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（業主 2026-11-20）
+  const iconSize = UI_SCALE > 1 ? 30 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（業主 2026-11-20）
   const iconBox = Math.round((iconSize + 4) * UI_SCALE); // 圖示本身會被全站放大，外框也要跟著放大，否則圖示會壓到下面的文字
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -63,7 +65,7 @@ export function BottomBar() {
   }, [barBg, hidden]);
   if (hidden) return null;
   return (
-    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.navBar, paddingTop: EDGE_GAP, paddingBottom: EDGE_GAP ? 0 : Math.min(insets.bottom, 20) }]} accessibilityRole="tablist">
+    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.navBar, paddingBottom: edge || Math.min(insets.bottom, 20) }]} accessibilityRole="tablist">
       <View style={[styles.row, large && styles.rowLarge]}>
       {tabs.map((t) => {
         const on = !lib && t.match(pathname);
