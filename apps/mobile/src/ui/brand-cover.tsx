@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { resolveUrl, type BrandCover as Brand } from "@/api/client";
+import { useThumbAlpha } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 
 /**
@@ -11,11 +13,13 @@ import { useTheme } from "@/theme/theme";
  */
 export function BrandCover({ brand, fill, style, scheme }: { brand: Brand; fill?: boolean; style?: StyleProp<ViewStyle>; scheme?: "light" | "dark" }) {
   const theme = useTheme();
+  const thumb = useThumbAlpha();
+  const [w, setW] = useState(480); // 實際寬度量到後才挑縮圖尺寸（業主 2026-11-20：品牌 logo 也用即時縮圖，WebP 保留透明）
   const dark = (scheme ?? theme.scheme) === "dark" && !!brand.bgColorDark;
   return (
-    <View style={[fill ? StyleSheet.absoluteFill : styles.ratio, { backgroundColor: dark ? brand.bgColorDark! : brand.bgColor ?? "#fff", overflow: "hidden" }, style]} accessibilityRole="image" accessibilityLabel="品牌封面">
-      {brand.bgUrl && !dark ? <Image source={{ uri: resolveUrl(brand.bgUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
-      <Image source={{ uri: resolveUrl(brand.logoUrl) }} style={styles.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
+    <View style={[fill ? StyleSheet.absoluteFill : styles.ratio, { backgroundColor: dark ? brand.bgColorDark! : brand.bgColor ?? "#fff", overflow: "hidden" }, style]} accessibilityRole="image" accessibilityLabel="品牌封面" onLayout={(e) => setW(Math.max(100, Math.round(e.nativeEvent.layout.width)))}>
+      {brand.bgUrl && !dark ? <Image source={{ uri: thumb(resolveUrl(brand.bgUrl), w) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
+      <Image source={{ uri: thumb(resolveUrl(brand.logoUrl), Math.round(w * 0.76)) }} style={styles.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
     </View>
   );
 }
