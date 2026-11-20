@@ -525,10 +525,10 @@ type CourseRow = {
  * 「純教材」判斷（業主 2026-11-20：教材卡只剩一種）：舊的清單型卡片（is_list=1），或是「沒有章節、免費、沒有日期」的教材卡。
  * 純教材卡沿用清單的規則：不需要報名、不顯示緞帶與費用、不列入學習中；一加上章節、日期或費用，就自動變成一般課程的規則。
  */
-const materialLike = (r: { is_list: number; chapter_n: number; price_twd: number; price_tba: number; event_start: string | null; event_end: string | null }): boolean =>
-  r.is_list === 1 || (r.chapter_n === 0 && r.price_twd === 0 && r.price_tba !== 1 && !r.event_start && !r.event_end);
+const materialLike = (r: { invite_only: number; is_list: number; chapter_n: number; price_twd: number; price_tba: number; event_start: string | null; event_end: string | null }): boolean =>
+  r.invite_only !== 1 && (r.is_list === 1 || (r.chapter_n === 0 && r.price_twd === 0 && r.price_tba !== 1 && !r.event_start && !r.event_end)); // 指定邀請制一定是要報名的一般課程（業主 2026-11-20）
 /** 同一個判斷的 SQL 版（FROM courses 的查詢用）。 */
-const MATERIAL_LIKE_SQL = `(is_list = 1 OR (NOT EXISTS (SELECT 1 FROM lessons ch WHERE ch.course_id = courses.id AND ch.kind = 'chapter') AND price_twd = 0 AND price_tba <> 1 AND COALESCE(event_start, '') = '' AND COALESCE(event_end, '') = ''))`;
+const MATERIAL_LIKE_SQL = `(invite_only = 0 AND (is_list = 1 OR (NOT EXISTS (SELECT 1 FROM lessons ch WHERE ch.course_id = courses.id AND ch.kind = 'chapter') AND price_twd = 0 AND price_tba <> 1 AND COALESCE(event_start, '') = '' AND COALESCE(event_end, '') = '')))`;
 
 const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.invite_only, c.invite_code, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
@@ -641,7 +641,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     hostUnit: row.host_unit,
     eventStart: row.event_start,
     eventEnd: row.event_end,
-    isPublic: row.is_public === 1,
+    isPublic: row.is_public === 1 && row.invite_only !== 1, // 指定邀請制不可能完全公開
     viewScope: scopeOf(row.view_scope),
     pendingOrderId: state.pendingOrder.get(row.id) ?? null,
     priceTba: row.price_tba === 1,
@@ -1008,8 +1008,8 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const watchFree = summaryNow.watchFree;
   const admin = manages;
   // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
-  const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
-  const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || row.is_public === 1 || watchFree));
+  const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.invite_only !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
+  const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && row.invite_only !== 1) || watchFree));
   const canRoster = await canSeeRoster(ctx, s, row, manages);
   return {
     ...summaryNow,
@@ -1080,11 +1080,11 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) {
     // 訪客：只有完全公開、已上架的課程可以看。
-    const pub = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND status = 'published'").bind(courseId).first();
+    const pub = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published'").bind(courseId).first();
     return !!pub;
   }
   if (s.role === "admin") return true;
-  if ((await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND status = 'published'").bind(courseId).first())) return true; // 完全公開的課程，會員也不必報名
+  if ((await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published'").bind(courseId).first())) return true; // 完全公開的課程，會員也不必報名
   const rights = await rightsOf(ctx);
   if (rights.any) {
     const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string }>();
@@ -2607,10 +2607,10 @@ function checkPublicFree(price: number, isPublic: boolean, tba = false) {
 }
 
 /** is_public＝訪客也能看、免費、費用已公布、而且沒有獎銜限制（有獎銜限制＝訪客只能看介紹，不能直接看內容也不能報名；業主 2026-11-17 規則 B）。 */
-function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number; min_rank_code?: string } | null) {
-  if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba", "min_rank_code"].includes(c))) return;
+function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number; min_rank_code?: string; invite_only?: number } | null) {
+  if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba", "min_rank_code", "invite_only"].includes(c))) return;
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
-  const pub = ["all", "link_guest"].includes(String(pick("view_scope", cur?.view_scope ?? "all"))) && Number(pick("price_twd", cur?.price_twd ?? 0)) === 0 && pick("price_tba", cur?.price_tba ?? 0) !== 1 && String(pick("min_rank_code", cur?.min_rank_code ?? "none")) === "none";
+  const pub = ["all", "link_guest"].includes(String(pick("view_scope", cur?.view_scope ?? "all"))) && Number(pick("price_twd", cur?.price_twd ?? 0)) === 0 && pick("price_tba", cur?.price_tba ?? 0) !== 1 && String(pick("min_rank_code", cur?.min_rank_code ?? "none")) === "none" && Number(pick("invite_only", cur?.invite_only ?? 0)) !== 1;
   const i = sets.findIndex(([c]) => c === "is_public");
   if (i >= 0) sets.splice(i, 1);
   sets.push(["is_public", pub ? 1 : 0]);
@@ -2810,7 +2810,7 @@ async function updateCourse(ctx: Ctx, id: string) {
 /** 儲存課程設定的核心（單一課程儲存與「套用到全系列課程」共用）；light＝不重建整份課程資料（批次套用用）。 */
 async function updateCourseWith(ctx: Ctx, id: string, body: Record<string, unknown>, light = false) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
-  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list, teacher, no_speaker, zone FROM courses WHERE id = ?").bind(id).first<{ zone: string | null; event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; teacher: string | null; no_speaker: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT invite_only, status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list, teacher, no_speaker, zone FROM courses WHERE id = ?").bind(id).first<{ invite_only: number; zone: string | null; event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; teacher: string | null; no_speaker: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");

@@ -233,6 +233,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   // 學員看的版面：區塊裡的章節要顯示在區塊格子裡（當成教材列），課程章節清單只剩區塊前面的章節。
   const inBlockChapters = new Set(pkgBlocks ? nonFull.slice(firstSec).filter((l) => !l.material).map((l) => l.id) : []);
   const blockView: CourseDetail = pkgBlocks ? { ...course, lessons: course.lessons.filter((l) => l.material || inBlockChapters.has(l.id)).map((l) => (inBlockChapters.has(l.id) ? { ...l, material: true } : l)) } : course;
+  const materialItems = blockView.lessons.filter((l) => l.material && !l.section);
+  const materialsLocked = materialItems.length > 0 && materialItems.every((l) => l.locked);
   const chapterView: CourseDetail = pkgBlocks ? { ...course, lessons: lessons } : course;
   /** 重新編號：章節、教材各自從 1 開始（完整版課程影片不編號）。 */
   const renumber = (list: Lesson[]): Lesson[] => {
@@ -505,7 +507,18 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
                 ))}
               </View>
             ) : null}
-            <FullVersionList course={blockView} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
+            <View style={!editing && materialsLocked ? { minHeight: 230 } : undefined}>
+              <FullVersionList course={blockView} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
+              {/* 沒有權限時，其他教材也蓋上同一個大鎖頭（業主 2026-11-20）。 */}
+              {!editing && materialsLocked ? (
+                <View style={styles.mask} accessibilityRole="alert" accessibilityLabel={lockedText}>
+                  <Ionicons name="lock-closed" size={48} color="#fff" />
+                  <AppText variant="title" style={{ color: "#fff", textAlign: "center" }}>
+                    {lockedText}
+                  </AppText>
+                </View>
+              ) : null}
+            </View>
           </Section>
         ) : null}
         {member && course.status !== "draft" ? <CommentBoard courseId={course.id} /> : null}

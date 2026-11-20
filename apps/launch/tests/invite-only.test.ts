@@ -86,3 +86,19 @@ test("指定邀請制：先按「無邀請碼」待審核，之後拿到邀請�
   const mine = (await call<Order[]>("GET", "/orders", { token: a })).data;
   assert.equal(mine.filter((o) => o.status === "pending").length, 0, "待審核的那筆已被取代");
 });
+
+test("指定邀請制：原本完全公開的免費課，勾選後訪客與未報名會員的章節、教材都鎖住", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on" };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.body ? JSON.stringify(opts.body) : undefined }), env);
+    return { status: res.status, data: (await res.json()) as T };
+  };
+  const admin = (await call<{ token: string }>("POST", "/auth/demo", { body: { sub: "demo-admin" } })).data.token;
+  const c = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "公開課", teacher: "王", status: "published", priceTwd: 0, viewScope: "all" } })).data;
+  assert.equal((await call<CourseDetail>("GET", `/courses/${c.id}`)).data.isPublic, true, "勾選前是完全公開");
+  assert.equal((await call("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { inviteOnly: true } })).status, 200);
+  const after = (await call<CourseDetail>("GET", `/courses/${c.id}`)).data;
+  assert.equal(after.isPublic, false);
+  assert.equal(after.isList, false, "指定邀請制是要報名的一般課程");
+  assert.ok(after.lessons.every((l) => l.locked), "訪客看到的章節與教材全部鎖住");
+});
