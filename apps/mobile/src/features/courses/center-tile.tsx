@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, View } from "react-native";
+import { useThumb } from "@/lib/thumb";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { resolveUrl } from "@/api/client";
 import { centerTitle } from "@/features/format";
@@ -10,13 +11,14 @@ import { AppText } from "@/ui";
  * 有上傳 EDM 就用照片，沒有就用品牌綠色漸層底，兩種長得一樣。整張可點。
  */
 export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edmUrl?: string | null; width: number; onPress: () => void }) {
+  const thumb = useThumb();
   useCenterNames();
   const title = centerTitle(name);
   const height = Math.round((width * 10) / 16);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={[styles.card, { width, height }, edmUrl ? { backgroundColor: "#fff" } : null]}>
       {edmUrl ? (
-        <Image source={{ uri: resolveUrl(edmUrl) }} style={{ width, height }} resizeMode="cover" />
+        <Image source={{ uri: thumb(resolveUrl(edmUrl), width) }} style={{ width, height }} resizeMode="cover" />
       ) : (
         <Gradient id="brand" from="#2F5D3A" to="#4C8A5B" fromOpacity={1} toOpacity={1} diagonal />
       )}

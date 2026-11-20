@@ -1,4 +1,5 @@
 import { lessonHref } from "@/lib/lesson-href";
+import { useThumb } from "@/lib/thumb";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, View } from "react-native";
@@ -20,6 +21,7 @@ export type ChapterItem = { lesson: SearchLesson; course: CourseSummary; locked:
  * 點一列：能看就直接進該章節播放，不能看（尚未報名、內容準備中）進課程介紹頁。
  */
 export function ChapterList({ items }: { items: ChapterItem[] }) {
+  const thumb = useThumb();
   const { c } = useTheme();
   return (
     <View>
@@ -37,7 +39,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
           >
             <View style={styles.thumb}>
               {lesson.coverUrl || course.coverUrl || course.edmUrl || lesson.ytThumb ? (
-                <Image source={{ uri: resolveUrl((lesson.coverUrl || course.coverUrl || course.edmUrl || lesson.ytThumb) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+                <Image source={{ uri: thumb(resolveUrl((lesson.coverUrl || course.coverUrl || course.edmUrl || lesson.ytThumb) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
               ) : (
                 <CourseCover theme={course.theme} label="" title={displayName(course)} fill />
               )}
