@@ -1,5 +1,4 @@
 import { trackFeature } from "@/lib/feature-track";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
@@ -26,7 +25,6 @@ import { seriesOrdered } from "./sort";
 import { useCoverStats } from "./cover-stats";
 
 type View_ = "list" | "edm";
-const KEY = "hglobal:learn:series-view";
 const GAP = space.md;
 
 /**
@@ -43,7 +41,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
   const artList = useApi<SeriesArt[]>("/series-art");
   const adminList = useApi<CourseSummary[]>(member?.courseRights ? "/admin/courses" : null);
-  const [view, setView] = useState<View_>("list");
+  const [view, setView] = useState<View_>("edm"); // 每次進入系列頁一律從「縮圖」開始，不記住上次選擇（業主 2026-11-21）
   const [editing, setEditing] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
@@ -53,11 +51,6 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const shownTitle = settings.titleOf(series);
   const [titleDraft, setTitleDraft] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    AsyncStorage.getItem(KEY)
-      .then((v) => (v === "list" || v === "edm") && setView(v))
-      .catch(() => undefined);
-  }, []);
   useEffect(() => {
     trackFeature("series_page");
   }, [series]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -133,10 +126,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     if (Platform.OS === "web" && slug && typeof window !== "undefined" && window.location.pathname !== sharePath) window.history.replaceState(window.history.state, "", sharePath + window.location.search);
   }, [slug, sharePath]);
   const art = artList.data?.find((x) => x.series === series);
-  const pick = (v: View_) => {
-    setView(v);
-    AsyncStorage.setItem(KEY, v).catch(() => undefined);
-  };
+  const pick = (v: View_) => setView(v);
   const colsOf = (n: number) => Math.max(1, n);
   const courseCols = colsOf(portraitColumns(boxW)); // 課程卡：直式 3:4，手機一列三張，大螢幕依寬度增加
   const listCols = colsOf(tileColumns(boxW)); // 清單卡：橫式 4:3，手機一列兩張，大螢幕依寬度增加
