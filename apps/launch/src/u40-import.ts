@@ -51,11 +51,11 @@ export function parseVideoTitle(raw: string): ParsedTitle {
   return { date, name: t.length >= 2 ? t.slice(0, 80) : "", seq, speaker, rank: "" };
 }
 
-/** 排序：每支影片都有明確堂次就依堂次，否則依日期（標題日期和實際上傳日差太多＝標題打錯年份，改用上傳日）；沒日期的放最後。 */
+/** 排序：每支影片都有明確堂次就依堂次，否則依日期（標題日期比上傳日還晚＝標題打錯年份，改用上傳日；事後才上傳的舊影片仍用標題上的上課日）；沒日期的放最後。 */
 export function orderVideos<T extends { p: ParsedTitle; up: string | null }>(items: T[]): (T & { day: string | null })[] {
   const dated = items.map((it) => {
     let day = it.p.date;
-    if (day && it.up && Math.abs(Date.parse(day) - Date.parse(it.up)) > 60 * 86400_000) day = it.up;
+    if (day && it.up && Date.parse(day) > Date.parse(it.up) + 2 * 86400_000) day = it.up; // 影片不可能在上課日之前上傳：標題日期比上傳日還晚＝標題打錯年份
     return { ...it, day: day ?? it.up };
   });
   const bySeq = dated.every((d) => d.p.seq !== null) && new Set(dated.map((d) => d.p.seq)).size === dated.length;

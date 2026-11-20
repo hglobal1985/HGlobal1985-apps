@@ -34,6 +34,9 @@ test("影片排序：每支都有堂次依堂次；否則依日期，標題日�
   const mk = (title: string, up: string | null) => ({ p: parseVideoTitle(title), up });
   const a = orderVideos([mk("20231202-U40創業學院", "2023-12-02"), mk("20241007-U40創業學院", "2023-10-07"), mk("20230909-U40創業學院", "2023-09-09")]);
   assert.deepEqual(a.map((x) => x.day), ["2023-09-09", "2023-10-07", "2023-12-02"]);
+  // 事後才上傳的舊影片：標題日期早於上傳日是正常的，維持標題日期
+  const late = orderVideos([mk("20220416U40創玩家創玩計畫", "2022-10-02"), mk("20220423U40創玩計劃第二堂", "2022-10-02")]);
+  assert.deepEqual(late.map((x) => x.day), ["2022-04-16", "2022-04-23"]);
   const b = orderVideos([mk("20230610-U40-成功的八大習慣（7）全力以赴", "2023-06-10"), mk("20230603-U40-成功的八大習慣（8）價值觀的排序", "2023-06-03")]);
   assert.deepEqual(b.map((x) => x.p.seq), [7, 8]);
 });
