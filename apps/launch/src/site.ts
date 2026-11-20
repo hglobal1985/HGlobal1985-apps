@@ -16,7 +16,12 @@ function bytesOf(files: StaticFiles, path: string): Uint8Array<ArrayBuffer> {
 export function serveStatic(req: Request, files: StaticFiles): Response {
   const url = new URL(req.url);
   if (req.method !== "GET" && req.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { allow: "GET, HEAD" } });
-  let path = decodeURIComponent(url.pathname);
+  let path: string;
+  try {
+    path = decodeURIComponent(url.pathname);
+  } catch {
+    path = url.pathname; // 網址裡有不完整的 %XX（例如被截斷的連結）：不要讓整個網站回 500，照原樣當成 App 路由處理
+  }
   if (path.endsWith("/")) path += "index.html";
   if (!files[path]) {
     // 有副檔名的檔案找不到就是 404；其餘是 App 路由，回傳 index.html 由前端處理。

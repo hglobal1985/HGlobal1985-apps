@@ -68,3 +68,23 @@ test("獎銜定義全站只問一次；回應帶中央呼叫計時；職務過�
     Date.now = realNow;
   }
 });
+
+test("同時查同一份資料：先開始的那個請求被取消（查詢失敗）時，等它的請求自己再查一次，不會回 500（2026-11-21 修正）", async () => {
+  const { cached } = await import("../src/central.ts");
+  let n = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  const first = cached("t:shared", 60_000, async () => {
+    n++;
+    await gate;
+    throw new Error("request canceled"); // 模擬：發起查詢的請求被瀏覽器取消，連線一起中斷
+  });
+  const second = cached("t:shared", 60_000, async () => {
+    n++;
+    return "fresh";
+  });
+  release();
+  await assert.rejects(first);
+  assert.equal(await second, "fresh");
+  assert.equal(n, 2);
+});

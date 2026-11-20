@@ -249,7 +249,8 @@ async function loadSession(env: Env, req: Request, warmAmway = false, light = fa
     // 「完善資料」視窗的請求只需要知道是誰（帶著會員本人的 Token 轉給會員中心），不必先問名稱與職務，省下一趟。
     if (light) return { kind: "central", sub, name: "", avatarUrl: null, role: "student", token: jwt, roles: [], hglobal: false, center: null };
     // 向會員中心的查詢同時送出（/me 還會順便預先查好 Amway 資料，後面直接用快取）。
-    const [prof, superAdmin, mc] = await Promise.all([profileSummary(sub, jwt), isAdmin(sub, jwt, env.LEARN_ADMIN_SUBS), memberContext(sub, jwt), warmAmway ? amwayMe(sub, jwt) : undefined]);
+    // 名稱頭像、Amway 預查只是顯示用：查詢本身出錯也不能讓整個請求失敗（2026-11-21）；權限（職務）不在這裡吞掉錯誤，避免管理員被誤判降級。
+    const [prof, superAdmin, mc] = await Promise.all([profileSummary(sub, jwt).catch(() => ({ name: "會員", avatarUrl: null })), isAdmin(sub, jwt, env.LEARN_ADMIN_SUBS), memberContext(sub, jwt), warmAmway ? amwayMe(sub, jwt).catch(() => undefined) : undefined]);
     // 管理員（可管理課程、審核全部報名）＝超級管理員、總部秘書，或 LEARN_ADMIN_SUBS 指定的會員。
     const admin = superAdmin || mc.roles.includes("super_admin") || mc.roles.includes("secretary");
     return { kind: "central", sub, name: prof.name, avatarUrl: prof.avatarUrl, role: admin ? "admin" : "student", token: jwt, roles: mc.roles, hglobal: mc.hglobal, center: mc.center };

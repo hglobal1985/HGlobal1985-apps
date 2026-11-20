@@ -109,21 +109,25 @@ const inflight = new Map<string, Promise<unknown>>();
  * staleMs＞0＝「先給舊的、背景更新」（業主 2026-11-20）：過期後在 staleMs 內，這次先立刻回舊資料、背景去問中央換新的；
  * 超過 staleMs 才會站著等。權限相關（職務、資格）舊資料最長可用 5 分鐘（ttl＋staleMs）。
  */
-async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>, staleMs = 0): Promise<T> {
+export async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>, staleMs = 0): Promise<T> {
   const hit = memo.get(key);
   const now = Date.now();
   if (hit && hit.until > now) return hit.value as T;
+  const run = async () => {
+    const value = await load();
+    if (value !== undefined) {
+      memo.set(key, { value, until: Date.now() + ttlMs });
+      if (memo.size > 2000) memo.delete(memo.keys().next().value!);
+    }
+    return value;
+  };
   const start = (): Promise<unknown> => {
     const running = inflight.get(key);
-    if (running) return running;
-    const p = (async () => {
-      const value = await load();
-      if (value !== undefined) {
-        memo.set(key, { value, until: Date.now() + ttlMs });
-        if (memo.size > 2000) memo.delete(memo.keys().next().value!);
-      }
-      return value;
-    })();
+    // 同一時間同一份資料只問一次（同一個人一開頁面會同時送好幾個請求）。
+    // 但「別的請求」先開始的查詢，如果那個請求被瀏覽器取消（例如使用者切換頁面），它的連線會被一起中斷；
+    // 等它的請求就會收到錯誤（2026-11-20 正式站 /courses、/ui-config 因此偶爾回 500）。所以等別人的失敗時，自己再問一次。
+    if (running) return running.catch(() => run());
+    const p = run();
     inflight.set(key, p);
     p.then(() => inflight.delete(key), () => inflight.delete(key));
     return p;
