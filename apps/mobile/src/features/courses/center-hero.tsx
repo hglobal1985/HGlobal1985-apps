@@ -34,7 +34,7 @@ export const centerHeroFull = (winW: number, winH = 10000) => centerHeroSize(win
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
  */
-export function CenterHero({ art, scrollY, stats, title }: { stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; title: string }) {
+export function CenterHero({ art, scrollY, stats, title, onEditCover }: { onEditCover?: () => void; stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; title: string }) {
   const { width: winW, height: winH } = useWindowDimensions();
   const thumb = useThumb();
   const [open, setOpen] = useState(false);
@@ -72,6 +72,15 @@ export function CenterHero({ art, scrollY, stats, title }: { stats: CoverStats; 
       <View style={styles.chips} pointerEvents="box-none">
         <CoverBadges stats={stats} />
       </View>
+      {/* 右上角「更換封面圖」（系列頁，超級管理員；業主 2026-11-20：不必先進編輯模式就能直接改封面）。 */}
+      {onEditCover ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="更換封面圖" onPress={onEditCover} style={styles.editCover}>
+          <Icon name="image-outline" size={18} color="#fff" />
+          <AppText variant="callout" style={{ color: "#fff", fontWeight: "800" }}>
+            更換封面圖
+          </AppText>
+        </Pressable>
+      ) : null}
       {open && art ? <EdmLightbox uri={art.edmUrl} title={title} onClose={() => setOpen(false)} /> : null}
     </Animated.View>
   );
@@ -106,4 +115,5 @@ const styles = StyleSheet.create({
   pin: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   box: { overflow: "hidden", backgroundColor: "#2F5D3A", alignSelf: "stretch" },
   chips: { position: "absolute", left: 12, bottom: 10 },
+  editCover: { position: "absolute", right: 12, top: 12, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.55)" },
 });

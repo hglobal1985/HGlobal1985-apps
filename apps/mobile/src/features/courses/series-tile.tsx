@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl, UNCATEGORIZED } from "@/api/client";
-import { useApi, useSession } from "@/state/session";
+import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
@@ -10,7 +10,7 @@ import { radius } from "@/theme/tokens";
 import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
-import { BlockSheet } from "./series-sheet";
+import { BlockSheet, SeriesSheet } from "./series-sheet";
 import { useSeriesSettings } from "./series-settings";
 import { nearestOf, type SeriesGroup } from "./sort";
 
@@ -55,7 +55,6 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const thumb = useThumb();
   const [sheet, setSheet] = useState(false);
   const settings = useSeriesSettings();
-  const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
   // 系列卡（業主 2026-11-19）：被系列頁隱藏的卡不算；系列裡只有一張卡時，第一層直接顯示那張卡的內容、點了直接進去。
   const cards = group.sessions.filter((x) => !x.seriesHidden);
   const sessions = cards.length ? cards : group.sessions;
@@ -76,9 +75,8 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
   // 系列裡只有一份清單：有勾「顯示在上拉選單」的區塊就彈出區塊選單，沒有區塊就直接進清單頁（業主 2026-11-18）。
   const soloList = !flat && sessions.length === 1 && rep.isList;
-  const slug = inSeries ? links.data?.find((l) => l.kind === "series" && l.value === rep.series)?.slug : undefined;
-  // 系列卡：點了直接進系列頁（不再彈選單）；單張卡直接進該卡；中心頁的課程卡照舊彈章節選單。
-  const open = () => (inSeries ? router.push(slug ? `/${slug}` : `/series/${encodeURIComponent(rep.series)}`) : soloList && !rep.blocks.length ? router.push(`/course/${rep.id}`) : flat || soloList ? setSheet(true) : router.push(`/course/${rep.id}`));
+  // 系列卡（業主 2026-11-20 改回）：點了先彈出上拉選單（列出系列內的卡，右上「顯示全部」或繼續上拉才進系列頁）；單張卡直接進該卡；中心頁的課程卡照舊彈章節選單。
+  const open = () => (inSeries ? setSheet(true) : soloList && !rep.blocks.length ? router.push(`/course/${rep.id}`) : flat || soloList ? setSheet(true) : router.push(`/course/${rep.id}`));
   const unlisted = inSeries && !settings.listed(rep.series); // 只有超級管理員會看到：關掉了「顯示在所有系列」或是「未分類」
   return (
     <View style={{ width }} nativeID={`tile-${group.key}`}>
@@ -106,6 +104,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
           </View>
         ) : null}
       </Pressable>
+      {sheet && inSeries ? <SeriesSheet title={settings.titleOf(rep.series)} items={sessions} showAllSeries={rep.series} onClose={() => setSheet(false)} /> : null}
       {sheet && flat ? <CourseLessonsSheet course={rep} onClose={() => setSheet(false)} /> : null}
       {sheet && !flat && soloList && rep.blocks.length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : null}
     </View>
