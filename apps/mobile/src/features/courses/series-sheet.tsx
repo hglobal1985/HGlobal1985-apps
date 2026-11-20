@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useThumb } from "@/lib/thumb";
 import { router } from "expo-router";
 import { Image, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -35,6 +36,7 @@ function StatusChip({ course }: { course: CourseSummary }) {
  * 每列＝封面（手動上傳 > 品牌 logo > 預設圖）＋區塊名稱＋灰色數字（只顯示數量）；點一列進清單頁、自動捲到該區塊並展開。
  */
 export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
+  const thumb = useThumb();
   const { c } = useTheme();
   const open = (block?: string) => {
     onClose();
@@ -64,7 +66,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
             leading={
               <SheetThumb>
                 {b.coverUrl ? (
-                  <Image source={{ uri: resolveUrl(b.coverUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  <Image source={{ uri: thumb(resolveUrl(b.coverUrl), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
                 ) : b.brand ? (
                   <BrandCover brand={b.brand} fill />
                 ) : (
@@ -85,6 +87,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
 
 /** 「還有 N 個梯次」：從下方彈出，列出同系列所有梯次（日期＋狀態），點一列進入那一場的課程頁。 */
 export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllSeries }: { title: string; items: CourseSummary[]; onClose: () => void; onPick?: (c: CourseSummary) => void; currentId?: string; showAllSeries?: string }) {
+  const thumb = useThumb();
   const { c } = useTheme();
   const links = useApi<{ kind: string; value: string; slug: string }[]>(showAllSeries ? "/short-links" : null);
   /** 顯示該系列全部梯次（全部展開）：有設定短網址就用短網址，沒有用 /series/系列名稱。 */
@@ -122,7 +125,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             }}
             leading={
               <SheetThumb>
-                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: resolveUrl((x.coverUrl || x.edmUrl) as string) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <CourseCover theme={x.theme} label="" title={displayName(x)} fill />}
+                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: thumb(resolveUrl((x.coverUrl || x.edmUrl) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <CourseCover theme={x.theme} label="" title={displayName(x)} fill />}
               </SheetThumb>
             }
             // 素材：清單卡名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）

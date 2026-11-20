@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useThumb } from "@/lib/thumb";
 import { Image, StyleSheet, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 import { useTheme } from "@/theme/theme";
@@ -54,10 +55,11 @@ function fitLines(lines: string[], w: number, h: number, max = 72, min = 14): nu
  * fill＝填滿父層（課程介紹頁上方沒有 EDM 時用）。
  */
 export function CourseCover({ theme, label, title, height, imageUrl, fill }: { theme: string; label: string; title?: string; height?: number; imageUrl?: string | null; fill?: boolean }) {
+  const thumb = useThumb();
   const { scheme } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
   if (imageUrl) {
-    return <Image source={{ uri: resolveUrl(imageUrl) }} style={{ width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md }} resizeMode="cover" accessibilityLabel={`${label}課程封面`} />;
+    return <Image source={{ uri: thumb(resolveUrl(imageUrl), 360) }} style={{ width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md }} resizeMode="cover" accessibilityLabel={`${label}課程封面`} />;
   }
   // 沒有封面圖時的文字封面顏色：自動隨機（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（業主 2026-11-18）。
   const names = Object.keys(courseThemes);
