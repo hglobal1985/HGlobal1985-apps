@@ -45,7 +45,7 @@ export default function BrandLogosScreen() {
   return (
     <Screen header={false}>
       <AppText variant="callout" tone="muted">
-        新增品牌並上傳 logo。課程卡、清單卡、清單區塊在編輯時選「品牌」（和分類是分開的欄位）；沒有手動上傳封面時，封面就用這個品牌的 logo。
+        新增品牌並上傳 logo。教材卡、區塊在編輯時選「品牌」（和分類是分開的欄位）；沒有手動上傳封面時，封面就用這個品牌的 logo。
       </AppText>
       <Button label="新增品牌" icon="add-circle-outline" loading={busy} onPress={create} fullWidth />
       {list.data.map((b) => (
@@ -151,7 +151,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
     if (await run(() => api("PATCH", `/admin/brand-logos/${logo.id}`, body), "已儲存")) onClose();
   };
   const remove = async () => {
-    if (await confirmAsk("刪除品牌 Logo", `確定刪除「${logo.name}」？選了這個品牌的課程卡與清單卡會改回原本的封面。`, "刪除")) {
+    if (await confirmAsk("刪除品牌 Logo", `確定刪除「${logo.name}」？選了這個品牌的教材卡會改回原本的封面。`, "刪除")) {
       if (await run(() => api("DELETE", `/admin/brand-logos/${logo.id}`), "已刪除")) onClose();
     }
   };

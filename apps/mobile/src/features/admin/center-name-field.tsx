@@ -47,7 +47,7 @@ export function CenterNameField({ center }: { center: string }) {
         style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]}
       />
       <AppText variant="caption" tone="muted">
-        儲存後，整個行動大學顯示這個中心的地方（中心清單、課程卡、分享預覽…）都會一起改成這個名稱；留空就是預設格式。
+        儲存後，整個行動大學顯示這個中心的地方（中心清單、教材卡、分享預覽…）都會一起改成這個名稱；留空就是預設格式。
       </AppText>
       <View style={styles.row}>
         <Button label="儲存名稱" icon="checkmark-outline" loading={busy} disabled={busy || draft.trim() === current} onPress={() => save(draft)} />

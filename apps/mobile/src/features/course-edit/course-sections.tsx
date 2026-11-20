@@ -259,7 +259,7 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
               </AppText>
             </>
           ) : (
-            <NoticeBox text="這份清單卡還沒有系列短網址。請先把清單卡放進系列，並到「設定 › 短網址設定」替這個系列設定英文短網址，才能設定清單網址。" />
+            <NoticeBox text="這張教材卡還沒有系列短網址。請先把教材卡放進系列，並到「設定 › 短網址設定」替這個系列設定英文短網址，才能設定清單網址。" />
           )}
         </View>
       ) : null}
@@ -283,7 +283,7 @@ function WhenSheet({ course, onClose, onSaved }: SheetProps) {
       <DateSelect label="活動開始日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
       {f.eventStart ? <DateSelect label="活動結束日期（連續多天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventEnd: v }))} /> : null}
       <AppText variant="caption" tone="muted">
-        顯示在課程卡、首頁與「全部課程」的排序。
+        顯示在教材卡、首頁與「全部課程」的排序。
       </AppText>
       <Field label="地點" value={f.location} onChange={(v) => setF((x) => ({ ...x, location: v }))} placeholder="例如：台北總部教室" />
       <Check label="不顯示地點" value={f.locationNone} onChange={(v) => setF((x) => ({ ...x, locationNone: v }))} />
