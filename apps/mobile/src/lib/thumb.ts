@@ -17,3 +17,14 @@ export function useThumb(): (url: string, cssWidth: number) => string {
     return w ? `${url}${url.includes("?") ? "&" : "?"}w=${w}&r=3` : url; // r＝縮圖版本，改版時加一，避開手機瀏覽器裡舊的快取
   };
 }
+
+/**
+ * 有透明背景的圖（品牌 logo、PNG）專用（業主 2026-11-20）：縮圖格式是 JPEG 會失去透明，所以只有在設定頁把格式選成 WebP／AVIF／PNG（保留透明）時才縮，
+ * 否則維持原圖。其餘規則同 useThumb。
+ */
+export function useThumbAlpha(): (url: string, cssWidth: number) => string {
+  const { config } = useUiConfig();
+  const thumb = useThumb();
+  const f = config.app.thumb?.format;
+  return (url, cssWidth) => (f === "webp" || f === "avif" || f === "png" ? thumb(url, cssWidth) : url);
+}
