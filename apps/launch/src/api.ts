@@ -67,7 +67,7 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
-import { memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -6156,6 +6156,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
       fail(404, "not_found", "找不到這個 API");
     }
     const [, re, handler] = route!;
+    setBackground(exec ? (p) => exec.waitUntil(p) : null);
     const ctx = await context(req, env, url);
     if (exec) ctx.defer = (p) => exec.waitUntil(p);
     const out = await handler(ctx, [...re.exec(path)!].slice(1));
@@ -6170,7 +6171,8 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
   }
   for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
   // 伺服器處理時間（含向會員中心查詢），方便在瀏覽器開發者工具的 Network → Timing 看哪一步慢。
-  res.headers.set("server-timing", `app;dur=${Date.now() - started}`);
+  const centralTiming = takeCentralTimings(/^Bearer (\S+)$/.exec(req.headers.get("authorization") ?? "")?.[1]);
+  res.headers.set("server-timing", `app;dur=${Date.now() - started}${centralTiming ? `, ${centralTiming}` : ""}`);
   // 有寫入動作時，把新產生的站內通知也寄成 Email、推播到手機（背景處理，失敗不影響回應）。
   if (req.method !== "GET" && res.status < 400 && env.EMAIL) {
     const job = flushEmails(env).catch((e) => console.error("flush emails", e instanceof Error ? e.message : "error"));
