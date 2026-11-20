@@ -110,6 +110,8 @@ export function normalizeApp(raw: unknown): AppSettings {
     imageQuality: num(r.imageQuality, d.imageQuality, 50, 100),
     centerMaxSide: num(r.centerMaxSide, d.centerMaxSide, 800, 4096),
     centerQuality: num(r.centerQuality, d.centerQuality, 70, 100),
+    thumbEnabled: bool(r.thumbEnabled, d.thumbEnabled),
+    thumbQuality: num(r.thumbQuality, d.thumbQuality, 30, 95),
   };
 }
 

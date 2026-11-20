@@ -34,8 +34,15 @@ export interface R2Bucket {
     abort(): Promise<void>;
   };
 }
+/** Cloudflare Images 綁定（即時縮圖）。只列用到的部分。 */
+export interface ImagesBinding {
+  input(stream: ReadableStream | ArrayBuffer): { transform(o: { width?: number; fit?: string }): { output(o: { format: string; quality?: number }): Promise<{ response(): Response }> } };
+}
+
 export interface Env {
   DB: D1Database;
+  /** 即時縮圖綁定（wrangler.jsonc 的 images）；沒有就不縮圖、一律回原圖。 */
+  IMAGES?: ImagesBinding;
   /** 這次部署的程式版本（git 提交編號，由 scripts/safe-deploy.mjs 部署時寫入）；GET /api/v2/version 回報，部署前用來確認不會蓋掉別人較新的版本。 */
   GIT_SHA?: string;
   /** YouTube Data API 金鑰（Secret，由業主在 Cloudflare 後台設定）：補教材的影片長度與發布日期。沒設定就不補。 */

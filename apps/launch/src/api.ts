@@ -1234,6 +1234,8 @@ async function bumpView(db: D1Database, kind: "center" | "series" | "course", ke
   const row = await db.prepare("INSERT INTO page_views (kind, key, total) VALUES (?, ?, 1) ON CONFLICT(kind, key) DO UPDATE SET total = total + 1 RETURNING total").bind(kind, key).first<{ total: number }>();
   return row?.total ?? 0;
 }
+/** 縮圖允許的寬度（像素）：固定幾種，每張圖每月最多這幾次「不重複縮圖」。 */
+const THUMB_WIDTHS = [320, 480, 640, 800];
 const pubUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 const cleanAnnouncement = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, 120) : "");
 const ART_TYPES = new Set(["president", "sound"]);
@@ -4636,6 +4638,28 @@ const routes: [string, RegExp, Handler][] = [
       const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first();
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
+      // 小螢幕縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受固定幾種，避免縮圖次數暴增）。縮不了或超過免費額度就回原圖，網站不會壞。
+      const w = Number(ctx.url.searchParams.get("w"));
+      if (ctx.env.IMAGES && THUMB_WIDTHS.includes(w) && /^image\/(jpeg|png|webp)$/.test(obj.httpMetadata?.contentType ?? "image/jpeg")) {
+        const q = (await loadConfig(ctx.db)).app.thumbQuality;
+        const webp = /image\/webp/.test(ctx.req.headers.get("accept") ?? "");
+        const cacheKey = new Request(`${ctx.url.origin}/__thumb/${encodeURIComponent(key)}?v=${ctx.url.searchParams.get("v") ?? ""}&w=${w}&q=${q}&f=${webp ? "webp" : "jpeg"}`);
+        const cache = (caches as unknown as { default: Cache }).default;
+        const hit = await cache.match(cacheKey);
+        if (hit) return hit;
+        try {
+          const out = await ctx.env.IMAGES.input(obj.body).transform({ width: w, fit: "scale-down" }).output({ format: webp ? "image/webp" : "image/jpeg", quality: q });
+          const body = await out.response().arrayBuffer();
+          const done = new Response(body, { headers: { "content-type": webp ? "image/webp" : "image/jpeg", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", vary: "Accept", "x-thumb": `w=${w},q=${q},kb=${Math.round(body.byteLength / 1024)}` } });
+          await cache.put(cacheKey, done.clone()).catch(() => undefined);
+          return done;
+        } catch (e) {
+          console.log("thumb_failed", key, w, (e as Error).message);
+          const again = await bucket.get(key);
+          if (!again) return new Response("Not found", { status: 404 });
+          return new Response(again.body, { headers: { "content-type": again.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff", "x-thumb": "fallback" } });
+        }
+      }
       return new Response(obj.body, {
         headers: { "content-type": obj.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
       });
