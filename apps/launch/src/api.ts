@@ -13,6 +13,11 @@ import {
   iconText,
   applicantLabel,
   type InviteInfo,
+  SERIES_APPLY_FIELDS,
+  SERIES_PRICE_FIELDS,
+  type SeriesApplyPlan,
+  type SeriesApplyResult,
+  type SeriesRosterPlan,
   type Roster,
   type RosterRow,
   type AchievementType,
@@ -1628,7 +1633,7 @@ async function rosterAccess(ctx: Ctx, courseId: string): Promise<RosterAccess> {
 /** 每位學員只列最新的一筆報名。 */
 const ROSTER_LATEST = "o.id = (SELECT o2.id FROM orders o2 JOIN order_items i2 ON i2.order_id = o2.id WHERE i2.course_id = i.course_id AND o2.member_sub = o.member_sub ORDER BY o2.created_at DESC, o2.rowid DESC LIMIT 1)";
 type RosterDb = { id: string; member_sub: string; member_name_snapshot: string; center_label: string; status: "opened" | "pending" | "rejected"; total_twd: number; join_method: string; created_at: string; revoked_at: string | null };
-const rosterMethod = (r: RosterDb): RosterRow["method"] => (r.join_method === "invite" ? "invite" : r.join_method === "invite_request" ? "invite_request" : r.total_twd > 0 ? "paid" : "free");
+const rosterMethod = (r: RosterDb): RosterRow["method"] => (r.join_method === "batch" ? "batch" : r.join_method === "invite" ? "invite" : r.join_method === "invite_request" ? "invite_request" : r.total_twd > 0 ? "paid" : "free");
 
 async function rosterRows(ctx: Ctx, courseId: string, a: RosterAccess, opts: { filter: string; q: string; limit: number; offset: number }): Promise<{ rows: (RosterDb)[]; total: number; counts: Roster["counts"] }> {
   const base = `FROM orders o JOIN order_items i ON i.order_id = o.id WHERE i.course_id = ? AND ${ROSTER_LATEST} AND ${a.w.sql}`;
@@ -1669,7 +1674,7 @@ async function rosterCsv(ctx: Ctx, courseId: string): Promise<Response> {
   const title = (await ctx.db.prepare("SELECT title FROM courses WHERE id = ?").bind(courseId).first<{ title: string }>())?.title ?? "";
   const { rows } = await rosterRows(ctx, courseId, a, { filter: "all", q: "", limit: 5000, offset: 0 });
   const uplines = await lookupUplines(ctx.env.CENTRAL_SERVICE_SECRET, rows.map((r) => r.member_sub)).catch(() => undefined);
-  const methodLabel = { free: "免費報名", paid: "付費報名", invite: "邀請碼加入", invite_request: "無邀請碼申請" } as const;
+  const methodLabel = { free: "免費報名", paid: "付費報名", invite: "邀請碼加入", invite_request: "無邀請碼申請", batch: "系列批次加入" } as const;
   const statusLabel = (r: RosterDb) => (r.revoked_at ? "已移除" : r.status === "opened" ? "已開通" : r.status === "rejected" ? "已退回" : "待審核");
   const lines = [
     ["姓名", "中心", "報名方式", "狀態", "報名時間", "上手白金", "上手鑽石"],
@@ -1709,6 +1714,145 @@ async function canSeeRoster(ctx: Ctx, s: Session | null, row: { id: string; revi
   if (manages || s.role === "admin") return true;
   const sc = await reviewScope(ctx, s);
   return sc.groups.some((g) => g.groupId === row.review_group_id) || sc.courses.some((c) => c.courseId === row.id);
+}
+
+
+// ---------- 系列「套用到全系列課程」（業主 2026-11-20）：系列只是設定範本，沒有報名鈕；只有超級管理員 ----------
+type SeriesCourseRow = { id: string; title: string; status: string; is_list: number };
+async function seriesCourses(ctx: Ctx, series: string, only?: unknown): Promise<SeriesCourseRow[]> {
+  const { results } = await ctx.db.prepare("SELECT id, title, status, is_list FROM courses WHERE series = ? ORDER BY created_at").bind(series).all<SeriesCourseRow>();
+  const ids = Array.isArray(only) ? new Set(only.filter((x): x is string => typeof x === "string")) : null;
+  return results.filter((c) => !ids || ids.has(c.id));
+}
+async function seriesApply(ctx: Ctx): Promise<SeriesApplyPlan | SeriesApplyResult> {
+  requireSuperAdmin(ctx);
+  const body = await readJson<{ series?: unknown; fields?: unknown; courseIds?: unknown; dry?: unknown }>(ctx.req);
+  const series = typeof body.series === "string" && body.series.trim() ? body.series.trim() : fail(400, "invalid_series", "請指定系列");
+  const raw = body.fields && typeof body.fields === "object" && !Array.isArray(body.fields) ? (body.fields as Record<string, unknown>) : fail(400, "no_fields", "請勾選要套用的欄位");
+  const keys = Object.keys(raw);
+  if (!keys.length) fail(400, "no_fields", "請勾選要套用的欄位");
+  const bad = keys.find((k) => !SERIES_APPLY_FIELDS.includes(k));
+  if (bad) fail(400, "invalid_field", `「${bad}」不能套用到全系列`);
+  if (raw.status !== undefined && raw.status !== "draft" && raw.status !== "published") fail(400, "invalid_status", "上架狀態只能是上架或未上架");
+  const courses = await seriesCourses(ctx, series, body.courseIds);
+  if (!courses.length) fail(404, "empty_series", "這個系列沒有可以套用的課程");
+  // 已經有人報名（含審核中）的課程：費用不被覆蓋。
+  const marks = courses.map(() => "?").join(",");
+  const { results: regs } = await ctx.db.prepare(`SELECT DISTINCT i.course_id FROM order_items i JOIN orders o ON o.id = i.order_id WHERE o.status <> 'rejected' AND i.course_id IN (${marks})`).bind(...courses.map((c) => c.id)).all<{ course_id: string }>();
+  const hasRegs = new Set(regs.map((r) => r.course_id));
+  const plan: SeriesApplyPlan = {
+    fields: keys,
+    courses: courses.map((c) => {
+      const skipped: { key: string; reason: string }[] = [];
+      let apply = keys;
+      if (c.status === "archived") {
+        skipped.push(...keys.map((key) => ({ key, reason: "已下架封存" })));
+        apply = [];
+      } else if (hasRegs.has(c.id)) {
+        for (const k of keys) if (SERIES_PRICE_FIELDS.includes(k)) skipped.push({ key: k, reason: "已有人報名，費用不覆蓋" });
+        apply = keys.filter((k) => !SERIES_PRICE_FIELDS.includes(k));
+      }
+      return { id: c.id, title: c.title, apply, skipped };
+    }),
+  };
+  if (body.dry === true) return plan;
+  const result: SeriesApplyResult = { applied: 0, failed: [] };
+  for (const c of plan.courses) {
+    if (!c.apply.length) continue;
+    try {
+      await updateCourseWith(ctx, c.id, Object.fromEntries(c.apply.map((k) => [k, raw[k]])), true);
+      result.applied++;
+    } catch (e) {
+      result.failed.push({ id: c.id, title: c.title, error: e instanceof HttpError ? e.message : "儲存失敗" });
+    }
+  }
+  // 記下這個系列的範本：之後在這個系列新增課程，預設沿用（只記有成功套用的欄位值）。
+  const cur = await ctx.db.prepare("SELECT template FROM series_settings WHERE series = ?").bind(series).first<{ template: string }>();
+  let tpl: Record<string, unknown> = {};
+  try {
+    tpl = cur?.template ? (JSON.parse(cur.template) as Record<string, unknown>) : {};
+  } catch {
+    tpl = {};
+  }
+  await ctx.db.batch([
+    ctx.db.prepare("INSERT OR IGNORE INTO series_settings (series) VALUES (?)").bind(series),
+    ctx.db.prepare("UPDATE series_settings SET template = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE series = ?").bind(JSON.stringify({ ...tpl, ...raw }), series),
+    audit(ctx.db, ctx.session!.sub, "series.apply", "series", series, `${keys.join(",")}｜${result.applied}門`),
+  ]);
+  return result;
+}
+/** 新增課程時，系列有範本就把沒填的欄位用範本補上（名稱、主講人這類每門課自己的資料不在範本裡）。 */
+async function withSeriesDefaults(ctx: Ctx, body: Record<string, unknown>): Promise<void> {
+  const series = typeof body.series === "string" ? body.series.trim() : "";
+  if (!series) return;
+  const row = await ctx.db.prepare("SELECT template FROM series_settings WHERE series = ?").bind(series).first<{ template: string }>();
+  if (!row?.template || row.template === "{}") return;
+  let tpl: Record<string, unknown> = {};
+  try {
+    tpl = JSON.parse(row.template) as Record<string, unknown>;
+  } catch {
+    return;
+  }
+  for (const [k, v] of Object.entries(tpl)) if (SERIES_APPLY_FIELDS.includes(k) && body[k] === undefined) body[k] = v;
+}
+/** 第七項「報名名單」的套用：把某一門課的已開通學員，批次加入同系列的其他課程。 */
+async function seriesRosterJoin(ctx: Ctx): Promise<SeriesRosterPlan | { added: number }> {
+  const s = requireSuperAdmin(ctx);
+  const body = await readJson<{ series?: unknown; sourceCourseId?: unknown; courseIds?: unknown; dry?: unknown }>(ctx.req);
+  const series = typeof body.series === "string" && body.series.trim() ? body.series.trim() : fail(400, "invalid_series", "請指定系列");
+  const sourceId = typeof body.sourceCourseId === "string" ? body.sourceCourseId : fail(400, "no_source", "請選擇名單來源的課程");
+  const all = await seriesCourses(ctx, series);
+  const source = all.find((c) => c.id === sourceId) ?? fail(404, "not_found", "來源課程不在這個系列裡");
+  const { results: members } = await ctx.db
+    .prepare("SELECT e.member_sub, o.member_name_snapshot AS name, o.center_key, o.center_label, o.hglobal FROM enrollments e JOIN orders o ON o.id = e.source_order_id WHERE e.course_id = ?")
+    .bind(sourceId)
+    .all<{ member_sub: string; name: string; center_key: string | null; center_label: string; hglobal: number }>();
+  const only = Array.isArray(body.courseIds) ? new Set(body.courseIds.filter((x): x is string => typeof x === "string")) : null;
+  const targets = all.filter((c) => c.id !== sourceId && (!only || only.has(c.id)));
+  const plan: SeriesRosterPlan = { source: { id: source.id, title: source.title, members: members.length }, targets: [], totalAdd: 0 };
+  const toAdd = new Map<string, string[]>();
+  for (const t of targets) {
+    if (t.status === "archived") {
+      plan.targets.push({ id: t.id, title: t.title, add: 0, already: 0, skipped: "已下架封存" });
+      continue;
+    }
+    if (await ctx.db.prepare(`SELECT 1 AS x FROM courses WHERE id = ? AND ${MATERIAL_LIKE_SQL}`).bind(t.id).first()) {
+      plan.targets.push({ id: t.id, title: t.title, add: 0, already: 0, skipped: "這張教材卡不需要報名" });
+      continue;
+    }
+    const { results: have } = await ctx.db
+      .prepare("SELECT member_sub FROM enrollments WHERE course_id = ? UNION SELECT o.member_sub FROM orders o JOIN order_items i ON i.order_id = o.id WHERE i.course_id = ? AND o.status = 'pending'")
+      .bind(t.id, t.id)
+      .all<{ member_sub: string }>();
+    const haveSet = new Set(have.map((h) => h.member_sub));
+    const add = members.filter((m) => !haveSet.has(m.member_sub)).map((m) => m.member_sub);
+    toAdd.set(t.id, add);
+    plan.targets.push({ id: t.id, title: t.title, add: add.length, already: members.length - add.length, skipped: null });
+    plan.totalAdd += add.length;
+  }
+  if (body.dry === true) return plan;
+  if (plan.totalAdd > 2000) fail(400, "too_many", "一次最多批次加入 2000 筆，請減少選取的課程");
+  const byMember = new Map(members.map((m) => [m.member_sub, m]));
+  const now = new Date();
+  let added = 0;
+  for (const t of targets) {
+    const subs = toAdd.get(t.id) ?? [];
+    const stmts: D1PreparedStatement[] = [];
+    for (const sub of subs) {
+      const m = byMember.get(sub)!;
+      const id = orderId(now);
+      stmts.push(
+        ctx.db.prepare("INSERT INTO orders (id, member_sub, member_name_snapshot, status, total_twd, created_at, center_key, center_label, hglobal, paid_twd, pay_method, paid_at, legal_name, pay_ref, join_method) VALUES (?, ?, ?, 'opened', 0, ?, ?, ?, ?, 0, 'vip', ?, '', '', 'batch')").bind(id, sub, m.name, iso(now), m.center_key, m.center_label, m.hglobal, iso(now)),
+        ctx.db.prepare("INSERT INTO order_items (order_id, course_id, title_snapshot, price_twd) VALUES (?, ?, ?, 0)").bind(id, t.id, t.title),
+        ctx.db.prepare("INSERT OR IGNORE INTO enrollments (member_sub, course_id, source_order_id) VALUES (?, ?, ?)").bind(sub, t.id, id),
+        notify(ctx.db, { sub }, "已加入課程", t.title, "/learning"),
+      );
+    }
+    for (let i = 0; i < stmts.length; i += 60) await ctx.db.batch(stmts.slice(i, i + 60));
+    added += subs.length;
+  }
+  await audit(ctx.db, s.sub, "series.roster_join", "series", series, `${source.title}｜${added}筆`).run();
+  return { added };
 }
 
 const INVITE_MAX_FAILS = 5;
@@ -2473,6 +2617,7 @@ function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; pr
 
 async function createCourse(ctx: Ctx, admin: Session) {
   const body = await readJson<Record<string, unknown>>(ctx.req);
+  await withSeriesDefaults(ctx, body); // 系列最後一次「套用到全系列課程」的設定，當新課程的預設值
   const sets = await courseFields(ctx, body, true, admin);
   checkPublicFree(Number(sets.find(([c]) => c === "price_twd")?.[1] ?? 0), sets.find(([c]) => c === "is_public")?.[1] === 1, sets.find(([c]) => c === "price_tba")?.[1] === 1);
   if (!sets.some(([c]) => c === "allow_president")) sets.push(["allow_president", 1]); // 新課程預設「會長不受獎銜限制也可報名」
@@ -2659,8 +2804,11 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
 /** 把課程的「名稱、主講人、獎銜、職稱」套到這門課的主講人章節（沒有主講人章節就不動）。 */
 
 async function updateCourse(ctx: Ctx, id: string) {
+  return updateCourseWith(ctx, id, await readJson<Record<string, unknown>>(ctx.req));
+}
+/** 儲存課程設定的核心（單一課程儲存與「套用到全系列課程」共用）；light＝不重建整份課程資料（批次套用用）。 */
+async function updateCourseWith(ctx: Ctx, id: string, body: Record<string, unknown>, light = false) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
-  const body = await readJson<Record<string, unknown>>(ctx.req);
   const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list, teacher, no_speaker, zone FROM courses WHERE id = ?").bind(id).first<{ zone: string | null; event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; teacher: string | null; no_speaker: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
@@ -2744,7 +2892,7 @@ async function updateCourse(ctx: Ctx, id: string) {
   if (cur.is_list !== 1 && cur.status === "published" && (changed("event_start") || changed("event_end") || changed("location"))) {
     await notifyEnrolled(ctx.db, id, `${cur.title.slice(0, 40)}時間或地點有更新`, "請打開課程頁確認最新的日期與地點", `/course/${id}`, admin.sub, null).catch(() => undefined);
   }
-  return courseDetail(ctx, id);
+  return light ? ({ ok: true } as unknown as CourseDetail) : courseDetail(ctx, id);
 }
 
 async function renumber(db: D1Database, courseId: string) {
@@ -5889,6 +6037,22 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/admin\/courses\/([\w-]+)\/roster$/, async (ctx, [id]) => rosterOf(ctx, id)],
   ["GET", /^\/admin\/courses\/([\w-]+)\/roster\.csv$/, async (ctx, [id]) => rosterCsv(ctx, id)],
   ["DELETE", /^\/admin\/courses\/([\w-]+)\/roster\/([\w-]+)$/, async (ctx, [id, orderId]) => rosterRemove(ctx, id, orderId)],
+  ["POST", /^\/admin\/series-apply$/, async (ctx) => seriesApply(ctx)],
+  ["POST", /^\/admin\/series-apply-roster$/, async (ctx) => seriesRosterJoin(ctx)],
+  [
+    "GET",
+    /^\/admin\/series-template$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      const series = ctx.url.searchParams.get("series") ?? "";
+      const row = await ctx.db.prepare("SELECT template FROM series_settings WHERE series = ?").bind(series).first<{ template: string }>();
+      try {
+        return { template: row?.template ? (JSON.parse(row.template) as Record<string, unknown>) : {} };
+      } catch {
+        return { template: {} };
+      }
+    },
+  ],
   [
     "GET",
     /^\/admin\/courses\/([\w-]+)\/invite$/,
