@@ -74,14 +74,6 @@ export function EditSheet({
             {title}
           </AppText>
           {headRight ?? null}
-          {!headRight && material ? (
-            <View style={styles.matTag} accessibilityLabel="教材卡">
-              <Ionicons name="folder-open" size={14} color="#1D2A22" />
-              <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
-                教材卡
-              </AppText>
-            </View>
-          ) : null}
         </View>
         <ScrollView style={{ maxHeight: height * 0.68 }} contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           {children}

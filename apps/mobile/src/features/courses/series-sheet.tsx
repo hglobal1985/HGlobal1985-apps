@@ -45,12 +45,6 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
   return (
     <BottomSheet onClose={onClose} onExpand={() => open()} expandLabel="繼續上拉進入清單">
       <View style={styles.head}>
-        <View style={styles.matTag} accessibilityLabel="教材卡">
-          <Ionicons name="folder-open" size={14} color="#1D2A22" />
-          <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
-            教材卡
-          </AppText>
-        </View>
         <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
           {course.title}
         </AppText>
@@ -99,15 +93,6 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
   return (
     <BottomSheet onClose={onClose} onExpand={showAllSeries ? showAll : undefined} expandLabel="繼續上拉顯示全部">
       <View style={styles.head}>
-        {/* 素材（清單類別）的標示放在標題左邊（業主 2026-11-17：從小卡右下角移到這裡）。 */}
-        {items.length > 0 && items.every((x) => x.isList) ? (
-          <View style={styles.matTag} accessibilityLabel="教材卡">
-            <Ionicons name="folder-open" size={14} color="#1D2A22" />
-            <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
-              教材卡
-            </AppText>
-          </View>
-        ) : null}
         <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
           {title}
         </AppText>
