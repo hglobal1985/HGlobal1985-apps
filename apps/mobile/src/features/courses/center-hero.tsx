@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Animated, Image, Linking, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
+import { useThumb } from "@/lib/thumb";
 import { resolveUrl } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { layoutOf } from "@/theme/layout";
@@ -35,6 +36,7 @@ export const centerHeroFull = (winW: number, winH = 10000) => centerHeroSize(win
  */
 export function CenterHero({ art, scrollY, stats, title }: { stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; title: string }) {
   const { width: winW, height: winH } = useWindowDimensions();
+  const thumb = useThumb();
   const [open, setOpen] = useState(false);
   const { w: heroW, h: full } = centerHeroSize(winW, winH);
   const range = Math.max(1, full - (COMPACT_H + COMPACT_GAP));
@@ -43,7 +45,7 @@ export function CenterHero({ art, scrollY, stats, title }: { stats: CoverStats; 
   return (
     <Animated.View style={[styles.box, url ? { backgroundColor: "#fff" } : null, heroW < winW ? { alignSelf: "center", width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
       {url ? (
-        <Image source={{ uri: resolveUrl(url) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image source={{ uri: thumb(resolveUrl(url), winW) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
         <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
           <Defs>
