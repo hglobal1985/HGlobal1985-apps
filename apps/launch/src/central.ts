@@ -667,45 +667,59 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
     return undefined;
   }
   let failed = false;
+  const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : null);
+  const none: Upline = { platinum: null, diamond: null };
   for (let i = 0; i < need.length; i += 100) {
-    const chunk = need.slice(i, i + 100);
-    const t0 = Date.now();
-    try {
-      const res = await centralFetch(`${CENTRAL}/v1/apps/${APP_ID}/members/lookup`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ member_ids: chunk, fields: ["upline_platinum", "upline_diamond"], use: "display" }),
-        signal: AbortSignal.timeout(8000),
-      });
-      logCall(token, "/v1/apps/learn/members/lookup", Date.now() - t0);
-      if (res.status === 401) svcToken = null;
-      if (!res.ok) {
+    let chunk = need.slice(i, i + 100);
+    // 中央只要有一個會員編號格式不合（422 member_ids.N）就整批退回：把那一筆剔除（當作沒有資料）後重送，最多重送 20 次。
+    for (let attempt = 0; chunk.length && attempt < 20; attempt++) {
+      const t0 = Date.now();
+      try {
+        const res = await centralFetch(`${CENTRAL}/v1/apps/${APP_ID}/members/lookup`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+          body: JSON.stringify({ member_ids: chunk, fields: ["upline_platinum", "upline_diamond"], use: "display" }),
+          signal: AbortSignal.timeout(8000),
+        });
+        logCall(token, "/v1/apps/learn/members/lookup", Date.now() - t0);
+        if (res.status === 401) svcToken = null;
+        if (!res.ok) {
+          const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown; message?: unknown; details?: { field_key?: unknown } } } | null;
+          const bad = res.status === 422 && typeof eb?.error?.details?.field_key === "string" ? /^member_ids\.(\d+)$/.exec(eb.error.details.field_key) : null;
+          if (bad && Number(bad[1]) < chunk.length) {
+            const dropped = chunk[Number(bad[1])]!;
+            out.set(dropped, none);
+            memo.set(`upl:${dropped}`, { value: none, until: Date.now() + 600_000 });
+            chunk = chunk.filter((_, k) => k !== Number(bad[1]));
+            continue;
+          }
+          failed = true;
+          // 只顯示狀態碼、錯誤代碼與中央的錯誤說明（欄位名稱等，不含會員資料）；除錯用，長度有限制。
+          const msg = typeof eb?.error?.message === "string" ? eb.error.message.slice(0, 200) : "";
+          const det = eb?.error?.details !== undefined ? JSON.stringify(eb.error.details).slice(0, 200) : "";
+          lastUplineError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}${msg ? `：${msg}` : ""}${det && det !== "{}" ? ` ${det}` : ""}`;
+          break;
+        }
+        const b = (await res.json().catch(() => null)) as { members?: unknown[]; not_found?: unknown[] } | null;
+        if (!Array.isArray(b?.members)) lastUplineError = "中央回傳的格式不是預期的（沒有 members 清單）";
+        const notFound = new Set((b?.not_found ?? []).filter((x): x is string => typeof x === "string"));
+        for (const raw of b?.members ?? []) {
+          const m = raw as { member_id?: unknown; id?: unknown; fields?: Record<string, unknown>; upline_platinum?: unknown; upline_diamond?: unknown };
+          const id = typeof m.member_id === "string" ? m.member_id : typeof m.id === "string" ? m.id : "";
+          if (!id) continue;
+          const f = m.fields ?? {};
+          const pick = (k: "upline_platinum" | "upline_diamond") => text(f[k] ?? m[k]);
+          const val: Upline = { platinum: pick("upline_platinum"), diamond: pick("upline_diamond") };
+          out.set(id, val);
+          memo.set(`upl:${id}`, { value: val, until: Date.now() + 600_000 });
+        }
+        for (const id of notFound) out.set(id, none);
+        break;
+      } catch {
         failed = true;
-        const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown; message?: unknown; details?: unknown } } | null;
-        // 只顯示狀態碼、錯誤代碼與中央的錯誤說明（欄位名稱等，不含會員資料）；除錯用，長度有限制。
-        const msg = typeof eb?.error?.message === "string" ? eb.error.message.slice(0, 200) : "";
-        const det = eb?.error?.details !== undefined ? JSON.stringify(eb.error.details).slice(0, 200) : "";
-        lastUplineError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}${msg ? `：${msg}` : ""}${det && det !== "{}" ? ` ${det}` : ""}`;
-        continue;
+        lastUplineError = "連線逾時或失敗";
+        break;
       }
-      const b = (await res.json().catch(() => null)) as { members?: unknown[]; not_found?: unknown[] } | null;
-      if (!Array.isArray(b?.members)) lastUplineError = "中央回傳的格式不是預期的（沒有 members 清單）";
-      const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : null);
-      const notFound = new Set((b?.not_found ?? []).filter((x): x is string => typeof x === "string"));
-      for (const raw of b?.members ?? []) {
-        const m = raw as { member_id?: unknown; id?: unknown; fields?: Record<string, unknown>; upline_platinum?: unknown; upline_diamond?: unknown };
-        const id = typeof m.member_id === "string" ? m.member_id : typeof m.id === "string" ? m.id : "";
-        if (!id) continue;
-        const f = m.fields ?? {};
-        const pick = (k: "upline_platinum" | "upline_diamond") => text(f[k] ?? m[k]);
-        const val: Upline = { platinum: pick("upline_platinum"), diamond: pick("upline_diamond") };
-        out.set(id, val);
-        memo.set(`upl:${id}`, { value: val, until: Date.now() + 600_000 });
-      }
-      for (const id of notFound) out.set(id, { platinum: null, diamond: null });
-    } catch {
-      failed = true;
-      lastUplineError = "連線逾時或失敗";
     }
   }
   return failed && !out.size ? undefined : out;
