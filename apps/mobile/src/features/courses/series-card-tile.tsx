@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
+import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius } from "@/theme/tokens";
 import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
@@ -21,6 +22,7 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
   const { c } = useTheme();
   const { member } = useSession();
   const { config } = useUiConfig();
+  const thumb = useThumb();
   const list = course.isList;
   const height = Math.round(list ? (width * 3) / 4 : (width * 4) / 3);
   const ribbons = ribbonsFor(course, member, config);
@@ -41,7 +43,7 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
         onPress={() => router.push(`/course/${course.id}`)}
         style={[styles.art, { width, height, backgroundColor: img ? "#fff" : c.surfaceMuted }, ...(empty ? fadedStyle : []), hidden && { opacity: 0.4 }]}
       >
-        {course.brand ? <BrandCover brand={course.brand} fill /> : img && cropped ? <Image source={{ uri: resolveUrl(img) }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : img ? <TopFill uri={resolveUrl(img)} w={width} h={height} viewY={course.edmViewY} fillBlur /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
+        {course.brand ? <BrandCover brand={course.brand} fill /> : img && cropped ? <Image source={{ uri: thumb(resolveUrl(img), width) }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : img ? <TopFill uri={thumb(resolveUrl(img), width)} w={width} h={height} viewY={course.edmViewY} fillBlur /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         <View style={styles.count} pointerEvents="none">

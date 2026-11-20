@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Image, PanResponder, Platform, Pressable, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
+import { useThumb } from "@/lib/thumb";
 import { eventDays, hostLine, placeText } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
 import { useTheme } from "@/theme/theme";
@@ -31,9 +32,10 @@ function TopFillImage({ uri, w, h }: { uri: string; w: number; h: number }) {
 }
 
 function Slide({ course, w, h }: { course: CourseSummary; w: number; h: number }) {
+  const thumb = useThumb();
   if (course.brand) return <BrandCover brand={course.brand} fill />;
   return course.edmUrl ? (
-    <TopFillImage uri={resolveUrl(course.edmUrl)} w={w} h={h} />
+    <TopFillImage uri={thumb(resolveUrl(course.edmUrl), w)} w={w} h={h} />
   ) : (
     <View style={{ width: w, height: h, borderRadius: radius.md, overflow: "hidden" }}>
       <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />

@@ -816,6 +816,42 @@ export type RecommendRules = {
   /** 最多推薦幾門（0＝不限）。 */
   max: number;
 };
+/**
+ * Cloudflare 即時縮圖的全部選項（業主 2026-11-20）：對應 Cloudflare Images 的參數。
+ * 預設全部關閉或中性值；只有被改成非預設值的選項才會送給 Cloudflare。
+ */
+export type ThumbSettings = {
+  enabled: boolean;
+  /** 允許的縮圖寬度（像素）；前端依畫面大小挑最接近的一種，每張圖每種寬度算一次「不重複縮圖」。 */
+  widths: number[];
+  /** 高度＝寬度的幾倍（0＝依原圖比例）；例：0.5625＝16:9。 */
+  height: number;
+  fit: "scale-down" | "contain" | "cover" | "crop" | "pad" | "squeeze";
+  gravity: "auto" | "center" | "face" | "left" | "right" | "top" | "bottom";
+  /** auto＝依瀏覽器（avif／webp 優先，不支援就 jpeg）。 */
+  format: "auto" | "avif" | "webp" | "jpeg" | "png";
+  quality: number;
+  /** 用文字等級取代數字畫質（空字串＝用數字）。 */
+  qualityLevel: "" | "high" | "medium-high" | "medium-low" | "low";
+  anim: boolean;
+  metadata: "none" | "keep" | "copyright";
+  rotate: 0 | 90 | 180 | 270;
+  flip: "" | "h" | "v" | "hv";
+  blur: number;
+  sharpen: number;
+  brightness: number;
+  contrast: number;
+  gamma: number;
+  saturation: number;
+  /** 補邊或透明背景的底色（空字串＝不指定）。 */
+  background: string;
+  /** 四邊各裁掉的像素（0＝不裁）。 */
+  trim: number;
+  borderWidth: number;
+  borderColor: string;
+};
+export const THUMB_WIDTH_CHOICES = [240, 320, 480, 640, 800, 960];
+
 export type AppSettings = {
   /** 首頁左邊「繼續學習」自動輪播間隔（秒；0＝不自動輪播）。 */
   homeLeftSec: number;
@@ -848,9 +884,8 @@ export type AppSettings = {
   /** 中心封面照片（中心首頁圖）的壓縮：長邊與畫質，比一般圖片更高（業主 2026-11-18）。 */
   centerMaxSide: number;
   centerQuality: number;
-  /** 小螢幕封面縮圖（Cloudflare 即時縮圖，業主 2026-11-20 小範圍試用）：開關與畫質（%）。寬度由前端依畫面大小選擇固定幾種尺寸。 */
-  thumbEnabled: boolean;
-  thumbQuality: number;
+  /** Cloudflare 即時縮圖（業主 2026-11-20 小範圍試用）：封面縮圖的所有選項，在「設定 › Cloudflare即時縮圖」調整。 */
+  thumb: ThumbSettings;
 };
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   homeLeftSec: 5,
@@ -871,8 +906,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   imageQuality: 88,
   centerMaxSide: 2048,
   centerQuality: 95,
-  thumbEnabled: false,
-  thumbQuality: 70,
+  thumb: { enabled: false, widths: [320, 480, 640], height: 0, fit: "scale-down", gravity: "auto", format: "auto", quality: 70, qualityLevel: "", anim: true, metadata: "none", rotate: 0, flip: "", blur: 0, sharpen: 0, brightness: 1, contrast: 1, gamma: 1, saturation: 1, background: "", trim: 0, borderWidth: 0, borderColor: "#ffffff" },
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },

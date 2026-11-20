@@ -4,6 +4,7 @@ import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native
 import { resolveUrl, UNCATEGORIZED } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
+import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius } from "@/theme/tokens";
 import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
@@ -51,6 +52,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const { c } = useTheme();
   const { member } = useSession();
   const { config } = useUiConfig();
+  const thumb = useThumb();
   const [sheet, setSheet] = useState(false);
   const settings = useSeriesSettings();
   const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
@@ -81,7 +83,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   return (
     <View style={{ width }} nativeID={`tile-${group.key}`}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? settings.titleOf(rep.series) : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: edm ? "#fff" : c.surfaceMuted }, unlisted && { opacity: 0.55 }]}>
-        {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: resolveUrl(edm) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={resolveUrl(edm)} w={width} h={height} viewY={flat || !inSeries ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? settings.titleOf(rep.series) : rep.title} fill />}
+        {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: thumb(resolveUrl(edm), width) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={thumb(resolveUrl(edm), width)} w={width} h={height} viewY={flat || !inSeries ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? settings.titleOf(rep.series) : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         {/* 安麗品牌專區的每張卡片：右下角統一用淡灰色膠囊顯示教材數量（業主 2026-11-18）。 */}
