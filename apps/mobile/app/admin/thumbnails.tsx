@@ -136,7 +136,8 @@ export default function ThumbnailsScreen() {
 
       <Section title="試算（用已儲存的設定，對一張真實封面縮圖）">
         <Card>
-          {sample ? <Image source={{ uri: resolveUrl(sample) }} style={styles.sample} resizeMode="cover" accessibilityIgnoresInvertColors /> : <AppText tone="muted">目前沒有已上架的封面可試算。</AppText>}
+          {!saved.enabled ? <NoticeBox tone="danger" text="總開關目前是關閉的，所以下面的圖與試算都是原圖（沒有縮小）。請在最上方勾選「啟用即時縮圖」並按「儲存設定」，再試算。" /> : null}
+          {sample ? <Image source={{ uri: `${resolveUrl(sample)}${sample.includes("?") ? "&" : "?"}w=${[...saved.widths].sort((x, y) => x - y)[0] ?? 320}` }} style={styles.sample} resizeMode="cover" accessibilityIgnoresInvertColors /> : <AppText tone="muted">目前沒有已上架的封面可試算。</AppText>}
           <Button label="開始試算" icon="speedometer-outline" variant="secondary" loading={probing} disabled={!sample || probing} onPress={runProbe} fullWidth />
           {probes?.map((p) => (
             <View key={p.w} style={styles.row}>
