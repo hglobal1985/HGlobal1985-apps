@@ -21,6 +21,18 @@ async function placeInBlock(db: D1Database, courseId: string, blockId: string, n
   await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
 }
 
+/** 把新建的教材放到這份清單所有教材（含區塊）的最前面，完整版課程影片永遠在最後；順序重新編號。 */
+async function placeOnTop(db: D1Database, courseId: string, newIds: string[]): Promise<void> {
+  if (!newIds.length) return;
+  const { results } = await db.prepare("SELECT id, kind, is_full FROM lessons WHERE course_id = ? ORDER BY position").bind(courseId).all<{ id: string; kind: string; is_full: number }>();
+  const fresh = new Set(newIds);
+  const rest = results.filter((r) => !fresh.has(r.id) && r.is_full !== 1);
+  let at = rest.findIndex((r) => r.kind === "material" || r.kind === "section");
+  if (at < 0) at = rest.length;
+  const order = [...rest.slice(0, at).map((r) => r.id), ...newIds, ...rest.slice(at).map((r) => r.id), ...results.filter((r) => r.is_full === 1).map((r) => r.id)];
+  await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
+}
+
 const nextPos = async (db: D1Database, courseId: string) => ((await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0) + 1;
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
 
@@ -237,8 +249,8 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   const read = await readPlaylist(env.YOUTUBE_API_KEY, sync.playlist_id, have);
   if ("error" in read) return finish({ imported: 0, note: read.error });
   if (!read.items.length) return finish({ imported: 0, note: "沒有新的影片（都已經同步過了）" });
-  // 依影片日期由舊到新加入。
-  const items = [...read.items].sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
+  // 最新的在最上面（業主 2026-11-20）：新影片依日期由新到舊，加在這份清單所有教材的最前面。
+  const items = [...read.items].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const pos = await nextPos(db, sync.course_id);
   const ids = items.map(() => `${sync.course_id}-${short()}`);
   const lines: string[] = [];
@@ -249,7 +261,7 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
       return db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, event_date, kind) VALUES (?, ?, ?, ?, 0, 'youtube', ?, ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.id, it.date);
     }),
   );
-  await placeInBlock(db, sync.course_id, "", ids);
+  await placeOnTop(db, sync.course_id, ids);
   return finish({ imported: items.length, note: lines.join("\n").slice(0, 600) });
 }
 

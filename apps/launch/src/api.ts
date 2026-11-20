@@ -1351,16 +1351,29 @@ async function deleteR2Files(env: Env, keys: (string | null | undefined)[]): Pro
   }
 }
 
+/**
+ * 新教材放哪裡（業主 2026-11-20：最新的在最上面）：放在這份清單「第一個教材／區塊」的位置，原本的往後挪一格；
+ * 還沒有任何教材就放最後（完整版課程影片永遠在最後）。回傳要放的順序位置與要先執行的搬移指令。
+ */
+async function materialSlot(db: D1Database, courseId: string): Promise<{ at: number; pre: D1PreparedStatement[] }> {
+  const first = await db.prepare("SELECT MIN(position) AS p FROM lessons WHERE course_id = ? AND is_full = 0 AND kind IN ('material', 'section')").bind(courseId).first<{ p: number | null }>();
+  if (first?.p != null)
+    return { at: first.p, pre: [db.prepare("UPDATE lessons SET position = -(position + 1) WHERE course_id = ? AND position >= ?").bind(courseId, first.p), db.prepare("UPDATE lessons SET position = -position WHERE course_id = ? AND position < 0").bind(courseId)] };
+  const max = (await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0;
+  const full = await db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+  return full ? { at: full.position, pre: [db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(max + 1, full.id)] } : { at: max + 1, pre: [] };
+}
+
 /** 把已存進 R2 的檔案建成一個「其他教材」（放在完整版課程影片之前），並通知訂閱者。回傳教材編號。 */
 async function createFileMaterial(ctx: Ctx, admin: Session, courseId: string, f: { name: string; key: string; size: number; contentType: string; attType: AttachmentType; audit: string }): Promise<string> {
   const course = await ctx.db.prepare("SELECT (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number }>();
   if (!course) return fail(404, "not_found", "找不到這門課程");
   const id = `${courseId}-${randomId(6)}`;
-  const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+  const slot = await materialSlot(ctx.db, courseId);
   const title = cleanTitle(f.name.replace(/\.[^.]+$/, "")) || "檔案";
   await ctx.db.batch([
-    ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title),
+    ...slot.pre,
+    ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, 'demo', NULL, 0, 'material')").bind(id, courseId, slot.at, title),
     ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, att_type, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, 'file', ?, ?)").bind(crypto.randomUUID(), id, courseId, f.name, f.key, f.size, f.contentType, f.attType, admin.sub),
     audit(ctx.db, admin.sub, f.audit, "lesson", id, `${f.attType}:${f.name}:${f.size}`),
   ]);
@@ -4172,11 +4185,11 @@ const routes: [string, RegExp, Handler][] = [
       // 清單卡貼 YouTube 影片：存成影片來源，在 App 內原地播放（計入學習進度）；其他連結照常開外部網頁。
       const yt = youtubeId(u.toString());
       // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
-      const full = await ctx.db.prepare("SELECT id, position FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId).first<{ id: string; position: number }>();
+      const slot = await materialSlot(ctx.db, courseId);
       const attId = crypto.randomUUID();
       await ctx.db.batch([
-        ...(full ? [ctx.db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(course.maxpos + 1, full.id)] : []),
-        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, ?, ?, ?, 0, 'material')").bind(id, courseId, full ? full.position : course.maxpos + 1, title, yt ? "youtube" : "demo", yt, itemDate),
+        ...slot.pre,
+        ctx.db.prepare("INSERT INTO lessons (id, course_id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, event_date, auto_cover, kind) VALUES (?, ?, ?, ?, '', '', '', 0, ?, ?, ?, 0, 'material')").bind(id, courseId, slot.at, title, yt ? "youtube" : "demo", yt, itemDate),
         ...(yt ? [] : [ctx.db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, ?)").bind(attId, id, courseId, title, u.toString(), classifyLink(u), admin.sub)]),
         audit(ctx.db, admin.sub, "material.create", "lesson", id, `${classifyLink(u)}:${title}`),
       ]);

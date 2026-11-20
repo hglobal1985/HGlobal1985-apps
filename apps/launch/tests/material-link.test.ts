@@ -48,9 +48,9 @@ test("其他教材（外部連結）：新增＝名稱＋連結一次建立、�
     assert.deepEqual([m1.title, m1.linkType, m1.ready], ["我的簡報", "canva", true]);
     // 抓不到 → 類型預設名稱；自己填的名稱優先
     const r2 = await call<CourseDetail>("POST", `/admin/courses/${made.id}/materials`, admin, { url: "https://forms.gle/xyz" });
-    assert.equal(r2.data.lessons.filter((l) => l.material)[1]!.title, "Google 表單");
+    assert.equal(r2.data.lessons.filter((l) => l.material)[0]!.title, "Google 表單");
     const r3 = await call<CourseDetail>("POST", `/admin/courses/${made.id}/materials`, admin, { url: "https://notion.so/p", title: "我取的名字" });
-    assert.equal(r3.data.lessons.filter((l) => l.material)[2]!.title, "我取的名字");
+    assert.equal(r3.data.lessons.filter((l) => l.material)[0]!.title, "我取的名字");
     assert.equal((await call("POST", `/admin/courses/${made.id}/materials`, admin, { url: "http://insecure.com/x" })).status, 400, "只收 https");
     assert.equal((await call("POST", `/admin/courses/${made.id}/materials`, student, { url: "https://a.com/x" })).status, 403, "學員不能新增");
 

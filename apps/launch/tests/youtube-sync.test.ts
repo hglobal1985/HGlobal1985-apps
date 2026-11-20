@@ -13,7 +13,7 @@ test("同步清單：網址判讀與教材名稱格式", () => {
   assert.equal(syncTitle("王老師小線對焦會", "對焦會", null), "王老師小線對焦會");
 });
 
-test("同步清單：只加新影片、依日期由舊到新、再按一次不重複", async () => {
+test("同步清單：只加新影片、最新的在最上面、再按一次不重複", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
   const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
@@ -35,7 +35,7 @@ test("同步清單：只加新影片、依日期由舊到新、再按一次不�
     globalThis.fetch = realFetch;
   }
   const rows = (await db.prepare("SELECT title, media_ref, kind FROM lessons WHERE course_id = 'c1' ORDER BY position").all<{ title: string; media_ref: string; kind: string }>()).results;
-  assert.deepEqual(rows.map((r) => r.title), ["2026年10月 會長翡翠鑽石會議", "2026年11月 會長翡翠鑽石會議（主持陳小美）"]);
+  assert.deepEqual(rows.map((r) => r.title), ["2026年11月 會長翡翠鑽石會議（主持陳小美）", "2026年10月 會長翡翠鑽石會議"]);
   assert.ok(rows.every((r) => r.kind === "material"));
   const st = await db.prepare("SELECT last_imported, last_note FROM youtube_syncs WHERE id = 's1'").first<{ last_imported: number; last_note: string }>();
   assert.equal(st?.last_imported, 0);

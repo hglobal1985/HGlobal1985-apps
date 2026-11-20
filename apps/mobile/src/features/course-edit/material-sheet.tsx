@@ -171,7 +171,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   };
 
   const before = useRef(new Set(course.lessons.map((l) => l.id)));
-  // 上傳檔案完成：新建的教材（可能多個）搬到指定區塊的最後面，然後關閉。
+  // 上傳檔案完成：新建的教材（可能多個）搬到指定區塊的最上面，然後關閉。
   const onFiles = async (d: CourseDetail, hadErrors: boolean) => {
     const fresh = d.lessons.filter((l) => l.material && !l.full && !before.current.has(l.id));
     if (afterBlock && fresh.length) {
@@ -179,9 +179,8 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
       const rest = all.filter((l) => !fresh.some((f) => f.id === l.id));
       const at = rest.findIndex((l) => l.id === afterBlock);
       if (at >= 0) {
-        let end = at + 1;
-        while (end < rest.length && !rest[end]!.section) end++;
-        await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: [...rest.slice(0, end), ...fresh, ...rest.slice(end)].map((l) => l.id) }).catch(() => undefined);
+        // 最新的在最上面（業主 2026-11-20）：放在區塊標題的正下方。
+        await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: [...rest.slice(0, at + 1), ...fresh, ...rest.slice(at + 1)].map((l) => l.id) }).catch(() => undefined);
       }
     }
     invalidate();
@@ -199,15 +198,13 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
         const before = new Set(course.lessons.map((l) => l.id));
         const d = await api<CourseDetail>("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title, ...dateBody });
         lessonId = d.lessons.find((l) => !before.has(l.id))?.id;
-        // 指定區塊：把新教材移到該區塊的最後面（區塊底下＝到下一個區塊標題之前）。
+        // 指定區塊：把新教材移到該區塊的最上面（區塊標題的正下方）。
         if (afterBlock && lessonId) {
           const all = d.lessons.filter((l) => l.material && !l.full);
           const rest = all.filter((l) => l.id !== lessonId);
           const at = rest.findIndex((l) => l.id === afterBlock);
           if (at >= 0) {
-            let end = at + 1;
-            while (end < rest.length && !rest[end]!.section) end++;
-            const next = [...rest.slice(0, end), all.find((l) => l.id === lessonId)!, ...rest.slice(end)];
+            const next = [...rest.slice(0, at + 1), all.find((l) => l.id === lessonId)!, ...rest.slice(at + 1)]; // 區塊標題的正下方（最新的在最上面）
             await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: next.map((l) => l.id) });
           }
         }
