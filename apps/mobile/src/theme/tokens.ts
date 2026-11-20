@@ -25,6 +25,10 @@ const palettes = {
     success: "#1B7A43",
     successSoft: "#E7F1EA",
     tabBar: "#FFFFFF",
+    // 底部分頁列（業主 2026-11-20 方案 1）：深綠實心底、白字，目前分頁是黃色膠囊。
+    navBar: "#0C603C",
+    navPill: "#F5C842",
+    navPillText: "#1F1A00",
   },
   dark: {
     background: "#121515",
@@ -44,6 +48,9 @@ const palettes = {
     success: "#4FA774",
     successSoft: "#1B3022",
     tabBar: "#171B1B",
+    navBar: "#14573A",
+    navPill: "#F2C063",
+    navPillText: "#1F1A00",
   },
 } as const;
 

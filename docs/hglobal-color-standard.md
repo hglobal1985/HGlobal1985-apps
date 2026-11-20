@@ -37,7 +37,9 @@
 | 危險底 | dangerSoft | `#fbeae8` | `#3c1e1c` |
 | 成功 | success | `#1b7a43` | `#4fa774` |
 | 成功底 | successSoft | `#e7f1ea` | `#1b3022` |
-| 底部分頁列 | tabBar | `#ffffff` | `#171b1b` |
+| 底部分頁列（舊，書櫃外已不用） | tabBar | `#ffffff` | `#171b1b` |
+| 底部分頁列底色（深綠實心） | navBar | `#0c603c` | `#14573a` |
+| 底部分頁列「目前分頁」黃色膠囊／膠囊上的字 | navPill／navPillText | `#f5c842`／`#1f1a00` | `#f2c063`／`#1f1a00` |
 | 亮黃標籤（只給「已付費」） | bright／onBright | `#ffd43b`／`#5a3b00` | `#f5c518`／`#2a1d00` |
 
 其他固定色：課程卡緞帶色表、資料編輯「儲存」按鈕（金黃底）、首頁品牌標題流動色階，見 `hglobal-tokens.json` 的 `ribbons`、`saveButton`、`brandFlow`。
