@@ -113,7 +113,7 @@ const fail = (status: number, code: string, message: string): never => {
 /** demo：模擬會員（rankCode 為示範獎銜）；central：中央會員（不持有獎銜，資格每次向中央查詢）。 */
 type SessionBase = { sub: string; name: string; role: "student" | "admin"; roles: string[]; hglobal: boolean; center: { key: string; label: string } | null };
 type Session = SessionBase & ({ kind: "demo"; rankCode: string } | { kind: "central"; token: string; avatarUrl: string | null; rankValue?: string | null; rankLabel?: string });
-type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; touched?: string; /** 品牌 logo（組課程封面用，列表／詳情載入）。 */ brands?: BrandRow[]; /** 清單的區塊（顯示在上拉選單的）：courseId → 區塊。 */ blocks?: Map<string, SheetBlock[]>; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
+type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientPlatform; session: Session | null; /** 回應送出後才做的背景工作（沒有執行環境時為 undefined，呼叫端就改成等它做完）。 */ defer?: (p: Promise<unknown>) => void; touched?: string; /** 品牌 logo（組課程封面用，列表／詳情載入）。 */ brands?: BrandRow[]; /** 清單的區塊（顯示在上拉選單的）：courseId → 區塊。 */ blocks?: Map<string, SheetBlock[]>; /** 中心縮寫（centerKey → slug），列表／詳情組課程網址用。 */ centerSlugs?: Map<string, string>; seriesSlugs?: Map<string, string> };
 
 type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; bg_color_dark: string | null; categories: string; art_version: number };
 const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, bg_color_dark, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
@@ -3900,14 +3900,23 @@ const routes: [string, RegExp, Handler][] = [
         await ensureCentersReconciled(ctx.db, saved);
         return saved;
       }
-      const list = await centerList(s.token);
-      if (!list.length) {
-        if (saved.length) return saved;
-        fail(503, "central_unavailable", "暫時無法取得會員中心的中心清單，請稍後再試");
+      const refresh = async (): Promise<string[]> => {
+        const list = await centerList(s.token);
+        if (!list.length) {
+          if (saved.length) return saved;
+          fail(503, "central_unavailable", "暫時無法取得會員中心的中心清單，請稍後再試");
+        }
+        await ensureCentersReconciled(ctx.db, list);
+        if (JSON.stringify(list) !== JSON.stringify(saved)) await ctx.db.prepare("INSERT INTO central_snapshots (key, value) VALUES ('centers', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list)).run();
+        return list;
+      };
+      // 速度（業主 2026-11-20：寰宇大學「教育中心」區塊比其他區塊晚約 2 秒才出現）：已有最近一次成功的副本就立刻回傳，
+      // 向中央確認最新清單、同步改名等工作放到背景（下次進來就是新的）；還沒有副本（第一次）才等中央。
+      if (saved.length && ctx.defer) {
+        ctx.defer(refresh().catch((e) => console.error("centers refresh", e instanceof Error ? e.message : "error")));
+        return saved;
       }
-      await ensureCentersReconciled(ctx.db, list);
-      if (JSON.stringify(list) !== JSON.stringify(saved)) await ctx.db.prepare("INSERT INTO central_snapshots (key, value) VALUES ('centers', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list)).run();
-      return list;
+      return refresh();
     },
   ],
   ["GET", /^\/courses\/([\w-]+)\/comments$/, async (ctx, [id]) => listComments(ctx, id)],
@@ -6148,6 +6157,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
     }
     const [, re, handler] = route!;
     const ctx = await context(req, env, url);
+    if (exec) ctx.defer = (p) => exec.waitUntil(p);
     const out = await handler(ctx, [...re.exec(path)!].slice(1));
     if (ctx.touched && ctx.session) await touchCourse(env.DB, ctx.touched, ctx.session).run().catch(() => undefined);
     res = out instanceof Response ? out : json(out);
