@@ -643,20 +643,29 @@ export async function reportIntegration(token: string): Promise<void> {
  * 回傳 undefined＝這次中央沒有回應（整批「未提供」）。
  */
 export type Upline = { platinum: string | null; diamond: string | null };
+/** 最近一次讀不到上手資料的原因（只有狀態碼與中央的錯誤代碼，不含任何會員資料；報名名單畫面顯示給管理者除錯用）。 */
+export let lastUplineError = "";
 export async function lookupUplines(secret: string | undefined, subs: string[]): Promise<Map<string, Upline> | undefined> {
   const out = new Map<string, Upline>();
   const ids = [...new Set(subs)].slice(0, 5000);
   const need: string[] = [];
   const now = Date.now();
+  lastUplineError = "";
   for (const id of ids) {
     const hit = memo.get(`upl:${id}`);
     if (hit && hit.until > now) out.set(id, hit.value as Upline);
     else need.push(id);
   }
   if (!need.length) return out;
-  if (!secret) return undefined;
+  if (!secret) {
+    lastUplineError = "沒有設定中央服務金鑰（CENTRAL_SERVICE_SECRET）";
+    return undefined;
+  }
   const token = await serviceToken(secret);
-  if (!token) return undefined;
+  if (!token) {
+    lastUplineError = "向中央取得服務 Token 失敗";
+    return undefined;
+  }
   let failed = false;
   for (let i = 0; i < need.length; i += 100) {
     const chunk = need.slice(i, i + 100);
@@ -672,9 +681,12 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
       if (res.status === 401) svcToken = null;
       if (!res.ok) {
         failed = true;
+        const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
+        lastUplineError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}`;
         continue;
       }
       const b = (await res.json().catch(() => null)) as { members?: unknown[]; not_found?: unknown[] } | null;
+      if (!Array.isArray(b?.members)) lastUplineError = "中央回傳的格式不是預期的（沒有 members 清單）";
       const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : null);
       const notFound = new Set((b?.not_found ?? []).filter((x): x is string => typeof x === "string"));
       for (const raw of b?.members ?? []) {
@@ -690,6 +702,7 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
       for (const id of notFound) out.set(id, { platinum: null, diamond: null });
     } catch {
       failed = true;
+      lastUplineError = "連線逾時或失敗";
     }
   }
   return failed && !out.size ? undefined : out;

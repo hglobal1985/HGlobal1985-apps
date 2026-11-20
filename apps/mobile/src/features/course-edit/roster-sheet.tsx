@@ -99,7 +99,7 @@ export function RosterSheet({ course, onClose }: { course: CourseDetail; onClose
       <Button variant="secondary" label="匯出 CSV（全部名單）" icon="download-outline" loading={busy} disabled={busy} onPress={exportCsv} fullWidth />
       {roster.loading && !d ? <LoadingLadybug /> : null}
       {roster.error ? <AppText tone="danger">{roster.error}</AppText> : null}
-      {d && !d.uplineAvailable && d.rows.length ? <AppText variant="caption" tone="muted">上手白金、上手鑽石暫時無法取得（中央沒有回應），先顯示「未提供」。</AppText> : null}
+      {d && !d.uplineAvailable && d.rows.length ? <AppText variant="caption" tone="muted">上手白金、上手鑽石暫時無法取得（中央沒有回應），先顯示「未提供」。{d.uplineError ? `原因：${d.uplineError}` : ""}</AppText> : null}
       {d && !d.rows.length ? <AppText tone="muted" style={{ textAlign: "center", paddingVertical: space.lg }}>目前沒有符合的報名。</AppText> : null}
       {d?.rows.map((r) => (
         <Card key={r.orderId} style={{ gap: space.xs }}>
