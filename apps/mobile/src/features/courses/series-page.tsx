@@ -19,6 +19,8 @@ import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
 import { CourseRow } from "./course-row";
 import { SeriesCardTile } from "./series-card-tile";
+import { SeriesCardPanel } from "./series-card-panel";
+import { ExpandGrid } from "./expand-grid";
 import { useSeriesSettings } from "./series-settings";
 import { seriesOrdered } from "./sort";
 import { useCoverStats } from "./cover-stats";
@@ -183,11 +185,24 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     items.length ? (
       <View style={{ gap: space.sm }}>
         {section(title, items.length)}
-        <View style={styles.grid}>
-          {tileW(cols)
-            ? items.map((x, i) => <SeriesCardTile key={x.id} course={x} width={tileW(cols)} editing={editing} canBack={i > 0} canForward={i < items.length - 1} onMove={(d) => move(items, i, d)} onToggleHide={() => toggleHide(x)} />)
-            : null}
-        </View>
+        {editing ? (
+          // 編輯模式：維持原本的排序／隱藏控制，點卡直接進詳細頁
+          <View style={styles.grid}>
+            {tileW(cols)
+              ? items.map((x, i) => <SeriesCardTile key={x.id} course={x} width={tileW(cols)} editing canBack={i > 0} canForward={i < items.length - 1} onMove={(d) => move(items, i, d)} onToggleHide={() => toggleHide(x)} />)
+              : null}
+          </View>
+        ) : (
+          // 一般檢視：點一張卡，在那一列下方原地展開它的教材，其他卡淡化（共用 ExpandGrid，業主 2026-11-20）
+          <ExpandGrid
+            items={items}
+            keyOf={(x) => x.id}
+            cols={() => cols}
+            gap={GAP}
+            renderCell={(x, { on, dimmed, toggle, width }) => <SeriesCardTile course={x} width={width} selected={on} dimmed={dimmed} onPress={toggle} />}
+            renderPanel={(x) => <SeriesCardPanel course={x} />}
+          />
+        )}
       </View>
     ) : null;
   return (

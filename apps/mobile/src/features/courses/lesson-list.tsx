@@ -2,7 +2,7 @@ import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
 import { useThumb } from "@/lib/thumb";
 import { BLOCK_BEHAVIOR } from "@/features/courses/block-module";
 import { trackFeature } from "@/lib/feature-track";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image, Linking, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
@@ -21,6 +21,7 @@ import { flashText } from "@/ui/flash-notice";
 import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead, SpeakerMark } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
+import { ExpandGrid } from "./expand-grid";
 
 /**
  * 章節清單（學員看到的樣子）：課程介紹頁與中心頁「點課程彈出的選單」共用同一個元件，
@@ -84,8 +85,6 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
   const { c } = useTheme();
   const isBlocks = course.lessons.some((l) => l.section);
   // 清單的區塊：預設全部收起（業主 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
-  const [openId, setOpenId] = useState<string | null>(openBlock ?? null);
-  const [gridW, setGridW] = useState(0);
   useEffect(() => {
     if (!openBlock || typeof document === "undefined") return;
     const t = setTimeout(() => document.getElementById(`blk-${openBlock}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
@@ -143,9 +142,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
     const leadShown = lead.filter(shown);
     if (!visibleBlocks.length && !leadShown.length && !full.length) return null;
     // 欄數隨螢幕寬度自動變：手機 2 欄，越寬越多，最多 5 欄（業主 2026-11-18）。
-    const cols = BLOCK_BEHAVIOR.columns(gridW);
     const GAP = space.sm;
-    const cell = gridW ? Math.floor((gridW - GAP * (cols - 1)) / cols) : 0;
     if (layout === "detail") {
       return (
         <View style={{ gap: space.sm }}>
@@ -165,59 +162,45 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
         </View>
       );
     }
-    const rows: (typeof visibleBlocks)[] = [];
-    for (let i = 0; i < visibleBlocks.length; i += cols) rows.push(visibleBlocks.slice(i, i + cols));
     return (
       <View style={{ gap: space.sm }}>
         {leadShown.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{leadShown.map(itemRow)}</Card> : null}
-        <View style={{ gap: GAP }} onLayout={(e) => setGridW(Math.floor(e.nativeEvent.layout.width))}>
-          {cell
-            ? rows.map((row, ri) => {
-                const opened = row.find((b) => b.head.id === openId);
-                return (
-                  <View key={ri} style={{ gap: GAP }}>
-                    <View style={{ flexDirection: "row", gap: GAP }}>
-                      {row.map((b) => {
-                        const on = b.head.id === openId;
-                        return (
-                          <Pressable key={b.head.id} nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={() => setOpenId(on ? null : b.head.id)} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, (openId && !on) || !b.items.some(shown) ? fadedStyle : null, pressed && { opacity: 0.75 }]}>
-                            <View style={{ width: cell, aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: on ? 3 : 1, borderColor: on ? c.accent : c.border }}>
-                              {b.head.coverUrl ? (
-                                <Image source={{ uri: thumb(resolveUrl(b.head.coverUrl), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
-                              ) : b.head.brand ? (
-                                <BrandCover brand={b.head.brand} fill />
-                              ) : (
-                                // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
-                                <CourseCover theme="" label="" title={b.head.title} fill />
-                              )}
-                              {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
-                              <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
-                                <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
-                                  {b.items.filter(shown).length}
-                                </AppText>
-                                <Ionicons name={on ? "chevron-up" : "chevron-down"} size={12} color={c.textOnAccent} />
-                              </View>
-                            </View>
-                            <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontWeight: "800", color: on ? c.accentText : c.text }}>
-                              {b.head.title}
-                            </AppText>
-                          </Pressable>
-                        );
-                      })}
-                      {Array.from({ length: cols - row.length }, (_, k) => (
-                        <View key={`pad${k}`} style={{ width: cell }} />
-                      ))}
-                    </View>
-                    {opened ? (
-                      <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-                        {opened.items.filter(shown).length ? opened.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
-                      </Card>
-                    ) : null}
-                  </View>
-                );
-              })
-            : null}
-        </View>
+        <ExpandGrid
+          items={visibleBlocks}
+          keyOf={(b) => b.head.id}
+          cols={BLOCK_BEHAVIOR.columns}
+          gap={GAP}
+          defaultOpenId={openBlock}
+          renderCell={(b, { on, dimmed, toggle, width: cell }) => (
+            <Pressable nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={toggle} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, dimmed || !b.items.some(shown) ? fadedStyle : null, pressed && { opacity: 0.75 }]}>
+              <View style={{ width: cell, aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: on ? 3 : 1, borderColor: on ? c.accent : c.border }}>
+                {b.head.coverUrl ? (
+                  <Image source={{ uri: thumb(resolveUrl(b.head.coverUrl), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                ) : b.head.brand ? (
+                  <BrandCover brand={b.head.brand} fill />
+                ) : (
+                  // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
+                  <CourseCover theme="" label="" title={b.head.title} fill />
+                )}
+                {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
+                <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
+                  <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
+                    {b.items.filter(shown).length}
+                  </AppText>
+                  <Ionicons name={on ? "chevron-up" : "chevron-down"} size={12} color={c.textOnAccent} />
+                </View>
+              </View>
+              <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontWeight: "800", color: on ? c.accentText : c.text }}>
+                {b.head.title}
+              </AppText>
+            </Pressable>
+          )}
+          renderPanel={(b) => (
+            <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+              {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
+            </Card>
+          )}
+        />
         {full.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{full.map(itemRow)}</Card> : null}
       </View>
     );
