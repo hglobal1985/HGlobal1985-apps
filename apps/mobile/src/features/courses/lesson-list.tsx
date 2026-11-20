@@ -22,6 +22,8 @@ import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead, SpeakerMark } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 import { ExpandGrid } from "./expand-grid";
+import { MaterialRow, RowShare } from "./material-rows";
+export { RowShare } from "./material-rows";
 
 /**
  * 章節清單（學員看到的樣子）：課程介紹頁與中心頁「點課程彈出的選單」共用同一個元件，
@@ -63,19 +65,6 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
   );
 }
 
-/** 教材標了「主題」（業主 2026-11-19）：圖示右下角加學士帽小徽章；沒有自訂圖示時用預設播放圖示加徽章。 */
-function themeBadge(lesson: Lesson, icon: React.ReactElement | undefined, color: string): React.ReactElement | undefined {
-  if (!lesson.isSpeaker || lesson.full) return icon;
-  return (
-    <View style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center" }}>
-      {icon ?? <Ionicons name={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"} size={32} color={color} />}
-      <View style={{ position: "absolute", right: -6, bottom: -6, backgroundColor: "#fff", borderRadius: 11, padding: 2 }}>
-        <SpeakerMark size={14} />
-      </View>
-    </View>
-  );
-}
-
 /**
  * 「其他教材」區塊的清單：外部連結教材（業主 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
@@ -94,39 +83,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
   const all = course.lessons.filter((l) => l.material);
   // 學員只看得到「有內容的項目」；區塊底下沒有任何可看項目就整個隱藏（管理者全部都看得到）。
   const shown = (l: Lesson) => l.ready || canEdit;
-  const itemRow = (lesson: Lesson) => {
-    const link = lesson.linkType && !lesson.full ? lesson : null;
-    return (
-      <ListRow
-        key={lesson.id}
-        icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-        leading={themeBadge(lesson, lesson.iconType && !lesson.locked ? <BrandIcon type={lesson.iconType} fallback={TYPE_INFO[lesson.iconType].icon as never} size={36} /> : undefined, c.accent)}
-        compact
-        playing={!link && playingId === lesson.id}
-        playingLesson={lesson.id}
-        highlight={!link && playingId === lesson.id}
-        note=""
-        title={lesson.title}
-        titleLines={course.isList ? 2 : undefined}
-        dateChip={course.isList && lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined}
-        subtitle={course.isList ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
-        right={link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : course.isList && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
-        onPress={
-          link
-            ? link.linkUrl
-              ? isDownloadUrl(link.linkUrl)
-                ? () => (trackFeature("open_material"), void downloadMaterial(link.linkUrl!))
-                : () => (trackFeature("open_material"), void Linking.openURL(link.linkUrl!).catch(() => flashText("無法開啟連結")))
-              : undefined
-            : lesson.locked
-              ? undefined
-              : playingId === lesson.id
-                ? () => engine.toggle()
-                : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))
-        }
-      />
-    );
-  };
+  const itemRow = (lesson: Lesson) => <MaterialRow key={lesson.id} course={course} lesson={lesson} playingId={playingId} onPlay={onPlay} />;
   if (isBlocks) {
     // 切成：區塊前面沒歸區塊的項目＋各區塊（標題＋底下的項目）。
     const lead: Lesson[] = [];
@@ -208,29 +165,6 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
   const rows: Lesson[] = all.filter(shown);
   if (!rows.length) return null;
   return <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{rows.map(itemRow)}</Card>;
-}
-
-/** 清單每列最右側的「分享」小按鈕（系統預設分享圖示）。 */
-export function RowShare({ label, onShare }: { label: string; onShare: () => Promise<"shared" | "copied" | "cancelled"> }) {
-  const { c } = useTheme();
-  const press = async () => {
-    if ((await onShare()) === "copied") flashText("已複製連結");
-  };
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={6} style={({ pressed }) => [{ width: 34, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
-      <ShareIcon size={22} color={c.accent} />
-    </Pressable>
-  );
-}
-
-/** 教材最右側的「分享」鈕：分享出去的是外部連結本身（文字範本見「設定 > 分享預設值」的教材分享文字）。 */
-function MaterialShare({ course, lesson }: { course: CourseDetail; lesson: Lesson }) {
-  return <RowShare label={`分享教材：${lesson.title}`} onShare={() => shareLink(lesson.title, lesson.linkUrl!, { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }, { title: lesson.title })} />;
-}
-
-/** 清單卡裡每段影片最右側的「分享」鈕：網址＝清單網址?N（點開直接播放這一段），文字用「設定 > 分享預設值」的清單影片範本。 */
-function ListItemShare({ course, lesson }: { course: CourseDetail; lesson: Lesson }) {
-  return <RowShare label={`分享影片：${lesson.title}`} onShare={() => shareLink(lesson.title, lessonShareHref(course, lesson.position), undefined, undefined, undefined, { title: course.title, item: lesson.title })} />;
 }
 
 /** 章節最右側的「分享」鈕：分享這一堂（網址帶 ?lesson=，點開直接停在這一堂）；分享者姓名、職稱、章節名稱一律取這一堂章節自己的設定，不用課程的。 */
