@@ -85,3 +85,26 @@ test("上手白金／鑽石：一次最多 100 筆、依中央格式讀取、10 
   mode = "ok";
   assert.equal((await lookupUplines("secret", ["fresh1"]))?.get("fresh1")?.platinum, "白金-fresh1");
 });
+
+test("上手資料：中央說某個會員編號格式不合（422 member_ids.N）就剔除那一筆、其餘重送，不害整批拿不到", async () => {
+  const sent: string[][] = [];
+  setCentralFetch(async (url, init) => {
+    const ok = (b: unknown) => new Response(JSON.stringify(b), { status: 200 });
+    if (url.endsWith("/v1/service/token")) return ok({ access_token: "svc2", expires_in: 300 });
+    if (url.endsWith("/v1/apps/learn/members/lookup")) {
+      const ids = (JSON.parse(String(init?.body)) as { member_ids: string[] }).member_ids;
+      sent.push(ids);
+      const bad = ids.findIndex((x) => x.startsWith("bad"));
+      if (bad >= 0) return new Response(JSON.stringify({ error: { code: "invalid_field", message: "Invalid request", details: { field_key: `member_ids.${bad}`, reason: "invalid_string" } } }), { status: 422 });
+      return ok({ members: ids.map((id) => ({ member_id: id, fields: { upline_platinum: `白-${id}`, upline_diamond: null } })), not_found: [] });
+    }
+    return new Response("{}", { status: 404 });
+  });
+  const got = await lookupUplines("secret", ["u1", "u2", "bad-a", "u3", "bad-b"]);
+  assert.ok(got, "有剔除壞編號後仍成功");
+  assert.deepEqual(got!.get("u3"), { platinum: "白-u3", diamond: null });
+  assert.deepEqual(got!.get("bad-a"), { platinum: null, diamond: null });
+  assert.deepEqual(got!.get("bad-b"), { platinum: null, diamond: null });
+  assert.equal(sent.length, 3, "第一次送 5 筆、剔除一筆重送、再剔除一筆重送");
+  assert.deepEqual(sent[2], ["u1", "u2", "u3"]);
+});
