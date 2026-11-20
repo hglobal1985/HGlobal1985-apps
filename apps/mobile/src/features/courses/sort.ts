@@ -81,7 +81,7 @@ export function collapseSeries(list: CourseSummary[], all: CourseSummary[]): Ser
 }
 
 /** 課程在卡片、封面、首頁上顯示的名稱：有系列就顯示系列名稱，沒有系列才顯示課程名稱（「未分類」不是真正的系列，一律顯示課程名稱，業主 2026-11-20）。 */
-export const displayName = (c: { series: string; title: string }): string => (textCoverLines(c.title) || c.series === UNCATEGORIZED ? c.title : c.series || c.title);
+export const displayName = (c: { series: string; title: string }): string => c.title; // 課程卡封面文字一律用課程標題，不用系列名稱（業主 2026-11-21）
 
 /** 一群梯次裡「日期最近」的那一場：還沒結束的取最近的，都結束了取最近結束的；沒有日期的最後才用。緞帶文字以它為準。 */
 export function nearestOf(list: CourseSummary[]): CourseSummary {

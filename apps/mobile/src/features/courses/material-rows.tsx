@@ -37,7 +37,8 @@ function themeBadge(lesson: Lesson, icon: React.ReactElement | undefined, color:
   );
 }
 
-export function MaterialRow({ course, lesson, listStyle, playingId, onPlay }: { course: CourseDetail; lesson: Lesson; listStyle?: boolean; playingId?: string | null; onPlay?: (lessonId: string) => void }) {
+/** `onBlockedPress`：這一列沒有權限（鎖住、沒有連結）時點下去的動作；系列頁展開內容用它跳到該課程詳細頁（業主 2026-11-21）。 */
+export function MaterialRow({ course, lesson, listStyle, playingId, onPlay, onBlockedPress }: { course: CourseDetail; lesson: Lesson; listStyle?: boolean; playingId?: string | null; onPlay?: (lessonId: string) => void; onBlockedPress?: () => void }) {
   const { c } = useTheme();
   const ls = listStyle ?? course.isList;
   const link = lesson.linkType && !lesson.full ? lesson : null;
@@ -56,7 +57,7 @@ export function MaterialRow({ course, lesson, listStyle, playingId, onPlay }: { 
       subtitle={ls ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
       right={link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : ls && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
       onPress={
-        link
+        (link
           ? link.linkUrl
             ? isDownloadUrl(link.linkUrl)
               ? () => (trackFeature("open_material"), void downloadMaterial(link.linkUrl!))
@@ -66,20 +67,20 @@ export function MaterialRow({ course, lesson, listStyle, playingId, onPlay }: { 
             ? undefined
             : playingId === lesson.id
               ? () => engine.toggle()
-              : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))
+              : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))) ?? onBlockedPress
       }
     />
   );
 }
 
 /** 這份課程所有教材排成一張卡（不顯示區塊標題；學員只看得到有內容的項目，管理者全部都看得到）。沒有任何教材回 null。 */
-export function MaterialRows({ course, listStyle = true, playingId, onPlay }: { course: CourseDetail; listStyle?: boolean; playingId?: string | null; onPlay?: (lessonId: string) => void }) {
+export function MaterialRows({ course, listStyle = true, playingId, onPlay, onBlockedPress }: { course: CourseDetail; listStyle?: boolean; playingId?: string | null; onPlay?: (lessonId: string) => void; onBlockedPress?: () => void }) {
   const items = course.lessons.filter((l) => l.material && !l.section && !l.full && (l.ready || course.can?.edit));
   if (!items.length) return null;
   return (
     <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
       {items.map((l) => (
-        <MaterialRow key={l.id} course={course} lesson={l} listStyle={listStyle} playingId={playingId} onPlay={onPlay} />
+        <MaterialRow key={l.id} course={course} lesson={l} listStyle={listStyle} playingId={playingId} onPlay={onPlay} onBlockedPress={onBlockedPress} />
       ))}
     </Card>
   );

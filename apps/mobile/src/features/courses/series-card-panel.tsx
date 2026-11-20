@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { View } from "react-native";
 import type { CourseDetail, CourseSummary } from "@/api/client";
 import { useApi } from "@/state/session";
@@ -12,6 +13,7 @@ import { MaterialRows } from "./material-rows";
  */
 export function SeriesCardPanel({ course }: { course: CourseSummary }) {
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${course.id}`);
+  const goCourse = () => router.push(`/course/${course.id}`); // 沒有權限時點任何教材標題，都跳到該課程詳細頁（業主 2026-11-21）
   const hasChapters = !!data?.lessons.some((l) => !l.material);
   const hasMaterials = !!data?.lessons.some((l) => l.material && !l.section && !l.full && (l.ready || data.can?.edit));
   return (
@@ -20,8 +22,8 @@ export function SeriesCardPanel({ course }: { course: CourseSummary }) {
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {data ? (
         <>
-          {hasChapters || !hasMaterials ? <ChapterList course={data} /> : null}
-          <MaterialRows course={data} />
+          {hasChapters || !hasMaterials ? <ChapterList course={data} onBlockedPress={goCourse} /> : null}
+          <MaterialRows course={data} onBlockedPress={goCourse} />
         </>
       ) : null}
     </View>

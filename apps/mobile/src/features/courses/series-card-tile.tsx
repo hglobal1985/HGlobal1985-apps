@@ -7,7 +7,7 @@ import { useUiConfig } from "@/state/ui-config";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius } from "@/theme/tokens";
-import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
+import { AppText, BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { fadedStyle } from "@/ui/fade-style";
 import { CardCount } from "@/ui/card-count";
 import { ribbonsFor } from "./ribbons";
@@ -60,6 +60,10 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
           </View>
         ) : null}
       </Pressable>
+      {/* 縮圖下方顯示課程標題，太長就「…」（業主 2026-11-21） */}
+      <AppText variant="callout" numberOfLines={1} style={{ fontWeight: "700" }}>
+        {course.title}
+      </AppText>
       {editing ? (
         <View style={{ flexDirection: "row", gap: 6 }}>
           {btn("b", `${course.title} 往前移`, "chevron-back", !canBack, () => onMove?.(-1))}
