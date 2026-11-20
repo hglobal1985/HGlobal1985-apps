@@ -368,6 +368,8 @@ export type Roster = {
   pageSize: number;
   /** 中央有沒有回應上手資料（false＝這一頁的上手欄位顯示「未提供」）。 */
   uplineAvailable: boolean;
+  /** 讀不到上手資料的原因（狀態碼或錯誤代碼，除錯用）。 */
+  uplineError?: string;
 };
 /** 系列「套用到全系列課程」（業主 2026-11-20）：可以套用的欄位（鍵＝課程儲存 API 的欄位名），依課程設定的大項分組；新增欄位只加在這一張表。 */
 export const SERIES_APPLY_GROUPS = [
