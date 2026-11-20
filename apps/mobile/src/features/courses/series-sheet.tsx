@@ -2,7 +2,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useThumb } from "@/lib/thumb";
 import { router } from "expo-router";
 import { Image, StyleSheet, View } from "react-native";
-import { resolveUrl, type CourseSummary } from "@/api/client";
+import { resolveUrl, type CourseDetail, type CourseSummary } from "@/api/client";
+import { BrandIcon } from "@/ui/brand-icon";
+import { TYPE_INFO } from "@/features/link-types";
+import { ErrorView, LoadingLadybug } from "@/ui";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
@@ -71,6 +74,44 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
             }
             title={b.title}
             count={b.count}
+          />
+        ))}
+      </SheetScroll>
+      <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
+    </BottomSheet>
+  );
+}
+
+/**
+ * 系列裡只有一張教材卡時的上拉選單（業主 2026-11-20）：內容＝這張卡自己的內容，順序「區塊 > 教材」二者則一——
+ * 有區塊就用 BlockSheet（呼叫端判斷），沒有區塊就列出教材；點一列進這張卡的頁面。
+ */
+export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
+  const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${course.id}`);
+  const open = () => {
+    onClose();
+    router.push(`/course/${course.id}`);
+  };
+  const items = (data?.lessons ?? []).filter((l) => l.material && !l.section && !l.full && (l.ready || data?.can?.edit));
+  return (
+    <BottomSheet onClose={onClose} onExpand={open} expandLabel="繼續上拉進入完整內容">
+      <View style={styles.head}>
+        <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
+          {course.title}
+        </AppText>
+        <SheetAction label="完整內容" accessibilityLabel={`進入「${course.title}」完整內容`} onPress={open} />
+      </View>
+      <SheetScroll>
+        {loading && !data ? <LoadingLadybug /> : null}
+        {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
+        {data && items.length === 0 ? <AppText tone="muted">目前還沒有教材</AppText> : null}
+        {items.map((l) => (
+          <SheetRow
+            key={l.id}
+            accessibilityLabel={l.title}
+            onPress={open}
+            leading={<SheetThumb>{l.iconType ? <BrandIcon type={l.iconType} fallback={TYPE_INFO[l.iconType].icon as never} size={36} /> : <Ionicons name="play-circle-outline" size={32} />}</SheetThumb>}
+            title={l.title}
           />
         ))}
       </SheetScroll>

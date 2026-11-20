@@ -10,7 +10,7 @@ import { radius } from "@/theme/tokens";
 import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
-import { BlockSheet, SeriesSheet } from "./series-sheet";
+import { BlockSheet, MaterialsSheet, SeriesSheet } from "./series-sheet";
 import { useSeriesSettings } from "./series-settings";
 import { nearestOf, type SeriesGroup } from "./sort";
 
@@ -65,6 +65,8 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   const inSeries = !flat && !!rep.series && sessions.length >= 2;
   // 只要有系列（中心卡除外），不論裡面幾張卡，點了一律先彈上拉選單（業主 2026-11-20：單張卡的系列也要有）。封面顯示仍用 inSeries。
   const hasSeries = !flat && !!rep.series;
+  // 系列裡只有一張教材卡：上拉選單直接顯示這張卡的內容，「區塊 > 教材」二者則一（業主 2026-11-20）；兩張以上才是梯次／卡片清單。
+  const soloSeries = hasSeries && sessions.length === 1;
   // 平鋪（flat，中心頁）：統一用直式 4:3 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始；圖太小／太矮就完整顯示，用同一張圖模糊填滿背景）；沒有 EDM 才退回封面。
   // 第一層的卡（業主 2026-11-19 更正：指定的封面裁切位置沒生效）：
   // 系列卡＝系列的封面（橫式裁切）；單張卡／獨立清單卡＝這張卡自己裁好的封面 > 系列封面 > EDM（照「預設顯示位置」從該處開始顯示）。中心頁（flat）照舊。
@@ -106,9 +108,10 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
           </View>
         ) : null}
       </Pressable>
-      {sheet && hasSeries ? <SeriesSheet title={settings.titleOf(rep.series)} items={sessions} showAllSeries={rep.series} onClose={() => setSheet(false)} /> : null}
+      {sheet && hasSeries && !soloSeries ? <SeriesSheet title={settings.titleOf(rep.series)} items={sessions} showAllSeries={rep.series} onClose={() => setSheet(false)} /> : null}
       {sheet && flat ? <CourseLessonsSheet course={rep} onClose={() => setSheet(false)} /> : null}
-      {sheet && !flat && !hasSeries && soloList && rep.blocks.length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : null}
+      {sheet && !flat && (soloSeries || soloList) && rep.blocks.length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : null}
+      {sheet && soloSeries && !rep.blocks.length ? <MaterialsSheet course={rep} onClose={() => setSheet(false)} /> : null}
     </View>
   );
 }
