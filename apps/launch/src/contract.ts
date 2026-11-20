@@ -106,7 +106,7 @@ export function textCoverLines(title: string | null | undefined): string[] | nul
 /** 寰宇大學「所有系列」檢視的三個專區（業主 2026-11-18）。空字串＝沒指定：課程放 hglobal、清單放 amway_material。 */
 export type Zone = "hglobal" | "amway_material" | "amway_brand";
 export const ZONES: { id: Zone; label: string }[] = [
-  { id: "hglobal", label: "寰宇課程/活動/清單" },
+  { id: "hglobal", label: "寰宇課程與活動" },
   { id: "amway_material", label: "安麗官方清單專區" },
   { id: "amway_brand", label: "安麗品牌專區" },
 ];
