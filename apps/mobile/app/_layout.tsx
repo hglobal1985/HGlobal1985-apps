@@ -20,6 +20,7 @@ import { CenterNamesProvider } from "@/state/center-names";
 import { SessionProvider } from "@/state/session";
 import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
+import { installBottomGap } from "@/lib/bottom-gap";
 import { useLayout } from "@/theme/layout";
 import { UpdateNotice } from "@/features/update-notice";
 import { BottomBar, InAppBrowserBanner, TopBar, TopBarShadow } from "@/ui";
@@ -96,6 +97,7 @@ function StatusBarCover() {
 export default function RootLayout() {
   const { scheme, c } = useTheme();
   useEffect(() => installNoPageZoom(), []);
+  useEffect(() => installBottomGap(), []);
   useEffect(() => installWebPullRefresh(), []);
   useEffect(() => installStableScrollbar(), []);
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
