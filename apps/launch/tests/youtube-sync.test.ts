@@ -165,10 +165,10 @@ test("同步排序規則：放最後面、手動鎖定後不重排（業主 2026
     return (await db.prepare("SELECT id FROM lessons WHERE course_id = 'c1' ORDER BY position").all<{ id: string }>()).results.map((r) => (r.id.startsWith("old") ? r.id : "new"));
   };
   assert.deepEqual(await run("date_desc", 0), ["old2", "new", "old1"]); // 自動：整張依日期重排
-  assert.deepEqual(await run("date_desc", 1), ["new", "old1", "old2"]); // 已鎖定：手動順序不動，新影片放最上面
+  assert.deepEqual(await run("date_desc", 1), ["new", "old1", "old2"]); // 已鎖定：手動順序不動，新影片依日期插入（2025 比 old1 的 2020 新，插在它前面）
   assert.deepEqual(await run("top", 0), ["new", "old1", "old2"]); // 放最上面，其餘不動
   assert.deepEqual(await run("bottom", 0), ["old1", "old2", "new"]); // 放最後面，其餘不動
-  assert.deepEqual(await run("bottom", 1), ["new", "old1", "old2"]); // 鎖定時一律放最上面且不重排
+  assert.deepEqual(await run("bottom", 1), ["old1", "old2", "new"]); // 使用者明確選「放最後面」就照選的放，不重排
 });
 
 test("手動調整教材順序後，這張卡的同步自動鎖定", async () => {
@@ -192,4 +192,31 @@ test("手動調整教材順序後，這張卡的同步自動鎖定", async () =>
   const st = await db.prepare("SELECT sort_locked, sort_mode FROM youtube_syncs WHERE id = 's1'").first<{ sort_locked: number; sort_mode: string }>();
   assert.equal(st?.sort_locked, 0);
   assert.equal(st?.sort_mode, "top");
+});
+
+test("已手動排序（鎖定）的卡：新影片依日期插入正確位置，其餘順序完全不動（業主 2026-11-20）", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
+  const q = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+  await q("INSERT INTO courses (id, title, status) VALUES ('c1', 'A', 'published')");
+  await q("INSERT INTO youtube_syncs (id, url, playlist_id, course_id, title_prefix, title_format, sort_mode, sort_locked) VALUES ('s1', 'u', 'PLX', 'c1', 'A', '{年}年{月}月{日}日 A', 'date_desc', 1)");
+  // 使用者手動排好的順序（不是依日期）：2026、2020、2024
+  await q("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, kind, event_date) VALUES ('a', 'c1', 1, 'a', 0, 'youtube', 'AAA11111111', 'material', '2026-01-01'), ('b', 'c1', 2, 'b', 0, 'youtube', 'BBB11111111', 'material', '2020-01-01'), ('c', 'c1', 3, 'c', 0, 'youtube', 'CCC11111111', 'material', '2024-01-01')");
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (u: string | URL | Request) =>
+    String(u).includes("playlistItems")
+      ? new Response(JSON.stringify({ items: [
+          { snippet: { title: "n1" }, contentDetails: { videoId: "N1111111111", videoPublishedAt: "2027-06-01T01:00:00Z" } }, // 最新：放最上面
+          { snippet: { title: "n2" }, contentDetails: { videoId: "N2222222222", videoPublishedAt: "2022-06-01T01:00:00Z" } }, // 比 2020 新：插在 2020 前面
+          { snippet: { title: "n3" }, contentDetails: { videoId: "N3333333333", videoPublishedAt: "2019-06-01T01:00:00Z" } }, // 最舊：放最後
+        ] }), { status: 200 })
+      : new Response("x", { status: 404 })) as typeof fetch;
+  try {
+    await runYoutubeSync(env, "s1");
+  } finally {
+    globalThis.fetch = real;
+  }
+  const order = (await db.prepare("SELECT id, title FROM lessons WHERE course_id = 'c1' ORDER BY position").all<{ id: string; title: string }>()).results.map((r) => (["a", "b", "c"].includes(r.id) ? r.id : r.title.slice(0, 4) + "新"));
+  // 手動順序 a(2026)、b(2020)、c(2024) 原樣保留；n1(2027) 在最上面；n2(2022) 插在第一個比它舊的 b(2020) 前面；n3(2019) 放教材最後
+  assert.deepEqual(order, ["2027新", "a", "2022新", "b", "c", "2019新"]);
 });
