@@ -219,17 +219,35 @@ export function playlistIdOf(input: string): string | null {
   }
 }
 
+/** 命名規則可用的代入欄位（設定頁顯示同一份說明）。 */
+export const SYNC_FORMAT_HELP = "可用：{年}、{月}、{日}（年月日，影片標題寫的優先，沒有就用影片日期）、{主持}（從標題判讀，判讀不到就連同它所在的括號一起省略）、{標題}（影片原標題）";
+
+/** 沒有填規則時的預設：「2026年11月 名稱（主持xxx）」。 */
+export const defaultSyncFormat = (name: string): string => `{年}年{月}月 ${name}（主持{主持}）`;
+
 /**
- * 同步清單產生的教材名稱（業主 2026-11-20）：「2026年11月 會長翡翠鑽石會議（主持王大明）」。
- * 年月先看影片標題裡寫的「2026年11月」，沒有就用影片日期；「主持」從標題判讀，判讀不到就不加括號。
+ * 同步清單產生的教材名稱（業主 2026-11-20）：依這份同步自己的「命名規則」代入。
+ * 例：規則「{年}年{月}月{日}日 王老師小線對焦」＋影片日期 2026-03-14 →「2026年3月14日 王老師小線對焦」。
+ * 年月先看影片標題裡寫的「2026年11月」，沒有就用影片日期；日期判讀不到的欄位連同後面的單位字（年／月／日）一起省略。
  */
-export function syncTitle(prefix: string, videoTitle: string, date: string | null): string {
+export function syncTitle(format: string, videoTitle: string, date: string | null): string {
   const t = videoTitle.replace(/\s+/g, " ");
-  const ym = /(\d{4})\s*年\s*(\d{1,2})\s*月/.exec(t);
-  const d = /^(\d{4})-(\d{2})/.exec(date ?? "");
-  const when = ym ? `${ym[1]}年${Number(ym[2])}月` : d ? `${d[1]}年${Number(d[2])}月` : "";
+  const ym = /(\d{4})\s*年\s*(\d{1,2})\s*月(?:\s*(\d{1,2})\s*[日號])?/.exec(t);
+  const d = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? "");
+  const year = ym ? ym[1]! : d ? d[1]! : "";
+  const month = ym ? String(Number(ym[2])) : d ? String(Number(d[2])) : "";
+  // 日：標題有寫就用；否則影片日期的月份與（標題或影片）月份一致時才用影片日期。
+  const day = ym?.[3] ? String(Number(ym[3])) : d && (!ym || Number(ym[2]) === Number(d[2])) ? String(Number(d[3])) : "";
   const host = /主持(?:人)?\s*[:：]?\s*([^\s（）()【】[\]|｜,，、/／\-－—~～]{1,8})/.exec(t)?.[1] ?? "";
-  return `${when ? `${when} ` : ""}${prefix}${host ? `（主持${host}）` : ""}`.trim();
+  return format
+    .replace(/[（(][^（）()]*\{主持\}[^（）()]*[）)]/g, (m) => (host ? m : ""))
+    .replace(/\{年\}\s*年?/g, year ? `${year}年` : "")
+    .replace(/\{月\}\s*月?/g, month ? `${month}月` : "")
+    .replace(/\{日\}\s*[日號]?/g, day ? `${day}日` : "")
+    .replace(/\{主持\}/g, host)
+    .replace(/\{標題\}/g, t)
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /**
@@ -238,7 +256,7 @@ export function syncTitle(prefix: string, videoTitle: string, date: string | nul
  */
 export async function runYoutubeSync(env: Env, syncId: string): Promise<{ imported: number; note: string }> {
   const db = env.DB;
-  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ id: string; url: string; playlist_id: string; course_id: string; title_prefix: string }>();
+  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string }>();
   if (!sync) return { imported: 0, note: "找不到這個同步設定" };
   const finish = async (out: { imported: number; note: string }) => {
     await db.prepare("UPDATE youtube_syncs SET last_synced_at = ?, last_imported = ?, last_note = ? WHERE id = ?").bind(new Date().toISOString(), out.imported, out.note.slice(0, 600), syncId).run();
@@ -255,7 +273,7 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   const ids = items.map(() => `${sync.course_id}-${short()}`);
   const lines: string[] = [];
   // 名稱一樣的教材才加日期（業主 2026-11-20）：同一批裡、或和這張卡原本就有的教材同名，就在名稱後面加「（月/日）」。
-  const base = items.map((it) => syncTitle(sync.title_prefix, it.title, it.date).slice(0, 120) || it.title);
+  const base = items.map((it) => syncTitle(sync.title_format || defaultSyncFormat(sync.title_prefix), it.title, it.date).slice(0, 120) || it.title);
   const existing = new Set((await db.prepare("SELECT title FROM lessons WHERE course_id = ?").bind(sync.course_id).all<{ title: string }>()).results.map((r) => r.title));
   const count = new Map<string, number>();
   for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
@@ -273,6 +291,36 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   );
   await placeOnTop(db, sync.course_id, ids);
   return finish({ imported: items.length, note: lines.join("\n").slice(0, 600) });
+}
+
+/**
+ * 依這份同步目前的命名規則，重新命名「已經匯入」的教材（業主 2026-11-20：改規則後，舊的也要跟著改）。
+ * 重新讀播放清單取得影片標題與日期，只改名稱、不動其他欄位；同名時一樣加「（月/日）」。
+ */
+export async function renameYoutubeSync(env: Env, syncId: string): Promise<{ renamed: number; note: string }> {
+  const db = env.DB;
+  const sync = await db.prepare("SELECT playlist_id, course_id, title_prefix, title_format FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ playlist_id: string; course_id: string; title_prefix: string; title_format: string }>();
+  if (!sync) return { renamed: 0, note: "找不到這個同步設定" };
+  if (!env.YOUTUBE_API_KEY) return { renamed: 0, note: "尚未設定 YouTube 金鑰" };
+  const read = await readPlaylist(env.YOUTUBE_API_KEY, sync.playlist_id, new Set());
+  if ("error" in read) return { renamed: 0, note: read.error };
+  const rows = (await db.prepare("SELECT id, media_ref, title FROM lessons WHERE course_id = ? AND kind = 'material' AND media_type = 'youtube' AND media_ref IS NOT NULL").bind(sync.course_id).all<{ id: string; media_ref: string; title: string }>()).results;
+  const byVideo = new Map(read.items.map((it) => [it.id, it]));
+  const targets = rows.filter((r) => byVideo.has(r.media_ref));
+  const fmt = sync.title_format || defaultSyncFormat(sync.title_prefix);
+  const base = targets.map((r) => syncTitle(fmt, byVideo.get(r.media_ref)!.title, byVideo.get(r.media_ref)!.date).slice(0, 120) || r.title);
+  const count = new Map<string, number>();
+  for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
+  const stmts = targets.flatMap((r, i) => {
+    let name = base[i]!;
+    if ((count.get(name) ?? 0) >= 2) {
+      const d = /^\d{4}-(\d{2})-(\d{2})/.exec(byVideo.get(r.media_ref)!.date ?? "");
+      if (d) name = `${name}（${Number(d[1])}/${Number(d[2])}）`;
+    }
+    return name === r.title ? [] : [db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(name, r.id)];
+  });
+  if (stmts.length) await db.batch(stmts);
+  return { renamed: stmts.length, note: stmts.length ? `已重新命名 ${stmts.length} 個教材` : "名稱都已經符合命名規則" };
 }
 
 /** 排程：還沒同步過的同步設定，自動做第一次同步（之後都是手動按「同步」；每次最多 2 份）。 */
