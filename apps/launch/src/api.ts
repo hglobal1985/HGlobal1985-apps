@@ -2776,6 +2776,8 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/health$/, async () => ({ ok: true })],
   ["GET", /^\/ranks$/, async (ctx) => [...(await ranks(ctx.db)).values()]],
   ["GET", /^\/config$/, async (ctx) => ({ demoLogin: demoEnabled(ctx.env) })],
+  // 正式站目前的程式版本（多個 AI 接手開發時，部署前用它確認自己的程式包含線上版本，才不會蓋掉別人的成果）。
+  ["GET", /^\/version$/, async (ctx) => ({ sha: ctx.env.GIT_SHA ?? null })],
   [
     "GET",
     /^\/demo-members$/,
@@ -5942,7 +5944,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
 }
 
 /** 不需要登入身分的公開路徑：不必為它們向會員中心查詢（首頁的公告、金句、設定每次都會打）。 */
-const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|central\/webhook|media\/(pub|img|file|audio|dl))(\?|$)/;
+const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|version|central\/webhook|media\/(pub|img|file|audio|dl))(\?|$)/;
 
 async function context(req: Request, env: Env, url: URL): Promise<Ctx> {
   const light = /^\/api\/v2\/me\/(central-profile|vocab)$/.test(url.pathname);

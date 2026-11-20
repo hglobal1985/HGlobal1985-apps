@@ -36,6 +36,8 @@ export interface R2Bucket {
 }
 export interface Env {
   DB: D1Database;
+  /** 這次部署的程式版本（git 提交編號，由 scripts/safe-deploy.mjs 部署時寫入）；GET /api/v2/version 回報，部署前用來確認不會蓋掉別人較新的版本。 */
+  GIT_SHA?: string;
   /** YouTube Data API 金鑰（Secret，由業主在 Cloudflare 後台設定）：補教材的影片長度與發布日期。沒設定就不補。 */
   YOUTUBE_API_KEY?: string;
   /** 從使用者自己的 Google 雲端硬碟匯入教材用（Google Picker，業主在 Cloudflare 後台設定；都是給瀏覽器用的公開值，沒有密鑰）：OAuth 用戶端 ID、API 金鑰（限制只能從 learn.hglobal1985.com 使用）、Google Cloud 專案編號。缺任何一個就不顯示這個來源。 */
