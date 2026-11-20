@@ -254,9 +254,19 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   const pos = await nextPos(db, sync.course_id);
   const ids = items.map(() => `${sync.course_id}-${short()}`);
   const lines: string[] = [];
+  // 名稱一樣的教材才加日期（業主 2026-11-20）：同一批裡、或和這張卡原本就有的教材同名，就在名稱後面加「（月/日）」。
+  const base = items.map((it) => syncTitle(sync.title_prefix, it.title, it.date).slice(0, 120) || it.title);
+  const existing = new Set((await db.prepare("SELECT title FROM lessons WHERE course_id = ?").bind(sync.course_id).all<{ title: string }>()).results.map((r) => r.title));
+  const count = new Map<string, number>();
+  for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
+  const names = base.map((n, i) => {
+    if ((count.get(n) ?? 0) < 2 && !existing.has(n)) return n;
+    const d = /^\d{4}-(\d{2})-(\d{2})/.exec(items[i]!.date ?? "");
+    return d ? `${n}（${Number(d[1])}/${Number(d[2])}）` : n;
+  });
   await db.batch(
     items.map((it, i) => {
-      const name = syncTitle(sync.title_prefix, it.title, it.date).slice(0, 120) || it.title;
+      const name = names[i]!;
       lines.push(`${name}｜${it.title}`);
       return db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, event_date, kind) VALUES (?, ?, ?, ?, 0, 'youtube', ?, ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.id, it.date);
     }),
