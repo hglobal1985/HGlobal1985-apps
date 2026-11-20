@@ -42,7 +42,9 @@ import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
-const ZONE_FOLD_KEY = "hglobal:learn:zone-collapsed"; // 各專區的收合狀態（業主 2026-11-18：預設展開，記住最後一次操作）
+// 各專區（含教育中心）的展開狀態（業主 2026-11-20）：預設全部收合；這次開啟 App／網頁期間記住使用者最後的操作（切換分頁回來還在），
+// 重新開啟（重新整理網頁、重開 App）就忘記、回到全部收合。只放在記憶體裡，不存到裝置。
+let zoneOpenMemory: Record<string, boolean> = {};
 const UNIT_FILTER_KEY = "hglobal:learn:unit-filter";
 const OLD_SPEAKER_KEY = "hglobal:learn:speaker-only";
 const GAP = space.md;
@@ -268,16 +270,22 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、清單專區（整組都是清單類別的）。
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
-  const [folded, setFolded] = useState<Record<string, boolean>>({});
-  useEffect(() => {
-    AsyncStorage.getItem(ZONE_FOLD_KEY).then((v) => v && setFolded(JSON.parse(v) as Record<string, boolean>)).catch(() => undefined);
-  }, []);
+  const [opened, setOpened] = useState<Record<string, boolean>>(() => ({ ...zoneOpenMemory }));
   const toggleFold = (key: string) =>
-    setFolded((x) => {
+    setOpened((x) => {
       const n = { ...x, [key]: !x[key] };
-      AsyncStorage.setItem(ZONE_FOLD_KEY, JSON.stringify(n)).catch(() => undefined);
+      zoneOpenMemory = n;
       return n;
     });
+  // 搜尋或篩選（分類、品牌）時，專區一律展開顯示結果，不然結果會被收合藏起來；不改變記住的收合狀態。
+  const narrowing = !!matched || selCats.length > 0 || !!brandSel;
+  const zoneOpen = (key: string) => narrowing || !!opened[key];
+  // 從清單頁返回要定位到某張卡：那張卡所在的專區要先展開，否則卡片不會出現、定位不到。
+  useEffect(() => {
+    if (!focusKey) return;
+    const zone = groups.find((g) => g.key === focusKey)?.nearest.zone;
+    if (zone) setOpened((x) => (x[zone] ? x : (zoneOpenMemory = { ...x, [zone]: true })));
+  }, [focusKey, groups]);
   /** 在同一個區塊裡把第 i 張跟相鄰的交換，立刻更新畫面、背景存檔；失敗就還原。 */
   useEffect(() => setOrderOverride(null), [config.seriesOrder]);
   const canSort = isSuperAdmin(member) && mode === "series" && !flat && !matched;
@@ -556,15 +564,15 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               ? zoneSections.map(({ zone, items }) =>
                   items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
                     <Fragment key={zone}>
-                      <ZoneBand zone={zone} count={items.reduce((n, g) => n + g.sessions.reduce((m, x) => m + x.materialCount, 0), 0)} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!!folded[zone]} onFold={() => toggleFold(zone)} />
-                      {folded[zone] ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
+                      <ZoneBand zone={zone} count={items.reduce((n, g) => n + g.sessions.reduce((m, x) => m + x.materialCount, 0), 0)} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!zoneOpen(zone)} onFold={() => toggleFold(zone)} />
+                      {!zoneOpen(zone) ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
                     </Fragment>
                   ) : null,
                 )
               : null}
             {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
-            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!!folded.centers} onFold={() => toggleFold("centers")} /> : null}
-            {tileW && mode === "series" && !matched && !folded.centers
+            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} /> : null}
+            {tileW && mode === "series" && !matched && !!opened.centers
               ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
               : null}
           </View>
