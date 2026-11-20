@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { api, type CentralReview, type CentralReviews, type Rank } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { dateTime } from "@/features/format";
-import { useApi } from "@/state/session";
+import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Button, Card, Icon } from "@/ui";
@@ -17,7 +17,8 @@ import { flashText } from "@/ui/flash-notice";
  * 這裡沒有權限就不會顯示整個區塊。通過／不通過前先彈出確認面板。
  */
 export function useCentralReviews() {
-  return useApi<CentralReviews>("/central-reviews");
+  const { member } = useSession();
+  return useApi<CentralReviews>(member ? "/central-reviews" : null); // 訪客不問（一定是 401）
 }
 
 const text = (v: unknown): string => {

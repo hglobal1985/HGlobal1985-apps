@@ -7,8 +7,13 @@ import type { FeatureKey } from "../../../launch/src/contract";
  * 新增功能徽章：在 contract.ts 的 FEATURES 加一筆，再在功能的入口呼叫 trackFeature("代碼")。
  */
 const sent = new Set<string>();
+let signedIn = false;
+/** 由登入狀態（state/session.tsx）設定：訪客不回報（伺服器一定拒絕，以前每次操作都白送一次請求，2026-11-21）。 */
+export function setFeatureTrackSignedIn(v: boolean) {
+  signedIn = v;
+}
 export function trackFeature(key: FeatureKey) {
-  if (sent.has(key)) return;
+  if (!signedIn || sent.has(key)) return;
   sent.add(key);
   api("POST", "/me/features", { feature: key }).catch(() => sent.delete(key));
 }
