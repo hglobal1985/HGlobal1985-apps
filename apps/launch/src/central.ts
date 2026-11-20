@@ -635,3 +635,62 @@ export async function reportIntegration(token: string): Promise<void> {
   lastReport = Date.now();
   await callCentral(token, `/v1/apps/${APP_ID}/handoff?integrated=${INTEGRATED_VERSION}&standards=${STANDARDS.join(",")}`);
 }
+
+/**
+ * 報名名單的「上手白金、上手鑽石」（Amway 資料，業主 2026-11-20；串接指令 2026-11-20.2）：
+ * 用服務 Token 呼叫 POST /v1/apps/learn/members/lookup（fields＝upline_platinum、upline_diamond，use＝display），一次最多 100 個會員。
+ * **不寫資料庫、不寫日誌**；只放記憶體短暫快取 10 分鐘（含「沒填」的結果）。失敗、403、422、429、逾時一律當作沒有資料（畫面顯示「未提供」，不快取）。
+ * 回傳 undefined＝這次中央沒有回應（整批「未提供」）。
+ */
+export type Upline = { platinum: string | null; diamond: string | null };
+export async function lookupUplines(secret: string | undefined, subs: string[]): Promise<Map<string, Upline> | undefined> {
+  const out = new Map<string, Upline>();
+  const ids = [...new Set(subs)].slice(0, 5000);
+  const need: string[] = [];
+  const now = Date.now();
+  for (const id of ids) {
+    const hit = memo.get(`upl:${id}`);
+    if (hit && hit.until > now) out.set(id, hit.value as Upline);
+    else need.push(id);
+  }
+  if (!need.length) return out;
+  if (!secret) return undefined;
+  const token = await serviceToken(secret);
+  if (!token) return undefined;
+  let failed = false;
+  for (let i = 0; i < need.length; i += 100) {
+    const chunk = need.slice(i, i + 100);
+    const t0 = Date.now();
+    try {
+      const res = await centralFetch(`${CENTRAL}/v1/apps/${APP_ID}/members/lookup`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify({ member_ids: chunk, fields: ["upline_platinum", "upline_diamond"], use: "display" }),
+        signal: AbortSignal.timeout(8000),
+      });
+      logCall(token, "/v1/apps/learn/members/lookup", Date.now() - t0);
+      if (res.status === 401) svcToken = null;
+      if (!res.ok) {
+        failed = true;
+        continue;
+      }
+      const b = (await res.json().catch(() => null)) as { members?: unknown[]; not_found?: unknown[] } | null;
+      const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : null);
+      const notFound = new Set((b?.not_found ?? []).filter((x): x is string => typeof x === "string"));
+      for (const raw of b?.members ?? []) {
+        const m = raw as { member_id?: unknown; id?: unknown; fields?: Record<string, unknown>; upline_platinum?: unknown; upline_diamond?: unknown };
+        const id = typeof m.member_id === "string" ? m.member_id : typeof m.id === "string" ? m.id : "";
+        if (!id) continue;
+        const f = m.fields ?? {};
+        const pick = (k: "upline_platinum" | "upline_diamond") => text(f[k] ?? m[k]);
+        const val: Upline = { platinum: pick("upline_platinum"), diamond: pick("upline_diamond") };
+        out.set(id, val);
+        memo.set(`upl:${id}`, { value: val, until: Date.now() + 600_000 });
+      }
+      for (const id of notFound) out.set(id, { platinum: null, diamond: null });
+    } catch {
+      failed = true;
+    }
+  }
+  return failed && !out.size ? undefined : out;
+}

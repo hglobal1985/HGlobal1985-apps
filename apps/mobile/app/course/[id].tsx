@@ -430,6 +430,12 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           <NoticeBox tone="success" text="恭喜！你已完成這門課程的最後一堂。" />
         ) : null}
         {!editing ? stickyNotice : null}
+        {/* 有審核權限的人（不是編輯模式）也能看報名名單（業主 2026-11-20）。 */}
+        {!editing && course.canRoster ? (
+          <Card style={{ paddingVertical: 0 }}>
+            <ListRow icon="list-outline" title="報名名單" subtitle="查看報名學員、匯出 CSV、移除資格" onPress={() => setSheet("roster")} />
+          </Card>
+        ) : null}
         {manages && mode === "view" && course.status !== "published" ? <NoticeBox tone="warning" text={course.status === "archived" ? "這門課已下架封存：學員在全部課程看不到，已報名的人照常上課。" : "這門課尚未上架：只有管理者看得到。按右上「編輯」可以上架。"} /> : null}
         {editing ? (
           // 編輯模式的「設定」預設收起，按右側「展開」才看到（業主 2026-11-18，全站一致）。
