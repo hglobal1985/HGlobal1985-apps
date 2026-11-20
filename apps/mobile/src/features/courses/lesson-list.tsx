@@ -1,4 +1,5 @@
 import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
+import { useThumb } from "@/lib/thumb";
 import { BLOCK_BEHAVIOR } from "@/features/courses/block-module";
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
@@ -79,6 +80,7 @@ function themeBadge(lesson: Lesson, icon: React.ReactElement | undefined, color:
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
  */
 export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb" }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（業主 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" } & LessonPlayProps) {
+  const thumb = useThumb();
   const { c } = useTheme();
   const isBlocks = course.lessons.some((l) => l.section);
   // 清單的區塊：預設全部收起（業主 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
@@ -181,7 +183,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
                           <Pressable key={b.head.id} nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={() => setOpenId(on ? null : b.head.id)} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, (openId && !on) || !b.items.some(shown) ? fadedStyle : null, pressed && { opacity: 0.75 }]}>
                             <View style={{ width: cell, aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: on ? 3 : 1, borderColor: on ? c.accent : c.border }}>
                               {b.head.coverUrl ? (
-                                <Image source={{ uri: resolveUrl(b.head.coverUrl) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                                <Image source={{ uri: thumb(resolveUrl(b.head.coverUrl), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
                               ) : b.head.brand ? (
                                 <BrandCover brand={b.head.brand} fill />
                               ) : (
