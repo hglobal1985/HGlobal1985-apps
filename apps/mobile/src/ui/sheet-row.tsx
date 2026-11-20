@@ -51,7 +51,13 @@ export function SheetThumb({ children }: { children: ReactNode }) {
   return <View style={styles.thumb}>{children}</View>;
 }
 
+/** 列左邊的「圖示框」：官方圖示（YouTube 等）、播放圖示沒有縮圖底，**不可用白底**（業主 2026-11-21：深色模式不該出現白色方塊）；寬度跟 `SheetThumb` 一樣，標題才對得齊。 */
+export function SheetIconBox({ children }: { children: ReactNode }) {
+  return <View style={styles.iconBox}>{children}</View>;
+}
+
 const styles = StyleSheet.create({
+  iconBox: { width: 64, height: 36, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch + 12, borderTopWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm },
   // 數量膠囊：小圓形徽章（業主 2026-11-20：原本在列裡被拉成又高又胖的橢圓），垂直置中、不隨列高拉長。
   pill: { alignSelf: "center", minWidth: 28, height: 28, paddingHorizontal: 8, borderRadius: radius.pill, borderWidth: 1, alignItems: "center", justifyContent: "center" },

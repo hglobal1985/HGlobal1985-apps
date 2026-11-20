@@ -11,6 +11,7 @@ import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { BrandCover, AppText, Button, SheetAction, SheetRow, SheetThumb } from "@/ui";
+import { SheetIconBox } from "@/ui/sheet-row";
 import { CourseCover } from "@/ui/course-cover";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
@@ -88,6 +89,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
  * 有區塊就用 BlockSheet（呼叫端判斷），沒有區塊就列出教材；點一列進這張卡的頁面。
  */
 export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
+  const { c } = useTheme();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${course.id}`);
   const open = () => {
     onClose();
@@ -111,7 +113,7 @@ export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onC
             key={l.id}
             accessibilityLabel={l.title}
             onPress={open}
-            leading={<SheetThumb>{l.iconType ? <BrandIcon type={l.iconType} fallback={TYPE_INFO[l.iconType].icon as never} size={36} /> : <Ionicons name="play-circle-outline" size={32} />}</SheetThumb>}
+            leading={<SheetIconBox>{l.iconType ? <BrandIcon type={l.iconType} fallback={TYPE_INFO[l.iconType].icon as never} size={36} /> : <Ionicons name="play-circle-outline" size={32} color={c.accent} />}</SheetIconBox>}
             title={l.title}
           />
         ))}
