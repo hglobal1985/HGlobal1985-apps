@@ -848,6 +848,9 @@ export type AppSettings = {
   /** 中心封面照片（中心首頁圖）的壓縮：長邊與畫質，比一般圖片更高（業主 2026-11-18）。 */
   centerMaxSide: number;
   centerQuality: number;
+  /** 小螢幕封面縮圖（Cloudflare 即時縮圖，業主 2026-11-20 小範圍試用）：開關與畫質（%）。寬度由前端依畫面大小選擇固定幾種尺寸。 */
+  thumbEnabled: boolean;
+  thumbQuality: number;
 };
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   homeLeftSec: 5,
@@ -868,6 +871,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   imageQuality: 88,
   centerMaxSide: 2048,
   centerQuality: 95,
+  thumbEnabled: false,
+  thumbQuality: 70,
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },
