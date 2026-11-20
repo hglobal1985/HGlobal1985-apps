@@ -196,7 +196,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         path={sharePath}
         extra={admin ? <TopBarButton label={editing ? "完成" : "編輯"} accessibilityLabel={editing ? "完成編輯系列" : "編輯系列"} iconName={editing ? "checkmark-circle-outline" : "create-outline"} onPress={() => setEditing((v) => !v)} /> : undefined}
       />
-      <Screen wide header={false} hero={<CenterHero art={art} scrollY={scrollY} stats={stats} title={shownTitle} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
+      <Screen wide header={false} hero={<CenterHero art={art} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}
