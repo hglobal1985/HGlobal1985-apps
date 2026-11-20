@@ -19,7 +19,7 @@ import { displayName } from "./sort";
  * 課程卡＝直式 3:4（一列至少 3 張）、清單卡＝橫式 4:3（一列至少 2 張）；點一下直接進該卡的詳細頁（不再展開細節）；
  * 右下角顯示教材數量，數量是 0 的卡灰色淡化（仍可點）。編輯模式下面多一排 ◀ ▶（跟相鄰的卡交換）與「隱藏／顯示」。
  */
-export function SeriesCardTile({ course, width, editing, canBack, canForward, onMove, onToggleHide }: { course: CourseSummary; width: number; editing?: boolean; canBack?: boolean; canForward?: boolean; onMove?: (dir: -1 | 1) => void; onToggleHide?: () => void }) {
+export function SeriesCardTile({ course, width, editing, canBack, canForward, onMove, onToggleHide, onPress, selected, dimmed }: { course: CourseSummary; width: number; /** 傳入＝點一下改成這個動作（系列頁縮圖原地展開）；沒傳＝進該卡詳細頁 */ onPress?: () => void; selected?: boolean; /** 別張卡展開時淡化（fadedStyle） */ dimmed?: boolean; editing?: boolean; canBack?: boolean; canForward?: boolean; onMove?: (dir: -1 | 1) => void; onToggleHide?: () => void }) {
   const { c } = useTheme();
   const { member } = useSession();
   const { config } = useUiConfig();
@@ -37,12 +37,13 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
     </Pressable>
   );
   return (
-    <View style={{ width, gap: 6 }}>
+    <View style={[{ width, gap: 6 }, dimmed ? fadedStyle : null]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${course.title}，${course.materialCount}個教材`}
-        onPress={() => router.push(`/course/${course.id}`)}
-        style={[styles.art, { width, height, backgroundColor: img ? "#fff" : c.surfaceMuted }, ...(empty ? fadedStyle : []), hidden && { opacity: 0.4 }]}
+        accessibilityState={{ expanded: onPress ? !!selected : undefined }}
+        onPress={onPress ?? (() => router.push(`/course/${course.id}`))}
+        style={[styles.art, { width, height, backgroundColor: img ? "#fff" : c.surfaceMuted }, selected && { borderWidth: 3, borderColor: c.accent }, ...(empty ? fadedStyle : []), hidden && { opacity: 0.4 }]}
       >
         {course.brand ? <BrandCover brand={course.brand} fill /> : img && cropped ? <Image source={{ uri: thumb(resolveUrl(img), width) }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : img ? <TopFill uri={thumb(resolveUrl(img), width)} w={width} h={height} viewY={course.edmViewY} fillBlur /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
