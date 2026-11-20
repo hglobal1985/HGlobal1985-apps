@@ -4692,7 +4692,8 @@ const routes: [string, RegExp, Handler][] = [
             cacheKey = new Request(`${ctx.url.origin}/__thumb/${encodeURIComponent(key)}?v=${ctx.url.searchParams.get("v") ?? ""}&w=${w}&s=${thumbSig(t)}&f=${fmt}`);
             cache = (caches as unknown as { default: Cache }).default;
             const hit = await cache.match(cacheKey);
-            if (hit) return hit;
+            // 快取取出的回應標頭是唯讀的，後面統一加標頭（cors、server-timing）會丟出例外＝1101、圖片空白；複製成可修改的回應再回傳。
+            if (hit) return new Response(hit.body, hit);
           } catch (e) {
             console.log("thumb_cache_failed", e instanceof Error ? e.message : String(e));
             cache = null;
