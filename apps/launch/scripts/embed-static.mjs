@@ -1,6 +1,7 @@
 // 把 Expo Web 輸出（apps/mobile/dist）打包成 Worker 模組，部署時不需另外上傳靜態資源。
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+import { subsetFont, usedIconNames } from "./subset-icons.mjs";
 
 const root = new URL("../../mobile/dist/", import.meta.url).pathname;
 const out = new URL("../.generated/static-files.js", import.meta.url).pathname;
@@ -23,9 +24,24 @@ const types = {
 const walk = (dir) => readdirSync(dir).flatMap((name) => (statSync(join(dir, name)).isDirectory() ? walk(join(dir, name)) : [join(dir, name)]));
 const files = {};
 let bytes = 0;
+// 圖示字型瘦身（見 subset-icons.mjs）：只保留 App 原始碼用到的圖示，失敗就用完整字型。
+const mobile = new URL("../../mobile/", import.meta.url).pathname;
+function slimIcons(path, data) {
+  if (!/\/Ionicons\.[0-9a-f]+\.ttf$/.test(path)) return data;
+  try {
+    const map = JSON.parse(readFileSync(new URL("../../../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json", import.meta.url), "utf8"));
+    const used = usedIconNames([join(mobile, "src"), join(mobile, "app")], map);
+    const r = subsetFont(data, [...used].map((n) => map[n]));
+    console.log(`icon font: kept ${r.kept}/${r.total} glyphs, ${(data.length / 1024).toFixed(0)} → ${(r.font.length / 1024).toFixed(0)} KiB`);
+    return r.font;
+  } catch (e) {
+    console.warn("icon font subset skipped:", e instanceof Error ? e.message : e);
+    return data;
+  }
+}
 for (const file of walk(root)) {
   const path = "/" + relative(root, file).split("\\").join("/");
-  const data = readFileSync(file);
+  const data = slimIcons(path, readFileSync(file));
   bytes += data.length;
   files[path] = { type: types[extname(file).toLowerCase()] ?? "application/octet-stream", data: data.toString("base64") };
 }
