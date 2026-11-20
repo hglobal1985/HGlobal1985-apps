@@ -183,7 +183,9 @@ export function cachedGet<T>(path: string, maxAgeMs = 0): Promise<T> {
   const hit = GET_CACHE.get(path);
   if (maxAgeMs && hit && Date.now() - hit.at < maxAgeMs) return Promise.resolve(hit.data as T);
   const run = GET_INFLIGHT.get(path);
-  if (run && Date.now() - run.at < 300) return run.p as Promise<T>;
+  // 一般開頁面（maxAgeMs>0）：開機預先抓的請求還在跑就共用它（以前只共用 300 毫秒內的，頁面程式晚一點載入就會重抓一次，2026-11-21）；
+  // 重新整理、資料異動後（maxAgeMs=0）只共用 300 毫秒內剛送出的，避免拿到異動前的舊資料。
+  if (run && Date.now() - run.at < (maxAgeMs || 300)) return run.p as Promise<T>;
   const p = api<T>("GET", path).then((d) => {
     GET_CACHE.set(path, { data: d, at: Date.now() });
     if (GET_CACHE.size > 200) GET_CACHE.delete(GET_CACHE.keys().next().value!);

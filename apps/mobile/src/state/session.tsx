@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
-import { clearCentral, handleWebSsoReturn, hasCentralSession, signInWithGoogle, signOutCentral, webSsoCheck, webSsoLogout } from "@/api/central";
+import { setFeatureTrackSignedIn } from "@/lib/feature-track";
+import { clearCentral, handleWebSsoReturn, hasCentralSession, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
 import { api, cachedGet, clearApiCache, loadToken, peekCache, prefetchCommon, saveToken, type Member } from "@/api/client";
 
 /**
@@ -56,7 +57,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // 跟登入檢查同時開始抓公開資料，頁面一出現就有內容（不必等 /me 回來才開始）。
-    if (Platform.OS === "web") prefetchCommon(globalThis.location?.pathname ?? "/");
+    // 這次會先去會員中心做共用登入檢查（整頁離開再回來）時不預先抓：回來後頁面會重新載入，先抓的會白費。
+    if (Platform.OS === "web" && !webSsoCheckDue()) prefetchCommon(globalThis.location?.pathname ?? "/");
     (async () => {
       const raw = await AsyncStorage.getItem(CART_KEY).catch(() => null);
       if (raw) setCartState(JSON.parse(raw) as string[]);
@@ -92,6 +94,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     invalidate();
   }, [invalidate]);
   const memberSub = member?.sub;
+  setFeatureTrackSignedIn(!!memberSub);
   // 換帳號（登入、登出）時清掉讀取快取；開啟網站、登入檢查剛完成那一次不清（預先抓的資料已經帶著憑證）。
   const settledSub = useRef<{ sub: string | undefined } | null>(null);
   useEffect(() => {
@@ -231,5 +234,6 @@ export function useApi<T>(path: string | null, opts: { early?: boolean } = {}): 
   );
   const reload = useCallback(() => load(true), [load]);
   void opts;
-  return { data, error, loading: loading || (!ready && data === undefined), reload };
+  // 沒有要抓的資料（path 為 null，例如訪客、沒有權限）＝不是「讀取中」，以免畫面一直轉圈（2026-11-21）。
+  return { data, error, loading: !!path && (loading || (!ready && data === undefined)), reload };
 }
