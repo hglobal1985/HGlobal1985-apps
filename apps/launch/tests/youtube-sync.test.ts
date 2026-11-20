@@ -13,6 +13,30 @@ test("同步清單：網址判讀與教材名稱格式", () => {
   assert.equal(syncTitle("王老師小線對焦會", "對焦會", null), "王老師小線對焦會");
 });
 
+test("同步清單：同名的教材才加（月/日），不同名的不加", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
+  await db.prepare("INSERT INTO courses (id, title, status) VALUES ('c1', '對焦會', 'published')").run();
+  await db.prepare("INSERT INTO youtube_syncs (id, url, playlist_id, course_id, title_prefix) VALUES ('s1', 'u', 'PLX', 'c1', '王老師小線對焦會')").run();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (u: string | URL | Request) => {
+    if (String(u).includes("playlistItems"))
+      return new Response(JSON.stringify({ items: [
+        { snippet: { title: "a" }, contentDetails: { videoId: "AAAAAAAAAAA", videoPublishedAt: "2025-12-15T01:00:00Z" } },
+        { snippet: { title: "b" }, contentDetails: { videoId: "BBBBBBBBBBB", videoPublishedAt: "2025-12-08T01:00:00Z" } },
+        { snippet: { title: "c" }, contentDetails: { videoId: "CCCCCCCCCCC", videoPublishedAt: "2026-01-05T01:00:00Z" } },
+      ] }), { status: 200 });
+    return new Response("x", { status: 404 });
+  }) as typeof fetch;
+  try {
+    await runYoutubeSync(env, "s1");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const rows = (await db.prepare("SELECT title FROM lessons WHERE course_id = 'c1' ORDER BY position").all<{ title: string }>()).results;
+  assert.deepEqual(rows.map((r) => r.title), ["2026年1月 王老師小線對焦會", "2025年12月 王老師小線對焦會（12/15）", "2025年12月 王老師小線對焦會（12/8）"]);
+});
+
 test("同步清單：只加新影片、最新的在最上面、再按一次不重複", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
