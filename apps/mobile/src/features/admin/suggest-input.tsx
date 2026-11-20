@@ -64,17 +64,6 @@ export function SuggestList({ list, q, onPick }: { list: string[]; q: string; on
   );
 }
 
-/** 單獨使用的輸入框＋關連詞（欄位下方直接接清單）。 */
-export function SuggestInput({ value, onChange, pool, accessibilityLabel, placeholder, maxLength = 50, inputStyle }: { value: string; onChange: (v: string) => void; pool: "job_title"; accessibilityLabel: string; placeholder?: string; maxLength?: number; inputStyle?: StyleProp<TextStyle> }) {
-  const [focus, setFocus] = useState(false);
-  const list = useSuggestions(value, pool, focus);
-  return (
-    <View style={{ gap: space.xs }}>
-      <SuggestField value={value} onChange={onChange} onFocusChange={setFocus} accessibilityLabel={accessibilityLabel} placeholder={placeholder} maxLength={maxLength} inputStyle={inputStyle} />
-      {focus ? <SuggestList list={list} q={value} onPick={(x) => (onChange(x), setFocus(false))} /> : null}
-    </View>
-  );
-}
 
 /** 只有輸入框（清單由外面放，例如兩欄並排時清單要放在整列下方）。 */
 export function SuggestField({ value, onChange, onFocusChange, accessibilityLabel, placeholder, maxLength = 50, inputStyle }: { value: string; onChange: (v: string) => void; onFocusChange: (f: boolean) => void; accessibilityLabel: string; placeholder?: string; maxLength?: number; inputStyle?: StyleProp<TextStyle> }) {

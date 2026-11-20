@@ -66,12 +66,6 @@ export function useCourseSave(course: CourseDetail, onSaved: (d: CourseDetail) =
   return { save, busy, error, setError };
 }
 
-/** 各主辦單位已有幾堂課（一門課可有多個主辦單位，每個各算一次）。 */
-export function countByHost(list: { hostUnit: string }[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const x of list) for (const h of x.hostUnit.split(/[、,，]+/).map((v) => v.trim()).filter(Boolean)) out[h] = (out[h] ?? 0) + 1;
-  return out;
-}
 
 /** 勾選框（整列可點、觸控夠大）。 */
 export function Check({ label, value, onChange, disabled }: { label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {

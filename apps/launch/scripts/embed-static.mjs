@@ -67,7 +67,8 @@ if (files["/index.html"]) {
   if (!out.includes("apple-touch-icon")) out = out.replace("</head>", `${tags}</head>`);
   // iPhone 的瀏海／狀態列／底部橫條「安全區」：viewport-fit=cover 才能讓 App 內量到安全區；狀態列用半透明樣式，畫面延伸到狀態列底下，
   // 由 App 自己（app/_layout.tsx）把標題列與狀態列底色處理好。
-  out = out.replace(/<meta name="viewport"[^>]*>/, '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>');
+  // 鎖定 1 倍、不可縮放（業主永久指示：不開放頁面雙指縮放；與 App 的 lib/no-page-zoom.ts 的 VIEWPORT 相同），網頁一開啟就生效。
+  out = out.replace(/<meta name="viewport"[^>]*>/, '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>');
   if (!out.includes("apple-mobile-web-app-status-bar-style")) out = out.replace("</head>", '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/></head>');
   // 整個畫面釘死在可視範圍（position:fixed）：Chrome 網址列伸縮、安裝到桌面的捷徑，底部選單都不會被推出畫面；也不讓整頁被拖動。
   if (!out.includes("hg-fixed")) out = out.replace("</head>", '<style id="hg-fixed">html,body{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;overflow:hidden;overscroll-behavior:none}#root{position:absolute;top:0;left:0;right:0;bottom:0;height:auto}</style></head>');
