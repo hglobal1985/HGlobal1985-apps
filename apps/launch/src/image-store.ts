@@ -19,8 +19,7 @@ export async function shrinkImage(env: Env, data: ArrayBuffer, type: string, cls
     const quality = cls === "center" ? app.centerQuality : cls === "edm" ? app.edmQuality : app.imageQuality;
     const info = await env.IMAGES.info(new Response(data).body!);
     const longSide = Math.max(info.width ?? 0, info.height ?? 0);
-    // 已在瀏覽器壓縮過（長邊在上限內、不是未壓縮的 PNG 以外）就不重複壓縮，避免畫質再損失一次。
-    if (longSide > 0 && longSide <= side && fmt !== "png") return same;
+    // 長邊已在上限內：長寬不再縮，但 JPEG／WebP 仍照設定的畫質重新壓縮一次（業主 2026-11-20）；PNG 沒有畫質參數，小於 1MB 就不動。
     if (longSide > 0 && longSide <= side && fmt === "png" && data.byteLength < 1024 * 1024) return same;
     const out = await env.IMAGES.input(new Response(data).body!).transform({ width: side, height: side, fit: "scale-down" }).output({ format: `image/${fmt}`, ...(fmt === "png" ? {} : { quality }) });
     const buf = await out.response().arrayBuffer();

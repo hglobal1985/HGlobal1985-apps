@@ -113,7 +113,7 @@ export default function StorageScreen() {
       <Section title="上傳設定與圖片壓縮">
         <Card>
           <Stepper label="手機／電腦上傳的單檔上限" hint="從這支裝置選檔案上傳時，超過就不能上傳，並提示改貼雲端連結（最多 95MB）" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
-          <NoticeBox tone="info" text="所有上傳到雲端的圖片（封面、EDM、教材圖片、雲端硬碟匯入、匯入工作…全站）都會先壓縮才存，不保留原圖；使用者下載到的就是壓縮後的版本。已在上限內的圖片不會重複壓縮。" />
+          <NoticeBox tone="info" text="所有上傳到雲端的圖片（封面、EDM、教材圖片、雲端硬碟匯入、匯入工作…全站）都會先壓縮才存，不保留原圖；使用者下載到的就是壓縮後的版本。長邊在上限內的圖片尺寸不變，但仍會照下面設定的畫質壓縮。" />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             ① 中心封面照片（中心首頁圖）
           </AppText>

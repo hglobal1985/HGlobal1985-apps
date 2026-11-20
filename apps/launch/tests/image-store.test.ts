@@ -10,12 +10,14 @@ const fake = (w: number, h: number, outBytes: number): ImagesBinding => ({
 });
 const big = new Uint8Array(5000).buffer;
 
-test("圖片存進 R2 前壓縮：太大的縮小後取代原圖、已在上限內的不重複壓縮、失敗與不支援格式照原樣", async () => {
+test("圖片存進 R2 前壓縮：太大的縮小後取代原圖、長邊在上限內的只照畫質重新壓縮、PNG 小檔不動、失敗與不支援格式照原樣", async () => {
   const env = (img?: ImagesBinding): Env => ({ DB: createTestDb(), IMAGES: img });
   const shrunk = await shrinkImage(env(fake(4000, 3000, 800)), big, "image/jpeg", "general");
   assert.equal(shrunk.size, 800);
   const within = await shrinkImage(env(fake(900, 600, 800)), big, "image/jpeg", "general");
-  assert.equal(within.size, 5000);
+  assert.equal(within.size, 800); // 長邊在上限內也照畫質重新壓縮（尺寸不變）
+  const smallPng = await shrinkImage(env(fake(900, 600, 800)), big, "image/png", "general");
+  assert.equal(smallPng.size, 5000);
   const noBinding = await shrinkImage(env(), big, "image/jpeg", "general");
   assert.equal(noBinding.size, 5000);
   const gif = await shrinkImage(env(fake(4000, 3000, 800)), big, "image/gif", "general");
