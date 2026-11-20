@@ -30,6 +30,16 @@ export function fitFontSize(title: string, w: number, h: number, max = 72, min =
   return min;
 }
 
+/** 固定格式封面的四行拆法：名稱對半（銅章會議→銅章／會議）、日期在「年」後面切開（2026年10月→2026年／10月）。 */
+function splitFixed(lines: string[]): string[] {
+  const half = (t: string) => (t.length >= 4 ? [t.slice(0, Math.ceil(t.length / 2)), t.slice(Math.ceil(t.length / 2))] : [t]);
+  const date = (t: string) => {
+    const k = t.indexOf("年");
+    return k > 0 && k < t.length - 1 ? [t.slice(0, k + 1), t.slice(k + 1)] : [t];
+  };
+  return [...half(lines[0] ?? ""), ...(lines[1] ? date(lines[1]) : [])].filter(Boolean);
+}
+
 /** 固定分行的字級：每一行都塞得進寬度，總高度也塞得進方框。 */
 function fitLines(lines: string[], w: number, h: number, max = 72, min = 14): number {
   // 每一行都不可換行（業主 2026-11-19：日期 X年X月 強制同一行）：寬度估算多留 15% 安全邊界，字寧可小一點。
@@ -53,7 +63,10 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   const names = Object.keys(courseThemes);
   const seed = [...(title || label || theme || "")].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
   // 固定格式文字封面（銅章會議等，見 contract 的 textCoverLines）：咖啡色系底、固定「名稱（換行）X年X月」兩行。
-  const fixed = textCoverLines(title);
+  const fixed0 = textCoverLines(title);
+  // 縮圖（直式或方形的小卡）改成四行：「銅章／會議／2026年／10月」（業主 2026-11-20）；橫式大封面維持兩行。
+  const portrait = box.w > 0 && box.h >= box.w * 0.9;
+  const fixed = fixed0 && portrait ? splitFixed(fixed0) : fixed0;
   const [bg, fg] = fixed ? coverBronze[scheme] : courseThemes[names[seed % names.length]!]![scheme];
   const pad = box.h && box.h < 90 ? 3 : space.md; // 小縮圖（上拉選單列等）內距縮小，字才放得進去
   const hasTitle = !!title?.trim();

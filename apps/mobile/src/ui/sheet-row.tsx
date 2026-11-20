@@ -53,6 +53,7 @@ export function SheetThumb({ children }: { children: ReactNode }) {
 
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch + 12, borderTopWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm },
-  pill: { minWidth: 40, paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, alignItems: "center" },
+  // 數量膠囊：小圓形徽章（業主 2026-11-20：原本在列裡被拉成又高又胖的橢圓），垂直置中、不隨列高拉長。
+  pill: { alignSelf: "center", minWidth: 28, height: 28, paddingHorizontal: 8, borderRadius: radius.pill, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   thumb: { width: 64, height: 36, borderRadius: radius.sm, backgroundColor: "#fff", overflow: "hidden" },
 });
