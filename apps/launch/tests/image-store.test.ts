@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Env, ImagesBinding } from "../src/d1.ts";
-import { shrinkImage } from "../src/image-store.ts";
+import { renameForType, shrinkImage } from "../src/image-store.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
 const fake = (w: number, h: number, outBytes: number): ImagesBinding => ({
@@ -17,13 +17,16 @@ test("圖片存進 R2 前壓縮：太大的縮小後取代原圖、長邊在上�
   const within = await shrinkImage(env(fake(900, 600, 800)), big, "image/jpeg", "general");
   assert.equal(within.size, 800); // 長邊在上限內也照畫質重新壓縮（尺寸不變）
   const smallPng = await shrinkImage(env(fake(900, 600, 800)), big, "image/png", "general");
-  assert.equal(smallPng.size, 5000);
+  assert.deepEqual([smallPng.size, smallPng.type], [800, "image/jpeg"]); // 任何格式一律轉成存檔格式（預設 JPEG）
+  const logo = await shrinkImage(env(fake(900, 600, 800)), big, "image/png", "general", true);
+  assert.deepEqual([logo.size, logo.type], [5000, "image/png"]); // 品牌 logo 不轉格式
   const noBinding = await shrinkImage(env(), big, "image/jpeg", "general");
   assert.equal(noBinding.size, 5000);
   const gif = await shrinkImage(env(fake(4000, 3000, 800)), big, "image/gif", "general");
   assert.equal(gif.size, 5000);
   const bigger = await shrinkImage(env(fake(4000, 3000, 9000)), big, "image/jpeg", "edm");
   assert.equal(bigger.size, 5000);
+  assert.equal(renameForType("photo.PNG", "image/jpeg"), "photo.jpg");
   const broken: ImagesBinding = { info: async () => { throw new Error("x"); }, input: () => { throw new Error("x"); } };
   assert.equal((await shrinkImage(env(broken), big, "image/png", "center")).size, 5000);
 });

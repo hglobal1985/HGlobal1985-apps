@@ -22,7 +22,7 @@ async function placeInBlock(db: D1Database, courseId: string, blockId: string, n
 }
 
 const nextPos = async (db: D1Database, courseId: string) => ((await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0) + 1;
-const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
 
 async function fetchImage(url: string, side: number): Promise<{ data: ArrayBuffer; type: string } | null> {
   const u = url.replace(/=w\d+(?=$|[-&])/, `=w${side}`);

@@ -7,7 +7,7 @@ import { centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Card, EmptyState, ErrorView, LoadingView, Screen, Section } from "@/ui";
+import { AppText, Card, Chips, EmptyState, ErrorView, LoadingView, Screen, Section } from "@/ui";
 
 type Kind = "image" | "doc" | "audio" | "other";
 type FileSettings = { importMaxMb: number; ticketSec: number; dailyDownloads: number; dailyDownloadMb: number };
@@ -63,14 +63,47 @@ export function Stepper({ label, hint, value, min, max, step, unit, onChange }: 
   );
 }
 
+/** 圖片格式簡易比較表（業主 2026-11-20）：選存檔格式時的參考。 */
+const FORMAT_ROWS: { name: string; size: string; compat: string; alpha: string; pro: string; con: string }[] = [
+  { name: "JPEG", size: "中", compat: "★★★ 所有裝置", alpha: "不支援（白底）", pro: "相容性最好、任何手機電腦都能顯示與下載", con: "同畫質檔案比 WebP、AVIF 大" },
+  { name: "WebP", size: "小（約省 25～35%）", compat: "★★ 新手機皆可，少數舊裝置失敗", alpha: "支援", pro: "檔案小、載入快", con: "曾有 Android 手機顯示空白；部分舊軟體開不了" },
+  { name: "AVIF", size: "最小（約省 40～50%）", compat: "★ 較新裝置才支援", alpha: "支援", pro: "同畫質最省空間", con: "舊手機、舊軟體常無法顯示；編碼較慢" },
+];
+function FormatTable() {
+  const { c } = useTheme();
+  return (
+    <View style={[styles.fmtBox, { borderColor: c.border }]}>
+      {FORMAT_ROWS.map((r, i) => (
+        <View key={r.name} style={[styles.fmtRow, i > 0 && { borderTopWidth: 1, borderTopColor: c.border }]}>
+          <AppText variant="headline" style={{ fontWeight: "800" }}>
+            {r.name}
+          </AppText>
+          <AppText variant="caption">檔案大小：{r.size}</AppText>
+          <AppText variant="caption">相容性：{r.compat}</AppText>
+          <AppText variant="caption">透明背景：{r.alpha}</AppText>
+          <AppText variant="caption" style={{ color: c.success }}>
+            優點：{r.pro}
+          </AppText>
+          <AppText variant="caption" style={{ color: c.danger }}>
+            缺點：{r.con}
+          </AppText>
+        </View>
+      ))}
+      <AppText variant="caption" tone="muted" style={{ padding: space.sm }}>
+        品牌 logo 不轉格式（要保留透明背景）；GIF 動圖不處理。透明背景的圖轉成上面格式時會用白色墊底。已經存在雲端的舊圖不會回頭轉檔。
+      </AppText>
+    </View>
+  );
+}
+
 export default function StorageScreen() {
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
-  const [lim, setLim] = useState({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality });
-  useEffect(() => setLim({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality }), [config.app.fileMaxMb, config.app.imageMaxSide, config.app.imageQuality, config.app.centerMaxSide, config.app.centerQuality, config.app.edmMaxSide, config.app.edmQuality]);
+  const [lim, setLim] = useState({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, storeFormat: config.app.storeFormat });
+  useEffect(() => setLim({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, storeFormat: config.app.storeFormat }), [config.app.fileMaxMb, config.app.imageMaxSide, config.app.imageQuality, config.app.centerMaxSide, config.app.centerQuality, config.app.edmMaxSide, config.app.edmQuality, config.app.storeFormat]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
-  const dirty = lim.fileMaxMb !== config.app.fileMaxMb || lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality || lim.centerMaxSide !== config.app.centerMaxSide || lim.centerQuality !== config.app.centerQuality || lim.edmMaxSide !== config.app.edmMaxSide || lim.edmQuality !== config.app.edmQuality;
+  const dirty = lim.fileMaxMb !== config.app.fileMaxMb || lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality || lim.centerMaxSide !== config.app.centerMaxSide || lim.centerQuality !== config.app.centerQuality || lim.edmMaxSide !== config.app.edmMaxSide || lim.edmQuality !== config.app.edmQuality || lim.storeFormat !== config.app.storeFormat;
   const saveLim = async () => {
     setSaving(true);
     setMsg(null);
@@ -114,6 +147,11 @@ export default function StorageScreen() {
         <Card>
           <Stepper label="手機／電腦上傳的單檔上限" hint="從這支裝置選檔案上傳時，超過就不能上傳，並提示改貼雲端連結（最多 95MB）" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
           <NoticeBox tone="info" text="所有上傳到雲端的圖片（封面、EDM、教材圖片、雲端硬碟匯入、匯入工作…全站）都會先壓縮才存，不保留原圖；使用者下載到的就是壓縮後的版本。長邊在上限內的圖片尺寸不變，但仍會照下面設定的畫質壓縮。" />
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            存檔格式（所有上傳的圖片一律轉成這種格式）
+          </AppText>
+          <Chips title="圖片存檔格式" value={lim.storeFormat} onChange={(v) => setLim((x) => ({ ...x, storeFormat: v }))} options={[{ key: "jpeg", label: "JPEG（預設）" }, { key: "webp", label: "WebP" }, { key: "avif", label: "AVIF" }]} />
+          <FormatTable />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             ① 中心封面照片（中心首頁圖）
           </AppText>
@@ -221,6 +259,8 @@ const styles = StyleSheet.create({
   bar: { flexDirection: "row", height: 14, borderRadius: radius.pill, overflow: "hidden", marginVertical: space.xs },
   legend: { flexDirection: "row", alignItems: "center", gap: space.sm },
   dot: { width: 10, height: 10, borderRadius: 5 },
+  fmtBox: { borderWidth: 1, borderRadius: radius.md, overflow: "hidden" },
+  fmtRow: { padding: space.sm, gap: 2 },
   step: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },

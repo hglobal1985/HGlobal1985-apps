@@ -1,5 +1,5 @@
 import { ensureBrandCards } from "./brand-cards.ts";
-import { shrinkImage, shrinkStored } from "./image-store.ts";
+import { renameForType, shrinkImage, shrinkStored } from "./image-store.ts";
 import { flushPushes, vapidPublicKey } from "./push.ts";
 import { HQ_SLUG, RESERVED_SLUGS, SLUG_RE } from "./short-links.ts";
 import { romanizeName, romanizeTitle, urlNameVariants } from "./romanize.ts";
@@ -4380,10 +4380,11 @@ const routes: [string, RegExp, Handler][] = [
       if (!data.byteLength) return fail(400, "empty_file", "檔案是空的");
       if (data.byteLength > maxBytes) return fail(413, "file_too_large", fileTooBig(maxMb));
       if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這門課程");
-      const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(name)}`;
       const shrunk = kind.type === "image" ? await shrinkImage(ctx.env, data, kind.ct, "general") : { data, type: kind.ct, size: data.byteLength };
+      const finalName = kind.type === "image" ? renameForType(name, shrunk.type) : name; // 轉成 JPEG 等格式後，檔名的副檔名跟著換
+      const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(finalName)}`;
       await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
-      const id = await createFileMaterial(ctx, admin, courseId, { name, key, size: shrunk.size, contentType: kind.ct, attType: kind.type, audit: "material.file_upload" });
+      const id = await createFileMaterial(ctx, admin, courseId, { name: finalName, key, size: shrunk.size, contentType: shrunk.type, attType: kind.type, audit: "material.file_upload" });
       return ctx.url.searchParams.get("lite") === "1" ? { id } : courseDetail(ctx, courseId);
     },
   ],
@@ -4460,8 +4461,17 @@ const routes: [string, RegExp, Handler][] = [
         } finally {
           if (progressId) await ctx.db.prepare("DELETE FROM import_progress WHERE id = ?").bind(progressId).run().catch(() => undefined);
         }
-        if (kind.type === "image") size = (await shrinkStored(ctx.env, key, kind.ct)) ?? size;
-        const id = await createFileMaterial(ctx, admin, courseId, { name: src.name, key, size, contentType: kind.ct, attType: kind.type, audit: "material.drive_import" });
+        let finalType = kind.ct;
+        let finalName = src.name;
+        if (kind.type === "image") {
+          const done = await shrinkStored(ctx.env, key, kind.ct);
+          if (done) {
+            size = done.size;
+            finalType = done.type;
+            finalName = renameForType(src.name, done.type);
+          }
+        }
+        const id = await createFileMaterial(ctx, admin, courseId, { name: finalName, key, size, contentType: finalType, attType: kind.type, audit: "material.drive_import" });
         return { id };
       } catch (e) {
         if (e instanceof ImportError) return fail(e.status, e.code, e.message);
@@ -5216,7 +5226,7 @@ const routes: [string, RegExp, Handler][] = [
       const old = await ctx.db.prepare(`SELECT ${col} AS k FROM brand_logos WHERE id = ?`).bind(id).first<{ k: string | null }>();
       if (!old) return fail(404, "not_found", "找不到這個品牌");
       const key = `brand/${id}/${crypto.randomUUID()}.${img.ext}`;
-      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general", true); // 品牌 logo 不轉格式（透明背景要保留）
       await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       await ctx.db.batch([ctx.db.prepare(`UPDATE brand_logos SET ${col} = ?, art_version = art_version + 1 WHERE id = ?`).bind(key, id), audit(ctx.db, s.sub, `brand.${part}_upload`, "brand", id, key)]);
       if (old.k) await bucket.delete(old.k).catch(() => undefined);

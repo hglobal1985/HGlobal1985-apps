@@ -37,7 +37,7 @@ export interface R2Bucket {
 /** Cloudflare Images 綁定（即時縮圖）。只列用到的部分。 */
 export interface ImagesBinding {
   info?(stream: ReadableStream): Promise<{ format?: string; fileSize?: number; width?: number; height?: number }>;
-  input(stream: ReadableStream | ArrayBuffer): { transform(o: { width?: number; height?: number; fit?: string }): { output(o: { format: string; quality?: number }): Promise<{ response(): Response }> } };
+  input(stream: ReadableStream | ArrayBuffer): { transform(o: { width?: number; height?: number; fit?: string; background?: string }): { output(o: { format: string; quality?: number }): Promise<{ response(): Response }> } };
 }
 
 export interface Env {
