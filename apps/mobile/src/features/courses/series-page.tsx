@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
 import { api, UNCATEGORIZED, type CourseSummary, type SeriesArt } from "@/api/client";
 import { SeriesEdm } from "@/features/admin/series-edm";
+import { SeriesApplySheet } from "./series-apply-sheet";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { PageHeader } from "@/features/page-header";
 import { isSuperAdmin } from "@/lib/roles";
@@ -43,6 +44,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const [view, setView] = useState<View_>("list");
   const [editing, setEditing] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
+  const [applyOpen, setApplyOpen] = useState(false);
   const [boxW, setBoxW] = useState(0);
   const scrollY = useRef(new Animated.Value(0)).current;
   const { width: winW, height: winHeight } = useWindowDimensions();
@@ -223,6 +225,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
               </>
             )}
             <Button variant="secondary" icon="image-outline" label="封面圖（直式＋橫式）" onPress={() => setCoverOpen(true)} fullWidth />
+            {series !== UNCATEGORIZED ? <Button variant="secondary" icon="copy-outline" label="套用設定到全系列課程" onPress={() => setApplyOpen(true)} fullWidth /> : null}
             <AppText variant="caption" tone="muted">
               下面每張卡可以用 ◀ ▶ 調整順序、用眼睛鈕隱藏（只是不在這個系列頁顯示）。系列裡的卡是自動收集的，不能在這裡新增。
             </AppText>
@@ -248,6 +251,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
           </View>
         ) : null}
       </Screen>
+      {applyOpen ? <SeriesApplySheet series={series} title={shownTitle} courses={all.filter((x) => !x.isList)} onClose={() => setApplyOpen(false)} /> : null}
       {coverOpen ? (
         <EditSheet title={`「${shownTitle}」封面圖`} onClose={() => setCoverOpen(false)} hideSave>
           <SeriesEdm series={series} edmUrl={art?.edmUrl} onChanged={artList.reload} />

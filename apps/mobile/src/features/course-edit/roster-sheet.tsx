@@ -20,6 +20,7 @@ const METHOD: Record<RosterRow["method"], { label: string; tone: "neutral" | "ac
   paid: { label: "付費報名", tone: "neutral" },
   invite: { label: "邀請碼", tone: "accent" },
   invite_request: { label: "無邀請碼申請", tone: "warning" },
+  batch: { label: "系列批次加入", tone: "accent" },
 };
 const STATUS: Record<RosterRow["status"], { label: string; tone: "success" | "warning" | "danger" }> = {
   opened: { label: "已開通", tone: "success" },

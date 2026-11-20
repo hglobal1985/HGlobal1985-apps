@@ -354,7 +354,7 @@ export type RosterRow = {
   name: string;
   center: string;
   /** free＝免費報名；paid＝付費報名；invite＝邀請碼加入；invite_request＝按「無邀請碼」申請。 */
-  method: "free" | "paid" | "invite" | "invite_request";
+  method: "free" | "paid" | "invite" | "invite_request" | "batch";
   status: "opened" | "pending" | "rejected";
   createdAt: string;
   uplinePlatinum: string | null;
@@ -369,6 +369,22 @@ export type Roster = {
   /** 中央有沒有回應上手資料（false＝這一頁的上手欄位顯示「未提供」）。 */
   uplineAvailable: boolean;
 };
+/** 系列「套用到全系列課程」（業主 2026-11-20）：可以套用的欄位（鍵＝課程儲存 API 的欄位名），依課程設定的大項分組；新增欄位只加在這一張表。 */
+export const SERIES_APPLY_GROUPS = [
+  { key: "basics", label: "基本資料", fields: ["category", "brandId", "isPackage"] },
+  { key: "when", label: "時間與地點", fields: ["location", "locationNone", "isOnline"] },
+  { key: "price", label: "費用與審核", fields: ["priceTwd", "priceTba", "diamondFree"] },
+  { key: "enroll", label: "報名資格條件", fields: ["viewScope", "minRankCode", "allowPresident", "inviteOnly", "inviteCode"] },
+  { key: "advanced", label: "進階設定", fields: ["hostUnit", "chapterCovers"] },
+  { key: "status", label: "上架與刪除", fields: ["status"] },
+] as const;
+export const SERIES_APPLY_FIELDS: string[] = SERIES_APPLY_GROUPS.flatMap((g) => [...g.fields]);
+/** 已經有人報名的課程不會被改到的欄位（費用）。 */
+export const SERIES_PRICE_FIELDS = ["priceTwd", "priceTba", "diamondFree"];
+/** 套用預覽：每門課會改哪些欄位、哪些被略過（為什麼）。 */
+export type SeriesApplyPlan = { courses: { id: string; title: string; apply: string[]; skipped: { key: string; reason: string }[] }[]; fields: string[] };
+export type SeriesApplyResult = { applied: number; failed: { id: string; title: string; error: string }[] };
+export type SeriesRosterPlan = { source: { id: string; title: string; members: number }; targets: { id: string; title: string; add: number; already: number; skipped: string | null }[]; totalAdd: number };
 /** 課程管理者看到的邀請設定。 */
 export type InviteInfo = { inviteOnly: boolean; code: string };
 export type Order = {

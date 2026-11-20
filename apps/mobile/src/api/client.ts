@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 import type { ApiError } from "../../../launch/src/contract";
 export { classifyLink, parseHttpsUrl } from "../../../launch/src/links";
-export { THUMB_WIDTH_CHOICES, ZONES, VIEW_SCOPES, VIEW_SCOPE_LABEL, PAYMENT_METHODS, KEYWORD_INFO, ACHIEVEMENT_TYPES, ACHIEVEMENT_CATEGORIES, isImageIcon, textCoverLines, UNCATEGORIZED, FEATURES, NOTICE_KINDS, applicantLabel, reviewerInviteMessage, REVIEW_ROLES, REVIEW_ROLE_LABEL, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, shareMessage, DUTY_LABELS, HQ_UNIT, REVIEW_REASONS, RIBBON_INFO, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUP_INFO, SORT_GROUPS, STATS_ROLE_OPTIONS } from "../../../launch/src/contract";
+export { SERIES_APPLY_GROUPS, THUMB_WIDTH_CHOICES, ZONES, VIEW_SCOPES, VIEW_SCOPE_LABEL, PAYMENT_METHODS, KEYWORD_INFO, ACHIEVEMENT_TYPES, ACHIEVEMENT_CATEGORIES, isImageIcon, textCoverLines, UNCATEGORIZED, FEATURES, NOTICE_KINDS, applicantLabel, reviewerInviteMessage, REVIEW_ROLES, REVIEW_ROLE_LABEL, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, shareMessage, DUTY_LABELS, HQ_UNIT, REVIEW_REASONS, RIBBON_INFO, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUP_INFO, SORT_GROUPS, STATS_ROLE_OPTIONS } from "../../../launch/src/contract";
 import { centralToken, refresh as refreshCentral } from "./central";
 
 export type {
@@ -48,6 +48,9 @@ export type {
   ReviewReason,
   CourseSummary,
   InviteInfo,
+  SeriesApplyPlan,
+  SeriesApplyResult,
+  SeriesRosterPlan,
   Roster,
   RosterRow,
   Lesson,
