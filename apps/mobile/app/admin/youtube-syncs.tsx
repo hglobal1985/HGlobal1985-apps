@@ -73,7 +73,7 @@ export default function YoutubeSyncsScreen() {
             <AppText variant="caption" tone="muted" numberOfLines={1}>{s.url}</AppText>
             <AppText variant="caption">{`命名規則：${s.titleFormat}`}</AppText>
             <AppText variant="caption">{`排序規則：${list.data!.sortLabels[s.sortMode] ?? s.sortMode}`}</AppText>
-            {s.sortLocked ? <AppText variant="caption" tone="muted">已鎖定手動排序：你手動調整過這張卡的順序，同步只會把新影片放進去，不會重排你排好的。要恢復自動排序，請按「修改規則」解除鎖定。</AppText> : null}
+            {s.sortLocked ? <AppText variant="caption" tone="muted">已鎖定手動排序：你手動調整過這張卡的順序，同步不會重排你排好的，只會把新影片依日期插入正確位置。要恢復自動整張依日期排序，請按「修改規則」解除鎖定。</AppText> : null}
             <AppText variant="caption" tone="muted">{`上次同步：${when(s.lastSyncedAt)}${s.lastSyncedAt ? `（新增 ${s.lastImported} 支）` : ""}`}</AppText>
             {s.lastNote ? <AppText variant="caption" tone="muted" numberOfLines={6}>{s.lastNote}</AppText> : null}
             <View style={styles.row}>
@@ -129,7 +129,7 @@ function FormatSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; 
       <AppText variant="caption" tone="muted">{help}</AppText>
       <AppText variant="caption" tone="muted">{"範例：「{年}年{月}月{日}日 王老師小線對焦」→「2026年3月14日 王老師小線對焦」。只影響之後匯入的教材；已匯入的請按「依規則重新命名」。"}</AppText>
       <Chips title="排序規則" label="排序規則" options={Object.entries(sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} />
-      <AppText variant="caption" tone="muted">你在課程頁手動調整過這張卡的順序，系統會自動「鎖定手動排序」：之後同步只把新影片放進去（放最上面，或選「放最後面」就放最後面），不會重排你排好的。</AppText>
+      <AppText variant="caption" tone="muted">你在課程頁手動調整過這張卡的順序，系統會自動「鎖定手動排序」：之後同步不會重排你排好的：「依日期」規則會把新影片依日期插入正確位置；選「放最上面／最後面」就照選的放。</AppText>
       {sync.sortLocked ? <Chips title="手動排序鎖定" label="手動排序鎖定" options={[{ key: "keep", label: "維持鎖定（保留我排好的）" }, { key: "unlock", label: "解除鎖定（恢復自動排序）" }]} value={unlock ? "unlock" : "keep"} onChange={(v) => setUnlock(v === "unlock")} /> : null}
     </EditSheet>
   );

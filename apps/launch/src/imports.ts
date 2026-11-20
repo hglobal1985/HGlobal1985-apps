@@ -53,8 +53,35 @@ export async function sortMaterialsByDate(db: D1Database, courseId: string): Pro
 /** 同步的排序規則（業主 2026-11-20）。 */
 export const SYNC_SORT_MODES = ["date_desc", "top", "bottom"] as const;
 export type SyncSortMode = (typeof SYNC_SORT_MODES)[number];
-export const SYNC_SORT_LABEL: Record<SyncSortMode, string> = { date_desc: "依日期新到舊（每次同步整張重排）", top: "新影片放最上面（其餘不動）", bottom: "新影片放最後面（其餘不動）" };
+export const SYNC_SORT_LABEL: Record<SyncSortMode, string> = { date_desc: "依日期新到舊（預設；已手動排序的卡，新影片也依日期插入正確位置，不動其餘）", top: "新影片放最上面（其餘不動）", bottom: "新影片放最後面（其餘不動）" };
 export const asSortMode = (v: unknown): SyncSortMode => ((SYNC_SORT_MODES as readonly unknown[]).includes(v) ? (v as SyncSortMode) : "date_desc");
+
+/**
+ * 新影片「依日期」插入（業主 2026-11-20：不論新舊影片，預設都照日期排，日期最新的在最上面，不是照加入時間）：
+ * 用在使用者已手動排序（鎖定）的卡——既有教材的順序完全不動，每支新影片只插入到「第一個比它更舊的教材」前面；找不到就放在教材最後面。
+ * 有區塊的卡是手動編排，新影片仍放最前面（placeOnTop）。
+ */
+async function placeByDate(db: D1Database, courseId: string, fresh: { id: string; date: string | null }[]): Promise<void> {
+  if (!fresh.length) return;
+  const { results } = await db.prepare("SELECT id, kind, is_full, event_date FROM lessons WHERE course_id = ? ORDER BY position").bind(courseId).all<{ id: string; kind: string; is_full: number; event_date: string | null }>();
+  if (results.some((r) => r.kind === "section")) return placeOnTop(db, courseId, fresh.map((f) => f.id));
+  const ids = new Set(fresh.map((f) => f.id));
+  const list = results.filter((r) => !ids.has(r.id) && r.is_full !== 1).map((r) => ({ id: r.id, material: r.kind === "material", date: r.event_date || "" }));
+  const tail = results.filter((r) => r.is_full === 1).map((r) => r.id);
+  // 日期新的先插，同一天維持匯入順序
+  for (const f of [...fresh].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))) {
+    const d = f.date ?? "";
+    let at = list.findIndex((e) => e.material && e.date < d);
+    if (at < 0) {
+      let last = -1;
+      list.forEach((e, i) => e.material && (last = i));
+      at = last >= 0 ? last + 1 : list.length;
+    }
+    list.splice(at, 0, { id: f.id, material: true, date: d });
+  }
+  const order = [...list.map((e) => e.id), ...tail];
+  await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
+}
 
 /** 新影片放在這張卡教材的最後面（「完整版課程影片」仍在最後）；其餘順序不動。 */
 async function placeAtEnd(db: D1Database, courseId: string, newIds: string[]): Promise<void> {
@@ -326,9 +353,13 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
       return db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, event_date, kind) VALUES (?, ?, ?, ?, 0, 'youtube', ?, ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.id, it.date);
     }),
   );
-  // 新影片的位置：鎖定或「放最上面」＝最前面；「放最後面」＝最後面；其餘順序一律不動。
-  if (asSortMode(sync.sort_mode) === "bottom" && !sync.sort_locked) await placeAtEnd(db, sync.course_id, ids);
-  else await placeOnTop(db, sync.course_id, ids);
+  // 新影片的位置：依排序規則。依日期（預設）：沒鎖定＝finish 時整張重排；已手動排序鎖定＝只把新影片依日期插入、不動其餘。
+  // 「放最上面」「放最後面」是使用者明確選的規則，照選的放，其餘順序一律不動。
+  const mode = asSortMode(sync.sort_mode);
+  if (mode === "bottom") await placeAtEnd(db, sync.course_id, ids);
+  else if (mode === "top") await placeOnTop(db, sync.course_id, ids);
+  else if (sync.sort_locked) await placeByDate(db, sync.course_id, items.map((it, i) => ({ id: ids[i]!, date: it.date })));
+  else await placeOnTop(db, sync.course_id, ids); // 馬上會在 finish 依日期整張重排
   return finish({ imported: items.length, note: lines.join("\n").slice(0, 600) });
 }
 
