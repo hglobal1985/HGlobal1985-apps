@@ -10,7 +10,9 @@ import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
 
 /** 底部分頁列高度（業主 2026-11-20：比一般工具列矮一點）。 */
-const navHeight = Math.round((UI_SCALE > 1 ? 62 : 50) * UI_SCALE);
+const navHeight = Math.round((UI_SCALE > 1 ? 66 : 50) * UI_SCALE);
+/** 平板（加到主畫面的 App）：畫面底部有一塊不屬於網頁的綠色區域（約 20），內容要往下挪才會在整片綠色裡置中（業主 2026-11-20）。 */
+const EDGE_GAP = UI_SCALE > 1 ? 20 : 0;
 import { AppText } from "./text";
 import { UniversityIcon } from "./university-icon";
 
@@ -39,7 +41,7 @@ export function BottomBar() {
   const [keyboard, setKeyboard] = useState(false);
   // 大螢幕（業主 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
   const { large } = useLayout();
-  const iconSize = UI_SCALE > 1 ? 26 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（業主 2026-11-20）
+  const iconSize = UI_SCALE > 1 ? 32 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（業主 2026-11-20）
   const iconBox = Math.round((iconSize + 4) * UI_SCALE); // 圖示本身會被全站放大，外框也要跟著放大，否則圖示會壓到下面的文字
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -61,7 +63,7 @@ export function BottomBar() {
   }, [barBg, hidden]);
   if (hidden) return null;
   return (
-    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.navBar, paddingBottom: Math.min(insets.bottom, UI_SCALE > 1 ? 6 : 20) }]} accessibilityRole="tablist">
+    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.navBar, paddingTop: EDGE_GAP, paddingBottom: EDGE_GAP ? 0 : Math.min(insets.bottom, 20) }]} accessibilityRole="tablist">
       <View style={[styles.row, large && styles.rowLarge]}>
       {tabs.map((t) => {
         const on = !lib && t.match(pathname);
@@ -80,7 +82,7 @@ export function BottomBar() {
                   </View>
                 ) : null}
               </View>
-              <AppText variant="caption" numberOfLines={1} style={{ color, fontWeight: "800", fontSize: UI_SCALE > 1 ? 13 : 12, lineHeight: UI_SCALE > 1 ? 16 : 14 }}>
+              <AppText variant="caption" numberOfLines={1} style={{ color, fontWeight: "800", fontSize: UI_SCALE > 1 ? 16 : 12, lineHeight: UI_SCALE > 1 ? 20 : 14 }}>
                 {t.title}
               </AppText>
             </View>
@@ -97,6 +99,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", width: "100%" },
   rowLarge: { maxWidth: 760 },
   tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 3, paddingBottom: 3, minHeight: navHeight },
-  cell: { alignItems: "center", justifyContent: "center", gap: UI_SCALE > 1 ? 4 : 1, paddingVertical: UI_SCALE > 1 ? 6 : 3, paddingHorizontal: 12, borderRadius: 16, minWidth: UI_SCALE > 1 ? 84 : 60 },
+  cell: { alignItems: "center", justifyContent: "center", gap: UI_SCALE > 1 ? 4 : 1, paddingVertical: UI_SCALE > 1 ? 6 : 3, paddingHorizontal: 12, borderRadius: 16, minWidth: UI_SCALE > 1 ? 100 : 60 },
   badge: { position: "absolute", top: -4, right: -12, minWidth: 16, height: 16, borderRadius: 8, borderWidth: 1.5, paddingHorizontal: 3, alignItems: "center", justifyContent: "center" },
 });
