@@ -630,10 +630,10 @@ function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zo
   const label = text ?? (zone ? zoneLabel(zone) : "");
   return (
     // 點標題列任意處都能收合／展開（業主 2026-11-18）；裡面的「移動」「收合」鈕各自處理自己的點擊。
-    // 方案 1（業主 2026-11-20）：白卡＋左側粗色條＋圓形數量徽章；右邊只留一個小箭頭（展開時朝上），不再有文字按鈕。
-    <Pressable onPress={onFold} disabled={!onFold} accessibilityRole="header" accessibilityState={{ expanded: onFold ? !folded : undefined }} accessibilityLabel={`${label}，${count}`} style={[styles.zone, { backgroundColor: c.surface, borderColor: c.border, borderLeftColor: look.fg }]}>
-      <Ionicons name={icon ?? look.icon} size={22} color={look.fg} />
-      <AppText variant="headline" style={{ fontWeight: "800", color: c.text, flex: 1 }} numberOfLines={2}>
+    // 方案 4（業主 2026-11-20）：極簡標題＋專區色底線（無底色）；數量用方案 1 的淡色圓形徽章靠右；右邊「收合／展開」文字加小箭頭。
+    <Pressable onPress={onFold} disabled={!onFold} accessibilityRole="header" accessibilityState={{ expanded: onFold ? !folded : undefined }} accessibilityLabel={`${label}，${count}`} style={[styles.zone, { borderBottomColor: look.fg }]}>
+      <Ionicons name={icon ?? look.icon} size={24} color={look.fg} />
+      <AppText variant="headline" style={{ fontWeight: "800", color: look.fg, flex: 1, fontSize: 19 }} numberOfLines={2}>
         {label}
       </AppText>
       {onMove ? (
@@ -649,14 +649,22 @@ function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zo
           {count}
         </AppText>
       </View>
-      {onFold ? <Ionicons name={folded ? "chevron-down" : "chevron-up"} size={24} color={c.textMuted} /> : null}
+      {onFold ? (
+        <View style={styles.foldText}>
+          <AppText variant="callout" style={{ color: look.fg, fontWeight: "800" }}>
+            {folded ? "展開" : "收合"}
+          </AppText>
+          <Ionicons name={folded ? "chevron-down" : "chevron-up"} size={20} color={look.fg} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   moveBtn: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
-  zone: { width: "100%", minHeight: 56, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderLeftWidth: 8 },
+  zone: { width: "100%", minHeight: 52, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 3 },
+  foldText: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: 2 },
   countDot: { minWidth: 32, height: 32, paddingHorizontal: 9, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   terms: { marginTop: space.xs, borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   term: { minHeight: 44, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", gap: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
