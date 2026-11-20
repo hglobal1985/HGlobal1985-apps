@@ -6,6 +6,7 @@ import { resolveUrl, type CourseDetail, type CourseSummary } from "@/api/client"
 import { BrandIcon } from "@/ui/brand-icon";
 import { TYPE_INFO } from "@/features/link-types";
 import { ErrorView, LoadingLadybug } from "@/ui";
+import { ChapterList } from "./lesson-list";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
@@ -104,7 +105,7 @@ export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onC
       <SheetScroll>
         {loading && !data ? <LoadingLadybug /> : null}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
-        {data && items.length === 0 ? <AppText tone="muted">目前還沒有教材</AppText> : null}
+        {data && items.length === 0 ? <ChapterList course={data} /> : null}
         {items.map((l) => (
           <SheetRow
             key={l.id}
