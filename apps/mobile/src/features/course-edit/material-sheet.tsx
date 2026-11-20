@@ -1,5 +1,5 @@
 import { isDownloadUrl } from "@/lib/download-material";
-import { Check } from "@/features/course-edit/course-sections";
+import { Check } from "@/ui/check";
 import { isSuperAdmin } from "@/lib/roles";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";

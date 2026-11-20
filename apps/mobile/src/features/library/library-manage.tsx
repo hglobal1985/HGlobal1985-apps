@@ -6,11 +6,11 @@ import { api, classifyLink, parseHttpsUrl, type LibraryItem, type LibraryMine } 
 import { confirmAsk } from "@/features/confirm";
 import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
-import { IconButton } from "@/features/course-edit/lessons";
+import { IconButton } from "@/ui/icon-button";
 import { TYPE_INFO } from "@/features/link-types";
 import { dateTime, eventDays } from "@/features/format";
 import { fromHms, toHms, type Hms } from "@/features/uploads/hms";
-import { TimeRangePicker } from "@/features/uploads/time-range-picker";
+import { TimeRangePicker } from "@/features/admin-parts";
 import { useLibraryChrome } from "@/lib/library-mode";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";

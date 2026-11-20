@@ -4,9 +4,12 @@ import { api } from "@/api/client";
 import { PageHeader } from "@/features/page-header";
 import { useApi } from "@/state/session";
 import { EmptyState, ErrorView, LoadingView, Screen, Button } from "@/ui";
-import { LibraryScreen } from "@/features/library/library-view";
+import { lazyPart } from "@/lib/lazy-part";
 import { CoursesView } from "./courses-view";
 import { SeriesPage } from "./series-page";
+
+/** 會員書櫃（/會員編號）：只有打開書櫃網址才下載（2026-11-21 載入速度優化）。 */
+const LibraryScreen = lazyPart(() => import("@/features/library/library-view"), "LibraryScreen", <LoadingView />);
 
 /**
  * 短網址頁（/縮寫，分類、系列或中心）：網址列維持短網址不變，內容是該分類／系列的課程清單。

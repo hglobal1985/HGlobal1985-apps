@@ -1,5 +1,4 @@
-import qrcode from "qrcode-generator";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import { absoluteUrl, shareLink } from "@/lib/share";
@@ -71,15 +70,24 @@ function InviteSheet({ title, path, onClose }: { title: string; path: string; on
 
 /** QR Code（白底黑點，四周留白；用 SVG 畫，手機與網頁都一樣清楚）。 */
 export function QrCode({ value, size }: { value: string; size: number }) {
-  const cells = useMemo(() => {
-    const qr = qrcode(0, "M");
-    qr.addData(value);
-    qr.make();
-    const n = qr.getModuleCount();
-    let d = "";
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
-    return { n, d };
+  // QR 產生器（約 20KB）只有打開邀請面板才下載（2026-11-21 載入速度優化）；下載完之前先顯示白色方塊。
+  const [cells, setCells] = useState<{ n: number; d: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void import("qrcode-generator").then(({ default: qrcode }) => {
+      const qr = qrcode(0, "M");
+      qr.addData(value);
+      qr.make();
+      const n = qr.getModuleCount();
+      let d = "";
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+      if (alive) setCells({ n, d });
+    }).catch(() => undefined);
+    return () => {
+      alive = false;
+    };
   }, [value]);
+  if (!cells) return <View style={{ width: size, height: size, backgroundColor: "#fff", borderRadius: 12 }} accessibilityLabel="QR Code 產生中" />;
   const quiet = 2;
   const box = cells.n + quiet * 2;
   return (

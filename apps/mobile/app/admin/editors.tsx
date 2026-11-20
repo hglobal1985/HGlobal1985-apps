@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, resolveUrl, type CourseEditor, type EditorCandidate } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
-import { Check } from "@/features/course-edit/course-sections";
+import { Check } from "@/ui/check";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { centerTitle } from "@/features/format";
 import { canManageEditors } from "@/lib/roles";

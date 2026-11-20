@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { api } from "@/api/client";
 import { useUiConfig } from "@/state/ui-config";
-import { Button, Icon, NoticeBox } from "@/ui";
+import { Button, NoticeBox } from "@/ui";
 import { centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Card, Chips, EmptyState, ErrorView, LoadingView, Screen, Section } from "@/ui";
+import { Stepper } from "@/ui/stepper";
 
 type Kind = "image" | "doc" | "audio" | "other";
 type FileSettings = { importMaxMb: number; ticketSec: number; dailyDownloads: number; dailyDownloadMb: number };
@@ -38,30 +39,6 @@ function StackBar({ parts, total }: { parts: { color: string; value: number }[];
  * 設定 > 儲存空間管理（超級管理員，業主 2026-11-18）：整個網站雲端儲存已使用的容量、
  * 各類型檔案的佔比，以及各中心（含寰宇總部）各自佔用多少、裡面各類型各多少。大小是雲端的實際大小。
  */
-/** 一個「減／數字／加」的調整列。 */
-export function Stepper({ label, hint, value, min, max, step, unit, onChange }: { label: string; hint: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }) {
-  const { c } = useTheme();
-  return (
-    <View style={styles.legend}>
-      <View style={{ flex: 1 }}>
-        <AppText variant="body">{label}</AppText>
-        <AppText variant="caption" tone="muted">
-          {hint}
-        </AppText>
-      </View>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${label}減少`} disabled={value <= min} onPress={() => onChange(Math.max(min, value - step))} style={[styles.step, { borderColor: c.border, opacity: value <= min ? 0.35 : 1 }]}>
-        <Icon name="remove" size={22} color={c.text} />
-      </Pressable>
-      <AppText variant="headline" style={{ minWidth: 76, textAlign: "center" }}>
-        {value}
-        {unit}
-      </AppText>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${label}增加`} disabled={value >= max} onPress={() => onChange(Math.min(max, value + step))} style={[styles.step, { borderColor: c.border, opacity: value >= max ? 0.35 : 1 }]}>
-        <Icon name="add" size={22} color={c.text} />
-      </Pressable>
-    </View>
-  );
-}
 
 /** 圖片格式簡易比較表（業主 2026-11-20）：選存檔格式時的參考。 */
 const FORMAT_ROWS: { name: string; size: string; compat: string; alpha: string; pro: string; con: string }[] = [
@@ -261,7 +238,6 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   fmtBox: { borderWidth: 1, borderRadius: radius.md, overflow: "hidden" },
   fmtRow: { padding: space.sm, gap: 2 },
-  step: { width: 40, height: 40, borderRadius: radius.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.xs },
   chip: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
 });

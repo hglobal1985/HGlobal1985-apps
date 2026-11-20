@@ -1,4 +1,5 @@
 export { AppText } from "./text";
+export { Check } from "./check";
 export { Icon, type IconName } from "./icon";
 export { Screen } from "./screen";
 export { Card } from "./card";

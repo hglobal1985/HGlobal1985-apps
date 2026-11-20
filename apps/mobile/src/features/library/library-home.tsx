@@ -6,7 +6,12 @@ import { useApi, useSession } from "@/state/session";
 import type { LibraryMine, LibraryView } from "@/api/client";
 import { LoadingView } from "@/ui";
 import { useLibraryChrome } from "@/lib/library-mode";
-import { LibraryScreen, Shelves } from "./library-view";
+import { lazyPart } from "@/lib/lazy-part";
+
+// 書櫃畫面用到才下載（與短網址的書櫃頁共用同一包，2026-11-21）。
+const view = () => import("./library-view");
+const LibraryScreen = lazyPart(view, "LibraryScreen", <LoadingView />);
+const Shelves = lazyPart(view, "Shelves", <LoadingView />);
 
 /**
  * 設定 › 我的書櫃 的主畫面（業主 2026-11-17）：所有登入會員點進來都看到同一套木質書架介面；

@@ -3,9 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
 import { api, UNCATEGORIZED, type CourseSummary, type SeriesArt } from "@/api/client";
-import { SeriesEdm } from "@/features/admin/series-edm";
-import { SeriesApplySheet } from "./series-apply-sheet";
-import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { SeriesApplySheet, SeriesCoverSheet } from "@/features/admin-parts";
 import { PageHeader } from "@/features/page-header";
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
@@ -258,9 +256,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       </Screen>
       {applyOpen ? <SeriesApplySheet series={series} title={shownTitle} courses={all.filter((x) => !x.isList)} onClose={() => setApplyOpen(false)} /> : null}
       {coverOpen ? (
-        <EditSheet title={`「${shownTitle}」封面圖`} onClose={() => setCoverOpen(false)} hideSave>
-          <SeriesEdm series={series} edmUrl={art?.edmUrl} onChanged={artList.reload} />
-        </EditSheet>
+        <SeriesCoverSheet series={series} title={shownTitle} edmUrl={art?.edmUrl} onClose={() => setCoverOpen(false)} onChanged={artList.reload} />
       ) : null}
     </>
   );

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, SERIES_APPLY_GROUPS, VIEW_SCOPE_LABEL, VIEW_SCOPES, type CourseSummary, type Rank, type SeriesApplyPlan, type SeriesApplyResult, type SeriesRosterPlan, type ViewScope } from "@/api/client";
-import { Check } from "@/features/course-edit/course-sections";
+import { Check } from "@/ui/check";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { BrandField, CategoryField } from "@/features/course-edit/field-groups";
 import { useApi, useSession } from "@/state/session";

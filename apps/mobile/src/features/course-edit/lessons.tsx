@@ -15,12 +15,19 @@ import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { AppText, Button, Card, DateSelect, Icon, NoticeBox, SheetRow, todayStr } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CollapseToggle } from "@/ui/collapse-toggle";
-import { Check } from "./course-sections";
+import { Check } from "@/ui/check";
+import { IconButton } from "@/ui/icon-button";
 import { BrandField, CategoryField } from "./field-groups";
 import { EditSheet } from "./edit-sheet";
 import { EditMaterialSheet } from "./material-sheet";
 
 /** YouTube 影片沒有長度時（章節顯示 0 分鐘），自動偵測並寫回（只有網頁版的管理者畫面做）。 */
+/** 元件版（給「用到才下載」用，見 features/admin-parts.tsx）：放在畫面上就會執行 useYoutubeLengthFix，本身不顯示任何東西。 */
+export function YoutubeLengthFix({ course, enabled }: { course: CourseDetail | null | undefined; enabled: boolean }) {
+  useYoutubeLengthFix(course, enabled);
+  return null;
+}
+
 export function useYoutubeLengthFix(course: CourseDetail | null | undefined, enabled: boolean) {
   const { invalidate } = useSession();
   const [detecting, setDetecting] = useState(false);
@@ -454,15 +461,6 @@ export function EditLessonRows({ group, word, onEdit, onMove, onCopy, onDelete, 
   );
 }
 
-export function IconButton({ icon, label, onPress, disabled, danger }: { icon: "arrow-up" | "arrow-down" | "trash-outline" | "create-outline" | "copy-outline" | "folder-open-outline"; label: string; onPress?: () => void; disabled?: boolean; danger?: boolean }) {
-  const { c } = useTheme();
-  const off = disabled || !onPress;
-  return (
-    <Pressable onPress={onPress} disabled={off} accessibilityRole="button" accessibilityLabel={label} style={[styles.iconBtn, { borderColor: c.border, opacity: off ? 0.35 : 1 }]}>
-      <Icon name={icon} size={14} color={danger ? c.danger : c.text} />
-    </Pressable>
-  );
-}
 
 const styles = StyleSheet.create({
   twoCol: { flexDirection: "row", gap: space.sm },
@@ -471,7 +469,6 @@ const styles = StyleSheet.create({
   sameCheck: { flexDirection: "row", alignItems: "center", gap: space.xs, minHeight: minTouch, paddingLeft: space.sm },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
   input: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },
-  iconBtn: { width: 28, height: 28, borderRadius: radius.sm, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   moveBtn: { alignSelf: "flex-start", marginLeft: space.sm, marginBottom: 4, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, minHeight: 28, borderRadius: 999, borderWidth: 1 },
   lessonRow: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: space.xs, borderBottomWidth: StyleSheet.hairlineWidth },
   lessonMain: { flex: 1, minWidth: 0, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm },

@@ -1,6 +1,4 @@
 import { trackFeature } from "@/lib/feature-track";
-import { Directory, File, Paths } from "expo-file-system";
-import * as Sharing from "expo-sharing";
 import { Platform, Share } from "react-native";
 import { DEFAULT_SHARE_SETTINGS, resolveUrl, reviewerInviteMessage, shareMessage, type UiConfig } from "@/api/client";
 
@@ -70,6 +68,8 @@ export async function shareImage(title: string, url: string, fileName = "poster.
   const link = absolute(url);
   if (Platform.OS !== "web") {
     try {
+      // App 才用到的檔案工具，用到才載入（網頁版不必下載，2026-11-21）。
+      const [{ Directory, File, Paths }, Sharing] = await Promise.all([import("expo-file-system"), import("expo-sharing")]);
       const file = await File.downloadFileAsync(link, new Directory(Paths.cache));
       await Sharing.shareAsync(file.uri, { mimeType: "image/jpeg", dialogTitle: title });
       return "shared";

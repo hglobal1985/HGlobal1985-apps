@@ -16,13 +16,11 @@ import { PlayerControls } from "@/features/player/player-controls";
 import { PlayerSlot } from "@/features/player/player-slot";
 import { useLessonSession } from "@/features/player/use-lesson-session";
 import { lessonHref } from "@/lib/lesson-href";
-import { EdmManager } from "@/features/admin/edm-manager";
-import { SectionList, SectionSheet, type SectionKey } from "@/features/course-edit/course-sections";
+import { BlockEditList, EdmManager, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
+import type { SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
-import { NewMaterialSheet } from "@/features/course-edit/material-sheet";
-import { Check } from "@/features/course-edit/course-sections";
+import { Check } from "@/ui/check";
 import { CollapseToggle } from "@/ui/collapse-toggle";
-import { BlockEditList, EditLessonRows, LessonSheet, MoveToBlockSheet, PickMaterialsSheet, NewLessonSheet, SectionTitleSheet, useYoutubeLengthFix } from "@/features/course-edit/lessons";
 import { PageHeader } from "@/features/page-header";
 import { useApi, useSession } from "@/state/session";
 import { useLayout } from "@/theme/layout";
@@ -103,7 +101,10 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
-  useYoutubeLengthFix(course, editing && Platform.OS === "web");
+  // 有管理權限的人：先在背景下載編輯工具，按「編輯」時立刻出現（一般學員不下載，見 features/admin-parts.tsx）。
+  useEffect(() => {
+    if (manages) preloadCourseEditor();
+  }, [manages]);
   // 原地播放：正在播放哪一堂（編輯模式不播放）。播放邏輯（授權、進度回報、自動完成…）都在 useLessonSession。
   const [playingId, setPlayingId] = useState<string | null>(lesson ?? null);
   useEffect(() => {
@@ -340,6 +341,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
 
   return (
     <View style={{ flex: 1 }}>
+      {editing && Platform.OS === "web" ? <YoutubeLengthFix course={course} enabled /> : null}
       <PageHeader
         title={course.title}
         path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
