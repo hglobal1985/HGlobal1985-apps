@@ -630,37 +630,34 @@ function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zo
   const label = text ?? (zone ? zoneLabel(zone) : "");
   return (
     // 點標題列任意處都能收合／展開（業主 2026-11-18）；裡面的「移動」「收合」鈕各自處理自己的點擊。
-    <Pressable onPress={onFold} disabled={!onFold} accessibilityRole="header" style={[styles.zone, { backgroundColor: look.bg }]}>
-      <Ionicons name={icon ?? look.icon} size={18} color={look.fg} />
-      <AppText variant="callout" style={{ fontWeight: "800", color: look.fg, flexShrink: 1 }}>
+    // 方案 1（業主 2026-11-20）：白卡＋左側粗色條＋圓形數量徽章；右邊只留一個小箭頭（展開時朝上），不再有文字按鈕。
+    <Pressable onPress={onFold} disabled={!onFold} accessibilityRole="header" accessibilityState={{ expanded: onFold ? !folded : undefined }} accessibilityLabel={`${label}，${count}`} style={[styles.zone, { backgroundColor: c.surface, borderColor: c.border, borderLeftColor: look.fg }]}>
+      <Ionicons name={icon ?? look.icon} size={22} color={look.fg} />
+      <AppText variant="headline" style={{ fontWeight: "800", color: c.text, flex: 1 }} numberOfLines={2}>
         {label}
       </AppText>
-      <AppText variant="caption" style={{ color: look.fg, flex: 1 }}>
-        {count}
-      </AppText>
       {onMove ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={`移動課程或清單到${label}`} onPress={onMove} style={[styles.moveBtn, { backgroundColor: look.fg }]}>
-          <Ionicons name="swap-horizontal" size={16} color={look.bg} />
-          <AppText variant="caption" style={{ color: look.bg, fontWeight: "800" }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={`移動課程或清單到${label}`} onPress={onMove} style={[styles.moveBtn, { backgroundColor: "transparent", borderWidth: 1, borderColor: look.fg }]}>
+          <Ionicons name="swap-horizontal" size={16} color={look.fg} />
+          <AppText variant="caption" style={{ color: look.fg, fontWeight: "800" }}>
             移動
           </AppText>
         </Pressable>
       ) : null}
-      {onFold ? (
-        <Pressable accessibilityRole="button" accessibilityState={{ expanded: !folded }} accessibilityLabel={`${folded ? "展開" : "收合"}${label}`} onPress={onFold} style={[styles.moveBtn, { backgroundColor: look.fg }]}>
-          <AppText variant="caption" style={{ color: look.bg, fontWeight: "800" }}>
-            {folded ? "展開" : "收合"}
-          </AppText>
-          <Ionicons name={folded ? "chevron-down" : "chevron-up"} size={16} color={look.bg} />
-        </Pressable>
-      ) : null}
+      <View style={[styles.countDot, { backgroundColor: look.bg }]}>
+        <AppText variant="callout" style={{ color: look.fg, fontWeight: "800" }}>
+          {count}
+        </AppText>
+      </View>
+      {onFold ? <Ionicons name={folded ? "chevron-down" : "chevron-up"} size={24} color={c.textMuted} /> : null}
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   moveBtn: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
-  zone: { width: "100%", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: 12 },
+  zone: { width: "100%", minHeight: 56, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: 14, borderWidth: 1, borderLeftWidth: 8 },
+  countDot: { minWidth: 32, height: 32, paddingHorizontal: 9, borderRadius: 16, alignItems: "center", justifyContent: "center" },
   terms: { marginTop: space.xs, borderWidth: 1, borderRadius: 12, overflow: "hidden" },
   term: { minHeight: 44, paddingHorizontal: space.md, flexDirection: "row", alignItems: "center", gap: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   kind: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 }, filters: { flexDirection: "row", alignItems: "flex-end", gap: space.sm },
