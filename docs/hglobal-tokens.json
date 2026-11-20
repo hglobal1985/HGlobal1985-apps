@@ -15,7 +15,7 @@
     "warning": "#a86408", "warningSoft": "#fdf0e3",
     "danger": "#b3261e", "dangerSoft": "#fbeae8",
     "success": "#1b7a43", "successSoft": "#e7f1ea",
-    "tabBar": "#ffffff", "bright": "#ffd43b", "onBright": "#5a3b00"
+    "tabBar": "#ffffff", "navBar": "#0c603c", "navPill": "#f5c842", "navPillText": "#1f1a00", "bright": "#ffd43b", "onBright": "#5a3b00"
   },
   "dark": {
     "background": "#121515", "surface": "#1c2020", "surfaceMuted": "#252a29", "border": "#343b38",
@@ -24,7 +24,7 @@
     "warning": "#f2c063", "warningSoft": "#3a2e17",
     "danger": "#f2b8b5", "dangerSoft": "#3c1e1c",
     "success": "#4fa774", "successSoft": "#1b3022",
-    "tabBar": "#171b1b", "bright": "#f5c518", "onBright": "#2a1d00"
+    "tabBar": "#171b1b", "navBar": "#14573a", "navPill": "#f2c063", "navPillText": "#1f1a00", "bright": "#f5c518", "onBright": "#2a1d00"
   },
   "ribbons": {
     "note": "課程卡角落緞帶可選的顏色（淺色、深色模式相同）。",
