@@ -150,6 +150,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="sparkles-outline" title="AI 模型" subtitle="切換逐字稿、關鍵字、語意搜尋用的 AI 模型，並比較花費" onPress={() => router.push("/admin/ai-models")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="trophy-outline" title="徽章任務設定" subtitle="依分類新增、修改所有徽章任務，並設定書櫃鑰匙門檻" onPress={() => router.push("/admin/achievements")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="images-outline" title="品牌 Logo" subtitle="上傳品牌 logo、選底圖或底色，並對應分類，課程與清單卡可用它當封面" onPress={() => router.push("/admin/brand-logos")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="logo-youtube" title="同步 YouTube 清單" subtitle="貼上播放清單網址，手動按同步就把新影片匯成教材" onPress={() => router.push("/admin/youtube-syncs")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="image-outline" title="Cloudflare即時縮圖" subtitle="手機小螢幕的卡片縮圖即時縮小，設定所有縮圖選項與試算" onPress={() => router.push("/admin/thumbnails")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="cloud-outline" title="儲存空間管理" subtitle="各中心已使用的檔案容量，以及圖片、文件、音檔的佔用比例" onPress={() => router.push("/admin/storage")} /> : null}
             {member.role === "admin" ? <ListRow icon="flag-outline" title="留言檢舉" subtitle="處理被檢舉的留言" onPress={() => router.push("/admin/comments")} /> : null}

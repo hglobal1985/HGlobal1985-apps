@@ -44,7 +44,7 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: li
     }
   };
   return (
-    <EditSheet material={list} title="新增教材卡" onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!f.title.trim() || !!f.teacher.trim()} busy={busy} error={error}>
+    <EditSheet title="新增教材卡" onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!f.title.trim() || !!f.teacher.trim()} busy={busy} error={error}>
       <BasicsFields isList={list} f={f} setF={setF} />
       <HostField title={list ? "建立單位" : "主辦中心"} value={host} fixed={host} onChange={setHost} />
       <AppText variant="caption" tone="muted">

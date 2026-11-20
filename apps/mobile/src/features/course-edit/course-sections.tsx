@@ -182,8 +182,8 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
   return (
     <>
       <Field label={"教材卡名稱（必填）"} value={f.title} onChange={set("title")} placeholder={isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
-      {/* 清單卡沒有主講人、職稱、獎銜（業主 2026-11-16）。 */}
-      {isList ? null : (
+      {/* 教材卡只剩一種（業主 2026-11-20）：主講人、日期、套裝課程欄位一律都有。 */}
+      {(
         <>
           {/* 沒有主講人（業主 2026-11-19）：勾「無」＝主講人、獎銜、職稱三個欄位隱藏並清空，專屬網址改用課程名稱的英譯＋編號。 */}
           <Check label="無（這門課沒有主講人、獎銜、職稱）" value={f.noSpeaker} onChange={(v) => setF((x) => ({ ...x, noSpeaker: v, ...(v ? { teacher: "", teacherRank: "", teacherTitle: "" } : {}) }))} />
@@ -230,14 +230,14 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
     if (!f.title.trim()) return setError("請輸入教材卡名稱");
     const { series: _series, zone, eventStart, eventEnd, ...rest } = f;
     // 日期與「時間與地點」面板是同一份資料；清單卡沒有日期，不送。
-    const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
-    const important = !course.isList && (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
+    const dates = { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
+    const important = (eventStart !== init.eventStart || eventEnd !== init.eventEnd) ? ["日期"] : [];
     const matBody = course.isList && isSuper && matUrl.trim().toLowerCase() !== (course.matUrl ?? "") ? { matUrl: matUrl.trim() } : {};
     if (await save({ ...(isSuper ? { ...rest, series: f.series, ...(zone !== init.zone ? { zone } : {}) } : rest), ...dates, ...matBody }, { important })) onClose();
   };
   return (
     <EditSheet
-      material={course.isList}
+     
       title="基本資料"
       onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
       {course.isList && isSuper ? (
@@ -279,7 +279,7 @@ function WhenSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save({ ...f, eventStart: f.eventStart || null, eventEnd: f.eventEnd || null }, { important })) onClose();
   };
   return (
-    <EditSheet material={course.isList} title="時間與地點" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="時間與地點" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <DateSelect label="活動開始日期" value={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventStart: v, ...(v ? {} : { eventEnd: "" }) }))} />
       {f.eventStart ? <DateSelect label="活動結束日期（連續多天才設定，單日不用）" value={f.eventEnd} defaultValue={f.eventStart} onChange={(v) => setF((x) => ({ ...x, eventEnd: v }))} /> : null}
       <AppText variant="caption" tone="muted">
@@ -326,7 +326,7 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save(body, { important })) onClose();
   };
   return (
-    <EditSheet material={course.isList} title="費用與審核" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="費用與審核" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <Label>報名費用（新台幣，0＝免費）</Label>
       <TextInput
         value={f.priceTwd}
@@ -374,7 +374,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
   };
   const rankName = ranks.data?.find((r) => r.code === f.minRankCode)?.name ?? course.minRank.name;
   return (
-    <EditSheet material={course.isList} title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <AppText variant="headline">誰能瀏覽課程？</AppText>
       <Chips title="瀏覽範圍" options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => (setF((x) => ({ ...x, viewScope: v as ViewScope })), (v === "all" || v === "link_guest") && setRankOpen(false))} />
       <AppText variant="caption" tone="muted">
@@ -419,7 +419,7 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save(body)) onClose();
   };
   return (
-    <EditSheet material={course.isList} title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <HostField title="主辦單位" value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
       <AppText variant="caption" tone="muted">
@@ -471,7 +471,7 @@ function StatusSheet({ course, onClose, onSaved }: SheetProps) {
     }
   };
   return (
-    <EditSheet material={course.isList} title="上架與刪除" onClose={onClose} busy={busy || working} error={error} hideSave>
+    <EditSheet title="上架與刪除" onClose={onClose} busy={busy || working} error={error} hideSave>
       <View style={styles.row}>
         <Label>目前狀態</Label>
         <Pill label={status === "published" ? "上架中" : status === "archived" ? "已下架封存" : "未上架"} tone={status === "published" ? "success" : "danger"} />
@@ -541,10 +541,10 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
   const statusText = course.status === "published" ? "上架中" : course.status === "archived" ? "已下架封存" : "未上架";
   return (
     <Card style={{ paddingVertical: 0 }}>
-      <ListRow icon="create-outline" title="基本資料" subtitle={[course.title, !course.isList && course.teacher && `主講 ${course.teacher}`, course.category, course.series && `系列 ${course.series}`].filter(Boolean).join("・")} onPress={() => onOpen("basics")} />
+      <ListRow icon="create-outline" title="基本資料" subtitle={[course.title, course.teacher && `主講 ${course.teacher}`, course.category, course.series && `系列 ${course.series}`].filter(Boolean).join("・")} onPress={() => onOpen("basics")} />
       {/* 清單卡沒有時間地點與費用（一律公開免費）。 */}
-      {course.isList ? null : <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />}
-      {course.isList ? null : <ListRow icon="pricetag-outline" title="費用與審核" subtitle={priceText} onPress={() => onOpen("price")} />}
+      <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />
+      <ListRow icon="pricetag-outline" title="費用與審核" subtitle={priceText} onPress={() => onOpen("price")} />
       <ListRow icon="people-outline" title="報名資格條件" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}・${VIEW_SCOPE_LABEL[course.viewScope]}`} onPress={() => onOpen("enroll")} />
       <ListRow icon="options-outline" title="進階設定" subtitle={`主辦：${course.hostUnit || "未設定"}${course.admin?.editedAt ? `・最後修改 ${course.admin.editedByName}` : ""}`} onPress={() => onOpen("advanced")} />
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />
