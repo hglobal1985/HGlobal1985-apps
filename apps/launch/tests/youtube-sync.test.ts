@@ -1,16 +1,23 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Env } from "../src/d1.ts";
-import { playlistIdOf, runYoutubeSync, syncTitle } from "../src/imports.ts";
+import { defaultSyncFormat, playlistIdOf, renameYoutubeSync, runYoutubeSync, syncTitle } from "../src/imports.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
 test("同步清單：網址判讀與教材名稱格式", () => {
   assert.equal(playlistIdOf("https://www.youtube.com/playlist?list=PLRuUjdLupIVp8nJWWDkDtE2JH3kYGV7Br"), "PLRuUjdLupIVp8nJWWDkDtE2JH3kYGV7Br");
   assert.equal(playlistIdOf("https://example.com/playlist?list=PLabcdefghijk"), null);
   assert.equal(playlistIdOf("not a url"), null);
-  assert.equal(syncTitle("會長翡翠鑽石會議", "2026年11月 會長翡翠鑽石會議 主持：王大明", "2026-11-20"), "2026年11月 會長翡翠鑽石會議（主持王大明）");
-  assert.equal(syncTitle("會長翡翠鑽石會議", "會議全程", "2026-10-03"), "2026年10月 會長翡翠鑽石會議");
-  assert.equal(syncTitle("王老師小線對焦會", "對焦會", null), "王老師小線對焦會");
+  const dflt = defaultSyncFormat("會長翡翠鑽石會議");
+  assert.equal(syncTitle(dflt, "2026年11月 會長翡翠鑽石會議 主持：王大明", "2026-11-20"), "2026年11月 會長翡翠鑽石會議（主持王大明）");
+  assert.equal(syncTitle(dflt, "會議全程", "2026-10-03"), "2026年10月 會長翡翠鑽石會議");
+  assert.equal(syncTitle(defaultSyncFormat("王老師小線對焦會"), "對焦會", null), "王老師小線對焦會");
+  // 自訂命名規則（業主 2026-11-20）：「2026年3月x日 王老師小線對焦」
+  const wang = "{年}年{月}月{日}日 王老師小線對焦";
+  assert.equal(syncTitle(wang, "對焦會", "2026-03-14"), "2026年3月14日 王老師小線對焦");
+  assert.equal(syncTitle(wang, "2026年3月 對焦會", "2026-03-09"), "2026年3月9日 王老師小線對焦");
+  assert.equal(syncTitle(wang, "2026年3月 對焦會", "2026-04-02"), "2026年3月 王老師小線對焦"); // 影片日期月份對不上標題，日省略
+  assert.equal(syncTitle(wang, "2026年3月18日 對焦會", "2026-04-02"), "2026年3月18日 王老師小線對焦");
 });
 
 test("同步清單：同名的教材才加（月/日），不同名的不加", async () => {
@@ -64,4 +71,27 @@ test("同步清單：只加新影片、最新的在最上面、再按一次不�
   const st = await db.prepare("SELECT last_imported, last_note FROM youtube_syncs WHERE id = 's1'").first<{ last_imported: number; last_note: string }>();
   assert.equal(st?.last_imported, 0);
   assert.match(st!.last_note, /沒有新的影片/);
+});
+
+test("同步清單：依命名規則重新命名已匯入的教材", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
+  const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+  await run("INSERT INTO courses (id, title, status) VALUES ('c1', '對焦會', 'published')");
+  await run("INSERT INTO youtube_syncs (id, url, playlist_id, course_id, title_prefix, title_format) VALUES ('s1', 'u', 'PLX', 'c1', '王老師小線對焦會', '{年}年{月}月{日}日 王老師小線對焦')");
+  await run("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, kind) VALUES ('l1', 'c1', 1, '2026年3月 王老師小線對焦會', 0, 'youtube', 'AAAAAAAAAAA', 'material')");
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (u: string | URL | Request) => {
+    if (String(u).includes("playlistItems"))
+      return new Response(JSON.stringify({ items: [{ snippet: { title: "a" }, contentDetails: { videoId: "AAAAAAAAAAA", videoPublishedAt: "2026-03-14T01:00:00Z" } }] }), { status: 200 });
+    return new Response("x", { status: 404 });
+  }) as typeof fetch;
+  try {
+    assert.equal((await renameYoutubeSync(env, "s1")).renamed, 1);
+    assert.equal((await renameYoutubeSync(env, "s1")).renamed, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const t = await db.prepare("SELECT title FROM lessons WHERE id = 'l1'").first<{ title: string }>();
+  assert.equal(t?.title, "2026年3月14日 王老師小線對焦");
 });

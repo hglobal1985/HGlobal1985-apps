@@ -3410,9 +3410,10 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       requireSuperAdmin(ctx);
       const { results } = await ctx.db
-        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id ORDER BY y.created_at")
-        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
-      return { syncs: results, keyReady: !!ctx.env.YOUTUBE_API_KEY };
+        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id ORDER BY y.created_at")
+        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
+      const { defaultSyncFormat, SYNC_FORMAT_HELP } = await import("./imports.ts");
+      return { syncs: results.map((r) => ({ ...r, titleFormat: r.titleFormat || defaultSyncFormat(r.titlePrefix) })), keyReady: !!ctx.env.YOUTUBE_API_KEY, formatHelp: SYNC_FORMAT_HELP };
     },
   ],
   [
@@ -3421,8 +3422,8 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       // 新增一份同步設定（業主 2026-11-20，超級管理員）：貼播放清單網址，選「放進哪一張教材卡」（或直接新建一張）與教材名稱前綴。
       const s = requireSuperAdmin(ctx);
-      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; label?: unknown }>(ctx.req);
-      const { playlistIdOf } = await import("./imports.ts");
+      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; label?: unknown }>(ctx.req);
+      const { playlistIdOf, defaultSyncFormat } = await import("./imports.ts");
       const playlistId = typeof body.url === "string" ? playlistIdOf(body.url) : null;
       if (!playlistId) return fail(400, "invalid_playlist", "請貼上 YouTube 播放清單的網址（網址裡要有 list=…）");
       let courseId = typeof body.courseId === "string" ? body.courseId : "";
@@ -3440,7 +3441,8 @@ const routes: [string, RegExp, Handler][] = [
       }
       const prefix = (typeof body.titlePrefix === "string" ? body.titlePrefix.trim() : "").slice(0, 80) || newTitle;
       const id = `ys${randomId(8)}`;
-      await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix) VALUES (?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix).run();
+      const format = (typeof body.titleFormat === "string" ? body.titleFormat.trim() : "").slice(0, 120) || defaultSyncFormat(prefix);
+      await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix, title_format) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix, format).run();
       await audit(ctx.db, s.sub, "youtube_sync.create", "youtube_sync", id, playlistId).run();
       return { id, courseId };
     },
@@ -3453,6 +3455,29 @@ const routes: [string, RegExp, Handler][] = [
       const { runYoutubeSync } = await import("./imports.ts");
       const out = await runYoutubeSync(ctx.env, id!);
       return out;
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/youtube-syncs\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      // 修改這份同步的命名規則（只影響之後匯入的；已匯入的要按「依規則重新命名」）。
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ titleFormat?: unknown }>(ctx.req);
+      const format = typeof body.titleFormat === "string" ? body.titleFormat.trim().slice(0, 120) : "";
+      if (!format) return fail(400, "format_required", "請輸入命名規則");
+      await ctx.db.prepare("UPDATE youtube_syncs SET title_format = ? WHERE id = ?").bind(format, id).run();
+      await audit(ctx.db, s.sub, "youtube_sync.format", "youtube_sync", id!, format).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/youtube-syncs\/([\w-]+)\/rename$/,
+    async (ctx, [id]) => {
+      requireSuperAdmin(ctx);
+      const { renameYoutubeSync } = await import("./imports.ts");
+      return renameYoutubeSync(ctx.env, id!);
     },
   ],
   [
