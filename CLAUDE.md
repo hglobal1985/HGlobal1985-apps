@@ -337,4 +337,5 @@
   ④ **QR Code 產生器、App 專用的檔案分享工具**改為用到才載入（`invite-button.tsx`、`lib/share.ts`）。
   ⑤ **伺服器查資料庫要「同時查」**：每次資料庫來回在台灣約 30～70ms；彼此不相依的查詢一律放進同一個 `Promise.all`，寫入用 `db.batch` 一次送出。課程頁 `courseDetail` 已從 12 趟減為 4 趟、`/me` 4→3、`/courses` 少 1 趟。新增查詢先加進現有的 `Promise.all`，不要在後面再 `await` 一次。
   ⑥ **中央查詢共用的錯誤**：`central.ts` 的 `cached()` 讓同一人同時的多個請求共用一次中央查詢；先發起的請求若被瀏覽器取消，其他請求改自己重查（2026-11-20 晚上正式站因此偶發 500）。`loadSession` 的名稱頭像查詢失敗不會讓請求失敗。
+  ⑧ **開網站不重複抓資料**：共用登入檢查（`webSsoCheck`，每個分頁每 5 分鐘一次，會整頁跳到會員中心再回來）即將發生時，不做開機預先抓取（`webSsoCheckDue()`）；`cachedGet` 一般開頁面會共用「還在下載中的預先抓取」，不再重送。`useApi(null)`（訪客、沒權限）回報「不是讀取中」。訪客不送功能徽章回報（`trackFeature` 由 `setFeatureTrackSignedIn` 控制）、不讀中央審核清單。
   ⑦ 已刪除的殘留：`lib/tablet-scale.ts`（viewport 放大已停用，鎖定 1 倍改直接寫在 `index.html`，常數在 `lib/no-page-zoom.ts` 的 `VIEWPORT`）、`theme/layout.ts` 的 `textScale`、後端 `convert-to-list` API、多個沒有被呼叫的函式與匯入。
