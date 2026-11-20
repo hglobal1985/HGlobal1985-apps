@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Env } from "../src/d1.ts";
 import { sortMaterialsByDate, defaultSyncFormat, playlistIdOf, renameYoutubeSync, runYoutubeSync, syncTitle } from "../src/imports.ts";
+import { handleApi } from "../src/api.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
 test("同步清單：網址判讀與教材名稱格式", () => {
@@ -140,4 +141,55 @@ test("命名規則已含 {日} 時，同名也不再加（月/日）尾巴", asy
   }
   const rows = (await db.prepare("SELECT title FROM lessons WHERE course_id = 'c1'").all<{ title: string }>()).results;
   assert.deepEqual(rows.map((r) => r.title), ["2026年5月4日 王老師小線對焦", "2026年5月4日 王老師小線對焦"]);
+});
+
+test("同步排序規則：放最後面、手動鎖定後不重排（業主 2026-11-20）", async () => {
+  const run = async (mode: string, locked: number) => {
+    const db = createTestDb();
+    const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
+    const q = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+    await q("INSERT INTO courses (id, title, status) VALUES ('c1', 'A', 'published')");
+    await q("INSERT INTO youtube_syncs (id, url, playlist_id, course_id, title_prefix, title_format, sort_mode, sort_locked) VALUES ('s1', 'u', 'PLX', 'c1', 'A', '{年}年{月}月{日}日 A', ?, ?)", mode, locked);
+    // 手動排好的舊順序：2020 在最上面、2026 在後面
+    await q("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, kind, event_date) VALUES ('old1', 'c1', 1, 'old1', 0, 'youtube', 'OLD11111111', 'material', '2020-01-01'), ('old2', 'c1', 2, 'old2', 0, 'youtube', 'OLD22222222', 'material', '2026-01-01')");
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (u: string | URL | Request) =>
+      String(u).includes("playlistItems")
+        ? new Response(JSON.stringify({ items: [{ snippet: { title: "n" }, contentDetails: { videoId: "NEW11111111", videoPublishedAt: "2025-05-05T01:00:00Z" } }] }), { status: 200 })
+        : new Response("x", { status: 404 })) as typeof fetch;
+    try {
+      await runYoutubeSync(env, "s1");
+    } finally {
+      globalThis.fetch = real;
+    }
+    return (await db.prepare("SELECT id FROM lessons WHERE course_id = 'c1' ORDER BY position").all<{ id: string }>()).results.map((r) => (r.id.startsWith("old") ? r.id : "new"));
+  };
+  assert.deepEqual(await run("date_desc", 0), ["old2", "new", "old1"]); // 自動：整張依日期重排
+  assert.deepEqual(await run("date_desc", 1), ["new", "old1", "old2"]); // 已鎖定：手動順序不動，新影片放最上面
+  assert.deepEqual(await run("top", 0), ["new", "old1", "old2"]); // 放最上面，其餘不動
+  assert.deepEqual(await run("bottom", 0), ["old1", "old2", "new"]); // 放最後面，其餘不動
+  assert.deepEqual(await run("bottom", 1), ["new", "old1", "old2"]); // 鎖定時一律放最上面且不重排
+});
+
+test("手動調整教材順序後，這張卡的同步自動鎖定", async () => {
+  const db = createTestDb();
+  const env = { DB: db, DEMO_LOGIN: "on" } as never;
+  const call = async (method: string, path: string, body?: unknown, token?: string) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env);
+    return { status: res.status, data: (await res.json()) as Record<string, unknown> };
+  };
+  const token = ((await call("POST", "/auth/demo", { sub: "demo-admin" })).data as { token: string }).token;
+  const course = await call("POST", "/admin/courses", { title: "卡" }, token);
+  const cid = course.data.id as string;
+  const q = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+  await q("INSERT INTO lessons (id, course_id, position, title, duration_minutes, kind, event_date) VALUES ('m1', ?, 101, 'm1', 0, 'material', '2026-01-01'), ('m2', ?, 102, 'm2', 0, 'material', '2026-02-01')", cid, cid);
+  await q("INSERT INTO youtube_syncs (id, url, playlist_id, course_id, title_prefix) VALUES ('s1', 'u', 'PLX', ?, 'x')", cid);
+  assert.equal((await db.prepare("SELECT sort_locked FROM youtube_syncs WHERE id = 's1'").first<{ sort_locked: number }>())?.sort_locked, 0);
+  assert.equal((await call("POST", `/admin/courses/${cid}/lessons/order?lite=1`, { ids: ["m2", "m1"] }, token)).status, 200);
+  assert.equal((await db.prepare("SELECT sort_locked FROM youtube_syncs WHERE id = 's1'").first<{ sort_locked: number }>())?.sort_locked, 1);
+  // 設定頁可解除鎖定
+  assert.equal((await call("PATCH", "/admin/youtube-syncs/s1", { unlock: true, sortMode: "top" }, token)).status, 200);
+  const st = await db.prepare("SELECT sort_locked, sort_mode FROM youtube_syncs WHERE id = 's1'").first<{ sort_locked: number; sort_mode: string }>();
+  assert.equal(st?.sort_locked, 0);
+  assert.equal(st?.sort_mode, "top");
 });

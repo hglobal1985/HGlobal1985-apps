@@ -50,6 +50,22 @@ export async function sortMaterialsByDate(db: D1Database, courseId: string): Pro
   return order.length;
 }
 
+/** 同步的排序規則（業主 2026-11-20）。 */
+export const SYNC_SORT_MODES = ["date_desc", "top", "bottom"] as const;
+export type SyncSortMode = (typeof SYNC_SORT_MODES)[number];
+export const SYNC_SORT_LABEL: Record<SyncSortMode, string> = { date_desc: "依日期新到舊（每次同步整張重排）", top: "新影片放最上面（其餘不動）", bottom: "新影片放最後面（其餘不動）" };
+export const asSortMode = (v: unknown): SyncSortMode => ((SYNC_SORT_MODES as readonly unknown[]).includes(v) ? (v as SyncSortMode) : "date_desc");
+
+/** 新影片放在這張卡教材的最後面（「完整版課程影片」仍在最後）；其餘順序不動。 */
+async function placeAtEnd(db: D1Database, courseId: string, newIds: string[]): Promise<void> {
+  if (!newIds.length) return;
+  const { results } = await db.prepare("SELECT id, is_full FROM lessons WHERE course_id = ? ORDER BY position").bind(courseId).all<{ id: string; is_full: number }>();
+  const fresh = new Set(newIds);
+  const rest = results.filter((r) => !fresh.has(r.id) && r.is_full !== 1).map((r) => r.id);
+  const order = [...rest, ...newIds, ...results.filter((r) => r.is_full === 1).map((r) => r.id)];
+  await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
+}
+
 const nextPos = async (db: D1Database, courseId: string) => ((await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0) + 1;
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
 
@@ -273,10 +289,11 @@ export function syncTitle(format: string, videoTitle: string, date: string | nul
  */
 export async function runYoutubeSync(env: Env, syncId: string): Promise<{ imported: number; note: string }> {
   const db = env.DB;
-  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string }>();
+  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format, sort_mode, sort_locked FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
   if (!sync) return { imported: 0, note: "找不到這個同步設定" };
   const finish = async (out: { imported: number; note: string }) => {
-    await sortMaterialsByDate(db, sync.course_id); // 每次同步都把整張卡依日期排好（新到舊）
+    // 只有「依日期新到舊」且沒有被手動鎖定時，才整張重排（手動排序永遠優先，業主 2026-11-20）。
+    if (asSortMode(sync.sort_mode) === "date_desc" && !sync.sort_locked) await sortMaterialsByDate(db, sync.course_id);
     await db.prepare("UPDATE youtube_syncs SET last_synced_at = ?, last_imported = ?, last_note = ? WHERE id = ?").bind(new Date().toISOString(), out.imported, out.note.slice(0, 600), syncId).run();
     return out;
   };
@@ -309,7 +326,9 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
       return db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, event_date, kind) VALUES (?, ?, ?, ?, 0, 'youtube', ?, ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.id, it.date);
     }),
   );
-  await placeOnTop(db, sync.course_id, ids);
+  // 新影片的位置：鎖定或「放最上面」＝最前面；「放最後面」＝最後面；其餘順序一律不動。
+  if (asSortMode(sync.sort_mode) === "bottom" && !sync.sort_locked) await placeAtEnd(db, sync.course_id, ids);
+  else await placeOnTop(db, sync.course_id, ids);
   return finish({ imported: items.length, note: lines.join("\n").slice(0, 600) });
 }
 
@@ -319,7 +338,7 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
  */
 export async function renameYoutubeSync(env: Env, syncId: string): Promise<{ renamed: number; note: string }> {
   const db = env.DB;
-  const sync = await db.prepare("SELECT playlist_id, course_id, title_prefix, title_format FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ playlist_id: string; course_id: string; title_prefix: string; title_format: string }>();
+  const sync = await db.prepare("SELECT playlist_id, course_id, title_prefix, title_format, sort_mode, sort_locked FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
   if (!sync) return { renamed: 0, note: "找不到這個同步設定" };
   if (!env.YOUTUBE_API_KEY) return { renamed: 0, note: "尚未設定 YouTube 金鑰" };
   const read = await readPlaylist(env.YOUTUBE_API_KEY, sync.playlist_id, new Set());
@@ -340,7 +359,7 @@ export async function renameYoutubeSync(env: Env, syncId: string): Promise<{ ren
     return name === r.title ? [] : [db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(name, r.id)];
   });
   if (stmts.length) await db.batch(stmts);
-  await sortMaterialsByDate(db, sync.course_id);
+  if (asSortMode(sync.sort_mode) === "date_desc" && !sync.sort_locked) await sortMaterialsByDate(db, sync.course_id);
   return { renamed: stmts.length, note: stmts.length ? `已重新命名 ${stmts.length} 個教材` : "名稱都已經符合命名規則" };
 }
 

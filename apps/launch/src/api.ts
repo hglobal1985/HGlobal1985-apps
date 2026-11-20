@@ -3410,10 +3410,10 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       requireSuperAdmin(ctx);
       const { results } = await ctx.db
-        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id ORDER BY y.created_at")
-        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
-      const { defaultSyncFormat, SYNC_FORMAT_HELP } = await import("./imports.ts");
-      return { syncs: results.map((r) => ({ ...r, titleFormat: r.titleFormat || defaultSyncFormat(r.titlePrefix) })), keyReady: !!ctx.env.YOUTUBE_API_KEY, formatHelp: SYNC_FORMAT_HELP };
+        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.sort_mode AS sortMode, y.sort_locked AS sortLocked, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id ORDER BY y.created_at")
+        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
+      const { defaultSyncFormat, SYNC_FORMAT_HELP, SYNC_SORT_LABEL } = await import("./imports.ts");
+      return { syncs: results.map((r) => ({ ...r, titleFormat: r.titleFormat || defaultSyncFormat(r.titlePrefix) })), keyReady: !!ctx.env.YOUTUBE_API_KEY, formatHelp: SYNC_FORMAT_HELP, sortLabels: SYNC_SORT_LABEL };
     },
   ],
   [
@@ -3422,8 +3422,8 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       // 新增一份同步設定（業主 2026-11-20，超級管理員）：貼播放清單網址，選「放進哪一張教材卡」（或直接新建一張）與教材名稱前綴。
       const s = requireSuperAdmin(ctx);
-      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; label?: unknown }>(ctx.req);
-      const { playlistIdOf, defaultSyncFormat } = await import("./imports.ts");
+      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; sortMode?: unknown; label?: unknown }>(ctx.req);
+      const { playlistIdOf, defaultSyncFormat, asSortMode } = await import("./imports.ts");
       const playlistId = typeof body.url === "string" ? playlistIdOf(body.url) : null;
       if (!playlistId) return fail(400, "invalid_playlist", "請貼上 YouTube 播放清單的網址（網址裡要有 list=…）");
       let courseId = typeof body.courseId === "string" ? body.courseId : "";
@@ -3442,7 +3442,7 @@ const routes: [string, RegExp, Handler][] = [
       const prefix = (typeof body.titlePrefix === "string" ? body.titlePrefix.trim() : "").slice(0, 80) || newTitle;
       const id = `ys${randomId(8)}`;
       const format = (typeof body.titleFormat === "string" ? body.titleFormat.trim() : "").slice(0, 120) || defaultSyncFormat(prefix);
-      await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix, title_format) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix, format).run();
+      await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix, title_format, sort_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix, format, asSortMode(body.sortMode)).run();
       await audit(ctx.db, s.sub, "youtube_sync.create", "youtube_sync", id, playlistId).run();
       return { id, courseId };
     },
@@ -3461,13 +3461,16 @@ const routes: [string, RegExp, Handler][] = [
     "PATCH",
     /^\/admin\/youtube-syncs\/([\w-]+)$/,
     async (ctx, [id]) => {
-      // 修改這份同步的命名規則（只影響之後匯入的；已匯入的要按「依規則重新命名」）。
+      // 修改這份同步的規則：命名規則、排序規則、解除手動排序鎖定（業主 2026-11-20）。命名只影響之後匯入的；已匯入的要按「依規則重新命名」。
       const s = requireSuperAdmin(ctx);
-      const body = await readJson<{ titleFormat?: unknown }>(ctx.req);
+      const body = await readJson<{ titleFormat?: unknown; sortMode?: unknown; unlock?: unknown }>(ctx.req);
+      const { asSortMode } = await import("./imports.ts");
       const format = typeof body.titleFormat === "string" ? body.titleFormat.trim().slice(0, 120) : "";
-      if (!format) return fail(400, "format_required", "請輸入命名規則");
-      await ctx.db.prepare("UPDATE youtube_syncs SET title_format = ? WHERE id = ?").bind(format, id).run();
-      await audit(ctx.db, s.sub, "youtube_sync.format", "youtube_sync", id!, format).run();
+      if (body.titleFormat !== undefined && !format) return fail(400, "format_required", "請輸入命名規則");
+      if (format) await ctx.db.prepare("UPDATE youtube_syncs SET title_format = ? WHERE id = ?").bind(format, id).run();
+      if (body.sortMode !== undefined) await ctx.db.prepare("UPDATE youtube_syncs SET sort_mode = ? WHERE id = ?").bind(asSortMode(body.sortMode), id).run();
+      if (body.unlock === true) await ctx.db.prepare("UPDATE youtube_syncs SET sort_locked = 0 WHERE id = ?").bind(id).run();
+      await audit(ctx.db, s.sub, "youtube_sync.rules", "youtube_sync", id!, JSON.stringify({ f: format || undefined, m: body.sortMode, u: body.unlock })).run();
       return { ok: true };
     },
   ],
@@ -6110,6 +6113,8 @@ const routes: [string, RegExp, Handler][] = [
         ]);
       } else if (foreignStmts.length) await ctx.db.batch([...foreignStmts, audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId)]);
       else fail(400, "invalid_order", "順序不正確，請重新整理後再試");
+      // 使用者手動調整過順序：這張卡的「同步 YouTube 清單」從此不再自動重排，只把新影片放進去（業主 2026-11-20）。
+      await ctx.db.prepare("UPDATE youtube_syncs SET sort_locked = 1 WHERE course_id = ?").bind(courseId).run();
       if (ctx.url.searchParams.get("lite") === "1") return { ok: true };
       return courseDetail(ctx, courseId);
     },
