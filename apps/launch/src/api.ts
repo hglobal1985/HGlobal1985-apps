@@ -4681,18 +4681,27 @@ const routes: [string, RegExp, Handler][] = [
       const w = Number(ctx.url.searchParams.get("w"));
       const type = obj.httpMetadata?.contentType ?? "image/jpeg";
       if (ctx.env.IMAGES && w && /^image\/(jpeg|png|webp)$/.test(type)) {
+       try {
         const t = (await loadConfig(ctx.db)).app.thumb;
         if (t.widths.includes(w)) {
           const fmt = thumbFormat(t.format);
-          const cacheKey = new Request(`${ctx.url.origin}/__thumb/${encodeURIComponent(key)}?v=${ctx.url.searchParams.get("v") ?? ""}&w=${w}&s=${thumbSig(t)}&f=${fmt}`);
-          const cache = (caches as unknown as { default: Cache }).default;
-          const hit = await cache.match(cacheKey);
-          if (hit) return hit;
+          // 快取（Cache API）出任何問題都當作沒有快取，不能讓整個請求丟出錯誤（錯誤會變成 1101，圖片整片空白）。
+          let cacheKey: Request | null = null;
+          let cache: Cache | null = null;
+          try {
+            cacheKey = new Request(`${ctx.url.origin}/__thumb/${encodeURIComponent(key)}?v=${ctx.url.searchParams.get("v") ?? ""}&w=${w}&s=${thumbSig(t)}&f=${fmt}`);
+            cache = (caches as unknown as { default: Cache }).default;
+            const hit = await cache.match(cacheKey);
+            if (hit) return hit;
+          } catch (e) {
+            console.log("thumb_cache_failed", e instanceof Error ? e.message : String(e));
+            cache = null;
+          }
           try {
             const src = await ctx.env.IMAGES.input(obj.body).transform(thumbTransform(t, w)).output({ format: `image/${fmt}`, ...thumbOutput(t) });
             const body = await src.response().arrayBuffer();
             const done = new Response(body, { headers: { "content-type": `image/${fmt}`, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", "x-thumb": `w=${w},f=${fmt},kb=${Math.round(body.byteLength / 1024)}` } });
-            await cache.put(cacheKey, done.clone()).catch(() => undefined);
+            if (cache && cacheKey) await cache.put(cacheKey, done.clone()).catch(() => undefined);
             return done;
           } catch (e) {
             const message = String((e as Error).message ?? e).slice(0, 300);
@@ -4703,6 +4712,15 @@ const routes: [string, RegExp, Handler][] = [
             return new Response(again.body, { headers: { "content-type": again.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff", "x-thumb": "fallback" } });
           }
         }
+       } catch (e) {
+        // 縮圖流程任何地方出錯（Worker 丟出例外會變成 1101、圖片整片空白）：記下原因、一律回原圖。
+        const message = String((e as Error)?.message ?? e).slice(0, 300);
+        console.log("thumb_crashed", key, message);
+        await ctx.db.prepare("INSERT INTO ui_settings (key, value, updated_at) VALUES ('thumb_health', ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at").bind(JSON.stringify({ at: new Date().toISOString(), key, w, message })).run().catch(() => undefined);
+        const again = await bucket.get(key);
+        if (!again) return new Response("Not found", { status: 404 });
+        return new Response(again.body, { headers: { "content-type": again.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=300", "x-content-type-options": "nosniff", "x-thumb": "fallback" } });
+       }
       }
       return new Response(obj.body, {
         headers: { "content-type": obj.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
