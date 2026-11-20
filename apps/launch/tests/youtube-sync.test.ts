@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Env } from "../src/d1.ts";
-import { defaultSyncFormat, playlistIdOf, renameYoutubeSync, runYoutubeSync, syncTitle } from "../src/imports.ts";
+import { sortMaterialsByDate, defaultSyncFormat, playlistIdOf, renameYoutubeSync, runYoutubeSync, syncTitle } from "../src/imports.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
 test("同步清單：網址判讀與教材名稱格式", () => {
@@ -94,4 +94,27 @@ test("同步清單：依命名規則重新命名已匯入的教材", async () =>
   }
   const t = await db.prepare("SELECT title FROM lessons WHERE id = 'l1'").first<{ title: string }>();
   assert.equal(t?.title, "2026年3月14日 王老師小線對焦");
+});
+
+test("同步來的教材卡：整張卡依日期新到舊，舊影片不會被放到最下面；有區塊的卡不動", async () => {
+  const db = createTestDb();
+  const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+  await run("INSERT INTO courses (id, title, status) VALUES ('c1', 'A', 'published'), ('c2', 'B', 'published')");
+  const add = (c: string, id: string, pos: number, date: string | null, kind = "material", full = 0) =>
+    run("INSERT INTO lessons (id, course_id, position, title, duration_minutes, kind, event_date, is_full) VALUES (?, ?, ?, ?, 0, ?, ?, ?)", id, c, pos, id, kind, date, full);
+  // 新匯入的在上、原本舊的被放到最後（真實發生的情況）
+  await add("c1", "n1", 1, "2026-03-16");
+  await add("c1", "n2", 2, "2025-09-22");
+  await add("c1", "o1", 3, "2026-03-09");
+  await add("c1", "o2", 4, "2025-07-15");
+  await add("c1", "nd", 5, null);
+  await add("c1", "full", 6, null, "material", 1);
+  assert.ok((await sortMaterialsByDate(db, "c1")) > 0);
+  const rows = (await db.prepare("SELECT id FROM lessons WHERE course_id = 'c1' ORDER BY position").all<{ id: string }>()).results;
+  assert.deepEqual(rows.map((r) => r.id), ["n1", "o1", "n2", "o2", "nd", "full"]);
+  assert.equal(await sortMaterialsByDate(db, "c1"), 0); // 已經排好就不動
+  await add("c2", "s", 1, null, "section");
+  await add("c2", "x", 2, "2020-01-01");
+  await add("c2", "y", 3, "2026-01-01");
+  assert.equal(await sortMaterialsByDate(db, "c2"), 0); // 有區塊＝手動編排
 });
