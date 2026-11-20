@@ -20,6 +20,7 @@ import { CenterNamesProvider } from "@/state/center-names";
 import { SessionProvider } from "@/state/session";
 import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
+import { useLayout } from "@/theme/layout";
 import { UpdateNotice } from "@/features/update-notice";
 import { BottomBar, InAppBrowserBanner, TopBar, TopBarShadow } from "@/ui";
 
@@ -85,8 +86,11 @@ function AppStack() {
  */
 function StatusBarCover() {
   const insets = useSafeAreaInsets();
+  const { c } = useTheme();
+  const { large } = useLayout();
   if (Platform.OS !== "web" || insets.top <= 0) return null;
-  return <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, height: insets.top, backgroundColor: "#2F5D3A", zIndex: 1000 }} />;
+  // 平板（業主 2026-11-20）：狀態列底下用頁面底色，不要一塊深綠壓在工具列上方。
+  return <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, height: insets.top, backgroundColor: large ? c.background : "#2F5D3A", zIndex: 1000 }} />;
 }
 
 export default function RootLayout() {

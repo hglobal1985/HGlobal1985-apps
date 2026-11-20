@@ -83,7 +83,7 @@ export function Screen({
     <View style={{ flex: 1 }}>
     {topBar ? <View style={{ zIndex: 6 }}>{topBar}</View> : null}
     {top ? (
-      <View style={[styles.top, gutter, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top + (lay.large ? space.md : 0) : 0) + space.sm }]}>
+      <View style={[styles.top, gutter, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
         <View style={[styles.topInner, maxW]}>{top}</View>
       </View>
     ) : null}
