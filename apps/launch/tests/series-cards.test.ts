@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { handleApi } from "../src/api.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-test("系列卡：沒有系列的課程卡進「未分類」、清單卡不動；系列設定與隱藏只有超級管理員能改", async () => {
+test("系列卡：沒有系列的教材卡一律進「未分類」；系列設定與隱藏只有超級管理員能改", async () => {
   const db = createTestDb();
   const env = { DB: db, DEMO_LOGIN: "on" } as never;
   const call = async (method: string, path: string, body?: unknown, token?: string) => {
@@ -17,7 +17,7 @@ test("系列卡：沒有系列的課程卡進「未分類」、清單卡不動�
   assert.equal(course.status, 200);
   assert.equal(course.data.series, "未分類");
   const list = await call("POST", "/admin/courses", { title: "新清單", isList: true }, admin);
-  assert.equal(list.data.series, "");
+  assert.equal(list.data.series, "未分類"); // 清單型教材卡也一樣（業主 2026-11-20）
   // 課程卡清掉系列＝回到「未分類」
   await call("PATCH", `/admin/courses/${course.data.id}`, { series: "測試系列" }, admin);
   const back = await call("PATCH", `/admin/courses/${course.data.id}`, { series: "" }, admin);
