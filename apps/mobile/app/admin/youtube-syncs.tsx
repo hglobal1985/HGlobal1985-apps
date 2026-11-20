@@ -8,18 +8,18 @@ import { space } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
-type Sync = { id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; lastSyncedAt: string | null; lastImported: number; lastNote: string };
+type Sync = { id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string };
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { hour12: false }) : "還沒同步過");
 
 /**
  * 設定 › 同步 YouTube 清單（業主 2026-11-20，超級管理員）：貼上播放清單網址、選要放進哪一張教材卡（或直接新建一張），
- * 之後清單有新影片，按該列的「同步」就會把新影片匯成教材（已經同步過的不重複）。每份清單各自有「命名規則」，可在清單卡上修改。
+ * 之後清單有新影片，按該列的「同步」就會把新影片匯成教材（已經同步過的不重複）。每份清單各自有「命名規則」與「排序規則」，可在清單卡上修改；你手動調整過順序的卡會自動鎖定，同步不會重排。
  */
 export default function YoutubeSyncsScreen() {
   const { member } = useSession();
   const isSuper = !!member?.titles.includes("超級管理員");
-  const list = useApi<{ syncs: Sync[]; keyReady: boolean; formatHelp: string }>(isSuper ? "/admin/youtube-syncs" : null);
+  const list = useApi<{ syncs: Sync[]; keyReady: boolean; formatHelp: string; sortLabels: Record<string, string> }>(isSuper ? "/admin/youtube-syncs" : null);
   const [adding, setAdding] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Sync | null>(null);
@@ -72,11 +72,13 @@ export default function YoutubeSyncsScreen() {
             <AppText variant="caption" tone="muted">{`放進：${s.courseTitle}`}</AppText>
             <AppText variant="caption" tone="muted" numberOfLines={1}>{s.url}</AppText>
             <AppText variant="caption">{`命名規則：${s.titleFormat}`}</AppText>
+            <AppText variant="caption">{`排序規則：${list.data!.sortLabels[s.sortMode] ?? s.sortMode}`}</AppText>
+            {s.sortLocked ? <AppText variant="caption" tone="muted">已鎖定手動排序：你手動調整過這張卡的順序，同步只會把新影片放進去，不會重排你排好的。要恢復自動排序，請按「修改規則」解除鎖定。</AppText> : null}
             <AppText variant="caption" tone="muted">{`上次同步：${when(s.lastSyncedAt)}${s.lastSyncedAt ? `（新增 ${s.lastImported} 支）` : ""}`}</AppText>
             {s.lastNote ? <AppText variant="caption" tone="muted" numberOfLines={6}>{s.lastNote}</AppText> : null}
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
-                <Button label="修改命名規則" variant="secondary" onPress={() => setEditing(s)} fullWidth />
+                <Button label="修改規則" variant="secondary" onPress={() => setEditing(s)} fullWidth />
               </View>
               <View style={{ flex: 1 }}>
                 <Button label="依規則重新命名" variant="secondary" loading={busyId === s.id} onPress={() => void renameAll(s)} fullWidth />
@@ -95,14 +97,16 @@ export default function YoutubeSyncsScreen() {
       ) : (
         <EmptyState icon="logo-youtube" title="還沒有同步清單" body="按上面的「新增同步清單」開始。" />
       )}
-      {editing ? <FormatSheet sync={editing} help={list.data.formatHelp} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); }} /> : null}
-      {adding ? <AddSheet help={list.data.formatHelp} onClose={() => setAdding(false)} onDone={() => { setAdding(false); list.reload(); }} /> : null}
+      {editing ? <FormatSheet sync={editing} help={list.data.formatHelp} sortLabels={list.data.sortLabels} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); }} /> : null}
+      {adding ? <AddSheet help={list.data.formatHelp} sortLabels={list.data.sortLabels} onClose={() => setAdding(false)} onDone={() => { setAdding(false); list.reload(); }} /> : null}
     </Screen>
   );
 }
 
-function FormatSheet({ sync, help, onClose, onDone }: { sync: Sync; help: string; onClose: () => void; onDone: () => void }) {
+function FormatSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; help: string; sortLabels: Record<string, string>; onClose: () => void; onDone: () => void }) {
   const [fmt, setFmt] = useState(sync.titleFormat);
+  const [sortMode, setSortMode] = useState(sync.sortMode);
+  const [unlock, setUnlock] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
@@ -110,8 +114,8 @@ function FormatSheet({ sync, help, onClose, onDone }: { sync: Sync; help: string
     setBusy(true);
     setError(null);
     try {
-      await api("PATCH", `/admin/youtube-syncs/${sync.id}`, { titleFormat: fmt.trim() });
-      flashText("已儲存，之後匯入的教材照新規則命名");
+      await api("PATCH", `/admin/youtube-syncs/${sync.id}`, { titleFormat: fmt.trim(), sortMode, ...(unlock ? { unlock: true } : {}) });
+      flashText("已儲存同步規則");
       onDone();
     } catch (e) {
       setError((e as Error).message);
@@ -120,15 +124,19 @@ function FormatSheet({ sync, help, onClose, onDone }: { sync: Sync; help: string
     }
   };
   return (
-    <EditSheet title="修改命名規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat} busy={busy} error={error}>
+    <EditSheet title="修改同步規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat || sortMode !== sync.sortMode || unlock} busy={busy} error={error}>
       <Field label="命名規則" value={fmt} onChange={setFmt} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
       <AppText variant="caption" tone="muted">{help}</AppText>
       <AppText variant="caption" tone="muted">{"範例：「{年}年{月}月{日}日 王老師小線對焦」→「2026年3月14日 王老師小線對焦」。只影響之後匯入的教材；已匯入的請按「依規則重新命名」。"}</AppText>
+      <Chips title="排序規則" label="排序規則" options={Object.entries(sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} />
+      <AppText variant="caption" tone="muted">你在課程頁手動調整過這張卡的順序，系統會自動「鎖定手動排序」：之後同步只把新影片放進去（放最上面，或選「放最後面」就放最後面），不會重排你排好的。</AppText>
+      {sync.sortLocked ? <Chips title="手動排序鎖定" label="手動排序鎖定" options={[{ key: "keep", label: "維持鎖定（保留我排好的）" }, { key: "unlock", label: "解除鎖定（恢復自動排序）" }]} value={unlock ? "unlock" : "keep"} onChange={(v) => setUnlock(v === "unlock")} /> : null}
     </EditSheet>
   );
 }
 
-function AddSheet({ help, onClose, onDone }: { help: string; onClose: () => void; onDone: () => void }) {
+function AddSheet({ help, sortLabels, onClose, onDone }: { help: string; sortLabels: Record<string, string>; onClose: () => void; onDone: () => void }) {
+  const [sortMode, setSortMode] = useState("date_desc");
   const cards = useApi<CourseSummary[]>("/admin/courses");
   const [url, setUrl] = useState("");
   const [mode, setMode] = useState<"new" | "old">("new");
@@ -146,7 +154,7 @@ function AddSheet({ help, onClose, onDone }: { help: string; onClose: () => void
     setBusy(true);
     setError(null);
     try {
-      await api("POST", "/admin/youtube-syncs", { url: url.trim(), ...(mode === "new" ? { newCardTitle: newTitle.trim() } : { courseId }), titlePrefix: prefix.trim() || (mode === "new" ? newTitle.trim() : ""), ...(format.trim() ? { titleFormat: format.trim() } : {}) });
+      await api("POST", "/admin/youtube-syncs", { url: url.trim(), ...(mode === "new" ? { newCardTitle: newTitle.trim() } : { courseId }), titlePrefix: prefix.trim() || (mode === "new" ? newTitle.trim() : ""), ...(format.trim() ? { titleFormat: format.trim() } : {}), sortMode });
       flashText("已新增，按「同步」就會匯入影片");
       onDone();
     } catch (e) {
@@ -167,6 +175,7 @@ function AddSheet({ help, onClose, onDone }: { help: string; onClose: () => void
       <Field label="教材名稱（選填，預設同教材卡名稱）" value={prefix} onChange={setPrefix} placeholder="例如：會長翡翠鑽石會議" />
       <Field label="命名規則（選填，沒填＝「2026年11月 名稱（主持xxx）」）" value={format} onChange={setFormat} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
       <AppText variant="caption" tone="muted">{help}</AppText>
+      <Chips title="排序規則" label="排序規則" options={Object.entries(sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} />
     </EditSheet>
   );
 }
