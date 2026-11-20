@@ -216,7 +216,7 @@ export function syncTitle(prefix: string, videoTitle: string, date: string | nul
   const ym = /(\d{4})\s*年\s*(\d{1,2})\s*月/.exec(t);
   const d = /^(\d{4})-(\d{2})/.exec(date ?? "");
   const when = ym ? `${ym[1]}年${Number(ym[2])}月` : d ? `${d[1]}年${Number(d[2])}月` : "";
-  const host = /主持(?:人)?\s*[:：]?\s*([^\s（）()【】\[\]|｜,，、/／\-－—~～]{1,8})/.exec(t)?.[1] ?? "";
+  const host = /主持(?:人)?\s*[:：]?\s*([^\s（）()【】[\]|｜,，、/／\-－—~～]{1,8})/.exec(t)?.[1] ?? "";
   return `${when ? `${when} ` : ""}${prefix}${host ? `（主持${host}）` : ""}`.trim();
 }
 
