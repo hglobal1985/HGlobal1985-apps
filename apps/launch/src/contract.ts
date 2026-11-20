@@ -850,7 +850,9 @@ export type ThumbSettings = {
   borderWidth: number;
   borderColor: string;
 };
-export const THUMB_WIDTH_CHOICES = [240, 320, 480, 640, 800, 960];
+export const THUMB_WIDTH_CHOICES = [240, 320, 480, 640, 800, 960, 1280, 1600];
+/** 平板、電腦用的大尺寸（業主 2026-11-20）：固定可用，不必在設定頁勾選。 */
+export const THUMB_WIDE_WIDTHS = [1280, 1600];
 
 export type AppSettings = {
   /** 首頁左邊「繼續學習」自動輪播間隔（秒；0＝不自動輪播）。 */

@@ -62,6 +62,7 @@ import {
   ZONES,
   zoneOf,
   type ThumbSettings,
+  THUMB_WIDE_WIDTHS,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
@@ -4683,7 +4684,7 @@ const routes: [string, RegExp, Handler][] = [
       if (ctx.env.IMAGES && w && /^image\/(jpeg|png|webp)$/.test(type)) {
        try {
         const t = (await loadConfig(ctx.db)).app.thumb;
-        if (t.widths.includes(w)) {
+        if (t.widths.includes(w) || THUMB_WIDE_WIDTHS.includes(w)) {
           const fmt = thumbFormat(t.format);
           // 快取（Cache API）出任何問題都當作沒有快取，不能讓整個請求丟出錯誤（錯誤會變成 1101，圖片整片空白）。
           let cacheKey: Request | null = null;
