@@ -1,5 +1,4 @@
 import { Redirect, router, useLocalSearchParams } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useRef, useState } from "react";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -66,17 +65,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   // 封面的訂閱鈕與點閱次數只放在中心卡、清單卡、系列卡（業主 2026-11-19：課程卡不顯示）；課程頁載入仍照舊把點閱算進主辦中心與所屬系列。
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（進入頁面時點閱 +1，算進主辦中心、所屬系列與這門課自己的封面）。
   const stats = useCoverStats("course", data?.id ?? null, `/course/${id}`, data?.isList ? "清單" : "課程");
-  // 清單卡頁右上角「縮圖／詳細列表」切換（業主 2026-11-19，模仿系列頁）：記住上次的選擇。
+  // 教材區右上角「縮圖／詳細列表」切換：每次進入課程卡頁一律從「縮圖」開始（業主 2026-11-21，不再記住上次的選擇）；區塊預設全部收起。
   const [listLayout, setListLayout] = useState<"thumb" | "detail">("thumb");
-  useEffect(() => {
-    AsyncStorage.getItem("hglobal:learn:list-layout")
-      .then((v) => (v === "thumb" || v === "detail") && setListLayout(v))
-      .catch(() => undefined);
-  }, []);
-  const pickLayout = (v: "thumb" | "detail") => {
-    setListLayout(v);
-    AsyncStorage.setItem("hglobal:learn:list-layout", v).catch(() => undefined);
-  };
+  const pickLayout = (v: "thumb" | "detail") => setListLayout(v);
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
   const opQueue = useRef<Promise<unknown>>(Promise.resolve());
