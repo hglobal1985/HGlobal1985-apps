@@ -7,7 +7,6 @@ import { isSuperAdmin } from "@/lib/roles";
 import { BasicsFields, type BasicsForm } from "./course-sections";
 import { HostField } from "./field-groups";
 import { EditSheet } from "./edit-sheet";
-import { KindToggle } from "./kind-toggle";
 
 /**
  * 「＋新增課程」：只填名稱、主講人姓名（必填）、主辦中心、系列（可不選），建立成未上架的草稿後，
@@ -16,20 +15,15 @@ import { KindToggle } from "./kind-toggle";
  */
 export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: listProp = false }: { onClose: () => void; defaultCenter?: string; /** 從系列頁新增：系列預先填好（業主 2026-11-18）。 */ defaultSeries?: string; /** 新增「清單卡」：只有名稱、主辦、系列，沒有主講人。 */ list?: boolean }) {
   const { member, invalidate } = useSession();
-  const [list, setList] = useState(listProp); // 右上「素材／課程」切換（業主 2026-11-18）：新增畫面可自由切換，整個面板的欄位跟著變
+  const list = listProp; // 業主 2026-11-20：新增只有一種「教材卡」，沒有右上角的切換（list 只剩內部舊流程使用）
   const isHq = member?.role === "admin";
   const isSuper = isSuperAdmin(member);
   const [f, setF] = useState<BasicsForm>({ isShorts: false, title: "", noSpeaker: false, isPackage: false, teacher: "", teacherRank: "", teacherTitle: "", eventStart: "", eventEnd: "", category: "", series: defaultSeries ?? "", brandId: "", zone: listProp ? "amway_material" : "hglobal" });
-  const pickKind = (toList: boolean) => {
-    setList(toList);
-    // 專區還是預設值就跟著類型換（課程→寰宇、素材→安麗素材）；自己改過的不動。
-    setF((x) => (x.zone === (toList ? "hglobal" : "amway_material") ? { ...x, zone: toList ? "amway_material" : "hglobal" } : x));
-  };
   const [host, setHost] = useState(isHq ? (defaultCenter ?? HQ_UNIT) : (member?.courseRights?.center ?? member?.center ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
-    if (!f.title.trim()) return setError(list ? "請輸入清單卡名稱" : "請輸入課程名稱");
+    if (!f.title.trim()) return setError("請輸入教材卡名稱");
     if (!list && !f.noSpeaker && !f.teacher.trim()) return setError("請輸入主講人姓名（課程專屬網址要用），沒有主講人請勾選「無」");
     setBusy(true);
     setError(null);
@@ -50,7 +44,7 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: li
     }
   };
   return (
-    <EditSheet material={list} headRight={<KindToggle isList={list} onPick={pickKind} />} title={list ? "新增清單" : "新增課程"} onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!f.title.trim() || !!f.teacher.trim()} busy={busy} error={error}>
+    <EditSheet material={list} title="新增教材卡" onClose={onClose} onSave={submit} saveLabel="建立" dirty={!!f.title.trim() || !!f.teacher.trim()} busy={busy} error={error}>
       <BasicsFields isList={list} f={f} setF={setF} />
       <HostField title={list ? "建立單位" : "主辦中心"} value={host} fixed={host} onChange={setHost} />
       <AppText variant="caption" tone="muted">

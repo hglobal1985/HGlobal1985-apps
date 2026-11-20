@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, HQ_UNIT, UNCATEGORIZED, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
-import { confirmAsk, confirmSheet } from "@/features/confirm";
+import { confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
@@ -13,7 +13,6 @@ import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, DateSelect, Field, FormBlock, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
-import { KindToggle } from "./kind-toggle";
 import { BrandField, CategoryField, HostField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
 
@@ -182,7 +181,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
   const series = useApi<string[]>(isSuper ? "/admin/series" : null);
   return (
     <>
-      <Field label={isList ? "清單卡名稱（必填）" : "課程名稱（必填）"} value={f.title} onChange={set("title")} placeholder={isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
+      <Field label={"教材卡名稱（必填）"} value={f.title} onChange={set("title")} placeholder={isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
       {/* 清單卡沒有主講人、職稱、獎銜（業主 2026-11-16）。 */}
       {isList ? null : (
         <>
@@ -205,7 +204,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
-          <FormBlock collapsible title="系列" hint="同系列合併成一張卡；沒指定系列，就自己單獨一張卡">
+          <FormBlock collapsible title="系列卡（顯示在課程首頁）" hint="同系列合併成一張系列卡；沒指定系列，就自己單獨一張卡">
             <Field label="" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
             {series.data?.length || !isList ? <Chips label="已有的系列" options={[...(isList ? [{ key: "", label: "無" }] : [{ key: UNCATEGORIZED, label: UNCATEGORIZED }]), ...(series.data ?? []).filter((x) => x !== UNCATEGORIZED).map((x) => ({ key: x, label: x }))]} value={f.series || (isList ? "" : UNCATEGORIZED)} onChange={set("series")} /> : null}
           </FormBlock>
@@ -228,7 +227,7 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const seriesSlug = links.data?.find((l) => l.kind === "series" && l.value === (course.series || f.series))?.slug;
   const { save, busy, error, setError } = useCourseSave(course, onSaved);
   const submit = async () => {
-    if (!f.title.trim()) return setError(course.isList ? "請輸入清單卡名稱" : "請輸入課程名稱");
+    if (!f.title.trim()) return setError("請輸入教材卡名稱");
     const { series: _series, zone, eventStart, eventEnd, ...rest } = f;
     // 日期與「時間與地點」面板是同一份資料；清單卡沒有日期，不送。
     const dates = course.isList ? {} : { eventStart: eventStart || null, eventEnd: eventStart ? eventEnd || null : null };
@@ -236,22 +235,9 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
     const matBody = course.isList && isSuper && matUrl.trim().toLowerCase() !== (course.matUrl ?? "") ? { matUrl: matUrl.trim() } : {};
     if (await save({ ...(isSuper ? { ...rest, series: f.series, ...(zone !== init.zone ? { zone } : {}) } : rest), ...dates, ...matBody }, { important })) onClose();
   };
-  // 右上「素材／課程」（業主 2026-11-18）：課程→素材要確認且不可逆（只有超級管理員）；清單卡不能轉回課程卡。
-  const pickKind = async (toList: boolean) => {
-    if (!toList) return flashText("清單卡不能轉回課程卡，請另外新增一門課程");
-    if (!isSuper) return flashText("只有超級管理員可以把課程轉成清單卡");
-    if (!(await confirmAsk("轉成清單卡", `確定把「${course.title}」轉成清單卡？轉換後費用、獎銜、報名與審核、主講人、日期地點都會消失，無法復原。`, "轉成清單卡"))) return;
-    try {
-      onSaved(await api<CourseDetail>("POST", `/admin/courses/${course.id}/convert-to-list`));
-      onClose();
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
   return (
     <EditSheet
       material={course.isList}
-      headRight={<KindToggle isList={course.isList} onPick={pickKind} />}
       title="基本資料"
       onClose={onClose} onSave={submit} dirty={!same(init, f) || matUrl.trim().toLowerCase() !== (course.matUrl ?? "")} busy={busy} error={error}>
       {course.isList && isSuper ? (

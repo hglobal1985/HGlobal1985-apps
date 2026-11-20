@@ -75,10 +75,10 @@ export function EditSheet({
           </AppText>
           {headRight ?? null}
           {!headRight && material ? (
-            <View style={styles.matTag} accessibilityLabel="清單卡">
+            <View style={styles.matTag} accessibilityLabel="教材卡">
               <Ionicons name="folder-open" size={14} color="#1D2A22" />
               <AppText variant="caption" style={{ color: "#1D2A22", fontWeight: "800" }}>
-                清單卡
+                教材卡
               </AppText>
             </View>
           ) : null}
