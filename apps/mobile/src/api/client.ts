@@ -47,6 +47,7 @@ export type {
   ReviewRole,
   ReviewReason,
   CourseSummary,
+  InviteInfo,
   Lesson,
   MediaType,
   Member,

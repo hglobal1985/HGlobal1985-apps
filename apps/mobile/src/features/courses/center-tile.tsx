@@ -5,12 +5,13 @@ import { resolveUrl } from "@/api/client";
 import { centerTitle } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
 import { AppText } from "@/ui";
+import { CardCount } from "@/ui/card-count";
 
 /**
  * 「寰宇教育中心」清單的卡片：整張 16:10 的圖，中心名稱（統一格式「XX中心」）用白字壓在左下角的暗色漸層上，名稱只出現一次（白字加黑色半透明文字陰影，業主 2026-11-17：照片亮時才看得清楚）、貼著卡片底部（七個中文字以內不換行，減少遮住照片）；
  * 有上傳 EDM 就用照片，沒有就用品牌綠色漸層底，兩種長得一樣。整張可點。
  */
-export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edmUrl?: string | null; width: number; onPress: () => void }) {
+export function CenterTile({ name, edmUrl, width, count, onPress }: { name: string; edmUrl?: string | null; width: number; count?: number; onPress: () => void }) {
   const thumb = useThumb();
   useCenterNames();
   const title = centerTitle(name);
@@ -23,7 +24,8 @@ export function CenterTile({ name, edmUrl, width, onPress }: { name: string; edm
         <Gradient id="brand" from="#2F5D3A" to="#4C8A5B" fromOpacity={1} toOpacity={1} diagonal />
       )}
       <Gradient id="shade" from="#000000" to="#000000" fromOpacity={0} toOpacity={0.7} startY={0.5} />
-      <View style={styles.label} pointerEvents="none">
+      {count !== undefined ? <CardCount count={count} /> : null}
+      <View style={[styles.label, count !== undefined ? { right: 40 } : null]} pointerEvents="none">
         <AppText numberOfLines={2} style={styles.name}>
           {title}
         </AppText>

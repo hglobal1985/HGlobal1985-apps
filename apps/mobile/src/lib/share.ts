@@ -5,6 +5,8 @@ import { Platform, Share } from "react-native";
 import { DEFAULT_SHARE_SETTINGS, resolveUrl, reviewerInviteMessage, shareMessage, type UiConfig } from "@/api/client";
 
 /** 絕對網址（分享與下載用）。 */
+/** 頁面路徑 → 完整網址（邀請的 QR Code 與分享共用）。 */
+export const absoluteUrl = (url: string) => absolute(url);
 const absolute = (url: string) => {
   const u = resolveUrl(url);
   return /^https?:/.test(u) || typeof location === "undefined" ? u : `${location.origin}${u.startsWith("/") ? "" : "/"}${u}`;
