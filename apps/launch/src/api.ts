@@ -2330,9 +2330,8 @@ async function createCourse(ctx: Ctx, admin: Session) {
   if (!sets.some(([c]) => c === "allow_president")) sets.push(["allow_president", 1]); // 新課程預設「會長不受獎銜限制也可報名」
   if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", "all"]); // 新課程（含清單）預設「所有人含訪客」（業主 2026-11-17）
   deriveIsPublic(sets, null);
-  // 沒有系列的「課程卡」一律放進「未分類」系列（只有超級管理員看得到；清單卡沒有系列照舊，業主 2026-11-19）。
-  const listNew = sets.some(([c, v]) => c === "is_list" && (v === 1 || v === true));
-  if (!listNew && !String(sets.find(([c]) => c === "series")?.[1] ?? "").trim()) {
+  // 沒有系列的教材卡一律放進「未分類」系列（只有超級管理員看得到；業主 2026-11-20：必須設定系列才會顯示在課程首頁）。
+  if (!String(sets.find(([c]) => c === "series")?.[1] ?? "").trim()) {
     const at = sets.findIndex(([c]) => c === "series");
     if (at >= 0) sets[at] = ["series", UNCATEGORIZED];
     else sets.push(["series", UNCATEGORIZED]);
@@ -2514,7 +2513,7 @@ async function duplicateCourse(ctx: Ctx, id: string, admin: Session) {
 async function updateCourse(ctx: Ctx, id: string) {
   const { s: admin, can } = await courseRightsFor(ctx, id);
   const body = await readJson<Record<string, unknown>>(ctx.req);
-  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list, teacher, no_speaker FROM courses WHERE id = ?").bind(id).first<{ event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; teacher: string | null; no_speaker: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
+  const cur = await ctx.db.prepare("SELECT status, view_scope, url_name, series, mat_url, host_center_key, guidance_unit, review_group_id, price_twd, is_public, price_tba, min_rank_code, updated_at, edited_by_name, event_start, event_end, location, title, is_list, teacher, no_speaker, zone FROM courses WHERE id = ?").bind(id).first<{ zone: string | null; event_start: string | null; event_end: string | null; location: string | null; title: string; is_list: number; teacher: string | null; no_speaker: number; status: string; view_scope: string; url_name: string | null; series: string; mat_url: string | null; host_center_key: string | null; guidance_unit: string; review_group_id: string | null; price_twd: number; is_public: number; min_rank_code: string; price_tba: number; updated_at: string; edited_by_name: string }>();
   if (!cur) return fail(404, "not_found", "找不到這門課程");
   // 狀態：下架封存要「刪除」權限；從封存還原只有總部、會長、音控；其餘修改要「修改」權限。
   const onlyStatus = Object.keys(body).every((k) => k === "status" || k === "ifUpdatedAt" || k === "force");
@@ -2561,7 +2560,7 @@ async function updateCourse(ctx: Ctx, id: string) {
   }
   deriveIsPublic(sets, cur);
   const serSet = sets.find(([c]) => c === "series");
-  if (serSet && !String(serSet[1] ?? "").trim() && pick("is_list", cur.is_list) !== 1) serSet[1] = UNCATEGORIZED; // 課程卡清掉系列＝回到「未分類」
+  if (serSet && !String(serSet[1] ?? "").trim() && cur.zone !== "amway_brand") serSet[1] = UNCATEGORIZED; // 清掉系列＝回到「未分類」（品牌卡不受影響，它們本來就沒有系列）
   // 清單網址：同一個系列內不可重複（也不能撞到別份素材改名前的舊網址）；改名後舊網址記進別名永遠有效。
   const matSet = sets.find(([c]) => c === "mat_url");
   const matAlias: D1PreparedStatement[] = [];

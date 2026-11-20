@@ -204,9 +204,9 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
       {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
-          <FormBlock collapsible title="系列卡（顯示在課程首頁）" hint="同系列合併成一張系列卡；沒指定系列，就自己單獨一張卡">
+          <FormBlock collapsible title="系列卡（顯示在課程首頁）" hint="同系列合併成一張系列卡；必須設定系列才會顯示在課程首頁，沒設定就暫時放入「未分類」（只有超級管理員看得到）">
             <Field label="" value={f.series} onChange={set("series")} placeholder="例如：翡翠達標班" />
-            {series.data?.length || !isList ? <Chips label="已有的系列" options={[...(isList ? [{ key: "", label: "無" }] : [{ key: UNCATEGORIZED, label: UNCATEGORIZED }]), ...(series.data ?? []).filter((x) => x !== UNCATEGORIZED).map((x) => ({ key: x, label: x }))]} value={f.series || (isList ? "" : UNCATEGORIZED)} onChange={set("series")} /> : null}
+            <Chips label="已有的系列" options={[{ key: UNCATEGORIZED, label: UNCATEGORIZED }, ...(series.data ?? []).filter((x) => x !== UNCATEGORIZED).map((x) => ({ key: x, label: x }))]} value={f.series || UNCATEGORIZED} onChange={set("series")} />
           </FormBlock>
         </>
       ) : null}
