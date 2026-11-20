@@ -6321,29 +6321,6 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "POST",
-    /^\/admin\/courses\/([\w-]+)\/convert-to-list$/,
-    async (ctx, [courseId]) => {
-      // 「轉成清單卡」（超級管理員，業主 2026-11-17）：一般課程直接轉成清單卡（清單類別），課程專屬的設定一律捨棄。
-      // 已經有人報名或報名審核中的課程不能轉（會讓他們失去資格與紀錄）。
-      const s = requireSuperAdmin(ctx);
-      const c = await ctx.db.prepare("SELECT is_list, view_scope FROM courses WHERE id = ?").bind(courseId).first<{ is_list: number; view_scope: string }>();
-      if (!c) return fail(404, "not_found", "找不到這門課程");
-      if (c.is_list === 1) return fail(400, "already_list", "這已經是清單卡了");
-      const used = await ctx.db.prepare("SELECT (SELECT COUNT(*) FROM enrollments WHERE course_id = ?) + (SELECT COUNT(*) FROM order_items WHERE course_id = ?) AS n").bind(courseId, courseId).first<{ n: number }>();
-      if ((used?.n ?? 0) > 0) return fail(400, "has_enrollments", "這門課已經有人報名（或報名審核中），不能轉成清單卡。請先下架封存。");
-      const pub = c.view_scope === "all" || c.view_scope === "link_guest" ? 1 : 0;
-      await ctx.db.batch([
-        ctx.db.prepare("DELETE FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId),
-        ctx.db.prepare("UPDATE lessons SET kind = 'material', is_speaker = 0, is_summary = 0, sharer = '', sharer_rank = '', sharer_title = '' WHERE course_id = ? AND kind = 'chapter'").bind(courseId),
-        ctx.db.prepare("UPDATE courses SET is_list = 1, is_shorts = 0, price_twd = 0, price_tba = 0, early_bird = 0, early_price_twd = NULL, early_until = NULL, free_from = NULL, free_until = NULL, diamond_free = 0, min_rank_code = 'none', allow_president = 1, review_group_id = NULL, review_roles = '', guidance_unit = '', teacher = '', teacher_rank = '', teacher_title = '', event_start = NULL, event_end = NULL, location = '', location_none = 0, is_online = 0, is_public = ? WHERE id = ?").bind(pub, courseId),
-        audit(ctx.db, s.sub, "course.convert_to_list", "course", courseId),
-      ]);
-      await renumber(ctx.db, courseId);
-      return courseDetail(ctx, courseId);
-    },
-  ],
-  [
-    "POST",
     /^\/admin\/courses\/([\w-]+)\/full-version$/,
     async (ctx, [courseId]) => {
       // 勾選「完整版課程影片」：在教材最後新增一列；章節都用同一支影片時自動帶入（秒數留空＝播整支）。已存在就直接回傳。
