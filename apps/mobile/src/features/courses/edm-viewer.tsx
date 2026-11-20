@@ -1,4 +1,5 @@
 import { trackFeature } from "@/lib/feature-track";
+import { useThumb } from "@/lib/thumb";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -22,6 +23,8 @@ import { CoverBadges, type CoverStats } from "./cover-stats";
  * 沒有 EDM 時顯示色塊。外框用 StageFrame，高度與上課頁的影片區完全相同。
  */
 export function EdmStage({ course, stats }: { course: CourseSummary; stats?: CoverStats }) {
+  const thumb = useThumb();
+  const { width: winW } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const { scheme } = useTheme();
   const { member } = useSession();
@@ -34,7 +37,7 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
         <Pressable accessibilityRole="button" accessibilityLabel="放大封面" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill}>
           <BrandCover brand={course.brand} fill />
         </Pressable>
-      ) : course.edmUrl ? <EdmCoverImage uri={resolveUrl(course.edmUrl)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
+      ) : course.edmUrl ? <EdmCoverImage uri={thumb(resolveUrl(course.edmUrl), winW)} viewY={course.edmViewY} onOpen={() => setOpen(true)} /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
       {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={2} /> : null}
       {/* 左下角：訂閱鈕＋點閱次數（共用封面統計模組 cover-stats.tsx，與中心頁、系列頁封面同一組）。 */}
       {stats ? (
