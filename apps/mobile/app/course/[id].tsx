@@ -478,7 +478,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
             </Section>
           </>
         ) : null}
-        {(editing && canEditContent) || course.isList || (pkgBlocks && !lessons.length) ? null : (
+        {(editing && canEditContent) || course.isList || (pkgBlocks && !lessons.length) || (!course.lessons.some((l) => !l.material) && course.lessons.some((l) => l.material && !l.section)) ? null : ( // 沒有章節、只有教材時不再顯示「敬請期待」，全部都叫教材（業主 2026-11-20）
           <View>
           <ChapterList course={chapterView} style={allLocked ? { minHeight: 230 } : undefined} playingId={editing ? null : playingId} onPlay={playLesson_} />
           {allLocked ? (
@@ -497,7 +497,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           </View>
         )}
         {!(editing && canEditContent) && blockView.lessons.some((l) => l.material) ? (
-          <Section title={course.isList ? "" : "其他教材"}>
+          <Section title="">
             {course.lessons.some((l) => l.section) ? (
               <View style={[styles.layoutToggle, { borderColor: c.border, backgroundColor: c.surface }]} accessibilityRole="radiogroup">
                 {(["detail", "thumb"] as const).map((v) => (
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
   edmEdit: { position: "absolute", right: space.sm, bottom: space.sm, flexDirection: "row", alignItems: "center", gap: 6, minHeight: minTouch, paddingHorizontal: space.md, borderRadius: radius.pill, backgroundColor: "rgba(0,0,0,0.6)" },
   lessonRow: { flexDirection: "row", alignItems: "center", gap: space.xs, paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
   lessonMain: { flex: 1, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm },
-  mask: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, borderRadius: 16, backgroundColor: "rgba(70,76,72,0.72)", alignItems: "center", justifyContent: "center", gap: space.sm, padding: space.md },
+  mask: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, borderRadius: 16, backgroundColor: "rgba(70,76,72,0.72)", alignItems: "center", justifyContent: "flex-start", gap: space.sm, padding: space.md, paddingTop: space.xl }, // 鎖頭文字靠上對齊（教材很長時才看得到）
   pending: { flexDirection: "row", alignItems: "center", gap: space.sm },
   row: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
 });
