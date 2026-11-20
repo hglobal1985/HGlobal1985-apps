@@ -295,8 +295,10 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   const existing = new Set((await db.prepare("SELECT title FROM lessons WHERE course_id = ?").bind(sync.course_id).all<{ title: string }>()).results.map((r) => r.title));
   const count = new Map<string, number>();
   for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
+  // 命名規則本身已含 {日} 時，名稱已經有日期，不再加「（月/日）」（業主 2026-11-20：規則之外不可多出尾巴）。
+  const hasDay = (sync.title_format || defaultSyncFormat(sync.title_prefix)).includes("{日}");
   const names = base.map((n, i) => {
-    if ((count.get(n) ?? 0) < 2 && !existing.has(n)) return n;
+    if (hasDay || ((count.get(n) ?? 0) < 2 && !existing.has(n))) return n;
     const d = /^\d{4}-(\d{2})-(\d{2})/.exec(items[i]!.date ?? "");
     return d ? `${n}（${Number(d[1])}/${Number(d[2])}）` : n;
   });
@@ -331,7 +333,7 @@ export async function renameYoutubeSync(env: Env, syncId: string): Promise<{ ren
   for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
   const stmts = targets.flatMap((r, i) => {
     let name = base[i]!;
-    if ((count.get(name) ?? 0) >= 2) {
+    if (!fmt.includes("{日}") && (count.get(name) ?? 0) >= 2) {
       const d = /^\d{4}-(\d{2})-(\d{2})/.exec(byVideo.get(r.media_ref)!.date ?? "");
       if (d) name = `${name}（${Number(d[1])}/${Number(d[2])}）`;
     }
