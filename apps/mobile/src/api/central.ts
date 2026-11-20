@@ -222,6 +222,13 @@ type SsoPending = { nonce: string; state: string; created: number };
 const ss = () => globalThis.sessionStorage;
 const here = () => safePath(globalThis.location.pathname + globalThis.location.search);
 
+/** 這次載入頁面是否會去會員中心做共用登入檢查（會整頁導向離開再回來）：會的話，開機預先抓資料就白抓了（2026-11-21）。 */
+export function webSsoCheckDue(): boolean {
+  if (!web || !globalThis.location || globalThis.location.hostname !== "learn.hglobal1985.com") return false;
+  if (globalThis.location.pathname.startsWith("/auth/")) return false;
+  return Date.now() - Number(ss()?.getItem(SSO_CHECKED) ?? 0) >= SSO_INTERVAL;
+}
+
 /** 載入頁面時（5 分鐘節流）向會員中心詢問這個瀏覽器目前登入的會員。會整頁導向時回傳 true。 */
 export async function webSsoCheck(): Promise<boolean> {
   if (!web || !globalThis.location || globalThis.location.hostname !== "learn.hglobal1985.com") return false;

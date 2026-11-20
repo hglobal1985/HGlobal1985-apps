@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
-import { clearCentral, handleWebSsoReturn, hasCentralSession, signInWithGoogle, signOutCentral, webSsoCheck, webSsoLogout } from "@/api/central";
+import { clearCentral, handleWebSsoReturn, hasCentralSession, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
 import { api, cachedGet, clearApiCache, loadToken, peekCache, prefetchCommon, saveToken, type Member } from "@/api/client";
 
 /**
@@ -56,7 +56,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // 跟登入檢查同時開始抓公開資料，頁面一出現就有內容（不必等 /me 回來才開始）。
-    if (Platform.OS === "web") prefetchCommon(globalThis.location?.pathname ?? "/");
+    // 這次會先去會員中心做共用登入檢查（整頁離開再回來）時不預先抓：回來後頁面會重新載入，先抓的會白費。
+    if (Platform.OS === "web" && !webSsoCheckDue()) prefetchCommon(globalThis.location?.pathname ?? "/");
     (async () => {
       const raw = await AsyncStorage.getItem(CART_KEY).catch(() => null);
       if (raw) setCartState(JSON.parse(raw) as string[]);
