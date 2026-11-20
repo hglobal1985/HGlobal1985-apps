@@ -10,7 +10,7 @@ import { EdmCropper } from "./edm-cropper.web";
 import { CoverLibraryPicker, deleteUnusedCover, type PickedCover } from "./cover-library.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
 import { useUiConfig } from "@/state/ui-config";
-import { EDM_MAX_SIDE, composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode; /** 從封面庫挑了「未使用的封面檔」：儲存成功後把它刪掉。 */ consumeKey?: string };
@@ -107,7 +107,7 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", ce
     setBusy(true);
     setMsg("處理並上傳中…");
     try {
-      if (job.isNew) await api("PUT", endpoints.edm, await cropCompress(job.img, null, center ? Math.max(EDM_MAX_SIDE, coverSide) : EDM_MAX_SIDE, center ? quality : 0.9));
+      if (job.isNew) await api("PUT", endpoints.edm, await cropCompress(job.img, null, center ? Math.max(config.app.edmMaxSide, coverSide) : config.app.edmMaxSide, center ? quality : config.app.edmQuality / 100));
       // 完整顯示：封面是「整張照片＋淡模糊背景」合成圖，預設停留位置固定在最上緣。
       const contain = job.mode === "contain";
       await api("PUT", endpoints.cover, contain ? await composeContain(job.img, coverSide, quality) : await cropCompress(job.img, job.cover, coverSide, quality));
