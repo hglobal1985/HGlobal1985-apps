@@ -304,10 +304,14 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const narrowing = !!matched || selCats.length > 0 || !!brandSel;
   const zoneOpen = (key: string) => narrowing || !!opened[key];
   // 從清單頁返回要定位到某張卡：那張卡所在的專區要先展開，否則卡片不會出現、定位不到。
+  // 每個 focusKey 只展開一次（業主 2026-11-21 回報專區按「收合」收不起來：groups 每次重算都會再執行一次，把剛收合的專區又打開）。
+  const focusDone = useRef<string | null>(null);
   useEffect(() => {
-    if (!focusKey) return;
+    if (!focusKey || focusDone.current === focusKey) return;
     const zone = groups.find((g) => g.key === focusKey)?.nearest.zone;
-    if (zone) setOpened((x) => (x[zone] ? x : (zoneOpenMemory = { ...x, [zone]: true })));
+    if (!zone) return;
+    focusDone.current = focusKey;
+    setOpened((x) => (x[zone] ? x : (zoneOpenMemory = { ...x, [zone]: true })));
   }, [focusKey, groups]);
   /** 在同一個區塊裡把第 i 張跟相鄰的交換，立刻更新畫面、背景存檔；失敗就還原。 */
   useEffect(() => setOrderOverride(null), [config.seriesOrder]);
