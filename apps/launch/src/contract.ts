@@ -161,6 +161,8 @@ export type CourseSummary = {
   /** 指定邀請制（業主 2026-11-20）：不看獎銜、一律人工審核；inviteHasCode＝有設邀請碼（輸入正確免審核）。邀請碼本身只給課程管理者（GET /admin/courses/:id/invite）。 */
   inviteOnly: boolean;
   inviteHasCode: boolean;
+  /** 這位登入者能不能看這門課的報名名單（管理者、有審核權限的人；業主 2026-11-20）。 */
+  canRoster: boolean;
   /** 指導單位、主辦單位（空字串表示未設定）。 */
   guidanceUnit: string;
   hostUnit: string;
@@ -345,6 +347,27 @@ export type OrderEvent = {
   /** 私人備註：只有審核人員會拿到。 */
   note?: string;
   createdAt: string;
+};
+/** 報名名單（業主 2026-11-20）：每位報名學員一列；上手白金／上手鑽石由中央即時提供（行動大學不保存），讀不到就是 null。 */
+export type RosterRow = {
+  orderId: string;
+  name: string;
+  center: string;
+  /** free＝免費報名；paid＝付費報名；invite＝邀請碼加入；invite_request＝按「無邀請碼」申請。 */
+  method: "free" | "paid" | "invite" | "invite_request";
+  status: "opened" | "pending" | "rejected";
+  createdAt: string;
+  uplinePlatinum: string | null;
+  uplineDiamond: string | null;
+};
+export type Roster = {
+  rows: RosterRow[];
+  total: number;
+  counts: { all: number; pending: number; invite: number; opened: number };
+  page: number;
+  pageSize: number;
+  /** 中央有沒有回應上手資料（false＝這一頁的上手欄位顯示「未提供」）。 */
+  uplineAvailable: boolean;
 };
 /** 課程管理者看到的邀請設定。 */
 export type InviteInfo = { inviteOnly: boolean; code: string };

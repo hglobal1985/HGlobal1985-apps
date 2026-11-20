@@ -15,9 +15,10 @@ import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
 import { BrandField, CategoryField, HostField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
+import { RosterSheet } from "./roster-sheet";
 
 /** 編輯面板的種類（每一區各自一個底部面板、各自儲存）。 */
-export type SectionKey = "basics" | "when" | "price" | "enroll" | "advanced" | "status";
+export type SectionKey = "basics" | "when" | "price" | "enroll" | "advanced" | "status" | "roster";
 
 /** 一次儲存（只送這一區的欄位）：帶 ifUpdatedAt，別人剛改過就先問「重新載入」或「仍要覆蓋」；重要資訊有人報名時先提醒。 */
 export function useCourseSave(course: CourseDetail, onSaved: (d: CourseDetail) => void) {
@@ -575,6 +576,7 @@ export function SectionSheet({ section, ...p }: SheetProps & { section: SectionK
   if (section === "price") return <PriceSheet {...p} />;
   if (section === "enroll") return <EnrollSheet {...p} />;
   if (section === "advanced") return <AdvancedSheet {...p} />;
+  if (section === "roster") return <RosterSheet course={p.course} onClose={p.onClose} />;
   return <StatusSheet {...p} />;
 }
 
@@ -593,6 +595,7 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
       <ListRow icon="people-outline" title="報名資格條件" subtitle={`${course.minRank.name}以上${course.allowPresident ? "（會長也可）" : ""}・${VIEW_SCOPE_LABEL[course.viewScope]}`} onPress={() => onOpen("enroll")} />
       <ListRow icon="options-outline" title="進階設定" subtitle={`主辦：${course.hostUnit || "未設定"}${course.admin?.editedAt ? `・最後修改 ${course.admin.editedByName}` : ""}`} onPress={() => onOpen("advanced")} />
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />
+      <ListRow icon="list-outline" title="報名名單" subtitle="查看報名學員、匯出 CSV、移除資格" onPress={() => onOpen("roster")} />
     </Card>
   );
 }

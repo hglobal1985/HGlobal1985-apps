@@ -13,6 +13,8 @@ import {
   iconText,
   applicantLabel,
   type InviteInfo,
+  type Roster,
+  type RosterRow,
   type AchievementType,
   type AdminAchievement,
   type CourseComment,
@@ -68,7 +70,7 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
-import { takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -671,6 +673,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     allowPresident: row.allow_president === 1,
     inviteOnly: row.invite_only === 1,
     inviteHasCode: row.invite_only === 1 && row.invite_code !== "",
+    canRoster: false, // 課程頁（courseDetail）再依登入者的權限補上
     enrollment: state.enrolled.has(row.id) ? "opened" : state.pending.has(row.id) ? "pending" : null,
     completedLessons: state.done.get(row.id) ?? 0,
     // 學習進度百分比：每一堂都有長度就以「（已完成的長度＋沒看完章節已播放的部分）／總長度」算；有任何一堂沒有長度（例如 YouTube 抓不到時間），改用章節數（已完成章節數＋沒看完章節的播放比例）／章節總數。
@@ -1002,8 +1005,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
   const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
   const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || row.is_public === 1 || watchFree));
+  const canRoster = await canSeeRoster(ctx, s, row, manages);
   return {
     ...summaryNow,
+    canRoster,
     ...(manages ? { can } : {}),
     description: row.description ?? "",
     lessons: [...lessonRows.map((l) => ({
@@ -1604,6 +1609,106 @@ async function cancelOrder(ctx: Ctx, orderId: string): Promise<{ ok: true }> {
     audit(ctx.db, s.sub, free ? "order.cancel_free" : "order.cancel", "order", orderId),
   ]);
   return { ok: true };
+}
+
+
+// ---------- 報名名單（業主 2026-11-20）：課程設定第七項；有審核權限的人都能看、都能移除學員 ----------
+type RosterAccess = { s: Session; w: { sql: string; args: unknown[] } };
+/** 能看報名名單的人：超級管理員與有課程編輯權的人看全部；其他有審核權限的人只看自己審核範圍內的報名。 */
+async function rosterAccess(ctx: Ctx, courseId: string): Promise<RosterAccess> {
+  const s = requireMember(ctx);
+  const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string }>();
+  if (!c) return fail(404, "not_found", "找不到這門課程");
+  const rights = await rightsOf(ctx);
+  if (s.role === "admin" || (rights.any && courseCan(rights, s, c).edit)) return { s, w: { sql: "1 = 1", args: [] } };
+  const sc = await reviewScope(ctx, s);
+  if (!hasScope(sc)) fail(403, "forbidden", "只有課程管理者與審核人員可以看報名名單");
+  return { s, w: scopeSql(sc) };
+}
+/** 每位學員只列最新的一筆報名。 */
+const ROSTER_LATEST = "o.id = (SELECT o2.id FROM orders o2 JOIN order_items i2 ON i2.order_id = o2.id WHERE i2.course_id = i.course_id AND o2.member_sub = o.member_sub ORDER BY o2.created_at DESC, o2.rowid DESC LIMIT 1)";
+type RosterDb = { id: string; member_sub: string; member_name_snapshot: string; center_label: string; status: "opened" | "pending" | "rejected"; total_twd: number; join_method: string; created_at: string; revoked_at: string | null };
+const rosterMethod = (r: RosterDb): RosterRow["method"] => (r.join_method === "invite" ? "invite" : r.join_method === "invite_request" ? "invite_request" : r.total_twd > 0 ? "paid" : "free");
+
+async function rosterRows(ctx: Ctx, courseId: string, a: RosterAccess, opts: { filter: string; q: string; limit: number; offset: number }): Promise<{ rows: (RosterDb)[]; total: number; counts: Roster["counts"] }> {
+  const base = `FROM orders o JOIN order_items i ON i.order_id = o.id WHERE i.course_id = ? AND ${ROSTER_LATEST} AND ${a.w.sql}`;
+  const baseArgs = [courseId, ...a.w.args];
+  const q = opts.q.trim().slice(0, 30);
+  const qSql = q ? " AND (o.member_name_snapshot LIKE ? ESCAPE '\\' OR o.center_label LIKE ? ESCAPE '\\')" : "";
+  const qArgs = q ? [`%${q.replace(/[%_\\]/g, "\\$&")}%`, `%${q.replace(/[%_\\]/g, "\\$&")}%`] : [];
+  const f = opts.filter === "pending" ? " AND o.status = 'pending'" : opts.filter === "invite" ? " AND o.join_method = 'invite'" : opts.filter === "opened" ? " AND o.status = 'opened'" : "";
+  const [list, cnt] = await ctx.db.batch([
+    ctx.db.prepare(`SELECT o.id, o.member_sub, o.member_name_snapshot, o.center_label, o.status, o.total_twd, o.join_method, o.created_at, o.revoked_at ${base}${qSql}${f} ORDER BY o.created_at DESC, o.rowid DESC LIMIT ? OFFSET ?`).bind(...baseArgs, ...qArgs, opts.limit, opts.offset),
+    ctx.db.prepare(`SELECT COUNT(*) AS n_all, COALESCE(SUM(o.status = 'pending'), 0) AS n_pending, COALESCE(SUM(o.join_method = 'invite'), 0) AS n_invite, COALESCE(SUM(o.status = 'opened'), 0) AS n_opened ${base}${qSql}`).bind(...baseArgs, ...qArgs),
+  ]);
+  const c = (cnt.results[0] ?? {}) as { n_all: number; n_pending: number; n_invite: number; n_opened: number };
+  const counts = { all: c.n_all ?? 0, pending: c.n_pending ?? 0, invite: c.n_invite ?? 0, opened: c.n_opened ?? 0 };
+  const total = opts.filter === "pending" ? counts.pending : opts.filter === "invite" ? counts.invite : opts.filter === "opened" ? counts.opened : counts.all;
+  return { rows: list.results as RosterDb[], total, counts };
+}
+
+async function rosterOf(ctx: Ctx, courseId: string): Promise<Roster> {
+  const a = await rosterAccess(ctx, courseId);
+  const page = Math.max(1, Number(ctx.url.searchParams.get("page")) || 1);
+  const pageSize = 50;
+  const { rows, total, counts } = await rosterRows(ctx, courseId, a, { filter: ctx.url.searchParams.get("filter") ?? "all", q: ctx.url.searchParams.get("q") ?? "", limit: pageSize, offset: (page - 1) * pageSize });
+  // 上手白金／鑽石只讀「這一頁」，由中央即時提供（不保存）。
+  const uplines = await lookupUplines(ctx.env.CENTRAL_SERVICE_SECRET, rows.map((r) => r.member_sub)).catch(() => undefined);
+  return {
+    rows: rows.map((r): RosterRow => ({ orderId: r.id, name: r.member_name_snapshot, center: r.center_label, method: rosterMethod(r), status: r.revoked_at ? "rejected" : r.status, createdAt: r.created_at, uplinePlatinum: uplines?.get(r.member_sub)?.platinum ?? null, uplineDiamond: uplines?.get(r.member_sub)?.diamond ?? null })),
+    total,
+    counts,
+    page,
+    pageSize,
+    uplineAvailable: !!uplines,
+  };
+}
+
+async function rosterCsv(ctx: Ctx, courseId: string): Promise<Response> {
+  const a = await rosterAccess(ctx, courseId);
+  const title = (await ctx.db.prepare("SELECT title FROM courses WHERE id = ?").bind(courseId).first<{ title: string }>())?.title ?? "";
+  const { rows } = await rosterRows(ctx, courseId, a, { filter: "all", q: "", limit: 5000, offset: 0 });
+  const uplines = await lookupUplines(ctx.env.CENTRAL_SERVICE_SECRET, rows.map((r) => r.member_sub)).catch(() => undefined);
+  const methodLabel = { free: "免費報名", paid: "付費報名", invite: "邀請碼加入", invite_request: "無邀請碼申請" } as const;
+  const statusLabel = (r: RosterDb) => (r.revoked_at ? "已移除" : r.status === "opened" ? "已開通" : r.status === "rejected" ? "已退回" : "待審核");
+  const lines = [
+    ["姓名", "中心", "報名方式", "狀態", "報名時間", "上手白金", "上手鑽石"],
+    ...rows.map((r) => [r.member_name_snapshot, r.center_label, methodLabel[rosterMethod(r)], statusLabel(r), r.created_at, uplines ? (uplines.get(r.member_sub)?.platinum ?? "") : "未提供", uplines ? (uplines.get(r.member_sub)?.diamond ?? "") : "未提供"]),
+  ];
+  await audit(ctx.db, a.s.sub, "roster.export", "course", courseId, String(rows.length)).run();
+  return new Response("﻿" + lines.map((l) => l.map(csvCell).join(",")).join("\r\n"), {
+    headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="roster-${courseId}-${iso().slice(0, 10)}.csv"`, "cache-control": "no-store" },
+  });
+  void title;
+}
+
+/** 移除資格：已開通的取消開通、待審核的退回；通知學員；審核人員也可以做（業主 2026-11-20）。 */
+async function rosterRemove(ctx: Ctx, courseId: string, orderId: string): Promise<{ ok: true }> {
+  const a = await rosterAccess(ctx, courseId);
+  const row = await ctx.db
+    .prepare(`SELECT o.id, o.member_sub, o.status FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.id = ? AND i.course_id = ? AND ${a.w.sql}`)
+    .bind(orderId, courseId, ...a.w.args)
+    .first<{ id: string; member_sub: string; status: string }>();
+  if (!row) return fail(404, "not_found", "找不到這位學員的報名");
+  if (row.status === "rejected") fail(409, "already_removed", "這筆報名已經是退回或移除的狀態");
+  const title = (await ctx.db.prepare("SELECT title FROM courses WHERE id = ?").bind(courseId).first<{ title: string }>())?.title ?? "";
+  const now = iso();
+  await ctx.db.batch([
+    ctx.db.prepare("UPDATE orders SET status = 'rejected', deferred = 0, reject_reason = '審核人員移除報名資格', reviewed_by_sub = ?, reviewed_at = ?, revoked_at = ? WHERE id = ?").bind(a.s.sub, now, now, orderId),
+    ctx.db.prepare("DELETE FROM enrollments WHERE source_order_id = ?").bind(orderId),
+    event(ctx.db, orderId, { sub: a.s.sub, name: a.s.name, title: titleOf(a.s, await dutyOf(ctx, a.s)) }, "revoke", { reason: null, message: "由報名名單移除資格", note: "" }),
+    notify(ctx.db, { sub: row.member_sub }, "報名資格已被移除", `課程：${title}`, `/orders/${orderId}`),
+    audit(ctx.db, a.s.sub, "roster.remove", "order", orderId, courseId),
+  ]);
+  return { ok: true };
+}
+
+/** 這位登入者能不能看這門課的報名名單（只用來決定要不要顯示入口；真正的權限在 rosterAccess）。 */
+async function canSeeRoster(ctx: Ctx, s: Session | null, row: { id: string; review_group_id: string | null }, manages: boolean): Promise<boolean> {
+  if (!s) return false;
+  if (manages || s.role === "admin") return true;
+  const sc = await reviewScope(ctx, s);
+  return sc.groups.some((g) => g.groupId === row.review_group_id) || sc.courses.some((c) => c.courseId === row.id);
 }
 
 const INVITE_MAX_FAILS = 5;
@@ -5781,6 +5886,9 @@ const routes: [string, RegExp, Handler][] = [
       return { ok: true };
     },
   ],
+  ["GET", /^\/admin\/courses\/([\w-]+)\/roster$/, async (ctx, [id]) => rosterOf(ctx, id)],
+  ["GET", /^\/admin\/courses\/([\w-]+)\/roster\.csv$/, async (ctx, [id]) => rosterCsv(ctx, id)],
+  ["DELETE", /^\/admin\/courses\/([\w-]+)\/roster\/([\w-]+)$/, async (ctx, [id, orderId]) => rosterRemove(ctx, id, orderId)],
   [
     "GET",
     /^\/admin\/courses\/([\w-]+)\/invite$/,

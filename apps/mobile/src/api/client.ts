@@ -48,6 +48,8 @@ export type {
   ReviewReason,
   CourseSummary,
   InviteInfo,
+  Roster,
+  RosterRow,
   Lesson,
   MediaType,
   Member,
