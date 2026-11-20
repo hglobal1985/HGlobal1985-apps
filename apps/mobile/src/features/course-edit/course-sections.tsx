@@ -1,8 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, UNCATEGORIZED, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type Rank } from "@/api/client";
+import { api, HQ_UNIT, UNCATEGORIZED, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type InviteInfo, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -363,18 +363,45 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
 
 // ---------- 報名資格條件：誰能瀏覽課程、最低獎銜（預設收起）、其他（審核群組移到「費用與審核」的審核窗口） ----------
 function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
-  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, viewScope: course.viewScope };
+  const { member } = useSession();
+  const isSuper = isSuperAdmin(member);
+  const invite = useApi<InviteInfo>(`/admin/courses/${course.id}/invite`);
+  const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, viewScope: course.viewScope, inviteOnly: course.inviteOnly };
   const [f, setF] = useState(init);
+  // 邀請碼（明碼）：另外讀取，讀回來才填入；付費課程只有超級管理員能設定（業主 2026-11-20）。
+  const [code, setCode] = useState("");
+  const [codeOn, setCodeOn] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [codeInit, setCodeInit] = useState("");
+  useEffect(() => {
+    if (invite.data && !loaded) {
+      setCode(invite.data.code);
+      setCodeInit(invite.data.code);
+      setCodeOn(invite.data.code !== "");
+      setLoaded(true);
+    }
+  }, [invite.data, loaded]);
+  const paid = (course.priceTwd ?? 0) > 0 || course.priceTba;
+  const codeLocked = paid && !isSuper;
   const [rankOpen, setRankOpen] = useState(false);
   // 業主 2026-11-17 規則 B：「所有人含訪客」只代表任何人都看得到介紹，獎銜限制照樣可以設定（沒有獎銜的人看得到、不能報名）。
   const ranks = useApi<Rank[]>("/ranks");
   const { save, busy, error } = useCourseSave(course, onSaved);
+  const finalCode = f.inviteOnly && codeOn ? code.trim() : "";
+  const codeChanged = loaded && finalCode !== codeInit;
   const submit = async () => {
-    if (await save({ ...f })) onClose();
+    if (f.inviteOnly && codeOn && !code.trim()) {
+      flashText("請輸入邀請碼，或取消勾選邀請碼");
+      return;
+    }
+    const body: Record<string, unknown> = { ...f };
+    if (codeChanged && !codeLocked) body.inviteCode = finalCode;
+    if (await save(body)) onClose();
   };
   const rankName = ranks.data?.find((r) => r.code === f.minRankCode)?.name ?? course.minRank.name;
+  const dirty = !same(init, f) || (codeChanged && !codeLocked);
   return (
-    <EditSheet title="報名資格條件" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
+    <EditSheet title="報名資格條件" onClose={onClose} onSave={submit} dirty={dirty} busy={busy} error={error}>
       <AppText variant="headline">誰能瀏覽課程？</AppText>
       <Chips title="瀏覽範圍" options={VIEW_SCOPES.map((k) => ({ key: k, label: VIEW_SCOPE_LABEL[k] }))} value={f.viewScope} onChange={(v) => (setF((x) => ({ ...x, viewScope: v as ViewScope })), (v === "all" || v === "link_guest") && setRankOpen(false))} />
       <AppText variant="caption" tone="muted">
@@ -382,23 +409,41 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
           ? "私密連結：不會出現在行動大學的任何清單與搜尋，只有拿到網址的人才看得到。"
           : "不在範圍內的人，這門課不會出現在清單與搜尋，也不能報名；已報名的學員照常看得到。"}
       </AppText>
-      <AppText variant="headline">
-        最低獎銜（誰可以報名）
-      </AppText>
-      <View style={styles.rankRow}>
-        <AppText variant="body" style={{ flex: 1 }}>
-          {rankName}
-        </AppText>
-        <Pressable accessibilityRole="button" accessibilityLabel={rankOpen ? "收起獎銜" : "展開獎銜"} onPress={() => setRankOpen((v) => !v)} style={[styles.rankToggle, { borderColor: "#00000022" }]}>
-          <AppText variant="callout" style={{ fontWeight: "700" }}>
-            {rankOpen ? "收起" : "展開"}
+      <AppText variant="headline">報名方式</AppText>
+      <Check label="指定邀請制" value={f.inviteOnly} onChange={(v) => setF((x) => ({ ...x, inviteOnly: v }))} />
+      {f.inviteOnly ? (
+        <>
+          <NoticeBox text="指定邀請制：不看獎銜，所有人報名都要人工審核（免費課程也一樣），審核人員會收到通知。" />
+          <Check label="設定邀請碼（密碼）" value={codeOn} onChange={(v) => !codeLocked && setCodeOn(v)} />
+          {codeOn ? (
+            <>
+              <Field label="邀請碼（明碼，可以很簡單，不限複雜度）" value={code} onChange={(v) => !codeLocked && setCode(v.slice(0, 40))} placeholder="例如：8888" />
+              <AppText variant="caption" tone="muted">
+                學員按「報名課程」後，可輸入邀請碼：輸入正確就不用審核、直接開通，並通知管理員；沒有邀請碼的人按「無邀請碼」改由人工審核。連續輸錯 5 次會暫停 10 分鐘。
+              </AppText>
+              {codeLocked ? <NoticeBox text="付費課程的邀請碼目前只有超級管理員可以設定。" /> : null}
+            </>
+          ) : null}
+        </>
+      ) : null}
+      <View style={f.inviteOnly ? { opacity: 0.45 } : undefined} pointerEvents={f.inviteOnly ? "none" : "auto"}>
+        <AppText variant="headline">最低獎銜（誰可以報名）</AppText>
+        <View style={styles.rankRow}>
+          <AppText variant="body" style={{ flex: 1 }}>
+            {rankName}
           </AppText>
-        </Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel={rankOpen ? "收起獎銜" : "展開獎銜"} onPress={() => setRankOpen((v) => !v)} style={[styles.rankToggle, { borderColor: "#00000022" }]}>
+            <AppText variant="callout" style={{ fontWeight: "700" }}>
+              {rankOpen ? "收起" : "展開"}
+            </AppText>
+          </Pressable>
+        </View>
       </View>
-      {f.viewScope === "all" || f.viewScope === "link_guest" ? (
+      {f.inviteOnly ? <NoticeBox text="🔒 無法選擇獎銜：已勾選「指定邀請制」，這門課不看獎銜，改由審核人員人工把關。取消勾選就可以重新設定獎銜。" /> : null}
+      {!f.inviteOnly && (f.viewScope === "all" || f.viewScope === "link_guest") ? (
         <NoticeBox text="訪客也看得到這門課的介紹；設了獎銜限制，沒有達到獎銜的人（包含訪客）只能看介紹，不能報名、也看不到章節內容。" />
       ) : null}
-      {rankOpen ? <Chips options={(ranks.data ?? []).map((r) => ({ key: r.code, label: r.name }))} value={f.minRankCode} onChange={(v) => setF((x) => ({ ...x, minRankCode: v }))} /> : null}
+      {rankOpen && !f.inviteOnly ? <Chips options={(ranks.data ?? []).map((r) => ({ key: r.code, label: r.name }))} value={f.minRankCode} onChange={(v) => setF((x) => ({ ...x, minRankCode: v }))} /> : null}
       <AppText variant="headline">其他</AppText>
       <Check label="會長不受獎銜限制也可報名" value={f.allowPresident} onChange={(v) => setF((x) => ({ ...x, allowPresident: v }))} />
       <NoticeBox text="審核群組與審核人員改在「費用與審核」的「審核窗口」設定。" />

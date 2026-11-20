@@ -10,6 +10,7 @@ import { radius } from "@/theme/tokens";
 import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
+import { CardCount } from "@/ui/card-count";
 import { BlockSheet, MaterialsSheet, SeriesSheet } from "./series-sheet";
 import { useSeriesSettings } from "./series-settings";
 import { nearestOf, type SeriesGroup } from "./sort";
@@ -87,14 +88,8 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
         {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: thumb(resolveUrl(edm), width) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={thumb(resolveUrl(edm), width)} w={width} h={height} viewY={flat || !inSeries ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? settings.titleOf(rep.series) : rep.title} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
-        {/* 安麗品牌專區的每張卡片：右下角統一用淡灰色膠囊顯示教材數量（業主 2026-11-18）。 */}
-        {!flat && rep.zone === "amway_brand" ? (
-          <View style={styles.count} pointerEvents="none" accessibilityLabel={`${count}個教材`}>
-            <Text style={styles.countText} {...({ dataSet: { noScale: "" } } as object)}>
-              {count}
-            </Text>
-          </View>
-        ) : null}
+        {/* 所有卡片右下角統一顯示教材數量（業主 2026-11-20，共用 CardCount；原本只有安麗品牌專區有）。中心頁（flat）是章節選單，不放。 */}
+        {!flat ? <CardCount count={count} /> : null}
         {unlisted ? (
           <View style={[styles.draft, { backgroundColor: c.textMuted, left: undefined, right: 6, top: 6, bottom: undefined }]}>
             <Text style={styles.draftText}>{rep.series === UNCATEGORIZED ? "未分類（僅你可見）" : "未顯示於所有系列"}</Text>
@@ -118,7 +113,5 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
 const styles = StyleSheet.create({
   art: { borderRadius: radius.md, overflow: "hidden" },
   draft: { position: "absolute", left: 6, bottom: 6, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-  count: { position: "absolute", right: 6, bottom: 6, minWidth: 22, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999, alignItems: "center", backgroundColor: "rgba(232,232,230,0.96)" },
-  countText: { color: "#5A5A57", fontSize: 12, fontWeight: "700" },
   draftText: { color: "#fff", fontSize: 13, fontWeight: "700" },
 });

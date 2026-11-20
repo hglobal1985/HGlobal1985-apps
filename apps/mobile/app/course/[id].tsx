@@ -6,6 +6,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { api, type CourseDetail, type Lesson, type Order } from "@/api/client";
 import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
+import { InviteJoin } from "@/features/courses/invite-join";
 import { EdmStage } from "@/features/courses/edm-viewer";
 import { useCoverStats } from "@/features/courses/cover-stats";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
@@ -150,15 +151,15 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
     );
 
   /** 報名：免費立即開通；付費建立待審核的報名並前往報名明細。 */
-  const register = async () => {
+  const register = async (inviteCode?: string) => {
     setBusy("course");
     setMessage(null);
     try {
-      const [order] = await api<Order[]>("POST", "/orders", { items: [{ courseId: course.id }] });
+      const [order] = await api<Order[]>("POST", "/orders", { items: [{ courseId: course.id }], ...(inviteCode ? { inviteCode } : {}) });
       invalidate();
       reload();
       // 留在這一頁：按鈕會變成「審核中」（付費）或課程直接開通（免費），不跳到別的頁面。
-      setMessage(order.status === "opened" ? { tone: "success", text: "報名成功！課程已開通，請從下方章節開始上課。" } : { tone: "success", text: "報名已送出，等待審核。繳費與審核進度可以點下方「付款審核中」查看。" });
+      setMessage(order.status === "opened" ? { tone: "success", text: order.joinMethod === "invite" ? "邀請碼正確，已加入課程！請從下方章節開始上課。" : "報名成功！課程已開通，請從下方章節開始上課。" } : { tone: "success", text: "報名已送出，等待審核。繳費與審核進度可以點下方「付款審核中」查看。" });
     } catch (e) {
       setMessage({ tone: "danger", text: (e as Error).message });
     } finally {
@@ -186,6 +187,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
     if (course.priceTba) return <NoticeBox tone="warning" text="這門課程的費用尚未公布，公布後才開放報名。" />;
     if (!member) return <Button label="登入後報名" icon="log-in-outline" onPress={() => router.push({ pathname: "/me", params: { next: `/course/${course.id}` } })} fullWidth />;
     if (!course.eligible) return <NoticeBox tone="warning" text={`這門課程限 ${course.minRank.name} 以上獎銜${course.allowPresident ? "或會長" : ""}報名。`} />;
+    // 指定邀請制：按下去原地變成輸入邀請碼（有「無邀請碼」改走人工審核）；不看獎銜。
+    if (course.inviteOnly) return <InviteJoin hasCode={course.inviteHasCode} busy={busy === key} error={message?.tone === "danger" ? message.text : null} onSubmit={(code) => void register(code)} />;
     if (free) return <Button label="免費報名・有更新會通知你" icon="gift-outline" loading={busy === key} disabled={!!busy} onPress={() => register()} fullWidth />;
     // iOS/Android：依商店規範不顯示付費報名方式，只說明尚未開通。
     if (!isWeb) return <NoticeBox text="這門課程尚未為你開通。開通後即可在這裡觀看。" />;
@@ -198,7 +201,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
     return (
     <View style={styles.pending}>
       <View style={{ flex: 1 }}>
-        <Button variant="secondary" label="付款審核中（點擊查看）" icon="time-outline" onPress={() => router.push(orderId ? `/orders/${orderId}` : "/orders")} fullWidth />
+        <Button variant="secondary" label={course.inviteOnly && course.free ? "報名審核中（點擊查看）" : "付款審核中（點擊查看）"} icon="time-outline" onPress={() => router.push(orderId ? `/orders/${orderId}` : "/orders")} fullWidth />
       </View>
       <Button variant="cancel" label="取消" loading={busy === "cancel-course"} disabled={!!busy} onPress={() => cancel()} />
     </View>
@@ -214,7 +217,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   // 課程類一律手動報名（即使免費或完全公開，登入後都有報名鈕；報名＝訂閱，有更新會通知）；清單／素材類永遠沒有報名鈕（業主 2026-11-18）。
   const canRegister = course.enrollment === null && !course.isList && (!course.isPublic || !!member);
   const registerNode = canRegister ? registerButton(course.free, "course") : null;
-  const registerIsAction = !!registerNode && (registerNode as { type?: unknown }).type === Button;
+  const registerIsAction = !!registerNode && ((registerNode as { type?: unknown }).type === Button || (registerNode as { type?: unknown }).type === InviteJoin);
   const stickyAction = course.enrollment === "pending" ? pendingRow() : registerIsAction ? registerNode : null;
   const stickyNotice = registerNode && !registerIsAction ? registerNode : null;
   const needRank = member && !course.eligible ? `限${course.minRank.name}獎銜以上報名${course.allowPresident ? "（會長也可報名）" : ""}` : null;

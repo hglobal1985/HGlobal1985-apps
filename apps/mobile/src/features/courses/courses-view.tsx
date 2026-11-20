@@ -14,6 +14,7 @@ import { NewCourseSheet } from "@/features/course-edit/new-course";
 import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { flashText } from "@/ui/flash-notice";
+import { HeaderInvite } from "@/features/invite-button";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
@@ -110,6 +111,28 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       setModeBeforeCat(null);
     }
     syncUrl(vs.join("、"), vs.length ? ALL : center);
+  };
+  // 搜尋（業主 2026-11-20）：不論在哪一個模式（所有系列、教育中心）按搜尋，一律自動切到「單元」模式的搜尋介面；關掉搜尋就回到原本的模式（不改變記住的模式）。
+  const [modeBeforeSearch, setModeBeforeSearch] = useState<CourseViewMode | null>(null);
+  const openSearch = () => {
+    setWantIndex(true);
+    setSearchOpen(true);
+    if (mode !== "chapter") {
+      setModeBeforeSearch(mode);
+      setMode("chapter");
+      setShuffleSeed(Math.floor(Math.random() * 2 ** 31));
+      flashMode("chapter", c.accent);
+    }
+  };
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setQ("");
+    setPicked("");
+    if (modeBeforeSearch && !selCats.length && !brandSel) {
+      setMode(modeBeforeSearch);
+      flashMode(modeBeforeSearch, c.accent);
+    }
+    setModeBeforeSearch(null);
   };
   const pickBrand = (id: string | null) => {
     setBrandSel(id);
@@ -397,8 +420,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         </View>
         <InlineSearch
           open={searchOpen}
-          onOpen={() => (setWantIndex(true), setSearchOpen(true))}
-          onClose={() => (setSearchOpen(false), setQ(""), setPicked(""))}
+          onOpen={openSearch}
+          onClose={closeSearch}
           value={q}
           onChange={(v) => (setQ(v), setPicked(""))}
           collapsedWidth={slotW}
@@ -420,8 +443,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       </View>
         <SearchBox
           open={searchOpen}
-          onOpen={() => (setWantIndex(true), setSearchOpen(true))}
-          onClose={() => (setSearchOpen(false), setQ(""), setPicked(""))}
+          onOpen={openSearch}
+          onClose={closeSearch}
           value={q}
           onChange={(v) => (setQ(v), setPicked(""))}
           rowWidth={rowW}
@@ -516,6 +539,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             <>
               {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心首頁圖與公告" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
               {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
+              <HeaderInvite title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
           } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
@@ -556,7 +580,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           ) : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
-              ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
+              ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {/* 三個專區（業主 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
             {tileW && flat ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
@@ -573,7 +597,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
             {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} /> : null}
             {tileW && mode === "series" && !matched && !!opened.centers
-              ? centerCounts.map(({ name }) => <CenterTile key={name} name={name} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
+              ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
               : null}
           </View>
         </>

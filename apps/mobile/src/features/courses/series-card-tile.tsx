@@ -9,6 +9,7 @@ import { useTheme } from "@/theme/theme";
 import { radius } from "@/theme/tokens";
 import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { fadedStyle } from "@/ui/fade-style";
+import { CardCount } from "@/ui/card-count";
 import { ribbonsFor } from "./ribbons";
 import { TopFill } from "./series-tile";
 import { displayName } from "./sort";
@@ -46,11 +47,7 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
         {course.brand ? <BrandCover brand={course.brand} fill /> : img && cropped ? <Image source={{ uri: thumb(resolveUrl(img), width) }} resizeMode="cover" style={StyleSheet.absoluteFill} accessibilityIgnoresInvertColors /> : img ? <TopFill uri={thumb(resolveUrl(img), width)} w={width} h={height} viewY={course.edmViewY} fillBlur /> : <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />}
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
-        <View style={styles.count} pointerEvents="none">
-          <Text style={styles.countText} {...({ dataSet: { noScale: "" } } as object)}>
-            {course.materialCount}
-          </Text>
-        </View>
+        <CardCount count={course.materialCount} />
         {course.status === "draft" ? (
           <View style={[styles.tag, { backgroundColor: c.warning, left: 6, bottom: 6 }]}>
             <Text style={styles.tagText}>未上架</Text>
@@ -75,8 +72,6 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
 
 const styles = StyleSheet.create({
   art: { borderRadius: radius.md, overflow: "hidden" },
-  count: { position: "absolute", right: 6, bottom: 6, minWidth: 22, paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999, alignItems: "center", backgroundColor: "rgba(232,232,230,0.96)" },
-  countText: { color: "#5A5A57", fontSize: 12, fontWeight: "700" },
   tag: { position: "absolute", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
   tagText: { color: "#fff", fontSize: 11, fontWeight: "700" },
   swapBtn: { flex: 1, minWidth: 0, height: 40, borderRadius: radius.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },

@@ -33,7 +33,15 @@ export function OrderCard({ order, onPress, showMember }: { order: Order; onPres
           <AppText tone="muted">{i.priceTwd ? ntd(i.priceTwd) : "免費"}</AppText>
         </View>
       ))}
-      {order.payMethod && order.payMethod !== "free" ? (
+      {order.joinMethod === "invite" ? (
+        <AppText variant="callout" tone="muted">
+          報名方式：邀請碼加入（免審核）
+        </AppText>
+      ) : order.joinMethod === "invite_request" && order.status === "pending" ? (
+        <AppText variant="callout" tone="muted">
+          報名方式：指定邀請制申請（無邀請碼，人工審核中）
+        </AppText>
+      ) : order.payMethod && order.payMethod !== "free" ? (
         <AppText variant="callout" tone="muted">
           實收 {ntd(order.paidTwd ?? 0)}（{payMethodLabel[order.payMethod]}）
         </AppText>

@@ -106,9 +106,9 @@ export function textCoverLines(title: string | null | undefined): string[] | nul
 /** 寰宇大學「所有系列」檢視的三個專區（業主 2026-11-18）。空字串＝沒指定：課程放 hglobal、清單放 amway_material。 */
 export type Zone = "hglobal" | "amway_material" | "amway_brand";
 export const ZONES: { id: Zone; label: string }[] = [
-  { id: "hglobal", label: "寰宇課程與活動" },
-  { id: "amway_material", label: "安麗官方清單專區" },
-  { id: "amway_brand", label: "安麗品牌專區" },
+  { id: "hglobal", label: "寰宇課程活動" },
+  { id: "amway_material", label: "安麗官方資源" },
+  { id: "amway_brand", label: "安麗品牌館" },
 ];
 export const zoneOf = (raw: string | null | undefined, isList: boolean): Zone => (ZONES.some((z) => z.id === raw) ? (raw as Zone) : isList ? "amway_material" : "hglobal");
 
@@ -158,6 +158,9 @@ export type CourseSummary = {
   eligible: boolean;
   /** 會長不受獎銜限制也可報名。 */
   allowPresident: boolean;
+  /** 指定邀請制（業主 2026-11-20）：不看獎銜、一律人工審核；inviteHasCode＝有設邀請碼（輸入正確免審核）。邀請碼本身只給課程管理者（GET /admin/courses/:id/invite）。 */
+  inviteOnly: boolean;
+  inviteHasCode: boolean;
   /** 指導單位、主辦單位（空字串表示未設定）。 */
   guidanceUnit: string;
   hostUnit: string;
@@ -343,6 +346,8 @@ export type OrderEvent = {
   note?: string;
   createdAt: string;
 };
+/** 課程管理者看到的邀請設定。 */
+export type InviteInfo = { inviteOnly: boolean; code: string };
 export type Order = {
   id: string;
   status: OrderStatus;
@@ -351,6 +356,8 @@ export type Order = {
   totalTwd: number;
   paidTwd: number | null;
   payMethod: "cash" | "transfer" | "vip" | "online" | "free" | null;
+  /** 報名方式：空＝一般；invite＝邀請碼加入；invite_request＝無邀請碼、等候人工審核。 */
+  joinMethod: "" | "invite" | "invite_request";
   rejectReason: string | null;
   createdAt: string;
   reviewedAt: string | null;
@@ -480,7 +487,7 @@ export function noticeKindOf(title: string, link: string): NoticeKind {
   if (/有新(課程|清單)/.test(title)) return "subscribe_new";
   if (/有新(章節|教材)|時間或地點有更新/.test(title)) return "course_update";
   if (/留言|回覆|檢舉/.test(title)) return "comment";
-  if (/審核|等待|報名已|報名延後|課程已開通|繳費確認|開通已撤銷/.test(title)) return "paid_review";
+  if (/審核|等待|報名已|報名延後|課程已開通|繳費確認|開通已撤銷|邀請碼/.test(title)) return "paid_review";
   return "other";
 }
 
@@ -557,7 +564,7 @@ export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; 
   { key: "social", label: "社群互動", icon: "💬", desc: "在課程留言板的互動" },
   { key: "subscribe", label: "訂閱關注", icon: "🔔", desc: "訂閱中心、系列的數量" },
   { key: "feature", label: "功能體驗", icon: "🧰", desc: "第一次使用某個網站功能（新手教學）" },
-  { key: "zone", label: "清單影片", icon: "🎬", desc: "安麗官方清單專區、安麗品牌專區：每個區塊隨機挑 1～2 支影片，讀完（看完）就解鎖" },
+  { key: "zone", label: "清單影片", icon: "🎬", desc: "安麗官方資源、安麗品牌館：每個區塊隨機挑 1～2 支影片，讀完（看完）就解鎖" },
 ];
 /** 條件類型：中文名稱、單位、分類、白話說明（後台挑選時顯示）。retired＝已停用的類型，後台不再提供。 */
 export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: string; category: AchievementCategory; hint: string; needsCourse?: boolean; needsFeature?: boolean; retired?: boolean; auto?: boolean }> = {

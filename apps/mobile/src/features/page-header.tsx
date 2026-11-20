@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import type { ReactNode } from "react";
 import { View } from "react-native";
+import { HeaderInvite } from "./invite-button";
 import { HeaderShare } from "./share-button";
 
 /**
@@ -20,6 +21,7 @@ export function PageHeader({ title, path, shareTitle, extra, course, list, backT
         headerRight: () => (
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {extra}
+            <HeaderInvite title={shareTitle ?? title} path={path} />
             <HeaderShare title={shareTitle ?? title} path={path} course={course} list={list} />
           </View>
         ),

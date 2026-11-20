@@ -12,6 +12,7 @@ import {
   textCoverLines,
   iconText,
   applicantLabel,
+  type InviteInfo,
   type AchievementType,
   type AdminAchievement,
   type CourseComment,
@@ -325,7 +326,7 @@ function notify(db: D1Database, to: { sub: string } | { role: "admin" } | { role
 function noticeCategory(title: string, link: string): NoticeCategory {
   if (/留言|回覆/.test(title)) return "comment";
   if (/有新(課程|清單|章節|教材)|廣播公告|已送出「新/.test(title)) return "subscribe";
-  if (/審核|等待|報名已|課程已開通|繳費確認|開通已撤銷|報名有|已成為課程報名|^你的.{1,6}申請|^已送出.{1,6}申請/.test(title) || link.startsWith("/admin/orders")) return "review";
+  if (/審核|等待|報名已|課程已開通|繳費確認|開通已撤銷|報名有|邀請碼|已成為課程報名|^你的.{1,6}申請|^已送出.{1,6}申請/.test(title) || link.startsWith("/admin/orders")) return "review";
   return "other";
 }
 
@@ -469,6 +470,8 @@ type CourseRow = {
   free_until: string | null;
   review_group_id: string | null;
   allow_president: number;
+  invite_only: number;
+  invite_code: string;
   event_start: string | null;
   event_end: string | null;
   is_public: number;
@@ -520,7 +523,7 @@ const materialLike = (r: { is_list: number; chapter_n: number; price_twd: number
 /** 同一個判斷的 SQL 版（FROM courses 的查詢用）。 */
 const MATERIAL_LIKE_SQL = `(is_list = 1 OR (NOT EXISTS (SELECT 1 FROM lessons ch WHERE ch.course_id = courses.id AND ch.kind = 'chapter') AND price_twd = 0 AND price_tba <> 1 AND COALESCE(event_start, '') = '' AND COALESCE(event_end, '') = ''))`;
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.invite_only, c.invite_code, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -664,8 +667,10 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     // 教材數：自己的教材，加上連結區塊（品牌資訊卡的「新品特惠培訓直播」）來源清單裡的教材。
     materialCount: row.material_count + (materialLike(row) ? (ctx.blocks?.get(row.id) ?? []).reduce((n, b) => n + (b.linked ? b.count : 0), 0) : 0),
     totalMinutes: row.total_minutes,
-    eligible: eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row),
+    eligible: row.invite_only === 1 || eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row), // 指定邀請制不看獎銜
     allowPresident: row.allow_president === 1,
+    inviteOnly: row.invite_only === 1,
+    inviteHasCode: row.invite_only === 1 && row.invite_code !== "",
     enrollment: state.enrolled.has(row.id) ? "opened" : state.pending.has(row.id) ? "pending" : null,
     completedLessons: state.done.get(row.id) ?? 0,
     // 學習進度百分比：每一堂都有長度就以「（已完成的長度＋沒看完章節已播放的部分）／總長度」算；有任何一堂沒有長度（例如 YouTube 抓不到時間），改用章節數（已完成章節數＋沒看完章節的播放比例）／章節總數。
@@ -1087,10 +1092,10 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
 async function freeRankBlocked(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) return false;
-  const c = await ctx.db.prepare("SELECT min_rank_code, allow_president, price_twd, price_tba, view_scope FROM courses WHERE id = ?").bind(courseId).first<{ min_rank_code: string; allow_president: number; price_twd: number; price_tba: number; view_scope: ViewScope }>();
+  const c = await ctx.db.prepare("SELECT min_rank_code, allow_president, price_twd, price_tba, view_scope, invite_only FROM courses WHERE id = ?").bind(courseId).first<{ invite_only: number; min_rank_code: string; allow_president: number; price_twd: number; price_tba: number; view_scope: ViewScope }>();
   if (!c || c.price_twd !== 0 || c.price_tba === 1) return false;
   if (!scopeAllows(c.view_scope, s)) return true; // 後來把「誰能瀏覽」改嚴：先前自動報名的不在範圍內也不能看
-  if (c.min_rank_code === "none" || byPresident(s, c)) return false;
+  if (c.invite_only === 1 || c.min_rank_code === "none" || byPresident(s, c)) return false; // 指定邀請制不看獎銜
   return (await eligibilityFor(s, await ranks(ctx.db), [c.min_rank_code])).get(c.min_rank_code) !== true;
 }
 
@@ -1412,9 +1417,10 @@ type OrderRow = {
   deferred: number;
   paid_twd: number | null;
   pay_method: Order["payMethod"];
+  join_method: Order["joinMethod"];
   revoked_at: string | null;
 };
-const ORDER_SELECT = "SELECT o.id, o.member_sub, o.status, o.total_twd, o.reject_reason, o.created_at, o.reviewed_at, o.member_name_snapshot, o.legal_name, o.pay_ref, o.center_key, o.center_label, o.hglobal, o.deferred, o.paid_twd, o.pay_method, o.revoked_at FROM orders o";
+const ORDER_SELECT = "SELECT o.id, o.member_sub, o.status, o.total_twd, o.reject_reason, o.created_at, o.reviewed_at, o.member_name_snapshot, o.legal_name, o.pay_ref, o.center_key, o.center_label, o.hglobal, o.deferred, o.paid_twd, o.pay_method, o.join_method, o.revoked_at FROM orders o";
 
 async function hydrateOrders(db: D1Database, rows: OrderRow[]): Promise<Order[]> {
   if (!rows.length) return [];
@@ -1430,6 +1436,7 @@ async function hydrateOrders(db: D1Database, rows: OrderRow[]): Promise<Order[]>
     totalTwd: r.total_twd,
     paidTwd: r.paid_twd,
     payMethod: r.pay_method,
+    joinMethod: r.join_method ?? "",
     rejectReason: r.reject_reason,
     createdAt: r.created_at,
     reviewedAt: r.reviewed_at,
@@ -1586,9 +1593,9 @@ type RegItem = { courseId: string };
 /** 會員自己取消報名：審核中的報名、或免費自動開通的報名都可以反悔取消；已繳費（含 VIP 免繳費）開通的要聯絡窗口。 */
 async function cancelOrder(ctx: Ctx, orderId: string): Promise<{ ok: true }> {
   const s = requireMember(ctx);
-  const o = await ctx.db.prepare("SELECT id, member_sub, status, pay_method FROM orders WHERE id = ?").bind(orderId).first<{ id: string; member_sub: string; status: string; pay_method: string | null }>();
+  const o = await ctx.db.prepare("SELECT id, member_sub, status, pay_method, join_method FROM orders WHERE id = ?").bind(orderId).first<{ id: string; member_sub: string; status: string; pay_method: string | null; join_method: string }>();
   if (!o || o.member_sub !== s.sub) return fail(404, "not_found", "找不到這筆報名");
-  const free = o.status === "opened" && o.pay_method === "free";
+  const free = o.status === "opened" && (o.pay_method === "free" || o.join_method === "invite");
   if (o.status !== "pending" && !free) fail(409, "not_cancellable", o.status === "opened" ? "已繳費開通的報名無法自行取消，請聯絡報名窗口" : "這筆報名已退回，不需要取消");
   await ctx.db.batch([
     ctx.db.prepare("DELETE FROM notifications WHERE (link = ?1 OR link = ?2)").bind(`/orders/${orderId}`, `/admin/orders/${orderId}`),
@@ -1599,7 +1606,24 @@ async function cancelOrder(ctx: Ctx, orderId: string): Promise<{ ok: true }> {
   return { ok: true };
 }
 
-async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unknown }, quiet = false): Promise<Order[]> {
+const INVITE_MAX_FAILS = 5;
+const INVITE_LOCK_MS = 600_000;
+/** 檢查邀請碼：連續輸錯 5 次鎖 10 分鐘；輸對就清掉錯誤紀錄。不分大小寫、忽略前後空白（明碼，可以很簡單）。 */
+async function checkInviteCode(ctx: Ctx, sub: string, c: { id: string; invite_code: string }, code: string): Promise<void> {
+  if (!c.invite_code) fail(400, "invite_no_code", "這門課沒有設定邀請碼，請按「無邀請碼」改由人工審核");
+  const row = await ctx.db.prepare("SELECT fails, locked_until FROM invite_attempts WHERE member_sub = ? AND course_id = ?").bind(sub, c.id).first<{ fails: number; locked_until: string | null }>();
+  const now = iso();
+  if (row?.locked_until && row.locked_until > now) fail(429, "invite_locked", "邀請碼輸入錯誤太多次，請 10 分鐘後再試");
+  if (code.toLowerCase() !== c.invite_code.toLowerCase()) {
+    const fails = (row?.locked_until && row.locked_until <= now ? 0 : (row?.fails ?? 0)) + 1;
+    const lock = fails >= INVITE_MAX_FAILS;
+    await ctx.db.prepare("INSERT INTO invite_attempts (member_sub, course_id, fails, locked_until) VALUES (?, ?, ?, ?) ON CONFLICT(member_sub, course_id) DO UPDATE SET fails = excluded.fails, locked_until = excluded.locked_until").bind(sub, c.id, lock ? 0 : fails, lock ? new Date(Date.now() + INVITE_LOCK_MS).toISOString() : null).run();
+    fail(lock ? 429 : 403, lock ? "invite_locked" : "invite_wrong", lock ? "邀請碼連續輸入錯誤 5 次，已暫停 10 分鐘" : `邀請碼不正確（還可以再試 ${INVITE_MAX_FAILS - fails} 次）`);
+  }
+  if (row) await ctx.db.prepare("DELETE FROM invite_attempts WHERE member_sub = ? AND course_id = ?").bind(sub, c.id).run();
+}
+
+async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unknown; inviteCode?: unknown }, quiet = false): Promise<Order[]> {
   const s = requireMember(ctx);
   const raw: RegItem[] = [
     ...(Array.isArray(body.courseIds) ? body.courseIds.filter((x): x is string => typeof x === "string").map((courseId) => ({ courseId })) : []),
@@ -1612,9 +1636,9 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
   const marks = ids.map(() => "?").join(",");
   const [{ results: courses }, rankMap, state] = await Promise.all([
     ctx.db
-      .prepare(`SELECT id, title, price_twd, price_tba, diamond_free, early_bird, early_price_twd, early_until, min_rank_code, free_from, free_until, review_group_id, allow_president FROM courses WHERE status = 'published' AND id IN (${marks})`)
+      .prepare(`SELECT id, title, price_twd, price_tba, diamond_free, early_bird, early_price_twd, early_until, min_rank_code, free_from, free_until, review_group_id, allow_president, invite_only, invite_code FROM courses WHERE status = 'published' AND id IN (${marks})`)
       .bind(...ids)
-      .all<{ id: string; title: string; price_twd: number; price_tba: number; diamond_free: number; early_bird: number; early_price_twd: number | null; early_until: string | null; min_rank_code: string; free_from: string | null; free_until: string | null; review_group_id: string | null; allow_president: number }>(),
+      .all<{ id: string; title: string; price_twd: number; price_tba: number; diamond_free: number; early_bird: number; early_price_twd: number | null; early_until: string | null; min_rank_code: string; free_from: string | null; free_until: string | null; review_group_id: string | null; allow_president: number; invite_only: number; invite_code: string }>(),
     ranks(ctx.db),
     memberCourseState(ctx.db, s.sub),
   ]);
@@ -1626,44 +1650,61 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
   }
   if (courses.some((c) => c.price_tba === 1)) fail(409, "price_tba", "這門課程的費用尚未公布，暫不開放報名");
   const eligibility = await eligibilityFor(s, rankMap, [...courses.map((c) => c.min_rank_code), DIAMOND]);
-  if (courses.some((c) => eligibility.get(c.min_rank_code) !== true && !byPresident(s, c))) fail(403, "rank_required", "此課程需要符合資格才能報名");
+  if (courses.some((c) => c.invite_only !== 1 && eligibility.get(c.min_rank_code) !== true && !byPresident(s, c))) fail(403, "rank_required", "此課程需要符合資格才能報名");
 
   const now = new Date();
   const statements: D1PreparedStatement[] = [];
   const created: string[] = [];
   const actor = { sub: s.sub, name: s.name, title: "學員" };
+  const code = typeof body.inviteCode === "string" ? body.inviteCode.trim() : "";
   for (const item of items) {
     const c = courses.find((x) => x.id === item.courseId)!;
     const key = c.id;
-    if (state.enrolled.has(key) || state.pending.has(key)) fail(409, "duplicate", "這門課程已報名（已開通或審核中），請勿重複報名");
-    const price = inFreeWindow(c, iso(now)) || (c.diamond_free === 1 && eligibility.get(DIAMOND) === true) ? 0 : earlyActive(c, iso(now)) ? (c.early_price_twd as number) : c.price_twd;
-    const isFree = price === 0;
-    if (!isFree && ctx.platform !== "web") fail(403, "web_only", "付費課程請至網頁版報名");
-    // 付費課程：對帳需要真實姓名，報名當下讀取會員中心的 legal_name 存成快照（免費課程不存）。
-    if (!isFree && legal === null) legal = s.kind === "central" ? await legalNameOf(s.token) : s.name;
+    // 指定邀請制（業主 2026-11-20）：輸入正確邀請碼＝免審核直接開通（金額 0）；沒有邀請碼＝一律人工審核（免費課程也要）。
+    let joinMethod: Order["joinMethod"] = "";
+    if (c.invite_only === 1) {
+      if (code) {
+        await checkInviteCode(ctx, s.sub, c, code);
+        joinMethod = "invite";
+      } else joinMethod = "invite_request";
+    }
+    const viaInvite = joinMethod === "invite";
+    // 先前按了「無邀請碼」正在待審核，現在拿到邀請碼：撤掉待審核的那筆，直接用邀請碼加入。
+    if (viaInvite && state.pending.has(key)) {
+      const prev = await ctx.db.prepare("SELECT o.id FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.member_sub = ? AND i.course_id = ? AND o.status = 'pending' LIMIT 1").bind(s.sub, key).first<{ id: string }>();
+      if (prev) statements.push(ctx.db.prepare("DELETE FROM notifications WHERE (link = ?1 OR link = ?2)").bind(`/orders/${prev.id}`, `/admin/orders/${prev.id}`), ctx.db.prepare("DELETE FROM orders WHERE id = ?").bind(prev.id));
+    } else if (state.enrolled.has(key) || state.pending.has(key)) fail(409, "duplicate", "這門課程已報名（已開通或審核中），請勿重複報名");
+    const listPrice = inFreeWindow(c, iso(now)) || (c.diamond_free === 1 && eligibility.get(DIAMOND) === true) ? 0 : earlyActive(c, iso(now)) ? (c.early_price_twd as number) : c.price_twd;
+    const price = viaInvite ? 0 : listPrice;
+    const auto = viaInvite || (listPrice === 0 && joinMethod === ""); // 立即開通：邀請碼加入，或一般免費課程
+    if (listPrice > 0 && !viaInvite && ctx.platform !== "web") fail(403, "web_only", "付費課程請至網頁版報名");
+    // 付費課程：對帳需要真實姓名，報名當下讀取會員中心的 legal_name 存成快照（免費課程、邀請碼加入不存）。
+    if (listPrice > 0 && !viaInvite && legal === null) legal = s.kind === "central" ? await legalNameOf(s.token) : s.name;
     const id = orderId(now);
     const title = c.title;
     created.push(id);
     statements.push(
       ctx.db
         .prepare(
-          "INSERT INTO orders (id, member_sub, member_name_snapshot, status, total_twd, created_at, center_key, center_label, hglobal, paid_twd, pay_method, paid_at, legal_name, pay_ref) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO orders (id, member_sub, member_name_snapshot, status, total_twd, created_at, center_key, center_label, hglobal, paid_twd, pay_method, paid_at, legal_name, pay_ref, join_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         )
-        .bind(id, s.sub, s.name, isFree ? "opened" : "pending", price, iso(now), s.center?.key ?? null, s.center?.label ?? "", s.hglobal ? 1 : 0, isFree ? 0 : null, isFree ? "free" : null, isFree ? iso(now) : null, isFree ? "" : (legal ?? ""), isFree ? "" : payRef()),
+        .bind(id, s.sub, s.name, auto ? "opened" : "pending", price, iso(now), s.center?.key ?? null, s.center?.label ?? "", s.hglobal ? 1 : 0, auto ? 0 : null, auto ? (viaInvite ? "vip" : "free") : null, auto ? iso(now) : null, auto || !legal ? "" : legal, !auto && price > 0 ? payRef() : "", joinMethod),
       ctx.db.prepare("INSERT INTO order_items (order_id, course_id, title_snapshot, price_twd) VALUES (?, ?, ?, ?)").bind(id, c.id, title, price),
       event(ctx.db, id, actor, "submit"),
-      audit(ctx.db, s.sub, isFree ? "order.register_free" : "order.register", "order", id, title),
+      audit(ctx.db, s.sub, viaInvite ? "order.join_invite" : auto ? "order.register_free" : "order.register", "order", id, title),
     );
-    if (isFree) {
-      // 免費課程立即開通；PRIMARY KEY 保證同一會員同一場只會開通一次（重複請求整批失敗）。
+    if (auto) {
+      // 立即開通；PRIMARY KEY 保證同一會員同一場只會開通一次（重複請求整批失敗）。
       statements.push(
         ctx.db.prepare("INSERT INTO enrollments (member_sub, course_id, source_order_id) VALUES (?, ?, ?)").bind(s.sub, c.id, id),
-        ...(quiet ? [] : [notify(ctx.db, { sub: s.sub }, "課程已開通", title, "/learning")]), // 自動報名（直接看免費課程）不發通知
+        ...(quiet ? [] : [notify(ctx.db, { sub: s.sub }, viaInvite ? "已透過邀請碼加入課程" : "課程已開通", title, "/learning")]),
+        // 管理員（課程的審核窗口、會長、總部）收到「有人使用邀請碼加入」（業主 2026-11-20）。
+        ...(viaInvite ? await reviewerNotices(ctx, { id, centerKey: s.center?.key ?? null, hglobal: s.hglobal, groupId: c.review_group_id, courseId: c.id }, "有人使用邀請碼加入課程", `${s.name}${s.center ? `（${s.center.label}）` : ""}｜${title}`) : []),
       );
     } else {
       statements.push(
         notify(ctx.db, { sub: s.sub }, "報名已送出，等待審核", title, `/orders/${id}`),
-        ...(await reviewerNotices(ctx, { id, centerKey: s.center?.key ?? null, hglobal: s.hglobal, groupId: c.review_group_id, courseId: c.id }, "有新的報名待審核", `${applicantLabel(legal, s.name)}｜${title}｜NT$${price.toLocaleString("en-US")}`)),
+        ...(await reviewerNotices(ctx, { id, centerKey: s.center?.key ?? null, hglobal: s.hglobal, groupId: c.review_group_id, courseId: c.id }, "有新的報名待審核", price > 0 ? `${applicantLabel(legal, s.name)}｜${title}｜NT$${price.toLocaleString("en-US")}` : `${s.name}${s.center ? `（${s.center.label}）` : ""}｜${title}｜指定邀請制申請`)),
       );
     }
   }
@@ -1805,7 +1846,7 @@ async function reviewOrder(ctx: Ctx, id: string, body: Record<string, unknown>):
       ctx.db
         .prepare("INSERT OR IGNORE INTO enrollments (member_sub, course_id, source_order_id) SELECT o.member_sub, i.course_id, o.id FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.id = ? AND o.status = 'opened'")
         .bind(id),
-      notify(ctx.db, { sub: order.member_sub }, action === "vip" ? "報名審核通過（VIP 免繳費），課程已開通" : "繳費確認完成，課程已開通", `審核人員：${by}${message ? `\n留言：${message}` : ""}`, `/orders/${id}`),
+      notify(ctx.db, { sub: order.member_sub }, order.total_twd === 0 ? "報名審核通過，課程已開通" : action === "vip" ? "報名審核通過（VIP 免繳費），課程已開通" : "繳費確認完成，課程已開通", `審核人員：${by}${message ? `\n留言：${message}` : ""}`, `/orders/${id}`),
     );
   } else if (action === "reject" || action === "revoke") {
     statements.push(
@@ -1854,7 +1895,7 @@ async function reviewList(ctx: Ctx): Promise<{ rows: OrderRow[]; scope: ReviewSc
   if (!hasScope(scope)) fail(403, "forbidden", "需要審核權限");
   const w = scopeSql(scope);
   const q = ctx.url.searchParams;
-  const conds = [w.sql, "o.total_twd > 0"];
+  const conds = [w.sql, "(o.total_twd > 0 OR o.join_method <> '')"]; // 邀請制的申請與邀請碼加入（金額 0）也要看得到
   const args = [...w.args];
   const add = (cond: string, ...values: unknown[]) => {
     conds.push(cond);
@@ -2189,6 +2230,8 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     sets.push(["status", body.status]);
   }
   if (body.allowPresident !== undefined) sets.push(["allow_president", body.allowPresident === true ? 1 : 0]);
+  if (body.inviteOnly !== undefined) sets.push(["invite_only", body.inviteOnly === true ? 1 : 0]);
+  if (body.inviteCode !== undefined) sets.push(["invite_code", typeof body.inviteCode === "string" ? body.inviteCode.trim().slice(0, 40) : ""]);
   if (body.viewScope !== undefined) {
     if (!(VIEW_SCOPES as string[]).includes(String(body.viewScope))) fail(400, "invalid_view_scope", "「誰可以瀏覽」的選項不正確");
     sets.push(["view_scope", body.viewScope]);
@@ -2551,6 +2594,8 @@ async function updateCourse(ctx: Ctx, id: string) {
     }
   }
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
+  // 付費課程的邀請碼：目前只有超級管理員能設定（業主 2026-11-20）；免費課程由有編輯權的人設定。
+  if (sets.some(([c]) => c === "invite_code") && (Number(pick("price_twd", cur.price_twd)) > 0 || pick("price_tba", cur.price_tba) === 1) && !admin.roles.includes("super_admin")) fail(403, "invite_code_super_admin", "付費課程的邀請碼只有超級管理員可以設定");
   const legacyPublic = body.isPublic !== undefined && body.viewScope === undefined;
   if (legacyPublic) {
     // 舊寫法：isPublic true＝所有人；false 只在原本是「所有人」時改成「所有會員」。
@@ -3592,7 +3637,7 @@ const routes: [string, RegExp, Handler][] = [
       // 從課程頁取消：找出自己這門課可取消的報名。
       const s = requireMember(ctx);
       const row = await ctx.db
-        .prepare("SELECT o.id FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.member_sub = ? AND i.course_id = ? AND (o.status = 'pending' OR (o.status = 'opened' AND o.pay_method = 'free')) LIMIT 1")
+        .prepare("SELECT o.id FROM orders o JOIN order_items i ON i.order_id = o.id WHERE o.member_sub = ? AND i.course_id = ? AND (o.status = 'pending' OR (o.status = 'opened' AND (o.pay_method = 'free' OR o.join_method = 'invite'))) LIMIT 1")
         .bind(s.sub, courseId)
         .first<{ id: string }>();
       if (!row) return fail(409, "not_cancellable", "找不到可以取消的報名（已繳費開通的報名請聯絡報名窗口）");
@@ -5734,6 +5779,15 @@ const routes: [string, RegExp, Handler][] = [
       if (!res.meta?.changes) fail(409, "no_edm", "請先上傳系列 EDM");
       await ctx.db.batch([audit(ctx.db, s.sub, "series.cover_rect", "series", series, JSON.stringify(rect))]);
       return { ok: true };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/courses\/([\w-]+)\/invite$/,
+    async (ctx, [id]) => {
+      await requireCourseManager(ctx, id);
+      const c = await ctx.db.prepare("SELECT invite_only, invite_code FROM courses WHERE id = ?").bind(id).first<{ invite_only: number; invite_code: string }>();
+      return c ? ({ inviteOnly: c.invite_only === 1, code: c.invite_code } satisfies InviteInfo) : fail(404, "not_found", "找不到這門課程");
     },
   ],
   [

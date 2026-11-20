@@ -113,7 +113,7 @@ export default function AdminAchievementsScreen() {
     api("PATCH", `/admin/achievements/${a.id}`, { difficulty: d }).then(() => list.reload()).catch((e: Error) => { setOver((o) => { const n = { ...o }; delete n[a.id]; return n; }); flashText(e.message); });
   };
   const draw = async () => {
-    if (!(await confirmAsk("重新抽選清單影片徽章", "會從「安麗官方清單專區」「安麗品牌專區」的每個區塊隨機挑影片（區塊裡影片超過 5 支挑 2 支，否則 1 支），新增尚未有徽章的區塊。已經有的徽章不會被換掉或刪除。", "開始抽選"))) return;
+    if (!(await confirmAsk("重新抽選清單影片徽章", "會從「安麗官方資源」「安麗品牌館」的每個區塊隨機挑影片（區塊裡影片超過 5 支挑 2 支，否則 1 支），新增尚未有徽章的區塊。已經有的徽章不會被換掉或刪除。", "開始抽選"))) return;
     setBusy(true);
     try {
       const r = await api<{ added: number; total: number }>("POST", "/admin/achievements/draw-videos");
