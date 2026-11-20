@@ -1,6 +1,7 @@
 // 把 Expo Web 輸出（apps/mobile/dist）打包成 Worker 模組，部署時不需另外上傳靜態資源。
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, relative } from "node:path";
+import { subsetFont, usedIconNames } from "./subset-icons.mjs";
 
 const root = new URL("../../mobile/dist/", import.meta.url).pathname;
 const out = new URL("../.generated/static-files.js", import.meta.url).pathname;
@@ -23,9 +24,24 @@ const types = {
 const walk = (dir) => readdirSync(dir).flatMap((name) => (statSync(join(dir, name)).isDirectory() ? walk(join(dir, name)) : [join(dir, name)]));
 const files = {};
 let bytes = 0;
+// 圖示字型瘦身（見 subset-icons.mjs）：只保留 App 原始碼用到的圖示，失敗就用完整字型。
+const mobile = new URL("../../mobile/", import.meta.url).pathname;
+function slimIcons(path, data) {
+  if (!/\/Ionicons\.[0-9a-f]+\.ttf$/.test(path)) return data;
+  try {
+    const map = JSON.parse(readFileSync(new URL("../../../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json", import.meta.url), "utf8"));
+    const used = usedIconNames([join(mobile, "src"), join(mobile, "app")], map);
+    const r = subsetFont(data, [...used].map((n) => map[n]));
+    console.log(`icon font: kept ${r.kept}/${r.total} glyphs, ${(data.length / 1024).toFixed(0)} → ${(r.font.length / 1024).toFixed(0)} KiB`);
+    return r.font;
+  } catch (e) {
+    console.warn("icon font subset skipped:", e instanceof Error ? e.message : e);
+    return data;
+  }
+}
 for (const file of walk(root)) {
   const path = "/" + relative(root, file).split("\\").join("/");
-  const data = readFileSync(file);
+  const data = slimIcons(path, readFileSync(file));
   bytes += data.length;
   files[path] = { type: types[extname(file).toLowerCase()] ?? "application/octet-stream", data: data.toString("base64") };
 }
@@ -51,7 +67,8 @@ if (files["/index.html"]) {
   if (!out.includes("apple-touch-icon")) out = out.replace("</head>", `${tags}</head>`);
   // iPhone 的瀏海／狀態列／底部橫條「安全區」：viewport-fit=cover 才能讓 App 內量到安全區；狀態列用半透明樣式，畫面延伸到狀態列底下，
   // 由 App 自己（app/_layout.tsx）把標題列與狀態列底色處理好。
-  out = out.replace(/<meta name="viewport"[^>]*>/, '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>');
+  // 鎖定 1 倍、不可縮放（業主永久指示：不開放頁面雙指縮放；與 App 的 lib/no-page-zoom.ts 的 VIEWPORT 相同），網頁一開啟就生效。
+  out = out.replace(/<meta name="viewport"[^>]*>/, '<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>');
   if (!out.includes("apple-mobile-web-app-status-bar-style")) out = out.replace("</head>", '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/></head>');
   // 整個畫面釘死在可視範圍（position:fixed）：Chrome 網址列伸縮、安裝到桌面的捷徑，底部選單都不會被推出畫面；也不讓整頁被拖動。
   if (!out.includes("hg-fixed")) out = out.replace("</head>", '<style id="hg-fixed">html,body{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;overflow:hidden;overscroll-behavior:none}#root{position:absolute;top:0;left:0;right:0;bottom:0;height:auto}</style></head>');

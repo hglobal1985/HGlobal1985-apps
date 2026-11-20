@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, TextInput, View } from "react-native";
 import { api, resolveUrl, THUMB_WIDTH_CHOICES, type ThumbSettings } from "@/api/client";
-import { Stepper } from "./storage";
-import { Check } from "@/features/course-edit/course-sections";
+import { Stepper } from "@/ui/stepper";
+import { Check } from "@/ui/check";
 import { useApi } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";

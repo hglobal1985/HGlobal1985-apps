@@ -7,7 +7,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, EmptyState, ErrorView, LoadingView, NoticeBox, Pill, Screen, Section, SheetRow } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
-import { SeriesEdm } from "@/features/admin/series-edm";
+import { SeriesEdm } from "@/features/admin-parts";
 import { useApi, useSession } from "@/state/session";
 
 const KINDS: KeywordKind[] = ["category", "series", "location"];

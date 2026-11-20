@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { confirmSheet } from "@/features/confirm";
@@ -37,7 +36,6 @@ export function EditSheet({
   error,
   saveLabel = "儲存",
   hideSave = false,
-  material = false,
   headRight,
   children,
 }: {
@@ -50,8 +48,6 @@ export function EditSheet({
   saveLabel?: string;
   /** 只有「關閉」（例如章節面板裡各自有儲存鈕、或只是查看）。 */
   hideSave?: boolean;
-  /** 素材（清單類別）：標題列右上角顯示黃色「素材」標示，方便跟課程區分（業主 2026-11-18）。 */
-  material?: boolean;
   /** 標題列右邊自訂內容（例如「素材／課程」切換）；有的話取代「素材」標示。 */
   headRight?: ReactNode;
   children: ReactNode;

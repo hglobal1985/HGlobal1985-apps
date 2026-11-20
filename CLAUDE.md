@@ -136,7 +136,7 @@
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
 - 部署：見 `docs/v2-handoff.md`「部署指令」。業主在 Cloudflare 後台改變數後，記得確認程式沒有被退回舊版。
 
-- **轉成素材（業主 2026-11-17）**：課程頁 › 編輯 › 基本資料最下面的「轉成素材」鈕，只有超級管理員看得到（`POST /admin/courses/:id/convert-to-list`）。一般課程變成素材（`is_list`）：章節變成素材項目（影音保留）、費用／獎銜限制／報名審核／主講人／日期地點等課程專屬設定捨棄；**已有人報名過的課程不能轉**；轉過後不能轉回。
+- **轉成素材（已移除，2026-11-21）**：只剩一種「教材卡」之後，「轉成素材／清單卡」的按鈕與後端 `convert-to-list` API 都已刪除；教材卡的行為由內容自動決定（見「只剩一種教材卡」）。
 
 - **主選單與設定的名稱圖示（業主 2026-11-17）**：主選單第二個分頁原「全部課程」改名「**寰宇大學**」，圖示改為建築物（`bottom-bar.tsx` 的 `BUILDING`，MaterialCommunityIcons `bank`）；設定頁的「我的圖書館」改名「**我的書櫃**」（圖示用書籍圖 `library-outline`），管理區的「圖書館管理」改「書櫃管理」；**全站已不再使用「圖書館」這個名稱，一律叫「書櫃」**（業主 2026-11-17；資料表與程式內部名稱 `library` 不變）。程式內部名稱與其他說明文字提到的「全部課程」就是現在的「寰宇大學」。
 
@@ -329,3 +329,12 @@
 - **課程卡頁每次進入預設「縮圖」、區塊全部收起（業主 2026-11-21）**：課程卡頁教材區的「縮圖／詳細列表」不再記住上次選擇（取消 `hglobal:learn:list-layout`），每次進入一律縮圖；區塊預設全部收起，只有網址帶 `?block=` 明確指定（從寰宇大學區塊選單進來）才展開那一個。
 - **系列頁也一樣：每次進入預設「縮圖」、卡片全部收起（業主 2026-11-21）**：系列頁（`SeriesPage`）的「詳細列表／縮圖」不再記住上次選擇（取消 `hglobal:learn:series-view`），每次進入一律縮圖；點卡展開的內容預設全部收起。
 - **上拉選單列的圖示不可有白底（業主 2026-11-21）**：`SheetThumb`（白底）只給「封面圖片縮圖」用（透明背景圖才不會發黑）；官方圖示（YouTube 等）與播放圖示一律用 `SheetIconBox`（`ui/sheet-row.tsx`，同寬、無底色），深色模式才不會出現白色方塊。
+
+- **載入速度與程式整理（2026-11-21，業主授權夜間整理）**：
+  ① **管理者專用的編輯工具「用到才下載」**：課程編輯（設定、章節、教材、區塊、EDM）、中心編輯面板、系列封面與「套用到全系列」、新增課程、時間軸、系列 EDM，一律從 `features/admin-parts.tsx` import（底下是 `lib/lazy-part.tsx` 的 `lazyPart`，全部經由同一包 `features/admin-bundle.ts`）；**不可**在一般頁面直接 import `course-edit/lessons`、`course-sections`、`material-sheet`、`admin/edm-manager` 等檔案，否則學員又要多下載約 200KB。新增管理者專用的大面板：在 `admin-bundle.ts` 與 `admin-parts.tsx` 各加一行。打包工具會把「被兩個以上按需下載包共用」的檔案搬回主程式，所以一定要經由同一包。驗證方式：`npx expo export --platform web` 後看 `__common-*.js` 大小（2026-11-21：836KB → 629KB）。
+  ② **共用小元件搬到 `ui/`**：勾選框 `Check`（`ui/check.tsx`，也從 `@/ui` 匯出）、編輯清單的小方形按鈕 `IconButton`（`ui/icon-button.tsx`，外觀 28 但觸控範圍 44）、數字調整列 `Stepper`（`ui/stepper.tsx`）。不要再從 `course-sections`、`lessons`、`app/admin/storage` 匯入它們。
+  ③ **圖示字型自動瘦身**：部署打包時（`apps/launch/scripts/embed-static.mjs` → `subset-icons.mjs`）掃描 App 原始碼裡用到的 Ionicons 名稱，只保留那些圖示（壓縮後 185KB → 41KB）。圖示名稱一律寫成字串（`name="play"`、`ok ? "a" : "b"`），**不可用程式拼出圖示名稱**（例如 `` `${x}-outline` ``），否則那個圖示會被瘦身掉變空白。
+  ④ **QR Code 產生器、App 專用的檔案分享工具**改為用到才載入（`invite-button.tsx`、`lib/share.ts`）。
+  ⑤ **伺服器查資料庫要「同時查」**：每次資料庫來回在台灣約 30～70ms；彼此不相依的查詢一律放進同一個 `Promise.all`，寫入用 `db.batch` 一次送出。課程頁 `courseDetail` 已從 12 趟減為 4 趟、`/me` 4→3、`/courses` 少 1 趟。新增查詢先加進現有的 `Promise.all`，不要在後面再 `await` 一次。
+  ⑥ **中央查詢共用的錯誤**：`central.ts` 的 `cached()` 讓同一人同時的多個請求共用一次中央查詢；先發起的請求若被瀏覽器取消，其他請求改自己重查（2026-11-20 晚上正式站因此偶發 500）。`loadSession` 的名稱頭像查詢失敗不會讓請求失敗。
+  ⑦ 已刪除的殘留：`lib/tablet-scale.ts`（viewport 放大已停用，鎖定 1 倍改直接寫在 `index.html`，常數在 `lib/no-page-zoom.ts` 的 `VIEWPORT`）、`theme/layout.ts` 的 `textScale`、後端 `convert-to-list` API、多個沒有被呼叫的函式與匯入。

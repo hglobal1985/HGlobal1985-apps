@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
-import { api, HQ_UNIT, UNCATEGORIZED, ZONES, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type InviteInfo, type Rank } from "@/api/client";
+import { api, HQ_UNIT, UNCATEGORIZED, RequestError, VIEW_SCOPE_LABEL, VIEW_SCOPES, type ViewScope, type CourseDetail, type InviteInfo, type Rank } from "@/api/client";
 import { RankTitleRow, useRankOptions } from "@/features/admin/person-extra";
 import { confirmSheet } from "@/features/confirm";
 import { centerTitle, dateTime, eventDays, ntd, parseLocal, placeText, toLocal } from "@/features/format";
@@ -12,6 +12,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, DateSelect, Field, FormBlock, ListRow, NoticeBox, Pill } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
+import { Check } from "@/ui/check";
 import { EditSheet } from "./edit-sheet";
 import { BrandField, CategoryField, HostField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
@@ -66,25 +67,8 @@ export function useCourseSave(course: CourseDetail, onSaved: (d: CourseDetail) =
   return { save, busy, error, setError };
 }
 
-/** 各主辦單位已有幾堂課（一門課可有多個主辦單位，每個各算一次）。 */
-export function countByHost(list: { hostUnit: string }[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const x of list) for (const h of x.hostUnit.split(/[、,，]+/).map((v) => v.trim()).filter(Boolean)) out[h] = (out[h] ?? 0) + 1;
-  return out;
-}
 
-/** 勾選框（整列可點、觸控夠大）。 */
-export function Check({ label, value, onChange, disabled }: { label: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
-  const { c } = useTheme();
-  return (
-    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value, disabled }} disabled={disabled} onPress={() => onChange(!value)} style={[styles.check, disabled && { opacity: 0.5 }]}>
-      <Ionicons name={value ? "checkbox" : "square-outline"} size={28} color={value ? c.accent : c.textMuted} />
-      <AppText variant="body" style={{ flex: 1 }}>
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
+
 
 /** 可複選的圓角選項（分類、主辦單位）。值是「、」分隔文字。 */
 export function MultiChips({ options, value, onChange, counts }: { options: string[]; value: string; onChange: (v: string) => void; /** 各選項已有幾堂課（顯示在名稱後面）。 */ counts?: Record<string, number> }) {
@@ -604,7 +588,6 @@ const styles = StyleSheet.create({
   rankRow: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch },
   rankToggle: { minWidth: 72, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, alignItems: "center", justifyContent: "center", paddingHorizontal: space.md },
   hostRow: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, paddingVertical: space.sm },
-  check: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: space.sm },
   catChip: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: minTouch - 4, paddingHorizontal: space.md, borderWidth: 1.5, borderRadius: radius.pill },
   input: { minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md },

@@ -5,12 +5,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Animated, BackHandler, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, ZONES, type CenterArt, type CourseSummary, type Zone } from "@/api/client";
-import { CenterEdm } from "@/features/admin/center-edm";
-import { CenterAddressField } from "@/features/admin/center-address-field";
-import { CenterNameField } from "@/features/admin/center-name-field";
-import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { AddMaterialFab, type AddKind } from "@/features/course-edit/add-material-fab";
-import { NewCourseSheet } from "@/features/course-edit/new-course";
+import { CenterEditSheet, NewCourseSheet } from "@/features/admin-parts";
 import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { flashText } from "@/ui/flash-notice";
@@ -23,7 +19,6 @@ import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
-import { CenterBroadcastEditor } from "@/features/admin/center-broadcast-editor";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { flashMode } from "./mode-flash";
@@ -617,12 +612,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     {newOpen ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {bcOpen && bc.data ? <BroadcastSheet title={`${centerTitle(activeCenter)}廣播公告`} items={bc.data.items} onClose={() => setBcOpen(false)} /> : null}
     {artOpen && activeCenter !== ALL ? (
-      <EditSheet title={`編輯${centerTitle(activeCenter)}`} onClose={() => setArtOpen(false)} hideSave>
-        <CenterNameField key={activeCenter} center={activeCenter} />
-        <CenterAddressField center={activeCenter} current={centerInfo.data?.[normCenter(activeCenter)] ?? ""} onSaved={centerInfo.reload} />
-        <CenterEdm center={activeCenter} art={art} onChanged={centerArt.reload} />
-        <CenterBroadcastEditor center={activeCenter} onChanged={bc.reload} />
-      </EditSheet>
+      <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={bc.reload} />
     ) : null}
     </View>
   );

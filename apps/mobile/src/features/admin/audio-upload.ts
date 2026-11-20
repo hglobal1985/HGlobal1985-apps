@@ -46,10 +46,3 @@ export async function uploadPickedAudio(lessonId: string, audio: PickedAudio, on
   await api("POST", `/admin/lessons/${lessonId}/audio/complete`, { key, uploadId, parts, durationSeconds: await audioDuration(file) });
 }
 
-/** 選擇音檔並分段上傳（舊用法：選完馬上傳）。 */
-export async function pickAndUploadAudio(lessonId: string, onProgress: (p: number) => void): Promise<"done" | "cancelled"> {
-  const audio = await pickAudio();
-  if (!audio) return "cancelled";
-  await uploadPickedAudio(lessonId, audio, onProgress);
-  return "done";
-}

@@ -3,7 +3,7 @@ import { useWindowDimensions } from "react-native";
 /**
  * 大螢幕版面規則（業主 2026-11-18：平板、電腦不可直接套用手機版面，全站統一從這裡取）。
  *
- * 依「目前可用的畫面寬度」分三級（平板已先由 lib/tablet-scale.ts 整體放大，這裡拿到的是放大後的寬度）：
+ * 依「目前可用的畫面寬度」分三級（平板的字體、圖示、按鈕由 theme/ui-scale.ts 放大）：
  * - compact（< 600）：手機。版面完全維持原本的手機設計。
  * - medium（600～899）：平板直式、小視窗。內容放寬、清單變兩欄。
  * - expanded（≥ 900）：平板橫式、電腦。內容更寬、格狀清單更多欄、課程頁改成左右兩欄（左影片、右章節）。
@@ -37,12 +37,8 @@ export type Layout = {
   cardCols: number;
   /** 課程頁改成左右兩欄（左：影片／EDM＋控制列，右：章節與內容）。 */
   split: boolean;
-  /** 文字放大倍數（AppText 套用）：電腦寬螢幕 1.1；手機 1；平板已由 tablet-scale.ts 整體放大，這裡維持 1。 */
-  textScale: number;
 };
 
-/** 電腦寬螢幕（≥ 900、不是放大過的平板）的文字放大倍數。 */
-export const DESKTOP_TEXT_SCALE = 1.1;
 
 export function layoutOf(width: number, height: number): Layout {
   const size = sizeClassOf(width);
@@ -60,7 +56,6 @@ export function layoutOf(width: number, height: number): Layout {
     sheetMax: compact ? undefined : 680,
     cardCols: compact ? 1 : size === "medium" ? 2 : width >= 1180 ? 3 : 2,
     split: size === "expanded" && landscape,
-    textScale: 1,
   };
 }
 

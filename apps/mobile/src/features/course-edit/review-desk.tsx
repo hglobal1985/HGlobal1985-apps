@@ -9,7 +9,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Button, Chips, NoticeBox } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
-import { Check } from "./course-sections";
+import { Check } from "@/ui/check";
 
 /**
  * 「費用與審核」面板裡的「審核窗口」（業主 2026-11-16）：誰可以審核這門課的付費報名。每一項按下就立刻儲存（不必按面板的「儲存」）。

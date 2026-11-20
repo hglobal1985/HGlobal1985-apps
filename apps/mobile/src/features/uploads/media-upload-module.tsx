@@ -99,7 +99,6 @@ async function detectLength(draft: MediaDraft, lesson?: Lesson): Promise<{ sec: 
   return { sec, approx: false };
 }
 
-export const mediaKindLabel = (k: MediaType) => MEDIA_CHANNELS.find((ch) => ch.key === k)?.label ?? "";
 
 export function MediaUploadModule({
   draft,

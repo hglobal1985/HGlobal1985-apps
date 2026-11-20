@@ -88,7 +88,7 @@ export type TypeVariant = keyof typeof type;
 
 /** 觸控目標最小尺寸（Apple HIG 44pt / Material 48dp 取大者）。 */
 export const minTouch = Math.round(48 * UI_SCALE);
-/** 手機網頁內容最大寬度。平板、電腦的內容寬度、欄數、放大倍數見 theme/layout.ts 與 lib/tablet-scale.ts（2026-11-18）。 */
+/** 手機網頁內容最大寬度。平板、電腦的內容寬度、欄數、放大倍數見 theme/layout.ts 與 theme/ui-scale.ts（2026-11-18）。 */
 export const maxContentWidth = 720;
 
 /** 底部分頁列與上方置頂標題列（返回＋分享）共用的高度：兩者永遠一樣高。 */

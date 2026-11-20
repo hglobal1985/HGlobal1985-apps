@@ -117,7 +117,6 @@ function ColorPicker({ value, onChange, swatches, picks }: { value: string; onCh
 }
 
 function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () => void; onChanged: () => void }) {
-  const { c } = useTheme();
   const [name, setName] = useState(logo.name);
   const [tab, setTab] = useState<Tab>("light"); // 預覽圖共用：切到哪一顆按鈕，預覽就顯示那個模式的樣子
   const [lightColor, setLightColor] = useState(logo.bgColor ?? "#FFFFFF");

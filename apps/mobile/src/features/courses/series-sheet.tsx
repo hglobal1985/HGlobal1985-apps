@@ -9,7 +9,7 @@ import { ErrorView, LoadingLadybug } from "@/ui";
 import { ChapterList } from "./lesson-list";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
-import { minTouch, radius, space } from "@/theme/tokens";
+import { radius, space } from "@/theme/tokens";
 import { BrandCover, AppText, Button, SheetAction, SheetRow, SheetThumb } from "@/ui";
 import { SheetIconBox } from "@/ui/sheet-row";
 import { CourseCover } from "@/ui/course-cover";
@@ -42,7 +42,6 @@ function StatusChip({ course }: { course: CourseSummary }) {
  */
 export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
   const thumb = useThumb();
-  const { c } = useTheme();
   const open = (block?: string) => {
     onClose();
     router.push(block ? { pathname: "/course/[id]", params: { id: course.id, block } } : `/course/${course.id}`);
@@ -126,7 +125,6 @@ export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onC
 /** 「還有 N 個梯次」：從下方彈出，列出同系列所有梯次（日期＋狀態），點一列進入那一場的課程頁。 */
 export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllSeries }: { title: string; items: CourseSummary[]; onClose: () => void; onPick?: (c: CourseSummary) => void; currentId?: string; showAllSeries?: string }) {
   const thumb = useThumb();
-  const { c } = useTheme();
   const links = useApi<{ kind: string; value: string; slug: string }[]>(showAllSeries ? "/short-links" : null);
   /** 顯示該系列全部梯次（全部展開）：有設定短網址就用短網址，沒有用 /series/系列名稱。 */
   const showAll = () => {

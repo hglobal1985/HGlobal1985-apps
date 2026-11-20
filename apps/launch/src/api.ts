@@ -81,7 +81,6 @@ import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
 import { fetchLinkInfo, fetchLinkTitle } from "./link-title.ts";
 import { ImportError, loadFileSettings, normalizeFileSettings, openUserDriveFile, saveFileSettings, streamToR2 } from "./material-files.ts";
-import { centerShareName } from "./og.ts";
 import { classifyFile, fileTooBig, FILE_NO_VIDEO, safeFileName, type StorageKind } from "./files.ts";
 import { drawZoneVideoBadges } from "./zone-video-badges.ts";
 import { isCoverKey, isKeyInUse, listInUseCards, listUnusedCovers, type InUseCard } from "./cover-library.ts";
@@ -185,14 +184,6 @@ function brandForBlock(ctx: Ctx, brandId: string | null, coverKey: string | null
 }
 const brandUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 
-const safeList = (raw: string): string[] => {
-  try {
-    const v = JSON.parse(raw) as unknown;
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-};
 
 // ---------- helpers ----------
 
@@ -258,7 +249,8 @@ async function loadSession(env: Env, req: Request, warmAmway = false, light = fa
     // 「完善資料」視窗的請求只需要知道是誰（帶著會員本人的 Token 轉給會員中心），不必先問名稱與職務，省下一趟。
     if (light) return { kind: "central", sub, name: "", avatarUrl: null, role: "student", token: jwt, roles: [], hglobal: false, center: null };
     // 向會員中心的查詢同時送出（/me 還會順便預先查好 Amway 資料，後面直接用快取）。
-    const [prof, superAdmin, mc] = await Promise.all([profileSummary(sub, jwt), isAdmin(sub, jwt, env.LEARN_ADMIN_SUBS), memberContext(sub, jwt), warmAmway ? amwayMe(sub, jwt) : undefined]);
+    // 名稱頭像、Amway 預查只是顯示用：查詢本身出錯也不能讓整個請求失敗（2026-11-21）；權限（職務）不在這裡吞掉錯誤，避免管理員被誤判降級。
+    const [prof, superAdmin, mc] = await Promise.all([profileSummary(sub, jwt).catch(() => ({ name: "會員", avatarUrl: null })), isAdmin(sub, jwt, env.LEARN_ADMIN_SUBS), memberContext(sub, jwt), warmAmway ? amwayMe(sub, jwt).catch(() => undefined) : undefined]);
     // 管理員（可管理課程、審核全部報名）＝超級管理員、總部秘書，或 LEARN_ADMIN_SUBS 指定的會員。
     const admin = superAdmin || mc.roles.includes("super_admin") || mc.roles.includes("secretary");
     return { kind: "central", sub, name: prof.name, avatarUrl: prof.avatarUrl, role: admin ? "admin" : "student", token: jwt, roles: mc.roles, hglobal: mc.hglobal, center: mc.center };
@@ -728,13 +720,15 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
     args = [s.sub];
   }
   // 全部同時查（以前網址對照表接在後面一個一個查，每一次都多等一趟資料庫來回）。
-  const [{ results }, rankMap, state, centerSlugs, seriesSlugs, mine] = await Promise.all([
+  const [{ results }, rankMap, state, centerSlugs, seriesSlugs, mine, brands, blocks] = await Promise.all([
     ctx.db.prepare(`${COURSE_SELECT}${where} ORDER BY c.sort_order, c.created_at`).bind(...args).all<CourseRow>(),
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
     centerSlugMap(ctx.db),
     seriesSlugMap(ctx.db),
     !all && s ? rightsOf(ctx) : Promise.resolve(null),
+    loadBrands(ctx.db), // 品牌與區塊也一起查（2026-11-21：以前排在後面，多等一趟資料庫來回）
+    loadBlocks(ctx.db),
   ]);
   // 瀏覽範圍：管理清單不過濾；公開清單依「誰可以瀏覽」，管理者與已報名／審核中／學習過的人照常看得到。
   let visible = results;
@@ -750,7 +744,8 @@ async function listCourses(ctx: Ctx, all: boolean): Promise<CourseSummary[]> {
   const eligibility = await eligibilityFor(s, rankMap, [...visible.map((r) => r.min_rank_code), DIAMOND]);
   ctx.centerSlugs = centerSlugs;
   ctx.seriesSlugs = seriesSlugs;
-  [ctx.brands, ctx.blocks] = await Promise.all([loadBrands(ctx.db), loadBlocks(ctx.db)]);
+  ctx.brands = brands;
+  ctx.blocks = blocks;
   const out = visible.map((r) => summarize(r, ctx, rankMap, state, eligibility));
   if (!rights || !s) return out;
   const r = rights;
@@ -945,15 +940,24 @@ async function backfillCourseUrls(ctx: Ctx, centerKeyOnly?: string): Promise<num
 const hostCenterOf = (hostUnit: string) => splitCats(hostUnit).find((x) => x !== HQ_UNIT) ?? "";
 
 
+/** 教材的外部連結與上傳檔案（每個教材一條，依建立順序）。 */
+function linkRowsOf(db: D1Database, courseIds: string[]) {
+  return db
+    .prepare(`SELECT id, lesson_id, att_type, link_url, kind FROM lesson_attachments WHERE course_id IN (${courseIds.map(() => "?").join(",")}) AND kind IN ('link', 'file') ORDER BY created_at`)
+    .bind(...courseIds)
+    .all<{ id: string; lesson_id: string; att_type: AttachmentType; link_url: string | null; kind: string }>()
+    .then((r) => r.results);
+}
+/** 連結區塊的來源：來源清單裡，那個區塊之後、下一個區塊之前的項目。 */
+const LINKED_ITEMS_SQL = `SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet, link_block_id FROM lessons WHERE course_id = ? AND position > ? AND position < COALESCE((SELECT MIN(position) FROM lessons WHERE course_id = ? AND kind = 'section' AND position > ?), 1000000000) AND kind <> 'section' AND is_full = 0 ORDER BY position`;
+
 async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const s = ctx.session;
-  const row = await ctx.db.prepare(`${COURSE_SELECT} WHERE c.id = ?`).bind(id).first<CourseRow>();
-  // 未登入的訪客：只有「完全公開」且已上架的課程可以看；其他一律要求登入。
-  if (!s && (!row || row.status !== "published" || (row.view_scope !== "all" && row.view_scope !== "link_guest"))) return fail(401, "unauthenticated", "請先登入");
-  if (!row) return fail(404, "not_found", "找不到這門課程");
-  const can = s ? courseCan(await rightsOf(ctx), s, row) : { edit: false, remove: false, restore: false };
-  const manages = can.edit || can.remove || can.restore;
-  const [rankMap, state, lessons, done] = await Promise.all([
+  // 這一頁需要的資料全部同時查（2026-11-21 載入速度優化：以前一個查完才查下一個，課程頁要等 12 趟資料庫來回）。
+  // 權限、可見範圍的判斷仍在查完之後才做，查到的資料不會外流。
+  const [row, rights, rankMap, state, lessons, done, ownLinks, centerSlugs, seriesSlugs, brands, blocks] = await Promise.all([
+    ctx.db.prepare(`${COURSE_SELECT} WHERE c.id = ?`).bind(id).first<CourseRow>(),
+    s ? rightsOf(ctx) : Promise.resolve(null),
     ranks(ctx.db),
     memberCourseState(ctx.db, s?.sub),
     ctx.db
@@ -961,7 +965,17 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       .bind(id)
       .all<{ id: string; position: number; title: string; sharer: string; sharer_rank: string; sharer_title: string; duration_minutes: number; media_type: MediaType; media_ref: string | null; start_seconds: number | null; end_seconds: number | null; event_date: string | null; cover_key: string | null; poster_key: string | null; art_version: number; auto_cover: number; kind: string; is_full: number; is_speaker: number; is_summary: number; brand_id: string | null; categories: string; in_sheet: number; link_block_id: string | null }>(),
     s ? ctx.db.prepare("SELECT lesson_id FROM lesson_progress WHERE member_sub = ? AND course_id = ?").bind(s.sub, id).all<{ lesson_id: string }>() : Promise.resolve({ results: [] as { lesson_id: string }[] }),
+    linkRowsOf(ctx.db, [id]),
+    centerSlugMap(ctx.db),
+    seriesSlugMap(ctx.db),
+    loadBrands(ctx.db),
+    loadBlocks(ctx.db),
   ]);
+  // 未登入的訪客：只有「完全公開」且已上架的課程可以看；其他一律要求登入。
+  if (!s && (!row || row.status !== "published" || (row.view_scope !== "all" && row.view_scope !== "link_guest"))) return fail(401, "unauthenticated", "請先登入");
+  if (!row) return fail(404, "not_found", "找不到這門課程");
+  const can = s && rights ? courseCan(rights, s, row) : { edit: false, remove: false, restore: false };
+  const manages = can.edit || can.remove || can.restore;
   // 未上架：只有能管理的人看得到。下架封存：管理者，以及有報名、審核中或學習過的學員（照常上課）。
   const archivedForMe = row.status === "archived" && (state.enrolled.has(id) || state.pending.has(id) || state.started.has(id));
   if (row.status !== "published" && !manages && !archivedForMe) return fail(404, "not_found", "找不到這門課程");
@@ -974,25 +988,36 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const linkCover = new Map<string, string>();
   const sourceCourses: string[] = [];
   const sourceCourseOf = new Map<string, string>();
-  for (const l of lessons.results) {
+  // 連結區塊（只有品牌卡有）：每個連結區塊各自的來源一起查，再依原本順序接回去。
+  const linked = await Promise.all(
+    lessons.results.map(async (l) => {
+      if (!l.link_block_id) return null;
+      const sec = await ctx.db.prepare("SELECT s.course_id, s.position, c.series FROM lessons s JOIN courses c ON c.id = s.course_id WHERE s.id = ? AND s.kind = 'section'").bind(l.link_block_id).first<{ course_id: string; position: number; series: string | null }>();
+      if (!sec) return null;
+      const [{ results: items }, art] = await Promise.all([
+        ctx.db
+          .prepare(LINKED_ITEMS_SQL)
+          .bind(sec.course_id, sec.position, sec.course_id, sec.position)
+          .all<LRow>(),
+        sec.series ? ctx.db.prepare("SELECT cover_key, edm_key, art_version FROM series_art WHERE series = ?").bind(sec.series).first<{ cover_key: string | null; edm_key: string | null; art_version: number }>() : Promise.resolve(null),
+      ]);
+      return { sec, items, art };
+    }),
+  );
+  lessons.results.forEach((l, i) => {
     lessonRows.push(l);
-    if (!l.link_block_id) continue;
-    const sec = await ctx.db.prepare("SELECT s.course_id, s.position, c.series FROM lessons s JOIN courses c ON c.id = s.course_id WHERE s.id = ? AND s.kind = 'section'").bind(l.link_block_id).first<{ course_id: string; position: number; series: string }>();
-    if (!sec) continue;
+    const hit = linked[i];
+    if (!hit) return;
+    const { sec, items, art } = hit;
     sourceCourses.push(sec.course_id);
     sourceCourseOf.set(l.id, sec.course_id);
-    const { results: items } = await ctx.db
-      .prepare(`SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet, link_block_id FROM lessons WHERE course_id = ? AND position > ? AND position < COALESCE((SELECT MIN(position) FROM lessons WHERE course_id = ? AND kind = 'section' AND position > ?), 1000000000) AND kind <> 'section' AND is_full = 0 ORDER BY position`)
-      .bind(sec.course_id, sec.position, sec.course_id, sec.position)
-      .all<LRow>();
     for (const it of items) lessonRows.push({ ...it, src: sec.course_id });
     // 封面＝來源清單的系列封面（上傳的封面優先，沒有再用首頁圖）；之後來源修改，這裡自動一致。
-    const art = sec.series ? await ctx.db.prepare("SELECT cover_key, edm_key, art_version FROM series_art WHERE series = ?").bind(sec.series).first<{ cover_key: string | null; edm_key: string | null; art_version: number }>() : null;
     const key = art?.cover_key || art?.edm_key;
     if (key) linkCover.set(l.id, pubUrl(key, art!.art_version));
-  }
+  });
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
-  const linkRows = await ctx.db.prepare(`SELECT id, lesson_id, att_type, link_url, kind FROM lesson_attachments WHERE course_id IN (${[id, ...sourceCourses].map(() => "?").join(",")}) AND kind IN ('link', 'file') ORDER BY created_at`).bind(id, ...sourceCourses).all<{ id: string; lesson_id: string; att_type: AttachmentType; link_url: string | null; kind: string }>();
+  const linkRows = { results: sourceCourses.length ? [...ownLinks, ...(await linkRowsOf(ctx.db, sourceCourses))] : ownLinks };
   const linkOf = new Map<string, { type: AttachmentType; url: string }>();
   // 上傳的檔案（雲端硬碟或舊的網站儲存空間）：網址一律是 dl://附件編號，不是真正的網址；畫面按下載時要先通過權限檢查才拿得到一次性下載連結。外部連結直接給原網址。
   for (const r of linkRows.results) if (!linkOf.has(r.lesson_id)) linkOf.set(r.lesson_id, { type: r.att_type, url: r.kind === "file" || (r.link_url ?? "").startsWith("drive:") ? `dl://${r.id}` : (r.link_url ?? "") });
@@ -1001,16 +1026,17 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     const n = { chapter: 0, material: 0 };
     for (const l of lessonRows) groupPos.set(l.id, l.kind === "section" ? 0 : ++n[l.kind === "material" ? "material" : "chapter"]);
   }
-  ctx.centerSlugs = await centerSlugMap(ctx.db);
-  ctx.seriesSlugs = await seriesSlugMap(ctx.db);
-  [ctx.brands, ctx.blocks] = await Promise.all([loadBrands(ctx.db), loadBlocks(ctx.db)]);
-  const summaryNow = summarize(row, ctx, rankMap, state, await eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]));
+  ctx.centerSlugs = centerSlugs;
+  ctx.seriesSlugs = seriesSlugs;
+  ctx.brands = brands;
+  ctx.blocks = blocks;
+  const [eligibility, canRoster, registrations] = await Promise.all([eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]), canSeeRoster(ctx, s, row, manages), manages ? registrationCount(ctx.db, id) : Promise.resolve(0)]);
+  const summaryNow = summarize(row, ctx, rankMap, state, eligibility);
   const watchFree = summaryNow.watchFree;
   const admin = manages;
   // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
   const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.invite_only !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
   const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && row.invite_only !== 1) || watchFree));
-  const canRoster = await canSeeRoster(ctx, s, row, manages);
   return {
     ...summaryNow,
     canRoster,
@@ -1064,7 +1090,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
             reviewGroupId: row.review_group_id,
             basePriceTwd: row.price_twd,
             can,
-            registrations: await registrationCount(ctx.db, id),
+            registrations,
             editedByName: row.edited_by_name,
             editedAt: row.edited_at,
             updatedAt: row.updated_at,
@@ -1127,8 +1153,10 @@ async function freeWatchable(ctx: Ctx, courseId: string): Promise<boolean> {
 async function openFreeCourse(ctx: Ctx, courseId: string): Promise<void> {
   const s = ctx.session;
   if (!s || s.role === "admin") return;
-  await ctx.db.prepare("UPDATE enrollments SET hidden = 0 WHERE member_sub = ? AND course_id = ? AND hidden = 1").bind(s.sub, courseId).run();
-  await ctx.db.prepare("UPDATE learning_started SET hidden = 0 WHERE member_sub = ? AND course_id = ? AND hidden = 1").bind(s.sub, courseId).run();
+  await ctx.db.batch([
+    ctx.db.prepare("UPDATE enrollments SET hidden = 0 WHERE member_sub = ? AND course_id = ? AND hidden = 1").bind(s.sub, courseId),
+    ctx.db.prepare("UPDATE learning_started SET hidden = 0 WHERE member_sub = ? AND course_id = ? AND hidden = 1").bind(s.sub, courseId),
+  ]);
 }
 
 /** 刪除課程前的影響：多少筆報名紀錄、多少人已開通、已確認收款多少（供「輸入 YES」確認畫面顯示）。 */
@@ -3222,13 +3250,11 @@ const routes: [string, RegExp, Handler][] = [
       if (!s) return { member: null };
       // fresh=1（開啟 App／重新整理／回到前景時）：丟掉這位會員在記憶體裡的會員中心資料快取，獎銜等資料立刻拿最新的。
       if (s.kind === "central" && ctx.url.searchParams.get("fresh") === "1") forgetMember(s.sub);
-      const { results } = await ctx.db.prepare("SELECT DISTINCT duty FROM review_group_members WHERE member_sub = ?").bind(s.sub).all<{ duty: Duty }>();
-      // 被指派為窗口的人登入時，補上／更新名單上的姓名。
-      if (results.length) await ctx.db.prepare("UPDATE review_group_members SET member_name = ? WHERE member_sub = ? AND member_name <> ?").bind(s.name, s.sub, s.name).run();
       const labels: Record<Duty, string> = { register: "報名窗口", collect: "收費窗口", review: "審核員" };
       // 向會員中心的幾個查詢彼此獨立，同時送出（以前是一個接一個，首頁會慢）。
       const central = s.kind === "central" ? s : null;
-      const [, rankMap, rv, opts, missing, badgeMap, canStats, rights] = await Promise.all([
+      const [{ results }, , rankMap, rv, opts, missing, badgeMap, canStats, rights] = await Promise.all([
+        ctx.db.prepare("SELECT DISTINCT duty FROM review_group_members WHERE member_sub = ?").bind(s.sub).all<{ duty: Duty }>(),
         syncContact(ctx, s).catch(() => undefined),
         ranks(ctx.db),
         central ? rankValue(central.sub, central.token).catch(() => undefined) : undefined,
@@ -3244,8 +3270,13 @@ const routes: [string, RegExp, Handler][] = [
         member.courseRights = { all: rights.admin, create: canCreateCourse(rights), manageEditors: rights.admin || rights.staff, center: rights.center?.label ?? null, editor: rights.editor };
         if (rights.editor) member.titles = [...new Set([...member.titles, "小編"])];
       }
-      // 小編登入時更新名單上的姓名。
-      await ctx.db.prepare("UPDATE course_editors SET member_name = ? WHERE member_sub = ? AND member_name <> ?").bind(s.name.slice(0, 60), s.sub, s.name.slice(0, 60)).run();
+      // 被指派為窗口、小編的人登入時，補上／更新名單上的姓名（一次送出；有背景執行環境就不必等它）。
+      const names = ctx.db.batch([
+        ctx.db.prepare("UPDATE review_group_members SET member_name = ? WHERE member_sub = ? AND member_name <> ?").bind(s.name, s.sub, s.name),
+        ctx.db.prepare("UPDATE course_editors SET member_name = ? WHERE member_sub = ? AND member_name <> ?").bind(s.name.slice(0, 60), s.sub, s.name.slice(0, 60)),
+      ]).catch(() => undefined);
+      if (ctx.defer) ctx.defer(names);
+      else await names;
       if (central) {
         // 獎銜：值為空或「無／none」顯示「安麗寶寶」；其餘用中央選項的名稱，查不到退回本地階梯名稱。
         if (rv !== undefined) member.rankLabel = rv && rv !== "none" && rv !== "無" ? (opts?.get(rv) ?? rankLabelOf(rv, rankMap)) : "安麗寶寶";
@@ -3318,8 +3349,9 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/courses\/([\w-]+)$/,
     async (ctx, [id]) => {
-      await openFreeCourse(ctx, id!).catch(() => undefined); // 打開免費課程＝自動加入學習中
-      return courseDetail(ctx, id!);
+      // 已報名／學習過但被隱藏的恢復顯示；與讀取課程同時進行（課程頁的資料不受這兩個欄位影響）。
+      const [, detail] = await Promise.all([openFreeCourse(ctx, id!).catch(() => undefined), courseDetail(ctx, id!)]);
+      return detail;
     },
   ],
   [
@@ -6325,29 +6357,6 @@ const routes: [string, RegExp, Handler][] = [
         audit(ctx.db, admin.sub, "lesson.create", "lesson", id, `${kind}:${title}`),
       ]);
       if (kind !== "section") await notifyNewContent(ctx, courseId, kind === "material" ? "教材" : "章節");
-      return courseDetail(ctx, courseId);
-    },
-  ],
-  [
-    "POST",
-    /^\/admin\/courses\/([\w-]+)\/convert-to-list$/,
-    async (ctx, [courseId]) => {
-      // 「轉成清單卡」（超級管理員，業主 2026-11-17）：一般課程直接轉成清單卡（清單類別），課程專屬的設定一律捨棄。
-      // 已經有人報名或報名審核中的課程不能轉（會讓他們失去資格與紀錄）。
-      const s = requireSuperAdmin(ctx);
-      const c = await ctx.db.prepare("SELECT is_list, view_scope FROM courses WHERE id = ?").bind(courseId).first<{ is_list: number; view_scope: string }>();
-      if (!c) return fail(404, "not_found", "找不到這門課程");
-      if (c.is_list === 1) return fail(400, "already_list", "這已經是清單卡了");
-      const used = await ctx.db.prepare("SELECT (SELECT COUNT(*) FROM enrollments WHERE course_id = ?) + (SELECT COUNT(*) FROM order_items WHERE course_id = ?) AS n").bind(courseId, courseId).first<{ n: number }>();
-      if ((used?.n ?? 0) > 0) return fail(400, "has_enrollments", "這門課已經有人報名（或報名審核中），不能轉成清單卡。請先下架封存。");
-      const pub = c.view_scope === "all" || c.view_scope === "link_guest" ? 1 : 0;
-      await ctx.db.batch([
-        ctx.db.prepare("DELETE FROM lessons WHERE course_id = ? AND is_full = 1").bind(courseId),
-        ctx.db.prepare("UPDATE lessons SET kind = 'material', is_speaker = 0, is_summary = 0, sharer = '', sharer_rank = '', sharer_title = '' WHERE course_id = ? AND kind = 'chapter'").bind(courseId),
-        ctx.db.prepare("UPDATE courses SET is_list = 1, is_shorts = 0, price_twd = 0, price_tba = 0, early_bird = 0, early_price_twd = NULL, early_until = NULL, free_from = NULL, free_until = NULL, diamond_free = 0, min_rank_code = 'none', allow_president = 1, review_group_id = NULL, review_roles = '', guidance_unit = '', teacher = '', teacher_rank = '', teacher_title = '', event_start = NULL, event_end = NULL, location = '', location_none = 0, is_online = 0, is_public = ? WHERE id = ?").bind(pub, courseId),
-        audit(ctx.db, s.sub, "course.convert_to_list", "course", courseId),
-      ]);
-      await renumber(ctx.db, courseId);
       return courseDetail(ctx, courseId);
     },
   ],

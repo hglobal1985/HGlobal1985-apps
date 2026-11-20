@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { UNCATEGORIZED, type CourseSummary, type SeriesSetting } from "@/api/client";
+import { UNCATEGORIZED, type SeriesSetting } from "@/api/client";
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 
@@ -27,4 +27,3 @@ export function useSeriesSettings() {
 }
 
 /** 學員看得到的卡：系列頁隱藏的卡只有超級管理員看得到（編輯模式淡化顯示）。 */
-export const visibleCards = (items: CourseSummary[], admin: boolean) => (admin ? items : items.filter((x) => !x.seriesHidden));

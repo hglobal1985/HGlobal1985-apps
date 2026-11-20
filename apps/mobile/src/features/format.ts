@@ -61,7 +61,6 @@ export function eventDays(start: string | null | undefined, end?: string | null)
 }
 
 /** 單位名稱不顯示教育中心的數字代碼：「飛登 013」→「飛登」。 */
-export const cleanUnit = (u: string): string => u.replace(/\s*\d+\s*$/, "").trim();
 
 let customCenterNames: Record<string, string> = {};
 const centerKeyOf = (l: string) => l.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
@@ -90,11 +89,6 @@ export function sharerLine(l: { sharer: string; sharerRankName: string; sharerTi
   return [l.sharer, l.sharerRankName, l.sharerTitle].map((x) => x.trim()).filter(Boolean).join("﹒");
 }
 
-/** 課程的主講人顯示：「主講人：王老師 白金 經理」（姓名、獎銜、職稱，沒填的略過；都沒填回空字串）。 */
-export function teacherLine(c: { teacher: string; teacherRankName: string; teacherTitle: string }): string {
-  const t = [c.teacher, c.teacherRankName, c.teacherTitle].map((x) => x.trim()).filter(Boolean).join(" ");
-  return t ? `主講人：${t}` : "";
-}
 
 /**
  * 只有主辦單位的顯示（首頁區塊、課程資訊卡的「XX主辦」，不含指導單位）：
