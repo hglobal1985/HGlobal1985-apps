@@ -32,7 +32,7 @@ export { RowShare } from "./material-rows";
  * 課程介紹頁傳 onPlay／playingId＝點章節原地播放、正在播放那列顯示動畫三角形；沒傳（中心頁選單）＝進該課程頁並開始播放。
  */
 export type LessonPlayProps = { playingId?: string | null; onPlay?: (lessonId: string) => void };
-export function ChapterList({ course, style, playingId, onPlay }: { course: CourseDetail; style?: ViewStyle } & LessonPlayProps) {
+export function ChapterList({ course, style, playingId, onPlay, onBlockedPress }: { course: CourseDetail; style?: ViewStyle; /** 沒有權限（鎖住、準備中）的章節點下去的動作 */ onBlockedPress?: () => void } & LessonPlayProps) {
   const chapters = course.lessons.filter((l) => !l.material);
   const anyReady = chapters.some((l) => l.ready);
   return (
@@ -56,7 +56,7 @@ export function ChapterList({ course, style, playingId, onPlay }: { course: Cour
                 dense
                 compact
                 right={chapters.length >= 2 && !soon ? <ChapterShare course={course} lesson={lesson} /> : undefined}
-                onPress={lesson.locked || soon ? undefined : playingId === lesson.id ? () => engine.toggle() : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))} // 正在播放的這一列再點一下＝暫停／繼續播放
+                onPress={lesson.locked || soon ? onBlockedPress : playingId === lesson.id ? () => engine.toggle() : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))} // 正在播放的這一列再點一下＝暫停／繼續播放
               />
             );
           })
