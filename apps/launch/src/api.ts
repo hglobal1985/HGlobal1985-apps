@@ -1236,7 +1236,8 @@ async function bumpView(db: D1Database, kind: "center" | "series" | "course", ke
   return row?.total ?? 0;
 }
 /** 即時縮圖：輸出格式、設定簽名（改設定後舊快取自然失效）、送給 Cloudflare 的參數（只送非預設值）。 */
-const thumbFormat = (f: ThumbSettings["format"], accept: string): "avif" | "webp" | "jpeg" | "png" => (f === "auto" ? (/image\/avif/.test(accept) ? "avif" : /image\/webp/.test(accept) ? "webp" : "jpeg") : f === "avif" ? (/image\/avif/.test(accept) ? "avif" : /image\/webp/.test(accept) ? "webp" : "jpeg") : f);
+// 格式不再依瀏覽器 Accept 變化（業主 2026-11-20 回報 Android 長按下載圖片後該圖變空白）：同一個網址永遠同一種格式，不用 Vary: Accept，瀏覽器快取才不會被不同請求搞混。auto＝WebP（所有手機瀏覽器都支援）。
+const thumbFormat = (f: ThumbSettings["format"]): "avif" | "webp" | "jpeg" | "png" => (f === "auto" ? "webp" : f);
 const thumbSig = (t: ThumbSettings): string => {
   let h = 5381;
   for (const ch of JSON.stringify({ ...t, enabled: undefined })) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0;
@@ -4669,8 +4670,7 @@ const routes: [string, RegExp, Handler][] = [
       if (ctx.env.IMAGES && w && /^image\/(jpeg|png|webp)$/.test(type)) {
         const t = (await loadConfig(ctx.db)).app.thumb;
         if (t.widths.includes(w)) {
-          const accept = ctx.req.headers.get("accept") ?? "";
-          const fmt = thumbFormat(t.format, accept);
+          const fmt = thumbFormat(t.format);
           const cacheKey = new Request(`${ctx.url.origin}/__thumb/${encodeURIComponent(key)}?v=${ctx.url.searchParams.get("v") ?? ""}&w=${w}&s=${thumbSig(t)}&f=${fmt}`);
           const cache = (caches as unknown as { default: Cache }).default;
           const hit = await cache.match(cacheKey);
@@ -4678,7 +4678,7 @@ const routes: [string, RegExp, Handler][] = [
           try {
             const src = await ctx.env.IMAGES.input(obj.body).transform(thumbTransform(t, w)).output({ format: `image/${fmt}`, ...thumbOutput(t) });
             const body = await src.response().arrayBuffer();
-            const done = new Response(body, { headers: { "content-type": `image/${fmt}`, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", vary: "Accept", "x-thumb": `w=${w},f=${fmt},kb=${Math.round(body.byteLength / 1024)}` } });
+            const done = new Response(body, { headers: { "content-type": `image/${fmt}`, "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff", "x-thumb": `w=${w},f=${fmt},kb=${Math.round(body.byteLength / 1024)}` } });
             await cache.put(cacheKey, done.clone()).catch(() => undefined);
             return done;
           } catch (e) {
