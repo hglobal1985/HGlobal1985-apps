@@ -453,6 +453,11 @@ export type Notice = { id: string; title: string; body: string; link: string; re
 /** 中央的一筆「獎銜、中心」新申請（只即時顯示，不保存）。 */
 export type CentralReview = { id: string; /** 申請人（只在審核者本人開啟時即時讀取，不保存）。 */ member_id?: string; display_name: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
 /** available＝false：這位會員沒有審核權限、或中央暫時不可用（畫面直接不顯示審核區）。 */
+/** App 內指派職務（業主 2026-11-21，中央串接指令 2026-11-21.1）：職務選項一律用中央回傳的 assignable_roles，不寫死。 */
+export type StaffRole = { value: string; label: string };
+export type StaffMember = { memberId: string; name: string; center: string; roles: string[] };
+/** available＝false：中央判斷沒有權限（任何非 200 都當沒有權限）；members 只在這次請求即時讀取，不保存。 */
+export type StaffSearch = { available: boolean; assignable: StaffRole[]; members: StaffMember[] };
 export type CentralReviews = { available: boolean; scope: "all" | "center" | null; reviews: CentralReview[] };
 
 /** demo 的 url 可能是相對路徑（以 API 網域為準），App 端以 resolveUrl 轉成完整網址。hls 為 Mux 簽名播放網址。 */

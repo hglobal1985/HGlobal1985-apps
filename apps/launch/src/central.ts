@@ -6,7 +6,7 @@
  *   或列在 LEARN_ADMIN_SUBS 的會員 ID。
  * 日誌不得出現 Token、信箱、姓名。
  */
-import type { CentralReviews } from "./contract.ts";
+import type { CentralReviews, StaffMember, StaffRole, StaffSearch } from "./contract.ts";
 export const CENTRAL = "https://id.hglobal1985.com";
 export const APP_ID = "learn";
 
@@ -346,6 +346,62 @@ export async function centralDecide(token: string, id: string, decision: "approv
   return { status: res?.status ?? 503, body };
 }
 
+/**
+ * App 內指派職務（業主 2026-11-21；中央串接指令 2026-11-21.1，第三章 17、檢查清單 31）：
+ * - 查人 GET /v1/eligibility/staff：不帶 q 回「有職務的人」；q 要 2～30 字。
+ * - 指派 PUT /v1/eligibility/staff/{member_id}，body {"roles":[...]} 是「事後完整清單」。
+ * - 一律用呼叫者本人的 App 會員 Token（不可用服務 Token）；任何非 200 都當沒有權限。
+ * - 職務選項用中央回傳的 assignable_roles；**不保存名單與搜尋字，也不寫日誌**（logCall 只記路徑、不含查詢字串）。
+ * 回應欄位名稱依中央回傳寬鬆讀取（member_id／id、display_name／name、center／education_center、roles）。
+ */
+const roleOf = (x: unknown): StaffRole | null => {
+  if (typeof x === "string" && x) return { value: x, label: x };
+  if (x && typeof x === "object") {
+    const o = x as Record<string, unknown>;
+    const value = [o.value, o.key, o.role, o.id, o.code].find((v) => typeof v === "string" && v) as string | undefined;
+    const label = [o.label, o.name, o.title, o.display_name].find((v) => typeof v === "string" && v) as string | undefined;
+    if (value) return { value, label: label ?? value };
+  }
+  return null;
+};
+const roleList = (v: unknown): StaffRole[] => (Array.isArray(v) ? v.map(roleOf).filter((r): r is StaffRole => !!r) : []);
+const textOfStaff = (...vs: unknown[]): string => {
+  for (const v of vs) {
+    if (typeof v === "string" && v.trim()) return v.trim();
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      const t = [o.label, o.name, o.display_name].find((x) => typeof x === "string" && x) as string | undefined;
+      if (t) return t;
+    }
+  }
+  return "";
+};
+export async function staffSearch(token: string, q?: string): Promise<StaffSearch> {
+  const none: StaffSearch = { available: false, assignable: [], members: [] };
+  const res = await callCentral(token, q ? `/v1/eligibility/staff?q=${encodeURIComponent(q)}` : "/v1/eligibility/staff");
+  if (!res || res.status !== 200) return none;
+  const b = (await res.json().catch(() => null)) as Record<string, unknown> | null;
+  if (!b || typeof b !== "object") return none;
+  const rows = [b.members, b.staff, b.items, b.results, b.data].find(Array.isArray) as unknown[] | undefined;
+  const members: StaffMember[] = (rows ?? [])
+    .map((r): StaffMember | null => {
+      if (!r || typeof r !== "object") return null;
+      const o = r as Record<string, unknown>;
+      const memberId = [o.member_id, o.id, o.sub].find((v) => typeof v === "string" && v) as string | undefined;
+      if (!memberId) return null;
+      return { memberId, name: textOfStaff(o.display_name, o.name), center: textOfStaff(o.education_center, o.center, o.center_label), roles: roleList(o.roles).map((x) => x.value) };
+    })
+    .filter((m): m is StaffMember => !!m);
+  return { available: true, assignable: roleList(b.assignable_roles), members };
+}
+/** 指派（事後完整清單）。回傳中央的狀態碼與最新的職務清單（成功才有；畫面用它更新）。 */
+export async function staffAssign(token: string, memberId: string, roles: string[]): Promise<{ status: number; roles: string[] | null }> {
+  const res = await callCentral(token, `/v1/eligibility/staff/${encodeURIComponent(memberId)}`, { method: "PUT", body: JSON.stringify({ roles }) });
+  if (!res) return { status: 503, roles: null };
+  const b = res.status === 200 ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
+  return { status: res.status, roles: b && Array.isArray(b.roles) ? roleList(b.roles).map((x) => x.value) : null };
+}
+
 /** 會員在會員中心的第一組會員編號（安麗會員編號，用來當「我的書櫃」網址）；查不到回 null。只在建立書櫃那一刻讀一次。 */
 export async function memberNumberOf(sub: string, token: string): Promise<string | null> {
   const doc = await profileDoc(sub, token);
@@ -560,7 +616,7 @@ export async function centralAddJobTitle(secret: string | undefined, value: stri
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
 
 /** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由業主在中央後台勾選，不在程式內宣稱）。 */
-export const INTEGRATED_VERSION = "2026-11-15.5";
+export const INTEGRATED_VERSION = "2026-11-21.1";
 export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile"];
 export const SIGNATURE_TOLERANCE_SECONDS = 300;
 

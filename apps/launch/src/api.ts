@@ -75,7 +75,7 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
-import { lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -4235,6 +4235,69 @@ const routes: [string, RegExp, Handler][] = [
       if (!pwActive(exp)) return fail(403, "password_expired", "這個密碼已經失效，請向書櫃主人索取新的密碼");
       if (!(await checkPassword(pw, hash, salt))) return fail(403, "wrong_password", "密碼不正確");
       return makeToken(hash, scope, exp);
+    },
+  ],
+  [
+    "GET",
+    /^\/staff-roles\/access$/,
+    async (ctx): Promise<{ available: boolean; assignable: { value: string; label: string }[] }> => {
+      // 設定頁入口：只有中央判斷有權限的人才顯示（任何非 200 都當沒有權限）；只回職務選項，不回名單。
+      const s = requireMember(ctx);
+      if (s.kind !== "central") return { available: false, assignable: [] };
+      const r = await staffSearch(s.token);
+      return { available: r.available, assignable: r.assignable };
+    },
+  ],
+  [
+    "GET",
+    /^\/staff-roles\/center-members$/,
+    async (ctx) => {
+      // 依中心列出會員（業主 2026-11-21）：用本人 Token 向中央讀同中心名單（權限與範圍全由中央判斷）；名單不保存、搜尋字不寫日誌。
+      const s = requireMember(ctx);
+      if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以使用");
+      const center = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 100);
+      if (!center) return fail(400, "center_required", "請先選擇中心");
+      try {
+        const page = await centerMembers(s.token, { q: (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 30), cursor: ctx.url.searchParams.get("cursor"), center, limit: 30 });
+        return { center: page.center?.label ?? center, members: page.members, next: page.next };
+      } catch (e) {
+        const err = e as { status?: number; code?: string };
+        if (err.code === "field_not_allowed") return fail(503, "central_field_not_allowed", "會員中心尚未開放「顯示名稱」給行動大學：請超級管理員到會員中心後台「平台設定」勾選 display_name");
+        if (err.status === 403) return fail(403, "central_forbidden", "會員中心不允許查詢這個中心的名單");
+        if (err.status === 404) return fail(404, "unknown_center", "會員中心找不到這個中心");
+        return fail(503, "central_unavailable", "暫時無法取得會員中心的名單，請稍後再試");
+      }
+    },
+  ],
+  [
+    "GET",
+    /^\/staff-roles$/,
+    async (ctx) => {
+      // 查人（業主 2026-11-21）：不帶 q＝有職務的人；q 要 2～30 字。用本人 Token、不保存名單與搜尋字、不寫日誌。
+      const s = requireMember(ctx);
+      if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以使用");
+      const q = (ctx.url.searchParams.get("q") ?? "").trim();
+      if (q && (q.length < 2 || q.length > 30)) return fail(422, "invalid_query", "搜尋字請輸入 2 到 30 個字");
+      const r = await staffSearch(s.token, q || undefined);
+      if (!r.available) return fail(403, "forbidden", "你沒有指派職務的權限");
+      return r;
+    },
+  ],
+  [
+    "PUT",
+    /^\/staff-roles\/([\w.-]{1,80})$/,
+    async (ctx, [memberId]) => {
+      // 指派職務：body.roles 是「事後完整清單」；成功時回中央最新的 roles 讓畫面更新。
+      const s = requireMember(ctx);
+      if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以使用");
+      const body = await readJson<{ roles?: unknown }>(ctx.req);
+      if (!Array.isArray(body.roles) || body.roles.length > 30 || body.roles.some((x) => typeof x !== "string" || !x || x.length > 60)) return fail(422, "invalid_roles", "職務清單格式不正確");
+      const r = await staffAssign(s.token, memberId!, [...new Set(body.roles as string[])]);
+      if (r.status === 200) return { roles: r.roles ?? (body.roles as string[]) };
+      if (r.status === 403) return fail(403, "forbidden", "你沒有權限指派這個職務或這位會員");
+      if (r.status === 404) return fail(404, "not_found", "找不到這位會員");
+      if (r.status === 422) return fail(422, "invalid_roles", "中央不接受這個職務組合");
+      return fail(r.status === 429 ? 429 : 503, "central_unavailable", "會員中心暫時無法回應，請稍後再試");
     },
   ],
   [
