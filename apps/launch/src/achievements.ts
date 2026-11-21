@@ -40,6 +40,10 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
       return d.course_id ? courseDone(db, sub, d.course_id) : 0;
     case "feature_used":
       return d.feature ? one(db, "SELECT COALESCE(MAX(count), 0) AS n FROM feature_uses WHERE member_sub = ? AND feature = ?", sub, d.feature) : 0;
+    case "lists_created":
+      return one(db, "SELECT COUNT(*) AS n FROM my_lists WHERE owner_sub = ?", sub);
+    case "list_people":
+      return one(db, "SELECT COALESCE(MAX(c), 0) AS n FROM (SELECT COUNT(*) AS c FROM my_list_visitors v JOIN my_lists l ON l.id = v.list_id WHERE l.owner_sub = ? GROUP BY v.list_id)", sub);
     case "material_video":
       return d.lesson_id ? one(db, "SELECT COUNT(*) AS n FROM lesson_progress WHERE member_sub = ? AND lesson_id = ?", sub, d.lesson_id) : 0;
     case "streak_days":

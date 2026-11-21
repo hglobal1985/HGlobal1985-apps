@@ -10,6 +10,7 @@ import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
 import { AppText, BrandCover, Card } from "@/ui";
 import { fadedStyle } from "@/ui/fade-style";
+import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
 
 /**
@@ -52,7 +53,12 @@ function CenterListRow({ course, trailing }: { course: CourseSummary; trailing?:
             </AppText>
           ) : null}
         </View>
-        {trailing ?? <RowShare label={`分享：${course.title}`} onShare={share} />}
+        {trailing ?? (
+          <>
+            <RowAddToList target={{ kind: "course", ref: course.id }} title={course.title} />
+            <RowShare label={`分享：${course.title}`} onShare={share} />
+          </>
+        )}
       </Pressable>
     </View>
   );

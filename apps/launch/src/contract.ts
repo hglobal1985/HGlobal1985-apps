@@ -604,9 +604,9 @@ export type ProfileForm = {
 };
 
 // ---------- 學習成就（徽章）----------
-export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video";
+export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video" | "lists_created" | "list_people";
 /** 任務分類（後台「徽章任務設定」用，業主 2026-11-18）。 */
-export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature" | "zone";
+export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature" | "zone" | "list";
 export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; icon: string; desc: string }[] = [
   { key: "progress", label: "學習進度", icon: "📈", desc: "學了多少：完成的堂數、課程、學習時間" },
   { key: "habit", label: "學習習慣", icon: "🔥", desc: "有沒有持續：累計天數、連續天數" },
@@ -615,6 +615,7 @@ export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; 
   { key: "social", label: "社群互動", icon: "💬", desc: "在課程留言板的互動" },
   { key: "subscribe", label: "訂閱關注", icon: "🔔", desc: "訂閱中心、系列的數量" },
   { key: "feature", label: "功能體驗", icon: "🧰", desc: "第一次使用某個網站功能（新手教學）" },
+  { key: "list", label: "我的清單", icon: "📋", desc: "建立自己的清單、分享給別人、清單被多少人點閱" },
   { key: "zone", label: "清單影片", icon: "🎬", desc: "安麗官方資源、安麗品牌館：每個區塊隨機挑 1～2 支影片，讀完（看完）就解鎖" },
 ];
 /** 條件類型：中文名稱、單位、分類、白話說明（後台挑選時顯示）。retired＝已停用的類型，後台不再提供。 */
@@ -635,6 +636,8 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   series_subscribed: { label: "訂閱系列數", unit: "個", category: "subscribe", hint: "按過訂閱鈴鐺的系列數量" },
   subscriptions_total: { label: "訂閱總數（中心＋系列）", unit: "個", category: "subscribe", hint: "中心與系列加起來的訂閱數量" },
   feature_used: { label: "使用過某個網站功能", unit: "次", category: "feature", hint: "第一次用到指定功能就達成（需要選功能），達成數量通常填 1", needsFeature: true },
+  lists_created: { label: "累計建立清單數", unit: "份", category: "list", hint: "會員自己建立的「我的清單」份數（刪除後不算）" },
+  list_people: { label: "單一清單被點閱的人數", unit: "人", category: "list", hint: "自己的清單裡，人氣最高的那份被不同的人點開過幾人（自己看不算）" },
   material_video: { label: "讀完指定的清單影片", unit: "支", category: "zone", hint: "由系統從清單專區、品牌專區隨機抽選影片產生（在「清單影片」分類按「重新抽選」），不能手動新增", auto: true },
   course_completed: { label: "學完指定的某一門課程", unit: "門", category: "progress", hint: "已取消這類任務", needsCourse: true, retired: true },
 };
@@ -666,6 +669,10 @@ export const FEATURES = {
   subscribe: { label: "訂閱中心或系列", hint: "在中心頁或系列頁按訂閱鈴鐺" },
   broadcast_open: { label: "查看廣播公告", hint: "點中心頁的黃色公告橫條" },
   notices_filter: { label: "切換通知分類", hint: "通知頁切換全部、審核、訂閱、留言" },
+  list_create: { label: "建立我的清單", hint: "按「加入清單」鈕，新增一份自己的清單" },
+  list_add: { label: "加入我的清單", hint: "把課程、教材、系列或中心加入自己的清單" },
+  list_share: { label: "分享我的清單", hint: "在「我的清單」按分享，把清單網址傳給朋友" },
+  list_copy: { label: "複製別人的清單", hint: "打開朋友分享的清單，按「複製到我的清單」" },
 } as const;
 export type FeatureKey = keyof typeof FEATURES;
 /** 會員看到的徽章：已取得或尚未取得（含目前進度）。 */
@@ -937,6 +944,9 @@ export type AppSettings = {
   watchReportSec: number;
   /** 集滿幾枚徽章自動解鎖「我的書櫃」鑰匙（業主 2026-11-18 起可在後台「徽章任務設定」調整）。 */
   libraryKeyBadges: number;
+  /** 「我的清單」（業主 2026-11-21）：每位會員一開始能建立幾份清單，以及完成指定學習成就後各多解鎖幾份（設定頁「清單解鎖設定」）。 */
+  listBaseQuota: number;
+  listUnlocks: { achievementId: string; extra: number }[];
   /** 上傳檔案設定（業主 2026-11-18，在「儲存空間管理」調整）：單檔大小上限（MB）、圖片壓縮長邊（像素）與畫質（%）。 */
   fileMaxMb: number;
   imageMaxSide: number;
@@ -973,6 +983,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   learnDonePct: 95,
   watchReportSec: 10,
   libraryKeyBadges: 100,
+  listBaseQuota: 2,
+  listUnlocks: [],
   fileMaxMb: 30,
   imageMaxSide: 1024,
   imageQuality: 88,

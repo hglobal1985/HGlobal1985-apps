@@ -19,6 +19,10 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
       const f = feature ? FEATURES[feature as keyof typeof FEATURES] : undefined;
       return f ? `${f.label}：${f.hint}` : "使用指定的網站功能";
     }
+    case "lists_created":
+      return `累計建立 ${threshold} 份自己的清單`;
+    case "list_people":
+      return `你的清單被 ${threshold} 位不同的人點開過`;
     case "material_video":
       return lessonTitle ? `讀完清單影片「${lessonTitle}」` : "讀完指定的清單影片";
     case "streak_days":

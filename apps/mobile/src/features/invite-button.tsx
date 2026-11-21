@@ -14,12 +14,34 @@ import { flashText } from "@/ui/flash-notice";
  * QR Code 在手機上自己產生（不連外部服務、不洩漏網址）。要改外觀只改這個檔案；新增可分享的頁面，在它的上方工具列放 HeaderInvite。
  */
 export function HeaderInvite({ title, path }: { title: string; path: string }) {
+  const { c } = useTheme();
   const [open, setOpen] = useState(false);
   return (
     <>
-      <TopBarButton label="＋邀請" accessibilityLabel="邀請：顯示這一頁的 QR Code 與網址" tone="accent" onPress={() => setOpen(true)} />
+      <TopBarButton label="邀請" accessibilityLabel="邀請：顯示這一頁的 QR Code 與網址" tone="accent" icon={<QrGlyph size={22} color={c.accent} />} onPress={() => setOpen(true)} />
       {open ? <InviteSheet title={title} path={path} onClose={() => setOpen(false)} /> : null}
     </>
+  );
+}
+
+/**
+ * QR Code 示意圖示（業主 2026-11-21：邀請鈕不再用「＋」，避免和「加入我的清單」混淆）：
+ * 三個角落的定位方塊加幾顆小點，只是示意、不是真的 QR Code。
+ */
+export function QrGlyph({ size = 22, color }: { size?: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Rect x={3} y={3} width={7} height={7} rx={1.2} fill="none" stroke={color} strokeWidth={2} />
+      <Rect x={14} y={3} width={7} height={7} rx={1.2} fill="none" stroke={color} strokeWidth={2} />
+      <Rect x={3} y={14} width={7} height={7} rx={1.2} fill="none" stroke={color} strokeWidth={2} />
+      <Rect x={5.5} y={5.5} width={2} height={2} fill={color} />
+      <Rect x={16.5} y={5.5} width={2} height={2} fill={color} />
+      <Rect x={5.5} y={16.5} width={2} height={2} fill={color} />
+      <Rect x={14} y={14} width={3} height={3} fill={color} />
+      <Rect x={18.5} y={14} width={2.5} height={2.5} fill={color} />
+      <Rect x={14} y={18.5} width={2.5} height={2.5} fill={color} />
+      <Rect x={18} y={18} width={3} height={3} fill={color} />
+    </Svg>
   );
 }
 

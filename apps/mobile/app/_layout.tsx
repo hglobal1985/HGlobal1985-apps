@@ -59,9 +59,12 @@ function AppStack() {
             <Stack.Screen name="course/[id]" options={{ title: "課程介紹" }} />
             <Stack.Screen name="review-invite/[token]" options={{ title: "審核人員邀請" }} />
             <Stack.Screen name="library" options={{ headerShown: false }} />
+            <Stack.Screen name="my-lists" options={{ title: "我的清單" }} />
+            <Stack.Screen name="my-list/[id]" options={{ title: "清單設定" }} />
             <Stack.Screen name="library-settings" options={{ title: "書櫃設定" }} />
             <Stack.Screen name="library-invite/[code]" options={{ title: "我的書櫃邀請" }} />
             <Stack.Screen name="admin/libraries" options={{ title: "書櫃管理" }} />
+            <Stack.Screen name="admin/list-unlocks" options={{ title: "清單解鎖設定" }} />
             <Stack.Screen name="[slug]" options={{ title: "課程" }} />
             <Stack.Screen name="series/[name]" options={{ title: "課程" }} />
             <Stack.Screen name="learn/[courseId]/[lessonId]" options={{ title: "上課" }} />

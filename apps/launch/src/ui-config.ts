@@ -111,6 +111,22 @@ export function normalizeThumb(raw: unknown): ThumbSettings {
   };
 }
 
+/** 清單解鎖條件：每項＝一個學習成就編號＋解鎖幾份（1～20）；同一個成就只留一筆，最多 100 筆。 */
+function normalizeListUnlocks(raw: unknown): { achievementId: string; extra: number }[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: { achievementId: string; extra: number }[] = [];
+  for (const x of raw.slice(0, 100)) {
+    const o = (x && typeof x === "object" ? x : {}) as Record<string, unknown>;
+    const id = typeof o.achievementId === "string" ? o.achievementId.trim().slice(0, 60) : "";
+    const extra = typeof o.extra === "number" && Number.isFinite(o.extra) ? Math.min(20, Math.max(1, Math.round(o.extra))) : 0;
+    if (!id || !extra || seen.has(id)) continue;
+    seen.add(id);
+    out.push({ achievementId: id, extra });
+  }
+  return out;
+}
+
 /** 整理 APP 數值設定：數字夾在合理範圍（四捨五入成整數）、選項不合法退回預設、缺的欄位用預設補。 */
 export function normalizeApp(raw: unknown): AppSettings {
   const d = DEFAULT_APP_SETTINGS;
@@ -139,6 +155,8 @@ export function normalizeApp(raw: unknown): AppSettings {
     ...learnPct(r, d),
     watchReportSec: num(r.watchReportSec, d.watchReportSec, 5, 120),
     libraryKeyBadges: num(r.libraryKeyBadges, d.libraryKeyBadges, 1, 1000),
+    listBaseQuota: num(r.listBaseQuota, d.listBaseQuota, 0, 50),
+    listUnlocks: normalizeListUnlocks(r.listUnlocks),
     fileMaxMb: num(r.fileMaxMb, d.fileMaxMb, 1, 95),
     imageMaxSide: num(r.imageMaxSide, d.imageMaxSide, 400, 4096),
     imageQuality: num(r.imageQuality, d.imageQuality, 50, 100),

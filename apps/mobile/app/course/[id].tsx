@@ -345,6 +345,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       {editing && Platform.OS === "web" ? <YoutubeLengthFix course={course} enabled /> : null}
       <PageHeader
         title={course.title}
+        addToList={{ kind: "course", ref: course.id }}
         path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
         course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
         list={course.isList ? { title: course.title } : undefined}

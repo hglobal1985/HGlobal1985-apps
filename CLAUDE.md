@@ -384,3 +384,13 @@
 - **中心頁「清單」分頁改兩行排版（業主 2026-11-21）**：`center-list.tsx` 每列兩行、行距緊密：第一行課程標題（單行「…」）、第二行「日期膠囊＋主講人＋獎銜」；縮圖左右留邊；卡片上方「中心名稱＋教材數量」標題已刪除（`CenterListCard` 的 `title` 參數不再顯示）。
 
 - **系列頁與中心頁切換鈕統一叫「EDM／清單」，清單格式全站同一個模組（業主 2026-11-21）**：系列頁的「縮圖／詳細列表」改名「**EDM／清單**」（EDM＝縮圖格、清單＝列表，順序 EDM 在前、預設 EDM），與中心頁「EDM｜清單｜相簿」一致。**清單的列格式只有一個來源 `features/courses/center-list.tsx` 的 `CenterListCard`**（縮圖、第一行標題、第二行日期膠囊＋主講人＋獎銜、右側分享鈕）：中心頁「清單」與系列頁「清單」都用它；系列頁編輯模式用 `trailing` 把右側換成排序／隱藏鈕。新增任何「卡片清單」一律用它，要改樣子只改這個檔案。教材卡頁自己的「縮圖／詳細列表」（教材與區塊）不在此列，維持原樣。
+
+- **加入我的清單（業主 2026-11-21）**：會員自己建立的清單（不是「收藏」）。**課程卡、單一教材、系列卡、中心卡**都能加入，**同一個內容可同時加入多份清單**。邏輯與資料：`apps/launch/src/my-lists.ts`（`my_lists`、`my_list_items`、`my_list_visitors`、`my_list_hits`，migration 0103；成就 0104）、API 在 `api.ts` 的 `/my-lists*`（`GET /my-lists?kind&ref` 帶「有沒有在裡面」、`POST` 建立並可同時加入、`PATCH` 改名稱／網址名稱／封面、`DELETE`、`PUT /:id/item` 加入或移除、`PATCH /:id/items/:itemId` 備註、`GET /:id`＋`/stats`、`GET /my-lists/marks` 全站按鈕共用的標記、`POST /my-lists/view/:編號/:名稱` 公開檢視＋點擊、`…/copy` 複製別人的清單）。
+  ① **按鈕位置（業主選定）**：整張卡片＝上方工具列的清單圖示（`HeaderAddToList`，放在邀請、分享旁；`PageHeader` 的 `addToList` 參數會自動放，已用在課程頁、系列頁、中心頁；已加入變黃色＋數字）；**單一教材＝教材列右側、分享鈕旁的圓鈕**（`RowAddToList`，`material-rows.tsx` 的 `RowActions`，課程列與中心清單列也有）。按下去先彈 `AddToListSheet`（`features/my-lists/add-to-list.tsx`）：勾選＝加入、取消勾選＝移除（立刻生效，畫面先換）、可直接「新增清單」並加入。標記狀態集中在 `features/my-lists/store.ts`（一次查詢、全站共用），新增任何加入清單的入口一律用這兩個元件，不可另做；圖示 `ui/list-icon.tsx`。
+  ② **邀請鈕改用 QR Code 示意圖示**（`QrGlyph`，不是真的 QR，文字改叫「邀請」不再有「＋」），避免和「加入清單」混淆。
+  ③ **所有清單一律公開、沒有隱私設定**（業主決定）；分享網址＝`/安麗會員編號/網址名稱`（預設隨機 6 碼，可自訂：英數與連字號 3～30 字，**不必避開網站保留字或短網址**，因為前面有會員編號；同一個人不能重複）。公開頁 `features/my-lists/public-list.tsx`（路由 `app/[slug]/[name].tsx`：第一段含數字且 ≥3 字才當清單）；沒有會員編號的人要先到會員中心填寫（`no_member_number`）。
+  ④ **清單數量**：基本 2 份（`AppSettings.listBaseQuota`），完成指定學習成就再多解鎖（`listUnlocks`：成就編號＋份數）；超級管理員在設定 › 清單解鎖設定（`app/admin/list-unlocks.tsx`）設定；額度用完時面板顯示要完成哪個成就。一份清單最多 100 個內容。
+  ⑤ **點擊**：每次進入 +1、人數用瀏覽器匿名代碼不重複計算、主人自己看不算；另存每天與各來源（LINE／Facebook／Instagram／微信／直接開啟／其他，`sourceOf`）。清單內頁（`app/my-list/[id].tsx`）可看近 14 天每天點擊與來源。
+  ⑥ **備註、封面、複製、已下架**：每個項目可寫個人備註；清單封面可自選項目，預設用第一個有封面的項目；別人的清單可「複製到我的清單」（額度不夠會提示要完成哪個成就）；內容被刪除或下架時清單仍保留該項並標「已下架」（不能點進去）。
+  ⑦ **成就**：新增功能體驗徽章 `list_create`／`list_add`／`list_share`／`list_copy`（`FEATURES`，入口已有 `trackFeature`）與新條件 `lists_created`（累計建立清單數）、`list_people`（單一清單被多少不同的人點開），共 8 枚徽章（migration 0104），分類「我的清單」。
+  ⑧ **分享者名片＝首頁同一個 `MemberHeader` 元件**；頭像與姓名（會員中心公開資料，不是 Amway 資料）由主人開清單頁面時順手更新存進清單；**獎銜與徽章屬 Amway 資料不保存，目前公開頁還顯示不出來**——需要中央提供「依會員編號查他人公開名片（獎銜、徽章）」，要求寫在 `docs/central-request-list-sharer.md`，中央支援後在公開頁補上（只在每次讀取時查、不保存）。

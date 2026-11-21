@@ -126,6 +126,7 @@ export default function MeScreen() {
 
       {member && isWeb ? (
         <Card style={{ paddingVertical: 0 }}>
+          <ListRow icon="list-outline" title="我的清單" subtitle="自己建立的清單：分享網址、點擊人數、備註" onPress={() => router.push("/my-lists")} />
           <ListRow icon="library-outline" title="我的書櫃" subtitle={myLibrary.data?.library ? "個人專屬頁面：書架、影片、簡報、連結，可設密碼" : "尚未解鎖書櫃鑰匙"} onPress={() => router.push("/library")} />
           <ListRow icon="document-text-outline" title="訂單紀錄" onPress={() => router.push("/orders")} />
         </Card>
@@ -147,6 +148,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="pricetags-outline" title="關鍵字管理" subtitle="集中新增、改名、刪除課程的分類、系列、場地" onPress={() => router.push("/admin/keywords")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="options-outline" title="APP 數值設定" subtitle="首頁推薦規則、輪播秒數與其他全站數值" onPress={() => router.push("/admin/app-settings")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="share-social-outline" title="分享預設值" subtitle="分享選單的文字、LINE 預覽卡片的標題與備註格式" onPress={() => router.push("/admin/share-defaults")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="list-outline" title="清單解鎖設定" subtitle="每位會員一開始能建幾份清單，完成指定成就再多解鎖幾份" onPress={() => router.push("/admin/list-unlocks")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="library-outline" title="書櫃管理" subtitle="產生「我的書櫃」邀請網址、查看與移除書櫃" onPress={() => router.push("/admin/libraries")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="link-outline" title="短網址" subtitle="集中設定分類、系列、中心的短網址與課程專屬網址" onPress={() => router.push("/admin/short-links")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="sparkles-outline" title="AI 模型" subtitle="切換逐字稿、關鍵字、語意搜尋用的 AI 模型，並比較花費" onPress={() => router.push("/admin/ai-models")} /> : null}

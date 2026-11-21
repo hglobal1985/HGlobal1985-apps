@@ -78,6 +78,7 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
+import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
 import { lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
@@ -3277,9 +3278,97 @@ async function listComments(ctx: Ctx, courseId: string): Promise<CourseComment[]
 
 // ---------- router ----------
 
+
+// ---------- 加入我的清單（業主 2026-11-21；邏輯在 my-lists.ts） ----------
+/** 清單網址前綴＝安麗會員編號（取自會員中心）；模擬會員用代號。沒有編號就請會員先到會員中心填寫。 */
+async function listNumber(s: Session): Promise<string> {
+  const raw = s.kind === "central" ? await memberNumberOf(s.sub, s.token) : `demo9${s.sub.replace(/[^a-z0-9]/gi, "")}`;
+  return libraryNumber(raw) ?? fail(409, "no_member_number", "要先在會員中心填寫安麗會員編號，清單的分享網址才會建立");
+}
+const listQuota = async (ctx: Ctx, sub: string) => {
+  const app = (await loadConfig(ctx.db)).app;
+  return quotaOf(ctx.db, sub, app.listBaseQuota, app.listUnlocks);
+};
+/** my-lists.ts 的錯誤轉成一般的 API 錯誤。 */
+async function listGuard<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof ListError) return fail(e.status, e.code, e.message);
+    throw e;
+  }
+}
+
 type Handler = (ctx: Ctx, params: string[]) => Promise<unknown>;
 const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/health$/, async () => ({ ok: true })],
+  // ----- 加入我的清單 -----
+  ["GET", /^\/my-lists$/, (ctx) => listGuard(async () => {
+    const s = requireMember(ctx);
+    if (s.name) await refreshOwner(ctx.db, s.sub, s.name, s.kind === "central" ? s.avatarUrl : null);
+    const q = ctx.url.searchParams;
+    const it = q.get("kind") && q.get("ref") ? readItem({ kind: q.get("kind"), ref: q.get("ref") }) : undefined;
+    return { lists: await ownLists(ctx.db, s.sub, it), quota: await listQuota(ctx, s.sub) };
+  })],
+  ["POST", /^\/my-lists$/, (ctx) => listGuard(async () => {
+    const s = requireMember(ctx);
+    const b = await readJson<{ title?: unknown; kind?: unknown; ref?: unknown; ref2?: unknown }>(ctx.req);
+    const title = checkTitle(b.title);
+    const id = await createList(ctx.db, s, await listNumber(s), title, await listQuota(ctx, s.sub));
+    if (b.kind && b.ref) await setItem(ctx.db, id, readItem(b), true);
+    const it = b.kind && b.ref ? readItem(b) : undefined;
+    return { id, lists: await ownLists(ctx.db, s.sub, it), quota: await listQuota(ctx, s.sub) };
+  })],
+  // 每個內容在我的幾份清單裡（全站所有「加入我的清單」按鈕共用一次查詢）。
+  ["GET", /^\/my-lists\/marks$/, async (ctx) => {
+    const s = requireMember(ctx);
+    const { results } = await ctx.db.prepare("SELECT i.kind, i.ref, COUNT(*) AS n FROM my_list_items i JOIN my_lists l ON l.id = i.list_id WHERE l.owner_sub = ? GROUP BY i.kind, i.ref").bind(s.sub).all<{ kind: string; ref: string; n: number }>();
+    return { marks: Object.fromEntries(results.map((r) => [`${r.kind}:${r.ref}`, r.n])) };
+  }],
+  ["GET", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => ownDetail(ctx.db, await ownedList(ctx.db, requireMember(ctx).sub, id!)))],
+  ["PATCH", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => {
+    const s = requireMember(ctx);
+    const l = await ownedList(ctx.db, s.sub, id!);
+    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown }>(ctx.req);
+    if (b.title !== undefined) await ctx.db.prepare("UPDATE my_lists SET title = ? WHERE id = ?").bind(checkTitle(b.title), l.id).run();
+    if (b.slug !== undefined) await setSlug(ctx.db, l, b.slug);
+    if (b.coverItemId !== undefined) {
+      const cid = typeof b.coverItemId === "string" && b.coverItemId ? b.coverItemId : null;
+      if (cid && !(await ctx.db.prepare("SELECT 1 AS ok FROM my_list_items WHERE id = ? AND list_id = ?").bind(cid, l.id).first())) fail(404, "not_found", "找不到這個項目");
+      await ctx.db.prepare("UPDATE my_lists SET cover_item_id = ? WHERE id = ?").bind(cid, l.id).run();
+    }
+    return ownDetail(ctx.db, await ownedList(ctx.db, s.sub, l.id));
+  })],
+  ["DELETE", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => {
+    const s = requireMember(ctx);
+    const l = await ownedList(ctx.db, s.sub, id!);
+    await ctx.db.batch([ctx.db.prepare("DELETE FROM my_list_items WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_visitors WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_hits WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_lists WHERE id = ?").bind(l.id)]);
+    return { ok: true };
+  })],
+  ["PUT", /^\/my-lists\/(l[\w]{4,20})\/item$/, (ctx, [id]) => listGuard(async () => {
+    const s = requireMember(ctx);
+    const l = await ownedList(ctx.db, s.sub, id!);
+    const b = await readJson<{ kind?: unknown; ref?: unknown; ref2?: unknown; on?: unknown }>(ctx.req);
+    return { count: await setItem(ctx.db, l.id, readItem(b), b.on !== false) };
+  })],
+  ["PATCH", /^\/my-lists\/(l[\w]{4,20})\/items\/(i[\w]{4,20})$/, (ctx, [id, itemId]) => listGuard(async () => {
+    const s = requireMember(ctx);
+    const l = await ownedList(ctx.db, s.sub, id!);
+    await setNote(ctx.db, l.id, itemId!, (await readJson<{ note?: unknown }>(ctx.req)).note);
+    return ownDetail(ctx.db, l);
+  })],
+  ["GET", /^\/my-lists\/(l[\w]{4,20})\/stats$/, (ctx, [id]) => listGuard(async () => listStats(ctx.db, (await ownedList(ctx.db, requireMember(ctx).sub, id!)).id))],
+  // 公開檢視（所有清單都公開，訪客也能看）；每次進入點擊 +1。
+  ["POST", /^\/my-lists\/view\/([\w-]{2,40})\/([\w-]{3,30})$/, (ctx, [number, slug]) => listGuard(async () => {
+    const b = await readJson<{ vid?: unknown; hint?: unknown; referrer?: unknown }>(ctx.req);
+    const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
+    return viewPublic(ctx.db, number!, slug!, str(b.vid, 40), ctx.session?.sub ?? null, str(b.hint, 30), str(b.referrer, 200));
+  })],
+  // 把別人的清單複製成自己的新清單（額度不夠會提示要完成哪個成就）。
+  ["POST", /^\/my-lists\/view\/([\w-]{2,40})\/([\w-]{3,30})\/copy$/, (ctx, [number, slug]) => listGuard(async () => {
+    const s = requireMember(ctx);
+    return { id: await copyList(ctx.db, s, await listNumber(s), number!, slug!, await listQuota(ctx, s.sub)) };
+  })],
   ["GET", /^\/ranks$/, async (ctx) => [...(await ranks(ctx.db)).values()]],
   ["GET", /^\/config$/, async (ctx) => ({ demoLogin: demoEnabled(ctx.env) })],
   // 正式站目前的程式版本（多個 AI 接手開發時，部署前用它確認自己的程式包含線上版本，才不會蓋掉別人的成果）。

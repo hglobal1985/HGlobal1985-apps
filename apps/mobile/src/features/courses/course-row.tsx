@@ -12,6 +12,7 @@ import { BrandCover, AppText, CountPill, CourseCover } from "@/ui";
 import { fadedStyle } from "@/ui/fade-style";
 import { styles } from "./chapter-list";
 import { shareLink } from "@/lib/share";
+import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
 import { ribbonsFor } from "./ribbons";
 import { displayName } from "./sort";
@@ -54,6 +55,7 @@ export function CourseRow({ course, last }: { course: CourseSummary; last?: bool
         ) : null}
       </View>
       <CountPill count={course.materialCount} />
+      <RowAddToList target={{ kind: "course", ref: course.id }} title={course.title} />
       <RowShare label={`分享：${course.title}`} onShare={() => shareLink(course.title, course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`, course.isList ? undefined : { teacher: course.teacher, teacherTitle: course.teacherTitle, title: course.title }, undefined, undefined, course.isList ? { title: course.title } : undefined)} />
     </Pressable>
   );

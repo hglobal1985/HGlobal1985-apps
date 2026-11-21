@@ -2,6 +2,8 @@ import { Stack } from "expo-router";
 import type { ReactNode } from "react";
 import { View } from "react-native";
 import { HeaderInvite } from "./invite-button";
+import { HeaderAddToList } from "./my-lists/add-to-list";
+import type { ListRef } from "./my-lists/store";
 import { HeaderShare } from "./share-button";
 
 /**
@@ -12,7 +14,8 @@ import { HeaderShare } from "./share-button";
  */
 /** course＝單堂課程的分享（主講人與課程名稱會帶進分享文字範本）；list＝清單卡的分享（清單範本）；其他頁面不傳。 */
 /** backTo＝直接從分享網址進來（沒有上一頁）時，返回鍵要去的上一層頁面（例如課程 → 主辦中心專屬頁）。 */
-export function PageHeader({ title, path, shareTitle, extra, course, list, backTo, backAlways }: { backAlways?: boolean; title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; teacherTitle?: string; title: string }; list?: { title: string }; backTo?: string }) {
+/** addToList＝這一頁可以「加入我的清單」的內容（課程卡、教材卡、系列卡…），工具列會多一顆清單圖示（業主 2026-11-21）。 */
+export function PageHeader({ title, path, shareTitle, extra, course, list, backTo, backAlways, addToList }: { addToList?: ListRef; backAlways?: boolean; title: string; path: string; shareTitle?: string; extra?: ReactNode; course?: { teacher: string; teacherTitle?: string; title: string }; list?: { title: string }; backTo?: string }) {
   return (
     <Stack.Screen
       options={{
@@ -21,6 +24,7 @@ export function PageHeader({ title, path, shareTitle, extra, course, list, backT
         headerRight: () => (
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {extra}
+            {addToList ? <HeaderAddToList target={addToList} title={shareTitle ?? title} /> : null}
             <HeaderInvite title={shareTitle ?? title} path={path} />
             <HeaderShare title={shareTitle ?? title} path={path} course={course} list={list} />
           </View>
