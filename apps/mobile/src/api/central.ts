@@ -5,8 +5,9 @@ import { Platform } from "react-native";
 
 /**
  * 中央會員登入（登入中繼，Google）。App 不持有密碼或 client secret。
- * Access Token：記憶體（App 另存安全儲存以便重開）；Refresh Token：App 用 SecureStore、Web 用 sessionStorage。
- * 換發加鎖，新的 refresh token 立刻覆蓋舊的。
+ * Access Token：記憶體＋保存（App 用安全儲存、Web 用 localStorage，重開仍有效）；Refresh Token：App 用 SecureStore、Web 用 localStorage。
+ * 業主 2026-11-21：「登入一次就永久通用，除非按登出」——網頁版以前存在 sessionStorage（關分頁、關瀏覽器、iPhone 主畫面 App 被系統關掉就登出），
+ * 改存 localStorage；同一個瀏覽器的所有分頁共用同一份，換發時跨分頁加鎖（navigator.locks），避免兩個分頁拿同一張舊憑證去換，被會員中心判定盜用而整個作廢。
  */
 export const CENTRAL_URL = "https://id.hglobal1985.com";
 export const APP_ID = "learn";
@@ -59,18 +60,55 @@ async function central<T>(path: string, method = "GET", body?: unknown, token?: 
 }
 
 const web = Platform.OS === "web";
+const ls = (): Storage | undefined => {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined; // 無痕模式或封鎖網站資料：退回只在這次開啟期間有效
+  }
+};
+// 舊版存在 sessionStorage 的登入：搬到 localStorage（這次升級不必重新登入）。
+if (web && typeof globalThis.sessionStorage !== "undefined") {
+  try {
+    for (const k of ["hglobal.learn.refresh"]) {
+      const v = globalThis.sessionStorage.getItem(k);
+      if (v && !ls()?.getItem(k)) ls()?.setItem(k, v);
+      globalThis.sessionStorage.removeItem(k);
+    }
+  } catch {
+    /* 讀不到就算了，照常需要登入 */
+  }
+}
 const storage = {
   async get(key: string) {
-    return web ? globalThis.sessionStorage?.getItem(key) ?? null : SecureStore.getItemAsync(key);
+    return web ? (ls()?.getItem(key) ?? null) : SecureStore.getItemAsync(key);
   },
   async set(key: string, value: string | null) {
     if (web) {
-      if (value) globalThis.sessionStorage?.setItem(key, value);
-      else globalThis.sessionStorage?.removeItem(key);
+      if (value) ls()?.setItem(key, value);
+      else ls()?.removeItem(key);
     } else if (value) await SecureStore.setItemAsync(key, value);
     else await SecureStore.deleteItemAsync(key);
   },
 };
+/** 網頁版有沒有保存的中央登入（同步判斷，給開機流程用）。 */
+export function hasSavedWebLogin(): boolean {
+  return web && !!ls()?.getItem(REFRESH_KEY);
+}
+// 別的分頁換發或登出時，這個分頁的記憶體跟著更新（不會拿已作廢的舊憑證）。
+if (web && typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener("storage", (e: StorageEvent) => {
+    if (e.key === ACCESS_KEY || e.key === REFRESH_KEY || e.key === null) {
+      access = null;
+      expiry = 0;
+    }
+  });
+}
+/** 跨分頁加鎖：同一時間只有一個分頁在換發（瀏覽器不支援就只在這個分頁內排隊）。 */
+function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = (globalThis.navigator as unknown as { locks?: { request: (name: string, cb: () => Promise<unknown>) => Promise<unknown> } } | undefined)?.locks;
+  return web && locks ? (locks.request("hglobal.learn.refresh", fn) as Promise<T>) : fn();
+}
 
 export async function appStatus(): Promise<AppStatus> {
   return central<AppStatus>(`/v1/apps/${APP_ID}/config`);
@@ -88,10 +126,8 @@ async function remember(pair: TokenPair) {
   await storage.set(REFRESH_KEY, pair.refresh_token);
   access = pair.access_token;
   expiry = Date.now() + Math.max(0, pair.expires_in - 30) * 1000;
-  if (!web) {
-    await storage.set(ACCESS_KEY, access);
-    await storage.set(ACCESS_EXP_KEY, String(expiry));
-  }
+  await storage.set(ACCESS_EXP_KEY, String(expiry));
+  await storage.set(ACCESS_KEY, access);
 }
 
 export async function clearCentral(): Promise<void> {
@@ -106,18 +142,29 @@ export async function hasCentralSession(): Promise<boolean> {
 
 export async function refresh(): Promise<boolean> {
   if (inflight) return inflight;
-  inflight = (async () => {
+  const stale = access;
+  inflight = withRefreshLock(async () => {
+    // 排隊等鎖的期間，別的分頁可能已經換好了：直接用它換來的（不要再拿舊的 refresh token 去換）。
+    const [savedAccess, savedExp] = await Promise.all([storage.get(ACCESS_KEY), storage.get(ACCESS_EXP_KEY)]);
+    if (savedAccess && savedAccess !== stale && Number(savedExp) > Date.now()) {
+      access = savedAccess;
+      expiry = Number(savedExp);
+      return true;
+    }
     const rt = await storage.get(REFRESH_KEY);
     if (!rt) return false;
     try {
       await remember(await central<TokenPair>("/v1/auth/refresh", "POST", { refresh_token: rt }));
       return true;
     } catch (e) {
-      // 網路問題時保留登入，其他錯誤（含 refresh_reused）清除。
-      if (!(e instanceof CentralError && e.status === 0)) await clearCentral();
+      // 網路問題時保留登入；其他錯誤（含 refresh_reused、過期）清除，下次開頁面會向會員中心做共用登入檢查，會員中心還登入著就自動登回來。
+      if (!(e instanceof CentralError && e.status === 0)) {
+        await clearCentral();
+        forgetSsoCheck();
+      }
       return false;
     }
-  })();
+  });
   try {
     return await inflight;
   } finally {
@@ -128,13 +175,11 @@ export async function refresh(): Promise<boolean> {
 /** 取得有效的 Access Token（必要時換發）；沒有中央登入時回傳 null。 */
 export async function centralToken(): Promise<string | null> {
   if (access && Date.now() < expiry) return access;
-  if (!web) {
-    const [saved, exp] = await Promise.all([storage.get(ACCESS_KEY), storage.get(ACCESS_EXP_KEY)]);
-    if (saved && Number(exp) > Date.now()) {
-      access = saved;
-      expiry = Number(exp);
-      return access;
-    }
+  const [saved, exp] = await Promise.all([storage.get(ACCESS_KEY), storage.get(ACCESS_EXP_KEY)]);
+  if (saved && Number(exp) > Date.now()) {
+    access = saved;
+    expiry = Number(exp);
+    return access;
   }
   return (await refresh()) ? access : null;
 }
@@ -226,13 +271,24 @@ const here = () => safePath(globalThis.location.pathname + globalThis.location.s
 export function webSsoCheckDue(): boolean {
   if (!web || !globalThis.location || globalThis.location.hostname !== "learn.hglobal1985.com") return false;
   if (globalThis.location.pathname.startsWith("/auth/")) return false;
+  if (hasSavedWebLogin()) return false; // 已登入：不再每次跳去會員中心檢查（業主 2026-11-21）
   return Date.now() - Number(ss()?.getItem(SSO_CHECKED) ?? 0) >= SSO_INTERVAL;
+}
+
+/** 登入失效時呼叫：下次開頁面立刻向會員中心做共用登入檢查（不等 5 分鐘）。 */
+function forgetSsoCheck() {
+  try {
+    ss()?.removeItem(SSO_CHECKED);
+  } catch {
+    /* 沒關係 */
+  }
 }
 
 /** 載入頁面時（5 分鐘節流）向會員中心詢問這個瀏覽器目前登入的會員。會整頁導向時回傳 true。 */
 export async function webSsoCheck(): Promise<boolean> {
   if (!web || !globalThis.location || globalThis.location.hostname !== "learn.hglobal1985.com") return false;
   if (globalThis.location.pathname.startsWith("/auth/")) return false;
+  if (hasSavedWebLogin()) return false;
   const last = Number(ss()?.getItem(SSO_CHECKED) ?? 0);
   if (Date.now() - last < SSO_INTERVAL) return false;
   ss()?.setItem(SSO_CHECKED, String(Date.now()));

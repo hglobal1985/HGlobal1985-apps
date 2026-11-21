@@ -3,7 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { setFeatureTrackSignedIn } from "@/lib/feature-track";
-import { clearCentral, handleWebSsoReturn, hasCentralSession, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
+import { clearCentral, handleWebSsoReturn, hasCentralSession, refresh as refreshCentral, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
 import { api, cachedGet, clearApiCache, loadToken, peekCache, prefetchCommon, saveToken, type Member } from "@/api/client";
 
 /**
@@ -63,7 +63,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const raw = await AsyncStorage.getItem(CART_KEY).catch(() => null);
       if (raw) setCartState(JSON.parse(raw) as string[]);
       const demo = await loadToken();
-      const first = demo || (await hasCentralSession()) ? await fetchMember() : null;
+      const hasCentral = !demo && (await hasCentralSession());
+      let first = demo || hasCentral ? await fetchMember() : null;
+      // 保存的短期憑證被伺服器拒絕（伺服器回「未登入」而不是錯誤）：用長期憑證換一張新的再問一次，不要讓使用者看起來被登出（2026-11-21）。
+      if (hasCentral && first === null && (await refreshCentral())) first = await fetchMember();
       // 只有伺服器明確回覆「未登入」才清除；連線失敗時保留登入，下次再試。
       if (demo && first === null) await saveToken(null);
       let m = known(first);
@@ -73,10 +76,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           const r = await handleWebSsoReturn(m?.sub ?? null);
           if (r.changed) m = known(await fetchMember());
           setSsoNext(r.next);
-        } else if (m) {
-          // 已經登入：共用登入的檢查放到背景做，不要讓使用者先等它（若需要會自動換頁）。
-          webSsoCheck().catch(() => false);
-        } else if (await webSsoCheck()) return "redirecting";
+        } else if (!m && (await webSsoCheck())) return "redirecting";
+        // 已經登入：不再每開一個分頁就跳去會員中心檢查（業主 2026-11-21：以前每次都整頁重新載入一次）。
+        // 在會員中心登出所有裝置時，這裡的登入憑證會在下次換發時失效、自動變成未登入。
       }
       setMember(m);
     })().then((r) => r !== "redirecting" && setReady(true), () => setReady(true));
