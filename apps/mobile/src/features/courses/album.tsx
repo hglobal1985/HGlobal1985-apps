@@ -3,11 +3,10 @@ import { createElement, useState } from "react";
 import { Image, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
 import { api, resolveUrl, type CoverMediaItem, type CoverMediaKind } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
-import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, EmptyState } from "@/ui";
+import { EmptyState } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EdmLightbox } from "./edm-viewer";
 
@@ -23,7 +22,6 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }:
   const { c } = useTheme();
   const thumb = useThumb();
   const [w, setW] = useState(0);
-  const [manage, setManage] = useState(false);
   const [view, setView] = useState<string | null>(null); // 看哪張圖（照片編號）
   const [play, setPlay] = useState<CoverMediaItem | null>(null);
   const images = items.filter((x) => x.kind === "image");
@@ -53,13 +51,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }:
   };
   return (
     <View style={{ gap: space.md }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      {canEdit ? (
-        <View style={{ gap: space.sm }}>
-          <AlbumUploadButton kind={kind} ownerKey={ownerKey} count={items.length} onDone={onChanged} />
-          {items.length ? <Button variant="secondary" label={manage ? "完成整理" : "整理（排序、刪除）"} icon={manage ? "checkmark" : "swap-horizontal"} onPress={() => setManage((v) => !v)} fullWidth /> : null}
-        </View>
-      ) : null}
-      {!items.length ? <EmptyState icon="images-outline" title="還沒有照片" body={canEdit ? "上傳的照片與短影音會自動成為封面輪播。" : undefined} /> : null}
+      {!items.length ? <EmptyState icon="images-outline" title="還沒有照片" body={canEdit ? "按右下角「新增教材 › 上傳照片影音」新增，照片與短影音會自動成為封面輪播。" : undefined} /> : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
         {items.map((x, i) => (
           <View key={x.id} style={{ width: tile || "33%", height: tile || 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: c.surfaceMuted }}>
@@ -71,7 +63,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }:
                 </View>
               ) : null}
             </Pressable>
-            {manage ? (
+            {canEdit ? (
               <View style={styles.tools} pointerEvents="box-none">
                 <Pressable accessibilityRole="button" accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-back" size={20} color="#fff" />

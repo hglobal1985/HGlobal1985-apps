@@ -5,11 +5,13 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, dimStyle } from "@/ui";
 
-export type AddKind = "course" | "list" | "schedule" | "announce";
+export type AddKind = "course" | "list" | "schedule" | "announce" | "photos";
 
 const OPTIONS: { key: AddKind; label: string; sub?: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
   // 業主 2026-11-20：只剩一種「教材卡」（不再分清單卡／課程卡）。
   { key: "course", label: "新增教材卡", icon: "school-outline" },
+  // 中心頁才有（業主 2026-11-21）：有權限的人在相簿、課程、清單任何一個分頁都能直接上傳照片與短影音（成為封面輪播與相簿）。
+  { key: "photos", label: "上傳照片影音", icon: "images-outline" },
   // 中心頁才有（業主 2026-11-21）：有權限的人直接上傳這個中心的月課表。
   { key: "schedule", label: "上傳課表", icon: "calendar-outline" },
   // 新增公告（業主 2026-11-21）：中心頁＝該中心；其他頁面由超級管理員選「目前的系列／中心」或「首頁公告」。

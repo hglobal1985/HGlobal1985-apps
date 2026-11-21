@@ -20,6 +20,8 @@ import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { CoverAlbum } from "./album";
+import { AlbumUploadButton } from "@/features/uploads/album-upload";
+import { BottomSheet } from "@/ui/bottom-sheet";
 import { useCoverMedia } from "./cover-media";
 import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
 import { BroadcastComposer, type BroadcastTarget } from "@/features/broadcast/broadcast-composer";
@@ -320,7 +322,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const nList = flat ? groups.filter((g) => g.nearest.isList).length : 0;
   const nCourse = flat ? groups.length - nList : 0;
   const centerPage = flat && activeCenter !== ALL;
-  const tab: "album" | "course" | "list" = kindTab === "album" && centerPage ? "album" : nList === 0 && nCourse === 0 && centerPage ? "album" : nList === 0 ? "course" : nCourse === 0 ? "list" : kindTab === "list" ? "list" : "course";
+  // 中心頁三個分頁一律都在（相簿、EDM、清單），不顯示數量（業主 2026-11-21）；沒點過時才依內容挑預設。
+  const [tabPicked, setTabPicked] = useState(false);
+  const autoTab: "album" | "course" | "list" = nList === 0 && nCourse === 0 && centerPage ? "album" : nList === 0 ? "course" : nCourse === 0 ? "list" : kindTab === "list" ? "list" : "course";
+  const tab: "album" | "course" | "list" = centerPage && tabPicked ? kindTab : autoTab;
   const flatShown = flat ? groups.filter((g) => !!g.nearest.isList === (tab === "list")) : groups;
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>(() => ({ ...zoneOpenMemory }));
@@ -588,7 +593,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
       {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {centerPage ? (
-        <SegmentTabs options={[{ key: "album", label: "相簿" }, ...(nCourse > 0 ? [{ key: "course" as const, label: `課程 ${nCourse}` }] : []), ...(nList > 0 ? [{ key: "list" as const, label: `清單 ${nList}` }] : [])]} value={tab} onChange={setKindTab} />
+        <SegmentTabs options={[{ key: "album", label: "相簿" }, { key: "course", label: "EDM" }, { key: "list", label: "清單" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
       ) : flat && nCourse > 0 && nList > 0 ? (
         <SegmentTabs options={[{ key: "course", label: `課程 ${nCourse}` }, { key: "list", label: `清單 ${nList}` }]} value={tab} onChange={setKindTab} />
       ) : null}
@@ -654,13 +659,20 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {canCreateCourse(member) || canEditArt || canAnnounce ? <View style={{ height: 64 }} /> : null}
     </Screen>
     {canCreateCourse(member) || canEditArt || canAnnounce ? (
-      <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["schedule"] as const) : []), ...(canAnnounce ? (["announce"] as const) : [])]} />
+      <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["photos", "schedule"] as const) : []), ...(canAnnounce ? (["announce"] as const) : [])]} />
     ) : null}
     {moveTo ? <ZoneMoveSheet target={moveTo} groups={groups} onMoved={() => { reload(); adminList.reload(); }} onClose={() => setMoveTo(null)} /> : null}
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} brands={brandList.data ?? []} brand={brandSel} onBrand={pickBrand} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
     {newOpen === "announce" ? <BroadcastComposer targets={announceTargets} onClose={() => setNewOpen(null)} onDone={() => setBcTick((n) => n + 1)} /> : null}
     {newOpen === "schedule" && activeCenter !== ALL ? <CenterScheduleSheet center={activeCenter} onClose={() => setNewOpen(null)} onChanged={sch.reload} /> : null}
-    {newOpen && newOpen !== "schedule" && newOpen !== "announce" ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
+    {newOpen === "photos" && activeCenter !== ALL ? (
+      <BottomSheet onClose={() => setNewOpen(null)}>
+        <AppText variant="headline">{`上傳${centerTitle(activeCenter)}照片影音`}</AppText>
+        <AppText variant="caption" tone="muted">上傳的照片與短影音會放進「相簿」，也會自動成為封面輪播。</AppText>
+        <AlbumUploadButton kind="center" ownerKey={activeCenter} count={cm.items.length} onDone={cm.reload} />
+      </BottomSheet>
+    ) : null}
+    {newOpen && newOpen !== "schedule" && newOpen !== "announce" && newOpen !== "photos" ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={() => setBcTick((n) => n + 1)} onScheduleChanged={sch.reload} />
     ) : null}
