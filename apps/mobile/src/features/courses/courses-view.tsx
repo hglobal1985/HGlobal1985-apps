@@ -13,7 +13,6 @@ import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { flashText } from "@/ui/flash-notice";
 import { HeaderInvite } from "@/features/invite-button";
 import { HeaderAddToList } from "@/features/my-lists/add-to-list";
-import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
 import { CenterListCard, CenterMaterialsCard } from "./center-list";
@@ -584,10 +583,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     <Screen wide header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={centerTitle(activeCenter)} onBack={backFromCenter} right={
             <>
               {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心首頁圖與公告" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
-              {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
+              {/* 分享收在「邀請」面板裡（業主 2026-11-21）；有設定短網址就用短網址，沒有就用這個中心的網址。 */}
               <HeaderAddToList target={{ kind: "center", ref: activeCenter }} title={centerTitle(activeCenter)} />
               <HeaderInvite title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
-              <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
           } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       {/* 廣播公告緊貼封面正下方、左右滿版（業主 2026-11-21），所以放在第一個。 */}

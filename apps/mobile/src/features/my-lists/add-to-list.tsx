@@ -54,7 +54,7 @@ export function HeaderAddToList({ target, title }: { target: ListRef; title: str
         hitSlop={6}
         style={[styles.headBtn, on && { backgroundColor: "#FFD43B" }]}
       >
-        <ListIcon size={22} color={on ? "#1F1A00" : c.text} added={on} />
+        <ListIcon size={22} color={c.accent} added={on} />
         {on ? (
           <View style={[styles.badge, { backgroundColor: c.accent }]}>
             <AppText variant="caption" style={{ color: "#fff", fontWeight: "800", fontSize: 11, lineHeight: 14 }}>
