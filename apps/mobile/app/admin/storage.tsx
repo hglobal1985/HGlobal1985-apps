@@ -94,6 +94,27 @@ export default function StorageScreen() {
       setSaving(false);
     }
   };
+  // 封面輪播與短影音（業主 2026-11-21）：輪播秒數與影片壓縮規範放在一起，一次儲存。
+  const cvKeys = ["coverSec", "videoMaxHeight", "videoKbps", "videoFps", "videoMaxMb", "videoMaxSec"] as const;
+  const cvOf = () => Object.fromEntries(cvKeys.map((k) => [k, config.app[k]])) as Record<(typeof cvKeys)[number], number>;
+  const [cv, setCv] = useState(cvOf);
+  useEffect(() => setCv(cvOf()), cvKeys.map((k) => config.app[k])); // eslint-disable-line react-hooks/exhaustive-deps
+  const [cvSaving, setCvSaving] = useState(false);
+  const [cvMsg, setCvMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const cvDirty = cvKeys.some((k) => cv[k] !== config.app[k]);
+  const saveCv = async () => {
+    setCvSaving(true);
+    setCvMsg(null);
+    try {
+      await api("PUT", "/admin/ui-config", { app: { ...config.app, ...cv } });
+      reloadConfig();
+      setCvMsg({ tone: "success", text: "已儲存，之後的輪播與影片上傳照新設定。" });
+    } catch (e) {
+      setCvMsg({ tone: "danger", text: (e as Error).message });
+    } finally {
+      setCvSaving(false);
+    }
+  };
   const { member } = useSession();
   const [fs, setFs] = useState<FileSettings | null>(null);
   const [fsSaving, setFsSaving] = useState(false);
@@ -146,6 +167,26 @@ export default function StorageScreen() {
           <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 90）" value={lim.edmQuality} min={70} max={100} step={1} unit="%" onChange={(v) => setLim((x) => ({ ...x, edmQuality: v }))} />
           {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
           <Button label="儲存上傳設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={saveLim} fullWidth />
+        </Card>
+      </Section>
+      <Section title="封面輪播與短影音">
+        <Card>
+          <NoticeBox tone="info" text="中心、系列、課程的封面最多放 100 張照片或 1 分鐘內的短影音，會自動輪播；中心頁的「相簿」與封面輪播是同一份資料。影片在上傳者的瀏覽器內先壓縮再上傳（不需要另外付費），規範如下。" />
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            輪播
+          </AppText>
+          <Stepper label="照片停留秒數" hint="每張照片停留幾秒後自動換下一張（影片播完才換，手指左右滑可以快速換張；預設 2 秒）" value={cv.coverSec} min={1} max={10} step={1} unit="秒" onChange={(v) => setCv((x) => ({ ...x, coverSec: v }))} />
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            短影音壓縮規範
+          </AppText>
+          <Chips title="最高解析度（短邊）" value={String(cv.videoMaxHeight)} onChange={(v) => setCv((x) => ({ ...x, videoMaxHeight: Number(v) }))} options={[{ key: "480", label: "480p（最小）" }, { key: "720", label: "720p（預設）" }, { key: "1080", label: "1080p（最清楚）" }]} />
+          <Stepper label="畫質（位元率）" hint="數字越大畫質越好、檔案越大；手機封面 2500 就很清楚（預設 2500）" value={cv.videoKbps} min={500} max={8000} step={250} unit="kbps" onChange={(v) => setCv((x) => ({ ...x, videoKbps: v }))} />
+          <Stepper label="每秒影格數" hint="30 最順，24 較省空間（預設 30）" value={cv.videoFps} min={15} max={60} step={5} unit="fps" onChange={(v) => setCv((x) => ({ ...x, videoFps: v }))} />
+          <Stepper label="影片最長" hint="超過就不能上傳（最長 60 秒）" value={cv.videoMaxSec} min={5} max={60} step={5} unit="秒" onChange={(v) => setCv((x) => ({ ...x, videoMaxSec: v }))} />
+          <Stepper label="壓縮後的大小上限" hint="壓縮後仍超過就不能上傳，請上傳者剪短或管理員調低畫質（預設 25MB）" value={cv.videoMaxMb} min={2} max={60} step={1} unit="MB" onChange={(v) => setCv((x) => ({ ...x, videoMaxMb: v }))} />
+          <NoticeBox tone="info" text="影片預設靜音播放，右下角可以手動開聲音。壓縮時間約等於影片長度（1 分鐘的影片要 1 分鐘），壓縮中請不要離開頁面。需要電腦或手機的 Chrome 等較新的瀏覽器。" />
+          {cvMsg ? <NoticeBox tone={cvMsg.tone} text={cvMsg.text} /> : null}
+          <Button label="儲存封面輪播設定" icon="save-outline" loading={cvSaving} disabled={!cvDirty || cvSaving} onPress={saveCv} fullWidth />
         </Card>
       </Section>
       <Section title="教材檔案：從 Google 雲端硬碟匯入與下載">

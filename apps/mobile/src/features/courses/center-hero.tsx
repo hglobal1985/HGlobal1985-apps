@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { Animated, Image, Linking, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Animated, Image, Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useThumb } from "@/lib/thumb";
-import { resolveUrl } from "@/api/client";
+import { resolveUrl, type CoverMediaItem } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { layoutOf } from "@/theme/layout";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { EdmLightbox } from "./edm-viewer";
 import { CoverBadges, type CoverStats } from "./cover-stats";
+import { CoverCarousel } from "./cover-carousel";
 
+const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
 const COMPACT_H = 112;
 const SIDE = 16;
 /** 縮成窄橫幅時，照片上下留白合計（上 8＋下 4）。 */
@@ -34,28 +36,43 @@ export const centerHeroFull = (winW: number, winH = 10000) => centerHeroSize(win
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
  */
-export function CenterHero({ art, scrollY, stats, title, onEditCover }: { onEditCover?: () => void; stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; title: string }) {
+export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover }: { /** 封面輪播的照片與短影音（相簿）；沒有時用 art 單張首頁圖。 */ media?: CoverMediaItem[]; onEditCover?: () => void; stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; title: string }) {
   const { width: winW, height: winH } = useWindowDimensions();
   const thumb = useThumb();
   const [open, setOpen] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const images = media.filter((x) => x.kind === "image");
   const { w: heroW, h: full } = centerHeroSize(winW, winH);
   const range = Math.max(1, full - (COMPACT_H + COMPACT_GAP));
   const at = (a: number, b: number) => scrollY.interpolate({ inputRange: [0, range], outputRange: [a, b], extrapolate: "clamp" });
   const url = art ? art.coverUrl ?? art.edmUrl : null;
   return (
     <Animated.View style={[styles.box, url ? { backgroundColor: "#fff" } : null, heroW < winW ? { alignSelf: "center", width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
-      {url ? (
+      {media.length ? (
+        // 封面輪播：高度固定為展開高度，往上捲縮成窄橫幅時整組跟著往上移一半，維持置中（業主 2026-11-21）。
+        <Animated.View style={{ position: "absolute", left: 0, top: 0, width: heroW, height: full, transform: [{ translateY: at(0, -(full - COMPACT_H) / 2) }] }}>
+          <CoverCarousel items={media} width={heroW} height={full} paused={openId !== null} onOpen={setOpenId} />
+        </Animated.View>
+      ) : url ? (
         <Image source={{ uri: thumb(resolveUrl(url), winW) }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
-        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor="#2F5D3A" />
-              <Stop offset="1" stopColor="#4C8A5B" />
-            </LinearGradient>
-          </Defs>
-          <Rect x="0" y="0" width="100%" height="100%" fill="url(#brand)" />
-        </Svg>
+        <>
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="brand" x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0" stopColor="#2F5D3A" />
+                <Stop offset="1" stopColor="#4C8A5B" />
+              </LinearGradient>
+            </Defs>
+            <Rect x="0" y="0" width="100%" height="100%" fill="url(#brand)" />
+          </Svg>
+          {/* 沒有任何照片：直接顯示名稱（業主 2026-11-21）。 */}
+          <View style={styles.nameWrap} pointerEvents="none">
+            <AppText variant="title" numberOfLines={2} {...NO_SCALE} style={{ color: "#fff", fontWeight: "900", fontSize: 30, lineHeight: 38, textAlign: "center" }}>
+              {title}
+            </AppText>
+          </View>
+        </>
       )}
       <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
         <Defs>
@@ -67,7 +84,7 @@ export function CenterHero({ art, scrollY, stats, title, onEditCover }: { onEdit
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#shade)" />
       </Svg>
       {/* 點封面任意處放大看原始大圖（業主 2026-11-17：不再放右上角的放大鈕）；與課程 EDM 放大共用同一個 EdmLightbox（分享、下載、拖曳、放大縮小）。 */}
-      {art ? <Pressable accessibilityRole="button" accessibilityLabel="放大中心首頁圖" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill} /> : null}
+      {art && !media.length ? <Pressable accessibilityRole="button" accessibilityLabel="放大中心首頁圖" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill} /> : null}
       {/* 左下角：訂閱鈕＋點閱次數（共用封面統計模組 cover-stats.tsx，課程與清單頁封面也是同一組）。 */}
       <View style={styles.chips} pointerEvents="box-none">
         <CoverBadges stats={stats} />
@@ -81,7 +98,8 @@ export function CenterHero({ art, scrollY, stats, title, onEditCover }: { onEdit
           </AppText>
         </Pressable>
       ) : null}
-      {open && art ? <EdmLightbox uri={art.edmUrl} title={title} onClose={() => setOpen(false)} /> : null}
+      {open && art && !media.length ? <EdmLightbox uri={art.edmUrl} title={title} onClose={() => setOpen(false)} /> : null}
+      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} items={images.map((x) => ({ uri: x.url, title }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
     </Animated.View>
   );
 }
@@ -113,6 +131,7 @@ export function CenterAddress({ address }: { address: string }) {
 const styles = StyleSheet.create({
   addr: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: 14, borderWidth: 1 },
   pin: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  nameWrap: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
   box: { overflow: "hidden", backgroundColor: "#2F5D3A", alignSelf: "stretch" },
   chips: { position: "absolute", left: 12, right: 12, bottom: 10 },
   editCover: { position: "absolute", right: 12, top: 12, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.55)" },

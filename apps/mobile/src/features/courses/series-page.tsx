@@ -17,6 +17,9 @@ import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, Login
 import { flashText } from "@/ui/flash-notice";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
+import { CoverAlbum } from "./album";
+import { useCoverMedia } from "./cover-media";
+import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CourseRow } from "./course-row";
 import { SeriesCardTile } from "./series-card-tile";
 import { SeriesCardPanel } from "./series-card-panel";
@@ -45,6 +48,8 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const [view, setView] = useState<View_>("edm"); // 每次進入系列頁一律從「縮圖」開始，不記住上次選擇（業主 2026-11-21）
   const [editing, setEditing] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
+  const [albumOpen, setAlbumOpen] = useState(false);
+  const cm = useCoverMedia("series", series);
   const [applyOpen, setApplyOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [bcTick, setBcTick] = useState(0);
@@ -200,7 +205,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         path={sharePath}
         extra={admin ? <TopBarButton label={editing ? "完成" : "編輯"} accessibilityLabel={editing ? "完成編輯系列" : "編輯系列"} iconName={editing ? "checkmark-circle-outline" : "create-outline"} onPress={() => setEditing((v) => !v)} /> : undefined}
       />
-      <Screen wide header={false} hero={<CenterHero art={art} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
+      <Screen wide header={false} hero={<CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
         {/* 系列公告緊貼封面下方（業主 2026-11-21）；課程頁、各中心頁各有自己的公告橫條。 */}
         <BroadcastZone series={series} title={`${shownTitle}公告`} reloadKey={bcTick} />
         <LoginPrompt />
@@ -230,6 +235,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
               </>
             )}
             <Button variant="secondary" icon="image-outline" label="封面圖（直式＋橫式）" onPress={() => setCoverOpen(true)} fullWidth />
+            <Button variant="secondary" icon="images-outline" label={`封面輪播相簿（${cm.items.length}）`} onPress={() => setAlbumOpen(true)} fullWidth />
             {series !== UNCATEGORIZED ? <Button variant="secondary" icon="copy-outline" label="套用設定到全系列課程" onPress={() => setApplyOpen(true)} fullWidth /> : null}
             <AppText variant="caption" tone="muted">
               下面每張卡可以用 ◀ ▶ 調整順序、用眼睛鈕隱藏（只是不在這個系列頁顯示）。系列裡的卡是自動收集的，不能在這裡新增。
@@ -264,6 +270,14 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         />
       ) : null}
       {applyOpen ? <SeriesApplySheet series={series} title={shownTitle} courses={all.filter((x) => !x.isList)} onClose={() => setApplyOpen(false)} /> : null}
+      {albumOpen ? (
+        <BottomSheet onClose={() => setAlbumOpen(false)}>
+          <AppText variant="headline">{`${shownTitle}封面輪播相簿`}</AppText>
+          <SheetScroll>
+            <CoverAlbum kind="series" ownerKey={series} title={shownTitle} items={cm.items} canEdit onChanged={cm.reload} />
+          </SheetScroll>
+        </BottomSheet>
+      ) : null}
       {coverOpen ? (
         <SeriesCoverSheet series={series} title={shownTitle} edmUrl={art?.edmUrl} onClose={() => setCoverOpen(false)} onChanged={artList.reload} />
       ) : null}

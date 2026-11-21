@@ -393,7 +393,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         ) : (
           <>
             <View>
-              <EdmStage course={course} stats={course.isList ? stats : undefined} />
+              <EdmStage course={course} stats={course.isList ? stats : undefined} canManageAlbum={editing} />
               {/* 影片中間不放任何按鈕（業主 2026-11-17）：播放一律從下面的控制列。 */}
             </View>
             {firstPlayable || playLesson ? (

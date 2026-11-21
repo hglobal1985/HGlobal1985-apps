@@ -146,6 +146,12 @@ export function normalizeApp(raw: unknown): AppSettings {
     centerQuality: num(r.centerQuality, d.centerQuality, 70, 100),
     edmMaxSide: num(r.edmMaxSide, d.edmMaxSide, 800, 4096),
     edmQuality: num(r.edmQuality, d.edmQuality, 70, 100),
+    coverSec: num(r.coverSec, d.coverSec, 1, 10),
+    videoMaxHeight: pick(r.videoMaxHeight, [480, 720, 1080] as const, 720),
+    videoKbps: num(r.videoKbps, d.videoKbps, 500, 8000),
+    videoFps: num(r.videoFps, d.videoFps, 15, 60),
+    videoMaxMb: num(r.videoMaxMb, d.videoMaxMb, 2, 60),
+    videoMaxSec: num(r.videoMaxSec, d.videoMaxSec, 5, 60),
     storeFormat: pick(r.storeFormat, ["jpeg", "webp", "avif"] as const, d.storeFormat),
     thumb: normalizeThumb(r.thumb),
   };

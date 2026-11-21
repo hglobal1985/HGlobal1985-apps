@@ -19,6 +19,8 @@ import { useSeriesSettings } from "./series-settings";
 import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
+import { CoverAlbum } from "./album";
+import { useCoverMedia } from "./cover-media";
 import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
 import { BroadcastComposer, type BroadcastTarget } from "@/features/broadcast/broadcast-composer";
 import { ScheduleCard, useCenterSchedules } from "./center-schedule";
@@ -313,10 +315,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、清單專區（整組都是清單類別的）。
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
   // 中心頁的「課程｜清單」切換（業主 2026-11-21 方案 A）：兩種都有才顯示切換，只有一種就直接顯示那一種。
-  const [kindTab, setKindTab] = useState<"course" | "list">("course");
+  // 業主 2026-11-21：中心頁第一個分頁是「相簿」（與封面輪播同一份資料）；預設仍停在課程，課程與清單都沒有時預設相簿。
+  const [kindTab, setKindTab] = useState<"album" | "course" | "list">("course");
   const nList = flat ? groups.filter((g) => g.nearest.isList).length : 0;
   const nCourse = flat ? groups.length - nList : 0;
-  const tab = nList === 0 ? "course" : nCourse === 0 ? "list" : kindTab;
+  const centerPage = flat && activeCenter !== ALL;
+  const tab: "album" | "course" | "list" = kindTab === "album" && centerPage ? "album" : nList === 0 && nCourse === 0 && centerPage ? "album" : nList === 0 ? "course" : nCourse === 0 ? "list" : kindTab === "list" ? "list" : "course";
   const flatShown = flat ? groups.filter((g) => !!g.nearest.isList === (tab === "list")) : groups;
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>(() => ({ ...zoneOpenMemory }));
@@ -543,8 +547,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 新增公告（業主 2026-11-21）：中心頁＝該中心的公告；其他頁面只有超級管理員（首頁公告）。
   const canAnnounce = activeCenter !== ALL ? canEditArt : isSuperAdmin(member);
   const announceTargets: BroadcastTarget[] = activeCenter !== ALL ? [{ scope: "center", name: activeCenter, label: `${centerTitle(activeCenter)}公告` }] : [{ scope: "home", label: "首頁公告" }];
+  const cm = useCoverMedia("center", activeCenter === ALL ? null : activeCenter);
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const archivedBlock =
@@ -582,12 +587,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
       {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
       {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : centerAddress ? <CenterAddress address={centerAddress} /> : null}
-      {flat && nCourse > 0 && nList > 0 ? (
+      {centerPage ? (
+        <SegmentTabs options={[{ key: "album", label: "相簿" }, ...(nCourse > 0 ? [{ key: "course" as const, label: `課程 ${nCourse}` }] : []), ...(nList > 0 ? [{ key: "list" as const, label: `清單 ${nList}` }] : [])]} value={tab} onChange={setKindTab} />
+      ) : flat && nCourse > 0 && nList > 0 ? (
         <SegmentTabs options={[{ key: "course", label: `課程 ${nCourse}` }, { key: "list", label: `清單 ${nList}` }]} value={tab} onChange={setKindTab} />
       ) : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
-      {chapterMode ? (
+      {centerPage && tab === "album" ? (
+        <CoverAlbum kind="center" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={cm.items} canEdit={canEditArt} onChanged={cm.reload} />
+      ) : chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
           {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}

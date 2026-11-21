@@ -1,0 +1,117 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { createElement, useState } from "react";
+import { Image, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
+import { api, resolveUrl, type CoverMediaItem, type CoverMediaKind } from "@/api/client";
+import { confirmAsk } from "@/features/confirm";
+import { AlbumUploadButton } from "@/features/uploads/album-upload";
+import { useThumb } from "@/lib/thumb";
+import { useTheme } from "@/theme/theme";
+import { radius, space } from "@/theme/tokens";
+import { AppText, Button, EmptyState } from "@/ui";
+import { flashText } from "@/ui/flash-notice";
+import { EdmLightbox } from "./edm-viewer";
+
+const GAP = 6;
+const COLS = 3;
+
+/**
+ * 相簿（業主 2026-11-21）：中心頁第一個分頁「相簿」，也用在系列、課程封面的照片管理。
+ * 與封面輪播是同一份資料（cover_media）：這裡新增的照片與短影音，會直接出現在封面輪播；管理者可上傳、整理順序、刪除。
+ * 點照片開全螢幕看圖（可左右翻整本相簿）；點影片開播放視窗。
+ */
+export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }: { kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void }) {
+  const { c } = useTheme();
+  const thumb = useThumb();
+  const [w, setW] = useState(0);
+  const [manage, setManage] = useState(false);
+  const [view, setView] = useState<string | null>(null); // 看哪張圖（照片編號）
+  const [play, setPlay] = useState<CoverMediaItem | null>(null);
+  const images = items.filter((x) => x.kind === "image");
+  const tile = w ? Math.floor((w - GAP * (COLS - 1)) / COLS) : 0;
+  const move = async (id: string, d: number) => {
+    const ids = items.map((x) => x.id);
+    const i = ids.indexOf(id);
+    const j = i + d;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    try {
+      await api("POST", "/admin/cover-media/order", { kind, key: ownerKey, ids });
+      onChanged();
+    } catch (e) {
+      flashText((e as Error).message);
+    }
+  };
+  const remove = async (x: CoverMediaItem) => {
+    if (!(await confirmAsk(x.kind === "video" ? "刪除影片" : "刪除照片", "確定刪除？刪除後無法復原，封面輪播也會一起移除。", "刪除"))) return;
+    try {
+      await api("DELETE", `/admin/cover-media/${x.id}`);
+      onChanged();
+      flashText("已刪除");
+    } catch (e) {
+      flashText((e as Error).message);
+    }
+  };
+  return (
+    <View style={{ gap: space.md }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
+      {canEdit ? (
+        <View style={{ gap: space.sm }}>
+          <AlbumUploadButton kind={kind} ownerKey={ownerKey} count={items.length} onDone={onChanged} />
+          {items.length ? <Button variant="secondary" label={manage ? "完成整理" : "整理（排序、刪除）"} icon={manage ? "checkmark" : "swap-horizontal"} onPress={() => setManage((v) => !v)} fullWidth /> : null}
+        </View>
+      ) : null}
+      {!items.length ? <EmptyState icon="images-outline" title="還沒有照片" body={canEdit ? "上傳的照片與短影音會自動成為封面輪播。" : undefined} /> : null}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
+        {items.map((x, i) => (
+          <View key={x.id} style={{ width: tile || "33%", height: tile || 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: c.surfaceMuted }}>
+            <Pressable accessibilityRole="button" accessibilityLabel={x.kind === "video" ? "播放影片" : "放大照片"} onPress={() => (x.kind === "video" ? setPlay(x) : setView(x.id))} style={StyleSheet.absoluteFill}>
+              {x.kind === "image" || x.posterUrl ? <Image source={{ uri: thumb(resolveUrl(x.kind === "video" ? x.posterUrl! : x.url), 480) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: "#222" }]} />}
+              {x.kind === "video" ? (
+                <View style={styles.playBadge}>
+                  <Ionicons name="play" size={22} color="#fff" />
+                </View>
+              ) : null}
+            </Pressable>
+            {manage ? (
+              <View style={styles.tools} pointerEvents="box-none">
+                <Pressable accessibilityRole="button" accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
+                  <Ionicons name="chevron-back" size={20} color="#fff" />
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="刪除" onPress={() => remove(x)} style={[styles.tbtn, { backgroundColor: "rgba(179,38,30,0.9)" }]}>
+                  <Ionicons name="trash" size={18} color="#fff" />
+                </Pressable>
+                <Pressable accessibilityRole="button" accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
+                  <Ionicons name="chevron-forward" size={20} color="#fff" />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+        ))}
+      </View>
+      {view !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} items={images.map((x) => ({ uri: x.url, title }))} index={Math.max(0, images.findIndex((x) => x.id === view))} onClose={() => setView(null)} /> : null}
+      {play ? <VideoModal item={play} onClose={() => setPlay(null)} /> : null}
+    </View>
+  );
+}
+
+/** 影片播放視窗（網頁版；預設有聲音，因為是使用者主動點開的）。App 版先顯示預覽圖。 */
+function VideoModal({ item, onClose }: { item: CoverMediaItem; onClose: () => void }) {
+  return (
+    <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.backdrop}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="關閉" />
+        {Platform.OS === "web" ? createElement("video", { src: resolveUrl(item.url), poster: item.posterUrl ? resolveUrl(item.posterUrl) : undefined, controls: true, autoPlay: true, playsInline: true, style: { maxWidth: "100%", maxHeight: "100%", background: "#000" } }) : null}
+        <Pressable accessibilityRole="button" accessibilityLabel="關閉" onPress={onClose} style={styles.close}>
+          <Ionicons name="close" size={26} color="#fff" />
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  playBadge: { position: "absolute", right: 6, bottom: 6, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
+  tools: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "space-between", padding: 4, backgroundColor: "rgba(0,0,0,0.35)" },
+  tbtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
+  backdrop: { flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
+  close: { position: "absolute", top: 16, right: 16, width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+});
