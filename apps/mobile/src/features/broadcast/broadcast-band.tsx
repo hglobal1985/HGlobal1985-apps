@@ -17,7 +17,7 @@ type Items = BroadcastItem[];
  * 中心頁封面正下方的「廣播公告」黃色橫條（業主 2026-11-17；2026-11-21 改成緊貼封面、左右滿版、沒有圖示的樣式，只有文字與「更多」）：強制只顯示一行，太長就「… 更多」；
  * 依設定的秒數（預設 2 秒）自動輪播；手指上下左右滑動可切換；點一下彈出完整公告清單（日期＋內容）。顏色用網站標準亮黃色（同「已付費」標籤）。
  */
-export function BroadcastBand({ items, seconds, onOpen, gutter: gutterOverride }: { items: Items; seconds: number; onOpen: () => void; /** 頁面左右留白（預設跟版面規則；頁面自訂留白時要傳同一個值，橫條才會左右滿版）。 */ gutter?: number }) {
+export function BroadcastBand({ items, seconds, onOpen, labelOf, gutter: gutterOverride }: { items: Items; seconds: number; onOpen: () => void; /** 每則公告左邊的來源簡稱（中心／系列名稱）；橫條顯示「📢新竹公告：內容」。 */ labelOf?: (scope: Items[number]["scope"]) => string; /** 頁面左右留白（預設跟版面規則；頁面自訂留白時要傳同一個值，橫條才會左右滿版）。 */ gutter?: number }) {
   const { scheme } = useTheme();
   const lay = useLayout();
   const gutter = gutterOverride ?? lay.gutter;
@@ -64,7 +64,7 @@ export function BroadcastBand({ items, seconds, onOpen, gutter: gutterOverride }
     <Pressable accessibilityRole="button" accessibilityLabel={`公告：${cur.text}，點一下看全部`} onPress={onOpen} hitSlop={{ top: 8, bottom: 8 }} style={[styles.band, { backgroundColor: bg, marginTop: -space.lg, marginLeft: -gutter, marginRight: -gutter, paddingHorizontal: gutter, alignSelf: "stretch", width: "auto" }]} {...pan.panHandlers} data-no-pull-refresh="">
       <Animated.View style={[styles.textWrap, { opacity: fade }]}>
         <AppText variant="callout" numberOfLines={1} ellipsizeMode="tail" style={{ color: fg, fontWeight: "700", flexShrink: 1 }}>
-          {cur.text}
+          {`📢${labelOf?.(cur.scope) ?? ""}公告：${cur.text}`}
         </AppText>
       </Animated.View>
       <AppText variant="callout" style={{ color: fg, fontWeight: "800" }}>

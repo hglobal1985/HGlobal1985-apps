@@ -81,6 +81,13 @@ export function centerTitle(label: string): string {
   return label.replace(/\s*\d+\s*$/, "").trim() || label;
 }
 
+/** 中心簡稱（公告橫條用，業主 2026-11-21）：只留地名或中心名稱——「新竹中心」→「新竹」、「嘉義生活美學館」維持原樣。 */
+export function centerShort(label: string): string {
+  const t = centerTitle(label);
+  const s = t.replace(/(教育)?中心$/, "").trim();
+  return s.length >= 2 ? s : t;
+}
+
 /** 章節長度：「12分鐘」（超過 60 分鐘也一樣用分鐘，不顯示「小時」、不加「約」；沒有長度回空字串。業主 2026-11-16）。 */
 export const minutesText = (m: number | null | undefined): string => (m && m > 0 ? `${m}分鐘` : "");
 
