@@ -4126,6 +4126,48 @@ const routes: [string, RegExp, Handler][] = [
       };
     },
   ],
+  [
+    "GET",
+    /^\/center-materials$/,
+    async (ctx) => {
+      // 中心頁「清單」分頁（業主 2026-11-21）：把指定這批課程裡「所有教材」（章節與其他教材，不含區塊標題與完整版影片）攤平成一份清單。
+      // 只回標題、日期、分享者與類型圖示（公開資料）；連結與檔案網址不在這裡，點下去進該課程頁，由課程頁依權限處理。
+      const ids = [...new Set((ctx.url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter((x) => /^[A-Za-z0-9_-]{1,40}$/.test(x)))].slice(0, 300);
+      if (!ids.length) return { items: [] };
+      const rankMap = await ranks(ctx.db);
+      const me = ctx.session;
+      const sub = me?.sub ?? "";
+      const scopeSql = !me
+        ? "c.view_scope = 'all'"
+        : me.role === "admin"
+          ? "c.view_scope NOT IN ('link_login', 'link_guest')"
+          : `(c.view_scope IN ('all', 'members'${me.hglobal ? ", 'hglobal'" : ""}${me.center ? ", 'center'" : ""}) OR (c.view_scope NOT IN ('link_login', 'link_guest') AND c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?)))`;
+      const { results } = await ctx.db
+        .prepare(
+          `SELECT l.id AS id, l.course_id AS courseId, c.title AS courseTitle, l.position AS position, l.title AS title, l.kind AS kind, l.sharer AS sharer, l.sharer_rank AS sharerRank, COALESCE(l.event_date, c.event_start) AS eventDate, l.media_type AS mediaType,
+            (SELECT a.att_type FROM lesson_attachments a WHERE a.lesson_id = l.id AND a.kind IN ('link', 'file') ORDER BY a.created_at LIMIT 1) AS attType
+           FROM lessons l JOIN courses c ON c.id = l.course_id
+           WHERE c.status = 'published' AND c.id IN (${ids.map(() => "?").join(",")}) AND ${scopeSql} AND l.kind IN ('chapter', 'material') AND l.is_full = 0
+             AND ((l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR l.duration_minutes > 0 OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id AND a.kind IN ('link', 'file')))
+           ORDER BY COALESCE(l.event_date, c.event_start) IS NULL, COALESCE(l.event_date, c.event_start) DESC, l.course_id, l.position`,
+        )
+        .bind(...ids, ...(me && me.role !== "admin" ? [sub] : []))
+        .all<{ id: string; courseId: string; courseTitle: string; position: number; title: string; kind: string; sharer: string; sharerRank: string; eventDate: string | null; mediaType: string; attType: string | null }>();
+      return {
+        items: results.map((r) => ({
+          id: r.id,
+          courseId: r.courseId,
+          courseTitle: r.courseTitle,
+          title: r.title,
+          kind: r.kind,
+          sharer: r.sharer,
+          sharerRankName: rankMap.get(r.sharerRank)?.name ?? "",
+          eventDate: r.eventDate,
+          ...(itemIconType((r.attType ?? undefined) as never, r.mediaType, true) ? { iconType: itemIconType((r.attType ?? undefined) as never, r.mediaType, true) } : {}),
+        })),
+      };
+    },
+  ],
   // 全部課程的「分類」下拉：與「關鍵字管理」的分類清單同步（含目前沒有課程使用的分類）。
   ["GET", /^\/categories$/, async (ctx) => keywordChoices(ctx, "category", null)],
   // 品牌清單（業主 2026-11-18）：選品牌與篩選用，只回有上傳 logo 的品牌。
