@@ -355,3 +355,5 @@
 - **登入回傳頁「登入狀態已失效」修正（業主 2026-11-21 回報：登出後再登入常出現）**：網頁版登入（`api/central.ts`）進行中的暫存（`PENDING_KEY`、共用登入的 `SSO_PENDING`／`SSO_NEXT`）原本只放分頁暫存 `sessionStorage`，登入頁跳去 Google／會員中心再回來時若不是原本那個分頁（手機主畫面 App、分頁被系統回收、換視窗），暫存就不見了。現在一律用 `putTemp`／`takeTemp`：同時寫分頁暫存與 `localStorage`（跨分頁共用），讀完兩邊都清；暫存內有時間戳記，超過 10 分鐘仍視為失效，所以不會誤用舊資料。`app/auth/done.tsx`：① 只執行一次（`started` ref，避免重複執行第二次找不到暫存而報錯）；② 失敗時若其實已經登入（`hasSavedWebLogin()`），直接回首頁，不顯示錯誤。新增任何「跳到外部再回來」的流程，暫存都要用 `putTemp`／`takeTemp`，不可只放 `sessionStorage`。
 
 - **取消「登入逾時」限制（業主 2026-11-21）**：行動大學 `api/central.ts` 不再限制登入要在 10 分鐘內完成（`finish` 與共用登入 `handleWebSsoReturn` 的時間檢查已刪除，只驗證 `state` 相符；一次性 nonce 是否有效由會員中心判斷）。會員中心自己的「登入逾時」畫面（id.hglobal1985.com）是中央的設定，**行動大學不能改**；要請中央放寬或取消的內容寫在 `docs/central-request-login-timeout.md`，業主貼給中央 AI 處理。
+
+- **中心卡名稱強制一行、教材數量標籤在最上層（業主 2026-11-21）**：`center-tile.tsx` 的中心名稱 `numberOfLines={1}`（不換行，原本最多兩行），右下角 `CardCount` 排在名稱之後（疊在最上層），可以蓋住名稱的尾端。
