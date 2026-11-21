@@ -114,6 +114,6 @@ const styles = StyleSheet.create({
   addr: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 10, paddingHorizontal: space.md, borderRadius: 14, borderWidth: 1 },
   pin: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   box: { overflow: "hidden", backgroundColor: "#2F5D3A", alignSelf: "stretch" },
-  chips: { position: "absolute", left: 12, bottom: 10 },
+  chips: { position: "absolute", left: 12, right: 12, bottom: 10 },
   editCover: { position: "absolute", right: 12, top: 12, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.55)" },
 });

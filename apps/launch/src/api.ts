@@ -1197,6 +1197,19 @@ async function subscriptionState(ctx: Ctx, key: string): Promise<{ count: number
   return { count: SUBSCRIBER_BASE + (n?.n ?? 0), subscribed: !!mine };
 }
 
+/** 中心課表的月份參數（YYYY-MM）。 */
+function scheduleYm(v: string | null): string {
+  const m = /^(\d{4})-(0[1-9]|1[0-2])$/.exec((v ?? "").trim());
+  if (!m || Number(m[1]) < 2000 || Number(m[1]) > 2100) return fail(400, "invalid_month", "請選擇正確的年月");
+  return `${m[1]}-${m[2]}`;
+}
+
+/** 中心每月課表：新的月份在前（公開）。 */
+async function schedulesOf(db: D1Database, key: string): Promise<{ items: { ym: string; url: string }[] }> {
+  const { results } = await db.prepare("SELECT ym, image_key, version FROM center_schedules WHERE center_key = ? ORDER BY ym DESC").bind(key).all<{ ym: string; image_key: string; version: number }>();
+  return { items: results.map((r) => ({ ym: r.ym, url: pubUrl(r.image_key, r.version) })) };
+}
+
 async function broadcastsOf(db: D1Database, key: string): Promise<{ seconds: number; items: { id: string; text: string; date: string }[] }> {
   const [cfg, list] = await Promise.all([
     db.prepare("SELECT seconds FROM center_broadcast_cfg WHERE center_key = ?").bind(key).first<{ seconds: number }>(),
@@ -3550,6 +3563,58 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/center-schedules$/,
+    async (ctx) => {
+      // 中心每月課表（公開）：新的月份在前。
+      const label = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 60);
+      if (!label) fail(400, "invalid_center", "請指定中心");
+      return schedulesOf(ctx.db, centerKey(label));
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/center-schedules$/,
+    async (ctx) => {
+      // 上傳（或更換）某個月的課表圖：?center=中心&ym=2026-11，內文是圖片檔。新月份上架時通知訂閱者。
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const ym = scheduleYm(ctx.url.searchParams.get("ym"));
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      if (!data.byteLength || data.byteLength > 8 * 1024 * 1024) fail(413, "invalid_size", "圖片大小需在 8MB 以內（上傳時會自動壓縮）");
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      const old = await ctx.db.prepare("SELECT image_key AS k FROM center_schedules WHERE center_key = ? AND ym = ?").bind(center.key, ym).first<{ k: string }>();
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "edm"); // 課表有小字，用 EDM 的高畫質設定
+      const key = `schedule/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${renameForType("x.jpg", shrunk.type).split(".").pop()}`;
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
+      await ctx.db.batch([
+        ctx.db
+          .prepare("INSERT INTO center_schedules (center_key, ym, center_label, image_key, edited_by) VALUES (?, ?, ?, ?, ?) ON CONFLICT(center_key, ym) DO UPDATE SET image_key = excluded.image_key, center_label = excluded.center_label, edited_by = excluded.edited_by, version = version + 1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+          .bind(center.key, ym, center.label, key, s.sub),
+        audit(ctx.db, s.sub, "center.schedule_upload", "center", center.key, ym),
+      ]);
+      if (old?.k) await bucket.delete(old.k).catch(() => undefined);
+      // 新月份才通知訂閱者（更換同月的圖不重複通知）；上傳的人自己會收到確認。
+      if (!old) {
+        const sent = await notifySubscribers(ctx.db, center.key, `${center.label}${ym.replace("-", "年")}月課表上架`, "點進中心頁查看本月課程安排", `/courses?center=${encodeURIComponent(center.label)}`, s.sub);
+        await notify(ctx.db, { sub: s.sub }, "已送出「課表上架」通知", `${center.label}${ym.replace("-", "年")}月（通知了 ${sent} 位訂閱者）`, `/courses?center=${encodeURIComponent(center.label)}`).run();
+      }
+      return schedulesOf(ctx.db, center.key);
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/center-schedules$/,
+    async (ctx) => {
+      const { s, center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
+      const ym = scheduleYm(ctx.url.searchParams.get("ym"));
+      const old = await ctx.db.prepare("SELECT image_key AS k FROM center_schedules WHERE center_key = ? AND ym = ?").bind(center.key, ym).first<{ k: string }>();
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM center_schedules WHERE center_key = ? AND ym = ?").bind(center.key, ym), audit(ctx.db, s.sub, "center.schedule_remove", "center", center.key, ym)]);
+      if (old?.k) await ctx.env.MEDIA?.delete(old.k).catch(() => undefined);
+      return schedulesOf(ctx.db, center.key);
+    },
+  ],
+  [
+    "GET",
     /^\/center-broadcasts$/,
     async (ctx) => {
       // 廣播公告（公開）：輪播秒數＋全部公告（新的在前）。
@@ -5042,13 +5107,14 @@ const routes: [string, RegExp, Handler][] = [
         cursor = page.cursor;
       }
       const owners = new Map<string, { owner: string; kind: StorageKind }>();
-      const [courses, lessons, atts, centers, series, brands] = await Promise.all([
+      const [courses, lessons, atts, centers, series, brands, schedules] = await Promise.all([
         ctx.db.prepare("SELECT id, host_center_key, edm_key, cover_key FROM courses").all<{ id: string; host_center_key: string | null; edm_key: string | null; cover_key: string | null }>(),
         ctx.db.prepare("SELECT l.course_id, l.cover_key, l.poster_key, l.media_type, l.media_ref FROM lessons l").all<{ course_id: string; cover_key: string | null; poster_key: string | null; media_type: string; media_ref: string | null }>(),
         ctx.db.prepare("SELECT course_id, r2_key, att_type FROM lesson_attachments WHERE r2_key IS NOT NULL").all<{ course_id: string; r2_key: string; att_type: string }>(),
         ctx.db.prepare("SELECT center_key, edm_key, cover_key FROM center_art").all<{ center_key: string; edm_key: string | null; cover_key: string | null }>(),
         ctx.db.prepare("SELECT edm_key, cover_key FROM series_art").all<{ edm_key: string | null; cover_key: string | null }>(),
         ctx.db.prepare("SELECT logo_key, bg_key FROM brand_logos").all<{ logo_key: string | null; bg_key: string | null }>(),
+        ctx.db.prepare("SELECT center_key, image_key FROM center_schedules").all<{ center_key: string; image_key: string }>(),
       ]);
       const HQ = "寰宇總部";
       const centerOf = new Map(courses.results.map((c) => [c.id, c.host_center_key || HQ]));
@@ -5072,6 +5138,7 @@ const routes: [string, RegExp, Handler][] = [
         put(x.edm_key, HQ, "image");
         put(x.cover_key, HQ, "image");
       }
+      for (const x of schedules.results) put(x.image_key, x.center_key, "image");
       for (const b of brands.results) {
         put(b.logo_key, HQ, "image");
         put(b.bg_key, HQ, "image");
@@ -5137,8 +5204,8 @@ const routes: [string, RegExp, Handler][] = [
       // 課程封面與 EDM 是公開圖片（課程列表本來就要顯示；EDM 開放下載）。只服務資料庫裡仍在使用的檔案。
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
-      if (!bucket || !/^(edm|cover|series|center|lesson|brand)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first();
+      if (!bucket || !/^(edm|cover|series|center|lesson|brand|schedule)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
+      const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : null); // D1 一個查詢最多串 5 個 UNION，課表另外查
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       // 即時縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受設定頁勾選的幾種，避免縮圖次數暴增）。

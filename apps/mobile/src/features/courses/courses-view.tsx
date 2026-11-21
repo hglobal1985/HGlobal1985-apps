@@ -19,6 +19,7 @@ import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
+import { ScheduleCard, useCenterSchedules } from "./center-schedule";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
 import { flashMode } from "./mode-flash";
@@ -287,6 +288,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   }, [flat, list, pool, config.seriesOrder, orderOverride, matched, seriesSettings]);
   // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、清單專區（整組都是清單類別的）。
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
+  // 中心頁的「課程｜清單」切換（業主 2026-11-21 方案 A）：兩種都有才顯示切換，只有一種就直接顯示那一種。
+  const [kindTab, setKindTab] = useState<"course" | "list">("course");
+  const nList = flat ? groups.filter((g) => g.nearest.isList).length : 0;
+  const nCourse = flat ? groups.length - nList : 0;
+  const tab = nList === 0 ? "course" : nCourse === 0 ? "list" : kindTab;
+  const flatShown = flat ? groups.filter((g) => !!g.nearest.isList === (tab === "list")) : groups;
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>(() => ({ ...zoneOpenMemory }));
   const toggleFold = (key: string) =>
@@ -508,6 +515,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（cover-stats.tsx，中心、系列、課程、清單同一套）。
   const stats = useCoverStats("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
   const bc = useCenterBroadcasts(activeCenter === ALL ? "" : activeCenter);
+  const sch = useCenterSchedules(activeCenter === ALL ? "" : activeCenter);
   const [bcOpen, setBcOpen] = useState(false);
   const centerHero =
     activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
@@ -543,8 +551,21 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             </>
           } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       <LoginPrompt />
-      {centerAddress ? <CenterAddress address={centerAddress} /> : null}
+      {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
       {activeCenter !== ALL && bc.data?.items.length ? <CenterBroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setBcOpen(true)} /> : null}
+      {centerAddress ? <CenterAddress address={centerAddress} /> : null}
+      {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} /> : null}
+      {flat && nCourse > 0 && nList > 0 ? (
+        <View style={[styles.kindSeg, { backgroundColor: c.surfaceMuted }]} accessibilityRole="tablist">
+          {(["course", "list"] as const).map((k) => (
+            <Pressable key={k} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} onPress={() => setKindTab(k)} style={[styles.kindBtn, tab === k ? { backgroundColor: c.accent } : null]}>
+              <AppText variant="callout" style={{ fontWeight: "800", color: tab === k ? c.textOnAccent : c.text }}>
+                {k === "course" ? `課程 ${nCourse}` : `清單 ${nList}`}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {chapterMode ? (
@@ -582,7 +603,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {/* 三個專區（業主 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
-            {tileW && flat ? groups.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
+            {tileW && flat ? flatShown.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat
               ? zoneSections.map(({ zone, items }) =>
                   items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
@@ -612,7 +633,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     {newOpen ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {bcOpen && bc.data ? <BroadcastSheet title={`${centerTitle(activeCenter)}廣播公告`} items={bc.data.items} onClose={() => setBcOpen(false)} /> : null}
     {artOpen && activeCenter !== ALL ? (
-      <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={bc.reload} />
+      <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={bc.reload} onScheduleChanged={sch.reload} />
     ) : null}
     </View>
   );
@@ -691,6 +712,8 @@ function ZoneBand({ zone, text, icon, count, red, onMove, folded, onFold }: { zo
 }
 
 const styles = StyleSheet.create({
+  kindSeg: { flexDirection: "row", borderRadius: radius.md, padding: 3 },
+  kindBtn: { flex: 1, minHeight: 40, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
   moveBtn: { minHeight: 36, minWidth: 64, paddingHorizontal: 12, borderRadius: 999, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
   zone: { width: "100%", minHeight: 52, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 3 },
   foldText: { minHeight: 36, flexDirection: "row", alignItems: "center", gap: 2 },

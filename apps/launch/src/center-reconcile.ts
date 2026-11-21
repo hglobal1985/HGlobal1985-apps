@@ -30,11 +30,13 @@ const KEY_COLS: [string, string][] = [
   ["member_contacts", "president_center_key"],
   ["push_subscriptions", "center_key"],
   ["center_views", "center_key"],
+  ["center_schedules", "center_key"],
 ];
 /** 同一列還有「顯示名稱」欄位的表：換鑰匙時一起換成中央的新名稱。 */
 const LABEL_COLS: Record<string, string> = {
   center_art: "center_label",
   center_info: "center_label",
+  center_schedules: "center_label",
   center_names: "center_label",
   course_editors: "center_label",
   review_group_members: "center_label",
