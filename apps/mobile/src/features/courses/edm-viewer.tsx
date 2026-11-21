@@ -95,56 +95,62 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
  * 站內小視窗：視窗大小剛好貼合圖片（沒有標題、沒有多餘留白），放大縮小、下載、分享按鈕都疊在圖片上。
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
-export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: string; onClose: () => void; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string }) {
+export type LightboxItem = { uri: string; title: string; bg?: string };
+export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri: string; title: string; onClose: () => void; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
   useEffect(() => trackFeature("edm_zoom"), []);
   useDimLayer();
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
+  const list = items && items.length ? items : [{ uri, title, bg }];
+  const [idx, setIdx] = useState(Math.min(Math.max(0, index), list.length - 1));
+  const cur = list[idx] ?? list[0]!;
   const [scale, setScale] = useState(1);
   const [ratio, setRatio] = useState(0.7); // 寬 / 高
   const [touching, setTouching] = useState(false); // 手指或滑鼠按著圖片時，按鈕暫時消失
-  const full = resolveUrl(uri);
+  const full = resolveUrl(cur.uri);
   useEffect(() => {
     Image.getSize(full, (w, h) => h && setRatio(w / h), () => undefined);
   }, [full]);
-  // 全螢幕（業主 2026-11-21）：圖片依整個螢幕大小等比貼合；手機轉向時視窗尺寸改變，會自動重新排版。
-  const maxW = win.width;
-  const maxH = win.height;
-  const frameW = Math.min(maxW, maxH * ratio);
+  // 全螢幕（業主 2026-11-21）：圖片依整個螢幕等比貼合；放大後「整個螢幕」都是可看、可拖曳的範圍（不再被圖片原本的外框切掉）。
+  const frameW = Math.min(win.width, win.height * ratio);
   const frameH = frameW / ratio;
 
-  // 放大後可以上下左右自由拖曳（自己處理手勢，不用巢狀捲動）。
   const tx = useRef(new Animated.Value(0)).current;
   const ty = useRef(new Animated.Value(0)).current;
-  const off = useRef({ x: 0, y: 0 });
+  const off = useRef({ x: 0, y: 0 }); // 0,0＝圖片置中
   const start = useRef({ x: 0, y: 0 });
-  const live = useRef({ scale: 1, w: frameW, h: frameH });
-  live.current = { scale, w: frameW, h: frameH };
+  const live = useRef({ scale: 1, w: frameW, h: frameH, ww: win.width, wh: win.height });
+  live.current = { scale, w: frameW, h: frameH, ww: win.width, wh: win.height };
   const place = (x: number, y: number) => {
-    const { scale: sc, w, h } = live.current;
-    off.current = { x: Math.min(0, Math.max(-(w * sc - w), x)), y: Math.min(0, Math.max(-(h * sc - h), y)) };
+    const { scale: sc, w, h, ww, wh } = live.current;
+    const mx = Math.max(0, (w * sc - ww) / 2);
+    const my = Math.max(0, (h * sc - wh) / 2);
+    off.current = { x: Math.min(mx, Math.max(-mx, x)), y: Math.min(my, Math.max(-my, y)) };
     tx.setValue(off.current.x);
     ty.setValue(off.current.y);
   };
-  // 螢幕轉向（寬高對調）：縮放與位移歸零，圖片重新貼合新的螢幕。
-  useEffect(() => {
-    live.current = { scale: 1, w: frameW, h: frameH };
+  const reset = () => {
+    live.current = { ...live.current, scale: 1 };
     setScale(1);
     off.current = { x: 0, y: 0 };
     tx.setValue(0);
     ty.setValue(0);
-  }, [win.width, win.height]); // eslint-disable-line react-hooks/exhaustive-deps
+  };
+  // 螢幕轉向或換一張圖：縮放與位移歸零，圖片重新貼合。
+  useEffect(reset, [win.width, win.height, idx]); // eslint-disable-line react-hooks/exhaustive-deps
   const zoomTo = (next: number) => {
-    const { scale: sc, w, h } = live.current;
-    // 以畫面中心為基準放大縮小
-    const cx = (w / 2 - off.current.x) / sc;
-    const cy = (h / 2 - off.current.y) / sc;
-    live.current = { scale: next, w, h };
+    const { scale: sc } = live.current;
+    const k = next / sc; // 以畫面中心為基準放大縮小
+    live.current = { ...live.current, scale: next };
     setScale(next);
-    place(w / 2 - cx * next, h / 2 - cy * next);
+    place(off.current.x * k, off.current.y * k);
   };
   const clampScale = (v: number) => Math.min(4, Math.max(1, v));
+  const go = (d: number) => setIdx((i) => Math.min(list.length - 1, Math.max(0, i + d)));
+  const goRef = useRef(go);
+  goRef.current = go;
   const pinch = useRef<{ dist: number; scale: number; mx: number; my: number } | null>(null);
+  const multi = useRef(false);
   const pan = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -152,11 +158,13 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
       onPanResponderGrant: () => {
         start.current = { ...off.current };
         pinch.current = null;
+        multi.current = false;
         setTouching(true);
       },
       onPanResponderMove: (e, g) => {
         const t = e.nativeEvent.touches;
         if (t && t.length >= 2) {
+          multi.current = true;
           // 兩指：捏合放大縮小（以畫面中心為基準），兩指一起移動也會平移。
           const a = t[0]!;
           const b = t[1]!;
@@ -176,9 +184,11 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
         }
         place(start.current.x + g.dx, start.current.y + g.dy);
       },
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_e, g) => {
         pinch.current = null;
         setTouching(false);
+        // 沒放大時，往左／右滑＝下一張／上一張。
+        if (!multi.current && live.current.scale <= 1.02 && Math.abs(g.dx) > 60 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5) goRef.current(g.dx < 0 ? 1 : -1);
       },
       onPanResponderTerminate: () => {
         pinch.current = null;
@@ -187,14 +197,25 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
     }),
   ).current;
   const wheel = Platform.OS === "web" ? { onWheel: (e: { deltaY: number }) => zoomTo(clampScale(live.current.scale * Math.exp(-e.deltaY * 0.002))) } : {};
+  // 電腦：鍵盤左右鍵切換、Esc 關閉。
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft") goRef.current(-1);
+      else if (e.key === "ArrowRight") goRef.current(1);
+      else if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   const share = async () => {
-    const r = await shareImage(title, uri, `${title}.jpg`);
+    const r = await shareImage(cur.title, cur.uri, `${cur.title}.jpg`);
     if (r === "copied") flashText("已複製連結");
   };
   const download = async () => {
     try {
-      await downloadImage(uri, `${title}.jpg`);
+      await downloadImage(cur.uri, `${cur.title}.jpg`);
     } catch {
       flashText("下載失敗，請稍後再試");
     }
@@ -204,24 +225,43 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
       {child}
     </Pressable>
   );
+  const many = list.length > 1;
+  const desktop = Platform.OS === "web" && win.width >= 700;
+  const imgBg = cur.bg ?? bg;
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="關閉" />
-        <View style={[styles.frame, { width: frameW, height: frameH }, bg ? { backgroundColor: bg } : null]}>
-          <View style={[StyleSheet.absoluteFill, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab" } as object) : null]} {...pan.panHandlers} {...wheel} {...NO_PULL}>
-            <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors />
-          </View>
+        {/* 整個螢幕都是手勢範圍：放大後可拖曳到螢幕的任何位置，不會被圖片原本的外框切掉。 */}
+        <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", overflow: "hidden" }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab" } as object) : null]} {...pan.panHandlers} {...wheel} {...NO_PULL}>
+          <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, backgroundColor: imgBg ?? "#fff", transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors />
         </View>
         <View style={[StyleSheet.absoluteFill, { opacity: touching ? 0 : 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]} pointerEvents={touching ? "none" : "box-none"}>
           <View style={styles.topRight} pointerEvents="box-none">
             {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
           </View>
+          {many ? (
+            <View style={styles.counter} pointerEvents="none">
+              <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>
+                {`${idx + 1} / ${list.length}`}
+              </AppText>
+            </View>
+          ) : null}
+          {many && desktop ? (
+            <>
+              <View style={[styles.side, { left: 16 }]} pointerEvents="box-none">
+                {tool("上一張", () => go(-1), <Ionicons name="chevron-back" size={28} color="#fff" />, idx === 0)}
+              </View>
+              <View style={[styles.side, { right: 16 }]} pointerEvents="box-none">
+                {tool("下一張", () => go(1), <Ionicons name="chevron-forward" size={28} color="#fff" />, idx === list.length - 1)}
+              </View>
+            </>
+          ) : null}
           <View style={styles.bottom} pointerEvents="box-none">
             <View style={styles.help} pointerEvents="none">
               <Ionicons name="move" size={18} color="#fff" />
-              <AppText variant="caption" style={{ color: "#fff", fontWeight: "700", flexShrink: 1 }}>
-                可拖曳移動、兩指放大縮小
+              <AppText variant="caption" style={{ color: "#fff", fontWeight: "700", flexShrink: 1 }} numberOfLines={1}>
+                {many ? "左右滑動換張、兩指放大縮小" : "可拖曳移動、兩指放大縮小"}
               </AppText>
             </View>
             {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
@@ -236,6 +276,8 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000" },
   frame: { overflow: "hidden", backgroundColor: "#fff" },
+  counter: { position: "absolute", top: 22, left: 16, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: "#000" },
+  side: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
   topRight: { position: "absolute", top: 16, right: 16 },
   bottom: { position: "absolute", left: 16, right: 16, bottom: 16, flexDirection: "row", alignItems: "center", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },

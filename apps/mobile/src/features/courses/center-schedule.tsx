@@ -76,7 +76,7 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
           </AppText>
         </Pressable>
       ) : null}
-      {zoom ? <EdmLightbox uri={sel.url} title={`${title} ${ymLabel(sel.ym)}課表`} onClose={() => setZoom(false)} /> : null}
+      {zoom ? <EdmLightbox uri={sel.url} title={`${title} ${ymLabel(sel.ym)}課表`} items={items.map((x) => ({ uri: x.url, title: `${title} ${ymLabel(x.ym)}課表` }))} index={Math.max(0, items.findIndex((x) => x.ym === sel.ym))} onClose={() => setZoom(false)} /> : null}
       {all ? (
         <BottomSheet onClose={() => setAll(false)}>
           <AppText variant="headline">{`${title}歷年課表`}</AppText>
