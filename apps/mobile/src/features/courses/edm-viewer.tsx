@@ -16,6 +16,7 @@ import { useUiConfig } from "@/state/ui-config";
 import { BrandCover, AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle, useDimLayer } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 import { CoverAlbum } from "./album";
+import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { CoverCarousel } from "./cover-carousel";
 import { useCoverMedia } from "./cover-media";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
@@ -71,7 +72,10 @@ export function EdmStage({ course, stats, canManageAlbum = false }: { course: Co
         <BottomSheet onClose={() => setAlbumOpen(false)}>
           <AppText variant="headline">封面輪播相簿</AppText>
           <SheetScroll>
-            <CoverAlbum kind="course" ownerKey={course.id} title={course.title} items={cm.items} canEdit onChanged={cm.reload} />
+            <View style={{ gap: 12 }}>
+              <AlbumUploadButton kind="course" ownerKey={course.id} count={cm.items.length} onDone={cm.reload} />
+              <CoverAlbum kind="course" ownerKey={course.id} title={course.title} items={cm.items} canEdit onChanged={cm.reload} />
+            </View>
           </SheetScroll>
         </BottomSheet>
       ) : null}

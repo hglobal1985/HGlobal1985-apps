@@ -18,6 +18,7 @@ import { flashText } from "@/ui/flash-notice";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
 import { CoverAlbum } from "./album";
+import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { useCoverMedia } from "./cover-media";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CourseRow } from "./course-row";
@@ -274,7 +275,10 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         <BottomSheet onClose={() => setAlbumOpen(false)}>
           <AppText variant="headline">{`${shownTitle}封面輪播相簿`}</AppText>
           <SheetScroll>
-            <CoverAlbum kind="series" ownerKey={series} title={shownTitle} items={cm.items} canEdit onChanged={cm.reload} />
+            <View style={{ gap: 12 }}>
+              <AlbumUploadButton kind="series" ownerKey={series} count={cm.items.length} onDone={cm.reload} />
+              <CoverAlbum kind="series" ownerKey={series} title={shownTitle} items={cm.items} canEdit onChanged={cm.reload} />
+            </View>
           </SheetScroll>
         </BottomSheet>
       ) : null}
