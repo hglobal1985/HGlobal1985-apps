@@ -7,7 +7,7 @@ import { AppText } from "@/ui";
 import { itemHref } from "./links";
 import type { ListKind } from "./store";
 
-export type ListItem = { id: string; kind: ListKind; ref: string; ref2: string; note: string; title: string; subtitle: string; coverUrl: string | null; missing: boolean };
+export type ListItem = { id: string; kind: ListKind; ref: string; ref2: string; note: string; title: string; subtitle: string; coverUrl: string | null; missing: boolean; block?: boolean };
 const KIND_LABEL: Record<ListKind, string> = { course: "課程", lesson: "教材", series: "系列", center: "中心" };
 
 /** 清單項目一列：封面、標題、類型、備註；內容已下架時淡化並標「已下架」（仍留在清單裡，點了不會壞）。我的清單頁與公開清單頁共用。 */

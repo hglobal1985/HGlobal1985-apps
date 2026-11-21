@@ -121,7 +121,7 @@ export async function setItem(db: D1Database, listId: string, it: ItemRef, on: b
   return (await db.prepare("SELECT COUNT(*) AS n FROM my_list_items WHERE list_id = ?").bind(listId).first<{ n: number }>())?.n ?? 0;
 }
 
-export type ListItemOut = { id: string; kind: ListItemKind; ref: string; ref2: string; note: string; title: string; subtitle: string; coverUrl: string | null; missing: boolean };
+export type ListItemOut = { id: string; kind: ListItemKind; ref: string; ref2: string; note: string; title: string; subtitle: string; coverUrl: string | null; missing: boolean; /** 這個「教材」其實是區塊（點下去進課程頁並展開該區塊）。 */ block?: boolean };
 
 /** 把項目補上名稱與封面（內容被刪除或下架時顯示「已下架」，不會讓清單壞掉，也不會自動消失）。 */
 export async function resolveItems(db: D1Database, listId: string): Promise<ListItemOut[]> {
@@ -130,10 +130,10 @@ export async function resolveItems(db: D1Database, listId: string): Promise<List
   const lessonIds = results.filter((r) => r.kind === "lesson").map((r) => r.ref);
   const mk = (n: number) => Array(n).fill("?").join(",");
   type C = { id: string; title: string; status: string; cover_key: string | null; edm_key: string | null; art_version: number | null };
-  type L = { id: string; title: string; course_id: string; cover_key: string | null; art_version: number | null };
+  type L = { id: string; title: string; course_id: string; kind: string; cover_key: string | null; art_version: number | null };
   const [courses, lessons] = await Promise.all([
     courseIds.length ? db.prepare(`SELECT id, title, status, cover_key, edm_key, art_version FROM courses WHERE id IN (${mk(courseIds.length)})`).bind(...courseIds).all<C>() : Promise.resolve({ results: [] as C[] }),
-    lessonIds.length ? db.prepare(`SELECT id, title, course_id, cover_key, art_version FROM lessons WHERE id IN (${mk(lessonIds.length)})`).bind(...lessonIds).all<L>() : Promise.resolve({ results: [] as L[] }),
+    lessonIds.length ? db.prepare(`SELECT id, title, course_id, kind, cover_key, art_version FROM lessons WHERE id IN (${mk(lessonIds.length)})`).bind(...lessonIds).all<L>() : Promise.resolve({ results: [] as L[] }),
   ]);
   const cMap = new Map(courses.results.map((c) => [c.id, c]));
   const lMap = new Map(lessons.results.map((l) => [l.id, l]));
@@ -146,7 +146,7 @@ export async function resolveItems(db: D1Database, listId: string): Promise<List
     if (r.kind === "lesson") {
       const l = lMap.get(r.ref);
       const c = cMap.get(l?.course_id ?? r.ref2);
-      return { ...r, ref2: l?.course_id ?? r.ref2, title: l?.title ?? "已下架的內容", subtitle: c?.title ?? "", coverUrl: pub(l?.cover_key ?? c?.cover_key ?? c?.edm_key ?? null, l?.art_version ?? c?.art_version ?? 0), missing: !l || !live(c) };
+      return { ...r, ref2: l?.course_id ?? r.ref2, ...(l?.kind === "section" ? { block: true } : {}), title: l?.title ?? "已下架的內容", subtitle: c?.title ?? "", coverUrl: pub(l?.cover_key ?? c?.cover_key ?? c?.edm_key ?? null, l?.art_version ?? c?.art_version ?? 0), missing: !l || !live(c) };
     }
     return { ...r, title: r.ref, subtitle: "", coverUrl: null, missing: false };
   });

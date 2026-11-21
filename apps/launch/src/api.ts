@@ -4157,13 +4157,16 @@ const routes: [string, RegExp, Handler][] = [
       const items: object[] = [];
       let curCourse = "";
       let block: string | null = null;
+      let blockId: string | null = null;
       for (const r of results) {
         if (r.courseId !== curCourse) {
           curCourse = r.courseId;
           block = null;
+          blockId = null;
         }
         if (r.kind === "section") {
           block = r.title;
+          blockId = r.id;
           continue;
         }
         if (!r.ok) continue;
@@ -4173,6 +4176,7 @@ const routes: [string, RegExp, Handler][] = [
           courseId: r.courseId,
           courseTitle: r.courseTitle,
           block,
+          blockId,
           title: r.title,
           kind: r.kind,
           sharer: r.sharer,

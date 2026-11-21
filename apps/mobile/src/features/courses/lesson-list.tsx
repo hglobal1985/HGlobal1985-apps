@@ -18,7 +18,7 @@ import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 import { ExpandGrid } from "./expand-grid";
 import { ListSection } from "./compact-row";
-import { MaterialRow, RowShare } from "./material-rows";
+import { MaterialRow, RowShare, SectionActions } from "./material-rows";
 export { RowShare } from "./material-rows";
 
 /**
@@ -102,7 +102,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           {leadShown.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{leadShown.map(itemRow)}</Card> : null}
           {visibleBlocks.map((b) => (
             <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-              <ListSection title={b.head.title} count={b.items.filter(shown).length} />
+              <ListSection title={b.head.title} count={b.items.filter(shown).length} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           ))}
