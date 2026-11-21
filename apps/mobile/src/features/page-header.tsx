@@ -4,11 +4,10 @@ import { View } from "react-native";
 import { HeaderInvite } from "./invite-button";
 import { HeaderAddToList } from "./my-lists/add-to-list";
 import type { ListRef } from "./my-lists/store";
-import { HeaderShare } from "./share-button";
 
 /**
- * 有「分享」的頁面共用的上方工具列：標題＋靠右「分享圖示＋分享」文字按鈕。
- * 課程詳細頁、短網址頁（分類／系列）、系列頁都用這一個；要改工具列的分享區，只改這個檔案與 share-button.tsx，
+ * 有「分享」的頁面共用的上方工具列：標題＋靠右按鈕；分享功能收在「邀請」面板裡（業主 2026-11-21：上方工具列不再有獨立的分享鈕）。
+ * 課程詳細頁、短網址頁（分類／系列）、系列頁都用這一個；要改工具列的按鈕，只改這個檔案，
  * 返回鍵、高度、陰影等整體樣式則在 app/_layout.tsx 的 screenOptions，全站一起連動。
  * path＝要分享的網址路徑（有短網址就傳 /縮寫）。extra＝放在分享左邊的按鈕（例如管理者的「編輯」）。
  */
@@ -25,8 +24,7 @@ export function PageHeader({ title, path, shareTitle, extra, course, list, backT
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             {extra}
             {addToList ? <HeaderAddToList target={addToList} title={shareTitle ?? title} /> : null}
-            <HeaderInvite title={shareTitle ?? title} path={path} />
-            <HeaderShare title={shareTitle ?? title} path={path} course={course} list={list} />
+            <HeaderInvite title={shareTitle ?? title} path={path} course={course} list={list} />
           </View>
         ),
       }}

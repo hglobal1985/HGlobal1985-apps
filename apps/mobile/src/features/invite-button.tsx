@@ -13,13 +13,14 @@ import { flashText } from "@/ui/flash-notice";
  * 按下去從下方彈出面板：這一頁的 QR Code、網址文字、複製、分享（系統分享選單）。
  * QR Code 在手機上自己產生（不連外部服務、不洩漏網址）。要改外觀只改這個檔案；新增可分享的頁面，在它的上方工具列放 HeaderInvite。
  */
-export function HeaderInvite({ title, path }: { title: string; path: string }) {
+type ShareCourse = { teacher: string; teacherTitle?: string; title: string };
+export function HeaderInvite({ title, path, course, list }: { title: string; path: string; course?: ShareCourse; list?: { title: string } }) {
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
   return (
     <>
       <TopBarButton label="邀請" accessibilityLabel="邀請：顯示這一頁的 QR Code 與網址" tone="accent" icon={<QrGlyph size={22} color={c.accent} />} onPress={() => setOpen(true)} />
-      {open ? <InviteSheet title={title} path={path} onClose={() => setOpen(false)} /> : null}
+      {open ? <InviteSheet title={title} path={path} course={course} list={list} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -45,7 +46,7 @@ export function QrGlyph({ size = 22, color }: { size?: number; color: string }) 
   );
 }
 
-function InviteSheet({ title, path, onClose }: { title: string; path: string; onClose: () => void }) {
+function InviteSheet({ title, path, course, list, onClose }: { title: string; path: string; course?: ShareCourse; list?: { title: string }; onClose: () => void }) {
   const { c } = useTheme();
   const url = absoluteUrl(path);
   const copy = async () => {
@@ -57,7 +58,7 @@ function InviteSheet({ title, path, onClose }: { title: string; path: string; on
     }
   };
   const share = async () => {
-    const r = await shareLink(title, path);
+    const r = await shareLink(title, path, course, undefined, undefined, list); // 課程／清單頁沿用原本的分享文字範本
     if (r === "copied") flashText("已複製連結");
   };
   return (
