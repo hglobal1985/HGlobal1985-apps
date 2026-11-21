@@ -15,7 +15,7 @@ import { HeaderInvite } from "@/features/invite-button";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
-import { CourseRow } from "./course-row";
+import { CenterListCard } from "./center-list";
 import { useSeriesSettings } from "./series-settings";
 import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
@@ -633,13 +633,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               </AppText>
             </Pressable>
           ) : null}
-          {centerPage && tab === "list" && groups.length ? (
-            <Card>
-              {groups.map((g, i) => (
-                <CourseRow key={g.key} course={g.nearest} last={i === groups.length - 1} />
-              ))}
-            </Card>
-          ) : null}
+          {centerPage && tab === "list" && groups.length ? <CenterListCard title={centerTitle(activeCenter)} courses={groups.map((g) => g.nearest)} /> : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
