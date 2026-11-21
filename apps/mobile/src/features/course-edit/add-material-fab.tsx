@@ -5,18 +5,20 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, dimStyle } from "@/ui";
 
-export type AddKind = "course" | "list";
+export type AddKind = "course" | "list" | "schedule";
 
 const OPTIONS: { key: AddKind; label: string; sub?: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
   // 業主 2026-11-20：只剩一種「教材卡」（不再分清單卡／課程卡）。
   { key: "course", label: "新增教材卡", icon: "school-outline" },
+  // 中心頁才有（業主 2026-11-21）：有權限的人直接上傳這個中心的月課表。
+  { key: "schedule", label: "上傳課表", icon: "calendar-outline" },
 ];
 
 /**
  * 全部課程右下角的「＋新增教材」（業主 2026-11-16）：按一下往上展開兩個選項——「新增課程」與「新增清單（影片／檔案）」；
  * 點選項、點背景或再按一次按鈕都會收起。選項是大膠囊（高 52），單手拇指就按得到。
  */
-export function AddMaterialFab({ onPick }: { onPick: (k: AddKind) => void }) {
+export function AddMaterialFab({ onPick, kinds = ["course"] }: { onPick: (k: AddKind) => void; /** 要顯示哪些選項（預設只有新增教材卡；中心頁有權限時加上 schedule）。 */ kinds?: AddKind[] }) {
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
@@ -33,7 +35,7 @@ export function AddMaterialFab({ onPick }: { onPick: (k: AddKind) => void }) {
       <View pointerEvents="box-none" style={styles.wrap}>
         {open ? (
           <Animated.View style={[styles.menu, { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }]}>
-            {OPTIONS.map((o) => (
+            {OPTIONS.filter((o) => kinds.includes(o.key)).map((o) => (
               <Pressable key={o.key} accessibilityRole="button" accessibilityLabel={`${o.label}${o.sub ?? ""}`} onPress={() => pick(o.key)} style={({ pressed }) => [styles.option, { backgroundColor: c.surface, borderColor: c.border }, pressed && { opacity: 0.8 }]}>
                 <Ionicons name={o.icon} size={24} color={c.accent} />
                 <View>
@@ -51,7 +53,7 @@ export function AddMaterialFab({ onPick }: { onPick: (k: AddKind) => void }) {
         <Pressable accessibilityRole="button" accessibilityLabel={open ? "收起新增選單" : "新增教材"} accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)} style={[styles.fab, { backgroundColor: c.accent }]}>
           <Ionicons name={open ? "close" : "add"} size={26} color={c.textOnAccent} />
           <AppText variant="headline" style={{ color: c.textOnAccent }}>
-            新增教材
+            {kinds.includes("course") ? "新增教材" : "上傳課表"}
           </AppText>
         </Pressable>
       </View>

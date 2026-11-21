@@ -6,7 +6,7 @@ import { Animated, BackHandler, Platform, Pressable, StyleSheet, useWindowDimens
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, ZONES, type CenterArt, type CourseSummary, type Zone } from "@/api/client";
 import { AddMaterialFab, type AddKind } from "@/features/course-edit/add-material-fab";
-import { CenterEditSheet, NewCourseSheet } from "@/features/admin-parts";
+import { CenterEditSheet, CenterScheduleSheet, NewCourseSheet } from "@/features/admin-parts";
 import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { flashText } from "@/ui/flash-notice";
@@ -616,14 +616,15 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         </>
       )}
       {archivedBlock}
-      {canCreateCourse(member) ? <View style={{ height: 64 }} /> : null}
+      {canCreateCourse(member) || canEditArt ? <View style={{ height: 64 }} /> : null}
     </Screen>
-    {canCreateCourse(member) ? (
-      <AddMaterialFab onPick={setNewOpen} />
+    {canCreateCourse(member) || canEditArt ? (
+      <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["schedule"] as const) : [])]} />
     ) : null}
     {moveTo ? <ZoneMoveSheet target={moveTo} groups={groups} onMoved={() => { reload(); adminList.reload(); }} onClose={() => setMoveTo(null)} /> : null}
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} brands={brandList.data ?? []} brand={brandSel} onBrand={pickBrand} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
-    {newOpen ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
+    {newOpen === "schedule" && activeCenter !== ALL ? <CenterScheduleSheet center={activeCenter} onClose={() => setNewOpen(null)} onChanged={sch.reload} /> : null}
+    {newOpen && newOpen !== "schedule" ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {bcOpen && bc.data ? <BroadcastSheet title={`${centerTitle(activeCenter)}廣播公告`} items={bc.data.items} onClose={() => setBcOpen(false)} /> : null}
     {artOpen && activeCenter !== ALL ? (
       <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={bc.reload} onScheduleChanged={sch.reload} />

@@ -8,7 +8,7 @@ export { SectionList, SectionSheet } from "@/features/course-edit/course-section
 export { NewMaterialSheet } from "@/features/course-edit/material-sheet";
 export { BlockEditList, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, PickMaterialsSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/course-edit/lessons";
 export { NewCourseSheet } from "@/features/course-edit/new-course";
-export { CenterEditSheet } from "@/features/admin/center-edit-sheet";
+export { CenterEditSheet, CenterScheduleSheet } from "@/features/admin/center-edit-sheet";
 export { TimeRangePicker } from "@/features/uploads/time-range-picker";
 export { SeriesEdm } from "@/features/admin/series-edm";
 export { SeriesCoverSheet } from "@/features/admin/series-cover-sheet";
