@@ -249,7 +249,8 @@ export async function signInWithGoogle(returnTo = "/me"): Promise<"ok" | "cancel
 }
 
 async function finish(params: URLSearchParams, pending: Pending): Promise<void> {
-  if (Date.now() - pending.created > 600_000 || params.get("state") !== pending.state) throw new CentralError(400, "state", "登入驗證已逾時，請重新登入");
+  // 行動大學這端不再限制登入要在幾分鐘內完成（業主 2026-11-21 取消登入逾時）；一次性的 nonce／state 是否有效由會員中心判斷。
+  if (params.get("state") !== pending.state) throw new CentralError(400, "state", "登入驗證失敗，請重新登入");
   if (params.get("error")) throw new CentralError(400, "cancelled", "登入已取消");
   const idToken = params.get("id_token");
   if (!idToken) throw new CentralError(400, "no_token", "沒有取得登入資料，請重新登入");
@@ -356,7 +357,7 @@ export async function handleWebSsoReturn(currentMember: string | null): Promise<
   const raw = takeTemp(SSO_PENDING);
   const pending = raw ? (JSON.parse(raw) as SsoPending) : null;
   if (params.get("sso_adopted")) return { next, changed: false };
-  if (!pending || params.get("state") !== pending.state || Date.now() - pending.created > 600_000) return { next, changed: false };
+  if (!pending || params.get("state") !== pending.state ) return { next, changed: false };
   if (params.get("sso_none")) {
     if (currentMember) {
       await clearCentral();
