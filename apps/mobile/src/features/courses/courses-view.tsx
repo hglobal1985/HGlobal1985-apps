@@ -641,19 +641,23 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {/* 三個專區（業主 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
             {tileW && flat && !(centerPage && tab === "list") ? flatShown.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat
-              ? zoneSections.map(({ zone, items }) =>
-                  items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
-                    <Fragment key={zone}>
-                      <ZoneBand zone={zone} count={items.reduce((n, g) => n + g.sessions.reduce((m, x) => m + x.materialCount, 0), 0)} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!zoneOpen(zone)} onFold={() => toggleFold(zone)} />
-                      {!zoneOpen(zone) ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
-                    </Fragment>
-                  ) : null,
-                )
-              : null}
-            {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心教材總數由多到少（業主 2026-11-21，原為課程數），「安麗公司」不列出（centerCounts 已處理）。 */}
-            {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} /> : null}
-            {tileW && mode === "series" && !matched && !!opened.centers
-              ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
+              ? zoneSections.map(({ zone, items }, zi) => (
+                  <Fragment key={zone}>
+                    {items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
+                      <>
+                        <ZoneBand zone={zone} count={items.reduce((n, g) => n + g.sessions.reduce((m, x) => m + x.materialCount, 0), 0)} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!zoneOpen(zone)} onFold={() => toggleFold(zone)} />
+                        {!zoneOpen(zone) ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
+                      </>
+                    ) : null}
+                    {/* 教育中心固定排在第二個區塊（業主 2026-11-21，原本在最下面）；排序＝各中心教材總數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
+                    {zi === 0 && mode === "series" && !matched && centerCounts.length ? (
+                      <>
+                        <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} />
+                        {opened.centers ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />) : null}
+                      </>
+                    ) : null}
+                  </Fragment>
+                ))
               : null}
           </View>
         </>
