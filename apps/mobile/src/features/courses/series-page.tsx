@@ -10,7 +10,7 @@ import { useApi, useSession } from "@/state/session";
 import { portraitColumns, tileColumns } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, LoginPrompt, NoticeBox, Screen } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, LoginPrompt, NoticeBox, Screen, SegmentTabs } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull } from "./center-hero";
@@ -129,11 +129,6 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const courseCols = colsOf(portraitColumns(boxW)); // 課程卡：直式 3:4，手機一列三張，大螢幕依寬度增加
   const listCols = colsOf(tileColumns(boxW)); // 清單卡：橫式 4:3，手機一列兩張，大螢幕依寬度增加
   const tileW = (cols: number) => (boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0);
-  const toggle = (v: View_, icon: "list-outline" | "grid-outline", label: string) => (
-    <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected: view === v }} accessibilityLabel={label} onPress={() => pick(v)} style={[styles.tbtn, view === v && { backgroundColor: c.accent }]}>
-      <Ionicons name={icon} size={22} color={view === v ? c.textOnAccent : c.text} />
-    </Pressable>
-  );
   const hiddenFromMember = series === UNCATEGORIZED && !admin; // 「未分類」只有超級管理員看得到
   const section = (_title: string, _n: number) => null; // 業主 2026-11-20：只剩「教材卡」一種，不再分「課程卡／清單卡」兩區標題（版型仍依內容自動排）
   const ctrl = (items: CourseSummary[], x: CourseSummary, i: number) => (
@@ -236,10 +231,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         ) : null}
         {data && !hiddenFromMember && !all.length ? <EmptyState icon="library-outline" title="這個系列目前沒有內容" /> : null}
         {!hiddenFromMember && shown.length ? (
-          <View style={[styles.toggle, { borderColor: c.border, backgroundColor: c.surface }]} accessibilityRole="radiogroup">
-            {toggle("list", "list-outline", "詳細列表")}
-            {toggle("edm", "grid-outline", "縮圖")}
-          </View>
+          <SegmentTabs options={[{ key: "list", label: "詳細列表" }, { key: "edm", label: "縮圖" }]} value={view} onChange={pick} />
         ) : null}
         {!hiddenFromMember && view === "list" ? (
           <View style={{ gap: space.md }}>

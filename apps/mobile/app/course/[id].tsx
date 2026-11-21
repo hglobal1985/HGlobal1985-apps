@@ -27,7 +27,7 @@ import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { StageWidth } from "@/ui/stage-frame";
-import { AppText, Button, Card, LoadingLadybug, LoginPrompt, ErrorView, ListRow, LoadingView, LockMask, NoticeBox, Pill, Screen, Section, TopBarButton } from "@/ui";
+import { AppText, Button, Card, LoadingLadybug, LoginPrompt, ErrorView, ListRow, LoadingView, LockMask, NoticeBox, Pill, Screen, Section, SegmentTabs, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
 
@@ -482,13 +482,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         {!(editing && canEditContent) && blockView.lessons.some((l) => l.material) ? (
           <Section title="">
             {course.lessons.some((l) => l.section) ? (
-              <View style={[styles.layoutToggle, { borderColor: c.border, backgroundColor: c.surface }]} accessibilityRole="radiogroup">
-                {(["detail", "thumb"] as const).map((v) => (
-                  <Pressable key={v} accessibilityRole="radio" accessibilityState={{ selected: listLayout === v }} accessibilityLabel={v === "detail" ? "詳細列表" : "縮圖"} onPress={() => pickLayout(v)} style={[styles.layoutBtn, listLayout === v && { backgroundColor: c.accent }]}>
-                    <Ionicons name={v === "detail" ? "list-outline" : "grid-outline"} size={22} color={listLayout === v ? c.textOnAccent : c.text} />
-                  </Pressable>
-                ))}
-              </View>
+              <SegmentTabs options={[{ key: "detail", label: "詳細列表" }, { key: "thumb", label: "縮圖" }]} value={listLayout} onChange={pickLayout} />
             ) : null}
             <View style={!editing && materialsLocked ? { minHeight: 230 } : undefined}>
               <FullVersionList course={blockView} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
