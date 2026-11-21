@@ -41,7 +41,7 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
       {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={2} /> : null}
       {/* 左下角：訂閱鈕＋點閱次數（共用封面統計模組 cover-stats.tsx，與中心頁、系列頁封面同一組）。 */}
       {stats ? (
-        <View style={{ position: "absolute", left: 12, bottom: 10 }} pointerEvents="box-none">
+        <View style={{ position: "absolute", left: 12, right: 12, bottom: 10 }} pointerEvents="box-none">
           <CoverBadges stats={stats} />
         </View>
       ) : null}
