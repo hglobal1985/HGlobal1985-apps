@@ -48,6 +48,30 @@ if (!force) {
   console.warn("⚠️ 使用 --force：略過所有保護檢查，可能蓋掉別人的成果！");
 }
 
+// 套件齊全檢查（業主 2026-11-21：邀請按鈕壞掉，因為雲端環境沒裝到新加的 qrcode-generator，打包照樣成功、到使用者手機才當掉）。
+// package.json 列的每個套件都要真的裝在 node_modules；缺了就先自動 npm install，還缺就停下來，不可以帶著缺的套件部署。
+import { existsSync, readFileSync } from "node:fs";
+const missingDeps = () => {
+  const out = [];
+  for (const pkg of ["../../mobile/package.json", "../package.json", "../../../package.json"]) {
+    const url = new URL(pkg, import.meta.url);
+    if (!existsSync(url)) continue;
+    const j = JSON.parse(readFileSync(url, "utf8"));
+    for (const name of Object.keys({ ...j.dependencies, ...j.devDependencies })) {
+      if (name.startsWith("@learn/")) continue;
+      const found = [`../../../node_modules/${name}/package.json`, `../../mobile/node_modules/${name}/package.json`, `../node_modules/${name}/package.json`].some((p) => existsSync(new URL(p, import.meta.url)));
+      if (!found) out.push(name);
+    }
+  }
+  return out;
+};
+if (missingDeps().length) {
+  console.warn(`⚠️ 缺少套件：${missingDeps().join("、")}，自動執行 npm install…`);
+  run("npm install");
+  const still = missingDeps();
+  if (still.length) die(`套件還是缺：${still.join("、")}。不可以帶著缺的套件部署，請檢查 package.json 與網路。`);
+}
+
 run("npm run build:web -w @learn/mobile");
 run("npm run embed");
 run("npx --yes wrangler@4 d1 migrations apply learn-v2 --remote");
