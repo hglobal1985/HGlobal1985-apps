@@ -274,7 +274,8 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
   const [helpW, setHelpW] = useState(0);
   // 單行自動縮小：中文每字約一個字寬；可用寬度＝長條寬度扣掉圖示與左右留白。
   const helpSize = helpW ? Math.max(11, Math.min(26, Math.floor((helpW - 32 - 24 - 10 - 60) / (hint.length * 1.05)))) : 18;
-  const desktop = Platform.OS === "web" && win.width >= 700;
+  // 電腦（有滑鼠）才顯示左右切換按鈕；手機、平板橫放用手指滑動（業主 2026-11-21）。
+  const desktop = Platform.OS === "web" && typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
   const imgBg = cur.bg ?? bg;
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>

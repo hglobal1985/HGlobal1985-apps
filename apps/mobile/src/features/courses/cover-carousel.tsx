@@ -105,5 +105,5 @@ const styles = StyleSheet.create({
   dots: { position: "absolute", left: 0, right: 0, bottom: 4, flexDirection: "row", justifyContent: "center", gap: 5 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   bar: { width: 80, height: 3, backgroundColor: "rgba(255,255,255,0.35)", borderRadius: 2, overflow: "hidden" },
-  sound: { position: "absolute", right: 12, top: 12, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  sound: { position: "absolute", left: 12, top: 12, width: 44, height: 44, borderRadius: 22, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
 });

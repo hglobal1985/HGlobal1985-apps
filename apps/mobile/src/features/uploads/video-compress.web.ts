@@ -8,7 +8,7 @@ export type VideoResult = { blob: Blob; width: number; height: number; durationS
 
 export const videoCompressSupported = (): boolean => typeof MediaRecorder !== "undefined" && typeof HTMLCanvasElement !== "undefined" && typeof HTMLCanvasElement.prototype.captureStream === "function";
 
-const MIMES = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+const MIMES = ["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"]; // 不用單獨的 video/mp4：Chrome 可能錄成 VP9 放進 MP4，Safari 不一定放得動；H.264 才是 MP4 的標準搭配
 const pickMime = () => MIMES.find((m) => MediaRecorder.isTypeSupported(m)) ?? "";
 
 function loadVideo(url: string): Promise<HTMLVideoElement> {
