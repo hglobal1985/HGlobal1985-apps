@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { Animated, ScrollView, StyleSheet, View } from "react-native";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { Animated, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
 import { useLayout } from "@/theme/layout";
@@ -136,9 +136,37 @@ export function Screen({
 function Scroller({ scrollY, children, ...props }: { scrollY?: Animated.Value } & React.ComponentProps<typeof ScrollView>) {
   // 網頁：頁面主要捲動區固定預留捲軸位置（lib/stable-scrollbar.ts 只認這個標記，避免外層每一層都多留一條捲軸寬度）。
   const rest = { ...props, ...({ dataSet: { stableGutter: "" } } as object) };
+  const ref = useRef<{ getScrollableNode?: () => HTMLElement | null } | null>(null);
+  // 網頁：內容高度改變（換中心、資料載入完）時，瀏覽器會自己把捲動位置夾回 0，卻不一定發出捲動事件，
+  // scrollY 就停在舊的數字，封面（hero）被誤縮成窄橫幅、下方留一大塊空白（業主 2026-11-21 回報）。這裡在內容與版面變動後主動對一次。
+  const resync = () => {
+    if (!scrollY || Platform.OS !== "web") return;
+    const el = ref.current?.getScrollableNode?.();
+    if (el) scrollY.setValue(el.scrollTop);
+  };
+  useEffect(() => {
+    if (!scrollY) return;
+    const ts = [0, 120, 600].map((ms) => setTimeout(resync, ms));
+    return () => ts.forEach(clearTimeout);
+  }, [scrollY]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!scrollY) return <ScrollView {...rest}>{children}</ScrollView>;
+  const { onContentSizeChange, onLayout } = props;
   return (
-    <Animated.ScrollView {...(rest as object)} scrollEventThrottle={16} onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}>
+    <Animated.ScrollView
+      {...(rest as object)}
+      ref={ref as never}
+      scrollEventThrottle={16}
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+      onContentSizeChange={(w: number, h: number) => {
+        onContentSizeChange?.(w, h);
+        resync();
+        setTimeout(resync, 60);
+      }}
+      onLayout={(e: Parameters<NonNullable<typeof onLayout>>[0]) => {
+        onLayout?.(e);
+        resync();
+      }}
+    >
       {children}
     </Animated.ScrollView>
   );
