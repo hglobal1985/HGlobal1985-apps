@@ -53,6 +53,7 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
 }
 
 /** 網頁：放大視窗裡拖曳圖片時，不觸發整頁的下拉重新整理（lib/web-pull-refresh.ts 認得 data-no-pull-refresh；業主 2026-11-17）。 */
+const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
 const NO_PULL = Platform.OS === "web" ? ({ dataSet: { noPullRefresh: "" } } as object) : {};
 
 /**
@@ -227,6 +228,10 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
   );
   const many = list.length > 1;
   const land = win.width > win.height; // 橫放：說明與按鈕合併在同一列
+  const hint = many ? "左右滑動換張、兩指放大縮小" : "可拖曳移動、兩指放大縮小";
+  const [helpW, setHelpW] = useState(0);
+  // 單行自動縮小：中文每字約一個字寬；可用寬度＝長條寬度扣掉圖示與左右留白。
+  const helpSize = helpW ? Math.max(11, Math.min(26, Math.floor((helpW - 32 - 26 - 10) / (hint.length * 1.05)))) : 18;
   const desktop = Platform.OS === "web" && win.width >= 700;
   const imgBg = cur.bg ?? bg;
   return (
@@ -249,17 +254,25 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
             </>
           ) : null}
           {/* 說明文字與下載、分享、關閉全部在最上面同一列（業主 2026-11-21）。 */}
-          <View style={[styles.top, land && { flexDirection: "row-reverse", alignItems: "center" }]} pointerEvents="box-none">
-            <View style={styles.row} pointerEvents="box-none">
-              {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
-              {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
-              {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
+          <View style={[styles.top, land && { flexDirection: "row-reverse", alignItems: "flex-start" }]} pointerEvents="box-none">
+            <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
+              <View style={styles.row} pointerEvents="box-none">
+                {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
+                {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
+                {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
+              </View>
+              {/* 第幾張、共幾張：獨立標籤，放在「關閉」鈕正下方（業主 2026-11-21）。 */}
+              {many ? (
+                <View style={styles.counter} pointerEvents="none">
+                  <AppText variant="callout" style={{ color: "#fff", fontWeight: "800" }}>{`第 ${idx + 1} 張，共 ${list.length} 張`}</AppText>
+                </View>
+              ) : null}
             </View>
-            {/* 操作說明在第二列，字體超大（業主 2026-11-21）。 */}
-            <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} pointerEvents="none">
-              <Ionicons name="move" size={30} color="#fff" />
-              <AppText variant="caption" style={{ color: "#fff", fontWeight: "800", fontSize: 26, lineHeight: 34, flexShrink: 1 }} numberOfLines={2}>
-                {many ? `第 ${idx + 1} 張，共 ${list.length} 張・左右滑動換張、兩指放大縮小` : "可拖曳移動、兩指放大縮小"}
+            {/* 操作說明：強制單行，字太多時自動縮小（業主 2026-11-21）。 */}
+            <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} onLayout={(e) => setHelpW(e.nativeEvent.layout.width)} pointerEvents="none">
+              <Ionicons name="move" size={26} color="#fff" />
+              <AppText variant="caption" numberOfLines={1} {...NO_SCALE} style={{ color: "#fff", fontWeight: "800", fontSize: helpSize, lineHeight: helpSize + 8, flexShrink: 1 }}>
+                {hint}
               </AppText>
             </View>
           </View>
@@ -273,6 +286,7 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000" },
   frame: { overflow: "hidden", backgroundColor: "#fff" },
   side: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
+  counter: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.5)" },
   top: { position: "absolute", left: 16, right: 16, top: 16, gap: space.xs },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
