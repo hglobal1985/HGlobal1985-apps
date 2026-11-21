@@ -14,7 +14,7 @@ import { TYPE_INFO } from "@/features/link-types";
 import { lessonHref } from "@/lib/lesson-href";
 import { useApi } from "@/state/session";
 import type { Attachment } from "@/api/client";
-import { CompactRow, LIST_CARD, ListSection, MetaLine, RowButtons, SubSection } from "./compact-row";
+import { CompactRow, LIST_CARD, ListSection, MetaLine, RowButtons } from "./compact-row";
 import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
 import { SectionActions } from "./material-rows";
@@ -93,14 +93,16 @@ export function CenterMaterialsCard({ courseIds }: { courseIds: string[] }) {
     if ((m.eventDate ?? "") > g.latest) g.latest = m.eventDate ?? "";
     groups.set(k, g);
   }
-  const ordered = [...groups.values()].sort((x, y) => (y.latest > x.latest ? 1 : y.latest < x.latest ? -1 : 0));
+  // 只有一個教材的區塊／課程，全部合併成同一個區塊「尚未分段章節」（業主 2026-11-21），放在最後；沒有「加入清單／分享」鈕（它不是真的區塊）。
+  const all = [...groups.values()];
+  const multi = all.filter((g) => g.items.length > 1).sort((x, y) => (y.latest > x.latest ? 1 : y.latest < x.latest ? -1 : 0));
+  const singles = all.filter((g) => g.items.length === 1).flatMap((g) => g.items).sort((x, y) => ((y.eventDate ?? "") > (x.eventDate ?? "") ? 1 : (y.eventDate ?? "") < (x.eventDate ?? "") ? -1 : 0));
+  const ordered: { title: string; courseId: string; blockId: string | null; items: CenterMaterial[]; bucket?: boolean }[] = [...multi, ...(singles.length ? [{ title: "尚未分段章節", courseId: "", blockId: null, items: singles, bucket: true }] : [])];
   return (
     <View style={{ gap: space.sm }}>
       {ordered.map((g, gi) => (
         <Card key={gi} style={LIST_CARD}>
-          {/* 沒有區塊的課程只有一個教材時，教材放在自動加上的「尚未分段章節」小標題底下（業主 2026-11-21） */}
-          <ListSection title={g.title} count={g.items.length} actions={<SectionActions courseId={g.courseId} blockId={g.blockId} title={g.title} />} />
-          {!g.blockId && g.items.length === 1 ? <SubSection title="尚未分段章節" /> : null}
+          <ListSection title={g.title} count={g.items.length} actions={g.bucket ? undefined : <SectionActions courseId={g.courseId} blockId={g.blockId} title={g.title} />} />
           {g.items.map((m) => {
             const who = [m.sharer, m.sharerRankName].filter(Boolean).join(" ");
             return (

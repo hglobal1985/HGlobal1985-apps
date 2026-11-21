@@ -70,17 +70,6 @@ export function RowButtons({ children }: { children: ReactNode }) {
 /** 清單卡的外框樣式：列與列之間不留空（Card 預設有 gap，會讓第一列上方多出一截，業主 2026-11-21 回報）。 */
 export const LIST_CARD = { paddingVertical: 0, paddingHorizontal: space.sm, gap: 0 } as const;
 
-/** 標題列底下的小標題（例如「尚未分段章節」）：灰色小字。 */
-export function SubSection({ title }: { title: string }) {
-  return (
-    <View style={{ paddingHorizontal: space.sm, paddingTop: 6, paddingBottom: 2 }}>
-      <AppText variant="caption" tone="muted" style={{ fontWeight: "700" }}>
-        {title}
-      </AppText>
-    </View>
-  );
-}
-
 /**
  * 區塊（或課程）標題列（業主 2026-11-21 選定方案 C「淡綠標題列」）：整條淡綠底、貼齊卡片左右與上緣；左邊是教材數量的白底圓圈（綠字），
  * 接著區塊／課程名稱（綠色粗體、最多 2 行），右邊放 `actions`（加入我的清單＋分享，和下方每列的鈕一樣、沒有外框）。數量是 0 就淡化。
