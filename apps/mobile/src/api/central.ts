@@ -19,6 +19,42 @@ const ACCESS_KEY = "hglobal.learn.access";
 const ACCESS_EXP_KEY = "hglobal.learn.access-expiry";
 const PENDING_KEY = "hglobal.learn.pending";
 
+/**
+ * 「登入進行中」的暫存（業主 2026-11-21 回報：登出後再登入常出現「登入狀態已失效」）：
+ * 原本只放分頁暫存（sessionStorage），登入頁跳去 Google／會員中心再回來時，如果回來的不是原本那個分頁
+ * （手機的「主畫面 App」、系統在背景回收分頁、換了瀏覽器視窗），暫存就不見了。
+ * 現在同時寫一份到 localStorage（同一個瀏覽器所有分頁共用）；讀取時先看分頁暫存、沒有再看 localStorage，讀完兩邊都清掉。
+ * 暫存本身有時間戳記，過期（10 分鐘）一律當作失效，所以留一份在 localStorage 不會有舊資料被誤用的風險。
+ */
+function putTemp(key: string, value: string): void {
+  try {
+    globalThis.sessionStorage?.setItem(key, value);
+  } catch {
+    /* 沒關係 */
+  }
+  try {
+    globalThis.localStorage?.setItem(key, value);
+  } catch {
+    /* 沒關係 */
+  }
+}
+function takeTemp(key: string): string | null {
+  let v: string | null = null;
+  try {
+    v = globalThis.sessionStorage?.getItem(key) ?? null;
+    globalThis.sessionStorage?.removeItem(key);
+  } catch {
+    /* 沒關係 */
+  }
+  try {
+    v = v ?? globalThis.localStorage?.getItem(key) ?? null;
+    globalThis.localStorage?.removeItem(key);
+  } catch {
+    /* 沒關係 */
+  }
+  return v;
+}
+
 type TokenPair = { access_token: string; refresh_token: string; expires_in: number };
 type SignIn = TokenPair & { user: { member_id: string; status: string } };
 export type AppStatus = { status: "active" | "paused" | "killed"; min_version: string };
@@ -200,7 +236,7 @@ export async function signInWithGoogle(returnTo = "/me"): Promise<"ok" | "cancel
   url.searchParams.set("return", web ? WEB_RETURN : NATIVE_RETURN);
   url.searchParams.set("state", pending.state);
   if (web) {
-    globalThis.sessionStorage?.setItem(PENDING_KEY, JSON.stringify(pending));
+    putTemp(PENDING_KEY, JSON.stringify(pending));
     globalThis.location.assign(url.toString());
     return "redirecting";
   }
@@ -229,8 +265,7 @@ async function finish(params: URLSearchParams, pending: Pending): Promise<void> 
 export async function finishWebReturn(): Promise<string> {
   const fragment = globalThis.location.hash.slice(1);
   globalThis.history.replaceState(null, "", globalThis.location.pathname);
-  const raw = globalThis.sessionStorage?.getItem(PENDING_KEY);
-  globalThis.sessionStorage?.removeItem(PENDING_KEY);
+  const raw = takeTemp(PENDING_KEY);
   if (!raw) throw new CentralError(400, "no_pending", "登入狀態已失效，請重新登入");
   const pending = JSON.parse(raw) as Pending;
   await finish(new URLSearchParams(fragment), pending);
@@ -295,8 +330,8 @@ export async function webSsoCheck(): Promise<boolean> {
   try {
     const { nonce } = await central<{ nonce: string }>("/v1/auth/nonce", "POST", { app_id: APP_ID });
     const pending: SsoPending = { nonce, state: randomHex(), created: Date.now() };
-    ss()?.setItem(SSO_PENDING, JSON.stringify(pending));
-    ss()?.setItem(SSO_NEXT, here());
+    putTemp(SSO_PENDING, JSON.stringify(pending));
+    putTemp(SSO_NEXT, here());
     const digest = (await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce)).toLowerCase();
     const url = new URL(`${CENTRAL_URL}/auth/sso/check`);
     url.searchParams.set("app_id", APP_ID);
@@ -317,10 +352,8 @@ export async function webSsoCheck(): Promise<boolean> {
 export async function handleWebSsoReturn(currentMember: string | null): Promise<{ next: string; changed: boolean }> {
   const params = new URLSearchParams(globalThis.location.hash.slice(1));
   globalThis.history.replaceState(null, "", globalThis.location.pathname);
-  const next = safePath(ss()?.getItem(SSO_NEXT) ?? "/");
-  ss()?.removeItem(SSO_NEXT);
-  const raw = ss()?.getItem(SSO_PENDING);
-  ss()?.removeItem(SSO_PENDING);
+  const next = safePath(takeTemp(SSO_NEXT) ?? "/");
+  const raw = takeTemp(SSO_PENDING);
   const pending = raw ? (JSON.parse(raw) as SsoPending) : null;
   if (params.get("sso_adopted")) return { next, changed: false };
   if (!pending || params.get("state") !== pending.state || Date.now() - pending.created > 600_000) return { next, changed: false };
@@ -350,7 +383,7 @@ export async function webSsoAdopt(next: string): Promise<boolean> {
     if (!token) return false;
     const { sso_token } = await central<{ sso_token: string }>("/v1/auth/sso/start", "POST", {}, token);
     const { code } = await central<{ code: string }>("/v1/auth/sso/web-code", "POST", { sso_token }, token);
-    ss()?.setItem(SSO_NEXT, safePath(next));
+    putTemp(SSO_NEXT, safePath(next));
     ss()?.setItem(SSO_CHECKED, String(Date.now()));
     const url = new URL(`${CENTRAL_URL}/auth/sso/adopt`);
     url.searchParams.set("c", code);
@@ -366,7 +399,7 @@ export async function webSsoAdopt(next: string): Promise<boolean> {
 /** 網頁版登出：清除本機後導向會員中心登出這個瀏覽器的所有 App。 */
 export function webSsoLogout(next = "/me"): void {
   if (!web) return;
-  ss()?.setItem(SSO_NEXT, safePath(next));
+  putTemp(SSO_NEXT, safePath(next));
   ss()?.setItem(SSO_CHECKED, String(Date.now()));
   const url = new URL(`${CENTRAL_URL}/auth/sso/logout`);
   url.searchParams.set("app_id", APP_ID);
