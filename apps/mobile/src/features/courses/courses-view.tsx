@@ -654,7 +654,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
                     {/* 教育中心固定排在第二個區塊（業主 2026-11-21，原本在最下面）；排序＝各中心教材總數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
                     {zi === 0 && mode === "series" && !matched && centerCounts.length ? (
                       <>
-                        <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} />
+                        <ZoneBand text="寰宇教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} />
                         {opened.centers ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />) : null}
                       </>
                     ) : null}
