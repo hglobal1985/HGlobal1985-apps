@@ -79,7 +79,7 @@ import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
 import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
-import { lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -3362,7 +3362,10 @@ const routes: [string, RegExp, Handler][] = [
   ["POST", /^\/my-lists\/view\/([\w-]{2,40})\/([\w-]{3,30})$/, (ctx, [number, slug]) => listGuard(async () => {
     const b = await readJson<{ vid?: unknown; hint?: unknown; referrer?: unknown }>(ctx.req);
     const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
-    return viewPublic(ctx.db, number!, slug!, str(b.vid, 40), ctx.session?.sub ?? null, str(b.hint, 30), str(b.referrer, 200));
+    const view = await viewPublic(ctx.db, number!, slug!, str(b.vid, 40), ctx.session?.sub ?? null, str(b.hint, 30), str(b.referrer, 200));
+    // 分享者的獎銜與徽章（Amway 資料：每次載入才向中央查，不保存）；查不到就只有頭像與姓名。超級管理員另外看得到查不到的原因（除錯用）。
+    const sharer = await lookupSharerRank(ctx.env.CENTRAL_SERVICE_SECRET, view.ownerSub).catch(() => null);
+    return { ...view, sharer, ...(sharer || !ctx.session?.roles.includes("super_admin") ? {} : { sharerError: lastSharerError }) };
   })],
   // 把別人的清單複製成自己的新清單（額度不夠會提示要完成哪個成就）。
   ["POST", /^\/my-lists\/view\/([\w-]{2,40})\/([\w-]{3,30})\/copy$/, (ctx, [number, slug]) => listGuard(async () => {

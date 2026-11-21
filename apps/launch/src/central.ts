@@ -784,3 +784,57 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
   }
   return failed && !out.size ? undefined : out;
 }
+
+/**
+ * 清單分享者名片的獎銜與徽章（業主 2026-11-21；Amway 資料，**不寫資料庫、不寫日誌**，只放記憶體短暫快取 10 分鐘）：
+ * 用服務 Token 呼叫 `POST /v1/apps/learn/members/lookup`（fields＝rank，use＝display）；獎銜名稱與徽章圖用中央的 field-definitions。
+ * 失敗、403（平台設定沒勾選 rank 欄位）、422、逾時一律回 null（名片只顯示頭像與姓名），不快取失敗；失敗原因只記狀態碼與錯誤代碼。
+ */
+export type SharerRank = { rankLabel: string; rankBadge: string | null; rankBadgeArt: { width: number; height: number; top: number; bottom: number } | null };
+export let lastSharerError = "";
+export async function lookupSharerRank(secret: string | undefined, sub: string): Promise<SharerRank | null> {
+  const hit = memo.get(`shr:${sub}`);
+  if (hit && hit.until > Date.now()) return hit.value as SharerRank;
+  lastSharerError = "";
+  if (!secret) {
+    lastSharerError = "沒有設定中央服務金鑰（CENTRAL_SERVICE_SECRET）";
+    return null;
+  }
+  const token = await serviceToken(secret);
+  if (!token) {
+    lastSharerError = "向中央取得服務 Token 失敗";
+    return null;
+  }
+  const t0 = Date.now();
+  try {
+    const res = await centralFetch(`${CENTRAL}/v1/apps/${APP_ID}/members/lookup`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ member_ids: [sub], fields: ["rank"], use: "display" }),
+      signal: AbortSignal.timeout(6000),
+    });
+    logCall(token, "/v1/apps/learn/members/lookup", Date.now() - t0);
+    if (!res.ok) {
+      const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
+      lastSharerError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}`;
+      return null;
+    }
+    const b = (await res.json().catch(() => null)) as { members?: { member_id?: unknown; id?: unknown; fields?: Record<string, unknown>; rank?: unknown }[] } | null;
+    const m = (b?.members ?? []).find((x) => x.member_id === sub || x.id === sub);
+    if (!m) {
+      lastSharerError = "中央沒有回傳這位會員（或格式不是預期的）";
+      return null;
+    }
+    const raw = m.fields?.rank ?? m.rank;
+    const rv = textOf(raw && typeof raw === "object" && "value" in (raw as object) ? (raw as { value?: unknown }).value : raw);
+    const [opts, badges] = await Promise.all([rankOptions(token).catch(() => new Map<string, string>()), rankBadges(token).catch(() => undefined)]);
+    const empty = !rv || rv === "none" || rv === "無";
+    const info = !empty && badges ? badges.get(rv) : undefined;
+    const out: SharerRank = { rankLabel: empty ? "安麗寶寶" : (opts.get(rv) ?? rv), rankBadge: info?.url ?? null, rankBadgeArt: info ? { width: info.width, height: info.height, top: info.top, bottom: info.bottom } : null };
+    memo.set(`shr:${sub}`, { value: out, until: Date.now() + 600_000 });
+    return out;
+  } catch {
+    lastSharerError = "連線逾時或失敗";
+    return null;
+  }
+}
