@@ -8,7 +8,12 @@ import { shareLink } from "@/lib/share";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { BrandCover, Card } from "@/ui";
+import { BrandCover, Card, LoadingLadybug } from "@/ui";
+import { BrandIcon } from "@/ui/brand-icon";
+import { TYPE_INFO } from "@/features/link-types";
+import { lessonHref } from "@/lib/lesson-href";
+import { useApi } from "@/state/session";
+import type { Attachment } from "@/api/client";
 import { CompactRow, MetaLine, RowButtons } from "./compact-row";
 import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
@@ -62,3 +67,47 @@ function CenterListRow({ course, trailing }: { course: CourseSummary; trailing?:
 const styles = StyleSheet.create({
   thumb: { width: 56, height: 36, borderRadius: 6, overflow: "hidden", backgroundColor: "#fff" },
 });
+
+/** 中心頁「清單」分頁裡的一筆教材（後端 GET /center-materials）。 */
+type CenterMaterial = { id: string; courseId: string; courseTitle: string; title: string; kind: string; sharer: string; sharerRankName: string; eventDate: string | null; iconType?: Attachment["type"] };
+
+/**
+ * 中心頁「清單」分頁（業主 2026-11-21 更正）：列出這個中心所有課程裡的「每一個教材」（章節與其他教材，不只是課程本身），
+ * 列的樣子用全站清單列模組（`CompactRow`）：縮圖／類型圖示、第一行教材名稱、第二行「日期 分享者 獎銜（沒有分享者就寫所屬課程）」。
+ * 點一列進該課程（章節直接開始播放）。
+ */
+export function CenterMaterialsCard({ courseIds }: { courseIds: string[] }) {
+  const { c } = useTheme();
+  const key = courseIds.join(",");
+  const { data, loading } = useApi<{ items: CenterMaterial[] }>(key ? `/center-materials?ids=${encodeURIComponent(key)}` : null);
+  if (loading && !data) return <LoadingLadybug />;
+  const items = data?.items ?? [];
+  if (!items.length) return null;
+  return (
+    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+      {items.map((m) => {
+        const who = [m.sharer, m.sharerRankName].filter(Boolean).join(" ");
+        return (
+          <CompactRow
+            key={m.id}
+            label={m.title}
+            onPress={() => router.push((m.kind === "chapter" ? lessonHref(m.courseId, m.id) : `/course/${m.courseId}`) as never)}
+            leading={
+              <View style={{ width: 40, alignItems: "center" }}>
+                {m.iconType ? <BrandIcon type={m.iconType} fallback={TYPE_INFO[m.iconType].icon as never} size={36} /> : <Ionicons name="play-circle-outline" size={32} color={c.accent} />}
+              </View>
+            }
+            title={m.title}
+            meta={<MetaLine date={m.eventDate ? eventDays(m.eventDate, null) : undefined} text={who || m.courseTitle} />}
+            actions={
+              <RowButtons>
+                <RowAddToList target={{ kind: "lesson", ref: m.id, ref2: m.courseId }} title={m.title} />
+                <RowShare label={`分享：${m.title}`} onShare={() => shareLink(m.title, `/course/${m.courseId}`, undefined, { title: m.title })} />
+              </RowButtons>
+            }
+          />
+        );
+      })}
+    </Card>
+  );
+}
