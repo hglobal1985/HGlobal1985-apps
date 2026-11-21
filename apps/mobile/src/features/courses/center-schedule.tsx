@@ -10,7 +10,7 @@ import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { EdmLightbox } from "./edm-viewer";
 
 /**
- * 中心每月課表（業主 2026-11-21 選方案 A）：中心頁封面與廣播公告下方的「本月課表」卡——縮圖、「歷年課表」進入鈕、最近幾個月的月份小鈕；
+ * 中心每月課表（業主 2026-11-21 選方案 A）：中心頁封面與廣播公告下方的課表卡（沒有標題）——縮圖、最近幾個月的月份小鈕（同一列最右邊是「歷年課表」進入鈕）；
  * 點圖用照片放大視窗（下載、分享、雙指縮放）。沒有任何課表時整張卡不顯示。資料公開（訪客也看得到）。
  * 上傳在中心頁「編輯」面板的「課表管理」（features/admin/center-schedule-editor.web.tsx）。
  */
@@ -39,18 +39,6 @@ export function ScheduleCard({ items, title }: { items: Schedules["items"]; titl
   const chipLabel = (ym: string) => (ym.slice(0, 4) === now.slice(0, 4) ? `${Number(ym.slice(5))}月` : `${ym.slice(0, 4)}/${Number(ym.slice(5))}`);
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <View style={styles.head}>
-        <AppText variant="headline" style={{ flex: 1, fontWeight: "800" }}>
-          {sel.ym === now ? "本月課表" : "課表"}
-        </AppText>
-        {items.length > 1 ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="歷年課表" onPress={() => setAll(true)} hitSlop={8} style={styles.linkBtn}>
-            <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>
-              歷年課表 ›
-            </AppText>
-          </Pressable>
-        ) : null}
-      </View>
       <Pressable accessibilityRole="button" accessibilityLabel={`放大${ymLabel(sel.ym)}課表`} onPress={() => setZoom(true)} style={[styles.img, { borderColor: c.border }]}>
         <Image source={{ uri: thumb(resolveUrl(sel.url), Math.min(winW, 720)) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
       </Pressable>
@@ -58,18 +46,26 @@ export function ScheduleCard({ items, title }: { items: Schedules["items"]; titl
         {ymLabel(sel.ym)}・點圖放大，可下載分享
       </AppText>
       {items.length > 1 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {items.slice(0, 8).map((x) => {
-            const on = x.ym === sel.ym;
-            return (
-              <Pressable key={x.ym} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={ymLabel(x.ym)} onPress={() => setPicked(x.ym)} style={[styles.chip, { backgroundColor: on ? c.accent : c.surfaceMuted, borderColor: on ? c.accent : c.border }]}>
-                <AppText variant="callout" style={{ color: on ? c.textOnAccent : c.text, fontWeight: on ? "800" : "600" }}>
-                  {chipLabel(x.ym)}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+        // 月份小鈕在左、「歷年課表」在同一列最右邊（業主 2026-11-21）；上方不再有「本月課表」標題。
+        <View style={styles.chipRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.chips}>
+            {items.slice(0, 8).map((x) => {
+              const on = x.ym === sel.ym;
+              return (
+                <Pressable key={x.ym} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={ymLabel(x.ym)} onPress={() => setPicked(x.ym)} style={[styles.chip, { backgroundColor: on ? c.accent : c.surfaceMuted, borderColor: on ? c.accent : c.border }]}>
+                  <AppText variant="callout" style={{ color: on ? c.textOnAccent : c.text, fontWeight: on ? "800" : "600" }}>
+                    {chipLabel(x.ym)}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <Pressable accessibilityRole="button" accessibilityLabel="歷年課表" onPress={() => setAll(true)} hitSlop={8} style={styles.linkBtn}>
+            <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>
+              歷年課表 ›
+            </AppText>
+          </Pressable>
+        </View>
       ) : null}
       {zoom ? <EdmLightbox uri={sel.url} title={`${title} ${ymLabel(sel.ym)}課表`} onClose={() => setZoom(false)} /> : null}
       {all ? (
@@ -99,7 +95,7 @@ export function ScheduleCard({ items, title }: { items: Schedules["items"]; titl
 
 const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.md, padding: space.md, gap: space.sm },
-  head: { flexDirection: "row", alignItems: "center", gap: space.sm },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   linkBtn: { minHeight: 44, justifyContent: "center" },
   img: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.sm, borderWidth: 1, overflow: "hidden", backgroundColor: "#fff" },
   chips: { gap: 6, paddingVertical: 2 },
