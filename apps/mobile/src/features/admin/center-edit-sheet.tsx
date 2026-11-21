@@ -19,3 +19,12 @@ export function CenterEditSheet({ center, address, art, onClose, onAddressSaved,
     </EditSheet>
   );
 }
+
+/** 中心頁右下「＋新增教材 › 上傳課表」直接開的面板（業主 2026-11-21）：只有課表管理，上傳後立刻出現在中心頁。 */
+export function CenterScheduleSheet({ center, onClose, onChanged }: { center: string; onClose: () => void; onChanged: () => void }) {
+  return (
+    <EditSheet title={`上傳${centerTitle(center)}課表`} onClose={onClose} hideSave>
+      <CenterScheduleEditor center={center} onChanged={onChanged} />
+    </EditSheet>
+  );
+}

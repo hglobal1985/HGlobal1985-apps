@@ -26,6 +26,7 @@ export const YoutubeLengthFix = lazyPart(bundle, "YoutubeLengthFix");
 // 寰宇大學／中心頁（features/courses/courses-view.tsx）
 export const NewCourseSheet = lazyPart(bundle, "NewCourseSheet");
 export const CenterEditSheet = lazyPart(bundle, "CenterEditSheet");
+export const CenterScheduleSheet = lazyPart(bundle, "CenterScheduleSheet");
 
 // 書櫃（features/library/library-manage.tsx）、關鍵字管理（app/admin/keywords.tsx）
 export const TimeRangePicker = lazyPart(bundle, "TimeRangePicker");
