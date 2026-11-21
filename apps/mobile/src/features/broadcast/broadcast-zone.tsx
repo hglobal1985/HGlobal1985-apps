@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { centerShort } from "@/features/format";
+import { useSeriesSettings } from "@/features/courses/series-settings";
 import { BroadcastBand, BroadcastSheet } from "./broadcast-band";
 import { useBroadcasts } from "./use-broadcasts";
 
@@ -9,6 +11,7 @@ import { useBroadcasts } from "./use-broadcasts";
  */
 export function BroadcastZone({ center, series, title, gutter, reloadKey }: { center?: string; series?: string; title: string; gutter?: number; /** 頁面別處新增、修改公告後把這個數字加一，這裡就重新讀取。 */ reloadKey?: number }) {
   const bc = useBroadcasts({ center, series });
+  const seriesSettings = useSeriesSettings();
   const [open, setOpen] = useState(false);
   const first = useRef(true);
   useEffect(() => {
@@ -18,7 +21,7 @@ export function BroadcastZone({ center, series, title, gutter, reloadKey }: { ce
   if (!bc.data?.items.length) return null;
   return (
     <>
-      <BroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setOpen(true)} gutter={gutter} />
+      <BroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setOpen(true)} gutter={gutter} labelOf={(s) => (s === "center" && center ? centerShort(center) : s === "series" && series ? seriesSettings.titleOf(series) : "")} />
       {open ? <BroadcastSheet title={title} items={bc.data.items} onClose={() => setOpen(false)} onChanged={bc.reload} /> : null}
     </>
   );
