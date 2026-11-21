@@ -3,6 +3,7 @@ import { router, usePathname, type Href } from "expo-router";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { requestCoursesReset } from "@/lib/courses-reset";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
 import { getBottomGap, onBottomGap } from "@/lib/bottom-gap";
 import { useUnreadCount } from "@/state/unread";
@@ -72,7 +73,10 @@ export function BottomBar() {
         // 方案 1（業主 2026-11-20）：整條深綠實心、白字白圖示；目前所在分頁是黃色膠囊＋深色字。書櫃模式維持咖啡色舊樣式。
         const color = lib ? LIB.muted : on ? c.navPillText : "#FFFFFF";
         return (
-          <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => router.navigate(t.href)}>
+          <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => {
+            if (t.title === "課程") requestCoursesReset();
+            router.navigate(t.href);
+          }}>
             <View style={[styles.cell, on && { backgroundColor: c.navPill }]}>
               <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
                 {t.building ? <UniversityIcon size={iconSize} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={iconSize} color={color} />}
