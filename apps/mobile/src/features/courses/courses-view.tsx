@@ -275,7 +275,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           const mine = courses.filter((x) => x.centerCourse && x.hasMaterial && normCenter(x.hostCenter) === normCenter(name) && inCategory(x));
           return { name, count: mine.length, materials: mine.reduce((n, x) => n + x.materialCount, 0) }; // materials＝該中心所有課程內含的教材總數（專區標題列數字用）
         })
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "zh-Hant")),
+        .sort((a, b) => b.materials - a.materials || a.name.localeCompare(b.name, "zh-Hant")),
     [centers, courses, category, brandSel], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const art = activeCenter !== ALL ? centerArt.data?.find((a) => a.center === activeCenter) : undefined;
@@ -628,7 +628,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
                   ) : null,
                 )
               : null}
-            {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心課程數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
+            {/* 系列檢視最下面：教育中心（業主 2026-11-18）；排序＝各中心教材總數由多到少（業主 2026-11-21，原為課程數），「安麗公司」不列出（centerCounts 已處理）。 */}
             {tileW && mode === "series" && !matched && centerCounts.length ? <ZoneBand text="教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} /> : null}
             {tileW && mode === "series" && !matched && !!opened.centers
               ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />)
