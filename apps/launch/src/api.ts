@@ -214,6 +214,7 @@ function orderId(now: Date): string {
 }
 const iso = (d = new Date()) => d.toISOString();
 
+const clientErrorHits = new Map<string, { at: number; n: number }>();
 async function readJson<T>(req: Request): Promise<T> {
   try {
     return (await req.json()) as T;
@@ -3156,6 +3157,19 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/config$/, async (ctx) => ({ demoLogin: demoEnabled(ctx.env) })],
   // 正式站目前的程式版本（多個 AI 接手開發時，部署前用它確認自己的程式包含線上版本，才不會蓋掉別人的成果）。
   ["GET", /^\/version$/, async (ctx) => ({ sha: ctx.env.GIT_SHA ?? null })],
+  // 前台錯誤回報（業主 2026-11-21）：使用者畫面出錯時 App 自動送來，只寫進 Cloudflare 錯誤紀錄（不存資料庫、不記會員身分），每週自動檢查會看。
+  ["POST", /^\/client-errors$/, async (ctx) => {
+    const ip = ctx.req.headers.get("cf-connecting-ip") ?? "";
+    const now = Date.now();
+    const hit = clientErrorHits.get(ip);
+    if (hit && now - hit.at < 60_000 && hit.n >= 10) return { ok: true }; // 同一來源每分鐘最多 10 則，避免洗版
+    clientErrorHits.set(ip, hit && now - hit.at < 60_000 ? { at: hit.at, n: hit.n + 1 } : { at: now, n: 1 });
+    if (clientErrorHits.size > 500) clientErrorHits.delete(clientErrorHits.keys().next().value!);
+    const b = await readJson<Record<string, unknown>>(ctx.req);
+    const str = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).slice(0, max) : "");
+    console.error("client error", JSON.stringify({ kind: str("kind", 20), message: str("message", 300), page: str("page", 200), platform: str("platform", 10), ua: str("ua", 200), extra: str("extra", 300), stack: str("stack", 1500) }));
+    return { ok: true };
+  }],
   [
     "GET",
     /^\/demo-members$/,
@@ -6524,7 +6538,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
 }
 
 /** 不需要登入身分的公開路徑：不必為它們向會員中心查詢（首頁的公告、金句、設定每次都會打）。 */
-const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|version|central\/webhook|media\/(pub|img|file|audio|dl))(\?|$)/;
+const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|version|client-errors|central\/webhook|media\/(pub|img|file|audio|dl))(\?|$)/;
 
 async function context(req: Request, env: Env, url: URL): Promise<Ctx> {
   const light = /^\/api\/v2\/me\/(central-profile|vocab)$/.test(url.pathname);
