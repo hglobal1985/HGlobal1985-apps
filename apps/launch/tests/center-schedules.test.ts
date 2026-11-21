@@ -5,11 +5,12 @@ import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
 // 最簡單的假 R2：只記得放進去的東西。
+type R2Bucket = NonNullable<Env["MEDIA"]>;
 function memR2(): R2Bucket {
   const m = new Map<string, { body: Uint8Array; httpMetadata?: { contentType?: string } }>();
   return {
-    put: async (k: string, v: ArrayBuffer | Uint8Array, o?: { httpMetadata?: { contentType?: string } }) => void m.set(k, { body: new Uint8Array(v as ArrayBuffer), httpMetadata: o?.httpMetadata }),
-    get: async (k: string) => (m.has(k) ? { ...m.get(k)!, body: new Response(m.get(k)!.body).body } : null),
+    put: async (k: string, v: ArrayBuffer | Uint8Array | ArrayBufferView, o?: { httpMetadata?: { contentType?: string } }) => void m.set(k, { body: new Uint8Array(v as ArrayBuffer), httpMetadata: o?.httpMetadata }),
+    get: async (k: string) => (m.has(k) ? { ...m.get(k)!, body: new Response(m.get(k)!.body as unknown as BodyInit).body } : null),
     delete: async (k: string) => void m.delete(k),
     list: async () => ({ objects: [...m.keys()].map((key) => ({ key, size: 1 })), truncated: false }),
     _keys: () => [...m.keys()],
@@ -21,7 +22,7 @@ test("中心每月課表：上傳、更換、查詢、刪除、權限與通知",
   const bucket = memR2();
   const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: bucket };
   const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown; bytes?: Uint8Array } = {}) => {
-    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.bytes ? {} : { "content-type": "application/json" }), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.bytes as Uint8Array<ArrayBuffer> | undefined) ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)) }), env);
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.bytes ? {} : { "content-type": "application/json" }), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.bytes as unknown as BodyInit | undefined) ?? (opts.body === undefined ? undefined : JSON.stringify(opts.body)) }), env);
     const text = await res.text();
     return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
   };
