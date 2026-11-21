@@ -1,10 +1,11 @@
 import "@/lib/global-scale"; // 全站字體、圖示、按鈕放大（平板 1.3、電腦 1.1，theme/ui-scale.ts）
 import "@/lib/install-app"; // 要最早載入，才接得到瀏覽器只送一次的「可安裝」事件
+import { installErrorReporting, reportClientError } from "@/lib/error-report";
 import { Stack } from "expo-router/stack";
 import { useEffect } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";
-import { Platform, View } from "react-native";
+import { Platform, Pressable, Text, View } from "react-native";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppGate } from "@/features/app-gate";
 import { ConfirmSheetHost } from "@/features/confirm";
@@ -23,6 +24,22 @@ import { installBottomGap } from "@/lib/bottom-gap";
 import { useLayout } from "@/theme/layout";
 import { UpdateNotice } from "@/features/update-notice";
 import { BottomBar, InAppBrowserBanner, TopBar, TopBarShadow } from "@/ui";
+
+installErrorReporting(); // 前台錯誤自動回報（lib/error-report.ts）
+
+/** 任何頁面畫面出錯時顯示的白話畫面（Expo Router 的根錯誤邊界）：自動回報錯誤，提供「重新載入」。 */
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => Promise<void> }) {
+  useEffect(() => reportClientError("render", error), [error]);
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 16, backgroundColor: "#F8F6EF" }}>
+      <Text style={{ fontSize: 20, fontWeight: "700", color: "#1B2A22", textAlign: "center" }}>這個畫面暫時出了點問題</Text>
+      <Text style={{ fontSize: 15, color: "#55605A", textAlign: "center" }}>已自動回報給我們。請按下方按鈕重新載入。</Text>
+      <Pressable accessibilityRole="button" onPress={() => (Platform.OS === "web" && typeof location !== "undefined" ? location.reload() : void retry())} style={{ minHeight: 48, paddingHorizontal: 28, borderRadius: 12, backgroundColor: "#0C603C", alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: "#fff", fontSize: 17, fontWeight: "700" }}>重新載入</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 /**
  * 全站頁面堆疊與上方標題列。標題列高度＝固定的 barHeight＋手機上方的安全區（瀏海、狀態列）；

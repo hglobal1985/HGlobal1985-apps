@@ -1,5 +1,6 @@
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Text } from "react-native";
+import { reportClientError } from "./error-report";
 
 /**
  * 「用到才下載」的元件（2026-11-21 載入速度優化）：只有管理者會打開的編輯面板、上傳工具……
@@ -37,6 +38,9 @@ class LoadGuard extends Component<{ children: ReactNode }, { failed: boolean }> 
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    reportClientError("lazy-part", error);
   }
   render() {
     if (this.state.failed) return <Text style={{ color: "#B3261E", padding: 12, fontSize: 15 }}>這個功能載入失敗，請重新整理網頁後再試一次。</Text>;
