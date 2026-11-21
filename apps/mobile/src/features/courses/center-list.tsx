@@ -14,7 +14,7 @@ import { TYPE_INFO } from "@/features/link-types";
 import { lessonHref } from "@/lib/lesson-href";
 import { useApi } from "@/state/session";
 import type { Attachment } from "@/api/client";
-import { CompactRow, MetaLine, RowButtons } from "./compact-row";
+import { CompactRow, ListSection, MetaLine, RowButtons } from "./compact-row";
 import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
 
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
 });
 
 /** 中心頁「清單」分頁裡的一筆教材（後端 GET /center-materials）。 */
-type CenterMaterial = { id: string; courseId: string; courseTitle: string; title: string; kind: string; sharer: string; sharerRankName: string; eventDate: string | null; iconType?: Attachment["type"] };
+type CenterMaterial = { id: string; courseId: string; courseTitle: string; /** 所屬區塊名稱（沒有區塊＝null）。 */ block: string | null; title: string; kind: string; sharer: string; sharerRankName: string; eventDate: string | null; iconType?: Attachment["type"] };
 
 /**
  * 中心頁「清單」分頁（業主 2026-11-21 更正）：列出這個中心所有課程裡的「每一個教材」（章節與其他教材，不只是課程本身），
@@ -83,31 +83,46 @@ export function CenterMaterialsCard({ courseIds }: { courseIds: string[] }) {
   if (loading && !data) return <LoadingLadybug />;
   const items = data?.items ?? [];
   if (!items.length) return null;
+  // 依「區塊名稱（沒有區塊就用課程名稱）」分組，每組上方一條標題列＋教材數；組與組之間依該組最新的日期由新到舊。
+  const groups = new Map<string, { title: string; items: CenterMaterial[]; latest: string }>();
+  for (const m of items) {
+    const k = `${m.courseId}|${m.block ?? ""}`;
+    const g = groups.get(k) ?? { title: m.block || m.courseTitle, items: [], latest: "" };
+    g.items.push(m);
+    if ((m.eventDate ?? "") > g.latest) g.latest = m.eventDate ?? "";
+    groups.set(k, g);
+  }
+  const ordered = [...groups.values()].sort((x, y) => (y.latest > x.latest ? 1 : y.latest < x.latest ? -1 : 0));
   return (
-    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-      {items.map((m) => {
-        const who = [m.sharer, m.sharerRankName].filter(Boolean).join(" ");
-        return (
-          <CompactRow
-            key={m.id}
-            label={m.title}
-            onPress={() => router.push((m.kind === "chapter" ? lessonHref(m.courseId, m.id) : `/course/${m.courseId}`) as never)}
-            leading={
-              <View style={{ width: 40, alignItems: "center" }}>
-                {m.iconType ? <BrandIcon type={m.iconType} fallback={TYPE_INFO[m.iconType].icon as never} size={36} /> : <Ionicons name="play-circle-outline" size={32} color={c.accent} />}
-              </View>
-            }
-            title={m.title}
-            meta={<MetaLine date={m.eventDate ? eventDays(m.eventDate, null) : undefined} text={who || m.courseTitle} />}
-            actions={
-              <RowButtons>
-                <RowAddToList target={{ kind: "lesson", ref: m.id, ref2: m.courseId }} title={m.title} />
-                <RowShare label={`分享：${m.title}`} onShare={() => shareLink(m.title, `/course/${m.courseId}`, undefined, { title: m.title })} />
-              </RowButtons>
-            }
-          />
-        );
-      })}
-    </Card>
+    <View style={{ gap: space.sm }}>
+      {ordered.map((g, gi) => (
+        <Card key={gi} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+          <ListSection title={g.title} count={g.items.length} />
+          {g.items.map((m) => {
+            const who = [m.sharer, m.sharerRankName].filter(Boolean).join(" ");
+            return (
+              <CompactRow
+                key={m.id}
+                label={m.title}
+                onPress={() => router.push((m.kind === "chapter" ? lessonHref(m.courseId, m.id) : `/course/${m.courseId}`) as never)}
+                leading={
+                  <View style={{ width: 40, alignItems: "center" }}>
+                    {m.iconType ? <BrandIcon type={m.iconType} fallback={TYPE_INFO[m.iconType].icon as never} size={30} /> : <Ionicons name="play-circle-outline" size={28} color={c.accent} />}
+                  </View>
+                }
+                title={m.title}
+                meta={<MetaLine date={m.eventDate ? eventDays(m.eventDate, null) : undefined} text={who || undefined} />}
+                actions={
+                  <RowButtons>
+                    <RowAddToList target={{ kind: "lesson", ref: m.id, ref2: m.courseId }} title={m.title} />
+                    <RowShare label={`分享：${m.title}`} onShare={() => shareLink(m.title, `/course/${m.courseId}`, undefined, { title: m.title })} />
+                  </RowButtons>
+                }
+              />
+            );
+          })}
+        </Card>
+      ))}
+    </View>
   );
 }

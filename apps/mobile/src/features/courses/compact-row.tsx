@@ -69,10 +69,10 @@ export function ListSection({ title, count }: { title: string; count: number }) 
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 3, paddingLeft: space.sm, paddingRight: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 1, paddingLeft: space.sm, paddingRight: 0, borderBottomWidth: StyleSheet.hairlineWidth },
   actions: { marginRight: -space.xs },
   buttons: { flexDirection: "row", alignItems: "center", gap: 0 },
-  tight: { lineHeight: 20 },
-  chip: { fontSize: 12, lineHeight: 18, fontWeight: "700", borderRadius: 9, overflow: "hidden" },
-  section: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.sm, paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  tight: { lineHeight: 18 },
+  chip: { fontSize: 12, lineHeight: 17, fontWeight: "700", borderRadius: 9, overflow: "hidden" },
+  section: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 6, paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
 });

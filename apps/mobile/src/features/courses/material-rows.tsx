@@ -48,10 +48,10 @@ export function MaterialRow({ course, lesson, listStyle, playingId, onPlay, onBl
   const ls = listStyle ?? course.isList;
   const link = lesson.linkType && !lesson.full ? lesson : null;
   const playing = !link && playingId === lesson.id;
-  const icon = themeBadge(lesson, lesson.iconType && !lesson.locked ? <BrandIcon type={lesson.iconType} fallback={TYPE_INFO[lesson.iconType].icon as never} size={36} /> : undefined, c.accent);
+  const icon = themeBadge(lesson, lesson.iconType && !lesson.locked ? <BrandIcon type={lesson.iconType} fallback={TYPE_INFO[lesson.iconType].icon as never} size={30} /> : undefined, c.accent);
   const leading = (
     <View style={{ width: Math.round(42 * UI_SCALE), alignItems: "center" }}>
-      {playing ? <NowPlayingIcon lessonId={lesson.id} /> : icon ?? <Ionicons name={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"} size={32} color={c.textMuted} />}
+      {playing ? <NowPlayingIcon lessonId={lesson.id} /> : icon ?? <Ionicons name={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"} size={28} color={c.textMuted} />}
     </View>
   );
   const text = ls ? sharerLine(lesson) : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ");
@@ -111,7 +111,7 @@ export function RowShare({ label, onShare }: { label: string; onShare: () => Pro
     if ((await onShare()) === "copied") flashText("已複製連結");
   };
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={{ top: 8, bottom: 8, left: 3, right: 6 }} style={({ pressed }) => [{ width: 30, height: 32, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={{ top: 8, bottom: 8, left: 3, right: 6 }} style={({ pressed }) => [{ width: 30, height: 28, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
       <ShareIcon size={22} color={c.accent} />
     </Pressable>
   );
