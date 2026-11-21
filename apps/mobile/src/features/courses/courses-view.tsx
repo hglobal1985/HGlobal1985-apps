@@ -1,5 +1,6 @@
 import { trackFeature } from "@/lib/feature-track";
-import { router, useFocusEffect, useNavigation } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { clearCoursesReset, consumeCoursesReset, onCoursesReset } from "@/lib/courses-reset";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, BackHandler, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -193,23 +194,27 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     }
     if (m !== "center") AsyncStorage.setItem(MODE_KEY, m).catch(() => undefined);
   };
-  // 每一次點底部選單的「課程」（業主 2026-11-21）：一律恢復成預設的「所有系列」檢視（不管上次停在單元、教育中心、搜尋或某個中心頁）。
-  const navigation = useNavigation();
+  // 每一次點底部選單的「課程」（業主 2026-11-21）：不論目前在哪一頁，一律回到寰宇大學「所有系列」檢視（模式、中心、搜尋、分類、品牌篩選全部還原）。
+  const resetAll = () => {
+    setMode("series");
+    setCenter(ALL);
+    setSearchOpen(false);
+    setQ("");
+    setPicked("");
+    setModeBeforeSearch(null);
+    setModeBeforeCat(null);
+    setSelCats([]);
+    setBrandSel(null);
+    syncUrl(ALL, ALL);
+    AsyncStorage.setItem(MODE_KEY, "series").catch(() => undefined);
+  };
   useEffect(() => {
     if (inStack) return;
-    return navigation.addListener("tabPress" as never, (() => {
-      setMode("series");
-      setCenter(ALL);
-      setSearchOpen(false);
-      setQ("");
-      setPicked("");
-      setModeBeforeSearch(null);
-      setModeBeforeCat(null);
-      setSelCats([]);
-      setBrandSel(null);
-      syncUrl(ALL, ALL);
-      AsyncStorage.setItem(MODE_KEY, "series").catch(() => undefined);
-    }) as never);
+    if (consumeCoursesReset()) resetAll(); // 從課程內頁按選單回來：畫面是新建立的，補做還原
+    return onCoursesReset(() => {
+      clearCoursesReset();
+      resetAll();
+    });
   }); // eslint-disable-line react-hooks/exhaustive-deps
   const [rowW, setRowW] = useState(0);
   const [wantIndex, setWantIndex] = useState(false);
