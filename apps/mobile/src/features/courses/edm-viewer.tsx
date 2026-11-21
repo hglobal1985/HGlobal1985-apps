@@ -1,4 +1,5 @@
 import { trackFeature } from "@/lib/feature-track";
+import { enterFullscreen, exitFullscreen } from "@/lib/fullscreen";
 import { useThumb } from "@/lib/thumb";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +15,10 @@ import { flashText } from "@/ui/flash-notice";
 import { useUiConfig } from "@/state/ui-config";
 import { BrandCover, AppText, CornerRibbon, CourseCover, ShareIcon, StageFrame, dimStyle, useDimLayer } from "@/ui";
 import { ribbonsFor } from "./ribbons";
+import { CoverAlbum } from "./album";
+import { CoverCarousel } from "./cover-carousel";
+import { useCoverMedia } from "./cover-media";
+import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CoverBadges, type CoverStats } from "./cover-stats";
 
 /**
@@ -22,7 +27,7 @@ import { CoverBadges, type CoverStats } from "./cover-stats";
  * 點一下彈出小視窗可放大縮小、下載、分享。
  * 沒有 EDM 時顯示色塊。外框用 StageFrame，高度與上課頁的影片區完全相同。
  */
-export function EdmStage({ course, stats }: { course: CourseSummary; stats?: CoverStats }) {
+export function EdmStage({ course, stats, canManageAlbum = false }: { course: CourseSummary; stats?: CoverStats; /** 編輯模式：右上角出現「封面相簿」鈕（上傳輪播用的照片與短影音）。 */ canManageAlbum?: boolean }) {
   const thumb = useThumb();
   const { width: winW } = useWindowDimensions();
   const [open, setOpen] = useState(false);
@@ -30,9 +35,19 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
   const { member } = useSession();
   const { config } = useUiConfig();
   const ribbons = ribbonsFor(course, member, config);
+  // 封面輪播（業主 2026-11-21）：這門課上傳了照片或短影音就輪播（手動上傳 > 品牌 logo 的規則之外，輪播最優先）。
+  const cm = useCoverMedia("course", course.id);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [albumOpen, setAlbumOpen] = useState(false);
+  const images = cm.items.filter((x) => x.kind === "image");
   return (
     <StageFrame>
-      {course.brand ? (
+      {cm.items.length ? (
+        <View style={StyleSheet.absoluteFill} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+          {box.w ? <CoverCarousel items={cm.items} width={box.w} height={box.h} paused={openId !== null || albumOpen} onOpen={setOpenId} /> : null}
+        </View>
+      ) : course.brand ? (
         // 品牌 logo 封面點一下也能放大、下載、分享（業主 2026-11-18：與一般課程 EDM 同一個放大視窗）。
         <Pressable accessibilityRole="button" accessibilityLabel="放大封面" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill}>
           <BrandCover brand={course.brand} fill />
@@ -46,6 +61,21 @@ export function EdmStage({ course, stats }: { course: CourseSummary; stats?: Cov
         </View>
       ) : null}
       {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={2} /> : null}
+      {canManageAlbum ? (
+        <Pressable accessibilityRole="button" accessibilityLabel="封面相簿" onPress={() => setAlbumOpen(true)} style={{ position: "absolute", right: 12, top: 12, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.55)" }}>
+          <Ionicons name="images-outline" size={18} color="#fff" />
+          <AppText variant="callout" style={{ color: "#fff", fontWeight: "800" }}>{`封面相簿 ${cm.items.length}`}</AppText>
+        </Pressable>
+      ) : null}
+      {albumOpen ? (
+        <BottomSheet onClose={() => setAlbumOpen(false)}>
+          <AppText variant="headline">封面輪播相簿</AppText>
+          <SheetScroll>
+            <CoverAlbum kind="course" ownerKey={course.id} title={course.title} items={cm.items} canEdit onChanged={cm.reload} />
+          </SheetScroll>
+        </BottomSheet>
+      ) : null}
+      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={course.title} items={images.map((x) => ({ uri: x.url, title: course.title }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
       {course.brand && open ? <EdmLightbox uri={course.brand.logoUrl} bg={(scheme === "dark" && course.brand.bgColorDark) || course.brand.bgColor || undefined} title={course.title} onClose={() => setOpen(false)} /> : null}
       {!course.brand && course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
     </StageFrame>
@@ -96,9 +126,21 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
  * 站內小視窗：視窗大小剛好貼合圖片（沒有標題、沒有多餘留白），放大縮小、下載、分享按鈕都疊在圖片上。
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
+/** 操作說明縮成十字圖示後，這次開啟網站期間都記住（不用每張圖再按一次）。 */
+let helpHiddenMemory = false;
 export type LightboxItem = { uri: string; title: string; bg?: string };
 export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri: string; title: string; onClose: () => void; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
   useEffect(() => trackFeature("edm_zoom"), []);
+  // 真正的全螢幕：進來時收起瀏覽器的網址列與按鈕，關閉時還原（lib/fullscreen.ts；不支援的瀏覽器略過）。
+  useEffect(() => {
+    enterFullscreen();
+    return exitFullscreen;
+  }, []);
+  const [hideHelp, setHideHelp] = useState(helpHiddenMemory);
+  const setHelp = (hide: boolean) => {
+    helpHiddenMemory = hide;
+    setHideHelp(hide);
+  };
   useDimLayer();
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
@@ -231,7 +273,7 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
   const hint = many ? "左右滑動換張、兩指放大縮小" : "可拖曳移動、兩指放大縮小";
   const [helpW, setHelpW] = useState(0);
   // 單行自動縮小：中文每字約一個字寬；可用寬度＝長條寬度扣掉圖示與左右留白。
-  const helpSize = helpW ? Math.max(11, Math.min(26, Math.floor((helpW - 32 - 26 - 10) / (hint.length * 1.05)))) : 18;
+  const helpSize = helpW ? Math.max(11, Math.min(26, Math.floor((helpW - 32 - 24 - 10 - 60) / (hint.length * 1.05)))) : 18;
   const desktop = Platform.OS === "web" && win.width >= 700;
   const imgBg = cur.bg ?? bg;
   return (
@@ -257,6 +299,7 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
           <View style={[styles.top, land && { flexDirection: "row-reverse", alignItems: "flex-start" }]} pointerEvents="box-none">
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
               <View style={styles.row} pointerEvents="box-none">
+                {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" />) : null}
                 {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
                 {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
                 {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
@@ -269,12 +312,16 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
               ) : null}
             </View>
             {/* 操作說明：強制單行，字太多時自動縮小（業主 2026-11-21）。 */}
-            <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} onLayout={(e) => setHelpW(e.nativeEvent.layout.width)} pointerEvents="none">
-              <Ionicons name="move" size={26} color="#fff" />
-              <AppText variant="caption" numberOfLines={1} {...NO_SCALE} style={{ color: "#fff", fontWeight: "800", fontSize: helpSize, lineHeight: helpSize + 8, flexShrink: 1 }}>
-                {hint}
-              </AppText>
-            </View>
+            {!hideHelp ? (
+              <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} onLayout={(e) => setHelpW(e.nativeEvent.layout.width)} pointerEvents="box-none">
+                <Ionicons name="move" size={24} color="#fff" />
+                <AppText variant="caption" numberOfLines={1} {...NO_SCALE} style={{ color: "#fff", fontWeight: "800", fontSize: helpSize, lineHeight: helpSize + 8, flexShrink: 1, flexGrow: 1 }}>
+                  {hint}
+                </AppText>
+                {/* 縮小：按了變成十字圖示，排在下載鈕左邊（業主 2026-11-21）。 */}
+                {tool("縮小操作說明", () => setHelp(true), <Ionicons name="contract" size={24} color="#fff" />)}
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
@@ -290,5 +337,5 @@ const styles = StyleSheet.create({
   top: { position: "absolute", left: 16, right: 16, top: 16, gap: space.xs },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
-  help: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: "rgba(0,0,0,0.5)" },
+  help: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, borderRadius: 30, backgroundColor: "rgba(0,0,0,0.5)" },
 });

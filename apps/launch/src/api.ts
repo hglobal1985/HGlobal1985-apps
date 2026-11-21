@@ -71,6 +71,9 @@ import {
   zoneOf,
   type ThumbSettings,
   THUMB_WIDE_WIDTHS,
+  COVER_MEDIA_MAX,
+  type CoverMediaKind,
+  type CoverMediaItem,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
@@ -2395,6 +2398,80 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 }
 
 /** 中心 EDM：總部任何中心（名稱必須在會員中心清單內）；會長、音控、有「修改別人」權限的小編只能改自己中心。 */
+// ---------- 封面輪播與相簿的共用函式 ----------
+type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; kind?: string; poster_key?: string | null };
+const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
+const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
+function coverItem(r: { id: string; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
+  return {
+    id: r.id,
+    kind: r.kind,
+    url: r.kind === "video" ? `/api/v2/media/album?k=${encodeURIComponent(r.r2_key)}` : pubUrl(r.r2_key, 0),
+    posterUrl: r.poster_key ? pubUrl(r.poster_key, 0) : null,
+    width: r.width,
+    height: r.height,
+    durationSec: r.duration_sec,
+  };
+}
+/** lookup：center＝中心鑰匙（centerKey）；series＝系列名稱；course＝課程編號。 */
+async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string): Promise<CoverMediaItem[]> {
+  const where = kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?";
+  const st = db.prepare(`SELECT id, kind, r2_key, poster_key, width, height, duration_sec FROM cover_media WHERE ${where} ORDER BY position, created_at LIMIT ${COVER_MEDIA_MAX}`);
+  const { results } = await (kind === "center" ? st.bind(lookup) : st.bind(kind, lookup)).all<{ id: string; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+  return results.map(coverItem);
+}
+/** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
+async function requireCoverOwner(ctx: Ctx, fromBody = false): Promise<{ s: Session; kind: CoverMediaKind; lookup: string; centerKey: string | null; ownerKey: string }> {
+  let kind: CoverMediaKind;
+  let key: string;
+  if (fromBody) {
+    const c = ctx.req.clone();
+    const b = (await c.json().catch(() => ({}))) as { kind?: unknown; key?: unknown };
+    kind = coverKindOf(typeof b.kind === "string" ? b.kind : null);
+    key = typeof b.key === "string" ? b.key.trim().slice(0, 100) : "";
+  } else {
+    kind = coverKindOf(ctx.url.searchParams.get("kind"));
+    key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
+  }
+  if (!key) fail(400, "invalid_key", "請指定要放封面的位置");
+  if (kind === "center") {
+    const { s, center } = await requireCenterArt(ctx, key);
+    return { s, kind, lookup: center.key, centerKey: center.key, ownerKey: "" };
+  }
+  if (kind === "series") {
+    const s = requireSuperAdmin(ctx);
+    return { s, kind, lookup: key, centerKey: null, ownerKey: key };
+  }
+  const s = requireMember(ctx);
+  await requireCourseArt(ctx, s, key);
+  return { s, kind, lookup: key, centerKey: null, ownerKey: key };
+}
+/** 刪除、換預覽圖時：依資料列所屬的封面檢查權限。 */
+async function requireCoverRowOwner(ctx: Ctx, row: CoverRow): Promise<Session> {
+  const s = requireMember(ctx);
+  if (row.owner_kind === "center") {
+    const rights = await rightsOf(ctx);
+    const mine = rights.center && row.center_key === centerKey(rights.center.label);
+    if (!rights.admin && !(mine && (rights.staff || rights.editor?.editOthers))) fail(403, "forbidden", "只能修改自己中心的封面");
+  } else if (row.owner_kind === "series") requireSuperAdmin(ctx);
+  else await requireCourseArt(ctx, s, row.owner_key);
+  return s;
+}
+async function coverRoom(db: D1Database, o: { kind: CoverMediaKind; lookup: string }): Promise<void> {
+  if ((await coverItems(db, o.kind, o.lookup)).length >= COVER_MEDIA_MAX) fail(409, "album_full", `最多放 ${COVER_MEDIA_MAX} 張，請先刪除一些`);
+}
+async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind; centerKey: string | null; ownerKey: string }, x: { kind: "image" | "video"; r2Key: string; posterKey: string | null; width: number; height: number; durationSec: number; bytes: number; by: string }): Promise<string> {
+  const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+  const where = o.kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?";
+  const st = db.prepare(`SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cover_media WHERE ${where}`);
+  const pos = (await (o.kind === "center" ? st.bind(o.centerKey) : st.bind(o.kind, o.ownerKey)).first<{ p: number }>())?.p ?? 0;
+  await db.batch([
+    db.prepare("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, poster_key, width, height, duration_sec, bytes, position, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, o.kind, o.centerKey, o.ownerKey, x.kind, x.r2Key, x.posterKey, x.width, x.height, x.durationSec, x.bytes, pos, x.by),
+    audit(db, x.by, "cover_media.add", o.kind, o.centerKey ?? o.ownerKey, id),
+  ]);
+  return id;
+}
+
 async function requireCenterArt(ctx: Ctx, label: string | null): Promise<{ s: Session; center: { key: string; label: string } }> {
   const s = requireMember(ctx);
   const rights = await rightsOf(ctx);
@@ -3596,6 +3673,141 @@ const routes: [string, RegExp, Handler][] = [
       if (had) await ctx.db.prepare("DELETE FROM center_subscriptions WHERE member_sub = ? AND center_key = ?").bind(s.sub, key).run();
       else await ctx.db.prepare("INSERT OR IGNORE INTO center_subscriptions (member_sub, center_key) VALUES (?, ?)").bind(s.sub, key).run();
       return subscriptionState(ctx, key);
+    },
+  ],
+  // ---------- 封面輪播與相簿（業主 2026-11-21）：中心、系列、課程共用 cover_media ----------
+  [
+    "GET",
+    /^\/cover-media$/,
+    async (ctx) => {
+      // 公開：封面輪播與中心「相簿」讀同一份資料。?kind=center|series|course&key=中心名稱|系列名稱|課程編號
+      const kind = coverKindOf(ctx.url.searchParams.get("kind"));
+      const key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
+      if (!key) return [];
+      return coverItems(ctx.db, kind, kind === "center" ? centerKey(key) : key);
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/cover-media$/,
+    async (ctx) => {
+      // 上傳一張照片（內文是圖片檔；瀏覽器已先壓縮，伺服器再照設定壓縮一次）。?kind&key&w&h
+      const o = await requireCoverOwner(ctx);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      if (!data.byteLength || data.byteLength > 8 * 1024 * 1024) fail(413, "invalid_size", "圖片大小需在 8MB 以內（上傳時會自動壓縮）");
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      await coverRoom(ctx.db, o);
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "center");
+      const key = `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${renameForType("x.jpg", shrunk.type).split(".").pop()}`;
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
+      const id = await addCoverRow(ctx.db, o, { kind: "image", r2Key: key, posterKey: null, width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")), durationSec: 0, bytes: shrunk.data.byteLength, by: o.s.sub });
+      return { id, items: await coverItems(ctx.db, o.kind, o.lookup) };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/cover-media\/video$/,
+    async (ctx) => {
+      // 上傳一支短影音（在上傳者的瀏覽器內已依「設定 › 儲存空間管理 › 封面輪播與短影音」壓縮）。?kind&key&w&h&dur
+      const o = await requireCoverOwner(ctx);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "檔案儲存空間尚未啟用");
+      const cfg = (await loadConfig(ctx.db)).app;
+      const dur = Math.round(Number(ctx.url.searchParams.get("dur")) || 0);
+      if (dur > cfg.videoMaxSec + 2) fail(413, "video_too_long", `影片太長，上限 ${cfg.videoMaxSec} 秒`);
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      if (!data.byteLength) fail(400, "invalid_video", "沒有收到影片");
+      if (data.byteLength > cfg.videoMaxMb * 1024 * 1024) fail(413, "video_too_large", `影片壓縮後仍超過 ${cfg.videoMaxMb}MB，請剪短或降低畫質後再試`);
+      const isMp4 = data.byteLength > 12 && String.fromCharCode(data[4]!, data[5]!, data[6]!, data[7]!) === "ftyp";
+      const isWebm = data.byteLength > 4 && data[0] === 0x1a && data[1] === 0x45 && data[2] === 0xdf && data[3] === 0xa3;
+      if (!isMp4 && !isWebm) fail(400, "invalid_video", "請上傳 MP4 或 WebM 影片");
+      await coverRoom(ctx.db, o);
+      const key = `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${isMp4 ? "mp4" : "webm"}`;
+      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: isMp4 ? "video/mp4" : "video/webm" } });
+      const id = await addCoverRow(ctx.db, o, { kind: "video", r2Key: key, posterKey: null, width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")), durationSec: Math.min(dur, 600), bytes: data.byteLength, by: o.s.sub });
+      return { id, items: await coverItems(ctx.db, o.kind, o.lookup) };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/cover-media\/([\w-]{1,40})\/poster$/,
+    async (ctx, [id]) => {
+      // 影片的預覽圖（第一格畫面，瀏覽器擷取）：影片還沒載入時先顯示它。
+      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, kind, poster_key FROM cover_media WHERE id = ?").bind(id).first<CoverRow>();
+      if (!row || row.kind !== "video") return fail(404, "not_found", "找不到這支影片");
+      const s = await requireCoverRowOwner(ctx, row);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      if (!data.byteLength || data.byteLength > 2 * 1024 * 1024) fail(413, "invalid_size", "預覽圖需在 2MB 以內");
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG 或 PNG 圖片");
+      const key = `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${img.type === "image/png" ? "png" : "jpg"}`;
+      await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: img.type } });
+      await ctx.db.prepare("UPDATE cover_media SET poster_key = ? WHERE id = ?").bind(key, id).run();
+      if (row.poster_key) await bucket.delete(row.poster_key).catch(() => undefined);
+      void s;
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/cover-media\/order$/,
+    async (ctx) => {
+      // 排序：ids＝新的完整順序（只重排這個封面自己的項目；不在清單裡的排最後）。
+      const o = await requireCoverOwner(ctx, true);
+      const body = await readJson<{ ids?: unknown }>(ctx.req);
+      const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string").slice(0, COVER_MEDIA_MAX) : [];
+      const cur = (await coverItems(ctx.db, o.kind, o.lookup)).map((x) => x.id);
+      const next = [...ids.filter((x) => cur.includes(x)), ...cur.filter((x) => !ids.includes(x))];
+      await ctx.db.batch(next.map((id, i) => ctx.db.prepare("UPDATE cover_media SET position = ? WHERE id = ?").bind(i, id)));
+      return { items: await coverItems(ctx.db, o.kind, o.lookup) };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/cover-media\/([\w-]{1,40})$/,
+    async (ctx, [id]) => {
+      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, r2_key, poster_key FROM cover_media WHERE id = ?").bind(id).first<CoverRow & { r2_key: string }>();
+      if (!row) return fail(404, "not_found", "找不到這個項目");
+      const s = await requireCoverRowOwner(ctx, row);
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM cover_media WHERE id = ?").bind(id), audit(ctx.db, s.sub, "cover_media.delete", row.owner_kind, row.center_key ?? row.owner_key, id)]);
+      // 檔案徹底刪除；中心原本的首頁圖（相簿第一張）還被中心首頁圖設定用著時不刪。
+      for (const k of [row.r2_key, row.poster_key]) {
+        if (!k) continue;
+        const shared = await ctx.db.prepare("SELECT 1 AS ok FROM center_art WHERE edm_key = ? OR cover_key = ?").bind(k, k).first();
+        if (!shared) await ctx.env.MEDIA?.delete(k).catch(() => undefined);
+      }
+      const kind = row.owner_kind as CoverMediaKind;
+      return { items: await coverItems(ctx.db, kind, kind === "center" ? row.center_key ?? "" : row.owner_key) };
+    },
+  ],
+  [
+    "GET",
+    /^\/media\/album$/,
+    async (ctx) => {
+      // 相簿裡的短影音（公開，支援 Range，手機播放與拖曳進度條需要）。只服務資料庫裡有的檔案。
+      const key = ctx.url.searchParams.get("k") ?? "";
+      const bucket = ctx.env.MEDIA;
+      if (!bucket || !/^album\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
+      if (!(await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ?").bind(key).first())) return new Response("Not found", { status: 404 });
+      const head = await bucket.head(key);
+      if (!head) return new Response("Not found", { status: 404 });
+      const type = head.httpMetadata?.contentType ?? "video/mp4";
+      const size = head.size;
+      const m = /^bytes=(\d*)-(\d*)$/.exec(ctx.req.headers.get("range") ?? "");
+      const base = { "content-type": type, "accept-ranges": "bytes", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" };
+      if (m && (m[1] || m[2])) {
+        let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+        let end = m[1] && m[2] ? Math.min(size - 1, Number(m[2])) : size - 1;
+        if (!(start <= end) || start >= size) return new Response(null, { status: 416, headers: { ...base, "content-range": `bytes */${size}` } });
+        start = Math.max(0, start);
+        end = Math.min(size - 1, end);
+        const part = await bucket.get(key, { range: { offset: start, length: end - start + 1 } });
+        if (!part) return new Response("Not found", { status: 404 });
+        return new Response(part.body, { status: 206, headers: { ...base, "content-range": `bytes ${start}-${end}/${size}`, "content-length": String(end - start + 1) } });
+      }
+      const obj = await bucket.get(key);
+      if (!obj) return new Response("Not found", { status: 404 });
+      return new Response(obj.body, { headers: { ...base, "content-length": String(size) } });
     },
   ],
   [
@@ -5142,7 +5354,7 @@ const routes: [string, RegExp, Handler][] = [
         cursor = page.cursor;
       }
       const owners = new Map<string, { owner: string; kind: StorageKind }>();
-      const [courses, lessons, atts, centers, series, brands, schedules] = await Promise.all([
+      const [courses, lessons, atts, centers, series, brands, schedules, albums] = await Promise.all([
         ctx.db.prepare("SELECT id, host_center_key, edm_key, cover_key FROM courses").all<{ id: string; host_center_key: string | null; edm_key: string | null; cover_key: string | null }>(),
         ctx.db.prepare("SELECT l.course_id, l.cover_key, l.poster_key, l.media_type, l.media_ref FROM lessons l").all<{ course_id: string; cover_key: string | null; poster_key: string | null; media_type: string; media_ref: string | null }>(),
         ctx.db.prepare("SELECT course_id, r2_key, att_type FROM lesson_attachments WHERE r2_key IS NOT NULL").all<{ course_id: string; r2_key: string; att_type: string }>(),
@@ -5150,6 +5362,7 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("SELECT edm_key, cover_key FROM series_art").all<{ edm_key: string | null; cover_key: string | null }>(),
         ctx.db.prepare("SELECT logo_key, bg_key FROM brand_logos").all<{ logo_key: string | null; bg_key: string | null }>(),
         ctx.db.prepare("SELECT center_key, image_key FROM center_schedules").all<{ center_key: string; image_key: string }>(),
+        ctx.db.prepare("SELECT cm.owner_kind, cm.center_key, cm.owner_key, cm.kind, cm.r2_key, cm.poster_key, c.host_center_key AS course_center FROM cover_media cm LEFT JOIN courses c ON cm.owner_kind = 'course' AND c.id = cm.owner_key").all<{ owner_kind: string; center_key: string | null; owner_key: string; kind: string; r2_key: string; poster_key: string | null; course_center: string | null }>(),
       ]);
       const HQ = "寰宇總部";
       const centerOf = new Map(courses.results.map((c) => [c.id, c.host_center_key || HQ]));
@@ -5174,6 +5387,11 @@ const routes: [string, RegExp, Handler][] = [
         put(x.cover_key, HQ, "image");
       }
       for (const x of schedules.results) put(x.image_key, x.center_key, "image");
+      for (const x of albums.results) {
+        const who = x.owner_kind === "center" ? x.center_key ?? HQ : x.owner_kind === "course" ? x.course_center || HQ : HQ;
+        put(x.r2_key, who, x.kind === "video" ? "other" : "image");
+        put(x.poster_key, who, "image");
+      }
       for (const b of brands.results) {
         put(b.logo_key, HQ, "image");
         put(b.bg_key, HQ, "image");
@@ -5239,8 +5457,8 @@ const routes: [string, RegExp, Handler][] = [
       // 課程封面與 EDM 是公開圖片（課程列表本來就要顯示；EDM 開放下載）。只服務資料庫裡仍在使用的檔案。
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
-      if (!bucket || !/^(edm|cover|series|center|lesson|brand|schedule)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : null); // D1 一個查詢最多串 5 個 UNION，課表另外查
+      if (!bucket || !/^(edm|cover|series|center|lesson|brand|schedule|album)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
+      const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : key.startsWith("album/") ? await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first() : null); // D1 一個查詢最多串 5 個 UNION，課表另外查
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       // 即時縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受設定頁勾選的幾種，避免縮圖次數暴增）。

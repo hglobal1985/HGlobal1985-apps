@@ -454,6 +454,11 @@ export type Notice = { id: string; title: string; body: string; link: string; re
 export type CentralReview = { id: string; /** 申請人（只在審核者本人開啟時即時讀取，不保存）。 */ member_id?: string; display_name: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
 /** available＝false：這位會員沒有審核權限、或中央暫時不可用（畫面直接不顯示審核區）。 */
 /** App 內指派職務（業主 2026-11-21，中央串接指令 2026-11-21.1）：職務選項一律用中央回傳的 assignable_roles，不寫死。 */
+/** 每個封面（中心、課程、系列）最多放幾張照片／影片（業主 2026-11-21）。 */
+export const COVER_MEDIA_MAX = 100;
+export type CoverMediaKind = "center" | "series" | "course";
+/** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
+export type CoverMediaItem = { id: string; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number };
 export type StaffRole = { value: string; label: string };
 export type StaffMember = { memberId: string; name: string; center: string; roles: string[] };
 /** available＝false：中央判斷沒有權限（任何非 200 都當沒有權限）；members 只在這次請求即時讀取，不保存。 */
@@ -942,6 +947,13 @@ export type AppSettings = {
   /** EDM 海報原圖：長邊像素與畫質（小字與 QR code 要看得清楚，預設較高）。 */
   edmMaxSide: number;
   edmQuality: number;
+  /** 封面輪播與短影音（業主 2026-11-21，在「儲存空間管理」同一區調整）：照片停留秒數、短影音壓縮規範（在上傳者的瀏覽器內壓縮）。 */
+  coverSec: number;
+  videoMaxHeight: number;
+  videoKbps: number;
+  videoFps: number;
+  videoMaxMb: number;
+  videoMaxSec: number;
   /** 所有上傳圖片存進雲端時統一轉成的格式（業主 2026-11-20；預設 JPEG，相容性最好）。 */
   storeFormat: "jpeg" | "webp" | "avif";
   /** Cloudflare 即時縮圖（業主 2026-11-20 小範圍試用）：封面縮圖的所有選項，在「設定 › Cloudflare即時縮圖」調整。 */
@@ -968,6 +980,12 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   centerQuality: 95,
   edmMaxSide: 2048,
   edmQuality: 90,
+  coverSec: 2,
+  videoMaxHeight: 720,
+  videoKbps: 2500,
+  videoFps: 30,
+  videoMaxMb: 25,
+  videoMaxSec: 60,
   storeFormat: "jpeg",
   thumb: { enabled: false, widths: [320, 480, 640], height: 0, fit: "scale-down", gravity: "auto", format: "auto", quality: 70, qualityLevel: "", anim: true, metadata: "none", rotate: 0, flip: "", blur: 0, sharpen: 0, brightness: 1, contrast: 1, gamma: 1, saturation: 1, background: "", trim: 0, borderWidth: 0, borderColor: "#ffffff" },
 };
