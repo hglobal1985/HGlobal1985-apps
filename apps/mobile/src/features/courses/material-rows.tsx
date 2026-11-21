@@ -16,7 +16,7 @@ import { space } from "@/theme/tokens";
 import { Card, ShareIcon } from "@/ui";
 import { NowPlayingIcon } from "@/ui/now-playing-icon";
 import { UI_SCALE } from "@/theme/ui-scale";
-import { CompactRow, MetaLine, RowButtons } from "./compact-row";
+import { CompactRow, LIST_CARD, MetaLine, RowButtons } from "./compact-row";
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 import { SpeakerMark } from "./speaker-mark";
@@ -84,7 +84,7 @@ export function MaterialRows({ course, listStyle = true, playingId, onPlay, onBl
   const items = course.lessons.filter((l) => l.material && !l.section && !l.full && (l.ready || course.can?.edit));
   if (!items.length) return null;
   return (
-    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+    <Card style={LIST_CARD}>
       {items.map((l) => (
         <MaterialRow key={l.id} course={course} lesson={l} listStyle={listStyle} playingId={playingId} onPlay={onPlay} onBlockedPress={onBlockedPress} />
       ))}

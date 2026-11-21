@@ -55,6 +55,7 @@ export function HeaderAddToList({ target, title }: { target: ListRef; title: str
         style={[styles.headBtn, on && { backgroundColor: "#FFD43B" }]}
       >
         <ListIcon size={22} color={c.accent} added={on} />
+        <AppText style={{ color: c.accent, fontSize: 17, fontWeight: "600" }}>清單</AppText>
         {on ? (
           <View style={[styles.badge, { backgroundColor: c.accent }]}>
             <AppText variant="caption" style={{ color: "#fff", fontWeight: "800", fontSize: 11, lineHeight: 14 }}>
@@ -225,7 +226,7 @@ export function AddToListSheet({ target, title, onClose }: { target: ListRef; ti
 }
 
 const styles = StyleSheet.create({
-  headBtn: { minWidth: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  headBtn: { minWidth: 40, height: 40, borderRadius: 20, flexDirection: "row", gap: 4, paddingHorizontal: 8, alignItems: "center", justifyContent: "center" },
   badge: { position: "absolute", top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
   rowBtn: { width: 30, height: 28, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: minTouch + 8, borderTopWidth: StyleSheet.hairlineWidth },
