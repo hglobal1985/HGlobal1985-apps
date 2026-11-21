@@ -8,7 +8,7 @@ import { trackFeature } from "@/lib/feature-track";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, GuestGate, LoadingView, Screen } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, GuestGate, LoadingView, Screen, ThumbFallback } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 /** 設定 › 我的清單：自己建立的所有清單（點進去編輯、看點擊）。新增清單在這裡或在任何內容的「加入我的清單」面板都可以。 */
@@ -49,7 +49,7 @@ export default function MyListsScreen() {
       {data?.lists.map((l) => (
         <Pressable key={l.id} accessibilityRole="button" accessibilityLabel={l.title} onPress={() => router.push(`/my-list/${l.id}` as never)}>
           <Card style={styles.card}>
-            <View style={[styles.cover, { backgroundColor: c.surfaceMuted }]}>{l.coverUrl ? <Image source={{ uri: l.coverUrl }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <Ionicons name="list-outline" size={28} color={c.textMuted} />}</View>
+            <View style={[styles.cover, { backgroundColor: c.surfaceMuted }]}>{l.coverUrl ? <Image source={{ uri: l.coverUrl }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback size={28} />}</View>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="headline" numberOfLines={1}>
                 {l.title}

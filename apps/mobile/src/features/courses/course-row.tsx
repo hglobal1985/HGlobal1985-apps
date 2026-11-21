@@ -8,14 +8,13 @@ import { useUiConfig } from "@/state/ui-config";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { BrandCover, AppText, CountPill, CourseCover } from "@/ui";
+import { BrandCover, AppText, CountPill, ThumbFallback } from "@/ui";
 import { fadedStyle } from "@/ui/fade-style";
 import { styles } from "./chapter-list";
 import { shareLink } from "@/lib/share";
 import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
 import { ribbonsFor } from "./ribbons";
-import { displayName } from "./sort";
 
 /** 連在一起的清單列（業主 2026-11-19）：沒有外框、沒有圓角、列與列之間不留空，只有一條細分隔線（同教材清單、課程章節清單）；外層放進同一張 Card。 */
 const joined = { borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderRadius: 0, marginBottom: 0, paddingHorizontal: 0, paddingVertical: space.sm, backgroundColor: "transparent" } as const;
@@ -37,7 +36,7 @@ export function CourseRow({ course, last }: { course: CourseSummary; last?: bool
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${date} ${course.title}`} onPress={() => router.push(`/course/${course.id}`)} style={[styles.row, joined, { borderBottomColor: c.border }, last && { borderBottomWidth: 0 }, ...(course.materialCount === 0 ? fadedStyle : []), course.seriesHidden && { opacity: 0.4 }]}>
       <View style={styles.thumb}>
-        {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: thumb(resolveUrl(img), 96) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <CourseCover theme={course.theme} label="" title={displayName(course)} fill />}
+        {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: thumb(resolveUrl(img), 96) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback />}
       </View>
       <View style={styles.mid}>
         <AppText variant="callout" style={{ fontWeight: "800" }} numberOfLines={2}>

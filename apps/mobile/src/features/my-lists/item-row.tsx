@@ -4,7 +4,7 @@ import { Image, StyleSheet, View } from "react-native";
 import { CompactRow, MetaLine } from "@/features/courses/compact-row";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText } from "@/ui";
+import { AppText, ThumbFallback } from "@/ui";
 import { itemHref } from "./links";
 import type { ListKind } from "./store";
 
@@ -25,7 +25,7 @@ export function ListItemRow({ item, children }: { item: ListItem; children?: Rea
         faded={item.missing}
         onPress={item.missing ? undefined : () => router.push(itemHref(item) as never)}
         leading={
-          <View style={[styles.thumb, { backgroundColor: c.surfaceMuted }]}>{item.coverUrl ? <Image source={{ uri: item.coverUrl }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}</View>
+          <View style={[styles.thumb, { backgroundColor: c.surfaceMuted }]}>{item.coverUrl ? <Image source={{ uri: item.coverUrl }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback />}</View>
         }
         title={item.title}
         meta={

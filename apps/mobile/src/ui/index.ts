@@ -33,6 +33,7 @@ export { SaplingIcon } from "./sapling-icon";
 export { LoginPrompt } from "./login-prompt";
 export { InstallCard } from "./install-card";
 export { BrandCover } from "./brand-cover";
+export { ThumbFallback } from "./thumb-fallback";
 export { GuestGate } from "./guest-gate";
 export { InAppBrowserBanner } from "./in-app-banner";
 export { LoadingSapling } from "./loading-sapling";
