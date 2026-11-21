@@ -39,3 +39,4 @@ export { LoadingSapling } from "./loading-sapling";
 export { LoadingLadybug } from "./loading-ladybug";
 export { DIM_ALPHA, DIM_BLUR, DIM_COLOR, DimBackdrop, dimStyle, hasDimLayer, useDimLayer } from "./dim-backdrop";
 export { CardGrid } from "./card-grid";
+export { SegmentTabs } from "./segment-tabs";

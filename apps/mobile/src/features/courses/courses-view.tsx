@@ -35,7 +35,7 @@ import { portraitColumns, tileColumns, useLayout } from "@/theme/layout";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Card, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView, LoadingLadybug, Screen, TopBar, TopBarButton } from "@/ui";
+import { AppText, Card, SegmentTabs, EmptyState, LoginPrompt, ErrorView, ListRow, LoadingView, LoadingLadybug, Screen, TopBar, TopBarButton } from "@/ui";
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
@@ -557,15 +557,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} /> : null}
       {flat && nCourse > 0 && nList > 0 ? (
-        <View style={[styles.kindSeg, { backgroundColor: c.surfaceMuted }]} accessibilityRole="tablist">
-          {(["course", "list"] as const).map((k) => (
-            <Pressable key={k} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} onPress={() => setKindTab(k)} style={[styles.kindBtn, tab === k ? { backgroundColor: c.accent } : null]}>
-              <AppText variant="callout" style={{ fontWeight: "800", color: tab === k ? c.textOnAccent : c.text }}>
-                {k === "course" ? `課程 ${nCourse}` : `清單 ${nList}`}
-              </AppText>
-            </Pressable>
-          ))}
-        </View>
+        <SegmentTabs options={[{ key: "course", label: `課程 ${nCourse}` }, { key: "list", label: `清單 ${nList}` }]} value={tab} onChange={setKindTab} />
       ) : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
