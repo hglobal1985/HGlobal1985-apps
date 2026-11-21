@@ -10,9 +10,8 @@ import { ChapterList } from "./lesson-list";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { BrandCover, AppText, Button, SheetAction, SheetRow, SheetThumb } from "@/ui";
+import { BrandCover, AppText, Button, SheetAction, SheetRow, SheetThumb, ThumbFallback } from "@/ui";
 import { SheetIconBox } from "@/ui/sheet-row";
-import { CourseCover } from "@/ui/course-cover";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
@@ -68,8 +67,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
                 ) : b.brand ? (
                   <BrandCover brand={b.brand} fill />
                 ) : (
-                  // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
-                  <CourseCover theme="" label="" title={b.title} fill />
+                  <ThumbFallback />
                 )}
               </SheetThumb>
             }
@@ -152,7 +150,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             }}
             leading={
               <SheetThumb>
-                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: thumb(resolveUrl((x.coverUrl || x.edmUrl) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <CourseCover theme={x.theme} label="" title={displayName(x)} fill />}
+                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: thumb(resolveUrl((x.coverUrl || x.edmUrl) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <ThumbFallback />}
               </SheetThumb>
             }
             // 素材：清單卡名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）
