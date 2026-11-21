@@ -550,9 +550,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
           } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+      {/* 廣播公告緊貼封面正下方、左右滿版（業主 2026-11-21），所以放在第一個。 */}
+      {activeCenter !== ALL && bc.data?.items.length ? <CenterBroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setBcOpen(true)} /> : null}
       <LoginPrompt />
       {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
-      {activeCenter !== ALL && bc.data?.items.length ? <CenterBroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setBcOpen(true)} /> : null}
       {centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} /> : null}
       {flat && nCourse > 0 && nList > 0 ? (

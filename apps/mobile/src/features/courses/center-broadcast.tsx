@@ -2,9 +2,10 @@ import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useRef, useState } from "react";
 import { Animated, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { useApi } from "@/state/session";
+import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Icon } from "@/ui";
+import { AppText, Button } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 
 export type Broadcasts = { seconds: number; items: { id: string; text: string; date: string }[] };
@@ -15,11 +16,12 @@ export function useCenterBroadcasts(center: string) {
 }
 
 /**
- * 中心頁地址下方的「廣播公告」黃色橫條（業主 2026-11-17）：強制只顯示一行，太長就「… 更多」；
+ * 中心頁封面正下方的「廣播公告」黃色橫條（業主 2026-11-17；2026-11-21 改成緊貼封面、左右滿版、沒有圖示的樣式，只有文字與「更多」）：強制只顯示一行，太長就「… 更多」；
  * 依設定的秒數（預設 2 秒）自動輪播；手指上下左右滑動可切換；點一下彈出完整公告清單（日期＋內容）。顏色用網站標準亮黃色（同「已付費」標籤）。
  */
 export function CenterBroadcastBand({ items, seconds, onOpen }: { items: Broadcasts["items"]; seconds: number; onOpen: () => void }) {
   const { scheme } = useTheme();
+  const { gutter } = useLayout();
   const [i, setI] = useState(0);
   const touching = useRef(false);
   const fade = useRef(new Animated.Value(1)).current;
@@ -60,8 +62,7 @@ export function CenterBroadcastBand({ items, seconds, onOpen }: { items: Broadca
   const fg = scheme === "dark" ? "#2A1D00" : "#5A3B00";
   const cur = items[Math.min(i, n - 1)]!;
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`廣播公告：${cur.text}，點一下看全部`} onPress={onOpen} style={[styles.band, { backgroundColor: bg }]} {...pan.panHandlers} data-no-pull-refresh="">
-      <Icon name="megaphone" size={20} color={fg} />
+    <Pressable accessibilityRole="button" accessibilityLabel={`廣播公告：${cur.text}，點一下看全部`} onPress={onOpen} style={[styles.band, { backgroundColor: bg, marginTop: -space.lg, marginLeft: -gutter, marginRight: -gutter, paddingHorizontal: gutter, alignSelf: "stretch", width: "auto" }]} {...pan.panHandlers} data-no-pull-refresh="">
       <Animated.View style={[styles.textWrap, { opacity: fade }]}>
         <AppText variant="callout" numberOfLines={1} ellipsizeMode="tail" style={{ color: fg, fontWeight: "700", flexShrink: 1 }}>
           {cur.text}
@@ -102,7 +103,7 @@ export function BroadcastSheet({ title, items, onClose }: { title: string; items
 }
 
 const styles = StyleSheet.create({
-  band: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: radius.md },
+  band: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch, paddingHorizontal: space.md, paddingVertical: 8, borderRadius: 0 },
   textWrap: { flex: 1, minWidth: 0 },
   row: { gap: 4, paddingVertical: space.md, borderTopWidth: StyleSheet.hairlineWidth },
 });
