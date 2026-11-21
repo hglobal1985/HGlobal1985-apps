@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, CountPill } from "@/ui";
+import { AppText } from "@/ui";
 import { fadedStyle } from "@/ui/fade-style";
 
 /**
@@ -67,15 +67,23 @@ export function RowButtons({ children }: { children: ReactNode }) {
   return <View style={styles.buttons}>{children}</View>;
 }
 
-/** 區塊標題列：區塊名稱（最多 2 行）＋教材數量；數量是 0 就淡化。 */
-export function ListSection({ title, count }: { title: string; count: number }) {
+/**
+ * 區塊（或課程）標題列（業主 2026-11-21 選定方案 C「淡綠標題列」）：整條淡綠底、貼齊卡片左右與上緣；左邊是教材數量的白底圓圈（綠字），
+ * 接著區塊／課程名稱（綠色粗體、最多 2 行），右邊放 `actions`（加入我的清單＋分享，和下方每列的鈕一樣、沒有外框）。數量是 0 就淡化。
+ */
+export function ListSection({ title, count, actions }: { title: string; count: number; actions?: ReactNode }) {
   const { c } = useTheme();
   return (
-    <View style={[styles.section, { borderBottomColor: c.border }, count === 0 && fadedStyle]}>
-      <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
+    <View style={[styles.section, { backgroundColor: c.accentSoft }, count === 0 && fadedStyle]}>
+      <View style={[styles.num, { backgroundColor: c.surface }]}>
+        <Text style={[styles.numText, { color: c.accentText }]} {...({ dataSet: { noScale: "" } } as object)}>
+          {count}
+        </Text>
+      </View>
+      <AppText variant="headline" style={{ flex: 1, fontWeight: "800", color: c.accentText }} numberOfLines={2}>
         {title}
       </AppText>
-      <CountPill count={count} />
+      {actions ? <View style={styles.actions}>{actions}</View> : null}
     </View>
   );
 }
@@ -89,5 +97,7 @@ const styles = StyleSheet.create({
   metaText: { lineHeight: 18 },
   chip: { height: 17, paddingHorizontal: 5, borderRadius: 9, justifyContent: "center" },
   chipText: { fontSize: 12, lineHeight: 17, fontWeight: "700" },
-  section: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 6, paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
+  section: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: -space.sm, paddingVertical: 6, paddingLeft: 16, paddingRight: space.sm, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg },
+  num: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  numText: { fontSize: 13, fontWeight: "800" },
 });

@@ -17,6 +17,7 @@ import type { Attachment } from "@/api/client";
 import { CompactRow, ListSection, MetaLine, RowButtons } from "./compact-row";
 import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
+import { SectionActions } from "./material-rows";
 
 /**
  * 全站「清單」格式唯一來源（業主 2026-11-21）：中心頁「清單」分頁、系列頁「清單」都用它（格式比照教材清單）：一張卡，一列一張 EDM 卡片，兩行緊密排列——
@@ -69,7 +70,7 @@ const styles = StyleSheet.create({
 });
 
 /** 中心頁「清單」分頁裡的一筆教材（後端 GET /center-materials）。 */
-type CenterMaterial = { id: string; courseId: string; courseTitle: string; /** 所屬區塊名稱（沒有區塊＝null）。 */ block: string | null; title: string; kind: string; sharer: string; sharerRankName: string; eventDate: string | null; iconType?: Attachment["type"] };
+type CenterMaterial = { id: string; courseId: string; courseTitle: string; /** 所屬區塊名稱與編號（沒有區塊＝null）。 */ block: string | null; blockId: string | null; title: string; kind: string; sharer: string; sharerRankName: string; eventDate: string | null; iconType?: Attachment["type"] };
 
 /**
  * 中心頁「清單」分頁（業主 2026-11-21 更正）：列出這個中心所有課程裡的「每一個教材」（章節與其他教材，不只是課程本身），
@@ -84,10 +85,10 @@ export function CenterMaterialsCard({ courseIds }: { courseIds: string[] }) {
   const items = data?.items ?? [];
   if (!items.length) return null;
   // 依「區塊名稱（沒有區塊就用課程名稱）」分組，每組上方一條標題列＋教材數；組與組之間依該組最新的日期由新到舊。
-  const groups = new Map<string, { title: string; items: CenterMaterial[]; latest: string }>();
+  const groups = new Map<string, { title: string; courseId: string; blockId: string | null; items: CenterMaterial[]; latest: string }>();
   for (const m of items) {
     const k = `${m.courseId}|${m.block ?? ""}`;
-    const g = groups.get(k) ?? { title: m.block || m.courseTitle, items: [], latest: "" };
+    const g = groups.get(k) ?? { title: m.block || m.courseTitle, courseId: m.courseId, blockId: m.blockId, items: [], latest: "" };
     g.items.push(m);
     if ((m.eventDate ?? "") > g.latest) g.latest = m.eventDate ?? "";
     groups.set(k, g);
@@ -97,7 +98,7 @@ export function CenterMaterialsCard({ courseIds }: { courseIds: string[] }) {
     <View style={{ gap: space.sm }}>
       {ordered.map((g, gi) => (
         <Card key={gi} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-          <ListSection title={g.title} count={g.items.length} />
+          <ListSection title={g.title} count={g.items.length} actions={<SectionActions courseId={g.courseId} blockId={g.blockId} title={g.title} />} />
           {g.items.map((m) => {
             const who = [m.sharer, m.sharerRankName].filter(Boolean).join(" ");
             return (

@@ -127,3 +127,14 @@ function ListItemShare({ course, lesson }: { course: CourseDetail; lesson: Lesso
   return <RowShare label={`分享影片：${lesson.title}`} onShare={() => shareLink(lesson.title, lessonShareHref(course, lesson.position), undefined, undefined, undefined, { title: course.title, item: lesson.title })} />;
 }
 
+
+/** 區塊（或課程）標題列右側的兩顆鈕（業主 2026-11-21）：加入我的清單＋分享，和下方每列教材的鈕完全一樣；有 blockId＝整個區塊，沒有＝整門課。 */
+export function SectionActions({ courseId, blockId, title, path }: { courseId: string; blockId?: string | null; title: string; path?: string | null }) {
+  const base = path ? `/${path}` : `/course/${courseId}`;
+  return (
+    <RowButtons>
+      <RowAddToList target={blockId ? { kind: "lesson", ref: blockId, ref2: courseId } : { kind: "course", ref: courseId }} title={title} />
+      <RowShare label={`分享：${title}`} onShare={() => shareLink(title, blockId ? `${base}?block=${blockId}` : base, undefined, { title })} />
+    </RowButtons>
+  );
+}
