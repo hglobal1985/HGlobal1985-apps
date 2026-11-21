@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import type { ReactNode } from "react";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -12,21 +13,21 @@ import { fadedStyle } from "@/ui/fade-style";
 import { RowShare } from "./lesson-list";
 
 /**
- * 中心頁「清單」分頁（業主 2026-11-21，格式比照教材清單）：一張卡，一列一張 EDM 卡片，兩行緊密排列——
+ * 全站「清單」格式唯一來源（業主 2026-11-21）：中心頁「清單」分頁、系列頁「清單」都用它（格式比照教材清單）：一張卡，一列一張 EDM 卡片，兩行緊密排列——
  * 第一行課程標題、第二行「日期 主講人 獎銜」；左側封面縮圖（左右留邊）、右側分享鈕；點一列進該卡片。
  * （業主 2026-11-21：卡片上方的「中心名稱＋教材數量」標題已刪除，所以 title 參數不再顯示。）
  */
-export function CenterListCard({ courses }: { title?: string; courses: CourseSummary[] }) {
+export function CenterListCard({ courses, trailing }: { title?: string; courses: CourseSummary[]; /** 有給就取代右側分享鈕（系列頁編輯模式放排序／隱藏鈕）。 */ trailing?: (course: CourseSummary, index: number) => ReactNode }) {
   return (
     <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-      {courses.map((course) => (
-        <CenterListRow key={course.id} course={course} />
+      {courses.map((course, i) => (
+        <CenterListRow key={course.id} course={course} trailing={trailing?.(course, i)} />
       ))}
     </Card>
   );
 }
 
-function CenterListRow({ course }: { course: CourseSummary }) {
+function CenterListRow({ course, trailing }: { course: CourseSummary; trailing?: ReactNode }) {
   const { c } = useTheme();
   const thumb = useThumb();
   const img = course.coverUrl || course.edmUrl;
@@ -51,7 +52,7 @@ function CenterListRow({ course }: { course: CourseSummary }) {
             </AppText>
           ) : null}
         </View>
-        <RowShare label={`分享：${course.title}`} onShare={share} />
+        {trailing ?? <RowShare label={`分享：${course.title}`} onShare={share} />}
       </Pressable>
     </View>
   );

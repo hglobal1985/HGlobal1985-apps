@@ -21,7 +21,7 @@ import { CoverAlbum } from "./album";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { useCoverMedia } from "./cover-media";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
-import { CourseRow } from "./course-row";
+import { CenterListCard } from "./center-list";
 import { SeriesCardTile } from "./series-card-tile";
 import { SeriesCardPanel } from "./series-card-panel";
 import { ExpandGrid } from "./expand-grid";
@@ -33,7 +33,7 @@ type View_ = "list" | "edm";
 const GAP = space.md;
 
 /**
- * 系列單頁（業主 2026-11-19 改版）：照片區（封面圖＋訂閱鈕＋點閱次數）→ 右上角切換「詳細列表／縮圖」→
+ * 系列單頁（業主 2026-11-19 改版）：照片區（封面圖＋訂閱鈕＋點閱次數）→ 切換「EDM／清單」→
  * 系列裡的「課程卡」與「清單卡」（兩種都有就分兩區）；內容是自動收集的，這裡不能手動新增教材或區塊，點卡片直接進該卡的詳細頁。
  * 超級管理員右上角「編輯」＝編輯模式：系列標題（只改顯示）、是否顯示在「所有系列」、封面圖（直式＋橫式）、
  * 每張卡的 ◀ ▶ 排序與隱藏（隱藏只是不在這個系列頁顯示）。
@@ -155,26 +155,8 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       </Pressable>
     </View>
   );
-  const listBlock = (title: string, items: CourseSummary[]) =>
-    items.length ? (
-      <View style={{ gap: space.sm }}>
-        {section(title, items.length)}
-        <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-          {items.map((x, i) =>
-            editing ? (
-              <View key={x.id} style={styles.orderRow}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <CourseRow course={x} last={i === items.length - 1} />
-                </View>
-                {ctrl(items, x, i)}
-              </View>
-            ) : (
-              <CourseRow key={x.id} course={x} last={i === items.length - 1} />
-            ),
-          )}
-        </Card>
-      </View>
-    ) : null;
+  // 「清單」＝與中心頁「清單」同一個模組 CenterListCard（業主 2026-11-21）；編輯模式右側換成排序／隱藏鈕。
+  const listBlock = (_title: string, items: CourseSummary[]) => (items.length ? <CenterListCard courses={items} trailing={editing ? (x, i) => ctrl(items, x, i) : undefined} /> : null);
   const gridBlock = (title: string, items: CourseSummary[], cols: number) =>
     items.length ? (
       <View style={{ gap: space.sm }}>
@@ -245,7 +227,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         ) : null}
         {data && !hiddenFromMember && !all.length ? <EmptyState icon="library-outline" title="這個系列目前沒有內容" /> : null}
         {!hiddenFromMember && shown.length ? (
-          <SegmentTabs options={[{ key: "list", label: "詳細列表" }, { key: "edm", label: "縮圖" }]} value={view} onChange={pick} />
+          <SegmentTabs options={[{ key: "edm", label: "EDM" }, { key: "list", label: "清單" }]} value={view} onChange={pick} />
         ) : null}
         {!hiddenFromMember && view === "list" ? (
           <View style={{ gap: space.md }}>
