@@ -4142,30 +4142,46 @@ const routes: [string, RegExp, Handler][] = [
         : me.role === "admin"
           ? "c.view_scope NOT IN ('link_login', 'link_guest')"
           : `(c.view_scope IN ('all', 'members'${me.hglobal ? ", 'hglobal'" : ""}${me.center ? ", 'center'" : ""}) OR (c.view_scope NOT IN ('link_login', 'link_guest') AND c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?)))`;
+      // 連同區塊標題一起讀（依課程、順序）：區塊底下的教材帶 block 名稱，畫面用「區塊或課程名稱」分組。
       const { results } = await ctx.db
         .prepare(
           `SELECT l.id AS id, l.course_id AS courseId, c.title AS courseTitle, l.position AS position, l.title AS title, l.kind AS kind, l.sharer AS sharer, l.sharer_rank AS sharerRank, COALESCE(l.event_date, c.event_start) AS eventDate, l.media_type AS mediaType,
+            ((l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR l.duration_minutes > 0 OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id AND a.kind IN ('link', 'file'))) AS ok,
             (SELECT a.att_type FROM lesson_attachments a WHERE a.lesson_id = l.id AND a.kind IN ('link', 'file') ORDER BY a.created_at LIMIT 1) AS attType
            FROM lessons l JOIN courses c ON c.id = l.course_id
-           WHERE c.status = 'published' AND c.id IN (${ids.map(() => "?").join(",")}) AND ${scopeSql} AND l.kind IN ('chapter', 'material') AND l.is_full = 0
-             AND ((l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR l.duration_minutes > 0 OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id AND a.kind IN ('link', 'file')))
-           ORDER BY COALESCE(l.event_date, c.event_start) IS NULL, COALESCE(l.event_date, c.event_start) DESC, l.course_id, l.position`,
+           WHERE c.status = 'published' AND c.id IN (${ids.map(() => "?").join(",")}) AND ${scopeSql} AND l.kind IN ('chapter', 'material', 'section') AND l.is_full = 0
+           ORDER BY l.course_id, l.position`,
         )
         .bind(...ids, ...(me && me.role !== "admin" ? [sub] : []))
-        .all<{ id: string; courseId: string; courseTitle: string; position: number; title: string; kind: string; sharer: string; sharerRank: string; eventDate: string | null; mediaType: string; attType: string | null }>();
-      return {
-        items: results.map((r) => ({
+        .all<{ id: string; courseId: string; courseTitle: string; position: number; title: string; kind: string; sharer: string; sharerRank: string; eventDate: string | null; mediaType: string; ok: number; attType: string | null }>();
+      const items: object[] = [];
+      let curCourse = "";
+      let block: string | null = null;
+      for (const r of results) {
+        if (r.courseId !== curCourse) {
+          curCourse = r.courseId;
+          block = null;
+        }
+        if (r.kind === "section") {
+          block = r.title;
+          continue;
+        }
+        if (!r.ok) continue;
+        const icon = itemIconType((r.attType ?? undefined) as never, r.mediaType, true);
+        items.push({
           id: r.id,
           courseId: r.courseId,
           courseTitle: r.courseTitle,
+          block,
           title: r.title,
           kind: r.kind,
           sharer: r.sharer,
           sharerRankName: rankMap.get(r.sharerRank)?.name ?? "",
           eventDate: r.eventDate,
-          ...(itemIconType((r.attType ?? undefined) as never, r.mediaType, true) ? { iconType: itemIconType((r.attType ?? undefined) as never, r.mediaType, true) } : {}),
-        })),
-      };
+          ...(icon ? { iconType: icon } : {}),
+        });
+      }
+      return { items };
     },
   ],
   // 全部課程的「分類」下拉：與「關鍵字管理」的分類清單同步（含目前沒有課程使用的分類）。

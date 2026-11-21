@@ -227,7 +227,7 @@ export function AddToListSheet({ target, title, onClose }: { target: ListRef; ti
 const styles = StyleSheet.create({
   headBtn: { minWidth: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   badge: { position: "absolute", top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
-  rowBtn: { width: 30, height: 32, alignItems: "center", justifyContent: "center" },
+  rowBtn: { width: 30, height: 28, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: minTouch + 8, borderTopWidth: StyleSheet.hairlineWidth },
   newBox: { gap: space.sm, paddingVertical: space.sm, borderTopWidth: StyleSheet.hairlineWidth },
   input: { minHeight: minTouch, borderWidth: 1.5, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
