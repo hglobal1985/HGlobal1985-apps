@@ -486,7 +486,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         {!(editing && canEditContent) && blockView.lessons.some((l) => l.material) ? (
           <Section title="">
             {course.lessons.some((l) => l.section) ? (
-              <SegmentTabs options={[{ key: "detail", label: "詳細列表" }, { key: "thumb", label: "縮圖" }]} value={listLayout} onChange={pickLayout} />
+              <SegmentTabs options={[{ key: "detail", label: "清單" }, { key: "thumb", label: "縮圖" }]} value={listLayout} onChange={pickLayout} />
             ) : null}
             <View style={!editing && materialsLocked ? { minHeight: 230 } : undefined}>
               <FullVersionList course={blockView} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />

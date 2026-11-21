@@ -13,7 +13,10 @@ import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { Card, ListRow, ShareIcon } from "@/ui";
+import { Card, ShareIcon } from "@/ui";
+import { NowPlayingIcon } from "@/ui/now-playing-icon";
+import { UI_SCALE } from "@/theme/ui-scale";
+import { CompactRow, MetaLine, RowButtons } from "./compact-row";
 import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 import { SpeakerMark } from "./speaker-mark";
@@ -44,20 +47,21 @@ export function MaterialRow({ course, lesson, listStyle, playingId, onPlay, onBl
   const { c } = useTheme();
   const ls = listStyle ?? course.isList;
   const link = lesson.linkType && !lesson.full ? lesson : null;
+  const playing = !link && playingId === lesson.id;
+  const icon = themeBadge(lesson, lesson.iconType && !lesson.locked ? <BrandIcon type={lesson.iconType} fallback={TYPE_INFO[lesson.iconType].icon as never} size={36} /> : undefined, c.accent);
+  const leading = (
+    <View style={{ width: Math.round(42 * UI_SCALE), alignItems: "center" }}>
+      {playing ? <NowPlayingIcon lessonId={lesson.id} /> : icon ?? <Ionicons name={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"} size={32} color={c.textMuted} />}
+    </View>
+  );
+  const text = ls ? sharerLine(lesson) : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ");
   return (
-    <ListRow
-      icon={lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-      leading={themeBadge(lesson, lesson.iconType && !lesson.locked ? <BrandIcon type={lesson.iconType} fallback={TYPE_INFO[lesson.iconType].icon as never} size={36} /> : undefined, c.accent)}
-      compact
-      playing={!link && playingId === lesson.id}
-      playingLesson={lesson.id}
-      highlight={!link && playingId === lesson.id}
-      note=""
+    <CompactRow
+      leading={leading}
+      highlight={playing}
       title={lesson.title}
-      titleLines={ls ? 2 : undefined}
-      dateChip={ls && lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined}
-      subtitle={ls ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
-      right={<RowActions course={course} lesson={lesson}>{link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : ls && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : null}</RowActions>}
+      meta={<MetaLine date={lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined} text={text || undefined} />}
+      actions={<RowActions course={course} lesson={lesson}>{link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : ls && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : null}</RowActions>}
       onPress={
         (link
           ? link.linkUrl
@@ -93,10 +97,10 @@ function RowActions({ course, lesson, children }: { course: CourseDetail; lesson
   const canAdd = !lesson.full && !lesson.locked && (lesson.linkUrl || lesson.ready);
   if (!canAdd && !children) return null;
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+    <RowButtons>
       {canAdd ? <RowAddToList target={{ kind: "lesson", ref: lesson.id, ref2: course.id }} title={lesson.title} /> : null}
       {children}
-    </View>
+    </RowButtons>
   );
 }
 
@@ -107,7 +111,7 @@ export function RowShare({ label, onShare }: { label: string; onShare: () => Pro
     if ((await onShare()) === "copied") flashText("已複製連結");
   };
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={6} style={({ pressed }) => [{ width: 34, height: 44, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={press} hitSlop={{ top: 8, bottom: 8, left: 3, right: 6 }} style={({ pressed }) => [{ width: 30, height: 32, alignItems: "center", justifyContent: "center" }, pressed && { opacity: 0.6 }]}>
       <ShareIcon size={22} color={c.accent} />
     </Pressable>
   );

@@ -17,6 +17,7 @@ import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 import { ExpandGrid } from "./expand-grid";
+import { ListSection } from "./compact-row";
 import { MaterialRow, RowShare } from "./material-rows";
 export { RowShare } from "./material-rows";
 
@@ -101,12 +102,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           {leadShown.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{leadShown.map(itemRow)}</Card> : null}
           {visibleBlocks.map((b) => (
             <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-              <View style={[{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: space.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border }, b.items.filter(shown).length === 0 && fadedStyle]}>
-                <AppText variant="headline" style={{ flex: 1 }} numberOfLines={2}>
-                  {b.head.title}
-                </AppText>
-                <CountPill count={b.items.filter(shown).length} />
-              </View>
+              <ListSection title={b.head.title} count={b.items.filter(shown).length} />
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           ))}
