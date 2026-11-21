@@ -18,7 +18,8 @@ import { useSeriesSettings } from "./series-settings";
 import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
-import { BroadcastSheet, CenterBroadcastBand, useCenterBroadcasts } from "./center-broadcast";
+import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
+import { BroadcastComposer, type BroadcastTarget } from "@/features/broadcast/broadcast-composer";
 import { ScheduleCard, useCenterSchedules } from "./center-schedule";
 import { CenterTile } from "./center-tile";
 import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } from "./unit-filter";
@@ -532,9 +533,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   }, [activeCenter]);
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（cover-stats.tsx，中心、系列、課程、清單同一套）。
   const stats = useCoverStats("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
-  const bc = useCenterBroadcasts(activeCenter === ALL ? "" : activeCenter);
   const sch = useCenterSchedules(activeCenter === ALL ? "" : activeCenter);
-  const [bcOpen, setBcOpen] = useState(false);
+  const [bcTick, setBcTick] = useState(0); // 新增、修改公告後加一，公告橫條重新讀取
+  // 新增公告（業主 2026-11-21）：中心頁＝該中心的公告；其他頁面只有超級管理員（首頁公告）。
+  const canAnnounce = activeCenter !== ALL ? canEditArt : isSuperAdmin(member);
+  const announceTargets: BroadcastTarget[] = activeCenter !== ALL ? [{ scope: "center", name: activeCenter, label: `${centerTitle(activeCenter)}公告` }] : [{ scope: "home", label: "首頁公告" }];
   const centerHero =
     activeCenter !== ALL ? <CenterHero art={art} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
@@ -569,7 +572,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             </>
           } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       {/* 廣播公告緊貼封面正下方、左右滿版（業主 2026-11-21），所以放在第一個。 */}
-      {activeCenter !== ALL && bc.data?.items.length ? <CenterBroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setBcOpen(true)} /> : null}
+      {activeCenter !== ALL ? <BroadcastZone center={activeCenter} title={`${centerTitle(activeCenter)}公告`} reloadKey={bcTick} /> : null}
       <LoginPrompt />
       {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
       {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
@@ -634,18 +637,18 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         </>
       )}
       {archivedBlock}
-      {canCreateCourse(member) || canEditArt ? <View style={{ height: 64 }} /> : null}
+      {canCreateCourse(member) || canEditArt || canAnnounce ? <View style={{ height: 64 }} /> : null}
     </Screen>
-    {canCreateCourse(member) || canEditArt ? (
-      <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["schedule"] as const) : [])]} />
+    {canCreateCourse(member) || canEditArt || canAnnounce ? (
+      <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["schedule"] as const) : []), ...(canAnnounce ? (["announce"] as const) : [])]} />
     ) : null}
     {moveTo ? <ZoneMoveSheet target={moveTo} groups={groups} onMoved={() => { reload(); adminList.reload(); }} onClose={() => setMoveTo(null)} /> : null}
     {catOpen ? <CategorySheet courses={courses} names={categories} picked={selCats} brands={brandList.data ?? []} brand={brandSel} onBrand={pickBrand} onApply={pickCategory} onClose={() => setCatOpen(false)} /> : null}
+    {newOpen === "announce" ? <BroadcastComposer targets={announceTargets} onClose={() => setNewOpen(null)} onDone={() => setBcTick((n) => n + 1)} /> : null}
     {newOpen === "schedule" && activeCenter !== ALL ? <CenterScheduleSheet center={activeCenter} onClose={() => setNewOpen(null)} onChanged={sch.reload} /> : null}
-    {newOpen && newOpen !== "schedule" ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
-    {bcOpen && bc.data ? <BroadcastSheet title={`${centerTitle(activeCenter)}廣播公告`} items={bc.data.items} onClose={() => setBcOpen(false)} /> : null}
+    {newOpen && newOpen !== "schedule" && newOpen !== "announce" ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
-      <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={bc.reload} onScheduleChanged={sch.reload} />
+      <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={() => setBcTick((n) => n + 1)} onScheduleChanged={sch.reload} />
     ) : null}
     </View>
   );

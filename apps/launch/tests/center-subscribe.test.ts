@@ -22,10 +22,11 @@ test("中心訂閱（從 688 開始、可取消）與廣播公告（新增、秒
   assert.equal((await call<St>("GET", "/center-subscription?center=台中中心")).data.count, 688, "別的中心不受影響");
 
   // 廣播公告：只有能編輯中心封面的人（總部、該中心會長）可以；新增時通知訂閱者
-  assert.equal((await call("POST", "/admin/center-broadcasts", { token: a, body: { center: "台北中心", text: "x" } })).status, 403);
-  const added = await call<{ seconds: number; items: { id: string; text: string; date: string }[] }>("POST", "/admin/center-broadcasts", { token: admin, body: { center: "台北中心", text: "本週三晚上 8 點開課" } });
+  assert.equal((await call("POST", "/admin/broadcasts", { token: a, body: { scope: "center", name: "台北中心", text: "x" } })).status, 403);
+  const added = await call<{ seconds: number; items: { id: string; text: string; date: string; scope: string }[] }>("POST", "/admin/broadcasts", { token: admin, body: { scope: "center", name: "台北中心", text: "本週三晚上 8 點開課" } });
   assert.equal(added.status, 200);
   assert.equal(added.data.seconds, 2, "預設 2 秒");
+  assert.equal(added.data.items[0]!.scope, "center");
   assert.equal(added.data.items[0]!.text, "本週三晚上 8 點開課");
   assert.match(added.data.items[0]!.date, /^\d{4}\/\d{2}\/\d{2}$/);
   const notices = (await call<{ title: string; body: string }[]>("GET", "/notifications", { token: a })).data;
@@ -33,7 +34,7 @@ test("中心訂閱（從 688 開始、可取消）與廣播公告（新增、秒
   assert.equal(((await call<{ title: string }[]>("GET", "/notifications", { token: b })).data).some((n) => n.title.includes("廣播公告")), false, "沒訂閱的不通知");
   assert.equal((await call<{ seconds: number }>("PUT", "/admin/center-broadcast-seconds", { token: admin, body: { center: "台北中心", seconds: 5 } })).data.seconds, 5);
   assert.equal((await call("PUT", "/admin/center-broadcast-seconds", { token: admin, body: { center: "台北中心", seconds: 0 } })).status, 400);
-  assert.equal((await call<{ items: unknown[] }>("GET", "/center-broadcasts?center=台北中心")).data.items.length, 1, "公開可讀");
+  assert.equal((await call<{ items: unknown[] }>("GET", "/broadcasts?center=台北中心")).data.items.length, 1, "公開可讀");
 
   // 新課程上架通知訂閱者
   const made = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "新開的課", teacher: "王小明", hostUnit: "台北中心", priceTwd: 0 } })).data;

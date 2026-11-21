@@ -13,7 +13,7 @@ const DEFAULT_PAUSE = 8000; // 手指滑過之後暫停自動輪播的時間（�
  * 首頁跑馬燈：多則公告自動上下滾動輪流播放，也可以用手指上下滑動快速查看。
  * 只有一則時不捲動。接在最後多放一份第一則，捲到底後無縫跳回第一則。
  */
-export function Ticker({ items, onClose, everyMs = DEFAULT_EVERY, pauseMs = DEFAULT_PAUSE }: { items: string[]; onClose?: () => void; everyMs?: number; pauseMs?: number }) {
+export function Ticker({ items, onClose, onPress, everyMs = DEFAULT_EVERY, pauseMs = DEFAULT_PAUSE }: { items: string[]; onClose?: () => void; /** 點一下公告（首頁：開啟完整公告清單，有權限的人可修改、刪除）。 */ onPress?: () => void; everyMs?: number; pauseMs?: number }) {
   const { c } = useTheme();
   const ref = useRef<ScrollViewInstance | null>(null);
   const index = useRef(0);
@@ -79,11 +79,11 @@ export function Ticker({ items, onClose, everyMs = DEFAULT_EVERY, pauseMs = DEFA
         }}
       >
         {rows.map((text, i) => (
-          <View key={`${i}-${text}`} style={styles.row}>
+          <Pressable key={`${i}-${text}`} accessibilityRole={onPress ? "button" : undefined} disabled={!onPress} onPress={onPress} style={styles.row}>
             <AppText variant="callout" numberOfLines={2} style={{ color: c.warning }}>
               {text}
             </AppText>
-          </View>
+          </Pressable>
         ))}
       </ScrollView>
       {onClose ? (
