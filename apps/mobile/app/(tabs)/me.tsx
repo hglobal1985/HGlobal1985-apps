@@ -44,6 +44,8 @@ export default function MeScreen() {
   const config = useApi<AppConfig>("/config");
   const gate = useProfileGate(member);
   const myLibrary = useApi<LibraryMine>(member ? "/library/mine" : null);
+  // 「會員職務指派」入口：只有中央判斷有權限的人才顯示（任何非 200 都當沒有權限）。
+  const staffAccess = useApi<{ available: boolean }>(member ? "/staff-roles/access" : null);
   const demo = useApi<Member[]>(!member && config.data?.demoLogin ? "/demo-members" : null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "success"; text: string } | null>(null);
@@ -133,6 +135,7 @@ export default function MeScreen() {
         <Section title="管理">
           <Card style={{ paddingVertical: 0 }}>
             {canManageEditors(member) ? <ListRow icon="people-circle-outline" title="小編管理" subtitle="指派同中心的會員協助編輯課程與章節" onPress={() => router.push("/admin/editors")} /> : null}
+            {staffAccess.data?.available ? <ListRow icon="key-outline" title="會員職務指派" subtitle="依中心或姓名找會員，直接修改會員中心的職務" onPress={() => router.push("/admin/staff-roles")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="chatbubble-ellipses-outline" title="編輯學習金句" subtitle="首頁「繼續學習」下方的金句" onPress={() => router.push("/admin/quotes")} /> : null}
             {isWeb && member.reviewer ? <ListRow icon="receipt-outline" title="報名審核" subtitle="確認繳費後開通、匯出對帳報表" onPress={() => router.push("/admin/orders")} /> : null}
             {member.reviewer ? <ListRow icon="bar-chart-outline" title="報名與營收報表" subtitle="依中心、課程、月份統計報名與繳費金額，可匯出 Excel" onPress={() => router.push("/admin/report")} /> : null}

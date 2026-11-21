@@ -73,6 +73,7 @@ function AppStack() {
             <Stack.Screen name="admin/app-settings" options={{ title: "APP 數值設定" }} />
             <Stack.Screen name="admin/share-defaults" options={{ title: "分享預設值" }} />
             <Stack.Screen name="admin/editors" options={{ title: "小編管理" }} />
+            <Stack.Screen name="admin/staff-roles" options={{ title: "會員職務指派" }} />
             <Stack.Screen name="admin/ai-models" options={{ title: "AI 模型" }} />
             <Stack.Screen name="achievements" options={{ title: "學習成就" }} />
             <Stack.Screen name="admin/achievements" options={{ title: "徽章任務設定" }} />
