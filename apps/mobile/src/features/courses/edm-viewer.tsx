@@ -237,16 +237,6 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
           <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, backgroundColor: imgBg ?? "#fff", transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors />
         </View>
         <View style={[StyleSheet.absoluteFill, { opacity: touching ? 0 : 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]} pointerEvents={touching ? "none" : "box-none"}>
-          <View style={styles.topRight} pointerEvents="box-none">
-            {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
-          </View>
-          {many ? (
-            <View style={styles.counter} pointerEvents="none">
-              <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>
-                {`${idx + 1} / ${list.length}`}
-              </AppText>
-            </View>
-          ) : null}
           {many && desktop ? (
             <>
               <View style={[styles.side, { left: 16 }]} pointerEvents="box-none">
@@ -257,15 +247,17 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
               </View>
             </>
           ) : null}
-          <View style={styles.bottom} pointerEvents="box-none">
+          {/* 說明文字與下載、分享、關閉全部在最上面同一列（業主 2026-11-21）。 */}
+          <View style={styles.top} pointerEvents="box-none">
             <View style={styles.help} pointerEvents="none">
               <Ionicons name="move" size={18} color="#fff" />
               <AppText variant="caption" style={{ color: "#fff", fontWeight: "700", flexShrink: 1 }} numberOfLines={1}>
-                {many ? "左右滑動換張、兩指放大縮小" : "可拖曳移動、兩指放大縮小"}
+                {many ? `${idx + 1}/${list.length}・左右滑動換張、兩指放大縮小` : "可拖曳移動、兩指放大縮小"}
               </AppText>
             </View>
             {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
             {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
+            {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
           </View>
         </View>
       </View>
@@ -276,10 +268,8 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
 const styles = StyleSheet.create({
   backdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000" },
   frame: { overflow: "hidden", backgroundColor: "#fff" },
-  counter: { position: "absolute", top: 22, left: 16, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: "#000" },
   side: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
-  topRight: { position: "absolute", top: 16, right: 16 },
-  bottom: { position: "absolute", left: 16, right: 16, bottom: 16, flexDirection: "row", alignItems: "center", gap: space.xs },
+  top: { position: "absolute", left: 16, right: 16, top: 16, flexDirection: "row", alignItems: "center", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
   help: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, minHeight: 36, borderRadius: 18, backgroundColor: "#000" },
 });
