@@ -185,6 +185,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     <View style={{ flex: 1 }}>
       <PageHeader
         title={shownTitle}
+        addToList={{ kind: "series", ref: series }}
         path={sharePath}
         extra={admin ? <TopBarButton label={editing ? "完成" : "編輯"} accessibilityLabel={editing ? "完成編輯系列" : "編輯系列"} iconName={editing ? "checkmark-circle-outline" : "create-outline"} onPress={() => setEditing((v) => !v)} /> : undefined}
       />

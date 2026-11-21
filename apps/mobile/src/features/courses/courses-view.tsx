@@ -12,6 +12,7 @@ import { centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { flashText } from "@/ui/flash-notice";
 import { HeaderInvite } from "@/features/invite-button";
+import { HeaderAddToList } from "@/features/my-lists/add-to-list";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
@@ -584,6 +585,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             <>
               {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心首頁圖與公告" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
               {/* 分享：與其他頁面同一個按鈕與規則（邀請文字＋網址）；有設定短網址就分享短網址，沒有就分享這個中心的網址。 */}
+              <HeaderAddToList target={{ kind: "center", ref: activeCenter }} title={centerTitle(activeCenter)} />
               <HeaderInvite title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
               <HeaderShare title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>

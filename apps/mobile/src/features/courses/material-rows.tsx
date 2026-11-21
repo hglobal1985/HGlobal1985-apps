@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import type { ReactNode } from "react";
 import { Linking, Pressable, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
@@ -7,6 +8,7 @@ import { trackFeature } from "@/lib/feature-track";
 import { TYPE_INFO } from "@/features/link-types";
 import { eventDays, sharerLine } from "@/features/format";
 import { engine } from "@/features/player/engine";
+import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
@@ -55,7 +57,7 @@ export function MaterialRow({ course, lesson, listStyle, playingId, onPlay, onBl
       titleLines={ls ? 2 : undefined}
       dateChip={ls && lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined}
       subtitle={ls ? undefined : [link ? TYPE_INFO[link.linkType!].label : sharerLine(lesson)].filter(Boolean).join(" · ") || undefined}
-      right={link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : ls && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : undefined}
+      right={<RowActions course={course} lesson={lesson}>{link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : ls && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : null}</RowActions>}
       onPress={
         (link
           ? link.linkUrl
@@ -83,6 +85,18 @@ export function MaterialRows({ course, listStyle = true, playingId, onPlay, onBl
         <MaterialRow key={l.id} course={course} lesson={l} listStyle={listStyle} playingId={playingId} onPlay={onPlay} onBlockedPress={onBlockedPress} />
       ))}
     </Card>
+  );
+}
+
+/** 教材列最右側：「加入我的清單」圓鈕＋分享鈕（業主 2026-11-21 配方案 1）；鎖住或完整版影片不放加入鈕。 */
+function RowActions({ course, lesson, children }: { course: CourseDetail; lesson: Lesson; children: ReactNode }) {
+  const canAdd = !lesson.full && !lesson.locked && (lesson.linkUrl || lesson.ready);
+  if (!canAdd && !children) return null;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+      {canAdd ? <RowAddToList target={{ kind: "lesson", ref: lesson.id, ref2: course.id }} title={lesson.title} /> : null}
+      {children}
+    </View>
   );
 }
 
