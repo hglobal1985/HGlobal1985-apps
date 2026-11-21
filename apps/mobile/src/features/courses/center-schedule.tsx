@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Image, Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 import { useThumb } from "@/lib/thumb";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, SheetRow, SheetThumb } from "@/ui";
+import { AppText, Button, Icon, SheetRow, SheetThumb } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { EdmLightbox } from "./edm-viewer";
 
@@ -24,7 +24,7 @@ export function useCenterSchedules(center: string) {
 export const thisYm = () => new Date(Date.now() + 8 * 3600 * 1000).toISOString().slice(0, 7);
 export const ymLabel = (ym: string) => `${Number(ym.slice(0, 4))}年${Number(ym.slice(5))}月`;
 
-export function ScheduleCard({ items, title }: { items: Schedules["items"]; title: string }) {
+export function ScheduleCard({ items, title, address }: { items: Schedules["items"]; title: string; address?: string }) {
   const { c } = useTheme();
   const { width: winW } = useWindowDimensions();
   const thumb = useThumb();
@@ -42,9 +42,6 @@ export function ScheduleCard({ items, title }: { items: Schedules["items"]; titl
       <Pressable accessibilityRole="button" accessibilityLabel={`放大${ymLabel(sel.ym)}課表`} onPress={() => setZoom(true)} style={[styles.img, { borderColor: c.border }]}>
         <Image source={{ uri: thumb(resolveUrl(sel.url), Math.min(winW, 720)) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
       </Pressable>
-      <AppText variant="caption" tone="muted">
-        {ymLabel(sel.ym)}・點圖放大，可下載分享
-      </AppText>
       {items.length > 1 ? (
         // 月份小鈕在左、「歷年課表」在同一列最右邊（業主 2026-11-21）；上方不再有「本月課表」標題。
         <View style={styles.chipRow}>
@@ -66,6 +63,18 @@ export function ScheduleCard({ items, title }: { items: Schedules["items"]; titl
             </AppText>
           </Pressable>
         </View>
+      ) : null}
+      {/* 地址收在課表卡最下面（業主 2026-11-21 方案二）：細線分隔、小字地址、右邊「地圖 ›」與「歷年課表 ›」同樣大小；點整列開啟 Google 地圖。 */}
+      {address ? (
+        <Pressable accessibilityRole="link" accessibilityLabel={`中心地址：${address}，開啟地圖`} onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`).catch(() => undefined)} style={[styles.addr, { borderTopColor: c.border }]}>
+          <Icon name="location" size={14} color={c.accentText} />
+          <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
+            {address}
+          </AppText>
+          <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>
+            地圖 ›
+          </AppText>
+        </Pressable>
       ) : null}
       {zoom ? <EdmLightbox uri={sel.url} title={`${title} ${ymLabel(sel.ym)}課表`} onClose={() => setZoom(false)} /> : null}
       {all ? (
@@ -100,5 +109,6 @@ const styles = StyleSheet.create({
   img: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.sm, borderWidth: 1, overflow: "hidden", backgroundColor: "#fff" },
   chips: { gap: 6, paddingVertical: 2 },
   chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  addr: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 2 },
   fill: { width: "100%", height: "100%" },
 });
