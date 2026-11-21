@@ -45,7 +45,7 @@ function InviteSheet({ title, path, onClose }: { title: string; path: string; on
           邀請朋友：{title}
         </AppText>
         <QrCode value={url} size={220} />
-        <AppText variant="callout" selectable style={{ textAlign: "center", paddingHorizontal: space.md }}>
+        <AppText variant="callout" selectable numberOfLines={3} style={{ textAlign: "center", paddingHorizontal: space.md, alignSelf: "stretch", ...(Platform.OS === "web" ? ({ wordBreak: "break-all" } as object) : {}) }}>
           {url}
         </AppText>
         <View style={styles.row}>
