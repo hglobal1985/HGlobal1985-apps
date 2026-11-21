@@ -37,16 +37,28 @@ export function CompactRow({ leading, title, meta, actions, onPress, highlight, 
   );
 }
 
-/** 第二行：日期膠囊＋文字（沒有日期也沒有文字就不顯示）。 */
+/**
+ * 第二行：日期膠囊＋文字（沒有日期也沒有文字就不顯示）。
+ * 用橫排 View（不是同一段文字裡塞小字膠囊）：混用不同字級的行內文字會讓整行基線上下偏移，造成標題上方的行距比下方大（業主 2026-11-21 回報）。
+ */
 export function MetaLine({ date, text }: { date?: string; text?: string }) {
   const { c } = useTheme();
   if (!date && !text) return null;
   return (
-    <AppText variant="callout" tone="muted" numberOfLines={1} style={styles.tight}>
-      {date ? <Text style={[styles.chip, { backgroundColor: c.accentSoft, color: c.accentText }]}>{` ${date} `}</Text> : null}
-      {date && text ? "  " : ""}
-      {text}
-    </AppText>
+    <View style={styles.meta}>
+      {date ? (
+        <View style={[styles.chip, { backgroundColor: c.accentSoft }]}>
+          <Text style={[styles.chipText, { color: c.accentText }]} numberOfLines={1}>
+            {date}
+          </Text>
+        </View>
+      ) : null}
+      {text ? (
+        <AppText variant="callout" tone="muted" numberOfLines={1} style={[styles.metaText, { flexShrink: 1 }]}>
+          {text}
+        </AppText>
+      ) : null}
+    </View>
   );
 }
 
@@ -69,10 +81,13 @@ export function ListSection({ title, count }: { title: string; count: number }) 
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 1, paddingLeft: space.sm, paddingRight: 0, borderBottomWidth: StyleSheet.hairlineWidth },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: 4, paddingLeft: space.sm, paddingRight: 0, borderBottomWidth: StyleSheet.hairlineWidth },
   actions: { marginRight: -space.xs },
   buttons: { flexDirection: "row", alignItems: "center", gap: 0 },
-  tight: { lineHeight: 18 },
-  chip: { fontSize: 12, lineHeight: 17, fontWeight: "700", borderRadius: 9, overflow: "hidden" },
+  tight: { lineHeight: 20 },
+  meta: { flexDirection: "row", alignItems: "center", gap: 6, height: 18 },
+  metaText: { lineHeight: 18 },
+  chip: { height: 17, paddingHorizontal: 5, borderRadius: 9, justifyContent: "center" },
+  chipText: { fontSize: 12, lineHeight: 17, fontWeight: "700" },
   section: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingVertical: 6, paddingHorizontal: space.sm, borderBottomWidth: StyleSheet.hairlineWidth },
 });
