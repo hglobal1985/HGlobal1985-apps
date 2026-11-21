@@ -10,6 +10,7 @@ import { EmptyState } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EdmLightbox } from "./edm-viewer";
 
+const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
 const GAP = 6;
 const COLS = 3;
 
@@ -65,14 +66,14 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }:
             </Pressable>
             {canEdit ? (
               <View style={styles.tools} pointerEvents="box-none">
-                <Pressable accessibilityRole="button" accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
-                  <Ionicons name="chevron-back" size={20} color="#fff" />
+                <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
+                  <Ionicons name="chevron-back" size={16} color="#fff" {...NO_SCALE} />
                 </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="刪除" onPress={() => remove(x)} style={[styles.tbtn, { backgroundColor: "rgba(179,38,30,0.9)" }]}>
-                  <Ionicons name="trash" size={18} color="#fff" />
+                <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="刪除" onPress={() => remove(x)} style={[styles.tbtn, { backgroundColor: "rgba(179,38,30,0.9)" }]}>
+                  <Ionicons name="trash" size={15} color="#fff" {...NO_SCALE} />
                 </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
-                  <Ionicons name="chevron-forward" size={20} color="#fff" />
+                <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
+                  <Ionicons name="chevron-forward" size={16} color="#fff" {...NO_SCALE} />
                 </Pressable>
               </View>
             ) : null}
@@ -102,8 +103,8 @@ function VideoModal({ item, onClose }: { item: CoverMediaItem; onClose: () => vo
 
 const styles = StyleSheet.create({
   playBadge: { position: "absolute", right: 6, bottom: 6, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
-  tools: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "space-between", padding: 4, backgroundColor: "rgba(0,0,0,0.35)" },
-  tbtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
+  tools: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 4, paddingVertical: 3, backgroundColor: "rgba(0,0,0,0.35)" },
+  tbtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
   backdrop: { flex: 1, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
   close: { position: "absolute", top: 16, right: 16, width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
 });

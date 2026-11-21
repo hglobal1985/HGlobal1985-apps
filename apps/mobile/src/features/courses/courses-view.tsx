@@ -15,6 +15,7 @@ import { HeaderInvite } from "@/features/invite-button";
 import { HeaderShare } from "@/features/share-button";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
+import { CourseRow } from "./course-row";
 import { useSeriesSettings } from "./series-settings";
 import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
@@ -324,9 +325,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const centerPage = flat && activeCenter !== ALL;
   // 中心頁三個分頁一律都在（相簿、EDM、清單），不顯示數量（業主 2026-11-21）；沒點過時才依內容挑預設。
   const [tabPicked, setTabPicked] = useState(false);
-  const autoTab: "album" | "course" | "list" = nList === 0 && nCourse === 0 && centerPage ? "album" : nList === 0 ? "course" : nCourse === 0 ? "list" : kindTab === "list" ? "list" : "course";
+  // 業主 2026-11-21：EDM＝該中心所有卡片的縮圖格；清單＝同樣這批卡片改成清單列表（一列一張）；相簿＝照片。沒有任何卡片時預設相簿。
+  const autoTab: "album" | "course" | "list" = centerPage && groups.length === 0 ? "album" : kindTab === "list" ? "list" : "course";
   const tab: "album" | "course" | "list" = centerPage && tabPicked ? kindTab : autoTab;
-  const flatShown = flat ? groups.filter((g) => !!g.nearest.isList === (tab === "list")) : groups;
+  const flatShown = groups;
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>(() => ({ ...zoneOpenMemory }));
   const toggleFold = (key: string) =>
@@ -593,7 +595,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
       {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {centerPage ? (
-        <SegmentTabs options={[{ key: "album", label: "相簿" }, { key: "course", label: "EDM" }, { key: "list", label: "清單" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
+        <SegmentTabs options={[{ key: "course", label: "EDM" }, { key: "list", label: "清單" }, { key: "album", label: "相簿" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
       ) : flat && nCourse > 0 && nList > 0 ? (
         <SegmentTabs options={[{ key: "course", label: `課程 ${nCourse}` }, { key: "list", label: `清單 ${nList}` }]} value={tab} onChange={setKindTab} />
       ) : null}
@@ -631,12 +633,19 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               </AppText>
             </Pressable>
           ) : null}
+          {centerPage && tab === "list" && groups.length ? (
+            <Card>
+              {groups.map((g, i) => (
+                <CourseRow key={g.key} course={g.nearest} last={i === groups.length - 1} />
+              ))}
+            </Card>
+          ) : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {/* 三個專區（業主 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
-            {tileW && flat ? flatShown.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
+            {tileW && flat && !(centerPage && tab === "list") ? flatShown.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat
               ? zoneSections.map(({ zone, items }) =>
                   items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
