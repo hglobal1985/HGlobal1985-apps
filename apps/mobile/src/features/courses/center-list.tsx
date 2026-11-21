@@ -14,7 +14,7 @@ import { TYPE_INFO } from "@/features/link-types";
 import { lessonHref } from "@/lib/lesson-href";
 import { useApi } from "@/state/session";
 import type { Attachment } from "@/api/client";
-import { CompactRow, ListSection, MetaLine, RowButtons } from "./compact-row";
+import { CompactRow, LIST_CARD, ListSection, MetaLine, RowButtons, SubSection } from "./compact-row";
 import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
 import { SectionActions } from "./material-rows";
@@ -26,7 +26,7 @@ import { SectionActions } from "./material-rows";
  */
 export function CenterListCard({ courses, trailing }: { title?: string; courses: CourseSummary[]; /** 有給就取代右側分享鈕（系列頁編輯模式放排序／隱藏鈕）。 */ trailing?: (course: CourseSummary, index: number) => ReactNode }) {
   return (
-    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+    <Card style={LIST_CARD}>
       {courses.map((course, i) => (
         <CenterListRow key={course.id} course={course} trailing={trailing?.(course, i)} />
       ))}
@@ -97,8 +97,10 @@ export function CenterMaterialsCard({ courseIds }: { courseIds: string[] }) {
   return (
     <View style={{ gap: space.sm }}>
       {ordered.map((g, gi) => (
-        <Card key={gi} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+        <Card key={gi} style={LIST_CARD}>
+          {/* 沒有區塊的課程只有一個教材時，教材放在自動加上的「尚未分段章節」小標題底下（業主 2026-11-21） */}
           <ListSection title={g.title} count={g.items.length} actions={<SectionActions courseId={g.courseId} blockId={g.blockId} title={g.title} />} />
+          {!g.blockId && g.items.length === 1 ? <SubSection title="尚未分段章節" /> : null}
           {g.items.map((m) => {
             const who = [m.sharer, m.sharerRankName].filter(Boolean).join(" ");
             return (

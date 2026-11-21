@@ -17,7 +17,7 @@ import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 import { ExpandGrid } from "./expand-grid";
-import { ListSection } from "./compact-row";
+import { LIST_CARD, ListSection } from "./compact-row";
 import { MaterialRow, RowShare, SectionActions } from "./material-rows";
 export { RowShare } from "./material-rows";
 
@@ -99,20 +99,20 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
     if (layout === "detail") {
       return (
         <View style={{ gap: space.sm }}>
-          {leadShown.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{leadShown.map(itemRow)}</Card> : null}
+          {leadShown.length ? <Card style={LIST_CARD}>{leadShown.map(itemRow)}</Card> : null}
           {visibleBlocks.map((b) => (
             <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
               <ListSection title={b.head.title} count={b.items.filter(shown).length} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           ))}
-          {full.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{full.map(itemRow)}</Card> : null}
+          {full.length ? <Card style={LIST_CARD}>{full.map(itemRow)}</Card> : null}
         </View>
       );
     }
     return (
       <View style={{ gap: space.sm }}>
-        {leadShown.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{leadShown.map(itemRow)}</Card> : null}
+        {leadShown.length ? <Card style={LIST_CARD}>{leadShown.map(itemRow)}</Card> : null}
         <ExpandGrid
           items={visibleBlocks}
           keyOf={(b) => b.head.id}
@@ -144,18 +144,18 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
             </Pressable>
           )}
           renderPanel={(b) => (
-            <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
+            <Card style={LIST_CARD}>
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           )}
         />
-        {full.length ? <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{full.map(itemRow)}</Card> : null}
+        {full.length ? <Card style={LIST_CARD}>{full.map(itemRow)}</Card> : null}
       </View>
     );
   }
   const rows: Lesson[] = all.filter(shown);
   if (!rows.length) return null;
-  return <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>{rows.map(itemRow)}</Card>;
+  return <Card style={LIST_CARD}>{rows.map(itemRow)}</Card>;
 }
 
 /** 章節最右側的「分享」鈕：分享這一堂（網址帶 ?lesson=，點開直接停在這一堂）；分享者姓名、職稱、章節名稱一律取這一堂章節自己的設定，不用課程的。 */
