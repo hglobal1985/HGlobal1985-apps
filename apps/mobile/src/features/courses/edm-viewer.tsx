@@ -107,8 +107,9 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
   useEffect(() => {
     Image.getSize(full, (w, h) => h && setRatio(w / h), () => undefined);
   }, [full]);
-  const maxW = Math.min(win.width - 24, 560);
-  const maxH = win.height - insets.top - insets.bottom - 40;
+  // 全螢幕（業主 2026-11-21）：圖片依整個螢幕大小等比貼合；手機轉向時視窗尺寸改變，會自動重新排版。
+  const maxW = win.width;
+  const maxH = win.height;
   const frameW = Math.min(maxW, maxH * ratio);
   const frameH = frameW / ratio;
 
@@ -125,6 +126,14 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
     tx.setValue(off.current.x);
     ty.setValue(off.current.y);
   };
+  // 螢幕轉向（寬高對調）：縮放與位移歸零，圖片重新貼合新的螢幕。
+  useEffect(() => {
+    live.current = { scale: 1, w: frameW, h: frameH };
+    setScale(1);
+    off.current = { x: 0, y: 0 };
+    tx.setValue(0);
+    ty.setValue(0);
+  }, [win.width, win.height]); // eslint-disable-line react-hooks/exhaustive-deps
   const zoomTo = (next: number) => {
     const { scale: sc, w, h } = live.current;
     // 以畫面中心為基準放大縮小
@@ -203,20 +212,20 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
           <View style={[StyleSheet.absoluteFill, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab" } as object) : null]} {...pan.panHandlers} {...wheel} {...NO_PULL}>
             <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors />
           </View>
-          <View style={[StyleSheet.absoluteFill, { opacity: touching ? 0 : 1 }]} pointerEvents={touching ? "none" : "box-none"}>
-            <View style={styles.topRight} pointerEvents="box-none">
-              {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
+        </View>
+        <View style={[StyleSheet.absoluteFill, { opacity: touching ? 0 : 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]} pointerEvents={touching ? "none" : "box-none"}>
+          <View style={styles.topRight} pointerEvents="box-none">
+            {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
+          </View>
+          <View style={styles.bottom} pointerEvents="box-none">
+            <View style={styles.help} pointerEvents="none">
+              <Ionicons name="move" size={18} color="#fff" />
+              <AppText variant="caption" style={{ color: "#fff", fontWeight: "700", flexShrink: 1 }}>
+                可拖曳移動、兩指放大縮小
+              </AppText>
             </View>
-            <View style={styles.bottom} pointerEvents="box-none">
-              <View style={styles.help} pointerEvents="none">
-                <Ionicons name="move" size={18} color="#fff" />
-                <AppText variant="caption" style={{ color: "#fff", fontWeight: "700", flexShrink: 1 }}>
-                  可拖曳移動、兩指放大縮小
-                </AppText>
-              </View>
-              {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
-              {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
-            </View>
+            {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
+            {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
           </View>
         </View>
       </View>
@@ -225,8 +234,8 @@ export function EdmLightbox({ uri, title, onClose, bg }: { uri: string; title: s
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, alignItems: "center", justifyContent: "center", ...dimStyle },
-  frame: { overflow: "hidden", borderRadius: radius.md, backgroundColor: "#fff" },
+  backdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#000" },
+  frame: { overflow: "hidden", backgroundColor: "#fff" },
   topRight: { position: "absolute", top: 16, right: 16 },
   bottom: { position: "absolute", left: 16, right: 16, bottom: 16, flexDirection: "row", alignItems: "center", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
