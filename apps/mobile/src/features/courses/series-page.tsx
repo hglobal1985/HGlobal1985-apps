@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, Switch, useWindowDimensions, View } from "react-native";
 import { api, UNCATEGORIZED, type CourseSummary, type SeriesArt } from "@/api/client";
 import { SeriesApplySheet, SeriesCoverSheet } from "@/features/admin-parts";
+import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
+import { BroadcastComposer } from "@/features/broadcast/broadcast-composer";
+import { AddMaterialFab } from "@/features/course-edit/add-material-fab";
 import { PageHeader } from "@/features/page-header";
 import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
@@ -43,6 +46,8 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const [editing, setEditing] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [bcTick, setBcTick] = useState(0);
   const [boxW, setBoxW] = useState(0);
   const scrollY = useRef(new Animated.Value(0)).current;
   const { width: winW, height: winHeight } = useWindowDimensions();
@@ -189,13 +194,15 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       </View>
     ) : null;
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <PageHeader
         title={shownTitle}
         path={sharePath}
         extra={admin ? <TopBarButton label={editing ? "完成" : "編輯"} accessibilityLabel={editing ? "完成編輯系列" : "編輯系列"} iconName={editing ? "checkmark-circle-outline" : "create-outline"} onPress={() => setEditing((v) => !v)} /> : undefined}
       />
       <Screen wide header={false} hero={<CenterHero art={art} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
+        {/* 系列公告緊貼封面下方（業主 2026-11-21）；課程頁、各中心頁各有自己的公告橫條。 */}
+        <BroadcastZone series={series} title={`${shownTitle}公告`} reloadKey={bcTick} />
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}
@@ -245,12 +252,22 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
             {gridBlock("清單卡", listCards, listCols)}
           </View>
         ) : null}
+        {admin ? <View style={{ height: 64 }} /> : null}
       </Screen>
+      {/* 右下角「＋」：超級管理員新增公告（目前這個系列，或首頁公告）。 */}
+      {admin ? <AddMaterialFab kinds={["announce"]} onPick={() => setComposeOpen(true)} /> : null}
+      {composeOpen ? (
+        <BroadcastComposer
+          targets={[...(series !== UNCATEGORIZED ? [{ scope: "series" as const, name: series, label: `${shownTitle}系列公告` }] : []), { scope: "home" as const, label: "首頁公告" }]}
+          onClose={() => setComposeOpen(false)}
+          onDone={() => setBcTick((n) => n + 1)}
+        />
+      ) : null}
       {applyOpen ? <SeriesApplySheet series={series} title={shownTitle} courses={all.filter((x) => !x.isList)} onClose={() => setApplyOpen(false)} /> : null}
       {coverOpen ? (
         <SeriesCoverSheet series={series} title={shownTitle} edmUrl={art?.edmUrl} onClose={() => setCoverOpen(false)} onChanged={artList.reload} />
       ) : null}
-    </>
+    </View>
   );
 }
 

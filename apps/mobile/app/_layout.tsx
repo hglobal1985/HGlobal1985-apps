@@ -86,7 +86,6 @@ function AppStack() {
             <Stack.Screen name="admin/orders/index" options={{ title: "報名審核" }} />
             <Stack.Screen name="admin/orders/[id]" options={{ title: "審核報名" }} />
             <Stack.Screen name="settings/notifications" options={{ title: "通知設定" }} />
-            <Stack.Screen name="admin/announcements" options={{ title: "跑馬燈公告" }} />
             <Stack.Screen name="admin/quotes" options={{ title: "編輯學習金句" }} />
             <Stack.Screen name="admin/review-groups" options={{ title: "審核群組" }} />
             <Stack.Screen name="admin/comments" options={{ title: "留言檢舉" }} />

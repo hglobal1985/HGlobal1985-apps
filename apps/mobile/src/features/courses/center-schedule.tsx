@@ -39,7 +39,7 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
   const chipLabel = (ym: string) => (ym.slice(0, 4) === now.slice(0, 4) ? `${Number(ym.slice(5))}月` : `${ym.slice(0, 4)}/${Number(ym.slice(5))}`);
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`放大${ymLabel(sel.ym)}課表`} onPress={() => setZoom(true)} style={[styles.img, { borderColor: c.border }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`放大${ymLabel(sel.ym)}課表`} onPress={() => setZoom(true)} style={styles.img}>
         <Image source={{ uri: thumb(resolveUrl(sel.url), Math.min(winW, 720)) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
       </Pressable>
       {items.length > 1 ? (
@@ -64,15 +64,15 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
           </Pressable>
         </View>
       ) : null}
-      {/* 地址收在課表卡最下面（業主 2026-11-21 方案二）：細線分隔、小字地址、右邊「地圖 ›」與「歷年課表 ›」同樣大小；點整列開啟 Google 地圖。 */}
+      {/* 地址收在課表卡最下面（業主 2026-11-21 方案二）：細線分隔、小字地址、右邊「導航 ›」與「歷年課表 ›」同樣大小；點整列開啟 Google 地圖。 */}
       {address ? (
-        <Pressable accessibilityRole="link" accessibilityLabel={`中心地址：${address}，開啟地圖`} onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`).catch(() => undefined)} style={[styles.addr, { borderTopColor: c.border }]}>
+        <Pressable accessibilityRole="link" accessibilityLabel={`中心地址：${address}，開啟導航`} onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`).catch(() => undefined)} style={[styles.addr, { borderTopColor: c.border }]}>
           <Icon name="location" size={14} color={c.accentText} />
           <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
             {address}
           </AppText>
           <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>
-            地圖 ›
+            導航 ›
           </AppText>
         </Pressable>
       ) : null}
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: radius.md, padding: space.md, gap: space.sm },
   chipRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   linkBtn: { minHeight: 44, justifyContent: "center" },
-  img: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.sm, borderWidth: 1, overflow: "hidden", backgroundColor: "#fff" },
+  img: { width: "100%", aspectRatio: 16 / 9, borderRadius: radius.sm, overflow: "hidden", backgroundColor: "#fff" },
   chips: { gap: 6, paddingVertical: 2 },
   chip: { minHeight: 36, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   addr: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: 2 },

@@ -5,13 +5,15 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, dimStyle } from "@/ui";
 
-export type AddKind = "course" | "list" | "schedule";
+export type AddKind = "course" | "list" | "schedule" | "announce";
 
 const OPTIONS: { key: AddKind; label: string; sub?: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
   // 業主 2026-11-20：只剩一種「教材卡」（不再分清單卡／課程卡）。
   { key: "course", label: "新增教材卡", icon: "school-outline" },
   // 中心頁才有（業主 2026-11-21）：有權限的人直接上傳這個中心的月課表。
   { key: "schedule", label: "上傳課表", icon: "calendar-outline" },
+  // 新增公告（業主 2026-11-21）：中心頁＝該中心；其他頁面由超級管理員選「目前的系列／中心」或「首頁公告」。
+  { key: "announce", label: "新增公告", icon: "megaphone-outline" },
 ];
 
 /**
@@ -53,7 +55,7 @@ export function AddMaterialFab({ onPick, kinds = ["course"] }: { onPick: (k: Add
         <Pressable accessibilityRole="button" accessibilityLabel={open ? "收起新增選單" : "新增教材"} accessibilityState={{ expanded: open }} onPress={() => setOpen((v) => !v)} style={[styles.fab, { backgroundColor: c.accent }]}>
           <Ionicons name={open ? "close" : "add"} size={26} color={c.textOnAccent} />
           <AppText variant="headline" style={{ color: c.textOnAccent }}>
-            {kinds.includes("course") ? "新增教材" : "上傳課表"}
+            {kinds.includes("course") ? "新增教材" : kinds.length === 1 ? OPTIONS.find((o) => o.key === kinds[0])!.label : "新增"}
           </AppText>
         </Pressable>
       </View>

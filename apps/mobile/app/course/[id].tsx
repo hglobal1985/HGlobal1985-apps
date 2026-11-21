@@ -6,6 +6,7 @@ import { api, type CourseDetail, type Lesson, type Order } from "@/api/client";
 import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { InviteJoin } from "@/features/courses/invite-join";
+import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
 import { EdmStage } from "@/features/courses/edm-viewer";
 import { useCoverStats } from "@/features/courses/cover-stats";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
@@ -416,6 +417,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       </StageWidth.Provider>
       <View style={lay.split ? [styles.splitRight, { borderLeftColor: c.border }] : styles.stack}>
       <Screen header={false} gutter={lay.split ? space.lg : undefined} footer={editing ? undefined : stickyAction}>
+        {/* 這個中心與所屬系列的公告：和中心頁、系列頁同一條，位置在封面（播放器）正下方（業主 2026-11-21）。 */}
+        <BroadcastZone center={course.hostCenter || undefined} series={course.series || undefined} title="公告" gutter={lay.split ? space.lg : undefined} />
         {message ? <NoticeBox tone={message.tone} text={message.text} /> : null}
         {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
         {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}

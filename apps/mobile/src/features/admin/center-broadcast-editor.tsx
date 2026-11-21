@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { api } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
-import { useCenterBroadcasts } from "@/features/courses/center-broadcast";
+import { useBroadcasts } from "@/features/broadcast/use-broadcasts";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, NoticeBox } from "@/ui";
@@ -15,7 +15,7 @@ import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
  */
 export function CenterBroadcastEditor({ center, onChanged }: { center: string; onChanged: () => void }) {
   const { c } = useTheme();
-  const list = useCenterBroadcasts(center);
+  const list = useBroadcasts({ center });
   const [text, setText] = useState("");
   const [editId, setEditId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,14 +37,14 @@ export function CenterBroadcastEditor({ center, onChanged }: { center: string; o
   };
   const submit = () =>
     run(async () => {
-      if (editId) await api("PATCH", `/admin/center-broadcasts/${editId}`, { center, text });
-      else await api("POST", "/admin/center-broadcasts", { center, text });
+      if (editId) await api("PATCH", `/admin/broadcasts/${editId}`, { text });
+      else await api("POST", "/admin/broadcasts", { scope: "center", name: center, text });
       setText("");
       setEditId(null);
     }, editId ? "已更新公告" : "已新增公告");
   const remove = async (id: string) => {
     if (!(await confirmAsk("刪除公告", "確定刪除這則廣播公告？", "刪除"))) return;
-    await run(() => api("DELETE", `/admin/center-broadcasts/${id}?center=${encodeURIComponent(center)}`), "已刪除");
+    await run(() => api("DELETE", `/admin/broadcasts/${id}`), "已刪除");
   };
   const secs = d?.seconds ?? 2;
   const setSecs = (n: number) => run(() => api("PUT", "/admin/center-broadcast-seconds", { center, seconds: Math.min(60, Math.max(1, n)) }));
@@ -52,7 +52,7 @@ export function CenterBroadcastEditor({ center, onChanged }: { center: string; o
     <View style={styles.wrap} accessibilityLabel="廣播公告設定">
       <AppText variant="title">廣播公告</AppText>
       <AppText variant="caption" tone="muted">
-        顯示在中心頁地址下方，多則會自動輪播。新增時，訂閱這個中心的人會收到通知。
+        顯示在中心頁與這個中心各課程頁的封面下方，多則會自動輪播。新增時，訂閱這個中心的人會收到通知。
       </AppText>
       {error ? <NoticeBox tone="danger" text={error} /> : null}
       <View style={styles.secRow}>

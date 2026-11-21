@@ -1210,14 +1210,51 @@ async function schedulesOf(db: D1Database, key: string): Promise<{ items: { ym: 
   return { items: results.map((r) => ({ ym: r.ym, url: pubUrl(r.image_key, r.version) })) };
 }
 
-async function broadcastsOf(db: D1Database, key: string): Promise<{ seconds: number; items: { id: string; text: string; date: string }[] }> {
-  const [cfg, list] = await Promise.all([
-    db.prepare("SELECT seconds FROM center_broadcast_cfg WHERE center_key = ?").bind(key).first<{ seconds: number }>(),
-    db.prepare("SELECT id, body, created_at FROM center_broadcasts WHERE center_key = ? ORDER BY created_at DESC, rowid DESC LIMIT 100").bind(key).all<{ id: string; body: string; created_at: string }>(),
+/**
+ * 公告（業主 2026-11-21 模組化）：中心、系列、首頁共用同一張表，用 center_key 欄位存範圍鍵——中心＝中心鍵、系列＝`series:名稱`、首頁＝`home`。
+ * 誰能新增／修改／刪除：中心＝能編輯該中心封面的人；系列與首頁＝只有超級管理員。
+ */
+const HOME_BC_KEY = "home";
+type BcScope = "center" | "series" | "home";
+const bcScopeOf = (key: string): BcScope => (key === HOME_BC_KEY ? "home" : key.startsWith("series:") ? "series" : "center");
+type BcItem = { id: string; text: string; date: string; scope: BcScope; canEdit: boolean };
+
+/** 這個人能不能管理某個範圍鍵的公告（只算權限，不查資料庫以外的東西）。 */
+async function canManageBc(ctx: Ctx, key: string): Promise<boolean> {
+  if (!ctx.session) return false;
+  if (bcScopeOf(key) !== "center") return ctx.session.roles.includes("super_admin");
+  const rights = await rightsOf(ctx);
+  if (rights.admin) return true;
+  return !!rights.center && centerKey(rights.center.label) === key && !!(rights.staff || rights.editor?.editOthers);
+}
+
+/** 把要新增公告的範圍（中心／系列／首頁）轉成範圍鍵，同時檢查權限。 */
+async function bcTarget(ctx: Ctx, scope: unknown, name: unknown): Promise<{ s: Session; key: string; label: string; scope: BcScope }> {
+  const label = typeof name === "string" ? name.trim().slice(0, 100) : "";
+  if (scope === "home") return { s: requireSuperAdmin(ctx), key: HOME_BC_KEY, label: "首頁", scope: "home" };
+  if (scope === "series") {
+    const s = requireSuperAdmin(ctx);
+    if (!label) fail(400, "series_required", "請指定系列");
+    return { s, key: seriesSubKey(label), label, scope: "series" };
+  }
+  const { s, center } = await requireCenterArt(ctx, label);
+  return { s, key: center.key, label: center.label, scope: "center" };
+}
+
+async function broadcastsOf(ctx: Ctx, keys: string[]): Promise<{ seconds: number; items: BcItem[] }> {
+  const db = ctx.db;
+  const list = [...new Set(keys.filter(Boolean))];
+  if (!list.length) return { seconds: 2, items: [] };
+  const mark = list.map(() => "?").join(",");
+  const [cfg, rows, can] = await Promise.all([
+    db.prepare("SELECT seconds FROM center_broadcast_cfg WHERE center_key = ?").bind(list[0]).first<{ seconds: number }>(),
+    db.prepare(`SELECT id, center_key, body, created_at FROM center_broadcasts WHERE center_key IN (${mark}) ORDER BY created_at DESC, rowid DESC LIMIT 100`).bind(...list).all<{ id: string; center_key: string; body: string; created_at: string }>(),
+    Promise.all(list.map((k) => canManageBc(ctx, k))),
   ]);
+  const canOf = new Map(list.map((k, i) => [k, can[i]!]));
   // 日期用台灣時間（資料庫存 UTC）。
   const tw = (iso: string) => new Date(Date.parse(iso.replace(" ", "T") + "Z") + 8 * 3600 * 1000).toISOString().slice(0, 10).replace(/-/g, "/");
-  return { seconds: cfg?.seconds ?? 2, items: list.results.map((r) => ({ id: r.id, text: r.body, date: tw(r.created_at) })) };
+  return { seconds: cfg?.seconds ?? 2, items: rows.results.map((r) => ({ id: r.id, text: r.body, date: tw(r.created_at), scope: bcScopeOf(r.center_key), canEdit: canOf.get(r.center_key) ?? false })) };
 }
 
 /** 中心有新課程上架：通知這個中心的訂閱者（私密連結、清單卡、總部主辦的課不通知）。 */
@@ -3615,48 +3652,60 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
-    /^\/center-broadcasts$/,
+    /^\/broadcasts$/,
     async (ctx) => {
-      // 廣播公告（公開）：輪播秒數＋全部公告（新的在前）。
-      const label = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 60);
-      if (!label) fail(400, "invalid_center", "請指定中心");
-      return broadcastsOf(ctx.db, centerKey(label));
+      // 公告（公開）：?home=1＝首頁；?center=中心名稱 與／或 ?series=系列名稱＝該中心＋該系列的公告（中心課程頁、系列頁都用這支）。新的在前。
+      const q = ctx.url.searchParams;
+      const keys: string[] = [];
+      if (q.get("home")) keys.push(HOME_BC_KEY);
+      const center = (q.get("center") ?? "").trim().slice(0, 60);
+      if (center) keys.push(centerKey(center));
+      const series = (q.get("series") ?? "").trim().slice(0, 100);
+      if (series) keys.push(seriesSubKey(series));
+      return broadcastsOf(ctx, keys);
     },
   ],
   [
     "POST",
-    /^\/admin\/center-broadcasts$/,
+    /^\/admin\/broadcasts$/,
     async (ctx) => {
-      // 新增一則公告，並通知這個中心的訂閱者。
-      const body = await readJson<{ center?: unknown; text?: unknown }>(ctx.req);
-      const { s, center } = await requireCenterArt(ctx, typeof body.center === "string" ? body.center : null);
+      // 新增一則公告：scope＝center／series／home；中心與系列公告新增時通知訂閱者。
+      const body = await readJson<{ scope?: unknown; name?: unknown; text?: unknown }>(ctx.req);
+      const t = await bcTarget(ctx, body.scope, body.name);
       const text = typeof body.text === "string" ? body.text.trim().slice(0, 300) : "";
       if (!text) fail(400, "text_required", "請輸入公告內容");
       const id = crypto.randomUUID();
-      await ctx.db.batch([ctx.db.prepare("INSERT INTO center_broadcasts (id, center_key, body, edited_by) VALUES (?, ?, ?, ?)").bind(id, center.key, text, s.sub), audit(ctx.db, s.sub, "center.broadcast_add", "center", center.key, id)]);
-      await notifySubscribers(ctx.db, center.key, `${center.label}廣播公告`, text.slice(0, 80), `/courses?center=${encodeURIComponent(center.label)}`);
-      return broadcastsOf(ctx.db, center.key);
+      await ctx.db.batch([ctx.db.prepare("INSERT INTO center_broadcasts (id, center_key, body, edited_by) VALUES (?, ?, ?, ?)").bind(id, t.key, text, t.s.sub), audit(ctx.db, t.s.sub, `broadcast.add.${t.scope}`, "broadcast", t.key, id)]);
+      if (t.scope === "center") await notifySubscribers(ctx.db, t.key, `${t.label}廣播公告`, text.slice(0, 80), `/courses?center=${encodeURIComponent(t.label)}`);
+      if (t.scope === "series") await notifySubscribers(ctx.db, t.key, `${t.label}廣播公告`, text.slice(0, 80), `/series/${encodeURIComponent(t.label)}`);
+      return broadcastsOf(ctx, [t.key]);
     },
   ],
   [
     "PATCH",
-    /^\/admin\/center-broadcasts\/([\w-]+)$/,
+    /^\/admin\/broadcasts\/([\w-]+)$/,
     async (ctx, [id]) => {
-      const body = await readJson<{ center?: unknown; text?: unknown }>(ctx.req);
-      const { s, center } = await requireCenterArt(ctx, typeof body.center === "string" ? body.center : null);
+      const row = await ctx.db.prepare("SELECT center_key AS k FROM center_broadcasts WHERE id = ?").bind(id).first<{ k: string }>();
+      if (!row) return fail(404, "not_found", "找不到這則公告");
+      requireMember(ctx);
+      if (!(await canManageBc(ctx, row.k))) fail(403, "forbidden", "沒有修改這則公告的權限");
+      const body = await readJson<{ text?: unknown }>(ctx.req);
       const text = typeof body.text === "string" ? body.text.trim().slice(0, 300) : "";
       if (!text) fail(400, "text_required", "請輸入公告內容");
-      await ctx.db.batch([ctx.db.prepare("UPDATE center_broadcasts SET body = ?, edited_by = ? WHERE id = ? AND center_key = ?").bind(text, s.sub, id, center.key)]);
-      return broadcastsOf(ctx.db, center.key);
+      await ctx.db.prepare("UPDATE center_broadcasts SET body = ?, edited_by = ? WHERE id = ?").bind(text, ctx.session!.sub, id).run();
+      return broadcastsOf(ctx, [row.k]);
     },
   ],
   [
     "DELETE",
-    /^\/admin\/center-broadcasts\/([\w-]+)$/,
+    /^\/admin\/broadcasts\/([\w-]+)$/,
     async (ctx, [id]) => {
-      const { center } = await requireCenterArt(ctx, ctx.url.searchParams.get("center"));
-      await ctx.db.prepare("DELETE FROM center_broadcasts WHERE id = ? AND center_key = ?").bind(id, center.key).run();
-      return broadcastsOf(ctx.db, center.key);
+      const row = await ctx.db.prepare("SELECT center_key AS k FROM center_broadcasts WHERE id = ?").bind(id).first<{ k: string }>();
+      if (!row) return fail(404, "not_found", "找不到這則公告");
+      requireMember(ctx);
+      if (!(await canManageBc(ctx, row.k))) fail(403, "forbidden", "沒有刪除這則公告的權限");
+      await ctx.db.prepare("DELETE FROM center_broadcasts WHERE id = ?").bind(id).run();
+      return broadcastsOf(ctx, [row.k]);
     },
   ],
   [
@@ -3668,7 +3717,7 @@ const routes: [string, RegExp, Handler][] = [
       const n = Number(body.seconds);
       if (!Number.isFinite(n) || n < 1 || n > 60) fail(400, "invalid_seconds", "輪播秒數請填 1～60");
       await ctx.db.prepare("INSERT INTO center_broadcast_cfg (center_key, seconds) VALUES (?, ?) ON CONFLICT(center_key) DO UPDATE SET seconds = excluded.seconds").bind(center.key, Math.round(n)).run();
-      return broadcastsOf(ctx.db, center.key);
+      return broadcastsOf(ctx, [center.key]);
     },
   ],
   [
@@ -4808,86 +4857,9 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/announcements$/,
     async (ctx) => {
-      // 首頁跑馬燈：公開（未登入也看得到），只回啟用中的公告。
-      const { results } = await ctx.db.prepare("SELECT id, body FROM announcements WHERE enabled = 1 ORDER BY position, created_at").all<{ id: string; body: string }>();
+      // 首頁跑馬燈：公開（未登入也看得到）；資料來自統一的公告表（範圍＝首頁，新的在前）。
+      const { results } = await ctx.db.prepare("SELECT id, body FROM center_broadcasts WHERE center_key = ? ORDER BY created_at DESC, rowid DESC LIMIT 20").bind(HOME_BC_KEY).all<{ id: string; body: string }>();
       return results.map((r): Announcement => ({ id: r.id, text: r.body, enabled: true }));
-    },
-  ],
-  [
-    "GET",
-    /^\/admin\/announcements$/,
-    async (ctx) => {
-      requireAdmin(ctx);
-      const { results } = await ctx.db.prepare("SELECT id, body, enabled FROM announcements ORDER BY position, created_at").all<{ id: string; body: string; enabled: number }>();
-      return results.map((r): Announcement => ({ id: r.id, text: r.body, enabled: r.enabled === 1 }));
-    },
-  ],
-  [
-    "POST",
-    /^\/admin\/announcements$/,
-    async (ctx) => {
-      const admin = requireAdmin(ctx);
-      const body = await readJson<{ text?: unknown }>(ctx.req);
-      const text = cleanAnnouncement(body.text);
-      if (!text) return fail(400, "text_required", "請輸入公告內容（120 字以內）");
-      const n = await ctx.db.prepare("SELECT COUNT(*) AS n, COALESCE(MAX(position), 0) AS m FROM announcements").first<{ n: number; m: number }>();
-      if ((n?.n ?? 0) >= 30) return fail(409, "too_many", "最多 30 則公告，請先刪除不用的");
-      const id = crypto.randomUUID();
-      await ctx.db.batch([
-        ctx.db.prepare("INSERT INTO announcements (id, body, position, created_by) VALUES (?, ?, ?, ?)").bind(id, text, (n?.m ?? 0) + 1, admin.sub),
-        audit(ctx.db, admin.sub, "announcement.add", "announcement", id),
-      ]);
-      return { id, text, enabled: true } satisfies Announcement;
-    },
-  ],
-  [
-    "POST",
-    /^\/admin\/announcements\/order$/,
-    async (ctx) => {
-      const admin = requireAdmin(ctx);
-      const body = await readJson<{ ids?: unknown }>(ctx.req);
-      const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
-      if (!ids.length || ids.length > 30) return fail(400, "invalid_request", "排序參數不正確");
-      await ctx.db.batch([...ids.map((id, i) => ctx.db.prepare("UPDATE announcements SET position = ? WHERE id = ?").bind(i + 1, id)), audit(ctx.db, admin.sub, "announcement.reorder", "announcement", "all")]);
-      return { ok: true };
-    },
-  ],
-  [
-    "PATCH",
-    /^\/admin\/announcements\/([\w-]+)$/,
-    async (ctx, [id]) => {
-      const admin = requireAdmin(ctx);
-      const body = await readJson<{ text?: unknown; enabled?: unknown }>(ctx.req);
-      const sets: string[] = [];
-      const args: unknown[] = [];
-      if (body.text !== undefined) {
-        const text = cleanAnnouncement(body.text);
-        if (!text) return fail(400, "text_required", "請輸入公告內容（120 字以內）");
-        sets.push("body = ?");
-        args.push(text);
-      }
-      if (body.enabled !== undefined) {
-        if (typeof body.enabled !== "boolean") return fail(400, "invalid_request", "參數不正確");
-        sets.push("enabled = ?");
-        args.push(body.enabled ? 1 : 0);
-      }
-      if (!sets.length) return fail(400, "invalid_request", "沒有要修改的內容");
-      const [res] = await ctx.db.batch([
-        ctx.db.prepare(`UPDATE announcements SET ${sets.join(", ")}, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`).bind(...args, id),
-        audit(ctx.db, admin.sub, "announcement.edit", "announcement", id),
-      ]);
-      if (res.meta?.changes === 0) return fail(404, "not_found", "找不到這則公告");
-      return { ok: true };
-    },
-  ],
-  [
-    "DELETE",
-    /^\/admin\/announcements\/([\w-]+)$/,
-    async (ctx, [id]) => {
-      const admin = requireAdmin(ctx);
-      const [res] = await ctx.db.batch([ctx.db.prepare("DELETE FROM announcements WHERE id = ?").bind(id), audit(ctx.db, admin.sub, "announcement.delete", "announcement", id)]);
-      if (res.meta?.changes === 0) return fail(404, "not_found", "找不到這則公告");
-      return { ok: true };
     },
   ],
   [

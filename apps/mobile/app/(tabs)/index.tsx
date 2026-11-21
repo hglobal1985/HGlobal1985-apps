@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, HQ_UNIT, type Announcement, type CourseSummary } from "@/api/client";
+import { HomeBroadcastSheet } from "@/features/broadcast/broadcast-zone";
 import { MemberHeader } from "@/features/member-header";
 import { useProfileGate } from "@/features/profile-gate";
 import { HOME_INFO_SPACE, HomeRail } from "@/features/courses/home-rail";
@@ -59,6 +60,7 @@ export default function HomeScreen() {
   );
   const { config } = useUiConfig();
   const notices = useApi<Announcement[]>("/announcements", { early: true });
+  const [noticeOpen, setNoticeOpen] = useState(false); // 點跑馬燈：開完整公告清單（超級管理員可在裡面修改、刪除）
   const courses = data ?? [];
   const mine = courses
     // 與「學習中」頁同一個規則：已開通或播放超過 1% 的課程（被隱藏的不列）。
@@ -104,7 +106,7 @@ export default function HomeScreen() {
         </View>
         <LoginPrompt />
         {shortLand ? null : <InstallCard dismissible />}
-        {noticeClosed ? null : <Ticker items={(notices.data ?? []).map((n) => n.text)} everyMs={config.app.tickerSec * 1000} pauseMs={config.app.tickerPauseSec * 1000} onClose={() => setNoticeClosed(true)} />}
+        {noticeClosed ? null : <Ticker items={(notices.data ?? []).map((n) => n.text)} everyMs={config.app.tickerSec * 1000} pauseMs={config.app.tickerPauseSec * 1000} onPress={() => setNoticeOpen(true)} onClose={() => setNoticeClosed(true)} />}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {!data && !error ? <LoadingView /> : null}
         {data ? (
@@ -160,6 +162,7 @@ export default function HomeScreen() {
         ) : null}
       </View>
     </ScrollView>
+    {noticeOpen ? <HomeBroadcastSheet onClose={() => setNoticeOpen(false)} onChanged={notices.reload} /> : null}
     </>
   );
 }

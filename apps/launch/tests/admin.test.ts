@@ -307,32 +307,35 @@ test("EDM 與 16:9 封面（從 EDM 裁切）：公開網址、權限依中心�
   void env;
 });
 
-test("跑馬燈公告：公開只看啟用中的、管理員（超級管理員／秘書）才能新增修改排序刪除", async () => {
+test("首頁公告：公開可讀、只有超級管理員能新增修改刪除（統一公告 API）", async () => {
   const { call, login } = setup();
   const [admin, student, pres] = await Promise.all(["demo-admin", "demo-student", "demo-president"].map(login));
   type A = { id: string; text: string; enabled: boolean };
+  type B = { items: { id: string; text: string; scope: string; canEdit: boolean }[] };
   assert.deepEqual((await call<A[]>("GET", "/announcements")).data, [], "沒有公告時是空的（未登入也能讀）");
-  assert.equal((await call("POST", "/admin/announcements", { token: student, body: { text: "x" } })).status, 403);
-  assert.equal((await call("POST", "/admin/announcements", { token: pres, body: { text: "x" } })).status, 403, "會長目前不能管理");
-  assert.equal((await call("POST", "/admin/announcements", { token: admin, body: { text: "   " } })).status, 400);
-  const a = (await call<A>("POST", "/admin/announcements", { token: admin, body: { text: "第一則" } })).data;
-  const b = (await call<A>("POST", "/admin/announcements", { token: admin, body: { text: "第二則".repeat(60) } })).data;
-  assert.equal(b.text.length, 120, "超過 120 字會截斷");
-  const c = (await call<A>("POST", "/admin/announcements", { token: admin, body: { text: "第三則" } })).data;
-  assert.deepEqual((await call<A[]>("GET", "/announcements")).data.map((x) => x.id), [a.id, b.id, c.id]);
-
-  await call("PATCH", `/admin/announcements/${b.id}`, { token: admin, body: { enabled: false } });
-  assert.deepEqual((await call<A[]>("GET", "/announcements")).data.map((x) => x.id), [a.id, c.id], "停用的不顯示");
-  assert.equal((await call<A[]>("GET", "/admin/announcements", { token: admin })).data.length, 3, "管理員看得到全部");
-  assert.equal((await call("GET", "/admin/announcements", { token: student })).status, 403);
-
-  await call("POST", "/admin/announcements/order", { token: admin, body: { ids: [c.id, b.id, a.id] } });
-  assert.deepEqual((await call<A[]>("GET", "/announcements")).data.map((x) => x.text), ["第三則", "第一則"]);
-  await call("PATCH", `/admin/announcements/${a.id}`, { token: admin, body: { text: "改過的第一則" } });
-  assert.equal((await call<A[]>("GET", "/announcements")).data.at(-1)!.text, "改過的第一則");
-  assert.equal((await call("DELETE", `/admin/announcements/${c.id}`, { token: admin })).status, 200);
-  assert.equal((await call("DELETE", `/admin/announcements/${c.id}`, { token: admin })).status, 404);
-  assert.equal((await call("PATCH", `/admin/announcements/${a.id}`, { token: admin, body: {} })).status, 400);
+  assert.equal((await call("POST", "/admin/broadcasts", { token: student, body: { scope: "home", text: "x" } })).status, 403);
+  assert.equal((await call("POST", "/admin/broadcasts", { token: pres, body: { scope: "home", text: "x" } })).status, 403, "會長不能發首頁公告");
+  assert.equal((await call("POST", "/admin/broadcasts", { token: admin, body: { scope: "home", text: "   " } })).status, 400);
+  await call("POST", "/admin/broadcasts", { token: admin, body: { scope: "home", text: "第一則" } });
+  const added = (await call<B>("POST", "/admin/broadcasts", { token: admin, body: { scope: "home", text: "第二則" } })).data;
+  assert.equal(added.items[0]!.scope, "home");
+  assert.equal(added.items[0]!.canEdit, true);
+  assert.equal((await call<A[]>("GET", "/announcements")).data.length, 2, "首頁跑馬燈讀得到");
+  const pub = (await call<B>("GET", "/broadcasts?home=1")).data;
+  assert.equal(pub.items.length, 2);
+  assert.equal(pub.items[0]!.canEdit, false, "訪客不能編輯");
+  const id = added.items[0]!.id;
+  assert.equal((await call("PATCH", `/admin/broadcasts/${id}`, { token: student, body: { text: "改" } })).status, 403);
+  await call("PATCH", `/admin/broadcasts/${id}`, { token: admin, body: { text: "改過的" } });
+  assert.ok((await call<A[]>("GET", "/announcements")).data.some((x) => x.text === "改過的"));
+  assert.equal((await call("DELETE", `/admin/broadcasts/${id}`, { token: student })).status, 403);
+  assert.equal((await call("DELETE", `/admin/broadcasts/${id}`, { token: admin })).status, 200);
+  assert.equal((await call("DELETE", `/admin/broadcasts/${id}`, { token: admin })).status, 404);
+  // 系列公告：只有超級管理員；中心與系列一起讀
+  assert.equal((await call("POST", "/admin/broadcasts", { token: pres, body: { scope: "series", name: "某系列", text: "x" } })).status, 403);
+  await call("POST", "/admin/broadcasts", { token: admin, body: { scope: "series", name: "某系列", text: "系列公告" } });
+  const both = (await call<B>("GET", "/broadcasts?series=某系列&center=台北中心")).data;
+  assert.deepEqual(both.items.map((x) => x.scope), ["series"]);
 });
 
 test("學習金句：內建 20 句、隨機取一則、只有超級管理員可新增修改刪除（秘書不行）", async () => {
