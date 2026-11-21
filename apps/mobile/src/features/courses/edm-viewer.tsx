@@ -226,6 +226,7 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
     </Pressable>
   );
   const many = list.length > 1;
+  const land = win.width > win.height; // 橫放：說明與按鈕合併在同一列
   const desktop = Platform.OS === "web" && win.width >= 700;
   const imgBg = cur.bg ?? bg;
   return (
@@ -248,17 +249,17 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
             </>
           ) : null}
           {/* 說明文字與下載、分享、關閉全部在最上面同一列（業主 2026-11-21）。 */}
-          <View style={styles.top} pointerEvents="box-none">
+          <View style={[styles.top, land && { flexDirection: "row-reverse", alignItems: "center" }]} pointerEvents="box-none">
             <View style={styles.row} pointerEvents="box-none">
               {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
               {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
               {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
             </View>
             {/* 操作說明在第二列，字體超大（業主 2026-11-21）。 */}
-            <View style={styles.help} pointerEvents="none">
+            <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} pointerEvents="none">
               <Ionicons name="move" size={30} color="#fff" />
               <AppText variant="caption" style={{ color: "#fff", fontWeight: "800", fontSize: 26, lineHeight: 34, flexShrink: 1 }} numberOfLines={2}>
-                {many ? `${idx + 1}/${list.length}・左右滑動換張、兩指放大縮小` : "可拖曳移動、兩指放大縮小"}
+                {many ? `第 ${idx + 1} 張，共 ${list.length} 張・左右滑動換張、兩指放大縮小` : "可拖曳移動、兩指放大縮小"}
               </AppText>
             </View>
           </View>
@@ -274,6 +275,6 @@ const styles = StyleSheet.create({
   side: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
   top: { position: "absolute", left: 16, right: 16, top: 16, gap: space.xs },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.xs },
-  tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "#000", alignItems: "center", justifyContent: "center" },
-  help: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: "#000" },
+  tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  help: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 24, backgroundColor: "rgba(0,0,0,0.5)" },
 });
