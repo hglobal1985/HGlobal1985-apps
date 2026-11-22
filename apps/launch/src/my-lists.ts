@@ -40,7 +40,7 @@ export function checkTitle(raw: unknown): string {
   return t;
 }
 
-export type ListRow = { id: string; owner_sub: string; owner_name: string; owner_avatar?: string; number: string; title: string; slug: string; cover_item_id: string | null; clicks: number; position: number; show_rank?: number };
+export type ListRow = { id: string; owner_sub: string; owner_name: string; owner_avatar?: string; number: string; title: string; slug: string; cover_item_id: string | null; clicks: number; position: number };
 export type UnlockRule = { achievementId: string; extra: number };
 export type QuotaInfo = { base: number; total: number; used: number; unlocks: { achievementId: string; name: string; extra: number; earned: boolean }[] };
 
@@ -95,7 +95,7 @@ export async function createList(db: D1Database, s: { sub: string; name: string;
 }
 
 export async function ownedList(db: D1Database, sub: string, id: string): Promise<ListRow> {
-  const l = await db.prepare("SELECT id, owner_sub, owner_name, owner_avatar, number, title, slug, cover_item_id, clicks, position, show_rank FROM my_lists WHERE id = ? AND owner_sub = ?").bind(id, sub).first<ListRow>();
+  const l = await db.prepare("SELECT id, owner_sub, owner_name, owner_avatar, number, title, slug, cover_item_id, clicks, position FROM my_lists WHERE id = ? AND owner_sub = ?").bind(id, sub).first<ListRow>();
   return l ?? fail(404, "not_found", "找不到這份清單");
 }
 
@@ -155,7 +155,7 @@ export async function resolveItems(db: D1Database, listId: string): Promise<List
 /** 清單主人的內頁：項目＋點擊統計。 */
 export async function ownDetail(db: D1Database, l: ListRow) {
   const [items, stats] = await Promise.all([resolveItems(db, l.id), listStats(db, l.id)]);
-  return { id: l.id, title: l.title, slug: l.slug, url: urlOf(l), showRank: l.show_rank !== 0, coverItemId: l.cover_item_id, clicks: l.clicks, items, stats };
+  return { id: l.id, title: l.title, slug: l.slug, url: urlOf(l), coverItemId: l.cover_item_id, clicks: l.clicks, items, stats };
 }
 
 /** 點擊來源分類：先看網址參數，再看上一頁網站。 */
@@ -181,9 +181,9 @@ export async function listStats(db: D1Database, listId: string): Promise<ListSta
   return { clicks: tot?.clicks ?? 0, people: ppl?.n ?? 0, bySource: Object.fromEntries(src.results.map((r) => [r.source, r.n])), days: days.results };
 }
 
-export type PublicList = { showRank: boolean; title: string; ownerSub: string; ownerName: string; ownerAvatar: string | null; number: string; slug: string; count: number; clicks: number; items: ListItemOut[] };
+export type PublicList = { title: string; ownerSub: string; ownerName: string; ownerAvatar: string | null; number: string; slug: string; count: number; clicks: number; items: ListItemOut[] };
 const findPublic = (db: D1Database, number: string, slug: string) =>
-  db.prepare("SELECT id, owner_sub, owner_name, owner_avatar, number, title, slug, cover_item_id, clicks, position, show_rank FROM my_lists WHERE number = ? AND slug = ?").bind(number.toLowerCase(), slug.toLowerCase()).first<ListRow>();
+  db.prepare("SELECT id, owner_sub, owner_name, owner_avatar, number, title, slug, cover_item_id, clicks, position FROM my_lists WHERE number = ? AND slug = ?").bind(number.toLowerCase(), slug.toLowerCase()).first<ListRow>();
 
 /** 公開檢視（所有清單都公開）：點擊＝每次進入 +1；人數以匿名代碼不重複計算；清單主人自己看不算。 */
 export async function viewPublic(db: D1Database, number: string, slug: string, vid: string, viewerSub: string | null, hint: string, referrer: string): Promise<PublicList> {
@@ -201,7 +201,7 @@ export async function viewPublic(db: D1Database, number: string, slug: string, v
     await db.batch(stmts);
   }
   const items = await resolveItems(db, l.id);
-  return { showRank: l.show_rank !== 0, title: l.title, ownerSub: l.owner_sub, ownerName: l.owner_name, ownerAvatar: l.owner_avatar || null, number: l.number, slug: l.slug, count: items.length, clicks, items };
+  return { title: l.title, ownerSub: l.owner_sub, ownerName: l.owner_name, ownerAvatar: l.owner_avatar || null, number: l.number, slug: l.slug, count: items.length, clicks, items };
 }
 
 /** 把別人的清單複製成自己的新清單（名稱沿用、項目照順序，不含備註）；額度不夠就回提示。 */
