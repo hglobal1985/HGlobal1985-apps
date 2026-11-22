@@ -50,30 +50,6 @@ function Label({ text, tag, note }: { text: string; tag?: string; note?: string 
   );
 }
 
-/** 左側編號線的步驟區塊（業主 2026-11-22 方案 E）：① 手機推播 ② 個人資料 ③ Amway 會員。 */
-function Step({ n, last, title, right, children }: { n: number; last?: boolean; title: string; right?: React.ReactNode; children: React.ReactNode }) {
-  const { c } = useTheme();
-  return (
-    <View style={{ flexDirection: "row", gap: space.sm }}>
-      <View style={{ width: 28, alignItems: "center" }}>
-        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ color: c.textOnAccent, fontWeight: "800", fontSize: 14 }}>{n}</Text>
-        </View>
-        {last ? null : <View style={{ flex: 1, width: 2, backgroundColor: c.border, marginVertical: 3 }} />}
-      </View>
-      <View style={{ flex: 1, minWidth: 0, gap: space.xs, paddingBottom: last ? 0 : space.xs }}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 24 }}>
-          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
-            {title}
-          </AppText>
-          {right}
-        </View>
-        {children}
-      </View>
-    </View>
-  );
-}
-
 /** 必填沒填時，整列用 2px 橘框＋淡橘底標示（中央視覺規範）。 */
 function Row({ bad, z, children }: { bad?: boolean; z?: number; children: React.ReactNode }) {
   const { c } = useTheme();
@@ -99,7 +75,7 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
 /**
  * 自訂下拉選單（不用系統原生選單）：依螢幕剩餘空間自動往下或往上展開；選項超過 12 個時上方有搜尋框。
  */
-function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange }: { options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
+function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop }: { pop?: "left" | "center" | "right"; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { c } = useTheme();
   const { height: winH } = useWindowDimensions();
   const box = useRef<HostInstance>(null);
@@ -119,14 +95,14 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange 
   const list = q.trim() ? options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase())) : options;
   return (
     <View ref={box} collapsable={false} style={{ flex: 1, zIndex: open ? 50 : 1 }}>
-      <Pressable onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: space.sm, opacity: disabled ? 0.7 : 1 }]}>
+      <Pressable onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
         <AppText style={{ flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
           {label}
         </AppText>
-        <Icon name={open ? "chevron-up" : "chevron-down"} size={20} color={c.textMuted} />
+        <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 16 : 20} color={c.textMuted} />
       </Pressable>
       {open ? (
-        <View style={[styles.dropdown, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
+        <View style={[styles.dropdown, pop ? { width: 220, ...(pop === "left" ? { left: 0, right: undefined } : pop === "right" ? { right: 0, left: undefined } : { left: -56, right: undefined }) } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
           {options.length > 12 ? (
             <TextInput value={q} onChangeText={setQ} placeholder="搜尋" placeholderTextColor={c.textMuted} autoCapitalize="none" style={[styles.search, { color: c.text, borderColor: c.border }]} />
           ) : null}
@@ -204,6 +180,9 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const centerListed = systemHg && terms.education_center.length > 0 && vals.education_center !== undefined;
   const missing: Key[] = data ? ([!vals.display_name.trim() && "display_name", amway && !vals.education_system.trim() && "education_system", amway && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
 
+  /** 三欄窄版用的短標籤：審核通過→通過、審核中...→審核中。 */
+  const shortTag = (t: string | undefined) => (t === "審核通過" ? "通過" : t === "審核中..." ? "審核中" : t);
+
   /** 標籤：沒填 → 「必填」；填了就隱藏；中心、獎銜（沒被改動時）等待審核 → 「審核中...」、已通過審核 → 「審核通過」（外觀都同必填）。 */
   const tagFor = (key: "education_system" | "education_center" | "rank" | "display_name", reviewed = false): string | undefined => {
     const v = vals[key];
@@ -251,41 +230,46 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     }
   };
 
-  /** 系統／中心：清單選單＋「其他」自訂輸入＋右邊的「無」勾選框。 */
-  const listedRow = (key: "education_system" | "education_center", label: string) => {
+  /** 系統／中心：清單選單＋「其他」自訂輸入＋下方的「無」勾選框（三欄緊湊表單的一欄）。 */
+  const listedCol = (key: "education_system" | "education_center", label: string, pop: "left" | "center" | "right") => {
     const v = vals[key];
     const none = v.trim() === NONE_TERM;
     const list = terms[key];
     const other = !none && (otherPick[key] ?? (!!v.trim() && !list.includes(v)));
     const sel = none ? "" : other ? OTHER : v;
     const options = [{ value: "", label: "（未選擇）" }, ...list.map((t) => ({ value: t, label: t })), { value: OTHER, label: "其他" }];
-    return (
-      <Row z={openKey === key ? 100 : key === "education_system" ? 30 : 20} bad={showBad && missing.includes(key)}>
-        <Label text={label} tag={tagFor(key, key === "education_center")} note={key === "education_center" ? noteFor("education_center") : undefined} />
-        <View style={styles.line}>
-          <Dropdown
-            options={options}
-            value={sel}
-            label={none ? "無" : other ? "其他" : v || "（未選擇）"}
-            disabled={none}
-            open={openKey === key}
-            onOpenChange={(o) => setOpenKey(o ? key : null)}
-            onPick={(p) => {
-              if (p === OTHER) {
-                setOtherPick((s) => ({ ...s, [key]: true }));
-                set(key)("");
-              } else {
-                setOtherPick((s) => ({ ...s, [key]: false }));
-                set(key)(p);
-              }
-            }}
-          />
-          <NoneBox on={none} onToggle={() => (setOtherPick((s) => ({ ...s, [key]: false })), set(key)(none ? "" : NONE_TERM))} />
+    return {
+      other,
+      node: (
+        <View style={{ flex: key === "education_center" ? 1.5 : 0.9, minWidth: 0 }}>
+          <Row z={openKey === key ? 100 : key === "education_system" ? 30 : 20} bad={showBad && missing.includes(key)}>
+            <Label text={label} tag={shortTag(tagFor(key, key === "education_center"))} note={key === "education_center" ? noteFor("education_center") : undefined} />
+            <Dropdown
+              pop={pop}
+              options={options}
+              value={sel}
+              label={none ? "無" : other ? "其他" : v || "（未選擇）"}
+              disabled={none}
+              open={openKey === key}
+              onOpenChange={(o) => setOpenKey(o ? key : null)}
+              onPick={(p) => {
+                if (p === OTHER) {
+                  setOtherPick((s) => ({ ...s, [key]: true }));
+                  set(key)("");
+                } else {
+                  setOtherPick((s) => ({ ...s, [key]: false }));
+                  set(key)(p);
+                }
+              }}
+            />
+            <NoneBox on={none} onToggle={() => (setOtherPick((s) => ({ ...s, [key]: false })), set(key)(none ? "" : NONE_TERM))} />
+          </Row>
         </View>
-        {other ? <Input value={v} onChange={set(key)} placeholder="請輸入自訂內容" /> : null}
-      </Row>
-    );
+      ),
+    };
   };
+  const sysCol = listedCol("education_system", "系統", "left");
+  const cenCol = centerListed ? listedCol("education_center", "中心", "center") : null;
 
   return (
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
@@ -308,83 +292,81 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
             </AppText>
           ) : null}
           {!data && !error ? <AppText tone="muted">讀取中…</AppText> : null}
-          <Step n={1} last={!data} title="手機推播">
-            <PushSwitchRow />
-          </Step>
+          <PushSwitchRow banner />
           {data ? (
             <>
-              <Step n={2} title="個人資料">
               <View style={[styles.line, { alignItems: "flex-end" }]}>
-                  <View style={{ flex: 1 }}>
-                    <Row>
-                      <Label text="本名（付費課程對帳用）" />
-                      <Input value={vals.legal_name} onChange={set("legal_name")} />
-                    </Row>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Row bad={showBad && missing.includes("display_name")}>
-                      <Label text="暱稱" tag={tagFor("display_name")} />
-                      <Input value={vals.display_name} onChange={set("display_name")} />
-                    </Row>
-                  </View>
+                <View style={{ flex: 1 }}>
+                  <Row>
+                    <Label text="本名（付費課程對帳用）" />
+                    <Input value={vals.legal_name} onChange={set("legal_name")} />
+                  </Row>
                 </View>
-                <Row>
-                  <Label text="Email" />
-                  <Input value={vals.contact_email} onChange={set("contact_email")} />
-                </Row>
-              </Step>
-              {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上在下面出現系統、中心、獎銜三個欄位；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
-              <Step n={3} last title="Amway 會員" right={
-              <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={[styles.none, { minHeight: 28 }]}>
-                <Icon name={amway ? "checkbox" : "square-outline"} size={24} color={amway ? c.accentText : c.textMuted} />
-                <AppText style={{ fontWeight: "700" }}>我是 Amway 會員</AppText>
-              </Pressable>
-              }>
+                <View style={{ flex: 1 }}>
+                  <Row bad={showBad && missing.includes("display_name")}>
+                    <Label text="暱稱" tag={tagFor("display_name")} />
+                    <Input value={vals.display_name} onChange={set("display_name")} />
+                  </Row>
+                </View>
+              </View>
+              <Row>
+                <Label text="Email" />
+                <Input value={vals.contact_email} onChange={set("contact_email")} />
+              </Row>
+              {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
+              <View style={[styles.amwayCard, { backgroundColor: c.surfaceMuted }]}>
+                <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={[styles.none, { minHeight: 32 }]}>
+                  <Icon name={amway ? "checkbox" : "square-outline"} size={26} color={amway ? c.accentText : c.textMuted} />
+                  <AppText style={{ fontWeight: "800" }}>我是 Amway 會員</AppText>
+                </Pressable>
+                {amway ? (
+                  <>
+                    <View style={{ flexDirection: "row", gap: 6, zIndex: 30 }}>
+                      {sysCol.node}
+                      {cenCol ? (
+                        cenCol.node
+                      ) : (
+                        <View style={{ flex: 1.5, minWidth: 0 }}>
+                          <Row z={20} bad={showBad && missing.includes("education_center")}>
+                            <Label text="中心" tag={shortTag(tagFor("education_center", true))} note={noteFor("education_center")} />
+                            {vals.education_center.trim() === NONE_TERM ? (
+                              <View style={[styles.input, { borderColor: c.border, backgroundColor: c.surfaceMuted, justifyContent: "center" }]}>
+                                <AppText tone="muted">無</AppText>
+                              </View>
+                            ) : (
+                              <Input value={vals.education_center} onChange={set("education_center")} />
+                            )}
+                            <NoneBox on={vals.education_center.trim() === NONE_TERM} onToggle={() => set("education_center")(vals.education_center.trim() === NONE_TERM ? "" : NONE_TERM)} />
+                          </Row>
+                        </View>
+                      )}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Row z={openKey === "rank" ? 100 : 10} bad={showBad && missing.includes("rank")}>
+                          <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} />
+                          <Dropdown
+                            pop="right"
+                            options={data.rankOptions.filter((o) => o.value !== "none").map((o) => ({ value: o.value, label: o.label }))}
+                            value={rankNone ? "" : vals.rank}
+                            label={!canRank ? "請先填" : rankNone ? "無" : vals.rank ? rankLabel(vals.rank) : "請選擇"}
+                            disabled={!canRank || rankNone}
+                            open={openKey === "rank"}
+                            onOpenChange={(o) => setOpenKey(o ? "rank" : null)}
+                            onPick={set("rank")}
+                          />
+                          <NoneBox on={rankNone} disabled={!canRank} onToggle={() => set("rank")(rankNone ? "" : "none")} />
+                        </Row>
+                      </View>
+                    </View>
+                    {sysCol.other ? <Input value={vals.education_system} onChange={set("education_system")} placeholder="系統：請輸入自訂內容" /> : null}
+                    {cenCol?.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
+                  </>
+                ) : null}
+              </View>
               {data.enabled ? (
-                <AppText variant="caption" tone="muted">
+                <AppText variant="caption" tone="muted" style={{ textAlign: "center" }}>
                   已勾選；要取消請到會員中心。
                 </AppText>
               ) : null}
-              {amway ? (
-                <>
-                  {listedRow("education_system", "系統")}
-                  {centerListed ? (
-                    listedRow("education_center", "中心")
-                  ) : (
-                    <Row z={20} bad={showBad && missing.includes("education_center")}>
-                      <Label text="中心" tag={tagFor("education_center", true)} note={noteFor("education_center")} />
-                      <View style={styles.line}>
-                        <View style={{ flex: 1 }}>
-                          {vals.education_center.trim() === NONE_TERM ? (
-                            <View style={[styles.input, { borderColor: c.border, backgroundColor: c.surfaceMuted, justifyContent: "center" }]}>
-                              <AppText tone="muted">無</AppText>
-                            </View>
-                          ) : (
-                            <Input value={vals.education_center} onChange={set("education_center")} />
-                          )}
-                        </View>
-                        <NoneBox on={vals.education_center.trim() === NONE_TERM} onToggle={() => set("education_center")(vals.education_center.trim() === NONE_TERM ? "" : NONE_TERM)} />
-                      </View>
-                    </Row>
-                  )}
-                  <Row z={openKey === "rank" ? 100 : 10} bad={showBad && missing.includes("rank")}>
-                    <Label text="獎銜" tag={tagFor("rank", true)} note={noteFor("rank")} />
-                    <View style={styles.line}>
-                      <Dropdown
-                        options={data.rankOptions.filter((o) => o.value !== "none").map((o) => ({ value: o.value, label: o.label }))}
-                        value={rankNone ? "" : vals.rank}
-                        label={!canRank ? "請先填系統與中心" : rankNone ? "無" : vals.rank ? rankLabel(vals.rank) : "請選擇"}
-                        disabled={!canRank || rankNone}
-                        open={openKey === "rank"}
-                        onOpenChange={(o) => setOpenKey(o ? "rank" : null)}
-                        onPick={set("rank")}
-                      />
-                      <NoneBox on={rankNone} disabled={!canRank} onToggle={() => set("rank")(rankNone ? "" : "none")} />
-                    </View>
-                  </Row>
-                </>
-              ) : null}
-              </Step>
             </>
           ) : null}
       </ScrollView>
@@ -405,12 +387,13 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: space.sm, width: "100%" },
   btn: { minHeight: 44, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm },
   line: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  labelRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  labelRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 24 },
   req: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1 },
   input: { minHeight: FIELD_H, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
   none: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 36, minWidth: 60 },
   dropdown: { position: "absolute", left: 0, right: 0, borderWidth: 1, borderRadius: radius.md, zIndex: 60, overflow: "hidden" },
   search: { minHeight: 40, borderBottomWidth: 1, paddingHorizontal: space.md, fontSize: 15 },
   opt: { minHeight: 44, paddingHorizontal: space.md, justifyContent: "center" },
+  amwayCard: { borderRadius: radius.md, padding: space.sm, gap: space.xs },
   more: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44 },
 });
