@@ -5,7 +5,6 @@ import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
 import { api, clearApiCache, LIST_COVER_COLORS, resolveUrl } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
-import { Check } from "@/ui/check";
 import { FormBlock } from "@/ui/form-block";
 import { ListItemRow, type ListItem } from "@/features/my-lists/item-row";
 import { coverFill, ListCover, type ListCoverMode } from "@/features/my-lists/list-cover";
@@ -20,7 +19,7 @@ import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, SegmentTa
 import { DIM_COLOR } from "@/ui/dim-backdrop";
 import { flashText } from "@/ui/flash-notice";
 
-type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; coverColor: string | null; coverText: string | null; coverTextRaw: string; coverTextOn: boolean; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
+type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; coverColor: string | null; coverText: string | null; coverTextRaw: string; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
 
 /**
  * 我的清單內頁（業主 2026-11-22 改版：大圖封面首頁＋三個分頁）：上方是清單封面大圖（名稱、點閱數疊在圖上）與「分享／複製網址」，
@@ -275,16 +274,15 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
   const [isCustom, setIsCustom] = useState(d.coverMode !== "item");
   const [bgId, setBgId] = useState<string | null>(d.coverBgId);
   const [color, setColor] = useState<string | null>(d.coverColor);
-  const [textOn, setTextOn] = useState(d.coverTextOn);
   const [textRaw, setTextRaw] = useState(d.coverTextRaw);
   const [busy, setBusy] = useState(false);
   const bgUrl = bgs.data?.find((x) => x.id === bgId)?.url ?? null;
   const mode: ListCoverMode = isCustom ? "text" : "item";
-  const previewText = textOn ? textRaw.trim() || d.title : null;
+  const previewText = textRaw.trim() || d.title;
   const save = async () => {
     setBusy(true);
     try {
-      const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, { coverMode: mode, coverBgId: bgId ?? "", coverColor: bgId ? "" : (color ?? ""), coverText: textRaw.trim(), coverTextOn: textOn });
+      const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, { coverMode: mode, coverBgId: bgId ?? "", coverColor: bgId ? "" : (color ?? ""), coverText: textRaw.trim() });
       onDone(r);
       flashText("已儲存封面");
       onClose();
@@ -294,7 +292,7 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
       setBusy(false);
     }
   };
-  const dirty = mode !== d.coverMode || bgId !== d.coverBgId || (bgId ? false : color !== d.coverColor) || textOn !== d.coverTextOn || textRaw.trim() !== d.coverTextRaw;
+  const dirty = mode !== d.coverMode || bgId !== d.coverBgId || (bgId ? false : color !== d.coverColor) || textRaw.trim() !== d.coverTextRaw;
   return (
     <EditSheet title="清單封面" onClose={onClose} onSave={save} busy={busy} dirty={dirty}>
       <ListCover mode={mode} imageUrl={d.itemCoverUrl} bgUrl={bgUrl} color={color} title={d.title} text={previewText} height={150} />
@@ -313,15 +311,10 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
       ) : (
         <View style={{ gap: space.md }}>
           <FormBlock title="文字">
-            <Check label="在封面上顯示文字" value={textOn} onChange={setTextOn} />
-            {textOn ? (
-              <>
-                <Field label="自訂文字（留空就用清單名稱）" value={textRaw} onChange={(v) => setTextRaw(v.slice(0, 40))} placeholder={d.title} />
-                <AppText variant="caption" tone="muted">
-                  文字會自動放到適當大小，並加上陰影，疊在圖片或底色上都看得清楚。
-                </AppText>
-              </>
-            ) : null}
+            <Field label="封面文字（留空就用清單名稱）" value={textRaw} onChange={(v) => setTextRaw(v.slice(0, 40))} placeholder={d.title} />
+            <AppText variant="caption" tone="muted">
+              文字會自動放到適當大小，並加上陰影，疊在圖片或底色上都看得清楚。
+            </AppText>
           </FormBlock>
           {bgs.data?.length ? (
             <FormBlock title="圖庫底圖">

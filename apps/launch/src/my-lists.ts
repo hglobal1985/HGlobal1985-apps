@@ -92,7 +92,7 @@ async function coverBgMap(db: D1Database): Promise<Map<string, string>> {
  */
 function coverOut(l: { cover_mode?: string; cover_bg_id?: string | null; cover_text?: string | null; cover_text_on?: number; cover_color?: string | null; title?: string }, itemCover: string | null, bgs: Map<string, string>): { coverMode: CoverMode; coverUrl: string | null; coverBgUrl: string | null; coverText: string | null; coverColor: string | null } {
   const mode: CoverMode = l.cover_mode === "item" ? "item" : "text";
-  const text = mode !== "item" && (l.cover_text_on ?? 1) ? ((l.cover_text ?? "").trim() || l.title || "") : null;
+  const text = mode !== "item" ? ((l.cover_text ?? "").trim() || l.title || "") : null; // 自訂封面一律顯示文字（業主 2026-11-22），cover_text_on 欄位已不使用
   return { coverMode: mode, coverUrl: mode === "item" ? itemCover : null, coverBgUrl: mode === "text" && l.cover_bg_id ? (bgs.get(l.cover_bg_id) ?? null) : null, coverText: text, coverColor: mode === "text" ? (l.cover_color ?? null) : null };
 }
 
@@ -177,7 +177,7 @@ export async function ownDetail(db: D1Database, l: ListRow) {
   const [items, stats, bgs] = await Promise.all([resolveItems(db, l.id), listStats(db, l.id), coverBgMap(db)]);
   const pick = l.cover_item_id;
   const itemCover = ((pick ? items.find((x) => x.id === pick && x.coverUrl) : undefined) ?? items.find((x) => x.coverUrl && !x.missing))?.coverUrl ?? null;
-  return { id: l.id, title: l.title, slug: l.slug, url: urlOf(l), coverItemId: l.cover_item_id, ...coverOut({ ...l, title: l.title }, itemCover, bgs), coverBgId: l.cover_bg_id ?? null, coverTextRaw: l.cover_text ?? "", coverTextOn: (l.cover_text_on ?? 1) === 1, itemCoverUrl: itemCover, coverBgChoiceUrl: l.cover_bg_id ? (bgs.get(l.cover_bg_id) ?? null) : null, clicks: l.clicks, items, stats };
+  return { id: l.id, title: l.title, slug: l.slug, url: urlOf(l), coverItemId: l.cover_item_id, ...coverOut({ ...l, title: l.title }, itemCover, bgs), coverBgId: l.cover_bg_id ?? null, coverTextRaw: l.cover_text ?? "", itemCoverUrl: itemCover, coverBgChoiceUrl: l.cover_bg_id ? (bgs.get(l.cover_bg_id) ?? null) : null, clicks: l.clicks, items, stats };
 }
 
 /** 點擊來源分類：先看網址參數，再看上一頁網站。 */
