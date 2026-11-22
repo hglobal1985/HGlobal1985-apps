@@ -2,10 +2,12 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
-import { api } from "@/api/client";
+import { api, resolveUrl } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { ListItemRow, type ListItem } from "@/features/my-lists/item-row";
+import { ListCover, type ListCoverMode } from "@/features/my-lists/list-cover";
+import { PickImageButton } from "@/features/admin/pick-image";
 import { SOURCE_LABEL } from "@/features/my-lists/links";
 import { bumpMark, resetMarks } from "@/features/my-lists/store";
 import { trackFeature } from "@/lib/feature-track";
@@ -17,7 +19,7 @@ import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, SegmentTa
 import { DIM_COLOR } from "@/ui/dim-backdrop";
 import { flashText } from "@/ui/flash-notice";
 
-type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
+type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; hasUpload: boolean; uploadUrl: string | null; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
 
 /**
  * 我的清單內頁（業主 2026-11-22 改版：大圖封面首頁＋三個分頁）：上方是清單封面大圖（名稱、點閱數疊在圖上）與「分享／複製網址」，
@@ -33,6 +35,7 @@ export default function MyListScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState<"items" | "stats" | "settings">("items");
   const [editing, setEditing] = useState<string | null>(null);
+  const [coverOpen, setCoverOpen] = useState(false);
   useEffect(() => {
     if (data) {
       setD(data);
@@ -47,7 +50,7 @@ export default function MyListScreen() {
     setBusy(key);
     try {
       const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, body);
-      setD((x) => (x ? { ...x, title: r.title, slug: r.slug, url: r.url, coverItemId: r.coverItemId, items: r.items } : x));
+      setD((x) => (x ? { ...x, ...r } : x));
       setTitle(r.title);
       setSlug(r.slug);
       flashText(ok);
@@ -103,7 +106,6 @@ export default function MyListScreen() {
     }
   };
   const max = Math.max(1, ...d.stats.days.map((x) => x.n));
-  const coverItem = d.items.find((x) => x.id === d.coverItemId) ?? d.items.find((x) => x.coverUrl);
   const editItem = d.items.find((x) => x.id === editing) ?? null;
   const settingsDirty = title !== d.title || slug !== d.slug;
   const saveSettings = async () => {
@@ -114,12 +116,13 @@ export default function MyListScreen() {
   };
   return (
     <Screen header={false}>
-      <View style={[styles.hero, { backgroundColor: c.surfaceMuted }]}>
-        {coverItem?.coverUrl ? <Image source={{ uri: coverItem.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback />}
+      <ListCover mode={d.coverMode} imageUrl={d.coverUrl} bgUrl={d.coverBgUrl} title={d.title} height={190}>
         <View style={[styles.heroText, { backgroundColor: DIM_COLOR }]}>
-          <AppText variant="title" numberOfLines={2} style={{ color: "#fff" }}>
-            {d.title}
-          </AppText>
+          {d.coverMode !== "text" ? (
+            <AppText variant="title" numberOfLines={2} style={{ color: "#fff" }}>
+              {d.title}
+            </AppText>
+          ) : null}
           <View style={styles.heroStat}>
             <Ionicons name="eye-outline" size={15} color="#fff" />
             <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>
@@ -127,7 +130,13 @@ export default function MyListScreen() {
             </AppText>
           </View>
         </View>
-      </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="更換清單封面" onPress={() => setCoverOpen(true)} style={styles.coverBtn}>
+          <Ionicons name="image-outline" size={18} color="#1F3A2E" />
+          <AppText variant="callout" style={{ color: "#1F3A2E", fontWeight: "800" }}>
+            更換封面
+          </AppText>
+        </Pressable>
+      </ListCover>
       <View style={{ flexDirection: "row", gap: space.sm }}>
         <Pressable accessibilityRole="button" accessibilityLabel="分享" onPress={() => void share()} style={[styles.shareBtn, { backgroundColor: c.accent }]}>
           <ShareIcon size={20} color="#fff" />
@@ -246,8 +255,105 @@ export default function MyListScreen() {
         </>
       ) : null}
 
+      {coverOpen ? <CoverSheet d={d} onClose={() => setCoverOpen(false)} onDone={(r) => setD((x) => (x ? { ...x, ...r } : x))} /> : null}
       {editItem ? <ItemSheet key={editItem.id} item={editItem} cover={d.coverItemId === editItem.id} onClose={() => setEditing(null)} onNote={(n) => saveNote(editItem, n)} onCover={() => void patch("cover", { coverItemId: d.coverItemId === editItem.id ? "" : editItem.id }, d.coverItemId === editItem.id ? "已改用預設封面" : "已設為清單封面")} onRemove={() => { setEditing(null); void remove(editItem); }} /> : null}
     </Screen>
+  );
+}
+
+/**
+ * 清單封面設定（業主 2026-11-22）：三種——內容封面（用清單內容的圖）、上傳圖片、文字封面（清單名稱放大當封面＋管理員上傳的底圖或純色）。
+ * 上面有即時預覽；上傳圖片選好就立刻上傳，「儲存」才套用封面類型與底圖。
+ */
+function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; onDone: (r: Detail) => void }) {
+  const { c } = useTheme();
+  const bgs = useApi<{ id: string; name: string; url: string }[]>("/list-cover-bgs");
+  const [mode, setMode] = useState<ListCoverMode>(d.coverMode);
+  const [bgId, setBgId] = useState<string | null>(d.coverBgId);
+  const [up, setUp] = useState<{ has: boolean; url: string | null }>({ has: d.hasUpload, url: d.uploadUrl });
+  const [busy, setBusy] = useState<"upload" | "save" | null>(null);
+  const bgUrl = bgs.data?.find((x) => x.id === bgId)?.url ?? null;
+  const upload = async (file: File) => {
+    setBusy("upload");
+    try {
+      const r = await api<Detail>("PUT", `/my-lists/${d.id}/cover-image`, file);
+      onDone(r);
+      setUp({ has: true, url: r.uploadUrl });
+      setMode("upload");
+      flashText("已上傳封面圖");
+    } catch (e) {
+      flashText(e instanceof Error ? e.message : "上傳失敗");
+    } finally {
+      setBusy(null);
+    }
+  };
+  const save = async () => {
+    if (mode === "upload" && !up.has) return flashText("請先上傳一張封面圖");
+    setBusy("save");
+    try {
+      const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, { coverMode: mode, coverBgId: bgId ?? "" });
+      onDone(r);
+      flashText("已儲存封面");
+      onClose();
+    } catch (e) {
+      flashText(e instanceof Error ? e.message : "儲存失敗");
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <EditSheet title="清單封面" onClose={onClose} onSave={save} busy={busy === "save"} dirty={mode !== d.coverMode || bgId !== d.coverBgId}>
+      <ListCover mode={mode} imageUrl={mode === "upload" ? up.url : d.itemCoverUrl} bgUrl={bgUrl} title={d.title} height={150} />
+      <SegmentTabs
+        value={mode}
+        onChange={setMode}
+        options={[
+          { key: "item", label: "內容封面" },
+          { key: "upload", label: "上傳圖片" },
+          { key: "text", label: "文字封面" },
+        ]}
+      />
+      {mode === "item" ? (
+        <AppText variant="callout" tone="muted">
+          用清單內容的封面圖。要指定哪一個內容當封面：回到「內容」分頁，按那一列右邊的「⋯」→「設為封面」；沒指定就用第一個有封面的內容。
+        </AppText>
+      ) : null}
+      {mode === "upload" ? (
+        <View style={{ gap: space.sm }}>
+          <PickImageButton label={up.has ? "更換封面圖" : "上傳封面圖"} onPick={(f) => void upload(f)} busy={busy === "upload"} />
+          <AppText variant="caption" tone="muted">
+            JPG、PNG、WebP，8MB 內；會自動壓縮。封面是橫式（約 16:9），建議上傳橫式圖片。
+          </AppText>
+        </View>
+      ) : null}
+      {mode === "text" ? (
+        <View style={{ gap: space.sm }}>
+          <AppText variant="callout" style={{ fontWeight: "700" }}>
+            文字封面的底圖
+          </AppText>
+          <View style={styles.bgGrid}>
+            <Pressable accessibilityRole="radio" accessibilityState={{ selected: bgId === null }} accessibilityLabel="純色底" onPress={() => setBgId(null)} style={[styles.bgCell, { borderColor: bgId === null ? c.accent : c.border, backgroundColor: "#0C603C" }]}>
+              <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>
+                純色
+              </AppText>
+            </Pressable>
+            {(bgs.data ?? []).map((b) => (
+              <Pressable key={b.id} accessibilityRole="radio" accessibilityState={{ selected: bgId === b.id }} accessibilityLabel={`底圖 ${b.name}`} onPress={() => setBgId(b.id)} style={[styles.bgCell, { borderColor: bgId === b.id ? c.accent : c.border }]}>
+                <Image source={{ uri: resolveUrl(b.url) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+              </Pressable>
+            ))}
+          </View>
+          {bgs.data && !bgs.data.length ? (
+            <AppText variant="caption" tone="muted">
+              目前還沒有提供底圖，先用純色底。
+            </AppText>
+          ) : null}
+          <AppText variant="caption" tone="muted">
+            清單名稱會自動放到最大，並加上描邊與光暈，放在複雜的底圖上也看得清楚。
+          </AppText>
+        </View>
+      ) : null}
+    </EditSheet>
   );
 }
 
@@ -289,7 +395,9 @@ function ItemSheet({ item, cover, onClose, onNote, onCover, onRemove }: { item: 
 }
 
 const styles = StyleSheet.create({
-  hero: { height: 190, borderRadius: radius.lg, overflow: "hidden", justifyContent: "flex-end" },
+  coverBtn: { position: "absolute", top: 10, right: 10, minHeight: 44, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: "#FFFFFFE6", flexDirection: "row", alignItems: "center", gap: 6 },
+  bgGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  bgCell: { width: "31%", aspectRatio: 16 / 9, borderRadius: radius.md, borderWidth: 3, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   heroText: { paddingHorizontal: space.md, paddingVertical: space.sm, gap: 2 },
   heroStat: { flexDirection: "row", alignItems: "center", gap: 6 },
   more: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },

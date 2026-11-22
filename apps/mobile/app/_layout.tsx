@@ -81,6 +81,7 @@ function AppStack() {
             <Stack.Screen name="achievements" options={{ title: "學習成就" }} />
             <Stack.Screen name="admin/achievements" options={{ title: "徽章任務設定" }} />
             <Stack.Screen name="admin/brand-logos" options={{ title: "品牌 Logo" }} />
+            <Stack.Screen name="admin/list-cover-bgs" options={{ title: "清單封面底圖" }} />
             <Stack.Screen name="admin/youtube-syncs" options={{ title: "同步 YouTube 清單" }} />
             <Stack.Screen name="admin/thumbnails" options={{ title: "Cloudflare即時縮圖" }} />
             <Stack.Screen name="admin/storage" options={{ title: "儲存空間管理" }} />

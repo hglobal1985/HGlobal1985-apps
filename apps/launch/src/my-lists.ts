@@ -40,7 +40,7 @@ export function checkTitle(raw: unknown): string {
   return t;
 }
 
-export type ListRow = { id: string; owner_sub: string; owner_name: string; owner_avatar?: string; number: string; title: string; slug: string; cover_item_id: string | null; clicks: number; position: number };
+export type ListRow = { id: string; owner_sub: string; owner_name: string; owner_avatar?: string; number: string; title: string; slug: string; cover_item_id: string | null; clicks: number; position: number; cover_mode?: string; cover_key?: string | null; cover_bg_id?: string | null; cover_ver?: number };
 export type UnlockRule = { achievementId: string; extra: number };
 export type QuotaInfo = { base: number; total: number; used: number; unlocks: UnlockOut[] };
 export type UnlockOut = { achievementId: string; name: string; extra: number; earned: boolean; description: string; type: string; threshold: number; feature: string | null };
@@ -57,7 +57,7 @@ export async function quotaOf(db: D1Database, sub: string, base: number, rules: 
   return { base, total: base + unlocks.filter((u) => u.earned).reduce((a, u) => a + u.extra, 0), used: used?.n ?? 0, unlocks };
 }
 
-export type OwnList = { id: string; title: string; slug: string; clicks: number; people: number; count: number; url: string; coverItemId: string | null; coverUrl: string | null; has?: boolean };
+export type OwnList = { id: string; title: string; slug: string; clicks: number; people: number; count: number; url: string; coverItemId: string | null; coverUrl: string | null; coverMode: CoverMode; coverBgUrl: string | null; has?: boolean };
 const urlOf = (l: { number: string; slug: string }) => `/${l.number}/${l.slug}`;
 const pub = (key: string | null, v: number | null) => (key ? `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v ?? 0}` : null);
 
@@ -65,16 +65,29 @@ const pub = (key: string | null, v: number | null) => (key ? `/api/v2/media/pub?
 export async function ownLists(db: D1Database, sub: string, item?: { kind: ListItemKind; ref: string }): Promise<OwnList[]> {
   const { results } = await db
     .prepare(
-      `SELECT l.id, l.title, l.slug, l.number, l.clicks, l.cover_item_id AS coverItemId,
+      `SELECT l.id, l.title, l.slug, l.number, l.clicks, l.cover_item_id AS coverItemId, l.cover_mode AS coverMode, l.cover_key AS coverKey, l.cover_bg_id AS coverBgId, l.cover_ver AS coverVer,
         (SELECT COUNT(*) FROM my_list_items i WHERE i.list_id = l.id) AS count,
         (SELECT COUNT(*) FROM my_list_visitors v WHERE v.list_id = l.id) AS people
         ${item ? ", EXISTS(SELECT 1 FROM my_list_items i WHERE i.list_id = l.id AND i.kind = ? AND i.ref = ?) AS has" : ", 0 AS has"}
        FROM my_lists l WHERE l.owner_sub = ? ORDER BY l.position, l.created_at`,
     )
     .bind(...(item ? [item.kind, item.ref] : []), sub)
-    .all<{ id: string; title: string; slug: string; number: string; clicks: number; coverItemId: string | null; count: number; people: number; has: number }>();
-  const covers = await Promise.all(results.map((r) => (r.count ? listCover(db, r.id, r.coverItemId) : Promise.resolve(null))));
-  return results.map((r, i) => ({ id: r.id, title: r.title, slug: r.slug, clicks: r.clicks, people: r.people, count: r.count, url: urlOf(r), coverItemId: r.coverItemId, coverUrl: covers[i]!, ...(item ? { has: !!r.has } : {}) }));
+    .all<{ id: string; title: string; slug: string; number: string; clicks: number; coverItemId: string | null; coverMode: string; coverKey: string | null; coverBgId: string | null; coverVer: number; count: number; people: number; has: number }>();
+  const bgs = await coverBgMap(db);
+  const covers = await Promise.all(results.map((r) => (r.coverMode === "item" && r.count ? listCover(db, r.id, r.coverItemId) : Promise.resolve(null))));
+  return results.map((r, i) => ({ id: r.id, title: r.title, slug: r.slug, clicks: r.clicks, people: r.people, count: r.count, url: urlOf(r), coverItemId: r.coverItemId, ...coverOut({ cover_mode: r.coverMode, cover_key: r.coverKey, cover_bg_id: r.coverBgId, cover_ver: r.coverVer }, covers[i]!, bgs), ...(item ? { has: !!r.has } : {}) }));
+}
+
+export type CoverMode = "item" | "upload" | "text";
+/** 管理員上傳的清單專用封面底圖（全部，數量不多）：id → 圖片網址。 */
+async function coverBgMap(db: D1Database): Promise<Map<string, string>> {
+  const { results } = await db.prepare("SELECT id, image_key, art_version FROM list_cover_bgs").all<{ id: string; image_key: string; art_version: number }>();
+  return new Map(results.map((r) => [r.id, pub(r.image_key, r.art_version)!]));
+}
+/** 清單封面的輸出：內容封面（item）＝項目圖；上傳（upload）＝自己上傳的圖；文字封面（text）＝沒有圖，畫面用清單名稱＋底圖（coverBgUrl，空＝純色）排出來。 */
+function coverOut(l: { cover_mode?: string; cover_key?: string | null; cover_bg_id?: string | null; cover_ver?: number }, itemCover: string | null, bgs: Map<string, string>): { coverMode: CoverMode; coverUrl: string | null; coverBgUrl: string | null } {
+  const mode: CoverMode = l.cover_mode === "upload" && l.cover_key ? "upload" : l.cover_mode === "text" ? "text" : "item";
+  return { coverMode: mode, coverUrl: mode === "upload" ? pub(l.cover_key ?? null, l.cover_ver ?? 0) : mode === "item" ? itemCover : null, coverBgUrl: mode === "text" && l.cover_bg_id ? (bgs.get(l.cover_bg_id) ?? null) : null };
 }
 
 /** 清單封面：自選項目的封面；沒選（或那項已沒有封面）就用最上面第一個有封面的項目。 */
@@ -96,7 +109,7 @@ export async function createList(db: D1Database, s: { sub: string; name: string;
 }
 
 export async function ownedList(db: D1Database, sub: string, id: string): Promise<ListRow> {
-  const l = await db.prepare("SELECT id, owner_sub, owner_name, owner_avatar, number, title, slug, cover_item_id, clicks, position FROM my_lists WHERE id = ? AND owner_sub = ?").bind(id, sub).first<ListRow>();
+  const l = await db.prepare("SELECT id, owner_sub, owner_name, owner_avatar, number, title, slug, cover_item_id, clicks, position, cover_mode, cover_key, cover_bg_id, cover_ver FROM my_lists WHERE id = ? AND owner_sub = ?").bind(id, sub).first<ListRow>();
   return l ?? fail(404, "not_found", "找不到這份清單");
 }
 
@@ -155,8 +168,10 @@ export async function resolveItems(db: D1Database, listId: string): Promise<List
 
 /** 清單主人的內頁：項目＋點擊統計。 */
 export async function ownDetail(db: D1Database, l: ListRow) {
-  const [items, stats] = await Promise.all([resolveItems(db, l.id), listStats(db, l.id)]);
-  return { id: l.id, title: l.title, slug: l.slug, url: urlOf(l), coverItemId: l.cover_item_id, clicks: l.clicks, items, stats };
+  const [items, stats, bgs] = await Promise.all([resolveItems(db, l.id), listStats(db, l.id), coverBgMap(db)]);
+  const pick = l.cover_item_id;
+  const itemCover = ((pick ? items.find((x) => x.id === pick && x.coverUrl) : undefined) ?? items.find((x) => x.coverUrl && !x.missing))?.coverUrl ?? null;
+  return { id: l.id, title: l.title, slug: l.slug, url: urlOf(l), coverItemId: l.cover_item_id, ...coverOut(l, itemCover, bgs), coverBgId: l.cover_bg_id ?? null, hasUpload: !!l.cover_key, uploadUrl: pub(l.cover_key ?? null, l.cover_ver ?? 0), itemCoverUrl: itemCover, coverBgChoiceUrl: l.cover_bg_id ? (bgs.get(l.cover_bg_id) ?? null) : null, clicks: l.clicks, items, stats };
 }
 
 /** 點擊來源分類：先看網址參數，再看上一頁網站。 */
