@@ -3355,7 +3355,18 @@ const routes: [string, RegExp, Handler][] = [
   ["PATCH", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => {
     const s = requireMember(ctx);
     const l = await ownedList(ctx.db, s.sub, id!);
-    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown }>(ctx.req);
+    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown; coverMode?: unknown; coverBgId?: unknown }>(ctx.req);
+    if (b.coverMode !== undefined) {
+      // 封面類型：內容封面／自己上傳的圖片（要先上傳過）／清單名稱的文字封面。
+      if (b.coverMode !== "item" && b.coverMode !== "upload" && b.coverMode !== "text") fail(400, "invalid_cover_mode", "封面類型不正確");
+      if (b.coverMode === "upload" && !l.cover_key) fail(400, "no_upload", "請先上傳一張封面圖");
+      await ctx.db.prepare("UPDATE my_lists SET cover_mode = ? WHERE id = ?").bind(b.coverMode, l.id).run();
+    }
+    if (b.coverBgId !== undefined) {
+      const bid = typeof b.coverBgId === "string" && b.coverBgId ? b.coverBgId : null;
+      if (bid && !(await ctx.db.prepare("SELECT 1 AS ok FROM list_cover_bgs WHERE id = ?").bind(bid).first())) fail(404, "not_found", "找不到這張底圖");
+      await ctx.db.prepare("UPDATE my_lists SET cover_bg_id = ? WHERE id = ?").bind(bid, l.id).run();
+    }
     if (b.title !== undefined) await ctx.db.prepare("UPDATE my_lists SET title = ? WHERE id = ?").bind(checkTitle(b.title), l.id).run();
     if (b.slug !== undefined) await setSlug(ctx.db, l, b.slug);
     if (b.coverItemId !== undefined) {
@@ -3368,9 +3379,93 @@ const routes: [string, RegExp, Handler][] = [
   ["DELETE", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => {
     const s = requireMember(ctx);
     const l = await ownedList(ctx.db, s.sub, id!);
+    if (l.cover_key) await ctx.env.MEDIA?.delete(l.cover_key).catch(() => undefined);
     await ctx.db.batch([ctx.db.prepare("DELETE FROM my_list_items WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_visitors WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_hits WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_lists WHERE id = ?").bind(l.id)]);
     return { ok: true };
   })],
+  ["PUT", /^\/my-lists\/(l[\w]{4,20})\/cover-image$/, (ctx, [id]) => listGuard(async () => {
+    // 上傳自己的清單封面圖：伺服器再壓縮（同一般圖片設定），上傳成功就切到「上傳」封面。
+    const s = requireMember(ctx);
+    const l = await ownedList(ctx.db, s.sub, id!);
+    const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+    const data = new Uint8Array(await ctx.req.arrayBuffer());
+    const max = 8 * 1024 * 1024;
+    if (!data.byteLength || data.byteLength > max) fail(413, "invalid_size", `圖片大小需在 ${max / 1024 / 1024}MB 以內`);
+    const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+    const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
+    const key = `listcover/${l.id}/${crypto.randomUUID()}.${renameForType(`x.${img.ext}`, shrunk.type).split(".").pop()}`;
+    await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
+    await ctx.db.prepare("UPDATE my_lists SET cover_key = ?, cover_mode = 'upload', cover_ver = cover_ver + 1 WHERE id = ?").bind(key, l.id).run();
+    if (l.cover_key) await bucket.delete(l.cover_key).catch(() => undefined);
+    return ownDetail(ctx.db, await ownedList(ctx.db, s.sub, l.id));
+  })],
+  [
+    "GET",
+    /^\/list-cover-bgs$/,
+    async (ctx) => {
+      // 清單文字封面可選的底圖（管理員在「設定 › 清單封面底圖」上傳；所有登入會員都能選）。
+      requireMember(ctx);
+      const { results } = await ctx.db.prepare("SELECT id, name, image_key, art_version FROM list_cover_bgs ORDER BY sort_order, created_at").all<{ id: string; name: string; image_key: string; art_version: number }>();
+      return results.map((r) => ({ id: r.id, name: r.name, url: pubUrl(r.image_key, r.art_version) }));
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/list-cover-bgs$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      const { results } = await ctx.db.prepare("SELECT b.id, b.name, b.image_key, b.art_version, (SELECT COUNT(*) FROM my_lists l WHERE l.cover_bg_id = b.id AND l.cover_mode = 'text') AS used FROM list_cover_bgs b ORDER BY b.sort_order, b.created_at").all<{ id: string; name: string; image_key: string; art_version: number; used: number }>();
+      return results.map((r) => ({ id: r.id, name: r.name, url: pubUrl(r.image_key, r.art_version), used: r.used }));
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/list-cover-bgs$/,
+    async (ctx) => {
+      // 上傳一張清單專用封面底圖（原始檔放在請求內容，名稱放網址參數 name）。
+      const s = requireSuperAdmin(ctx);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      const max = 8 * 1024 * 1024;
+      if (!data.byteLength || data.byteLength > max) fail(413, "invalid_size", `圖片大小需在 ${max / 1024 / 1024}MB 以內`);
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      const name = (text(ctx.url.searchParams.get("name"), 30) ?? "").trim() || "未命名底圖";
+      const id = `g${randomId(7)}`;
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
+      const key = `listbg/${id}/${crypto.randomUUID()}.${renameForType(`x.${img.ext}`, shrunk.type).split(".").pop()}`;
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
+      const max2 = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM list_cover_bgs").first<{ m: number }>();
+      await ctx.db.batch([ctx.db.prepare("INSERT INTO list_cover_bgs (id, name, image_key, sort_order) VALUES (?, ?, ?, ?)").bind(id, name, key, (max2?.m ?? 0) + 1), audit(ctx.db, s.sub, "list_bg.create", "list_cover_bg", id, name)]);
+      return { id };
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/list-cover-bgs\/(g[\w]{4,20})$/,
+    async (ctx, [id]) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ name?: unknown }>(ctx.req);
+      const name = text(body.name, 30);
+      if (!name) return fail(400, "name_required", "請輸入底圖名稱");
+      const r = await ctx.db.prepare("UPDATE list_cover_bgs SET name = ? WHERE id = ?").bind(name, id).run();
+      if (r.meta?.changes === 0) return fail(404, "not_found", "找不到這張底圖");
+      await audit(ctx.db, s.sub, "list_bg.rename", "list_cover_bg", id, name).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/list-cover-bgs\/(g[\w]{4,20})$/,
+    async (ctx, [id]) => {
+      // 刪除底圖：正在用它的文字封面改回純色，檔案一併從雲端儲存刪除。
+      const s = requireSuperAdmin(ctx);
+      const old = await ctx.db.prepare("SELECT image_key FROM list_cover_bgs WHERE id = ?").bind(id).first<{ image_key: string }>();
+      if (!old) return fail(404, "not_found", "找不到這張底圖");
+      await ctx.db.batch([ctx.db.prepare("UPDATE my_lists SET cover_bg_id = NULL WHERE cover_bg_id = ?").bind(id), ctx.db.prepare("DELETE FROM list_cover_bgs WHERE id = ?").bind(id), audit(ctx.db, s.sub, "list_bg.delete", "list_cover_bg", id)]);
+      await ctx.env.MEDIA?.delete(old.image_key).catch(() => undefined);
+      return { ok: true };
+    },
+  ],
   ["PUT", /^\/my-lists\/(l[\w]{4,20})\/item$/, (ctx, [id]) => listGuard(async () => {
     const s = requireMember(ctx);
     const l = await ownedList(ctx.db, s.sub, id!);
@@ -5661,8 +5756,8 @@ const routes: [string, RegExp, Handler][] = [
       // 課程封面與 EDM 是公開圖片（課程列表本來就要顯示；EDM 開放下載）。只服務資料庫裡仍在使用的檔案。
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
-      if (!bucket || !/^(edm|cover|series|center|lesson|brand|schedule|album)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : key.startsWith("album/") ? await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first() : null); // D1 一個查詢最多串 5 個 UNION，課表另外查
+      if (!bucket || !/^(edm|cover|series|center|lesson|brand|schedule|album|listbg|listcover)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
+      const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : key.startsWith("album/") ? await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first() : key.startsWith("listbg/") ? await ctx.db.prepare("SELECT 1 AS ok FROM list_cover_bgs WHERE image_key = ?").bind(key).first() : key.startsWith("listcover/") ? await ctx.db.prepare("SELECT 1 AS ok FROM my_lists WHERE cover_key = ?").bind(key).first() : null); // D1 一個查詢最多串 5 個 UNION，課表另外查
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       // 即時縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受設定頁勾選的幾種，避免縮圖次數暴增）。
