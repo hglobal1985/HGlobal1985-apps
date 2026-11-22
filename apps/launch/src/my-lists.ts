@@ -102,7 +102,7 @@ export async function createList(db: D1Database, s: { sub: string; name: string;
   if (q.used >= q.total) return fail(403, "list_quota", "清單數量已用完，完成指定的學習成就可以解鎖更多");
   const id = `l${rid(8)}`;
   await db
-    .prepare("INSERT INTO my_lists (id, owner_sub, owner_name, owner_avatar, number, title, slug, position) VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(position), 0) + 1 FROM my_lists WHERE owner_sub = ?))")
+    .prepare("INSERT INTO my_lists (id, owner_sub, owner_name, owner_avatar, number, title, slug, cover_mode, position) VALUES (?, ?, ?, ?, ?, ?, ?, 'text', (SELECT COALESCE(MAX(position), 0) + 1 FROM my_lists WHERE owner_sub = ?))")
     .bind(id, s.sub, s.name, s.avatar ?? "", number, title, rand6(), s.sub)
     .run();
   return id;

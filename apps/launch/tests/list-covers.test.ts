@@ -17,7 +17,7 @@ test("清單封面：封面類型、文字封面底圖、管理員底圖清單�
   const made = await call<{ id: string }>("POST", "/my-lists", { token: me, body: { title: "新夥伴必看" } });
   const id = made.data.id;
   const d0 = (await call<{ coverMode: string; coverBgUrl: string | null; hasUpload: boolean }>("GET", `/my-lists/${id}`, { token: me })).data;
-  assert.deepEqual([d0.coverMode, d0.coverBgUrl, d0.hasUpload], ["item", null, false], "預設是內容封面");
+  assert.deepEqual([d0.coverMode, d0.coverBgUrl, d0.hasUpload], ["text", null, false], "預設是文字封面");
 
   assert.equal((await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverMode: "upload" } })).status, 400, "沒上傳過不能選上傳封面");
   assert.equal((await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverMode: "bad" } })).status, 400);
