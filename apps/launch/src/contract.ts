@@ -193,8 +193,6 @@ export type CourseSummary = {
   started: boolean;
   /** 課程勾選「章節各自設定封面」：章節編輯時才會出現封面設定。 */
   chapterCovers: boolean;
-  /** 勾了「自動使用 YouTube 影片畫面當封面」。 */
-  autoCover: boolean;
   /** 中心課程：只在「寰宇教育中心」頁出現，不在「全部課程」出現。 */
   centerCourse: boolean;
   /** 短影音專輯：這門課的章節與影音教材在「單元」頁歸類為短影音。 */
@@ -286,8 +284,6 @@ export type Lesson = {
   /** 章節自己的封面：橫式 16:9（清單縮圖）與直式；沒設定為 null（改用課程封面）。 */
   coverUrl?: string | null;
   posterUrl?: string | null;
-  /** 勾了「自動使用 YouTube 影片畫面當封面」。 */
-  autoCover?: boolean;
   /** 章節日期是否「跟著課程日期」（沒有自己設定日期）；eventDate 已是算好的實際日期。 */
   dateFollows?: boolean;
   /** 主講人章節（同一門課最多一堂，只有章節有）：「單元」頁的「只顯示主講人」只列這一堂。 */

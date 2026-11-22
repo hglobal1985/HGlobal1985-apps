@@ -83,7 +83,7 @@ export function RowAddToList({ target, title }: { target: ListRef; title: string
         accessibilityLabel={on ? `已加入 ${n} 份清單：${title}` : `加入我的清單：${title}`}
         onPress={() => login() && setOpen(true)}
         hitSlop={{ top: 8, bottom: 8, left: 3, right: 3 }}
-        style={({ pressed }) => [styles.rowBtn, pressed && { opacity: 0.6 }]}
+        style={({ pressed }) => [styles.rowBtn, on && { backgroundColor: "#FFD43B", borderRadius: 15 }, pressed && { opacity: 0.6 }]}
       >
         <ListIcon size={22} color={c.accent} added={on} />
       </Pressable>
@@ -228,7 +228,7 @@ export function AddToListSheet({ target, title, onClose }: { target: ListRef; ti
 const styles = StyleSheet.create({
   headBtn: { minWidth: 40, height: 40, borderRadius: 20, flexDirection: "row", gap: 4, paddingHorizontal: 8, alignItems: "center", justifyContent: "center" },
   badge: { position: "absolute", top: -2, right: -2, minWidth: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
-  rowBtn: { width: 30, height: 28, alignItems: "center", justifyContent: "center" },
+  rowBtn: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: minTouch + 8, borderTopWidth: StyleSheet.hairlineWidth },
   newBox: { gap: space.sm, paddingVertical: space.sm, borderTopWidth: StyleSheet.hairlineWidth },
   input: { minHeight: minTouch, borderWidth: 1.5, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
