@@ -21,6 +21,13 @@ export function BrandIcon({ type, fallback, size = 30 }: { type: string; fallbac
         </SvgText>
       </Svg>
     );
+  // YouTube 一律用標準綠色三角形（業主 2026-11-22：全網不再出現紅色 YouTube 標誌）。
+  if (type === "youtube")
+    return (
+      <Svg width={size} height={size} viewBox="0 0 24 24" accessibilityElementsHidden>
+        <Path d="M7 4.6v14.8a1 1 0 0 0 1.5.86l12.3-7.4a1 1 0 0 0 0-1.72L8.5 3.74A1 1 0 0 0 7 4.6z" fill={c.accent} />
+      </Svg>
+    );
   if (!brand) return <Ionicons name={fallback} size={size} color={c.accent} />;
   // 黑色的品牌（Notion）在深色模式改用文字色，才看得到。
   const fill = brand.hex.toLowerCase() === "#000000" ? c.text : brand.hex;
