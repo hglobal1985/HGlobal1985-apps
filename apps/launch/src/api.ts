@@ -96,6 +96,7 @@ import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnecti
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
+import { parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
 import { collectMuxStats } from "./mux-stats.ts";
 import { audioUrl, sniffImage, verifyAudioUrl } from "./media.ts";
 import { checkMuxPlayback, listMuxAssets, MuxApiError, muxPlaybackUrl, muxThumbnail } from "./mux.ts";
@@ -466,6 +467,9 @@ export async function purgeMember(db: D1Database, sub: string, actor: string, ac
     db.prepare("DELETE FROM notifications WHERE recipient_sub = ?").bind(sub),
     db.prepare("DELETE FROM member_achievements WHERE member_sub = ?").bind(sub),
     db.prepare("DELETE FROM member_contacts WHERE member_sub = ?").bind(sub),
+    // 審核紀錄（中央串接指令 2026-11-22.4 三、16）：待審的直接刪；已處理的只清掉姓名與申請內容快照，整筆紀錄（結果、時間、審核者）保留。
+    db.prepare("DELETE FROM review_log WHERE applicant_sub = ? AND status = 'pending'").bind(sub),
+    db.prepare("UPDATE review_log SET applicant_name = '', from_text = '', to_text = '', final_text = '' WHERE applicant_sub = ?").bind(sub),
     db.prepare("DELETE FROM sessions WHERE member_sub = ?").bind(sub),
     audit(db, actor, action, "member", sub),
   ]);
@@ -1368,6 +1372,7 @@ async function notifySubscribers(db: D1Database, key: string, title: string, bod
   return subs.length;
 }
 
+const usageHits = new Map<string, { t: number; n: number }>();
 async function bumpView(db: D1Database, kind: "center" | "series" | "course", key: string): Promise<number> {
   const row = await db.prepare("INSERT INTO page_views (kind, key, total) VALUES (?, ?, 1) ON CONFLICT(kind, key) DO UPDATE SET total = total + 1 RETURNING total").bind(kind, key).first<{ total: number }>();
   return row?.total ?? 0;
@@ -4347,6 +4352,22 @@ const routes: [string, RegExp, Handler][] = [
       return collectMuxStats(ctx.env);
     },
   ],
+  // 使用統計（業主 2026-11-22）：App 匿名回報裝置、系統、時段與首頁卡片點閱（訪客也可；格式不對就略過）；管理員交叉查詢。
+  ["POST", /^\/usage$/, async (ctx) => {
+    const ip = ctx.req.headers.get("cf-connecting-ip") ?? "";
+    const now = Date.now();
+    const hit = usageHits.get(ip);
+    if (hit && hit.t > now - 60_000 && hit.n >= 60) return { ok: true };
+    usageHits.set(ip, hit && hit.t > now - 60_000 ? { t: hit.t, n: hit.n + 1 } : { t: now, n: 1 });
+    if (usageHits.size > 2000) usageHits.clear();
+    await recordUsage(ctx.db, await readJson<Record<string, unknown>>(ctx.req).catch(() => ({}))).catch(() => undefined);
+    return { ok: true };
+  }],
+  ["GET", /^\/admin\/usage$/, async (ctx) => {
+    const s = requireMember(ctx);
+    if (!(await canViewStats(ctx, s))) fail(403, "forbidden", "沒有查看統計分析的權限");
+    return usageTable(ctx.db, parseUsageQuery(ctx.url));
+  }],
   [
     "GET",
     /^\/admin\/stats\/app$/,

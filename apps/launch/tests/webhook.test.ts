@@ -51,8 +51,12 @@ test("webhook：會員刪除帳號 → 清掉該會員在行動大學的資料�
   const sub = "00000000-0000-4000-8000-000000000001";
   await env.DB.prepare("INSERT INTO member_contacts (member_sub, is_admin) VALUES (?, 0)").bind(sub).run();
   await env.DB.prepare("INSERT INTO notifications (id, recipient_sub, title) VALUES ('n1', ?, 't')").bind(sub).run();
+  await env.DB.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name, from_text, to_text, final_text, status, decided_by_name, decided_at) VALUES ('r1', 'rank', '獎銜', ?, '王小明', 'silver', 'gold', '', 'approved', '審核員', '2026-11-22T00:00:00Z')").bind(sub).run();
+  await env.DB.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name, to_text) VALUES ('r2', 'rank', '獎銜', ?, '王小明', 'diamond')").bind(sub).run();
   const ev = { id: "d1", type: "member.deleted", app_id: "learn", member_id: sub };
   assert.equal((await post(ev)).status, 200);
+  const logs = (await env.DB.prepare("SELECT id, applicant_name, from_text, to_text, status, decided_by_name FROM review_log WHERE applicant_sub = ?").bind(sub).all<Record<string, string>>()).results;
+  assert.deepEqual(JSON.parse(JSON.stringify(logs)), [{ id: "r1", applicant_name: "", from_text: "", to_text: "", status: "approved", decided_by_name: "審核員" }], "已處理紀錄只清姓名與內容快照、待審紀錄刪除");
   const left = await env.DB.prepare("SELECT (SELECT COUNT(*) FROM member_contacts WHERE member_sub = ?) + (SELECT COUNT(*) FROM notifications WHERE recipient_sub = ?) AS n").bind(sub, sub).first<{ n: number }>();
   assert.equal(left?.n, 0);
   assert.equal((await post(ev)).data.duplicate, true);

@@ -1,3 +1,4 @@
+import { trackUsage } from "@/lib/usage";
 import { useEffect, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveUrl, UNCATEGORIZED } from "@/api/client";
@@ -79,7 +80,10 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
   // 系列卡（業主 2026-11-20 改回）：點了先彈出上拉選單（列出系列內的卡，右上「顯示全部」或繼續上拉才進系列頁）；單張卡直接進該卡；中心頁的課程卡照舊彈章節選單。
   // 第一層任何卡（中心卡除外）點了都先彈上拉選單：系列＝卡片清單；單張卡／獨立卡＝區塊 > 教材 > 章節（業主 2026-11-20）。
-  const open = () => setSheet(true);
+  const open = () => {
+    if (!flat) trackUsage(inSeries ? "card_series" : "card_course", inSeries ? rep.series : rep.id); // 首頁卡片點閱統計（中心頁的卡不算）
+    setSheet(true);
+  };
   const unlisted = inSeries && !settings.listed(rep.series); // 只有超級管理員會看到：關掉了「顯示在所有系列」或是「未分類」
   return (
     <View style={{ width }} nativeID={`tile-${group.key}`}>
