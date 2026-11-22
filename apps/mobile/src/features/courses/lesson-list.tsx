@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image, Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import { resolveUrl, type CourseDetail, type Lesson } from "@/api/client";
-import { minutesText, sharerLine } from "@/features/format";
+import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { engine } from "@/features/player/engine";
 import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
@@ -17,7 +17,9 @@ import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 import { ExpandGrid } from "./expand-grid";
-import { LIST_CARD, ListSection } from "./compact-row";
+import { CompactRow, LIST_CARD, ListSection, MetaLine, RowButtons } from "./compact-row";
+import { NowPlayingIcon } from "@/ui/now-playing-icon";
+import { UI_SCALE } from "@/theme/ui-scale";
 import { MaterialRow, RowShare, SectionActions } from "./material-rows";
 export { RowShare } from "./material-rows";
 
@@ -29,33 +31,37 @@ export { RowShare } from "./material-rows";
  */
 export type LessonPlayProps = { playingId?: string | null; onPlay?: (lessonId: string) => void };
 export function ChapterList({ course, style, playingId, onPlay, onBlockedPress }: { course: CourseDetail; style?: ViewStyle; /** 沒有權限（鎖住、準備中）的章節點下去的動作 */ onBlockedPress?: () => void } & LessonPlayProps) {
+  const { c } = useTheme();
   const chapters = course.lessons.filter((l) => !l.material);
   const anyReady = chapters.some((l) => l.ready);
   return (
-    <Card style={{ paddingVertical: 0, paddingHorizontal: space.sm, ...style }}>
+    <Card style={chapters.length === 0 || !anyReady ? { paddingVertical: 0, paddingHorizontal: space.sm, ...style } : { ...LIST_CARD, ...style }}>
       {chapters.length === 0 || !anyReady ? (
         <ListRow icon="hourglass-outline" title="敬請期待" subtitle="課程內容準備中" />
       ) : (
+        // 章節列＝全站清單列 CompactRow（業主 2026-11-22：課程頁章節清單與「清單」頁同一套）：縮圖／圖示、第一行標題、第二行日期膠囊＋分鐘數＋主講人、右側分享鈕。
         chapters.map((lesson) => {
-            const soon = !lesson.ready;
-            return (
-              <ListRow
-                key={lesson.id}
-                icon={soon ? "hourglass-outline" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline"}
-                leading={!soon && lesson.completed ? <SaplingIcon /> : !soon && !lesson.locked ? (lesson.isSpeaker ? <SpeakerLead /> : lesson.isSummary ? <SummaryLead /> : undefined) : undefined}
-                playing={playingId === lesson.id}
-                playingLesson={lesson.id}
-                highlight={playingId === lesson.id}
-                note={minutesText(lesson.minutes)}
-                title={`${lesson.position}. ${lesson.title}`}
-                subtitle={soon ? "敬請期待" : [sharerLine(lesson), lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ") || undefined}
-                dense
-                compact
-                right={chapters.length >= 2 && !soon ? <ChapterShare course={course} lesson={lesson} /> : undefined}
-                onPress={lesson.locked || soon ? onBlockedPress : playingId === lesson.id ? () => engine.toggle() : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))} // 正在播放的這一列再點一下＝暫停／繼續播放
-              />
-            );
-          })
+          const soon = !lesson.ready;
+          const playing = playingId === lesson.id;
+          const icon = soon ? "hourglass-outline" : lesson.locked ? "lock-closed-outline" : lesson.kind === "audio" ? "musical-notes-outline" : "play-circle-outline";
+          const lead = !soon && lesson.completed ? <SaplingIcon /> : !soon && !lesson.locked ? (lesson.isSpeaker ? <SpeakerLead /> : lesson.isSummary ? <SummaryLead /> : undefined) : undefined;
+          const text = soon ? "敬請期待" : [minutesText(lesson.minutes), sharerLine(lesson), lesson.completed ? "已完成" : ""].filter(Boolean).join(" · ");
+          return (
+            <CompactRow
+              key={lesson.id}
+              leading={
+                <View style={{ width: Math.round(42 * UI_SCALE), alignItems: "center" }}>
+                  {playing ? <NowPlayingIcon lessonId={lesson.id} /> : lead ?? <Ionicons name={icon} size={28} color={c.textMuted} />}
+                </View>
+              }
+              highlight={playing}
+              title={`${lesson.position}. ${lesson.title}`}
+              meta={<MetaLine date={lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined} text={text || undefined} />}
+              actions={chapters.length >= 2 && !soon ? <RowButtons><ChapterShare course={course} lesson={lesson} /></RowButtons> : undefined}
+              onPress={lesson.locked || soon ? onBlockedPress : playing ? () => engine.toggle() : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))} // 正在播放的這一列再點一下＝暫停／繼續
+            />
+          );
+        })
       )}
     </Card>
   );
