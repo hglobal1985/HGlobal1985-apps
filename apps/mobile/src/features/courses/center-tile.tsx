@@ -1,3 +1,4 @@
+import { trackUsage } from "@/lib/usage";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import { useThumb } from "@/lib/thumb";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
@@ -17,7 +18,7 @@ export function CenterTile({ name, edmUrl, width, count, onPress }: { name: stri
   const title = centerTitle(name);
   const height = Math.round((width * 10) / 16);
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={[styles.card, { width, height }, edmUrl ? { backgroundColor: "#fff" } : null]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={() => (trackUsage("card_center", name), onPress())} style={[styles.card, { width, height }, edmUrl ? { backgroundColor: "#fff" } : null]}>
       {edmUrl ? (
         <Image source={{ uri: thumb(resolveUrl(edmUrl), width) }} style={{ width, height }} resizeMode="cover" />
       ) : (

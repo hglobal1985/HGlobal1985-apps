@@ -3,6 +3,7 @@ import "@/lib/install-app"; // 要最早載入，才接得到瀏覽器只送一�
 import { installErrorReporting, reportClientError } from "@/lib/error-report";
 import { Stack } from "expo-router/stack";
 import { useEffect } from "react";
+import { installVisitTracking } from "@/lib/usage";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";
 import { Platform, Pressable, Text, View } from "react-native";
@@ -70,6 +71,7 @@ function AppStack() {
             <Stack.Screen name="learn/[courseId]/[lessonId]" options={{ title: "上課" }} />
             <Stack.Screen name="admin/list-rules" options={{ title: "課程排序與條件" }} />
             <Stack.Screen name="admin/stats" options={{ title: "統計分析" }} />
+            <Stack.Screen name="admin/usage" options={{ title: "使用統計" }} />
             <Stack.Screen name="admin/report" options={{ title: "報名與營收報表" }} />
             <Stack.Screen name="admin/keywords" options={{ title: "關鍵字管理" }} />
             <Stack.Screen name="admin/short-links" options={{ title: "短網址" }} />
@@ -117,6 +119,7 @@ function StatusBarCover() {
 
 export default function RootLayout() {
   const { scheme, c } = useTheme();
+  useEffect(() => installVisitTracking(), []);
   useEffect(() => installNoPageZoom(), []);
   useEffect(() => installBottomGap(), []);
   useEffect(() => installWebPullRefresh(), []);
