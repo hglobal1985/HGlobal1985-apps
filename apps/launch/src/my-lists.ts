@@ -42,17 +42,18 @@ export function checkTitle(raw: unknown): string {
 
 export type ListRow = { id: string; owner_sub: string; owner_name: string; owner_avatar?: string; number: string; title: string; slug: string; cover_item_id: string | null; clicks: number; position: number };
 export type UnlockRule = { achievementId: string; extra: number };
-export type QuotaInfo = { base: number; total: number; used: number; unlocks: { achievementId: string; name: string; extra: number; earned: boolean }[] };
+export type QuotaInfo = { base: number; total: number; used: number; unlocks: UnlockOut[] };
+export type UnlockOut = { achievementId: string; name: string; extra: number; earned: boolean; description: string; type: string; threshold: number; feature: string | null };
 
 export async function quotaOf(db: D1Database, sub: string, base: number, rules: UnlockRule[]): Promise<QuotaInfo> {
   const [earned, used, names] = await Promise.all([
     db.prepare("SELECT achievement_id AS id FROM member_achievements WHERE member_sub = ?").bind(sub).all<{ id: string }>(),
     db.prepare("SELECT COUNT(*) AS n FROM my_lists WHERE owner_sub = ?").bind(sub).first<{ n: number }>(),
-    rules.length ? db.prepare(`SELECT id, name FROM achievements WHERE id IN (${rules.map(() => "?").join(",")})`).bind(...rules.map((r) => r.achievementId)).all<{ id: string; name: string }>() : Promise.resolve({ results: [] as { id: string; name: string }[] }),
+    rules.length ? db.prepare(`SELECT id, name, description, condition_type AS type, threshold, feature FROM achievements WHERE id IN (${rules.map(() => "?").join(",")})`).bind(...rules.map((r) => r.achievementId)).all<{ id: string; name: string; description: string; type: string; threshold: number; feature: string | null }>() : Promise.resolve({ results: [] as { id: string; name: string; description: string; type: string; threshold: number; feature: string | null }[] }),
   ]);
   const have = new Set(earned.results.map((r) => r.id));
-  const nameOf = new Map(names.results.map((r) => [r.id, r.name]));
-  const unlocks = rules.filter((r) => nameOf.has(r.achievementId)).map((r) => ({ achievementId: r.achievementId, name: nameOf.get(r.achievementId)!, extra: r.extra, earned: have.has(r.achievementId) }));
+  const nameOf = new Map(names.results.map((r) => [r.id, r]));
+  const unlocks = rules.filter((r) => nameOf.has(r.achievementId)).map((r) => ({ achievementId: r.achievementId, name: nameOf.get(r.achievementId)!.name, description: nameOf.get(r.achievementId)!.description, type: nameOf.get(r.achievementId)!.type, threshold: nameOf.get(r.achievementId)!.threshold, feature: nameOf.get(r.achievementId)!.feature, extra: r.extra, earned: have.has(r.achievementId) }));
   return { base, total: base + unlocks.filter((u) => u.earned).reduce((a, u) => a + u.extra, 0), used: used?.n ?? 0, unlocks };
 }
 
