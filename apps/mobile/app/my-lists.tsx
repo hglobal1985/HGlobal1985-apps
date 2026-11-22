@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Image, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, type AchievementType } from "@/api/client";
 import { conditionText } from "@/features/achievements/text";
 import { quotaHint, type OwnList, type Quota } from "@/features/my-lists/add-to-list";
@@ -50,7 +50,9 @@ export default function MyListsScreen() {
       {data?.lists.map((l) => (
         <Pressable key={l.id} accessibilityRole="button" accessibilityLabel={l.title} onPress={() => router.push(`/my-list/${l.id}` as never)}>
           <Card style={styles.card}>
-            <View style={[styles.cover, { backgroundColor: c.surfaceMuted }]}>{l.coverUrl ? <Image source={{ uri: l.coverUrl }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback size={28} />}</View>
+            <View style={styles.cover}>
+              <ThumbFallback size={28} />
+            </View>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="headline" numberOfLines={1}>
                 {l.title}
