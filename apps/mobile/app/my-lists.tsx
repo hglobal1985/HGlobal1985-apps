@@ -52,7 +52,7 @@ export default function MyListsScreen() {
         <Pressable key={l.id} accessibilityRole="button" accessibilityLabel={l.title} onPress={() => router.push(`/my-list/${l.id}` as never)}>
           <Card style={styles.card}>
             <View style={styles.cover}>
-              <ListCover mode={l.coverMode} imageUrl={l.coverUrl} bgUrl={l.coverBgUrl} title={l.title} text={l.coverText} height={54} minFont={8} radius={radius.sm} />
+              <ListCover mode={l.coverMode} imageUrl={l.coverUrl} bgUrl={l.coverBgUrl} color={l.coverColor} title={l.title} text={l.coverText} height={54} minFont={8} radius={radius.sm} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="headline" numberOfLines={1}>
