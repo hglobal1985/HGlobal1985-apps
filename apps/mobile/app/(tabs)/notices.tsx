@@ -4,12 +4,12 @@ import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { api, type Notice, type NoticeCategory } from "@/api/client";
-import { dateTime, noticeTarget } from "@/features/format";
-import { CentralReviewList, useCentralReviews } from "@/features/notices/central-reviews";
+import { noticeTarget } from "@/features/format";
+import { CentralReviewList, groupByDay, hhmm, useCentralReviews } from "@/features/notices/central-reviews";
 import { NoticeSheet } from "@/features/notices/notice-sheet";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
-import { AppText, GuestGate, Button, Card, EmptyState, ErrorView, ListRow, LoadingView, Screen } from "@/ui";
+import { AppText, GuestGate, Button, Card, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
 import { radius, space } from "@/theme/tokens";
 
 export default function NoticesScreen() {
@@ -48,6 +48,7 @@ export default function NoticesScreen() {
     );
   return (
     <Screen
+      title="通知"
       subtitle={data ? (unread ? `${unread} 則未讀` : "全部已讀") : undefined}
       right={
         <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -82,20 +83,38 @@ export default function NoticesScreen() {
       </View>
       {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
       {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title={mode === "all" ? "目前沒有通知" : "這個分類目前沒有通知"} body={mode === "all" ? "報名課程或報名有進度時，會在這裡通知你。" : undefined} /> : null}
-      {list.length ? (
-        <Card style={{ paddingVertical: 0 }}>
-          {list.map((n) => (
-            <ListRow
-              key={n.id}
-              icon={n.read ? "mail-open-outline" : "mail-unread-outline"}
-              title={n.title}
-              subtitle={`${n.body}${n.body ? "\n" : ""}${dateTime(n.createdAt)}`}
-              unread={!n.read}
-              onPress={() => open(n)}
-            />
-          ))}
-        </Card>
-      ) : null}
+      {groupByDay(list, (n) => n.createdAt).map((g) => (
+        <View key={g.day} style={{ gap: 6, marginTop: space.xs }}>
+          <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
+            {g.day}
+          </AppText>
+          <Card style={{ paddingVertical: 4 }}>
+            {g.rows.map((n, i) => (
+              <Pressable key={n.id} accessibilityRole="button" accessibilityLabel={`${n.title}${n.read ? "" : "，未讀"}`} onPress={() => open(n)} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, minHeight: 64 }, i > 0 && { borderTopWidth: 1, borderColor: c.border }, pressed && { opacity: 0.7 }]}>
+                <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: n.read ? c.surfaceMuted : c.accentSoft }}>
+                  <Ionicons name={n.category === "review" ? "ribbon-outline" : n.category === "comment" ? "chatbubble-outline" : "notifications-outline"} size={20} color={n.read ? c.textMuted : c.accentText} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <AppText variant="body" numberOfLines={2} style={{ fontWeight: n.read ? "600" : "800" }}>
+                    {n.title}
+                  </AppText>
+                  {n.body ? (
+                    <AppText variant="caption" tone="muted" numberOfLines={1}>
+                      {n.body}
+                    </AppText>
+                  ) : null}
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <AppText variant="caption" tone="muted">
+                    {hhmm(n.createdAt)}
+                  </AppText>
+                  {!n.read ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.accent }} /> : <View style={{ width: 10, height: 10 }} />}
+                </View>
+              </Pressable>
+            ))}
+          </Card>
+        </View>
+      ))}
       {preview ? (
         <NoticeSheet notice={preview} onClose={() => setPreview(null)} onOpen={preview.link ? () => router.push(noticeTarget(preview.link) as Href) : undefined} />
       ) : null}
