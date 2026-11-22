@@ -2,6 +2,7 @@ import "@/lib/global-scale"; // 全站字體、圖示、按鈕放大（平板 1.
 import "@/lib/install-app"; // 要最早載入，才接得到瀏覽器只送一次的「可安裝」事件
 import { installErrorReporting, reportClientError } from "@/lib/error-report";
 import { Stack } from "expo-router/stack";
+import { router } from "expo-router";
 import { useEffect } from "react";
 import { installVisitTracking } from "@/lib/usage";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
@@ -117,6 +118,21 @@ function StatusBarCover() {
   return <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, height: insets.top, backgroundColor: large ? c.background : "#2F5D3A", zIndex: 1000 }} />;
 }
 
+/** 閒置時預先載入底部五個分頁的程式檔（不切換畫面、不抓資料）。 */
+function warmTabChunks(): () => void {
+  if (Platform.OS !== "web") return () => undefined;
+  const t = setTimeout(() => {
+    for (const href of ["/notices", "/courses", "/learning", "/me"]) {
+      try {
+        router.prefetch(href as never);
+      } catch {
+        /* 預載失敗不影響使用，點進去時照常載入 */
+      }
+    }
+  }, 2500);
+  return () => clearTimeout(t);
+}
+
 export default function RootLayout() {
   const { scheme, c } = useTheme();
   useEffect(() => installVisitTracking(), []);
@@ -124,6 +140,8 @@ export default function RootLayout() {
   useEffect(() => installBottomGap(), []);
   useEffect(() => installWebPullRefresh(), []);
   useEffect(() => installStableScrollbar(), []);
+  // 網頁版：開站後稍等，把其他分頁的程式檔先載入（每個分頁是獨立檔案，手機網路慢時第一次點進去會空白一陣子，業主 2026-11-22 回報）。
+  useEffect(() => warmTabChunks(), []);
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,
