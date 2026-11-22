@@ -398,7 +398,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     if (!chapterMode) return [];
     const byId = new Map(courses.map((x) => [x.id, x]));
     const hit = searchIndex ? matchLessons(searchIndex, q) : null;
-    const canWatch = (x: (typeof courses)[number]) => member?.role === "admin" || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
+    const canWatch = (x: (typeof courses)[number]) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
     const rand = (id: string) => {
       let h = shuffleSeed | 0;
       for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 2654435761);

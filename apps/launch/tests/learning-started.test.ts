@@ -21,14 +21,16 @@ test("播放超過 1%：納入學習中（含沒有報名紀錄的管理員）�
   await call("PATCH", `/admin/courses/${created.id}`, admin, { status: "published" });
   const lessonId = (await call<CourseDetail>("GET", `/courses/${created.id}`, admin)).data.lessons[0]!.id;
   await call("POST", "/orders", student, { courseIds: [created.id] }); // 課程類即使免費也要先報名才能播放（業主 2026-11-22）
+  assert.equal((await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`, admin)).status, 403, "管理員沒報名也不能播放（業主 2026-11-22）");
+  assert.equal((await call("POST", "/orders", admin, { courseIds: [created.id] })).status, 200, "管理員也能報名（不受獎銜限制）");
   const find = async (token: string) => (await call<CourseSummary[]>("GET", "/courses", token)).data.find((c) => c.id === created.id)!;
 
-  // 管理員（不會產生報名紀錄）還沒播放：不在學習中
+  // 管理員（報名後）還沒播放：不在學習中
   assert.equal((await find(admin)).started, false);
   assert.equal((await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`, admin)).status, 200);
   let c = await find(admin);
   assert.equal(c.started, true);
-  assert.equal(c.enrollment, null);
+  assert.equal(c.enrollment, "opened");
   assert.equal(c.hiddenFromLearning, false);
 
   // 隱藏 → 再播放超過 1% 又回來

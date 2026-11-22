@@ -1062,7 +1062,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const admin = manages;
   // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
   const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.invite_only !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
-  const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && materialLike(row)) || watchFree));
+  const lockedAll = (!admin || !materialLike(row)) && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && materialLike(row)) || watchFree));
   return {
     ...summaryNow,
     canRoster,
@@ -1101,7 +1101,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       locked: lockedAll,
       // 清單項目的圖示類型（連結類型，或清單裡的 YouTube 影片）；規則在 link-rules.ts（業主 2026-11-18）。
       ...(l.kind === "material" && !l.is_full && itemIconType(linkOf.get(l.id)?.type, l.media_type, true) ? { iconType: itemIconType(linkOf.get(l.id)?.type, l.media_type, true) } : {}),
-      ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...(lockedAll ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
+      ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...(lockedAll && !admin ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
       ...(admin ? { media: { type: l.media_type, ref: l.media_ref } } : {}),
     }))],
@@ -1133,10 +1133,12 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
     const pub = await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published' AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first();
     return !!pub;
   }
-  if (s.role === "admin") return true;
+  // 管理員與課程管理者也一樣：課程類要先報名才能播放（業主 2026-11-22）；只有清單／教材類可以不報名直接預覽。
+  const isMaterial = !!(await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first());
+  if (isMaterial && s.role === "admin") return true;
   if ((await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published' AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first())) return true; // 完全公開的清單／教材類，會員也不必報名（課程類即使免費也要報名，業主 2026-11-22）
   const rights = await rightsOf(ctx);
-  if (rights.any) {
+  if (isMaterial && rights.any) {
     const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string }>();
     if (c) {
       const can = courseCan(rights, s, c);
@@ -1151,7 +1153,7 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
 /** 免費（費用 0）、有獎銜限制、而這位會員不符合（會長例外只在勾選時）：即使先前自動報名過也不能看（業主 2026-11-18）。付費課程的報名是繳費換來的，不受影響。 */
 async function freeRankBlocked(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
-  if (!s) return false;
+  if (!s || s.role === "admin") return false; // 管理員不受獎銜與瀏覽範圍限制（仍要先報名）
   const c = await ctx.db.prepare("SELECT min_rank_code, allow_president, price_twd, price_tba, view_scope, invite_only FROM courses WHERE id = ?").bind(courseId).first<{ invite_only: number; min_rank_code: string; allow_president: number; price_twd: number; price_tba: number; view_scope: ViewScope }>();
   if (!c || c.price_twd !== 0 || c.price_tba === 1) return false;
   if (!scopeAllows(c.view_scope, s)) return true; // 後來把「誰能瀏覽」改嚴：先前自動報名的不在範圍內也不能看
@@ -2003,7 +2005,7 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
   }
   if (courses.some((c) => c.price_tba === 1)) fail(409, "price_tba", "這門課程的費用尚未公布，暫不開放報名");
   const eligibility = await eligibilityFor(s, rankMap, [...courses.map((c) => c.min_rank_code), DIAMOND]);
-  if (courses.some((c) => c.invite_only !== 1 && eligibility.get(c.min_rank_code) !== true && !byPresident(s, c))) fail(403, "rank_required", "此課程需要符合資格才能報名");
+  if (s.role !== "admin" && courses.some((c) => c.invite_only !== 1 && eligibility.get(c.min_rank_code) !== true && !byPresident(s, c))) fail(403, "rank_required", "此課程需要符合資格才能報名");
 
   const now = new Date();
   const statements: D1PreparedStatement[] = [];

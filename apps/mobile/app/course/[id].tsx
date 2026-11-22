@@ -202,7 +202,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   };
 
   // 還不能看（尚未報名、不符資格…）：整個章節區蓋一層灰色遮罩加大鎖頭，章節完全不能點。
-  const noAccess = course.lessons.length === 0 ? course.enrollment !== "opened" && !(course.isPublic && course.isList) && !course.admin : course.lessons.every((l) => l.locked);
+  const noAccess = course.lessons.length === 0 ? course.enrollment !== "opened" && !(course.isPublic && course.isList) && !(course.admin && course.isList) : course.lessons.every((l) => l.locked);
   const allLocked = noAccess;
   // 清單／素材類沒有報名：符合獎銜就能直接使用，不符合＝鎖頭（業主 2026-11-18）。
   const lockedText = course.isList ? (member ? "獎銜不符，目前無法使用" : "登入並符合獎銜才能使用") : course.priceTba ? "費用尚未公布，暫不開放" : member && !course.eligible ? "獎銜不符，目前無法報名" : "報名後才能觀看";
