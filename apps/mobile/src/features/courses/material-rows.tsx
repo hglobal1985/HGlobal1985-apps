@@ -93,7 +93,7 @@ export function MaterialRows({ course, listStyle = true, playingId, onPlay, onBl
 }
 
 /** 教材列最右側：「加入我的清單」圓鈕＋分享鈕（業主 2026-11-21 配方案 1）；鎖住或完整版影片不放加入鈕。 */
-function RowActions({ course, lesson, children }: { course: CourseDetail; lesson: Lesson; children: ReactNode }) {
+export function RowActions({ course, lesson, children }: { course: CourseDetail; lesson: Lesson; children: ReactNode }) {
   const canAdd = !lesson.full && !lesson.locked && (lesson.linkUrl || lesson.ready);
   if (!canAdd && !children) return null;
   return (

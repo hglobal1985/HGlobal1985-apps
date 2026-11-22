@@ -90,18 +90,16 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
         if (!expanding.current) back();
       },
     });
-  const pan = useRef(makePan(false)).current;
+  // 下滑關閉與上拉展開都只能「按住最上方灰色膠囊」拖曳才生效（業主 2026-11-22 全網設定）；面板其他地方、背景都不再有拖曳手勢（內容照常捲動、點背景仍會關閉）。
   const handlePan = useRef(makePan(true)).current;
-  const swipe = pan.panHandlers;
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.backdrop} {...swipe}>
+      <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="關閉" onPress={onClose} />
         <Animated.View
           onLayout={(e) => setSheetH(Math.round(e.nativeEvent.layout.height))}
           style={[styles.sheet, sheetMax ? { width: "100%", maxWidth: sheetMax, alignSelf: "center" } : null, { backgroundColor: c.surface, paddingBottom: space.lg + insets.bottom, transform: [{ translateY: ty }] }, onExpand && Platform.OS === "web" ? ({ userSelect: "none" } as object) : null]}
           accessibilityViewIsModal
-          {...swipe}
         >
           {onExpand ? (
             <>
@@ -116,7 +114,7 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
               </Animated.View>
             </>
           ) : null}
-          <View {...handlePan.panHandlers} style={[styles.handleHit, Platform.OS === "web" && onExpand ? ({ cursor: "grab", touchAction: "none" } as object) : null]} accessibilityLabel={onExpand ? "按住往上拉進入完整內容" : undefined}>
+          <View {...handlePan.panHandlers} style={[styles.handleHit, Platform.OS === "web" ? ({ cursor: "grab", touchAction: "none" } as object) : null]} accessibilityLabel={onExpand ? "按住往上拉進入完整內容，往下拉關閉" : "按住往下拉關閉"}>
             <View style={[styles.handle, { backgroundColor: c.border }]} />
           </View>
           {children}

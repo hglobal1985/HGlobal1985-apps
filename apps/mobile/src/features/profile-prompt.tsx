@@ -77,17 +77,20 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
  */
 function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop }: { pop?: "left" | "center" | "right"; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { c } = useTheme();
-  const { height: winH } = useWindowDimensions();
+  const { height: winH, width: winW } = useWindowDimensions();
   const box = useRef<HostInstance>(null);
   const [q, setQ] = useState("");
-  const [pos, setPos] = useState({ up: false, max: 240 });
+  const [pos, setPos] = useState({ up: false, max: 240, left: 0, w: 220 });
   const toggle = () => {
     if (open) return onOpenChange(false);
-    box.current?.measureInWindow((_x, y, _w, h) => {
+    box.current?.measureInWindow((x, y, w, h) => {
       const below = winH - (y + h) - 24;
       const above = y - 24;
       const up = below < 240 && above > below;
-      setPos({ up, max: Math.max(140, Math.min(300, up ? above : below)) });
+      // 窄欄（三欄表單）的選項面板：寬度放寬，並以欄位為中心、夾在螢幕左右各 16 之內（不再超出畫面）。
+      const popW = Math.min(240, winW - 32);
+      const left = Math.min(Math.max(x + (w - popW) / 2, 16), winW - 16 - popW) - x;
+      setPos({ up, max: Math.max(140, Math.min(300, up ? above : below)), left, w: popW });
       setQ("");
       onOpenChange(true);
     });
@@ -102,7 +105,7 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
         <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 16 : 20} color={c.textMuted} />
       </Pressable>
       {open ? (
-        <View style={[styles.dropdown, pop ? { width: 220, ...(pop === "left" ? { left: 0, right: undefined } : pop === "right" ? { right: 0, left: undefined } : { left: -56, right: undefined }) } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
+        <View style={[styles.dropdown, pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
           {options.length > 12 ? (
             <TextInput value={q} onChangeText={setQ} placeholder="搜尋" placeholderTextColor={c.textMuted} autoCapitalize="none" style={[styles.search, { color: c.text, borderColor: c.border }]} />
           ) : null}
@@ -394,6 +397,6 @@ const styles = StyleSheet.create({
   dropdown: { position: "absolute", left: 0, right: 0, borderWidth: 1, borderRadius: radius.md, zIndex: 60, overflow: "hidden" },
   search: { minHeight: 40, borderBottomWidth: 1, paddingHorizontal: space.md, fontSize: 15 },
   opt: { minHeight: 44, paddingHorizontal: space.md, justifyContent: "center" },
-  amwayCard: { borderRadius: radius.md, padding: space.sm, gap: space.xs },
+  amwayCard: { borderRadius: radius.md, padding: space.sm, gap: space.xs, zIndex: 5 },
   more: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 44 },
 });
