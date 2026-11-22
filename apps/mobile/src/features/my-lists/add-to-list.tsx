@@ -14,7 +14,7 @@ import { ListIcon } from "@/ui/list-icon";
 import { bumpMark, useMark, type ListRef } from "./store";
 
 export type OwnList = { id: string; title: string; slug: string; clicks: number; people: number; count: number; url: string; coverItemId: string | null; coverUrl: string | null; has?: boolean };
-export type Quota = { base: number; total: number; used: number; unlocks: { achievementId: string; name: string; extra: number; earned: boolean }[] };
+export type Quota = { base: number; total: number; used: number; unlocks: { achievementId: string; name: string; extra: number; earned: boolean; description: string; type: string; threshold: number; feature: string | null }[] };
 type Resp = { lists: OwnList[]; quota: Quota; id?: string };
 
 /** 清單額度用完時，提示要完成哪個學習成就才能多解鎖（取第一個還沒完成的）。 */
