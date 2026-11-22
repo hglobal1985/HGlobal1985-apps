@@ -3,6 +3,19 @@
 # 絕不破壞任何東西：有未提交的修改、或分支上有自己還沒合併的提交時，只提醒、不動程式。
 # 輸出的文字會顯示給這次對話的 AI 看，所以寫成給 AI 的指示。
 cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || exit 0
+
+# 結束前（不論走哪個分支）自動補裝套件：新對話的雲端環境是全新的，別人新加進 package.json 的套件不會自動裝。
+# 沒缺東西時只要幾秒；失敗也不影響開工，只提醒。（業主 2026-11-22）
+install_deps() {
+  cd "${CLAUDE_PROJECT_DIR:-.}" 2>/dev/null || return 0
+  [ -f package.json ] || return 0
+  if npm install --no-audit --no-fund --loglevel=error >/dev/null 2>&1; then
+    echo "【自動安裝套件】已確認套件齊全。"
+  else
+    echo "【自動安裝套件】套件安裝失敗，開工前請自己執行 npm install；若出現 Cannot find module 就是沒裝好，不可忽略。"
+  fi
+}
+trap install_deps EXIT
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
 if ! git fetch origin main --quiet 2>/dev/null; then
