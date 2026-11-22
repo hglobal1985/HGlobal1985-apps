@@ -16,8 +16,8 @@ test("清單封面：封面類型、文字封面底圖、管理員底圖清單�
 
   const made = await call<{ id: string }>("POST", "/my-lists", { token: me, body: { title: "新夥伴必看" } });
   const id = made.data.id;
-  const d0 = (await call<{ coverMode: string; coverBgUrl: string | null; hasUpload: boolean }>("GET", `/my-lists/${id}`, { token: me })).data;
-  assert.deepEqual([d0.coverMode, d0.coverBgUrl, d0.hasUpload], ["text", null, false], "預設是文字封面");
+  const d0 = (await call<{ coverMode: string; coverBgUrl: string | null; coverColor: string | null }>("GET", `/my-lists/${id}`, { token: me })).data;
+  assert.deepEqual([d0.coverMode, d0.coverBgUrl, d0.coverColor], ["text", null, null], "預設是文字封面");
 
   // 文字可疊在圖片上（業主 2026-11-22）：預設顯示清單名稱，可自訂、可關閉，文字設定獨立於封面類型。
   assert.equal(((await call<{ coverText: string | null }>("GET", `/my-lists/${id}`, { token: me })).data).coverText, "新夥伴必看", "預設文字＝清單名稱");
@@ -28,7 +28,14 @@ test("清單封面：封面類型、文字封面底圖、管理員底圖清單�
   assert.equal(((await call<{ lists: { coverText: string | null }[] }>("GET", "/my-lists", { token: me })).data).lists[0]!.coverText, null, "清單列表也一致");
   await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverTextOn: true, coverText: "" } });
 
-  assert.equal((await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverMode: "upload" } })).status, 400, "沒上傳過不能選上傳封面");
+  // 單色底色：只能選色票裡的顏色（業主 2026-11-22）。
+  assert.equal((await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverColor: "#123456" } })).status, 400, "不在色票裡的顏色不行");
+  const colored = (await call<{ coverColor: string | null }>("PATCH", `/my-lists/${id}`, { token: me, body: { coverColor: "#1f4e79" } })).data;
+  assert.equal(colored.coverColor, "#1F4E79", "選色票的顏色（不分大小寫）");
+  assert.equal((await call("PUT", `/my-lists/${id}/cover-image`, { token: me, body: "x" })).status, 404, "上傳封面圖的功能已移除");
+  await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverColor: "" } });
+
+  assert.equal((await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverMode: "upload" } })).status, 400, "會員不能選上傳封面（已取消上傳）");
   assert.equal((await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverMode: "bad" } })).status, 400);
   assert.equal((await call("PATCH", `/my-lists/${id}`, { token: me, body: { coverBgId: "gnope" } })).status, 404, "底圖要存在");
 

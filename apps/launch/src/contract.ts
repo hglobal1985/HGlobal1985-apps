@@ -1159,3 +1159,20 @@ export type LibraryMine = { keys?: { have: number; need: number; blocked?: strin
 /** 公開檢視：locked＝整座書櫃要先輸入密碼（items 是空的）；owner＝正在看自己的書櫃。 */
 export type LibraryView = { number: string; title: string; ownerName: string; locked: boolean; lockExpired: boolean; owner: boolean; items: LibraryItem[] };
 export type LibraryUnlock = { token: string; until: number };
+
+/**
+ * 我的清單封面的單色底色（業主 2026-11-22：會員不能上傳封面圖，只能選管理員的底圖或下面這些單色）。
+ * 10 種不同風格、白色粗體字疊上去都清楚；第一個是網站深綠（預設）。要增減只改這一張表（前後端共用）。
+ */
+export const LIST_COVER_COLORS: { hex: string; name: string }[] = [
+  { hex: "#0C603C", name: "森林綠" },
+  { hex: "#1F4E79", name: "深海藍" },
+  { hex: "#8E2A3A", name: "酒紅" },
+  { hex: "#B7791F", name: "琥珀金" },
+  { hex: "#6B4FA0", name: "薰衣草紫" },
+  { hex: "#6B4A2F", name: "咖啡棕" },
+  { hex: "#D4623A", name: "珊瑚橘" },
+  { hex: "#2B2B2E", name: "墨黑" },
+  { hex: "#C2517A", name: "玫瑰粉" },
+  { hex: "#137C83", name: "湖水青" },
+];

@@ -75,6 +75,7 @@ import {
   COVER_MEDIA_MAX,
   type CoverMediaKind,
   type CoverMediaItem,
+  LIST_COVER_COLORS,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
@@ -3355,17 +3356,21 @@ const routes: [string, RegExp, Handler][] = [
   ["PATCH", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => {
     const s = requireMember(ctx);
     const l = await ownedList(ctx.db, s.sub, id!);
-    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown; coverMode?: unknown; coverBgId?: unknown; coverText?: unknown; coverTextOn?: unknown }>(ctx.req);
+    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown; coverMode?: unknown; coverBgId?: unknown; coverColor?: unknown; coverText?: unknown; coverTextOn?: unknown }>(ctx.req);
     if (b.coverMode !== undefined) {
-      // 封面類型：內容封面／自己上傳的圖片（要先上傳過）／清單名稱的文字封面。
-      if (b.coverMode !== "item" && b.coverMode !== "upload" && b.coverMode !== "text") fail(400, "invalid_cover_mode", "封面類型不正確");
-      if (b.coverMode === "upload" && !l.cover_key) fail(400, "no_upload", "請先上傳一張封面圖");
+      // 封面類型：內容封面／自訂封面（管理員的底圖或單色＋文字）；會員不能上傳封面圖。
+      if (b.coverMode !== "item" && b.coverMode !== "text") fail(400, "invalid_cover_mode", "封面類型不正確");
       await ctx.db.prepare("UPDATE my_lists SET cover_mode = ? WHERE id = ?").bind(b.coverMode, l.id).run();
     }
     if (b.coverBgId !== undefined) {
       const bid = typeof b.coverBgId === "string" && b.coverBgId ? b.coverBgId : null;
       if (bid && !(await ctx.db.prepare("SELECT 1 AS ok FROM list_cover_bgs WHERE id = ?").bind(bid).first())) fail(404, "not_found", "找不到這張底圖");
       await ctx.db.prepare("UPDATE my_lists SET cover_bg_id = ? WHERE id = ?").bind(bid, l.id).run();
+    }
+    if (b.coverColor !== undefined) {
+      const col = typeof b.coverColor === "string" ? b.coverColor.toUpperCase() : "";
+      if (col && !LIST_COVER_COLORS.some((x) => x.hex === col)) fail(400, "invalid_color", "請從色票選一種顏色");
+      await ctx.db.prepare("UPDATE my_lists SET cover_color = ? WHERE id = ?").bind(col || null, l.id).run();
     }
     if (b.coverText !== undefined) {
       // 封面上的自訂文字（空＝用清單名稱）；最多 40 字。
@@ -3389,22 +3394,6 @@ const routes: [string, RegExp, Handler][] = [
     if (l.cover_key) await ctx.env.MEDIA?.delete(l.cover_key).catch(() => undefined);
     await ctx.db.batch([ctx.db.prepare("DELETE FROM my_list_items WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_visitors WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_hits WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_lists WHERE id = ?").bind(l.id)]);
     return { ok: true };
-  })],
-  ["PUT", /^\/my-lists\/(l[\w]{4,20})\/cover-image$/, (ctx, [id]) => listGuard(async () => {
-    // 上傳自己的清單封面圖：伺服器再壓縮（同一般圖片設定），上傳成功就切到「上傳」封面。
-    const s = requireMember(ctx);
-    const l = await ownedList(ctx.db, s.sub, id!);
-    const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
-    const data = new Uint8Array(await ctx.req.arrayBuffer());
-    const max = 8 * 1024 * 1024;
-    if (!data.byteLength || data.byteLength > max) fail(413, "invalid_size", `圖片大小需在 ${max / 1024 / 1024}MB 以內`);
-    const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
-    const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "general");
-    const key = `listcover/${l.id}/${crypto.randomUUID()}.${renameForType(`x.${img.ext}`, shrunk.type).split(".").pop()}`;
-    await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
-    await ctx.db.prepare("UPDATE my_lists SET cover_key = ?, cover_mode = 'upload', cover_ver = cover_ver + 1 WHERE id = ?").bind(key, l.id).run();
-    if (l.cover_key) await bucket.delete(l.cover_key).catch(() => undefined);
-    return ownDetail(ctx.db, await ownedList(ctx.db, s.sub, l.id));
   })],
   [
     "GET",
