@@ -604,7 +604,7 @@ export type ProfileForm = {
 };
 
 // ---------- 學習成就（徽章）----------
-export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video" | "lists_created" | "list_people" | "files_downloaded";
+export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video" | "lists_created" | "list_people" | "files_downloaded" | "target_lesson" | "series_completed";
 /** 任務分類（後台「徽章任務設定」用，業主 2026-11-18）。 */
 export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature" | "zone" | "list";
 export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; icon: string; desc: string }[] = [
@@ -640,7 +640,9 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   list_people: { label: "單一清單被點閱的人數", unit: "人", category: "list", hint: "自己的清單裡，人氣最高的那份被不同的人點開過幾人（自己看不算）" },
   files_downloaded: { label: "下載教材檔案數", unit: "個", category: "feature", hint: "下載過幾個不同的教材檔案（同一個檔案下載多次只算一次）" },
   material_video: { label: "讀完指定的清單影片", unit: "支", category: "zone", hint: "由系統從清單專區、品牌專區隨機抽選影片產生（在「清單影片」分類按「重新抽選」），不能手動新增", auto: true },
-  course_completed: { label: "學完指定的某一門課程", unit: "門", category: "progress", hint: "已取消這類任務", needsCourse: true, retired: true },
+  course_completed: { label: "學完指定的課程卡", unit: "門", category: "progress", hint: "指定的那張課程卡，每個章節都完成才算", needsCourse: true },
+  target_lesson: { label: "完成指定的教材或章節", unit: "堂", category: "progress", hint: "指定的那個章節（或有影片的教材）看完就達成" },
+  series_completed: { label: "學完指定系列卡內的課程", unit: "門", category: "progress", hint: "指定系列裡，學完幾門課程卡就達成" },
 };
 
 // ---------- 成就產生器（業主 2026-11-22）：動詞＋對象＋時段＋數量＋單位，全部用下拉選單點選 ----------
@@ -664,6 +666,10 @@ export type AchObject = {
   /** 固定的網站功能（例如分享）；pickFeature＝讓管理員從功能清單自己挑。 */
   feature?: string;
   pickFeature?: boolean;
+  /** 要先搜尋並指定一個目標：lesson＝教材／章節、course＝課程卡、series＝系列卡。 */
+  target?: "lesson" | "course" | "series";
+  /** 達成數量固定為 1（不顯示數量與單位）。 */
+  fixedOne?: boolean;
 };
 /** 動詞清單：icon＝這個動詞的預設徽章圖示（同動詞的成就全站一致）。新增動詞只要在這裡加一行。 */
 export const ACH_VERBS: { verb: string; icon: string; objects: AchObject[] }[] = [
@@ -679,6 +685,7 @@ export const ACH_VERBS: { verb: string; icon: string; objects: AchObject[] }[] =
   { verb: "建立", icon: "📋", objects: [{ name: "清單", unit: "份", type: "lists_created" }] },
   { verb: "被點閱", icon: "👀", objects: [{ name: "我的清單", unit: "人", type: "list_people" }] },
   { verb: "分享", icon: "📤", objects: [{ name: "給朋友", unit: "次", type: "feature_used", feature: "share" }, { name: "我的清單", unit: "次", type: "feature_used", feature: "list_share" }] },
+  { verb: "指定學習", icon: "🎯", objects: [{ name: "教材", unit: "堂", type: "target_lesson", target: "lesson", fixedOne: true }, { name: "課程卡", unit: "門", type: "course_completed", target: "course", fixedOne: true }, { name: "系列卡", unit: "門", type: "series_completed", target: "series" }] },
   { verb: "下載", icon: "📥", objects: [{ name: "教材檔案", unit: "個", type: "files_downloaded" }] },
 ];
 /** 圖示圖庫（「隨機」與「自選」用）。 */
@@ -755,6 +762,8 @@ export type Achievement = {
   feature?: string | null;
   /** 量化單位（堂、天、次…；後台自選，空白時用條件類型的預設單位）。 */
   unit?: string | null;
+  /** 指定系列卡的名稱（series_completed）。 */
+  series?: string | null;
   /** 清單影片徽章：指定的影片名稱與所屬清單。 */
   lessonTitle?: string | null;
   courseTitle: string | null;
@@ -772,6 +781,7 @@ export type AdminAchievement = {
   threshold: number;
   feature?: string | null;
   unit?: string | null;
+  series?: string | null;
   courseId: string | null;
   courseTitle: string | null;
   /** 清單影片徽章指定的影片（章節編號與名稱）。 */

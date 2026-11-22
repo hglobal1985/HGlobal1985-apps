@@ -14,13 +14,17 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
     case "comments_posted":
       return `在課程留言板留言 ${threshold} 次`;
     case "course_completed":
-      return `學完「${courseTitle ?? "指定課程"}」`;
+      return `學完課程卡「${courseTitle ?? "指定課程"}」`;
     case "feature_used": {
       const f = feature ? FEATURES[feature as keyof typeof FEATURES] : undefined;
       return f ? `${f.label}：${f.hint}` : "使用指定的網站功能";
     }
     case "lists_created":
       return `累計建立 ${threshold} 份自己的清單`;
+    case "target_lesson":
+      return lessonTitle ? `完成指定教材「${lessonTitle}」` : "完成指定的教材";
+    case "series_completed":
+      return `學完指定系列卡內的 ${threshold} 門課程`;
     case "files_downloaded":
       return `下載 ${threshold} 個教材檔案`;
     case "list_people":
@@ -54,10 +58,14 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
 export const BADGE_ICONS = ["🌱", "🌿", "🌳", "⭐", "🌟", "🏆", "🥇", "🥈", "🥉", "🎓", "📚", "📖", "📗", "🔥", "⚡", "🎯", "💬", "🗣️", "🤝", "💡", "🔔", "📺", "🏙️", "🌅", "🌙", "🏖️", "🧭", "🔍", "🚀", "💎", "👑", "🏅", "🎖️", "🎁", "🍀", "🧩"];
 
 /** 成就產生器的白話句子：例如「早晨完成章節 5 堂」「訂閱中心 3 個」（名稱與說明自動用它）。 */
-export function achPhrase(vi: number, oi: number, time: AchTime, n: number, unit: string, feature?: string | null): string {
+export function achPhrase(vi: number, oi: number, time: AchTime, n: number, unit: string, feature?: string | null, target?: string | null): string {
   const v = ACH_VERBS[vi];
   const o = v?.objects[oi];
   if (!v || !o) return "";
+  if (o.target) {
+    const t = target ? `「${target}」` : "（尚未指定）";
+    return o.target === "lesson" ? `指定學習教材${t}` : o.target === "course" ? `學完指定課程卡${t}` : `學完指定系列卡${t}內 ${n} ${unit}`;
+  }
   if (o.pickFeature) {
     const f = feature ? FEATURES[feature as keyof typeof FEATURES] : undefined;
     return `使用過「${f?.label ?? "指定功能"}」${n} ${unit}`;

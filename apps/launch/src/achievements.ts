@@ -5,7 +5,7 @@
 import type { Achievement, AchievementType } from "./contract.ts";
 import type { D1Database } from "./d1.ts";
 
-type Def = { id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; lesson_id: string | null; unit: string | null };
+type Def = { id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; lesson_id: string | null; unit: string | null; series: string | null };
 
 const one = async (db: D1Database, sql: string, ...args: unknown[]) => Number((await db.prepare(sql).bind(...args).first<{ n: number }>())?.n ?? 0);
 
@@ -42,6 +42,13 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
       return d.feature ? one(db, "SELECT COALESCE(MAX(count), 0) AS n FROM feature_uses WHERE member_sub = ? AND feature = ?", sub, d.feature) : 0;
     case "lists_created":
       return one(db, "SELECT COUNT(*) AS n FROM my_lists WHERE owner_sub = ?", sub);
+    case "target_lesson":
+      return d.lesson_id ? one(db, "SELECT COUNT(*) AS n FROM lesson_progress WHERE member_sub = ? AND lesson_id = ?", sub, d.lesson_id) : 0;
+    case "series_completed": {
+      if (!d.series) return 0;
+      const { results } = await db.prepare("SELECT id FROM courses WHERE series = ? AND status = 'published'").bind(d.series).all<{ id: string }>();
+      return (await Promise.all(results.map((r) => courseDone(db, sub, r.id)))).reduce((a, b) => a + b, 0);
+    }
     case "files_downloaded":
       return one(db, "SELECT COUNT(DISTINCT att_id) AS n FROM material_downloads WHERE member_sub = ?", sub);
     case "list_people":
@@ -78,7 +85,7 @@ async function current(db: D1Database, sub: string, d: Def): Promise<number> {
 export async function evaluateAchievements(db: D1Database, sub: string): Promise<{ list: Achievement[]; fresh: Achievement[] }> {
   const [defs, mine] = await Promise.all([
     db
-      .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.lesson_id, a.unit, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT title FROM lessons WHERE id = a.lesson_id) AS lesson_title FROM achievements a WHERE a.active = 1 ORDER BY a.sort_order, a.created_at")
+      .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.lesson_id, a.unit, a.series, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT title FROM lessons WHERE id = a.lesson_id) AS lesson_title FROM achievements a WHERE a.active = 1 ORDER BY a.sort_order, a.created_at")
       .all<Def & { course_title: string | null; lesson_title: string | null }>(),
     db.prepare("SELECT achievement_id, earned_at FROM member_achievements WHERE member_sub = ?").bind(sub).all<{ achievement_id: string; earned_at: string }>(),
   ]);
@@ -87,16 +94,16 @@ export async function evaluateAchievements(db: D1Database, sub: string): Promise
   const fresh: Achievement[] = [];
   const inserts = [];
   // 同一種條件只算一次（100 枚徽章只有十幾種不同的算法），而且全部同時查（以前一枚一枚排隊查，要等好幾秒）。
-  const keyOf = (d: Def) => `${d.condition_type}|${d.course_id ?? ""}|${d.feature ?? ""}|${d.lesson_id ?? ""}`;
+  const keyOf = (d: Def) => `${d.condition_type}|${d.course_id ?? ""}|${d.feature ?? ""}|${d.lesson_id ?? ""}|${d.series ?? ""}`;
   const uniq = new Map<string, Def>();
   for (const d of defs.results) if (!uniq.has(keyOf(d))) uniq.set(keyOf(d), d);
   const values = new Map<string, number>(await Promise.all([...uniq].map(async ([k, d]) => [k, await current(db, sub, d)] as const)));
   for (const d of defs.results) {
-    const need = d.condition_type === "course_completed" ? 1 : d.threshold;
+    const need = d.condition_type === "course_completed" || d.condition_type === "target_lesson" ? 1 : d.threshold;
     const now = values.get(keyOf(d)) ?? 0;
     let earnedAt = got.get(d.id) ?? null;
     const earned = !!earnedAt || now >= need;
-    const a: Achievement = { id: d.id, name: d.name, description: d.description, icon: d.icon, type: d.condition_type, threshold: need, feature: d.feature, unit: d.unit, lessonTitle: d.lesson_title, courseTitle: d.course_title, current: Math.min(now, need), earned, earnedAt };
+    const a: Achievement = { id: d.id, name: d.name, description: d.description, icon: d.icon, type: d.condition_type, threshold: need, feature: d.feature, unit: d.unit, series: d.series, lessonTitle: d.lesson_title, courseTitle: d.course_title, current: Math.min(now, need), earned, earnedAt };
     if (earned && !earnedAt) {
       earnedAt = new Date().toISOString();
       a.earnedAt = earnedAt;

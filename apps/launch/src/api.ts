@@ -398,6 +398,26 @@ async function achievementBody(ctx: Ctx, body: Record<string, unknown>, creating
       sets.push(["course_id", body.courseId]);
     }
   }
+  if (body.lessonId !== undefined && body.type !== "material_video") {
+    if (body.lessonId === null || body.lessonId === "") sets.push(["lesson_id", null]);
+    else {
+      if (!(await ctx.db.prepare("SELECT 1 AS ok FROM lessons WHERE id = ?").bind(String(body.lessonId)).first())) fail(400, "invalid_lesson", "找不到這個教材");
+      sets.push(["lesson_id", body.lessonId]);
+    }
+  }
+  if (body.series !== undefined) {
+    if (body.series === null || body.series === "") sets.push(["series", null]);
+    else {
+      if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE series = ? LIMIT 1").bind(String(body.series)).first())) fail(400, "invalid_series", "找不到這個系列卡");
+      sets.push(["series", body.series]);
+    }
+  }
+  if (creating) {
+    const has = (c: string) => sets.some(([k, v]) => k === c && !!v);
+    if (body.type === "target_lesson" && !has("lesson_id")) fail(400, "target_required", "請搜尋並指定一個教材");
+    if (body.type === "course_completed" && !has("course_id")) fail(400, "target_required", "請搜尋並指定一張課程卡");
+    if (body.type === "series_completed" && !has("series")) fail(400, "target_required", "請搜尋並指定一張系列卡");
+  }
   if (body.feature !== undefined) {
     if (body.feature === null || body.feature === "") sets.push(["feature", null]);
     else if (typeof body.feature === "string" && body.feature in FEATURES) sets.push(["feature", body.feature]);
@@ -420,9 +440,9 @@ async function listAchievements(ctx: Ctx): Promise<AdminAchievement[]> {
   for (const r of parts) for (const x of r.results as { member_sub: string }[]) subs.add(x.member_sub);
   const total = subs.size;
   const { results } = await ctx.db
-    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.lesson_id, a.unit, a.difficulty, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT title FROM lessons WHERE id = a.lesson_id) AS lesson_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
-    .all<{ difficulty: number; id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; lesson_id: string | null; unit: string | null; lesson_title: string | null; active: number; course_title: string | null; earned_count: number }>();
-  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, unit: r.unit, lessonId: r.lesson_id, lessonTitle: r.lesson_title, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count, difficulty: (r.difficulty >= 1 && r.difficulty <= 3 ? r.difficulty : 2) as 1 | 2 | 3, memberTotal: total }));
+    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.lesson_id, a.unit, a.series, a.difficulty, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT title FROM lessons WHERE id = a.lesson_id) AS lesson_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
+    .all<{ difficulty: number; id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; lesson_id: string | null; unit: string | null; series: string | null; lesson_title: string | null; active: number; course_title: string | null; earned_count: number }>();
+  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, unit: r.unit, series: r.series, lessonId: r.lesson_id, lessonTitle: r.lesson_title, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count, difficulty: (r.difficulty >= 1 && r.difficulty <= 3 ? r.difficulty : 2) as 1 | 2 | 3, memberTotal: total }));
 }
 
 /** 刪除一位會員在本 App 的所有資料。 */
@@ -4356,6 +4376,30 @@ const routes: [string, RegExp, Handler][] = [
       const r = await drawZoneVideoBadges(ctx.db);
       await ctx.db.batch([audit(ctx.db, s.sub, "achievement.draw_videos", "achievement", "-", `added=${r.added}`)]);
       return r;
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/achievement-targets$/,
+    async (ctx) => {
+      // 成就「指定學習」的搜尋：依關鍵字找教材（章節或有影片的教材）、課程卡、系列卡，最多 20 筆。
+      requireSuperAdmin(ctx);
+      const q = (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 40);
+      const kind = ctx.url.searchParams.get("kind");
+      const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+      if (kind === "lesson") {
+        const { results } = await ctx.db.prepare("SELECT l.id, l.title, c.title AS sub FROM lessons l JOIN courses c ON c.id = l.course_id WHERE (l.kind = 'chapter' OR (l.kind = 'material' AND COALESCE(l.media_ref, '') <> '')) AND (l.title LIKE ?1 ESCAPE '\\' OR c.title LIKE ?1 ESCAPE '\\') ORDER BY c.title, l.position LIMIT 20").bind(like).all<{ id: string; title: string; sub: string }>();
+        return results;
+      }
+      if (kind === "course") {
+        const { results } = await ctx.db.prepare("SELECT id, title, COALESCE(series, '') AS sub FROM courses WHERE title LIKE ?1 ESCAPE '\\' ORDER BY title LIMIT 20").bind(like).all<{ id: string; title: string; sub: string }>();
+        return results;
+      }
+      if (kind === "series") {
+        const { results } = await ctx.db.prepare("SELECT series AS id, series AS title, COUNT(*) || ' 門課程' AS sub FROM courses WHERE COALESCE(series, '') <> '' AND series LIKE ?1 ESCAPE '\\' GROUP BY series ORDER BY series LIMIT 20").bind(like).all<{ id: string; title: string; sub: string }>();
+        return results;
+      }
+      fail(400, "invalid_kind", "搜尋種類不正確");
     },
   ],
   ["GET", /^\/admin\/achievements$/, async (ctx) => (requireSuperAdmin(ctx), listAchievements(ctx))],
