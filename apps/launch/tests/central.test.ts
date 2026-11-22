@@ -314,3 +314,19 @@ test("我的書櫃：獲得任意 100 枚徽章自動解鎖鑰匙（99 枚不行
   const after = (await call<{ library: { number: string } | null }>("GET", "/library/mine", { token: alice })).data;
   assert.equal(after.library?.number, "tw1234567");
 });
+
+test("審核紀錄：待審時不存申請內容，審核完成才寫入內容與姓名（業主 2026-11-22）", async () => {
+  const env: Env = { DB: createTestDb() };
+  const call = async <T = unknown,>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (opts.token) headers.authorization = `Bearer ${opts.token}`;
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
+    return { status: res.status, data: (await res.json()) as T };
+  };
+  // 申請送出時留下的待審紀錄：只有誰、哪個欄位，沒有申請內容
+  await env.DB.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name) VALUES ('p1', 'rank', '獎銜', 'm_alice', '王小明')").run();
+  const item = { display_name: "王小明", field_key: "rank", field_label: "獎銜", current_value: "silver", requested_value: "gold" };
+  assert.equal((await call("POST", "/central-reviews/r1/decision", { token: token({ sub: "m_pres" }), body: { decision: "approve", item } })).status, 200);
+  const row = await env.DB.prepare("SELECT status, applicant_name, to_text, from_text FROM review_log WHERE id = 'p1'").first<Record<string, string>>();
+  assert.deepEqual(JSON.parse(JSON.stringify(row)), { status: "approved", applicant_name: "王小明", to_text: "gold", from_text: "silver" }, "對應到待審紀錄，審核後補上內容");
+});
