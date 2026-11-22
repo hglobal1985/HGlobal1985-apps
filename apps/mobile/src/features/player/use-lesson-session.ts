@@ -68,7 +68,7 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
         setClaimed(track.key);
         // 續播記憶：告訴學員是從上次的位置接著播（業主 2026-11-17）。
         const r = track.playback.resumeAt;
-        if (r != null) flashText(`從上次看到的 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
+        if (r != null) flashText(`接續上次進度，從 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
         return;
       }
       const cur = engine.getSnapshot().track;

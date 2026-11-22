@@ -29,7 +29,8 @@ export function showFlash(content: FlashContent): void {
  * 太長的句子在第一個標點切成「標題＋說明」。新增任何一句話提示都用它，不要再做底部小字。
  */
 export function flashText(text: string): void {
-  const m = /^(.{2,14}?)[，,。：:；;]\s*(.+)$/.exec(text);
+  // 冒號後面緊接數字（例如時間 7:00）不是分隔點，不能把時間切成兩半（業主 2026-11-22 回報「從上次看到的 7」「00 繼續播放」）。
+  const m = /^(.{2,14}?)(?:[，,。；;：]|:(?!\d))\s*(.+)$/.exec(text);
   const title = m && text.length > 12 ? m[1]! : text;
   const body = m && text.length > 12 ? m[2] : undefined;
   const bad = /無法|失敗|錯誤|不能|不正確|過期|已存在|不足|逾時/.test(text);
