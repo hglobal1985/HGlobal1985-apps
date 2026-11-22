@@ -3355,7 +3355,7 @@ const routes: [string, RegExp, Handler][] = [
   ["PATCH", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => {
     const s = requireMember(ctx);
     const l = await ownedList(ctx.db, s.sub, id!);
-    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown; coverMode?: unknown; coverBgId?: unknown }>(ctx.req);
+    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown; coverMode?: unknown; coverBgId?: unknown; coverText?: unknown; coverTextOn?: unknown }>(ctx.req);
     if (b.coverMode !== undefined) {
       // 封面類型：內容封面／自己上傳的圖片（要先上傳過）／清單名稱的文字封面。
       if (b.coverMode !== "item" && b.coverMode !== "upload" && b.coverMode !== "text") fail(400, "invalid_cover_mode", "封面類型不正確");
@@ -3367,6 +3367,12 @@ const routes: [string, RegExp, Handler][] = [
       if (bid && !(await ctx.db.prepare("SELECT 1 AS ok FROM list_cover_bgs WHERE id = ?").bind(bid).first())) fail(404, "not_found", "找不到這張底圖");
       await ctx.db.prepare("UPDATE my_lists SET cover_bg_id = ? WHERE id = ?").bind(bid, l.id).run();
     }
+    if (b.coverText !== undefined) {
+      // 封面上的自訂文字（空＝用清單名稱）；最多 40 字。
+      const t = typeof b.coverText === "string" ? b.coverText.trim().slice(0, 40) : "";
+      await ctx.db.prepare("UPDATE my_lists SET cover_text = ? WHERE id = ?").bind(t || null, l.id).run();
+    }
+    if (b.coverTextOn !== undefined) await ctx.db.prepare("UPDATE my_lists SET cover_text_on = ? WHERE id = ?").bind(b.coverTextOn ? 1 : 0, l.id).run();
     if (b.title !== undefined) await ctx.db.prepare("UPDATE my_lists SET title = ? WHERE id = ?").bind(checkTitle(b.title), l.id).run();
     if (b.slug !== undefined) await setSlug(ctx.db, l, b.slug);
     if (b.coverItemId !== undefined) {
