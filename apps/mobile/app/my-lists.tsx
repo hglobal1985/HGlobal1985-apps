@@ -110,7 +110,7 @@ export default function MyListsScreen() {
 
 const styles = StyleSheet.create({
   card: { flexDirection: "row", alignItems: "center", gap: space.md },
-  cover: { width: 72, height: 54, borderRadius: radius.sm, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  cover: { width: 72, height: 54, borderRadius: radius.sm, overflow: "hidden" },
   unlock: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch + 8, borderTopWidth: StyleSheet.hairlineWidth, paddingTop: space.xs },
   extra: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
   input: { minHeight: minTouch, borderWidth: 1.5, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
