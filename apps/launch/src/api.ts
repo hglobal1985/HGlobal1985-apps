@@ -80,7 +80,7 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
-import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
+import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, recordEvent, recordItemHit, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
 import { lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
@@ -3392,7 +3392,7 @@ const routes: [string, RegExp, Handler][] = [
     const s = requireMember(ctx);
     const l = await ownedList(ctx.db, s.sub, id!);
     if (l.cover_key) await ctx.env.MEDIA?.delete(l.cover_key).catch(() => undefined);
-    await ctx.db.batch([ctx.db.prepare("DELETE FROM my_list_items WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_visitors WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_hits WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_lists WHERE id = ?").bind(l.id)]);
+    await ctx.db.batch([ctx.db.prepare("DELETE FROM my_list_items WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_visitors WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_hits WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_item_hits WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_list_events WHERE list_id = ?").bind(l.id), ctx.db.prepare("DELETE FROM my_lists WHERE id = ?").bind(l.id)]);
     return { ok: true };
   })],
   [
@@ -3475,6 +3475,16 @@ const routes: [string, RegExp, Handler][] = [
     return ownDetail(ctx.db, l);
   })],
   ["GET", /^\/my-lists\/(l[\w]{4,20})\/stats$/, (ctx, [id]) => listGuard(async () => listStats(ctx.db, (await ownedList(ctx.db, requireMember(ctx).sub, id!)).id))],
+  // 清單主人按「分享」「複製連結」時記一次；訪客點開某個項目時該項目 +1（成效頁的分享成效、最受歡迎項目；業主 2026-11-22）。
+  ["POST", /^\/my-lists\/(l[\w]{4,20})\/share$/, (ctx, [id]) => listGuard(async () => {
+    const l = await ownedList(ctx.db, requireMember(ctx).sub, id!);
+    await recordEvent(ctx.db, l.id, "share");
+    return { ok: true };
+  })],
+  ["POST", /^\/my-lists\/view\/([\w-]{2,40})\/([\w-]{3,30})\/item\/(i[\w]{4,20})\/hit$/, (ctx, [number, slug, itemId]) => listGuard(async () => {
+    await recordItemHit(ctx.db, number!, slug!, itemId!, ctx.session?.sub ?? null);
+    return { ok: true };
+  })],
   // 公開檢視（所有清單都公開，訪客也能看）；每次進入點擊 +1。
   ["POST", /^\/my-lists\/view\/([\w-]{2,40})\/([\w-]{3,30})$/, (ctx, [number, slug]) => listGuard(async () => {
     const b = await readJson<{ vid?: unknown; hint?: unknown; referrer?: unknown }>(ctx.req);

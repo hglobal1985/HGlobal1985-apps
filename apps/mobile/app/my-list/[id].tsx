@@ -19,7 +19,7 @@ import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, SegmentTa
 import { DIM_COLOR } from "@/ui/dim-backdrop";
 import { flashText } from "@/ui/flash-notice";
 
-type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; coverColor: string | null; coverText: string | null; coverTextRaw: string; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
+type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; coverColor: string | null; coverText: string | null; coverTextRaw: string; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[]; shares: number; copies: number; items: { id: string; title: string; n: number; missing: boolean }[] } };
 
 /**
  * 我的清單內頁（業主 2026-11-22 改版：大圖封面首頁＋三個分頁）：上方是清單封面大圖（名稱、點閱數疊在圖上）與「分享／複製網址」，
@@ -65,12 +65,14 @@ export default function MyListScreen() {
   const share = async () => {
     const r = await shareLink(d.title, d.url);
     trackFeature("list_share");
+    void api("POST", `/my-lists/${d.id}/share`).catch(() => undefined);
     if (r === "copied") flashText("已複製連結");
   };
   const copy = async () => {
     try {
       await navigator.clipboard?.writeText(full);
       trackFeature("list_share");
+      void api("POST", `/my-lists/${d.id}/share`).catch(() => undefined);
       flashText("已複製連結");
     } catch {
       flashText("無法複製，請長按網址自行複製");
@@ -227,17 +229,104 @@ export default function MyListScreen() {
             ))
           )}
           {Object.keys(d.stats.bySource).length ? (
-            <View style={{ gap: 2 }}>
+            <View style={{ gap: 6 }}>
               <AppText variant="caption" tone="muted">
                 從哪裡點進來：
               </AppText>
-              <AppText variant="callout">
-                {Object.entries(d.stats.bySource)
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([k, n]) => `${SOURCE_LABEL[k] ?? k} ${n}`)
-                  .join("・")}
+              {Object.entries(d.stats.bySource)
+                .sort((a, b) => b[1] - a[1])
+                .map(([k, n]) => {
+                  const pct = Math.round((n / Math.max(1, d.stats.clicks)) * 100);
+                  return (
+                    <View key={k} style={styles.barRow}>
+                      <AppText variant="caption" style={{ width: 84, fontWeight: "700" }}>
+                        {SOURCE_LABEL[k] ?? k}
+                      </AppText>
+                      <View style={{ flex: 1, height: 14, borderRadius: 7, backgroundColor: c.surfaceMuted, overflow: "hidden" }}>
+                        <View style={{ height: 14, borderRadius: 7, backgroundColor: c.accent, width: `${Math.max(3, Math.min(100, pct))}%` }} />
+                      </View>
+                      <AppText variant="caption" style={{ fontWeight: "800", width: 64, textAlign: "right" }}>
+                        {pct}%・{n}
+                      </AppText>
+                    </View>
+                  );
+                })}
+            </View>
+          ) : null}
+          <View style={{ height: 1, backgroundColor: c.border }} />
+          <AppText variant="callout" style={{ fontWeight: "800" }}>
+            分享與複製
+          </AppText>
+          <View style={{ flexDirection: "row" }}>
+            <View style={{ flex: 1 }}>
+              <AppText variant="display">{d.stats.shares}</AppText>
+              <AppText variant="caption" tone="muted">
+                你按分享的次數
               </AppText>
             </View>
+            <View style={{ flex: 1 }}>
+              <AppText variant="display">{d.stats.copies}</AppText>
+              <AppText variant="caption" tone="muted">
+                別人複製成自己的清單
+              </AppText>
+            </View>
+          </View>
+          {d.stats.shares > 0 && d.stats.clicks > 0 ? (
+            <AppText variant="caption" tone="muted">
+              平均每次分享帶來約 {Math.round((d.stats.clicks / d.stats.shares) * 10) / 10} 次點閱（分享次數從 2026/11/22 開始統計，點閱含更早的）。
+            </AppText>
+          ) : (
+            <AppText variant="caption" tone="muted">
+              分享次數從 2026/11/22 開始統計。
+            </AppText>
+          )}
+          {d.stats.items.length ? (
+            <>
+              <View style={{ height: 1, backgroundColor: c.border }} />
+              <AppText variant="callout" style={{ fontWeight: "800" }}>
+                最受歡迎的項目
+              </AppText>
+              {d.stats.items.some((x) => x.n > 0) ? (
+                d.stats.items
+                  .filter((x) => x.n > 0)
+                  .sort((a, b) => b.n - a.n)
+                  .slice(0, 5)
+                  .map((x, i) => (
+                    <View key={x.id} style={styles.barRow}>
+                      <AppText variant="caption" style={{ width: 20, fontWeight: "800" }}>
+                        {i + 1}
+                      </AppText>
+                      <AppText variant="callout" numberOfLines={2} style={{ flex: 1 }}>
+                        {x.title}
+                      </AppText>
+                      <AppText variant="caption" style={{ fontWeight: "800" }}>
+                        {x.n} 次
+                      </AppText>
+                    </View>
+                  ))
+              ) : (
+                <AppText variant="caption" tone="muted">
+                  還沒有人點開過裡面的項目（從 2026/11/22 開始統計）。
+                </AppText>
+              )}
+              {d.stats.items.some((x) => x.n > 0) && d.stats.items.some((x) => x.n === 0 && !x.missing) ? (
+                <>
+                  <AppText variant="callout" style={{ fontWeight: "800", marginTop: space.xs }}>
+                    還沒人點過的項目
+                  </AppText>
+                  <AppText variant="caption" tone="muted">
+                    可以考慮調整順序、換掉，或在備註寫一句推薦。
+                  </AppText>
+                  {d.stats.items
+                    .filter((x) => x.n === 0 && !x.missing)
+                    .map((x) => (
+                      <AppText key={x.id} variant="callout" numberOfLines={2}>
+                        ・{x.title}
+                      </AppText>
+                    ))}
+                </>
+              ) : null}
+            </>
           ) : null}
         </Card>
       ) : null}

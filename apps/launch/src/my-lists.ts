@@ -174,7 +174,8 @@ export async function resolveItems(db: D1Database, listId: string): Promise<List
 
 /** 清單主人的內頁：項目＋點擊統計。 */
 export async function ownDetail(db: D1Database, l: ListRow) {
-  const [items, stats, bgs] = await Promise.all([resolveItems(db, l.id), listStats(db, l.id), coverBgMap(db)]);
+  const items = await resolveItems(db, l.id);
+  const [stats, bgs] = await Promise.all([listStats(db, l.id, items), coverBgMap(db)]);
   const pick = l.cover_item_id;
   const itemCover = ((pick ? items.find((x) => x.id === pick && x.coverUrl) : undefined) ?? items.find((x) => x.coverUrl && !x.missing))?.coverUrl ?? null;
   return { id: l.id, title: l.title, slug: l.slug, url: urlOf(l), coverItemId: l.cover_item_id, ...coverOut({ ...l, title: l.title }, itemCover, bgs), coverBgId: l.cover_bg_id ?? null, coverTextRaw: l.cover_text ?? "", itemCoverUrl: itemCover, coverBgChoiceUrl: l.cover_bg_id ? (bgs.get(l.cover_bg_id) ?? null) : null, clicks: l.clicks, items, stats };
@@ -192,15 +193,40 @@ export function sourceOf(hint: string, referrer: string): string {
 }
 const twDay = (now = Date.now()) => new Date(now + 8 * 3600_000).toISOString().slice(0, 10);
 
-export type ListStats = { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] };
-export async function listStats(db: D1Database, listId: string): Promise<ListStats> {
-  const [tot, src, days, ppl] = await Promise.all([
+export type ListStats = { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[]; shares: number; copies: number; items: { id: string; title: string; n: number; missing: boolean }[] };
+export async function listStats(db: D1Database, listId: string, itemsIn?: ListItemOut[]): Promise<ListStats> {
+  const [tot, src, days, ppl, ev, hits, items] = await Promise.all([
     db.prepare("SELECT clicks FROM my_lists WHERE id = ?").bind(listId).first<{ clicks: number }>(),
     db.prepare("SELECT source, SUM(n) AS n FROM my_list_hits WHERE list_id = ? GROUP BY source").bind(listId).all<{ source: string; n: number }>(),
     db.prepare("SELECT day, SUM(n) AS n FROM my_list_hits WHERE list_id = ? AND day >= ? GROUP BY day ORDER BY day DESC").bind(listId, twDay(Date.now() - 13 * 86_400_000)).all<{ day: string; n: number }>(),
     db.prepare("SELECT COUNT(*) AS n FROM my_list_visitors WHERE list_id = ?").bind(listId).first<{ n: number }>(),
+    db.prepare("SELECT kind, n FROM my_list_events WHERE list_id = ?").bind(listId).all<{ kind: string; n: number }>(),
+    db.prepare("SELECT item_id, n FROM my_list_item_hits WHERE list_id = ?").bind(listId).all<{ item_id: string; n: number }>(),
+    itemsIn ? Promise.resolve(itemsIn) : resolveItems(db, listId),
   ]);
-  return { clicks: tot?.clicks ?? 0, people: ppl?.n ?? 0, bySource: Object.fromEntries(src.results.map((r) => [r.source, r.n])), days: days.results };
+  const evN = (k: string) => ev.results.find((r) => r.kind === k)?.n ?? 0;
+  const hitOf = new Map(hits.results.map((r) => [r.item_id, r.n]));
+  return {
+    clicks: tot?.clicks ?? 0,
+    people: ppl?.n ?? 0,
+    bySource: Object.fromEntries(src.results.map((r) => [r.source, r.n])),
+    days: days.results,
+    shares: evN("share"),
+    copies: evN("copy"),
+    items: items.map((it) => ({ id: it.id, title: it.title, n: hitOf.get(it.id) ?? 0, missing: it.missing })),
+  };
+}
+
+/** 清單主人按「分享」或「複製連結」：記一次（成效頁的「分享後的成效」）。 */
+export async function recordEvent(db: D1Database, listId: string, kind: "share" | "copy"): Promise<void> {
+  await db.prepare("INSERT INTO my_list_events (list_id, kind, n) VALUES (?, ?, 1) ON CONFLICT(list_id, kind) DO UPDATE SET n = n + 1").bind(listId, kind).run();
+}
+
+/** 訪客在公開清單點開某個項目：該項目 +1（清單主人自己點不算；項目必須真的屬於這份清單）。 */
+export async function recordItemHit(db: D1Database, number: string, slug: string, itemId: string, viewerSub: string | null): Promise<void> {
+  const l = await findPublic(db, number, slug);
+  if (!l || viewerSub === l.owner_sub) return;
+  await db.prepare("INSERT INTO my_list_item_hits (list_id, item_id, n) SELECT ?, id, 1 FROM my_list_items WHERE id = ? AND list_id = ? ON CONFLICT(list_id, item_id) DO UPDATE SET n = n + 1").bind(l.id, itemId, l.id).run();
 }
 
 export type PublicList = { title: string; ownerSub: string; ownerName: string; ownerAvatar: string | null; number: string; slug: string; count: number; clicks: number; items: ListItemOut[] };
@@ -235,6 +261,7 @@ export async function copyList(db: D1Database, s: { sub: string; name: string },
   if (q.used >= q.total) return fail(403, "list_quota", next ? `清單數量已用完，完成「${next.name}」成就可以多解鎖 ${next.extra} 份` : "清單數量已用完");
   const id = await createList(db, s, myNumber, src.title.slice(0, NAME_MAX), q);
   await db.prepare("INSERT INTO my_list_items (id, list_id, kind, ref, ref2, position) SELECT 'i' || lower(hex(randomblob(5))), ?, kind, ref, ref2, position FROM my_list_items WHERE list_id = ?").bind(id, src.id).run();
+  await recordEvent(db, src.id, "copy").catch(() => undefined);
   return id;
 }
 
