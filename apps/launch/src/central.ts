@@ -616,7 +616,7 @@ export async function centralAddJobTitle(secret: string | undefined, value: stri
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
 
 /** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由業主在中央後台勾選，不在程式內宣稱）。 */
-export const INTEGRATED_VERSION = "2026-11-21.1";
+export const INTEGRATED_VERSION = "2026-11-22.1";
 export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile"];
 export const SIGNATURE_TOLERANCE_SECONDS = 300;
 
@@ -786,15 +786,25 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
 }
 
 /**
- * 清單分享者名片的獎銜與徽章（業主 2026-11-21；Amway 資料，**不寫資料庫、不寫日誌**，只放記憶體短暫快取 10 分鐘）：
- * 用服務 Token 呼叫 `POST /v1/apps/learn/members/lookup`（fields＝rank，use＝display）；獎銜名稱與徽章圖用中央的 field-definitions。
- * 失敗、403（平台設定沒勾選 rank 欄位）、422、逾時一律回 null（名片只顯示頭像與姓名），不快取失敗；失敗原因只記狀態碼與錯誤代碼。
+ * 清單分享者名片的獎銜與獎章圖（業主 2026-11-21；Amway 資料，**不寫資料庫、不寫日誌**，只放記憶體短暫快取 10 分鐘）：
+ * 串接指令 2026-11-22.1：用服務 Token 呼叫 `POST /v1/apps/learn/members/lookup`（fields＝rank，use＝display），
+ * 中央直接回 `rank_label`（獎銜中文名稱）與 `rank_badge`（`badge_url`＋`badge:{width,height,art_top,art_bottom}`）；
+ * 服務 Token 讀不了 field-definitions，所以不再自己對照。沒開 Amway 或獎銜未審核＝全是 null，只顯示頭像與姓名。
+ * 失敗、403（平台設定沒勾 rank）、422、429、逾時一律回 null，不快取失敗；失敗原因只記狀態碼與錯誤代碼。
  */
 export type SharerRank = { rankLabel: string; rankBadge: string | null; rankBadgeArt: { width: number; height: number; top: number; bottom: number } | null };
 export let lastSharerError = "";
+export function parseSharerRank(m: { rank_label?: unknown; rank_badge?: unknown; fields?: Record<string, unknown> }): SharerRank | null {
+  const label = typeof m.rank_label === "string" ? m.rank_label.trim() : typeof m.fields?.rank_label === "string" ? (m.fields.rank_label as string).trim() : "";
+  if (!label) return null;
+  const rb = (m.rank_badge ?? m.fields?.rank_badge) as { badge_url?: unknown; badge?: { width?: unknown; height?: unknown; art_top?: unknown; art_bottom?: unknown } | null } | null | undefined;
+  const b = rb?.badge;
+  const ok = typeof rb?.badge_url === "string" && /^https:\/\//.test(rb.badge_url) && !!b && [b.width, b.height, b.art_top, b.art_bottom].every((n) => typeof n === "number" && Number.isFinite(n)) && (b.height as number) > 0;
+  return { rankLabel: label.slice(0, 30), rankBadge: ok ? (rb!.badge_url as string) : null, rankBadgeArt: ok ? { width: b!.width as number, height: b!.height as number, top: b!.art_top as number, bottom: b!.art_bottom as number } : null };
+}
 export async function lookupSharerRank(secret: string | undefined, sub: string): Promise<SharerRank | null> {
   const hit = memo.get(`shr:${sub}`);
-  if (hit && hit.until > Date.now()) return hit.value as SharerRank;
+  if (hit && hit.until > Date.now()) return hit.value as SharerRank | null;
   lastSharerError = "";
   if (!secret) {
     lastSharerError = "沒有設定中央服務金鑰（CENTRAL_SERVICE_SECRET）";
@@ -814,23 +824,19 @@ export async function lookupSharerRank(secret: string | undefined, sub: string):
       signal: AbortSignal.timeout(6000),
     });
     logCall(token, "/v1/apps/learn/members/lookup", Date.now() - t0);
+    if (res.status === 401) svcToken = null;
     if (!res.ok) {
       const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
       lastSharerError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}`;
       return null;
     }
-    const b = (await res.json().catch(() => null)) as { members?: { member_id?: unknown; id?: unknown; fields?: Record<string, unknown>; rank?: unknown }[] } | null;
+    const b = (await res.json().catch(() => null)) as { members?: { member_id?: unknown; id?: unknown; fields?: Record<string, unknown>; rank_label?: unknown; rank_badge?: unknown }[] } | null;
     const m = (b?.members ?? []).find((x) => x.member_id === sub || x.id === sub);
     if (!m) {
-      lastSharerError = "中央沒有回傳這位會員（或格式不是預期的）";
+      lastSharerError = "中央沒有回傳這位會員（沒在這款 App 登入過，或格式不是預期的）";
       return null;
     }
-    const raw = m.fields?.rank ?? m.rank;
-    const rv = textOf(raw && typeof raw === "object" && "value" in (raw as object) ? (raw as { value?: unknown }).value : raw);
-    const [opts, badges] = await Promise.all([rankOptions(token).catch(() => new Map<string, string>()), rankBadges(token).catch(() => undefined)]);
-    const empty = !rv || rv === "none" || rv === "無";
-    const info = !empty && badges ? badges.get(rv) : undefined;
-    const out: SharerRank = { rankLabel: empty ? "安麗寶寶" : (opts.get(rv) ?? rv), rankBadge: info?.url ?? null, rankBadgeArt: info ? { width: info.width, height: info.height, top: info.top, bottom: info.bottom } : null };
+    const out = parseSharerRank(m);
     memo.set(`shr:${sub}`, { value: out, until: Date.now() + 600_000 });
     return out;
   } catch {
