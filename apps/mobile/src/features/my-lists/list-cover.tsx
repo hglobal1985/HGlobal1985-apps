@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Image, Platform, StyleSheet, View } from "react-native";
-import { resolveUrl } from "@/api/client";
+import { LIST_COVER_COLORS, resolveUrl } from "@/api/client";
 import { radius } from "@/theme/tokens";
 import { AppText, ThumbFallback } from "@/ui";
 import { fitFontSize } from "@/ui/course-cover";
@@ -9,6 +9,12 @@ export type ListCoverMode = "item" | "text";
 
 /** 文字封面的純色底（沒有選底圖時用，網站深綠）。 */
 const SOLID = "#0C603C";
+
+/** 色票（起始色代號）對應的底：網頁版是 135 度漸層，App 版暫用起始色單色（業主 2026-11-22）。 */
+export function coverFill(hex: string | null | undefined): object {
+  const sw = LIST_COVER_COLORS.find((x) => x.hex === (hex ?? "").toUpperCase()) ?? LIST_COVER_COLORS[0]!;
+  return Platform.OS === "web" ? { backgroundColor: sw.hex, backgroundImage: `linear-gradient(135deg, ${sw.hex}, ${sw.to})` } : { backgroundColor: sw.hex };
+}
 
 /**
  * 我的清單封面（業主 2026-11-22，全站清單封面唯一來源）：
@@ -27,7 +33,7 @@ export function ListCover({ mode, imageUrl, bgUrl, color, title, text, height = 
   const fs = overlay && box.w > 0 ? fitFontSize(overlay, box.w * 0.8, box.h * 0.6, Math.round(box.h * 0.42), minFont) : 0;
   const web = Platform.OS === "web";
   return (
-    <View style={[styles.box, { height, backgroundColor: custom ? color || SOLID : "transparent" }, rad !== undefined ? { borderRadius: rad } : null]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <View style={[styles.box, custom ? [{ height }, coverFill(color)] : { height, backgroundColor: "transparent" }, rad !== undefined ? { borderRadius: rad } : null]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
       {custom ? (
         <>
           {bg ? <Image source={{ uri: resolveUrl(bg) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}

@@ -1161,18 +1161,19 @@ export type LibraryView = { number: string; title: string; ownerName: string; lo
 export type LibraryUnlock = { token: string; until: number };
 
 /**
- * 我的清單封面的單色底色（業主 2026-11-22：會員不能上傳封面圖，只能選管理員的底圖或下面這些單色）。
- * 10 種不同風格、白色粗體字疊上去都清楚；第一個是網站深綠（預設）。要增減只改這一張表（前後端共用）。
+ * 我的清單封面的漸層底色（業主 2026-11-22：會員不能上傳封面圖，只能選管理員的底圖或下面這些漸層）。
+ * 10 種不同風格、白色粗體字疊上去都清楚；`hex`（起始色）是儲存用的代號（沿用舊的單色代號），`to` 是漸層終點色，由左上往右下 135 度。
+ * 第一個是網站深綠（預設）。要增減或調色只改這一張表（前後端共用）。
  */
-export const LIST_COVER_COLORS: { hex: string; name: string }[] = [
-  { hex: "#0C603C", name: "森林綠" },
-  { hex: "#1F4E79", name: "深海藍" },
-  { hex: "#8E2A3A", name: "酒紅" },
-  { hex: "#B7791F", name: "琥珀金" },
-  { hex: "#6B4FA0", name: "薰衣草紫" },
-  { hex: "#6B4A2F", name: "咖啡棕" },
-  { hex: "#D4623A", name: "珊瑚橘" },
-  { hex: "#2B2B2E", name: "墨黑" },
-  { hex: "#C2517A", name: "玫瑰粉" },
-  { hex: "#137C83", name: "湖水青" },
+export const LIST_COVER_COLORS: { hex: string; to: string; name: string }[] = [
+  { hex: "#0C603C", to: "#3FA66B", name: "森林綠" },
+  { hex: "#1F4E79", to: "#4A90C2", name: "深海藍" },
+  { hex: "#8E2A3A", to: "#D4586A", name: "酒紅" },
+  { hex: "#B7791F", to: "#E0A62E", name: "琥珀金" },
+  { hex: "#6B4FA0", to: "#B08CE0", name: "薰衣草紫" },
+  { hex: "#6B4A2F", to: "#B5835A", name: "咖啡棕" },
+  { hex: "#D4623A", to: "#F28C4E", name: "珊瑚橘" },
+  { hex: "#2B2B2E", to: "#6B6F78", name: "墨黑" },
+  { hex: "#C2517A", to: "#E57AA0", name: "玫瑰粉" },
+  { hex: "#137C83", to: "#3FB5AE", name: "湖水青" },
 ];

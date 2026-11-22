@@ -8,7 +8,7 @@ import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { Check } from "@/ui/check";
 import { FormBlock } from "@/ui/form-block";
 import { ListItemRow, type ListItem } from "@/features/my-lists/item-row";
-import { ListCover, type ListCoverMode } from "@/features/my-lists/list-cover";
+import { coverFill, ListCover, type ListCoverMode } from "@/features/my-lists/list-cover";
 import { SOURCE_LABEL } from "@/features/my-lists/links";
 import { bumpMark, resetMarks } from "@/features/my-lists/store";
 import { trackFeature } from "@/lib/feature-track";
@@ -312,20 +312,16 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
         </AppText>
       ) : (
         <View style={{ gap: space.md }}>
-          <FormBlock title="背景色">
-            <View style={styles.bgGrid}>
-              {LIST_COVER_COLORS.map((x) => {
-                const on = !bgId && (color ?? LIST_COVER_COLORS[0]!.hex).toUpperCase() === x.hex;
-                return (
-                  <Pressable key={x.hex} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`單色 ${x.name}`} onPress={() => { setBgId(null); setColor(x.hex); }} style={[styles.bgCell, { borderColor: on ? c.accent : c.border, backgroundColor: x.hex }]}>
-                    {on ? <Ionicons name="checkmark-circle" size={22} color="#fff" /> : null}
-                    <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
-                      {x.name}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
+          <FormBlock title="文字">
+            <Check label="在封面上顯示文字" value={textOn} onChange={setTextOn} />
+            {textOn ? (
+              <>
+                <Field label="自訂文字（留空就用清單名稱）" value={textRaw} onChange={(v) => setTextRaw(v.slice(0, 40))} placeholder={d.title} />
+                <AppText variant="caption" tone="muted">
+                  文字會自動放到適當大小，並加上陰影，疊在圖片或底色上都看得清楚。
+                </AppText>
+              </>
+            ) : null}
           </FormBlock>
           {bgs.data?.length ? (
             <FormBlock title="圖庫底圖">
@@ -339,16 +335,20 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
               </View>
             </FormBlock>
           ) : null}
-          <FormBlock title="文字">
-            <Check label="在封面上顯示文字" value={textOn} onChange={setTextOn} />
-            {textOn ? (
-              <>
-                <Field label="自訂文字（留空就用清單名稱）" value={textRaw} onChange={(v) => setTextRaw(v.slice(0, 40))} placeholder={d.title} />
-                <AppText variant="caption" tone="muted">
-                  文字會自動放到適當大小，並加上陰影，疊在圖片或底色上都看得清楚。
-                </AppText>
-              </>
-            ) : null}
+          <FormBlock title="背景漸層色">
+            <View style={styles.bgGrid}>
+              {LIST_COVER_COLORS.map((x) => {
+                const on = !bgId && (color ?? LIST_COVER_COLORS[0]!.hex).toUpperCase() === x.hex;
+                return (
+                  <Pressable key={x.hex} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`單色 ${x.name}`} onPress={() => { setBgId(null); setColor(x.hex); }} style={[styles.bgCell, { borderColor: on ? c.accent : c.border, ...coverFill(x.hex) }]}>
+                    {on ? <Ionicons name="checkmark-circle" size={22} color="#fff" /> : null}
+                    <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
+                      {x.name}
+                    </AppText>
+                  </Pressable>
+                );
+              })}
+            </View>
           </FormBlock>
         </View>
       )}
