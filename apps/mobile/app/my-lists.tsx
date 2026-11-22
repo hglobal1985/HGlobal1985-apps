@@ -80,7 +80,7 @@ export default function MyListsScreen() {
       )}
       {data && data.quota.unlocks.length > 0 ? (
         <Card style={{ gap: space.xs }}>
-          <AppText variant="headline">增加清單數量</AppText>
+          <AppText variant="headline">如何擴充更多清單數量？</AppText>
           {data.quota.unlocks.map((u) => (
             <Pressable key={u.achievementId} accessibilityRole="button" accessibilityLabel={`${u.name}，多 ${u.extra} 份清單${u.earned ? "，已完成" : ""}`} onPress={() => router.push("/achievements" as never)} style={[styles.unlock, { borderTopColor: c.border }]}>
               <Ionicons name={u.earned ? "checkmark-circle" : "lock-closed-outline"} size={26} color={u.earned ? c.accent : c.textMuted} />
