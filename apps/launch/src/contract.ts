@@ -604,7 +604,7 @@ export type ProfileForm = {
 };
 
 // ---------- 學習成就（徽章）----------
-export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video" | "lists_created" | "list_people";
+export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video" | "lists_created" | "list_people" | "files_downloaded";
 /** 任務分類（後台「徽章任務設定」用，業主 2026-11-18）。 */
 export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature" | "zone" | "list";
 export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; icon: string; desc: string }[] = [
@@ -638,9 +638,78 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   feature_used: { label: "使用過某個網站功能", unit: "次", category: "feature", hint: "第一次用到指定功能就達成（需要選功能），達成數量通常填 1", needsFeature: true },
   lists_created: { label: "累計建立清單數", unit: "份", category: "list", hint: "會員自己建立的「我的清單」份數（刪除後不算）" },
   list_people: { label: "單一清單被點閱的人數", unit: "人", category: "list", hint: "自己的清單裡，人氣最高的那份被不同的人點開過幾人（自己看不算）" },
+  files_downloaded: { label: "下載教材檔案數", unit: "個", category: "feature", hint: "下載過幾個不同的教材檔案（同一個檔案下載多次只算一次）" },
   material_video: { label: "讀完指定的清單影片", unit: "支", category: "zone", hint: "由系統從清單專區、品牌專區隨機抽選影片產生（在「清單影片」分類按「重新抽選」），不能手動新增", auto: true },
   course_completed: { label: "學完指定的某一門課程", unit: "門", category: "progress", hint: "已取消這類任務", needsCourse: true, retired: true },
 };
+
+// ---------- 成就產生器（業主 2026-11-22）：動詞＋對象＋時段＋數量＋單位，全部用下拉選單點選 ----------
+/** 時段限制（只有「完成章節」可選）。 */
+export type AchTime = "any" | "early" | "night" | "weekend" | "day";
+export const ACH_TIMES: { key: AchTime; label: string }[] = [
+  { key: "any", label: "不限時段" },
+  { key: "early", label: "早晨（04–08 點）" },
+  { key: "night", label: "夜間（22–04 點）" },
+  { key: "weekend", label: "週末" },
+  { key: "day", label: "同一天內" },
+];
+/** 量化單位可選清單。 */
+export const ACH_UNITS = ["堂", "門", "天", "分鐘", "次", "個", "份", "人", "種", "支"] as const;
+export type AchObject = {
+  name: string;
+  unit: string;
+  /** 這個「動詞＋對象」對應的條件類型（有時段選項的改看 times）。 */
+  type?: AchievementType;
+  times?: Partial<Record<AchTime, AchievementType>>;
+  /** 固定的網站功能（例如分享）；pickFeature＝讓管理員從功能清單自己挑。 */
+  feature?: string;
+  pickFeature?: boolean;
+};
+/** 動詞清單：icon＝這個動詞的預設徽章圖示（同動詞的成就全站一致）。新增動詞只要在這裡加一行。 */
+export const ACH_VERBS: { verb: string; icon: string; objects: AchObject[] }[] = [
+  { verb: "完成", icon: "✅", objects: [{ name: "章節", unit: "堂", times: { any: "lessons_completed", early: "early_lessons", night: "night_lessons", weekend: "weekend_lessons", day: "lessons_in_a_day" } }] },
+  { verb: "學完", icon: "🎓", objects: [{ name: "課程", unit: "門", type: "courses_completed" }] },
+  { verb: "報名", icon: "📝", objects: [{ name: "課程", unit: "門", type: "courses_enrolled" }] },
+  { verb: "累計學習", icon: "📚", objects: [{ name: "時間", unit: "分鐘", type: "watch_minutes" }, { name: "天數", unit: "天", type: "learning_days" }] },
+  { verb: "連續學習", icon: "🔥", objects: [{ name: "天數", unit: "天", type: "streak_days" }] },
+  { verb: "涉獵", icon: "🧭", objects: [{ name: "分類", unit: "種", type: "categories_explored" }] },
+  { verb: "留言", icon: "💬", objects: [{ name: "課程留言板", unit: "次", type: "comments_posted" }] },
+  { verb: "訂閱", icon: "🔔", objects: [{ name: "中心", unit: "個", type: "centers_subscribed" }, { name: "系列", unit: "個", type: "series_subscribed" }, { name: "中心＋系列", unit: "個", type: "subscriptions_total" }] },
+  { verb: "使用", icon: "🧰", objects: [{ name: "指定功能", unit: "次", type: "feature_used", pickFeature: true }] },
+  { verb: "建立", icon: "📋", objects: [{ name: "清單", unit: "份", type: "lists_created" }] },
+  { verb: "被點閱", icon: "👀", objects: [{ name: "我的清單", unit: "人", type: "list_people" }] },
+  { verb: "分享", icon: "📤", objects: [{ name: "給朋友", unit: "次", type: "feature_used", feature: "share" }, { name: "我的清單", unit: "次", type: "feature_used", feature: "list_share" }] },
+  { verb: "下載", icon: "📥", objects: [{ name: "教材檔案", unit: "個", type: "files_downloaded" }] },
+];
+/** 圖示圖庫（「隨機」與「自選」用）。 */
+export const ACH_ICON_POOL = ["🏅", "🔥", "🌱", "📚", "🎓", "🔔", "💬", "⭐", "🌟", "🏆", "🚀", "💎", "🎯", "🧭", "🍀", "🎖️"] as const;
+/** 動詞＋對象＋時段＋功能 → 條件類型（算不出來回 null）。 */
+export function achTypeOf(vi: number, oi: number, time: AchTime): AchievementType | null {
+  const o = ACH_VERBS[vi]?.objects[oi];
+  if (!o) return null;
+  return o.times ? (o.times[time] ?? o.times.any ?? null) : (o.type ?? null);
+}
+/** 反查：條件類型（與功能）＝哪個動詞、對象、時段；清單影片、指定課程這類沒有對應回 null。 */
+export function achRecipeOf(type: AchievementType, feature?: string | null): { vi: number; oi: number; time: AchTime } | null {
+  let loose: { vi: number; oi: number; time: AchTime } | null = null;
+  for (let vi = 0; vi < ACH_VERBS.length; vi++) {
+    const objs = ACH_VERBS[vi]!.objects;
+    for (let oi = 0; oi < objs.length; oi++) {
+      const o = objs[oi]!;
+      if (o.times) {
+        for (const t of Object.keys(o.times) as AchTime[]) if (o.times[t] === type) return { vi, oi, time: t };
+      } else if (o.type === type) {
+        if (o.feature) {
+          if (o.feature === feature) return { vi, oi, time: "any" };
+        } else if (o.pickFeature) loose ??= { vi, oi, time: "any" };
+        else return { vi, oi, time: "any" };
+      }
+    }
+  }
+  return loose;
+}
+/** 預設徽章圖示（依動詞）。 */
+export const achDefaultIcon = (vi: number) => ACH_VERBS[vi]?.icon ?? "🏅";
 /** 徽章圖固定用圖片時的代碼（存在 achievements.icon）：畫面用圖片、通知文字退回 🏅。 */
 export const BADGE_IMAGE_ICONS = ["@amway"] as const;
 export const isImageIcon = (icon: string) => (BADGE_IMAGE_ICONS as readonly string[]).includes(icon);
@@ -684,6 +753,8 @@ export type Achievement = {
   type: AchievementType;
   threshold: number;
   feature?: string | null;
+  /** 量化單位（堂、天、次…；後台自選，空白時用條件類型的預設單位）。 */
+  unit?: string | null;
   /** 清單影片徽章：指定的影片名稱與所屬清單。 */
   lessonTitle?: string | null;
   courseTitle: string | null;
@@ -700,6 +771,7 @@ export type AdminAchievement = {
   type: AchievementType;
   threshold: number;
   feature?: string | null;
+  unit?: string | null;
   courseId: string | null;
   courseTitle: string | null;
   /** 清單影片徽章指定的影片（章節編號與名稱）。 */
