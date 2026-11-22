@@ -69,7 +69,7 @@ export function PublicListScreen({ number, slug }: { number: string; slug: strin
             （只有你看得到）獎銜查不到：{data.sharerError}
           </AppText>
         ) : null}
-        {data.items.length === 0 ? <EmptyState icon="list-outline" title="這份清單還沒有內容" /> : <View>{data.items.map((it) => <ListItemRow key={it.id} item={it} />)}</View>}
+        {data.items.length === 0 ? <EmptyState icon="list-outline" title="這份清單還沒有內容" /> : <View>{data.items.map((it) => <ListItemRow key={it.id} item={it} onOpen={(x) => void api("POST", `/my-lists/view/${number}/${slug}/item/${x.id}/hit`).catch(() => undefined)} />)}</View>}
         {!mine ? (
           <Pressable accessibilityRole="button" accessibilityLabel="複製到我的清單" onPress={() => void copy()} disabled={busy} hitSlop={8} style={styles.copy}>
             <Ionicons name="copy-outline" size={16} color={c.textMuted} />
