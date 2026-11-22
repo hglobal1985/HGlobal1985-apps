@@ -63,12 +63,24 @@ export default function MyListsScreen() {
           </Card>
         </Pressable>
       ))}
+      {creating && !full ? (
+        <Card style={{ gap: space.sm }}>
+          <TextInput value={name} onChangeText={setName} placeholder="清單名稱，例如：新夥伴必看" placeholderTextColor={c.textMuted} maxLength={30} autoFocus style={[styles.input, { borderColor: c.accent, color: c.text, backgroundColor: c.surface }]} />
+          <View style={{ flexDirection: "row", gap: space.sm }}>
+            <View style={{ flex: 1 }}>
+              <Button variant="cancel" label="取消" onPress={() => setCreating(false)} fullWidth />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button label="建立" onPress={() => void create()} loading={busy} disabled={!name.trim()} fullWidth />
+            </View>
+          </View>
+        </Card>
+      ) : (
+        <Button label={full ? "清單數量已用完" : "新增清單"} icon={full ? "lock-closed-outline" : "add"} disabled={full} onPress={() => setCreating(true)} fullWidth />
+      )}
       {data && data.quota.unlocks.length > 0 ? (
         <Card style={{ gap: space.xs }}>
           <AppText variant="headline">增加清單數量</AppText>
-          <AppText variant="callout" tone="muted">
-            基本可建立 {data.quota.base} 份；完成下面的學習成就，就能多建立清單：
-          </AppText>
           {data.quota.unlocks.map((u) => (
             <Pressable key={u.achievementId} accessibilityRole="button" accessibilityLabel={`${u.name}，多 ${u.extra} 份清單${u.earned ? "，已完成" : ""}`} onPress={() => router.push("/achievements" as never)} style={[styles.unlock, { borderTopColor: c.border }]}>
               <Ionicons name={u.earned ? "checkmark-circle" : "lock-closed-outline"} size={26} color={u.earned ? c.accent : c.textMuted} />
@@ -89,21 +101,6 @@ export default function MyListsScreen() {
           ))}
         </Card>
       ) : null}
-      {creating && !full ? (
-        <Card style={{ gap: space.sm }}>
-          <TextInput value={name} onChangeText={setName} placeholder="清單名稱，例如：新夥伴必看" placeholderTextColor={c.textMuted} maxLength={30} autoFocus style={[styles.input, { borderColor: c.accent, color: c.text, backgroundColor: c.surface }]} />
-          <View style={{ flexDirection: "row", gap: space.sm }}>
-            <View style={{ flex: 1 }}>
-              <Button variant="cancel" label="取消" onPress={() => setCreating(false)} fullWidth />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button label="建立" onPress={() => void create()} loading={busy} disabled={!name.trim()} fullWidth />
-            </View>
-          </View>
-        </Card>
-      ) : (
-        <Button label={full ? "清單數量已用完" : "新增清單"} icon={full ? "lock-closed-outline" : "add"} disabled={full} onPress={() => setCreating(true)} fullWidth />
-      )}
     </Screen>
   );
 }
