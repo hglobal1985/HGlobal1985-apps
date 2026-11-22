@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_TYPES, ACH_ICON_POOL, ACH_TIMES, ACH_UNITS, ACH_VERBS, FEATURES, achDefaultIcon, achRecipeOf, achTypeOf, api, type AchTime, type AchievementCategory, type AchievementType, type AdminAchievement } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
@@ -25,10 +25,12 @@ const doneOf = (a: AdminAchievement): Exclude<Done, "all"> => {
 const pct = (a: AdminAchievement) => (a.memberTotal ? Math.round((a.earnedCount / a.memberTotal) * 100) : 0);
 type IconMode = "default" | "random" | "pick";
 /** vi＜0＝沒有對應動詞的舊類型（清單影片徽章、指定課程）：只能改名稱、說明、難易度與啟用。 */
-type Form = { id: string | null; difficulty: Diff; name: string; description: string; icon: string; iconMode: IconMode; vi: number; oi: number; time: AchTime; unit: string; threshold: string; feature: string; active: boolean; type: AchievementType; lessonTitle?: string | null; nameTouched: boolean; step: number };
+type Form = { targetId: string; targetTitle: string; id: string | null; difficulty: Diff; name: string; description: string; icon: string; iconMode: IconMode; vi: number; oi: number; time: AchTime; unit: string; threshold: string; feature: string; active: boolean; type: AchievementType; lessonTitle?: string | null; nameTouched: boolean; step: number };
 const STEPS = ["① 做什麼", "② 時段", "③ 多少", "④ 外觀"];
-const blank = (): Form => ({ id: null, difficulty: 1, name: "", description: "", icon: achDefaultIcon(0), iconMode: "default", vi: 0, oi: 0, time: "any", unit: ACH_VERBS[0]!.objects[0]!.unit, threshold: "5", feature: "", active: true, type: "lessons_completed", nameTouched: false, step: 0 });
-const phraseOf = (f: Form) => achPhrase(f.vi, f.oi, f.time, Number(f.threshold) || 1, f.unit, f.feature);
+const blank = (): Form => ({ targetId: "", targetTitle: "", id: null, difficulty: 1, name: "", description: "", icon: achDefaultIcon(0), iconMode: "default", vi: 0, oi: 0, time: "any", unit: ACH_VERBS[0]!.objects[0]!.unit, threshold: "5", feature: "", active: true, type: "lessons_completed", nameTouched: false, step: 0 });
+const targetOf = (a: AdminAchievement) =>
+  a.type === "target_lesson" ? { targetId: a.lessonId ?? "", targetTitle: a.lessonTitle ?? "" } : a.type === "course_completed" ? { targetId: a.courseId ?? "", targetTitle: a.courseTitle ?? "" } : a.type === "series_completed" ? { targetId: a.series ?? "", targetTitle: a.series ?? "" } : { targetId: "", targetTitle: "" };
+const phraseOf = (f: Form) => achPhrase(f.vi, f.oi, f.time, Number(f.threshold) || 1, f.unit, f.feature, f.targetTitle);
 const randomIcon = (not: string) => {
   const pool = ACH_ICON_POOL.filter((i) => i !== not);
   return pool[Math.floor(Math.random() * pool.length)]!;
@@ -91,13 +93,17 @@ export default function AdminAchievementsScreen() {
     const r = achRecipeOf(a.type, a.feature);
     const vi = r?.vi ?? -1;
     const unit = a.unit ?? (r ? ACH_VERBS[r.vi]!.objects[r.oi]!.unit : ACHIEVEMENT_TYPES[a.type].unit);
-    open({ id: a.id, difficulty: a.difficulty, name: a.name, description: a.description, icon: a.icon, iconMode: vi >= 0 && a.icon === achDefaultIcon(vi) ? "default" : "pick", vi, oi: r?.oi ?? 0, time: r?.time ?? "any", unit, threshold: String(a.threshold), feature: a.feature ?? "", active: a.active, type: a.type, lessonTitle: a.lessonTitle, nameTouched: true, step: 0 });
+    open({ id: a.id, difficulty: a.difficulty, name: a.name, description: a.description, icon: a.icon, iconMode: vi >= 0 && a.icon === achDefaultIcon(vi) ? "default" : "pick", vi, oi: r?.oi ?? 0, time: r?.time ?? "any", unit, threshold: String(a.threshold), feature: a.feature ?? "", active: a.active, type: a.type, lessonTitle: a.lessonTitle, nameTouched: true, step: 0, ...targetOf(a) });
   };
   /** 改欄位：動詞或對象換了就帶入預設單位；圖示是「預設」就跟著動詞換；名稱沒被手動改過就跟著句子自動更新。 */
   const patch = (p: Partial<Form>) => {
     setForm((f) => {
       if (!f) return f;
       const n = { ...f, ...p };
+      if ((p.vi !== undefined && p.vi !== f.vi) || (p.oi !== undefined && p.oi !== f.oi)) {
+        n.targetId = "";
+        n.targetTitle = "";
+      }
       if (p.vi !== undefined && p.vi !== f.vi) {
         n.oi = p.oi ?? 0;
         n.time = "any";
@@ -128,7 +134,8 @@ export default function AdminAchievementsScreen() {
       if (!type) return setError("這個組合沒有對應的條件，請換一個時段");
       const feature = obj.feature ?? (obj.pickFeature ? form.feature : "");
       if (obj.pickFeature && !feature) return setError("請選擇要使用的功能");
-      body = { ...body, icon: form.icon || "🏅", type, threshold: n, unit: form.unit, feature: feature || null, courseId: null };
+      if (obj.target && !form.targetId) return setError("請先搜尋並點選要指定的" + obj.name);
+      body = { ...body, icon: form.icon || "🏅", type, threshold: obj.fixedOne ? 1 : n, unit: form.unit, feature: feature || null, courseId: obj.target === "course" ? form.targetId : null, lessonId: obj.target === "lesson" ? form.targetId : null, series: obj.target === "series" ? form.targetId : null };
     }
     if (await run(() => (form.id ? api("PATCH", `/admin/achievements/${form.id}`, body) : api("POST", "/admin/achievements", body)), form.id ? "已儲存" : "已新增徽章")) setForm(null);
   };
@@ -262,6 +269,7 @@ export default function AdminAchievementsScreen() {
                     ))}
                   </View>
                   <Chips title="對象" label="對象" options={ACH_VERBS[form.vi]!.objects.map((o, i) => ({ key: String(i), label: o.name }))} value={String(form.oi)} onChange={(v) => patch({ oi: Number(v) })} />
+                  {obj?.target ? <TargetSearch kind={obj.target} noun={obj.name} value={form.targetTitle} onPick={(id, title) => patch({ targetId: id, targetTitle: title })} /> : null}
                   {obj?.pickFeature ? (
                     <View style={{ gap: 6 }}>
                       <AppText variant="callout" style={{ fontWeight: "700" }}>
@@ -310,7 +318,8 @@ export default function AdminAchievementsScreen() {
                   <AppText variant="callout" style={{ fontWeight: "700", textAlign: "center" }}>
                     要達到多少
                   </AppText>
-                  <View style={styles.stepper}>
+                  {obj?.fixedOne ? <AppText variant="body" tone="muted" style={{ textAlign: "center" }}>這類成就指定了就只有一個，達成數量固定為 1，不用設定。</AppText> : null}
+                  {obj?.fixedOne ? null : <View style={styles.stepper}>
                     {[-10, -1].map((d) => (
                       <Step key={d} label={`${d}`} disabled={(Number(form.threshold) || 1) + d < 1} onPress={() => patch({ threshold: String(Math.max(1, (Number(form.threshold) || 1) + d)) })} />
                     ))}
@@ -318,9 +327,9 @@ export default function AdminAchievementsScreen() {
                     {[1, 10].map((d) => (
                       <Step key={d} label={`+${d}`} disabled={false} onPress={() => patch({ threshold: String(Math.min(100000, (Number(form.threshold) || 1) + d)) })} />
                     ))}
-                  </View>
+                  </View>}
                   {form.type === "streak_days" && Number(form.threshold) > 7 ? <NoticeBox tone="warning" text="連續學習超過 7 天很難達成，建議不要設更高。" /> : null}
-                  <Chips title="單位" label="單位" options={ACH_UNITS.map((u) => ({ key: u, label: u }))} value={form.unit} onChange={(v) => patch({ unit: v })} />
+                  {obj?.fixedOne ? null : <Chips title="單位" label="單位" options={ACH_UNITS.map((u) => ({ key: u, label: u }))} value={form.unit} onChange={(v) => patch({ unit: v })} />}
                   <View style={{ gap: 6 }}>
                     <AppText variant="callout" style={{ fontWeight: "700" }}>
                       難易度：{DIFF_LABEL[form.difficulty]}
@@ -392,6 +401,60 @@ export default function AdminAchievementsScreen() {
   );
 }
 
+/** 「指定學習」：輸入關鍵字搜尋站內的教材、課程卡或系列卡，點一筆就指定。 */
+function TargetSearch({ kind, noun, value, onPick }: { kind: "lesson" | "course" | "series"; noun: string; value: string; onPick: (id: string, title: string) => void }) {
+  const { c } = useTheme();
+  const [q, setQ] = useState("");
+  const [rows, setRows] = useState<{ id: string; title: string; sub: string }[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const seq = useRef(0);
+  useEffect(() => {
+    setRows(null);
+    setQ("");
+  }, [kind]);
+  useEffect(() => {
+    const my = ++seq.current;
+    setLoading(true);
+    const timer = setTimeout(() => {
+      api<{ id: string; title: string; sub: string }[]>("GET", `/admin/achievement-targets?kind=${kind}&q=${encodeURIComponent(q.trim())}`)
+        .then((r) => my === seq.current && setRows(r))
+        .catch(() => my === seq.current && setRows([]))
+        .finally(() => my === seq.current && setLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [q, kind]);
+  return (
+    <View style={{ gap: 6 }}>
+      <AppText variant="callout" style={{ fontWeight: "700" }}>
+        搜尋要指定的{noun}
+      </AppText>
+      {value ? (
+        <View style={[styles.picked, { borderColor: c.accent, backgroundColor: c.accentSoft }]}>
+          <Ionicons name="checkmark-circle" size={20} color={c.accent} />
+          <AppText variant="callout" style={{ flex: 1, fontWeight: "800" }} numberOfLines={2}>
+            已指定：{value}
+          </AppText>
+        </View>
+      ) : null}
+      <TextInput value={q} onChangeText={setQ} placeholder={`輸入${noun}的關鍵字`} placeholderTextColor={c.textMuted} accessibilityLabel={`搜尋${noun}`} style={[styles.search, typo.body, { color: c.text, borderColor: c.accent, backgroundColor: c.surface }]} />
+      {loading && !rows ? <AppText variant="caption" tone="muted">搜尋中…</AppText> : null}
+      {rows && !rows.length ? <AppText variant="caption" tone="muted">找不到符合的{noun}，換個關鍵字試試。</AppText> : null}
+      {(rows ?? []).map((r) => (
+        <Pressable key={r.id} accessibilityRole="button" accessibilityLabel={`指定 ${r.title}`} onPress={() => onPick(r.id, r.title)} style={[styles.kind, { borderColor: value === r.title ? c.accent : c.border, backgroundColor: value === r.title ? c.accentSoft : c.surface }]}>
+          <AppText variant="body" style={{ fontWeight: "700" }} numberOfLines={2}>
+            {r.title}
+          </AppText>
+          {r.sub ? (
+            <AppText variant="caption" tone="muted" numberOfLines={1}>
+              {r.sub}
+            </AppText>
+          ) : null}
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 /** 三顆星難易度：直接點第幾顆就設定成幾星（簡單／普通／困難）。 */
 function Stars({ value, onChange, big }: { value: Diff; onChange: (d: Diff) => void; big?: boolean }) {
   return (
@@ -438,6 +501,8 @@ const styles = StyleSheet.create({
   tile: { width: "48%", flexGrow: 1, minHeight: 56, borderWidth: 2, borderRadius: radius.md, paddingHorizontal: space.md, justifyContent: "center" },
   chip: { minHeight: minTouch, paddingHorizontal: 16, borderRadius: 22, borderWidth: 2, alignItems: "center", justifyContent: "center" },
   numInput: { flex: 1, minHeight: 56, borderWidth: 2, borderRadius: radius.md, textAlign: "center" },
+  picked: { flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: 2, borderRadius: radius.md, padding: space.md },
+  search: { minHeight: 52, borderWidth: 2, borderRadius: radius.md, paddingHorizontal: space.md },
   kind: { borderWidth: 1, borderRadius: radius.md, padding: space.md, gap: 2, minHeight: minTouch },
   icons: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   iconBtn: { width: minTouch, height: minTouch, borderRadius: radius.md, borderWidth: 2, alignItems: "center", justifyContent: "center" },
