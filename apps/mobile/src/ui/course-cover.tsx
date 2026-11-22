@@ -6,6 +6,7 @@ import { useTheme } from "@/theme/theme";
 import { textCoverLines } from "@/api/client";
 import { courseThemes, coverBronze, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
+import { ThumbFallback } from "./thumb-fallback";
 
 /** 估算文字寬度（以字級為單位）：中日韓全形字算 1，英數與標點約 0.58。 */
 const textUnits = (t: string) => [...t].reduce((n, ch) => n + (/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 1 : 0.58), 0);
@@ -61,7 +62,15 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   if (imageUrl) {
     return <Image source={{ uri: thumb(resolveUrl(imageUrl), 360) }} style={{ width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md }} resizeMode="cover" accessibilityLabel={`${label}課程封面`} />;
   }
-  // 沒有封面圖時的文字封面顏色：自動隨機（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（業主 2026-11-18）。
+  // 沒有封面圖：一律顯示綠色學士帽預設圖（業主 2026-11-22）；只有固定格式文字封面（銅章會議等）仍是文字。
+  if (!textCoverLines(title)) {
+    return (
+      <View style={[{ borderRadius: radius.md, overflow: "hidden" }, fill ? [StyleSheet.absoluteFill, { borderRadius: 0 }] : height ? { height } : { aspectRatio: 16 / 9 }]} accessible accessibilityRole="image" accessibilityLabel={`${title ?? ""} ${label}`.trim()}>
+        <ThumbFallback />
+      </View>
+    );
+  }
+  // 固定格式文字封面的顏色與排版：（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（業主 2026-11-18）。
   const names = Object.keys(courseThemes);
   const seed = [...(title || label || theme || "")].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
   // 固定格式文字封面（銅章會議等，見 contract 的 textCoverLines）：咖啡色系底、固定「名稱（換行）X年X月」兩行。
