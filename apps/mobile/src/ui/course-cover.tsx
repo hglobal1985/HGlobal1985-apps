@@ -6,7 +6,6 @@ import { useTheme } from "@/theme/theme";
 import { textCoverLines } from "@/api/client";
 import { courseThemes, coverBronze, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
-import { ThumbFallback } from "./thumb-fallback";
 
 /** 估算文字寬度（以字級為單位）：中日韓全形字算 1，英數與標點約 0.58。 */
 const textUnits = (t: string) => [...t].reduce((n, ch) => n + (/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 1 : 0.58), 0);
@@ -52,7 +51,7 @@ function fitLines(lines: string[], w: number, h: number, max = 72, min = 14): nu
 
 /**
  * 課程封面（課程清單縮圖）：有 16:9 封面圖就顯示圖片（管理員從 EDM 裁切出來的）；
- * 沒有就由系統自動產生（字級已依封面大小算好，不吃全站字體放大 noScale，否則平板／電腦會爆版，業主 2026-11-18）：在主題色底上放大大的標題文字（程式排版，不是 AI 生成）；不顯示系列與分類標籤（業主 2026-11-14 指示）。
+ * 沒有上傳封面就一律用「課程標題」當文字封面（業主 2026-11-22，不是清單封面 ListCover；也不用 YouTube 縮圖）：由系統自動產生（字級已依封面大小算好，不吃全站字體放大 noScale，否則平板／電腦會爆版，業主 2026-11-18）：在主題色底上放大大的標題文字（程式排版，不是 AI 生成）；不顯示系列與分類標籤（業主 2026-11-14 指示）。
  * fill＝填滿父層（課程介紹頁上方沒有 EDM 時用）。
  */
 export function CourseCover({ theme, label, title, height, imageUrl, fill }: { theme: string; label: string; title?: string; height?: number; imageUrl?: string | null; fill?: boolean }) {
@@ -61,14 +60,6 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   const [box, setBox] = useState({ w: 0, h: 0 });
   if (imageUrl) {
     return <Image source={{ uri: thumb(resolveUrl(imageUrl), 360) }} style={{ width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md }} resizeMode="cover" accessibilityLabel={`${label}課程封面`} />;
-  }
-  // 沒有封面圖：一律顯示綠色學士帽預設圖（業主 2026-11-22）；只有固定格式文字封面（銅章會議等）仍是文字。
-  if (!textCoverLines(title)) {
-    return (
-      <View style={[{ borderRadius: radius.md, overflow: "hidden" }, fill ? [StyleSheet.absoluteFill, { borderRadius: 0 }] : height ? { height } : { aspectRatio: 16 / 9 }]} accessible accessibilityRole="image" accessibilityLabel={`${title ?? ""} ${label}`.trim()}>
-        <ThumbFallback />
-      </View>
-    );
   }
   // 固定格式文字封面的顏色與排版：（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（業主 2026-11-18）。
   const names = Object.keys(courseThemes);
@@ -83,7 +74,7 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   const hasTitle = !!title?.trim();
   const innerW = Math.max(0, box.w - pad * 2);
   const innerH = Math.max(0, box.h - pad * 2);
-  const fs = hasTitle && box.w ? (fixed ? fitLines(fixed, innerW, innerH, 72, 8) : fitFontSize(title!, innerW, innerH)) : 0;
+  const fs = hasTitle && box.w ? (fixed ? fitLines(fixed, innerW, innerH, 72, 8) : fitFontSize(title!, innerW, innerH, 72, 6)) : 0;
   return (
     <View
       style={[styles.cover, fill ? [StyleSheet.absoluteFill, { borderRadius: 0 }] : height ? { height } : { aspectRatio: 16 / 9 }, { backgroundColor: bg, padding: pad }]}

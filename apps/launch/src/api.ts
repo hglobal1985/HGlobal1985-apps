@@ -532,8 +532,6 @@ type CourseRow = {
   auto_cover: number;
   center_course: number;
   created_at: string;
-  /** 第一支 YouTube 章節的影片代碼（臨時封面用）。 */
-  yt_ref: string | null;
   cover_key: string | null;
   edm_view_y: number;
   cover_rect: string | null;
@@ -558,7 +556,7 @@ const materialLike = (r: { invite_only: number; is_list: number; chapter_n: numb
 /** 同一個判斷的 SQL 版（FROM courses 的查詢用）。 */
 const MATERIAL_LIKE_SQL = `(invite_only = 0 AND (is_list = 1 OR (NOT EXISTS (SELECT 1 FROM lessons ch WHERE ch.course_id = courses.id AND ch.kind = 'chapter') AND price_twd = 0 AND price_tba <> 1 AND COALESCE(event_start, '') = '' AND COALESCE(event_end, '') = '')))`;
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.invite_only, c.invite_code, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, (SELECT l.media_ref FROM lessons l WHERE l.course_id = c.id AND l.media_type = 'youtube' AND l.media_ref IS NOT NULL ORDER BY l.position LIMIT 1) AS yt_ref, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.invite_only, c.invite_code, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -609,12 +607,8 @@ const byPresident = (s: Session | null, c: { allow_president: number }) => c.all
 const inFreeWindow = (row: { free_from: string | null; free_until: string | null }, now = iso()) =>
   !!(row.free_from || row.free_until) && (!row.free_from || row.free_from <= now) && (!row.free_until || now < row.free_until);
 
-/** 課程的 EDM／封面網址（含 YouTube 縮圖的自動與臨時封面）。 */
+/** 課程的 EDM／封面網址（只有手動上傳的；沒有就由畫面用課程標題產生文字封面，不再用 YouTube 縮圖，業主 2026-11-22）。 */
 function courseArt(row: CourseRow) {
-  const thumb = row.yt_ref && !textCoverLines(row.title) ? ytThumbUrl(row.yt_ref) : null; // 銅章會議等固定文字封面不用 YouTube 縮圖
-  const forced = row.auto_cover === 1 && !!thumb;
-  const none = !row.edm_key && !row.cover_key && !!thumb;
-  if (forced || none) return { edmUrl: thumb, coverUrl: thumb, edmViewY: 0, coverRect: null };
   return {
     edmUrl: row.edm_key ? pubUrl(row.edm_key, row.art_version) : null,
     coverUrl: row.cover_key ? pubUrl(row.cover_key, row.art_version) : null,
@@ -622,8 +616,6 @@ function courseArt(row: CourseRow) {
     coverRect: parseCoverRect(row.cover_rect),
   };
 }
-/** YouTube 影片縮圖（16:9、沒有黑邊）。 */
-const ytThumbUrl = (id: string) => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
 
 function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: MemberState, eligibility: Map<string, boolean>): CourseSummary {
   const minRank = rankMap.get(row.min_rank_code) ?? { code: row.min_rank_code, name: row.min_rank_code, order: 9999 };
@@ -651,9 +643,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     freeUntil: freeNow ? row.free_until : null,
     minRank,
     theme: row.theme,
-    // 封面：勾了「自動使用 YouTube 畫面」＝一律用第一支 YouTube 影片的縮圖；沒勾但完全沒有 EDM 與封面＝臨時用縮圖。
     ...courseArt(row),
-    autoCover: row.auto_cover === 1,
     // 中心課程＝主辦單位含某個中心（自動，不再手動勾選）；只有總部主辦的是一般課程。
     centerCourse: row.host_center_key != null,
     isShorts: row.is_shorts === 1,
@@ -1102,11 +1092,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       sharerRank: l.sharer_rank,
       sharerRankName: rankMap.get(l.sharer_rank)?.name ?? "",
       sharerTitle: l.sharer_title,
-      // 章節封面：勾了「自動使用 YouTube 畫面」＝影片縮圖；沒勾但沒上傳封面＝臨時用縮圖（非 YouTube 章節維持 null＝用課程封面）。
-      // 清單卡裡的影片一律用 YouTube 縮圖（業主 2026-11-17）；一般課程：有上傳章節封面用上傳的，沒有才用 YouTube 縮圖。
-      coverUrl: linkCover.has(l.id) ? linkCover.get(l.id)! : l.media_type === "youtube" && l.media_ref && (materialLike(row) || !l.cover_key) ? ytThumbUrl(l.media_ref) : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
-      posterUrl: l.media_type === "youtube" && l.media_ref && (materialLike(row) || !l.poster_key) ? ytThumbUrl(l.media_ref) : l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
-      autoCover: l.auto_cover === 1,
+      // 章節封面：只用手動上傳的（不再抓 YouTube 縮圖，業主 2026-11-22）；沒有就 null＝用課程封面。
+      coverUrl: linkCover.has(l.id) ? linkCover.get(l.id)! : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
+      posterUrl: l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
       // 完全公開的課程：任何人（含訪客與會員）都可以看章節，不需要報名。
@@ -3119,7 +3107,7 @@ function clearThemeInBlock(db: D1Database, courseId: string, id: string): D1Prep
     .bind(courseId, id);
 }
 async function updateLesson(ctx: Ctx, id: string, admin: Session) {
-  const body = await readJson<{ isSpeaker?: unknown; isSummary?: unknown; eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; autoCover?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
+  const body = await readJson<{ isSpeaker?: unknown; isSummary?: unknown; eventDate?: unknown; title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; mediaType?: unknown; mediaRef?: unknown; minutes?: unknown; startSeconds?: unknown; endSeconds?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
   if (body.mediaType === "mux" && !admin.roles.includes("super_admin")) fail(403, "forbidden", "Mux 影片只有超級管理員可以設定，請改用 YouTube 或音檔");
   const cur = await ctx.db
     .prepare("SELECT course_id, kind, is_speaker, is_summary, media_type, media_ref, start_seconds, end_seconds FROM lessons WHERE id = ?")
@@ -4230,10 +4218,10 @@ const routes: [string, RegExp, Handler][] = [
           : `(c.view_scope IN ('all', 'members'${me.hglobal ? ", 'hglobal'" : ""}${me.center ? ", 'center'" : ""}) OR (c.view_scope NOT IN ('link_login', 'link_guest') AND c.id IN (SELECT course_id FROM enrollments WHERE member_sub = ?)))`;
       const { results } = await ctx.db
         .prepare(
-          `SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.is_summary AS isSummary, (c.is_shorts = 1 OR c.is_list = 1) AS isShorts, c.is_list AS isList, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, l.auto_cover AS autoCover, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND ${scopeSql} AND (l.kind = 'chapter' OR ((c.is_shorts = 1 OR c.is_list = 1) AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position`,
+          `SELECT l.id AS id, l.course_id AS courseId, l.position AS position, l.title, l.sharer, l.sharer_rank AS sharerRank, l.sharer_title AS sharerTitle, COALESCE(l.event_date, c.event_start) AS eventDate, l.is_speaker AS isSpeaker, l.is_summary AS isSummary, (c.is_shorts = 1 OR c.is_list = 1) AS isShorts, c.is_list AS isList, l.kind AS lessonKind, l.duration_minutes AS minutes, l.media_type AS mediaType, l.media_ref AS mediaRef, l.cover_key AS coverKey, l.art_version AS artVersion, (SELECT 1 FROM lesson_progress p WHERE p.lesson_id = l.id AND p.member_sub = ?) AS done FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND ${scopeSql} AND (l.kind = 'chapter' OR ((c.is_shorts = 1 OR c.is_list = 1) AND l.kind = 'material' AND l.media_type <> 'demo' AND l.media_ref IS NOT NULL)) ORDER BY l.course_id, l.position`,
         )
         .bind(...(me && me.role !== "admin" ? [sub, sub] : [sub]))
-        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; isSummary: number; isShorts: number; isList: number; lessonKind: string; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; autoCover: number; done: number | null }>();
+        .all<{ id: string; courseId: string; position: number; title: string; sharer: string; sharerRank: string; sharerTitle: string; eventDate: string | null; isSpeaker: number; isSummary: number; isShorts: number; isList: number; lessonKind: string; minutes: number; mediaType: string; mediaRef: string | null; coverKey: string | null; artVersion: number; done: number | null }>();
       return {
         lessons: results.map((r) => ({
           id: r.id,
@@ -4249,12 +4237,8 @@ const routes: [string, RegExp, Handler][] = [
           isShorts: r.isShorts === 1,
           isMaterial: r.lessonKind === "material",
           minutes: r.minutes,
-          // 只給章節自己上傳的封面；沒有就留空，畫面依序改用「課程手動上傳的封面／EDM」→ 最後才用這一堂的 YouTube 縮圖（ytThumb）。
-          // 業主 2026-11-17：手動上傳的封面一律優先，不可被 YouTube 縮圖蓋掉。
-          // 清單卡裡的影片一律用 YouTube 縮圖，不用清單首頁上傳的封面（業主 2026-11-17）。
-          coverUrl: r.isList === 1 && r.mediaType === "youtube" && r.mediaRef ? ytThumbUrl(r.mediaRef) : r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
-          // 沒有任何封面時的臨時封面：YouTube 影片自己的縮圖（16:9、沒有黑邊）。
-          ytThumb: r.mediaType === "youtube" && r.mediaRef ? `https://i.ytimg.com/vi/${r.mediaRef}/mqdefault.jpg` : null,
+          // 只給章節自己上傳的封面；沒有就留空，畫面改用課程封面（不再用 YouTube 縮圖，業主 2026-11-22）。
+          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,
           completed: r.done === 1,
         })),
@@ -6977,7 +6961,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/courses\/([\w-]+)\/lessons$/,
     async (ctx, [courseId]) => {
       const admin = await requireCourseManager(ctx, courseId);
-      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; autoCover?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
+      const body = await readJson<{ title?: unknown; sharer?: unknown; sharerRank?: unknown; sharerTitle?: unknown; eventDate?: unknown; kind?: unknown; isSpeaker?: unknown; isSummary?: unknown; inSheet?: unknown; brandId?: unknown; categories?: unknown }>(ctx.req);
       const isList = await isListCourse(ctx, courseId);
       const kind = body.kind === "section" ? "section" : body.kind === "material" ? "material" : "chapter";
       const sharer = typeof body.sharer === "string" ? body.sharer.trim().slice(0, 60) : "";
