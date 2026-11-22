@@ -4889,9 +4889,9 @@ const routes: [string, RegExp, Handler][] = [
         const result = body.decision === "approve" ? "approved" : "rejected";
         // 對應申請時留的待審紀錄：先用申請人編號，其次「欄位＋申請內容＋名稱」，最後同欄位同內容只有一筆時。
         let found = who ? await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND applicant_sub = ? AND field_key = ? ORDER BY created_at DESC LIMIT 1").bind(who, fkey).first<{ id: string; applicant_sub: string | null }>() : null;
-        if (!found) found = await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND to_text = ? AND (applicant_name = ? OR ? = '') ORDER BY created_at LIMIT 1").bind(fkey, to, name, name).first<{ id: string; applicant_sub: string | null }>();
+        if (!found) found = await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND applicant_name = ? AND ? <> '' ORDER BY created_at LIMIT 1").bind(fkey, name, name).first<{ id: string; applicant_sub: string | null }>();
         if (!found) {
-          const alt = (await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? AND to_text = ? LIMIT 2").bind(fkey, to).all<{ id: string; applicant_sub: string | null }>()).results;
+          const alt = (await ctx.db.prepare("SELECT id, applicant_sub FROM review_log WHERE status = 'pending' AND field_key = ? LIMIT 2").bind(fkey).all<{ id: string; applicant_sub: string | null }>()).results;
           if (alt.length === 1) found = alt[0]!;
         }
         const names = fkey === "rank" ? await rankOptions(s.token).catch(() => new Map<string, string>()) : new Map<string, string>();
@@ -4899,7 +4899,7 @@ const routes: [string, RegExp, Handler][] = [
         const shown = nameOf(final || to);
         const target = who ?? found?.applicant_sub ?? null;
         const stmts: D1PreparedStatement[] = [];
-        if (found) stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ?, final_text = ?, applicant_sub = COALESCE(applicant_sub, ?), applicant_name = CASE WHEN applicant_name IS NULL OR applicant_name = '' THEN ? ELSE applicant_name END WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), final, who, name, found.id));
+        if (found) stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ?, to_text = ?, final_text = ?, applicant_sub = COALESCE(applicant_sub, ?), applicant_name = CASE WHEN applicant_name IS NULL OR applicant_name = '' THEN ? ELSE applicant_name END WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), to, final, who, name, found.id));
         else stmts.push(ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name, from_text, to_text, final_text, status, decided_by_sub, decided_by_name, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), fkey, flabel, who, name, reviewText(it.current_value), to, final, result, s.sub, s.name, iso()));
         if (target) {
           const title = result === "approved" ? (modified ? `你的${flabel}申請經審核者修改後通過` : `你的${flabel}申請已通過`) : `你的${flabel}申請未通過`;
@@ -5383,7 +5383,7 @@ const routes: [string, RegExp, Handler][] = [
         const label = REVIEW_FIELD_LABEL[c.key];
         if (!label || !c.value) continue;
         await ctx.db.batch([
-          ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name, to_text) VALUES (?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), c.key, label, s.sub, s.name, c.value.slice(0, 80)),
+          ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name) VALUES (?, ?, ?, ?, ?)").bind(crypto.randomUUID(), c.key, label, s.sub, s.name),
           notify(ctx.db, { sub: s.sub }, `已送出「${label}」申請，等待審核`, "審核結果會通知你，也會保留在這裡", "/notices"),
         ]).catch(() => undefined);
       }
