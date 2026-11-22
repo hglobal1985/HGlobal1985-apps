@@ -11,8 +11,9 @@ import { CoursePriceTag } from "./course-card";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
 import { displayName } from "./sort";
 
-/** EDM 填滿整個框（不留空白）、靠上對齊：先依寬度放大，不夠高再依高度放大；只會裁到下方與左右，不會裁到上方文字。 */
+/** 首頁海報（EDM）完整顯示（業主 2026-11-22 選 A，取代「填滿裁切」）：整張圖等比縮到框裡放得下的最大尺寸、置中，不裁切；比例和框不同時兩側（或上下）留底色。 */
 function TopFillImage({ uri, w, h }: { uri: string; w: number; h: number }) {
+  const { c } = useTheme();
   const [ratio, setRatio] = useState<number | null>(null); // 寬 / 高
   useEffect(() => {
     let alive = true;
@@ -22,11 +23,11 @@ function TopFillImage({ uri, w, h }: { uri: string; w: number; h: number }) {
     };
   }, [uri]);
   const r = ratio ?? 0.7;
-  const iw = Math.max(w, h * r);
+  const iw = Math.min(w, h * r);
   const ih = iw / r;
   return (
-    <View style={{ width: w, height: h, overflow: "hidden", borderRadius: radius.md, backgroundColor: "#fff" }}>
-      <Image source={{ uri }} resizeMode="stretch" style={{ position: "absolute", top: 0, left: (w - iw) / 2, width: iw, height: ih }} accessibilityLabel="課程海報" />
+    <View style={{ width: w, height: h, overflow: "hidden", borderRadius: radius.md, backgroundColor: c.surfaceMuted, alignItems: "center", justifyContent: "center" }}>
+      <Image source={{ uri }} resizeMode="contain" style={{ width: iw, height: ih }} accessibilityLabel="課程海報" />
     </View>
   );
 }
