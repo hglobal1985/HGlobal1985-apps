@@ -11,3 +11,4 @@
   ⑥ **中央查詢共用的錯誤**：`central.ts` 的 `cached()` 讓同一人同時的多個請求共用一次中央查詢；先發起的請求若被瀏覽器取消，其他請求改自己重查（2026-11-20 晚上正式站因此偶發 500）。`loadSession` 的名稱頭像查詢失敗不會讓請求失敗。
   ⑧ **開網站不重複抓資料**：共用登入檢查（`webSsoCheck`，每個分頁每 5 分鐘一次，會整頁跳到會員中心再回來）即將發生時，不做開機預先抓取（`webSsoCheckDue()`）；`cachedGet` 一般開頁面會共用「還在下載中的預先抓取」，不再重送。`useApi(null)`（訪客、沒權限）回報「不是讀取中」。訪客不送功能徽章回報（`trackFeature` 由 `setFeatureTrackSignedIn` 控制）、不讀中央審核清單。
   ⑦ 已刪除的殘留：`lib/tablet-scale.ts`（viewport 放大已停用，鎖定 1 倍改直接寫在 `index.html`，常數在 `lib/no-page-zoom.ts` 的 `VIEWPORT`）、`theme/layout.ts` 的 `textScale`、後端 `convert-to-list` API、多個沒有被呼叫的函式與匯入。
+- **舊網頁切頁空白的自動恢復（業主 2026-11-22 回報：久沒用再點通知整頁空白約 10 秒）**：每個頁面（路由）是獨立的程式檔（`/_expo/static/js/…-雜湊.js`），網站每次更新檔名都會換；很久沒重新整理的舊網頁切到沒載入過的頁面，會因檔案已不存在（404）而載入失敗、畫面空白。`lib/error-report.ts` 的 `recoverFromStaleChunks()`：偵測到頁面程式檔載入失敗（script 錯誤事件，或 Promise 錯誤訊息符合 `CHUNK_FAIL`）就記錄 `chunk-load` 錯誤並自動重新載入最新版（2 分鐘內最多一次，避免無限重新載入）。每週錯誤檢查時看到 `chunk-load` 回報，代表這個機制有被觸發。若使用者仍回報久沒用會空白，先查是不是別的原因（例如手機瀏覽器凍結分頁後的網路延遲）。
