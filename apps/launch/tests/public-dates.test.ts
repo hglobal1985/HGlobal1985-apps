@@ -31,19 +31,26 @@ test("完全公開：訪客可看免費且已上架的公開課程與章節；�
   const id = made.data.id;
   const lessonId = made.data.lessons[0]!.id;
 
-  // 訪客：能看介紹、章節沒有鎖、能取得播放授權
+  // 課程類即使免費、完全公開，也必須先登入並按報名才能收看（業主 2026-11-22）：訪客能看介紹，章節鎖住、不能播放
   const guest = await call<CourseDetail>("GET", `/courses/${id}`);
   assert.equal(guest.status, 200);
-  assert.equal(guest.data.lessons[0]!.locked, false);
+  assert.equal(guest.data.lessons[0]!.locked, true);
   assert.equal(guest.data.enrollment, null);
-  assert.equal((await call<Playback>("GET", `/courses/${id}/lessons/${lessonId}/playback`)).status, 200);
+  assert.notEqual((await call<Playback>("GET", `/courses/${id}/lessons/${lessonId}/playback`)).status, 200);
 
-  // 完全公開的課程：已登入的會員也不用報名就能看、記錄進度
+  // 已登入但還沒報名的會員：一樣鎖住；按下免費報名後才能看、記錄進度
   const student = await login("demo-student");
   const asMember = await call<CourseDetail>("GET", `/courses/${id}`, { token: student });
-  assert.equal(asMember.data.lessons[0]!.locked, false);
+  assert.equal(asMember.data.lessons[0]!.locked, true);
+  assert.equal((await call("GET", `/courses/${id}/lessons/${lessonId}/playback`, { token: student })).status, 403);
+  assert.equal((await call("POST", "/orders", { token: student, body: { courseIds: [id] } })).status, 200);
+  assert.equal((await call<CourseDetail>("GET", `/courses/${id}`, { token: student })).data.lessons[0]!.locked, false);
   assert.equal((await call("GET", `/courses/${id}/lessons/${lessonId}/playback`, { token: student })).status, 200);
   assert.equal((await call("POST", `/courses/${id}/lessons/${lessonId}/complete`, { token: student })).status, 200);
+  // 清單／教材類（沒有報名）完全公開：訪客不用報名就能進
+  const list = await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "公開清單", isList: true, status: "published" } });
+  assert.equal(list.status, 200);
+  assert.equal((await call<CourseDetail>("GET", `/courses/${list.data.id}`)).status, 200);
   // 沒有公開的課程：訪客一律 401
   assert.equal((await call("GET", "/courses/share")).status, 401);
   assert.equal((await call("GET", "/courses/share/lessons/share-welcome/playback")).status, 401);

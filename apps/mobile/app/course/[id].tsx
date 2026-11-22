@@ -202,13 +202,13 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   };
 
   // 還不能看（尚未報名、不符資格…）：整個章節區蓋一層灰色遮罩加大鎖頭，章節完全不能點。
-  const noAccess = course.lessons.length === 0 ? course.enrollment !== "opened" && !course.isPublic && !course.admin : course.lessons.every((l) => l.locked);
+  const noAccess = course.lessons.length === 0 ? course.enrollment !== "opened" && !(course.isPublic && course.isList) && !course.admin : course.lessons.every((l) => l.locked);
   const allLocked = noAccess;
   // 清單／素材類沒有報名：符合獎銜就能直接使用，不符合＝鎖頭（業主 2026-11-18）。
   const lockedText = course.isList ? (member ? "獎銜不符，目前無法使用" : "登入並符合獎銜才能使用") : course.priceTba ? "費用尚未公布，暫不開放" : member && !course.eligible ? "獎銜不符，目前無法報名" : "報名後才能觀看";
   // 報名／審核中的操作固定在頁面下方（底部選單上方），往下看章節、留言時仍然按得到；只是說明文字的（費用未公布、獎銜不符…）留在內容區。
   // 課程類一律手動報名（即使免費或完全公開，登入後都有報名鈕；報名＝訂閱，有更新會通知）；清單／素材類永遠沒有報名鈕（業主 2026-11-18）。
-  const canRegister = course.enrollment === null && !course.isList && (!course.isPublic || !!member);
+  const canRegister = course.enrollment === null && !course.isList; // 訪客也顯示（按下去先登入）；課程類即使免費、完全公開都要先報名（業主 2026-11-22）
   const registerNode = canRegister ? registerButton(course.free, "course") : null;
   const registerIsAction = !!registerNode && ((registerNode as { type?: unknown }).type === Button || (registerNode as { type?: unknown }).type === InviteJoin);
   const stickyAction = course.enrollment === "pending" ? pendingRow() : registerIsAction ? registerNode : null;

@@ -20,6 +20,7 @@ test("播放超過 1%：納入學習中（含沒有報名紀錄的管理員）�
   const created = (await call<CourseDetail>("POST", "/admin/courses", admin, { title: "免費課", priceTwd: 0, isPublic: true })).data;
   await call("PATCH", `/admin/courses/${created.id}`, admin, { status: "published" });
   const lessonId = (await call<CourseDetail>("GET", `/courses/${created.id}`, admin)).data.lessons[0]!.id;
+  await call("POST", "/orders", student, { courseIds: [created.id] }); // 課程類即使免費也要先報名才能播放（業主 2026-11-22）
   const find = async (token: string) => (await call<CourseSummary[]>("GET", "/courses", token)).data.find((c) => c.id === created.id)!;
 
   // 管理員（不會產生報名紀錄）還沒播放：不在學習中
@@ -36,12 +37,12 @@ test("播放超過 1%：納入學習中（含沒有報名紀錄的管理員）�
   await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`, admin);
   assert.equal((await find(admin)).hiddenFromLearning, false);
 
-  // 學員：公開課程播放後列入學習中（不再自動報名，報名要手動按；業主 2026-11-18）
+  // 學員：已報名的課程播放後列入學習中（報名要手動按；業主 2026-11-18）
   assert.equal((await find(student)).started, false);
   assert.equal((await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`, student)).status, 200);
   c = await find(student);
   assert.equal(c.started, true);
-  assert.equal(c.enrollment, null);
+  assert.equal(c.enrollment, "opened");
   // 沒登入不行
   assert.equal((await call("POST", `/courses/${created.id}/lessons/${lessonId}/started`)).status, 401);
 });
@@ -59,6 +60,7 @@ test("播放進度：沒看完的章節也讓課程進度前進（只進不退�
   const student = (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub: "demo-student" })).data.token;
   const created = (await call<CourseDetail>("POST", "/admin/courses", admin, { title: "進度課", priceTwd: 0, isPublic: true })).data;
   await call("PATCH", `/admin/courses/${created.id}`, admin, { status: "published" });
+  await call("POST", "/orders", student, { courseIds: [created.id] }); // 課程類即使免費也要先報名（業主 2026-11-22）
   // 第一堂（預設空白章節）＋第二堂；兩堂都設長度，方便驗算
   const l2 = (await call<CourseDetail>("POST", `/admin/courses/${created.id}/lessons`, admin, { title: "第二堂" })).data.lessons;
   const [a, b] = [l2[0]!, l2[1]!];
