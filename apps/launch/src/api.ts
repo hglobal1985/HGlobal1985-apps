@@ -3372,7 +3372,8 @@ const routes: [string, RegExp, Handler][] = [
     if (b.coverItemId !== undefined) {
       const cid = typeof b.coverItemId === "string" && b.coverItemId ? b.coverItemId : null;
       if (cid && !(await ctx.db.prepare("SELECT 1 AS ok FROM my_list_items WHERE id = ? AND list_id = ?").bind(cid, l.id).first())) fail(404, "not_found", "找不到這個項目");
-      await ctx.db.prepare("UPDATE my_lists SET cover_item_id = ? WHERE id = ?").bind(cid, l.id).run();
+      // 指定某個內容當封面＝切到內容封面；取消指定＝回到預設的文字封面（除非同一次請求自己指定了封面類型）。
+      await ctx.db.prepare(b.coverMode === undefined ? "UPDATE my_lists SET cover_item_id = ?, cover_mode = ? WHERE id = ?" : "UPDATE my_lists SET cover_item_id = ? WHERE id = ?").bind(...(b.coverMode === undefined ? [cid, cid ? "item" : "text", l.id] : [cid, l.id])).run();
     }
     return ownDetail(ctx.db, await ownedList(ctx.db, s.sub, l.id));
   })],

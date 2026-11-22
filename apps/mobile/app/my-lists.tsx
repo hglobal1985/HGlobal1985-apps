@@ -4,12 +4,13 @@ import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api, type AchievementType } from "@/api/client";
 import { conditionText } from "@/features/achievements/text";
+import { ListCover } from "@/features/my-lists/list-cover";
 import { quotaHint, type OwnList, type Quota } from "@/features/my-lists/add-to-list";
 import { trackFeature } from "@/lib/feature-track";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, GuestGate, LoadingView, Screen, ThumbFallback } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, GuestGate, LoadingView, Screen } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 /** 設定 › 我的清單：自己建立的所有清單（點進去編輯、看點擊）。新增清單在這裡或在任何內容的「加入我的清單」面板都可以。 */
@@ -51,7 +52,7 @@ export default function MyListsScreen() {
         <Pressable key={l.id} accessibilityRole="button" accessibilityLabel={l.title} onPress={() => router.push(`/my-list/${l.id}` as never)}>
           <Card style={styles.card}>
             <View style={styles.cover}>
-              <ThumbFallback size={28} />
+              <ListCover mode={l.coverMode} imageUrl={l.coverUrl} bgUrl={l.coverBgUrl} title={l.title} height={54} minFont={8} radius={radius.sm} />
             </View>
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="headline" numberOfLines={1}>

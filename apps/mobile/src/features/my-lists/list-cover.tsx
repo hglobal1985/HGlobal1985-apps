@@ -18,13 +18,13 @@ const SOLID = "#0C603C";
  * 底圖先蓋一層暗化，再加「描邊＋緊貼的陰影＋大範圍光暈」三層（網頁版；App 版用單層陰影），字級已算好、不吃全站字體放大。
  * children 疊在封面上（例如下緣的名稱列、右上角按鈕）。
  */
-export function ListCover({ mode, imageUrl, bgUrl, title, height = 190, children }: { mode: ListCoverMode; imageUrl: string | null; bgUrl: string | null; title: string; height?: number; children?: React.ReactNode }) {
+export function ListCover({ mode, imageUrl, bgUrl, title, height = 190, minFont = 18, radius: rad, children }: { mode: ListCoverMode; imageUrl: string | null; bgUrl: string | null; title: string; height?: number; minFont?: number; radius?: number; children?: React.ReactNode }) {
   const [box, setBox] = useState({ w: 0, h: 0 });
   const text = mode === "text";
-  const fs = text && box.w > 0 ? fitFontSize(title, box.w * 0.86, box.h * 0.78, Math.round(box.h * 0.62), 18) : 0;
+  const fs = text && box.w > 0 ? fitFontSize(title, box.w * 0.86, box.h * 0.78, Math.round(box.h * 0.62), minFont) : 0;
   const web = Platform.OS === "web";
   return (
-    <View style={[styles.box, { height, backgroundColor: text ? SOLID : "transparent" }]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+    <View style={[styles.box, { height, backgroundColor: text ? SOLID : "transparent" }, rad !== undefined ? { borderRadius: rad } : null]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
       {text ? (
         <>
           {bgUrl ? <Image source={{ uri: resolveUrl(bgUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}

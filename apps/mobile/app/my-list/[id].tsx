@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
-import { api, resolveUrl } from "@/api/client";
+import { api, clearApiCache, resolveUrl } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { ListItemRow, type ListItem } from "@/features/my-lists/item-row";
@@ -51,6 +51,7 @@ export default function MyListScreen() {
     try {
       const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, body);
       setD((x) => (x ? { ...x, ...r } : x));
+      clearApiCache(); // 清單列表（設定 › 我的清單）的縮圖要跟著同步
       setTitle(r.title);
       setSlug(r.slug);
       flashText(ok);
@@ -255,8 +256,8 @@ export default function MyListScreen() {
         </>
       ) : null}
 
-      {coverOpen ? <CoverSheet d={d} onClose={() => setCoverOpen(false)} onDone={(r) => setD((x) => (x ? { ...x, ...r } : x))} /> : null}
-      {editItem ? <ItemSheet key={editItem.id} item={editItem} cover={d.coverItemId === editItem.id} onClose={() => setEditing(null)} onNote={(n) => saveNote(editItem, n)} onCover={() => void patch("cover", { coverItemId: d.coverItemId === editItem.id ? "" : editItem.id }, d.coverItemId === editItem.id ? "已改用預設封面" : "已設為清單封面")} onRemove={() => { setEditing(null); void remove(editItem); }} /> : null}
+      {coverOpen ? <CoverSheet d={d} onClose={() => setCoverOpen(false)} onDone={(r) => { setD((x) => (x ? { ...x, ...r } : x)); clearApiCache(); }} /> : null}
+      {editItem ? <ItemSheet key={editItem.id} item={editItem} cover={d.coverItemId === editItem.id} onClose={() => setEditing(null)} onNote={(n) => saveNote(editItem, n)} onCover={() => void patch("cover", { coverItemId: d.coverItemId === editItem.id ? "" : editItem.id }, d.coverItemId === editItem.id ? "已改用文字封面" : "已設為清單封面")} onRemove={() => { setEditing(null); void remove(editItem); }} /> : null}
     </Screen>
   );
 }
@@ -315,7 +316,7 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
       />
       {mode === "item" ? (
         <AppText variant="callout" tone="muted">
-          用清單內容的封面圖。要指定哪一個內容當封面：回到「內容」分頁，按那一列右邊的「⋯」→「設為封面」；沒指定就用第一個有封面的內容。
+          用清單內容的封面圖（預設是文字封面）。要指定哪一個內容當封面：回到「內容」分頁，按那一列右邊的「⋯」→「設為封面」；再按一次「目前封面」就取消指定、回到文字封面。
         </AppText>
       ) : null}
       {mode === "upload" ? (
