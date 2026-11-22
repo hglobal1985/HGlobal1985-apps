@@ -4868,7 +4868,7 @@ const routes: [string, RegExp, Handler][] = [
         const shown = nameOf(final || to);
         const target = who ?? found?.applicant_sub ?? null;
         const stmts: D1PreparedStatement[] = [];
-        if (found) stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ?, final_text = ?, applicant_sub = COALESCE(applicant_sub, ?) WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), final, who, found.id));
+        if (found) stmts.push(ctx.db.prepare("UPDATE review_log SET status = ?, decided_by_sub = ?, decided_by_name = ?, decided_at = ?, from_text = ?, final_text = ?, applicant_sub = COALESCE(applicant_sub, ?), applicant_name = CASE WHEN applicant_name IS NULL OR applicant_name = '' THEN ? ELSE applicant_name END WHERE id = ?").bind(result, s.sub, s.name, iso(), reviewText(it.current_value), final, who, name, found.id));
         else stmts.push(ctx.db.prepare("INSERT INTO review_log (id, field_key, field_label, applicant_sub, applicant_name, from_text, to_text, final_text, status, decided_by_sub, decided_by_name, decided_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(crypto.randomUUID(), fkey, flabel, who, name, reviewText(it.current_value), to, final, result, s.sub, s.name, iso()));
         if (target) {
           const title = result === "approved" ? (modified ? `你的${flabel}申請經審核者修改後通過` : `你的${flabel}申請已通過`) : `你的${flabel}申請未通過`;

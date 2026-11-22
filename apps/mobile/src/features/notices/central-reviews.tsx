@@ -30,6 +30,26 @@ const text = (v: unknown): string => {
 
 type HistoryRow = { id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; final_text: string; status: string; decided_by_name: string; decided_at: string };
 
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+};
+/** 依處理日期分組：今天、昨天、其他顯示 月/日。 */
+function groupByDay(rows: HistoryRow[]): { day: string; rows: HistoryRow[] }[] {
+  const key = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  const now = new Date();
+  const yest = new Date(now.getTime() - 86400000);
+  const out: { day: string; rows: HistoryRow[] }[] = [];
+  for (const r of rows) {
+    const d = new Date(r.decided_at);
+    const day = key(d) === key(now) ? "今天" : key(d) === key(yest) ? "昨天" : `${d.getMonth() + 1}/${d.getDate()}`;
+    const last = out[out.length - 1];
+    if (last && last.day === day) last.rows.push(r);
+    else out.push({ day, rows: [r] });
+  }
+  return out;
+}
+
 export function CentralReviewList({ data, onChanged }: { data: CentralReviews; onChanged: () => void }) {
   const { c } = useTheme();
   const ranks = useApi<Rank[]>("/ranks");
@@ -100,29 +120,62 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
           </Card>
         ))
       ) : (
-        <AppText variant="callout" tone="muted">
-          目前沒有等待審核的申請。
-        </AppText>
+        <Card style={{ alignItems: "center", gap: 2, backgroundColor: c.accentSoft, borderColor: c.accentSoft }}>
+          <AppText style={{ fontSize: 26, lineHeight: 34 }}>{history.data?.length ? "🎉" : "✓"}</AppText>
+          <AppText variant="headline">沒有等待審核的申請</AppText>
+          {history.data?.length ? (
+            <AppText variant="caption" tone="muted">
+              已處理 {history.data.length} 筆，辛苦了
+            </AppText>
+          ) : null}
+        </Card>
       )}
       {editing ? <EditApproveSheet review={editing} onClose={() => setEditing(null)} onPick={(v, label) => (setEditing(null), void decide(editing, "approve", v, label))} /> : null}
-      {/* 已處理的申請紀錄（業主 2026-11-19）：審核完成後保留在這裡，不會消失。 */}
-      {history.data?.length ? (
-        <View style={{ gap: space.xs, marginTop: space.sm }}>
-          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
-            已處理的申請
-          </AppText>
-          {history.data.map((h) => (
-            <Card key={h.id} style={{ gap: 2 }}>
-              <AppText variant="body" style={{ fontWeight: "700" }}>
-                {h.applicant_name || "會員"}　{h.field_label}　{h.status === "approved" ? "✅ 已通過" : "❌ 不通過"}
+      {/* 已處理的申請紀錄（業主 2026-11-19；2026-11-22 改頭像清單、依日期分組）：審核完成後保留在這裡，不會消失。 */}
+      {history.data?.length
+        ? groupByDay(history.data).map((g) => (
+            <View key={g.day} style={{ gap: 6, marginTop: space.sm }}>
+              <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
+                {`已處理 · ${g.day}`}
               </AppText>
-              <AppText variant="caption" tone="muted">
-                {[h.final_text ? `申請：${h.to_text} → 核准：${h.final_text}（審核者修改）` : h.to_text ? `申請內容：${h.to_text}` : "", h.decided_by_name ? `審核：${h.decided_by_name}` : "", dateTime(h.decided_at)].filter(Boolean).join("　")}
-              </AppText>
-            </Card>
-          ))}
-        </View>
-      ) : null}
+              <Card style={{ paddingVertical: 4 }}>
+                {g.rows.map((h, i) => {
+                  const ok = h.status === "approved";
+                  const name = h.applicant_name || "會員";
+                  const content = h.final_text ? `${h.final_text}（審核者修改）` : h.to_text;
+                  return (
+                    <View key={h.id} style={[styles.hrow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.border }]}>
+                      <View style={[styles.avatar, { backgroundColor: c.accentSoft }]}>
+                        <AppText variant="headline" style={{ color: c.accentText }}>
+                          {name.slice(0, 1)}
+                        </AppText>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <AppText variant="body" style={{ fontWeight: "800" }}>
+                          {name}
+                          <AppText variant="caption" tone="muted">{`　${h.field_label}`}</AppText>
+                        </AppText>
+                        <AppText variant="caption" tone="muted">
+                          {[content, h.decided_by_name ? `審核 ${h.decided_by_name}` : ""].filter(Boolean).join(" · ")}
+                        </AppText>
+                      </View>
+                      <View style={{ alignItems: "flex-end", gap: 2 }}>
+                        <View style={{ borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: ok ? c.accentSoft : c.dangerSoft }}>
+                          <AppText variant="caption" style={{ fontWeight: "800", color: ok ? c.accentText : c.danger }}>
+                            {ok ? "通過" : "不通過"}
+                          </AppText>
+                        </View>
+                        <AppText variant="caption" tone="muted">
+                          {hhmm(h.decided_at)}
+                        </AppText>
+                      </View>
+                    </View>
+                  );
+                })}
+              </Card>
+            </View>
+          ))
+        : null}
     </View>
   );
 }
@@ -164,5 +217,7 @@ function EditApproveSheet({ review, onClose, onPick }: { review: CentralReview; 
 const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   actions: { flexDirection: "row", gap: space.sm, marginTop: space.xs },
+  hrow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
   btn: { flex: 1, minHeight: 48, borderRadius: radius.md, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 });
