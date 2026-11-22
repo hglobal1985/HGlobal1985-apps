@@ -1062,7 +1062,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const admin = manages;
   // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
   const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.invite_only !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
-  const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && row.invite_only !== 1) || watchFree));
+  const lockedAll = !admin && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && materialLike(row)) || watchFree));
   return {
     ...summaryNow,
     canRoster,
@@ -1129,12 +1129,12 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
 async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) {
-    // 訪客：只有完全公開、已上架的課程可以看。
-    const pub = await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published'").bind(courseId).first();
+    // 訪客：只有完全公開、已上架的「清單／教材類」可以看；課程類一律要登入並手動報名（業主 2026-11-22）。
+    const pub = await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published' AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first();
     return !!pub;
   }
   if (s.role === "admin") return true;
-  if ((await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published'").bind(courseId).first())) return true; // 完全公開的課程，會員也不必報名
+  if ((await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published' AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first())) return true; // 完全公開的清單／教材類，會員也不必報名（課程類即使免費也要報名，業主 2026-11-22）
   const rights = await rightsOf(ctx);
   if (rights.any) {
     const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string }>();
