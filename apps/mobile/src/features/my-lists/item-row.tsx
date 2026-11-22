@@ -15,7 +15,7 @@ const KIND_LABEL: Record<ListKind, string> = { course: "課程", lesson: "教材
  * 清單項目一列：用全站清單列模組 `CompactRow`（縮圖、單行標題、第二行類型＋說明，列高緊密，沒有外框），
  * 備註顯示在下面一行；內容已下架時淡化並標「已下架」（仍留在清單裡，點了不會壞）。我的清單頁與公開清單頁共用。
  */
-export function ListItemRow({ item, children }: { item: ListItem; children?: ReactNode }) {
+export function ListItemRow({ item, children, actions }: { item: ListItem; children?: ReactNode; actions?: ReactNode }) {
   const { c } = useTheme();
   const text = `${KIND_LABEL[item.kind]}${item.subtitle ? `・${item.subtitle}` : ""}${item.missing ? "・已下架" : ""}`;
   return (
@@ -28,6 +28,7 @@ export function ListItemRow({ item, children }: { item: ListItem; children?: Rea
           <View style={[styles.thumb, { backgroundColor: c.surfaceMuted }]}>{item.coverUrl ? <Image source={{ uri: item.coverUrl }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback />}</View>
         }
         title={item.title}
+        actions={actions}
         meta={
           <>
             <MetaLine text={text} />

@@ -1,9 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, View } from "react-native";
+import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
 import { api } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
+import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { ListItemRow, type ListItem } from "@/features/my-lists/item-row";
 import { SOURCE_LABEL } from "@/features/my-lists/links";
 import { bumpMark, resetMarks } from "@/features/my-lists/store";
@@ -12,12 +13,16 @@ import { absoluteUrl, shareLink } from "@/lib/share";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, Section, ShareIcon } from "@/ui";
+import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, SegmentTabs, ShareIcon, ThumbFallback } from "@/ui";
+import { DIM_COLOR } from "@/ui/dim-backdrop";
 import { flashText } from "@/ui/flash-notice";
 
 type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
 
-/** 我的清單內頁：改名稱、自訂網址、選封面、每個項目的備註與移除、點擊人數與每天／各來源統計、分享、刪除。 */
+/**
+ * 我的清單內頁（業主 2026-11-22 改版：大圖封面首頁＋三個分頁）：上方是清單封面大圖（名稱、點閱數疊在圖上）與「分享／複製網址」，
+ * 下面「內容｜成效｜設定」三個分頁一次只看一件事：內容只有項目列（右邊「⋯」才有備註、設為封面、移除）、成效是點閱統計、設定是名稱、網址與刪除。
+ */
 export default function MyListScreen() {
   const { c } = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,6 +31,8 @@ export default function MyListScreen() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
+  const [tab, setTab] = useState<"items" | "stats" | "settings">("items");
+  const [editing, setEditing] = useState<string | null>(null);
   useEffect(() => {
     if (data) {
       setD(data);
@@ -96,35 +103,101 @@ export default function MyListScreen() {
     }
   };
   const max = Math.max(1, ...d.stats.days.map((x) => x.n));
+  const coverItem = d.items.find((x) => x.id === d.coverItemId) ?? d.items.find((x) => x.coverUrl);
+  const editItem = d.items.find((x) => x.id === editing) ?? null;
+  const settingsDirty = title !== d.title || slug !== d.slug;
+  const saveSettings = async () => {
+    const body: Record<string, unknown> = {};
+    if (title !== d.title) body.title = title;
+    if (slug !== d.slug) body.slug = slug;
+    await patch("settings", body, "已儲存設定");
+  };
   return (
     <Screen header={false}>
-      <Section title="分享">
-        <Card style={{ gap: space.sm }}>
-          <AppText variant="callout" selectable style={Platform.OS === "web" ? ({ wordBreak: "break-all" } as object) : undefined}>
-            {full}
+      <View style={[styles.hero, { backgroundColor: c.surfaceMuted }]}>
+        {coverItem?.coverUrl ? <Image source={{ uri: coverItem.coverUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback />}
+        <View style={[styles.heroText, { backgroundColor: DIM_COLOR }]}>
+          <AppText variant="title" numberOfLines={2} style={{ color: "#fff" }}>
+            {d.title}
           </AppText>
-          <View style={{ flexDirection: "row", gap: space.sm }}>
-            {Platform.OS === "web" ? (
-              <View style={{ flex: 1 }}>
-                <Button variant="secondary" label="複製網址" icon="copy-outline" onPress={() => void copy()} fullWidth />
-              </View>
-            ) : null}
-            <Pressable accessibilityRole="button" accessibilityLabel="分享" onPress={() => void share()} style={[styles.shareBtn, { backgroundColor: c.accent }]}>
-              <ShareIcon size={20} color="#fff" />
-              <AppText variant="headline" style={{ color: "#fff" }}>
-                分享
-              </AppText>
-            </Pressable>
+          <View style={styles.heroStat}>
+            <Ionicons name="eye-outline" size={15} color="#fff" />
+            <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>
+              {d.stats.clicks} 次點閱・{d.stats.people} 人
+            </AppText>
           </View>
-        </Card>
-      </Section>
-      <Section title="點擊統計">
-        <Card style={{ gap: space.sm }}>
-          <AppText variant="headline">
-            {d.stats.people} 人・{d.stats.clicks} 次點擊
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", gap: space.sm }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="分享" onPress={() => void share()} style={[styles.shareBtn, { backgroundColor: c.accent }]}>
+          <ShareIcon size={20} color="#fff" />
+          <AppText variant="headline" style={{ color: "#fff" }}>
+            分享
           </AppText>
+        </Pressable>
+        {Platform.OS === "web" ? (
+          <View style={{ flex: 1 }}>
+            <Button variant="secondary" label="複製網址" icon="copy-outline" onPress={() => void copy()} fullWidth />
+          </View>
+        ) : null}
+      </View>
+
+      <SegmentTabs
+        value={tab}
+        onChange={setTab}
+        options={[
+          { key: "items", label: `內容 ${d.items.length}` },
+          { key: "stats", label: "成效" },
+          { key: "settings", label: "設定" },
+        ]}
+      />
+
+      {tab === "items" ? (
+        <>
+          <Card style={{ paddingVertical: 0 }}>
+            {d.items.length === 0 ? (
+              <AppText variant="callout" tone="muted" style={{ paddingVertical: space.md }}>
+                還沒有內容。到任何課程、教材、系列或中心，按「加入我的清單」。
+              </AppText>
+            ) : null}
+            {d.items.map((it) => (
+              <ListItemRow
+                key={it.id}
+                item={it}
+                actions={
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${it.title} 的更多選項`} onPress={() => setEditing(it.id)} hitSlop={8} style={styles.more}>
+                    <Ionicons name="ellipsis-horizontal" size={22} color={c.textMuted} />
+                  </Pressable>
+                }
+              />
+            ))}
+          </Card>
+          {d.items.length ? (
+            <AppText variant="caption" tone="muted">
+              按列右邊的「⋯」可以寫備註、設為清單封面或移除。封面預設用第一個有封面的內容。
+            </AppText>
+          ) : null}
+        </>
+      ) : null}
+
+      {tab === "stats" ? (
+        <Card style={{ gap: space.sm }}>
+          <View style={{ flexDirection: "row" }}>
+            <View style={{ flex: 1 }}>
+              <AppText variant="display">{d.stats.clicks}</AppText>
+              <AppText variant="caption" tone="muted">
+                累計點閱
+              </AppText>
+            </View>
+            <View style={{ flex: 1 }}>
+              <AppText variant="display">{d.stats.people}</AppText>
+              <AppText variant="caption" tone="muted">
+                不同的人
+              </AppText>
+            </View>
+          </View>
           <AppText variant="caption" tone="muted">
-            你自己打開不計入。每天的點擊（近 14 天）：
+            你自己打開不計入。每天的點閱（近 14 天）：
           </AppText>
           {d.stats.days.length === 0 ? (
             <AppText variant="callout" tone="muted">
@@ -157,66 +230,71 @@ export default function MyListScreen() {
             </View>
           ) : null}
         </Card>
-      </Section>
-      <Section title="清單設定">
-        <Card style={{ gap: space.md }}>
-          <Field label="清單名稱" value={title} onChange={setTitle} />
-          <Button label="儲存名稱" onPress={() => void patch("title", { title }, "已儲存名稱")} loading={busy === "title"} disabled={!title.trim() || title === d.title} fullWidth />
-          <Field label="自訂網址名稱" value={slug} onChange={(v) => setSlug(v.toLowerCase())} hint={`網址：${d.url.split("/").slice(0, 2).join("/")}/${slug || "…"}（英文、數字、連字號，3～30 字）`} />
-          <Button label="儲存網址" onPress={() => void patch("slug", { slug }, "已儲存網址")} loading={busy === "slug"} disabled={slug === d.slug || slug.length < 3} fullWidth />
-        </Card>
-      </Section>
-      <Section title={`內容（${d.items.length}）`}>
-        <Card style={{ paddingVertical: 0 }}>
-          {d.items.length === 0 ? (
-            <AppText variant="callout" tone="muted" style={{ paddingVertical: space.md }}>
-              還沒有內容。到任何課程、教材、系列或中心，按「加入我的清單」。
+      ) : null}
+
+      {tab === "settings" ? (
+        <>
+          <Card style={{ gap: space.md }}>
+            <Field label="清單名稱" value={title} onChange={setTitle} />
+            <Field label="自訂網址名稱" value={slug} onChange={(v) => setSlug(v.toLowerCase())} hint={`網址：${d.url.split("/").slice(0, 2).join("/")}/${slug || "…"}（英文、數字、連字號，3～30 字）`} />
+            <AppText variant="caption" tone="muted" selectable style={Platform.OS === "web" ? ({ wordBreak: "break-all" } as object) : undefined}>
+              {full}
             </AppText>
-          ) : null}
-          {d.items.map((it) => (
-            <ListItemRow key={it.id} item={it}>
-              <ItemTools item={it} cover={d.coverItemId === it.id} onCover={() => void patch("cover", { coverItemId: d.coverItemId === it.id ? "" : it.id }, d.coverItemId === it.id ? "已改用預設封面" : "已設為清單封面")} onNote={(n) => void saveNote(it, n)} onRemove={() => void remove(it)} />
-            </ListItemRow>
-          ))}
-        </Card>
-        <AppText variant="caption" tone="muted">
-          清單封面預設用第一個有封面的內容；點「設為封面」可以改選。
-        </AppText>
-      </Section>
-      <Button variant="cancel" label="刪除這份清單" icon="trash-outline" onPress={() => void del()} fullWidth />
+            <Button label="儲存設定" onPress={() => void saveSettings()} loading={busy === "settings"} disabled={!settingsDirty || !title.trim() || slug.length < 3} fullWidth />
+          </Card>
+          <Button variant="cancel" label="刪除這份清單" icon="trash-outline" onPress={() => void del()} fullWidth />
+        </>
+      ) : null}
+
+      {editItem ? <ItemSheet key={editItem.id} item={editItem} cover={d.coverItemId === editItem.id} onClose={() => setEditing(null)} onNote={(n) => saveNote(editItem, n)} onCover={() => void patch("cover", { coverItemId: d.coverItemId === editItem.id ? "" : editItem.id }, d.coverItemId === editItem.id ? "已改用預設封面" : "已設為清單封面")} onRemove={() => { setEditing(null); void remove(editItem); }} /> : null}
     </Screen>
   );
 }
 
-/** 每個項目的工具列：備註（改完離開輸入框就儲存）、設為封面、移除。 */
-function ItemTools({ item, cover, onCover, onNote, onRemove }: { item: ListItem; cover: boolean; onCover: () => void; onNote: (n: string) => void; onRemove: () => void }) {
+/** 項目的編輯面板：備註（按「儲存」）、設為封面、移除。儲存與關閉永遠在下方同一列（EditSheet）。 */
+function ItemSheet({ item, cover, onClose, onNote, onCover, onRemove }: { item: ListItem; cover: boolean; onClose: () => void; onNote: (n: string) => Promise<void>; onCover: () => void; onRemove: () => void }) {
   const { c } = useTheme();
   const [note, setNote] = useState(item.note);
+  const [busy, setBusy] = useState(false);
   return (
-    <View style={{ gap: space.xs, paddingLeft: 72 }}>
-      <Field label="" value={note} onChange={setNote} placeholder="個人備註，例如：下次小組聚會用" />
+    <EditSheet
+      title={item.title}
+      onClose={onClose}
+      dirty={note.trim() !== item.note}
+      busy={busy}
+      onSave={async () => {
+        setBusy(true);
+        await onNote(note.trim());
+        setBusy(false);
+        onClose();
+      }}
+    >
+      <Field label="個人備註" value={note} onChange={setNote} placeholder="例如：下次小組聚會用" />
       <View style={{ flexDirection: "row", gap: space.sm, flexWrap: "wrap" }}>
-        {note !== item.note ? <Button variant="secondary" label="儲存備註" onPress={() => onNote(note.trim())} /> : null}
         <Pressable accessibilityRole="button" accessibilityLabel="設為清單封面" onPress={onCover} style={[styles.chip, { borderColor: cover ? "#FFD43B" : c.border, backgroundColor: cover ? "#FFD43B" : "transparent" }]}>
-          <Ionicons name="image-outline" size={16} color={cover ? "#1F1A00" : c.textMuted} />
-          <AppText variant="caption" style={{ fontWeight: "800", color: cover ? "#1F1A00" : c.textMuted }}>
+          <Ionicons name="image-outline" size={18} color={cover ? "#1F1A00" : c.textMuted} />
+          <AppText variant="callout" style={{ fontWeight: "800", color: cover ? "#1F1A00" : c.textMuted }}>
             {cover ? "目前封面" : "設為封面"}
           </AppText>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="從清單移除" onPress={onRemove} style={[styles.chip, { borderColor: c.danger }]}>
-          <Ionicons name="trash-outline" size={16} color={c.danger} />
-          <AppText variant="caption" style={{ fontWeight: "800", color: c.danger }}>
+          <Ionicons name="trash-outline" size={18} color={c.danger} />
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.danger }}>
             移除
           </AppText>
         </Pressable>
       </View>
-    </View>
+    </EditSheet>
   );
 }
 
 const styles = StyleSheet.create({
+  hero: { height: 190, borderRadius: radius.lg, overflow: "hidden", justifyContent: "flex-end" },
+  heroText: { paddingHorizontal: space.md, paddingVertical: space.sm, gap: 2 },
+  heroStat: { flexDirection: "row", alignItems: "center", gap: 6 },
+  more: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   shareBtn: { flex: 1, minHeight: 44, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm },
   barRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   bar: { height: 10, borderRadius: 5 },
-  chip: { minHeight: 36, borderWidth: 1, borderRadius: radius.pill, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12 },
+  chip: { minHeight: 44, borderWidth: 1, borderRadius: radius.pill, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16 },
 });
