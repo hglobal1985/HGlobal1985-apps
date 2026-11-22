@@ -17,10 +17,10 @@ import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
 import { ExpandGrid } from "./expand-grid";
-import { CompactRow, LIST_CARD, ListSection, MetaLine, RowButtons } from "./compact-row";
+import { CompactRow, LIST_CARD, ListSection, MetaLine } from "./compact-row";
 import { NowPlayingIcon } from "@/ui/now-playing-icon";
 import { UI_SCALE } from "@/theme/ui-scale";
-import { MaterialRow, RowShare, SectionActions } from "./material-rows";
+import { MaterialRow, RowActions, RowShare, SectionActions } from "./material-rows";
 export { RowShare } from "./material-rows";
 
 /**
@@ -57,7 +57,7 @@ export function ChapterList({ course, style, playingId, onPlay, onBlockedPress }
               highlight={playing}
               title={`${lesson.position}. ${lesson.title}`}
               meta={<MetaLine date={lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined} text={text || undefined} />}
-              actions={chapters.length >= 2 && !soon ? <RowButtons><ChapterShare course={course} lesson={lesson} /></RowButtons> : undefined}
+              actions={soon ? undefined : <RowActions course={course} lesson={lesson}>{chapters.length >= 2 ? <ChapterShare course={course} lesson={lesson} /> : null}</RowActions>}
               onPress={lesson.locked || soon ? onBlockedPress : playing ? () => engine.toggle() : () => (onPlay ? onPlay(lesson.id) : router.push(lessonHref(course.id, lesson.id) as never))} // 正在播放的這一列再點一下＝暫停／繼續
             />
           );
