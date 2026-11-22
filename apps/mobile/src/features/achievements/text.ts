@@ -1,4 +1,4 @@
-import { FEATURES, type AchievementType } from "@/api/client";
+import { ACH_TIMES, ACH_VERBS, FEATURES, type AchTime, type AchievementType } from "@/api/client";
 
 /** 徽章條件的白話說明。 */
 export function conditionText(type: AchievementType, threshold: number, courseTitle: string | null, feature?: string | null, lessonTitle?: string | null): string {
@@ -21,6 +21,8 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
     }
     case "lists_created":
       return `累計建立 ${threshold} 份自己的清單`;
+    case "files_downloaded":
+      return `下載 ${threshold} 個教材檔案`;
     case "list_people":
       return `你的清單被 ${threshold} 位不同的人點開過`;
     case "material_video":
@@ -50,3 +52,18 @@ export function conditionText(type: AchievementType, threshold: number, courseTi
 
 /** 徽章圖示可選的表情符號。 */
 export const BADGE_ICONS = ["🌱", "🌿", "🌳", "⭐", "🌟", "🏆", "🥇", "🥈", "🥉", "🎓", "📚", "📖", "📗", "🔥", "⚡", "🎯", "💬", "🗣️", "🤝", "💡", "🔔", "📺", "🏙️", "🌅", "🌙", "🏖️", "🧭", "🔍", "🚀", "💎", "👑", "🏅", "🎖️", "🎁", "🍀", "🧩"];
+
+/** 成就產生器的白話句子：例如「早晨完成章節 5 堂」「訂閱中心 3 個」（名稱與說明自動用它）。 */
+export function achPhrase(vi: number, oi: number, time: AchTime, n: number, unit: string, feature?: string | null): string {
+  const v = ACH_VERBS[vi];
+  const o = v?.objects[oi];
+  if (!v || !o) return "";
+  if (o.pickFeature) {
+    const f = feature ? FEATURES[feature as keyof typeof FEATURES] : undefined;
+    return `使用過「${f?.label ?? "指定功能"}」${n} ${unit}`;
+  }
+  const t = ACH_TIMES.find((x) => x.key === time);
+  if (o.times && time === "day") return `單日內${v.verb}${o.name} ${n} ${unit}`;
+  const prefix = o.times && t && time !== "any" ? t.label.split("（")[0] : "";
+  return `${prefix}${v.verb}${o.name} ${n} ${unit}`;
+}

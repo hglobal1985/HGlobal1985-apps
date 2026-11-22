@@ -8,6 +8,7 @@ import {
   HQ_UNIT,
   REVIEW_REASONS,
   ACHIEVEMENT_TYPES,
+  ACH_UNITS,
   UNCATEGORIZED,
   textCoverLines,
   iconText,
@@ -385,6 +386,11 @@ async function achievementBody(ctx: Ctx, body: Record<string, unknown>, creating
     if (!Number.isInteger(n) || n < 1 || n > 100000) fail(400, "invalid_threshold", "達成數量請輸入 1 以上的整數");
     sets.push(["threshold", n]);
   }
+  if (body.unit !== undefined) {
+    if (body.unit === null || body.unit === "") sets.push(["unit", null]);
+    else if (typeof body.unit === "string" && (ACH_UNITS as readonly string[]).includes(body.unit)) sets.push(["unit", body.unit]);
+    else fail(400, "invalid_unit", "單位不正確");
+  }
   if (body.courseId !== undefined) {
     if (body.courseId === null || body.courseId === "") sets.push(["course_id", null]);
     else {
@@ -414,9 +420,9 @@ async function listAchievements(ctx: Ctx): Promise<AdminAchievement[]> {
   for (const r of parts) for (const x of r.results as { member_sub: string }[]) subs.add(x.member_sub);
   const total = subs.size;
   const { results } = await ctx.db
-    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.lesson_id, a.difficulty, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT title FROM lessons WHERE id = a.lesson_id) AS lesson_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
-    .all<{ difficulty: number; id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; lesson_id: string | null; lesson_title: string | null; active: number; course_title: string | null; earned_count: number }>();
-  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, lessonId: r.lesson_id, lessonTitle: r.lesson_title, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count, difficulty: (r.difficulty >= 1 && r.difficulty <= 3 ? r.difficulty : 2) as 1 | 2 | 3, memberTotal: total }));
+    .prepare("SELECT a.id, a.name, a.description, a.icon, a.condition_type, a.threshold, a.course_id, a.feature, a.lesson_id, a.unit, a.difficulty, a.active, (SELECT title FROM courses WHERE id = a.course_id) AS course_title, (SELECT title FROM lessons WHERE id = a.lesson_id) AS lesson_title, (SELECT COUNT(*) FROM member_achievements m WHERE m.achievement_id = a.id) AS earned_count FROM achievements a ORDER BY a.sort_order, a.created_at")
+    .all<{ difficulty: number; id: string; name: string; description: string; icon: string; condition_type: AchievementType; threshold: number; course_id: string | null; feature: string | null; lesson_id: string | null; unit: string | null; lesson_title: string | null; active: number; course_title: string | null; earned_count: number }>();
+  return results.map((r) => ({ id: r.id, name: r.name, description: r.description, icon: r.icon, type: r.condition_type, threshold: r.threshold, courseId: r.course_id, feature: r.feature, unit: r.unit, lessonId: r.lesson_id, lessonTitle: r.lesson_title, courseTitle: r.course_title, active: r.active === 1, earnedCount: r.earned_count, difficulty: (r.difficulty >= 1 && r.difficulty <= 3 ? r.difficulty : 2) as 1 | 2 | 3, memberTotal: total }));
 }
 
 /** 刪除一位會員在本 App 的所有資料。 */
