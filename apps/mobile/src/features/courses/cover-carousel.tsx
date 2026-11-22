@@ -6,7 +6,6 @@ import { useThumb } from "@/lib/thumb";
 import { useUiConfig } from "@/state/ui-config";
 import { buildSlides } from "./cover-media";
 
-const NO_PULL = Platform.OS === "web" ? ({ dataSet: { noPullRefresh: "" } } as object) : {};
 
 /**
  * 封面輪播（業主 2026-11-21，中心、系列、課程封面共用）：照片依「設定 › 儲存空間管理 › 封面輪播」的秒數自動換張，
@@ -62,7 +61,7 @@ export function CoverCarousel({ items, width, height, onOpen, paused = false }: 
   if (!cur) return null;
   const imgOf = (x: CoverMediaItem, w: number) => <Image key={x.id} source={{ uri: thumb(resolveUrl(x.kind === "video" ? x.posterUrl ?? x.url : x.url), Math.max(320, Math.round(w))) }} style={{ flex: 1, height }} resizeMode="cover" accessibilityIgnoresInvertColors />;
   return (
-    <View style={{ width, height, backgroundColor: "#000", overflow: "hidden" }} {...pan.panHandlers} {...NO_PULL} {...(Platform.OS === "web" ? ({ style: { width, height, backgroundColor: "#000", overflow: "hidden", touchAction: "pan-y" } } as object) : {})}>
+    <View style={{ width, height, backgroundColor: "#000", overflow: "hidden" }} {...pan.panHandlers} {...(Platform.OS === "web" ? ({ style: { width, height, backgroundColor: "#000", overflow: "hidden", touchAction: "pan-y" } } as object) : {})}>
       <Animated.View style={{ flex: 1, opacity: fade, flexDirection: "row", gap: cur.items.length > 1 ? 2 : 0 }}>
         {video ? (
           createElement("video", {
@@ -72,6 +71,7 @@ export function CoverCarousel({ items, width, height, onOpen, paused = false }: 
             autoPlay: true,
             muted: !sound,
             playsInline: true,
+            "data-allow-pull": "", // 封面影片也要能下拉重新整理（web-pull-refresh.ts 對一般 video 不觸發）
             onEnded: () => goRef.current(1),
             style: { width, height, objectFit: video.height > video.width * 1.05 ? "contain" : "cover", background: "#000" },
           })

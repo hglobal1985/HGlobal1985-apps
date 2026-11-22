@@ -128,7 +128,7 @@ export function installWebPullRefresh(): () => void {
     if (e.touches.length !== 1) return;
     const t = e.target as Element | null;
     // data-no-pull-refresh：自己有上下拖曳手勢的區塊（課程 EDM 封面、影片放大拖曳）不觸發下拉重新整理（業主 2026-11-17）。
-    if (!t || t.closest('[role="dialog"],[aria-modal="true"],input,textarea,select,video,iframe,[contenteditable="true"],[data-no-pull-refresh]')) return;
+    if (!t || t.closest('[role="dialog"],[aria-modal="true"],input,textarea,select,video:not([data-allow-pull]),iframe,[contenteditable="true"],[data-no-pull-refresh]')) return;
     if (!atTop(t)) return;
     startY = e.touches[0]!.clientY;
     startX = e.touches[0]!.clientX;
