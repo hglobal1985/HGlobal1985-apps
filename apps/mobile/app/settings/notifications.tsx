@@ -1,6 +1,7 @@
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
+import { PUSH_TEXT } from "@/features/push-switch";
 import { disablePush, enablePush, pushState, type PushState } from "@/lib/web-push";
 import { Switch, View } from "react-native";
 import { api, NOTICE_KINDS, type NotificationSettings } from "@/api/client";
@@ -111,15 +112,6 @@ export default function NotificationSettingsScreen() {
     </Screen>
   );
 }
-
-const PUSH_TEXT: Record<PushState, string> = {
-  on: "開啟：有新通知時，手機會跳出提醒（關掉 App 也收得到）。",
-  off: "關閉：只在 App 內的「通知」分頁看得到。",
-  denied: "你之前拒絕了通知權限。請到瀏覽器或手機的「網站設定 > 通知」允許本網站，再回來開啟。",
-  "ios-needs-install": "iPhone／iPad 要先把本網站「加入主畫面」：按 Safari 下方的分享鈕 →「加入主畫面」，再從主畫面的圖示開啟，就能在這裡開啟推播（需要 iOS 16.4 以上）。",
-  unsupported: "這個瀏覽器不支援推播通知，請改用 Chrome、Edge 或 Safari（iPhone 需加入主畫面）。",
-  "not-ready": "手機推播尚未開放，開放後就能在這裡開啟。",
-};
 
 /** 手機推播（業主 2026-11-17）：這個裝置的開關＋傳一則測試通知。每個裝置各自開啟。 */
 function PushCard() {

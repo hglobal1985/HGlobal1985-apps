@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type HostInstance, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { api } from "@/api/client";
 import { openAccountCenter } from "@/features/account-link";
+import { PushSwitchRow } from "@/features/push-switch";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -23,7 +24,7 @@ type View_ = {
 };
 type Key = "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank";
 
-const FIELD_H = 44;
+const FIELD_H = 40;
 const OTHER = "__other";
 const NONE_TERM = "無";
 /** 欄位要顯示的內容：有等待審核的新值就顯示新值（使用者剛填的），沒有才顯示目前生效的值。 */
@@ -49,6 +50,30 @@ function Label({ text, tag, note }: { text: string; tag?: string; note?: string 
   );
 }
 
+/** 左側編號線的步驟區塊（業主 2026-11-22 方案 E）：① 手機推播 ② 個人資料 ③ Amway 會員。 */
+function Step({ n, last, title, right, children }: { n: number; last?: boolean; title: string; right?: React.ReactNode; children: React.ReactNode }) {
+  const { c } = useTheme();
+  return (
+    <View style={{ flexDirection: "row", gap: space.sm }}>
+      <View style={{ width: 28, alignItems: "center" }}>
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: c.textOnAccent, fontWeight: "800", fontSize: 14 }}>{n}</Text>
+        </View>
+        {last ? null : <View style={{ flex: 1, width: 2, backgroundColor: c.border, marginVertical: 3 }} />}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: space.xs, paddingBottom: last ? 0 : space.xs }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 24 }}>
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            {title}
+          </AppText>
+          {right}
+        </View>
+        {children}
+      </View>
+    </View>
+  );
+}
+
 /** 必填沒填時，整列用 2px 橘框＋淡橘底標示（中央視覺規範）。 */
 function Row({ bad, z, children }: { bad?: boolean; z?: number; children: React.ReactNode }) {
   const { c } = useTheme();
@@ -65,7 +90,7 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
   const { c } = useTheme();
   return (
     <Pressable onPress={onToggle} disabled={disabled} accessibilityRole="checkbox" accessibilityState={{ checked: on, disabled }} accessibilityLabel="無" style={[styles.none, { opacity: disabled ? 0.45 : 1 }]}>
-      <Icon name={on ? "checkbox" : "square-outline"} size={30} color={on ? c.accentText : c.textMuted} />
+      <Icon name={on ? "checkbox" : "square-outline"} size={26} color={on ? c.accentText : c.textMuted} />
       <AppText style={{ fontWeight: "700" }}>無</AppText>
     </Pressable>
   );
@@ -265,7 +290,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   return (
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
     <BottomSheet onClose={onClose}>
-      <ScrollView style={{ maxHeight: Math.round(winH * (winH >= winW ? 0.74 : 0.5)) }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ maxHeight: Math.round(winH * (winH >= winW ? 0.86 : 0.5)) }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
             <Icon name="open-outline" size={20} color={c.accentText} />
             <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
@@ -283,31 +308,38 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
             </AppText>
           ) : null}
           {!data && !error ? <AppText tone="muted">讀取中…</AppText> : null}
+          <Step n={1} last={!data} title="手機推播">
+            <PushSwitchRow />
+          </Step>
           {data ? (
             <>
+              <Step n={2} title="個人資料">
               <View style={[styles.line, { alignItems: "flex-end" }]}>
-                <View style={{ flex: 1 }}>
-                  <Row>
-                    <Label text="本名（購買付費課程時，給中心窗口對帳用途）" />
-                    <Input value={vals.legal_name} onChange={set("legal_name")} />
-                  </Row>
+                  <View style={{ flex: 1 }}>
+                    <Row>
+                      <Label text="本名（付費課程對帳用）" />
+                      <Input value={vals.legal_name} onChange={set("legal_name")} />
+                    </Row>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Row bad={showBad && missing.includes("display_name")}>
+                      <Label text="暱稱" tag={tagFor("display_name")} />
+                      <Input value={vals.display_name} onChange={set("display_name")} />
+                    </Row>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Row bad={showBad && missing.includes("display_name")}>
-                    <Label text="暱稱" tag={tagFor("display_name")} />
-                    <Input value={vals.display_name} onChange={set("display_name")} />
-                  </Row>
-                </View>
-              </View>
-              <Row>
-                <Label text="Email" />
-                <Input value={vals.contact_email} onChange={set("contact_email")} />
-              </Row>
+                <Row>
+                  <Label text="Email" />
+                  <Input value={vals.contact_email} onChange={set("contact_email")} />
+                </Row>
+              </Step>
               {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上在下面出現系統、中心、獎銜三個欄位；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
-              <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={styles.none}>
-                <Icon name={amway ? "checkbox" : "square-outline"} size={30} color={amway ? c.accentText : c.textMuted} />
+              <Step n={3} last title="Amway 會員" right={
+              <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={[styles.none, { minHeight: 28 }]}>
+                <Icon name={amway ? "checkbox" : "square-outline"} size={24} color={amway ? c.accentText : c.textMuted} />
                 <AppText style={{ fontWeight: "700" }}>我是 Amway 會員</AppText>
               </Pressable>
+              }>
               {data.enabled ? (
                 <AppText variant="caption" tone="muted">
                   已勾選；要取消請到會員中心。
@@ -352,6 +384,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                   </Row>
                 </>
               ) : null}
+              </Step>
             </>
           ) : null}
       </ScrollView>
@@ -368,14 +401,14 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
 }
 
 const styles = StyleSheet.create({
-  sheetBody: { gap: space.sm, paddingBottom: space.sm },
+  sheetBody: { gap: space.xs, paddingBottom: space.xs },
   actions: { flexDirection: "row", gap: space.sm, width: "100%" },
   btn: { minHeight: 44, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm },
   line: { flexDirection: "row", alignItems: "center", gap: space.sm },
   labelRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   req: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1 },
   input: { minHeight: FIELD_H, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
-  none: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 40, minWidth: 60 },
+  none: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 36, minWidth: 60 },
   dropdown: { position: "absolute", left: 0, right: 0, borderWidth: 1, borderRadius: radius.md, zIndex: 60, overflow: "hidden" },
   search: { minHeight: 40, borderBottomWidth: 1, paddingHorizontal: space.md, fontSize: 15 },
   opt: { minHeight: 44, paddingHorizontal: space.md, justifyContent: "center" },
