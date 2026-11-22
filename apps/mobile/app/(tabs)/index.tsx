@@ -38,6 +38,8 @@ export default function HomeScreen() {
   const [noticeClosed, setNoticeClosed] = useState(false);
   // 版面太擠（上面的安裝提醒、公告占掉空間）時，先隱藏左右海報下方的資訊；使用者關掉提醒騰出空間後自動恢復（業主 2026-11-19）。
   // 判斷用「顯示資訊時海報還剩多高」：已隱藏時要扣掉資訊區的高度；加 12px 緩衝避免在邊界來回閃動。
+  // 首頁一頁顯示：外層高度固定為「畫面可用高度」，裡面的海報區才會依剩餘空間自動縮放（沒有固定高度時，海報會把版面撐高、擠掉下方資訊）。
+  const [viewH, setViewH] = useState(0);
   const stageH = useRef({ a: 0, b: 0 });
   const [tight, setTight] = useState(false);
   const reportStage = (key: "a" | "b") => (h: number) => {
@@ -96,7 +98,7 @@ export default function HomeScreen() {
   return (
     <>
     {gate.element}
-    <ScrollView style={{ flex: 1, backgroundColor: c.background }} contentContainerStyle={[styles.page, { paddingTop: insets.top + space.md, paddingHorizontal: lay.large ? lay.gutter : space.md }]} refreshControl={refreshControl} alwaysBounceVertical keyboardShouldPersistTaps="handled">
+    <ScrollView style={{ flex: 1, backgroundColor: c.background }} onLayout={(e) => setViewH(Math.floor(e.nativeEvent.layout.height))} contentContainerStyle={[styles.page, viewH > 0 ? { height: viewH } : null, { paddingTop: insets.top + space.md, paddingHorizontal: lay.large ? lay.gutter : space.md }]} refreshControl={refreshControl} alwaysBounceVertical keyboardShouldPersistTaps="handled">
       <View style={[styles.inner, lay.large ? { maxWidth: Math.min(lay.wideMax, 960), gap: space.lg } : null]}>
         <View style={[styles.head, landscape && { flexDirection: "row", justifyContent: "center", gap: space.xl }]}>
           <BrandTitle scale={k} />

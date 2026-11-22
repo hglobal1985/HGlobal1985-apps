@@ -141,6 +141,8 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
           onStageHeight?.(h);
         }}
       >
+        {/* 海報放在絕對定位的層裡：不參與版面高度計算，區塊高度完全由 flex 分配，空間不夠時會自動縮小、騰出空間時自動恢復（業主 2026-11-22）。 */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         {box.w > 0 && box.h > 0 ? (
           courses.length ? (
             <View style={{ width: box.w, height: box.h, overflow: "hidden", ...(Platform.OS === "web" ? ({ touchAction: "pan-y", userSelect: "none" } as object) : {}) }} {...pan.panHandlers}>
@@ -159,6 +161,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
             </View>
           )
         ) : null}
+        </View>
       </View>
       <View style={[styles.dots, compact && { height: 16 }]}>
         {/* 課程很多時，圓點只顯示放得下的數量（以目前這張為中心的一段），不會超出欄寬。 */}
