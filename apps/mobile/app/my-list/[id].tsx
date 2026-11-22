@@ -12,10 +12,10 @@ import { absoluteUrl, shareLink } from "@/lib/share";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, Check, ErrorView, Field, LoadingView, Screen, Section, ShareIcon } from "@/ui";
+import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, Section, ShareIcon } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
-type Detail = { showRank: boolean; id: string; title: string; slug: string; url: string; coverItemId: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
+type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
 
 /** 我的清單內頁：改名稱、自訂網址、選封面、每個項目的備註與移除、點擊人數與每天／各來源統計、分享、刪除。 */
 export default function MyListScreen() {
@@ -40,7 +40,7 @@ export default function MyListScreen() {
     setBusy(key);
     try {
       const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, body);
-      setD((x) => (x ? { ...x, title: r.title, slug: r.slug, url: r.url, coverItemId: r.coverItemId, items: r.items, showRank: r.showRank } : x));
+      setD((x) => (x ? { ...x, title: r.title, slug: r.slug, url: r.url, coverItemId: r.coverItemId, items: r.items } : x));
       setTitle(r.title);
       setSlug(r.slug);
       flashText(ok);
@@ -164,7 +164,6 @@ export default function MyListScreen() {
           <Button label="儲存名稱" onPress={() => void patch("title", { title }, "已儲存名稱")} loading={busy === "title"} disabled={!title.trim() || title === d.title} fullWidth />
           <Field label="自訂網址名稱" value={slug} onChange={(v) => setSlug(v.toLowerCase())} hint={`網址：${d.url.split("/").slice(0, 2).join("/")}/${slug || "…"}（英文、數字、連字號，3～30 字）`} />
           <Button label="儲存網址" onPress={() => void patch("slug", { slug }, "已儲存網址")} loading={busy === "slug"} disabled={slug === d.slug || slug.length < 3} fullWidth />
-          <Check label="在清單名片顯示我的獎銜與獎章" value={d.showRank} onChange={(v) => void patch("rank", { showRank: v }, v ? "名片會顯示獎銜與獎章" : "名片不再顯示獎銜與獎章")} />
         </Card>
       </Section>
       <Section title={`內容（${d.items.length}）`}>

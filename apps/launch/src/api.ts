@@ -3329,8 +3329,7 @@ const routes: [string, RegExp, Handler][] = [
   ["PATCH", /^\/my-lists\/(l[\w]{4,20})$/, (ctx, [id]) => listGuard(async () => {
     const s = requireMember(ctx);
     const l = await ownedList(ctx.db, s.sub, id!);
-    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown; showRank?: unknown }>(ctx.req);
-    if (typeof b.showRank === "boolean") await ctx.db.prepare("UPDATE my_lists SET show_rank = ? WHERE id = ?").bind(b.showRank ? 1 : 0, l.id).run();
+    const b = await readJson<{ title?: unknown; slug?: unknown; coverItemId?: unknown }>(ctx.req);
     if (b.title !== undefined) await ctx.db.prepare("UPDATE my_lists SET title = ? WHERE id = ?").bind(checkTitle(b.title), l.id).run();
     if (b.slug !== undefined) await setSlug(ctx.db, l, b.slug);
     if (b.coverItemId !== undefined) {
@@ -3365,8 +3364,8 @@ const routes: [string, RegExp, Handler][] = [
     const str = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
     const view = await viewPublic(ctx.db, number!, slug!, str(b.vid, 40), ctx.session?.sub ?? null, str(b.hint, 30), str(b.referrer, 200));
     // 分享者的獎銜與徽章（Amway 資料：每次載入才向中央查，不保存）；查不到就只有頭像與姓名。超級管理員另外看得到查不到的原因（除錯用）。
-    const sharer = view.showRank ? await lookupSharerRank(ctx.env.CENTRAL_SERVICE_SECRET, view.ownerSub).catch(() => null) : null;
-    return { ...view, sharer, ...(sharer || !view.showRank || !ctx.session?.roles.includes("super_admin") ? {} : { sharerError: lastSharerError }) };
+    const sharer = await lookupSharerRank(ctx.env.CENTRAL_SERVICE_SECRET, view.ownerSub).catch(() => null);
+    return { ...view, sharer, ...(sharer || !ctx.session?.roles.includes("super_admin") ? {} : { sharerError: lastSharerError }) };
   })],
   // 把別人的清單複製成自己的新清單（額度不夠會提示要完成哪個成就）。
   ["POST", /^\/my-lists\/view\/([\w-]{2,40})\/([\w-]{3,30})\/copy$/, (ctx, [number, slug]) => listGuard(async () => {

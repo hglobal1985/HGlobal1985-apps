@@ -53,11 +53,6 @@ test("加入我的清單：多份清單、額度與解鎖、自訂網址、備�
   assert.equal((await call("PATCH", `/my-lists/${idB}`, { token: me, body: { slug: "admin" } })).status, 409, "同一個人不能重複");
   assert.equal((await call("PATCH", `/my-lists/${idA}`, { token: other, body: { title: "別人改" } })).status, 404, "不能改別人的清單");
 
-  // 名片是否顯示獎銜與獎章（預設顯示，主人可取消）
-  assert.equal((await call<{ showRank: boolean }>("GET", `/my-lists/${idA}`, { token: me })).data.showRank, true);
-  assert.equal((await call<{ showRank: boolean }>("PATCH", `/my-lists/${idA}`, { token: me, body: { showRank: false } })).data.showRank, false);
-  assert.equal((await call<{ showRank: boolean }>("PATCH", `/my-lists/${idA}`, { token: me, body: { showRank: true } })).data.showRank, true);
-
   // 備註、封面
   const detail = (await call<{ items: { id: string; note: string; coverUrl: string | null }[] }>("GET", `/my-lists/${idA}`, { token: me })).data;
   const itemId = detail.items[0]!.id;
