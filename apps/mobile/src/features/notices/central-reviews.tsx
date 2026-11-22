@@ -30,19 +30,22 @@ const text = (v: unknown): string => {
 
 type HistoryRow = { id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; final_text: string; status: string; decided_by_name: string; decided_at: string };
 
-const hhmm = (iso: string) => {
+export const hhmm = (iso: string) => {
   const d = new Date(iso);
   return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
-/** 依處理日期分組：今天、昨天、其他顯示 月/日。 */
-function groupByDay(rows: HistoryRow[]): { day: string; rows: HistoryRow[] }[] {
+/** 日期分組標題：今天、昨天、其他顯示 月/日。 */
+export function dayLabel(iso: string): string {
   const key = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   const now = new Date();
-  const yest = new Date(now.getTime() - 86400000);
-  const out: { day: string; rows: HistoryRow[] }[] = [];
+  const d = new Date(iso);
+  return key(d) === key(now) ? "今天" : key(d) === key(new Date(now.getTime() - 86400000)) ? "昨天" : `${d.getMonth() + 1}/${d.getDate()}`;
+}
+/** 依處理日期分組（資料已由新到舊排好）。 */
+export function groupByDay<T>(rows: T[], at: (r: T) => string): { day: string; rows: T[] }[] {
+  const out: { day: string; rows: T[] }[] = [];
   for (const r of rows) {
-    const d = new Date(r.decided_at);
-    const day = key(d) === key(now) ? "今天" : key(d) === key(yest) ? "昨天" : `${d.getMonth() + 1}/${d.getDate()}`;
+    const day = dayLabel(at(r));
     const last = out[out.length - 1];
     if (last && last.day === day) last.rows.push(r);
     else out.push({ day, rows: [r] });
@@ -133,7 +136,7 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
       {editing ? <EditApproveSheet review={editing} onClose={() => setEditing(null)} onPick={(v, label) => (setEditing(null), void decide(editing, "approve", v, label))} /> : null}
       {/* 已處理的申請紀錄（業主 2026-11-19；2026-11-22 改頭像清單、依日期分組）：審核完成後保留在這裡，不會消失。 */}
       {history.data?.length
-        ? groupByDay(history.data).map((g) => (
+        ? groupByDay(history.data, (h) => h.decided_at).map((g) => (
             <View key={g.day} style={{ gap: 6, marginTop: space.sm }}>
               <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
                 {`已處理 · ${g.day}`}
