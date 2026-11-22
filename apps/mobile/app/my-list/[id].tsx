@@ -5,6 +5,8 @@ import { Image, Platform, Pressable, StyleSheet, View } from "react-native";
 import { api, clearApiCache, resolveUrl } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { Check } from "@/ui/check";
+import { FormBlock } from "@/ui/form-block";
 import { ListItemRow, type ListItem } from "@/features/my-lists/item-row";
 import { ListCover, type ListCoverMode } from "@/features/my-lists/list-cover";
 import { PickImageButton } from "@/features/admin/pick-image";
@@ -19,7 +21,7 @@ import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, SegmentTa
 import { DIM_COLOR } from "@/ui/dim-backdrop";
 import { flashText } from "@/ui/flash-notice";
 
-type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; hasUpload: boolean; uploadUrl: string | null; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
+type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; coverText: string | null; coverTextRaw: string; coverTextOn: boolean; hasUpload: boolean; uploadUrl: string | null; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[] } };
 
 /**
  * 我的清單內頁（業主 2026-11-22 改版：大圖封面首頁＋三個分頁）：上方是清單封面大圖（名稱、點閱數疊在圖上）與「分享／複製網址」，
@@ -117,9 +119,9 @@ export default function MyListScreen() {
   };
   return (
     <Screen header={false}>
-      <ListCover mode={d.coverMode} imageUrl={d.coverUrl} bgUrl={d.coverBgUrl} title={d.title} height={190}>
+      <ListCover mode={d.coverMode} imageUrl={d.coverUrl} bgUrl={d.coverBgUrl} title={d.title} text={d.coverText} height={190}>
         <View style={[styles.heroText, { backgroundColor: DIM_COLOR }]}>
-          {d.coverMode !== "text" ? (
+          {d.coverMode === "item" ? (
             <AppText variant="title" numberOfLines={2} style={{ color: "#fff" }}>
               {d.title}
             </AppText>
@@ -263,17 +265,24 @@ export default function MyListScreen() {
 }
 
 /**
- * 清單封面設定（業主 2026-11-22）：三種——內容封面（用清單內容的圖）、上傳圖片、文字封面（清單名稱放大當封面＋管理員上傳的底圖或純色）。
- * 上面有即時預覽；上傳圖片選好就立刻上傳，「儲存」才套用封面類型與底圖。
+ * 清單封面設定（業主 2026-11-22，文字與上傳圖片合併）：兩種——
+ * ① 內容封面（用清單內容的圖）；
+ * ② 自訂封面＝「背景」（自己上傳的圖片，或管理員提供的底圖／純色）＋「文字」（預設清單名稱、可自訂、可關閉），文字疊在背景上。
+ * 上面有即時預覽；上傳圖片選好就立刻上傳，「儲存」才套用封面類型、底圖與文字。
  */
 function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; onDone: (r: Detail) => void }) {
   const { c } = useTheme();
   const bgs = useApi<{ id: string; name: string; url: string }[]>("/list-cover-bgs");
-  const [mode, setMode] = useState<ListCoverMode>(d.coverMode);
+  const [mode, setMode] = useState<ListCoverMode>(d.coverMode === "item" ? (d.hasUpload ? "upload" : "text") : d.coverMode);
+  const [isCustom, setIsCustom] = useState(d.coverMode !== "item");
   const [bgId, setBgId] = useState<string | null>(d.coverBgId);
+  const [textOn, setTextOn] = useState(d.coverTextOn);
+  const [textRaw, setTextRaw] = useState(d.coverTextRaw);
   const [up, setUp] = useState<{ has: boolean; url: string | null }>({ has: d.hasUpload, url: d.uploadUrl });
   const [busy, setBusy] = useState<"upload" | "save" | null>(null);
   const bgUrl = bgs.data?.find((x) => x.id === bgId)?.url ?? null;
+  const effective: ListCoverMode = !isCustom ? "item" : mode === "upload" && !up.url ? "text" : mode;
+  const previewText = textOn ? textRaw.trim() || d.title : null;
   const upload = async (file: File) => {
     setBusy("upload");
     try {
@@ -281,6 +290,7 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
       onDone(r);
       setUp({ has: true, url: r.uploadUrl });
       setMode("upload");
+      setIsCustom(true);
       flashText("已上傳封面圖");
     } catch (e) {
       flashText(e instanceof Error ? e.message : "上傳失敗");
@@ -289,10 +299,10 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
     }
   };
   const save = async () => {
-    if (mode === "upload" && !up.has) return flashText("請先上傳一張封面圖");
+    if (isCustom && mode === "upload" && !up.has) return flashText("請先上傳一張封面圖");
     setBusy("save");
     try {
-      const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, { coverMode: mode, coverBgId: bgId ?? "" });
+      const r = await api<Detail>("PATCH", `/my-lists/${d.id}`, { coverMode: effective, coverBgId: bgId ?? "", coverText: textRaw.trim(), coverTextOn: textOn });
       onDone(r);
       flashText("已儲存封面");
       onClose();
@@ -302,58 +312,75 @@ function CoverSheet({ d, onClose, onDone }: { d: Detail; onClose: () => void; on
       setBusy(null);
     }
   };
+  const dirty = effective !== d.coverMode || bgId !== d.coverBgId || textOn !== d.coverTextOn || textRaw.trim() !== d.coverTextRaw;
   return (
-    <EditSheet title="清單封面" onClose={onClose} onSave={save} busy={busy === "save"} dirty={mode !== d.coverMode || bgId !== d.coverBgId}>
-      <ListCover mode={mode} imageUrl={mode === "upload" ? up.url : d.itemCoverUrl} bgUrl={bgUrl} title={d.title} height={150} />
+    <EditSheet title="清單封面" onClose={onClose} onSave={save} busy={busy === "save"} dirty={dirty}>
+      <ListCover mode={effective} imageUrl={effective === "upload" ? up.url : d.itemCoverUrl} bgUrl={bgUrl} title={d.title} text={previewText} height={150} />
       <SegmentTabs
-        value={mode}
-        onChange={setMode}
+        value={isCustom ? "custom" : "item"}
+        onChange={(k) => setIsCustom(k === "custom")}
         options={[
           { key: "item", label: "內容封面" },
-          { key: "upload", label: "上傳圖片" },
-          { key: "text", label: "文字封面" },
+          { key: "custom", label: "自訂封面" },
         ]}
       />
-      {mode === "item" ? (
+      {!isCustom ? (
         <AppText variant="callout" tone="muted">
-          用清單內容的封面圖（預設是文字封面）。要指定哪一個內容當封面：回到「內容」分頁，按那一列右邊的「⋯」→「設為封面」；再按一次「目前封面」就取消指定、回到文字封面。
+          用清單內容的封面圖。要指定哪一個內容當封面：回到「內容」分頁，按那一列右邊的「⋯」→「設為封面」；再按一次「目前封面」就取消指定、回到自訂封面。
         </AppText>
-      ) : null}
-      {mode === "upload" ? (
-        <View style={{ gap: space.sm }}>
-          <PickImageButton label={up.has ? "更換封面圖" : "上傳封面圖"} onPick={(f) => void upload(f)} busy={busy === "upload"} />
-          <AppText variant="caption" tone="muted">
-            JPG、PNG、WebP，8MB 內；會自動壓縮。封面是橫式（約 16:9），建議上傳橫式圖片。
-          </AppText>
+      ) : (
+        <View style={{ gap: space.md }}>
+          <FormBlock title="背景">
+            <SegmentTabs
+              value={mode === "upload" ? "upload" : "text"}
+              onChange={(k) => setMode(k as ListCoverMode)}
+              options={[
+                { key: "upload", label: "我的圖片" },
+                { key: "text", label: "底圖／純色" },
+              ]}
+            />
+            {mode === "upload" ? (
+              <View style={{ gap: space.sm }}>
+                <PickImageButton label={up.has ? "更換封面圖" : "上傳封面圖"} onPick={(f) => void upload(f)} busy={busy === "upload"} />
+                <AppText variant="caption" tone="muted">
+                  JPG、PNG、WebP，8MB 內；會自動壓縮。封面是橫式（約 16:9），建議上傳橫式圖片。
+                </AppText>
+              </View>
+            ) : (
+              <View style={{ gap: space.sm }}>
+                <View style={styles.bgGrid}>
+                  <Pressable accessibilityRole="radio" accessibilityState={{ selected: bgId === null }} accessibilityLabel="純色底" onPress={() => setBgId(null)} style={[styles.bgCell, { borderColor: bgId === null ? c.accent : c.border, backgroundColor: "#0C603C" }]}>
+                    <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>
+                      純色
+                    </AppText>
+                  </Pressable>
+                  {(bgs.data ?? []).map((b) => (
+                    <Pressable key={b.id} accessibilityRole="radio" accessibilityState={{ selected: bgId === b.id }} accessibilityLabel={`底圖 ${b.name}`} onPress={() => setBgId(b.id)} style={[styles.bgCell, { borderColor: bgId === b.id ? c.accent : c.border }]}>
+                      <Image source={{ uri: resolveUrl(b.url) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
+                    </Pressable>
+                  ))}
+                </View>
+                {bgs.data && !bgs.data.length ? (
+                  <AppText variant="caption" tone="muted">
+                    目前還沒有提供底圖，先用純色底。
+                  </AppText>
+                ) : null}
+              </View>
+            )}
+          </FormBlock>
+          <FormBlock title="文字">
+            <Check label="在封面上顯示文字" value={textOn} onChange={setTextOn} />
+            {textOn ? (
+              <>
+                <Field label="自訂文字（留空就用清單名稱）" value={textRaw} onChange={(v) => setTextRaw(v.slice(0, 40))} placeholder={d.title} />
+                <AppText variant="caption" tone="muted">
+                  文字會自動放到最大，並加上描邊與光暈，疊在圖片或底圖上也看得清楚。
+                </AppText>
+              </>
+            ) : null}
+          </FormBlock>
         </View>
-      ) : null}
-      {mode === "text" ? (
-        <View style={{ gap: space.sm }}>
-          <AppText variant="callout" style={{ fontWeight: "700" }}>
-            文字封面的底圖
-          </AppText>
-          <View style={styles.bgGrid}>
-            <Pressable accessibilityRole="radio" accessibilityState={{ selected: bgId === null }} accessibilityLabel="純色底" onPress={() => setBgId(null)} style={[styles.bgCell, { borderColor: bgId === null ? c.accent : c.border, backgroundColor: "#0C603C" }]}>
-              <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>
-                純色
-              </AppText>
-            </Pressable>
-            {(bgs.data ?? []).map((b) => (
-              <Pressable key={b.id} accessibilityRole="radio" accessibilityState={{ selected: bgId === b.id }} accessibilityLabel={`底圖 ${b.name}`} onPress={() => setBgId(b.id)} style={[styles.bgCell, { borderColor: bgId === b.id ? c.accent : c.border }]}>
-                <Image source={{ uri: resolveUrl(b.url) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
-              </Pressable>
-            ))}
-          </View>
-          {bgs.data && !bgs.data.length ? (
-            <AppText variant="caption" tone="muted">
-              目前還沒有提供底圖，先用純色底。
-            </AppText>
-          ) : null}
-          <AppText variant="caption" tone="muted">
-            清單名稱會自動放到最大，並加上描邊與光暈，放在複雜的底圖上也看得清楚。
-          </AppText>
-        </View>
-      ) : null}
+      )}
     </EditSheet>
   );
 }

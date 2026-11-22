@@ -13,7 +13,7 @@ import { flashText } from "@/ui/flash-notice";
 import { ListIcon } from "@/ui/list-icon";
 import { bumpMark, useMark, type ListRef } from "./store";
 
-export type OwnList = { id: string; title: string; slug: string; clicks: number; people: number; count: number; url: string; coverItemId: string | null; coverUrl: string | null; coverMode: "item" | "upload" | "text"; coverBgUrl: string | null; has?: boolean };
+export type OwnList = { id: string; title: string; slug: string; clicks: number; people: number; count: number; url: string; coverItemId: string | null; coverUrl: string | null; coverMode: "item" | "upload" | "text"; coverBgUrl: string | null; coverText?: string | null; has?: boolean };
 export type Quota = { base: number; total: number; used: number; unlocks: { achievementId: string; name: string; extra: number; earned: boolean; description: string; type: string; threshold: number; feature: string | null }[] };
 type Resp = { lists: OwnList[]; quota: Quota; id?: string };
 
