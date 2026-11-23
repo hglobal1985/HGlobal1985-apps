@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { View } from "react-native";
-import { api, apiUpload, COVER_MEDIA_MAX, type CoverMediaKind } from "@/api/client";
+import { api, apiUpload, COVER_MEDIA_MAX, type CoverMediaKind, type CoverScope } from "@/api/client";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
 import { useUiConfig } from "@/state/ui-config";
 import { space } from "@/theme/tokens";
@@ -14,13 +14,13 @@ import { UploadProgress } from "./upload-progress";
  * 照片先在瀏覽器壓縮（中心封面的畫質設定）；影片依「設定 › 儲存空間管理 › 封面輪播與短影音」的規範在瀏覽器內壓縮後再上傳，並擷取第一格當預覽圖。
  * 中心「相簿」、系列封面、課程封面都用這一個元件。
  */
-export function AlbumUploadButton({ kind, ownerKey, count, onDone }: { kind: CoverMediaKind; ownerKey: string; count: number; onDone: () => void }) {
+export function AlbumUploadButton({ kind, ownerKey, count, onDone, scope }: { kind: CoverMediaKind; ownerKey: string; count: number; onDone: () => void; /** 中心的儲存區：cover＝封面輪播照片（封面編輯）；edm＝EDM 分頁。系列、課程不用給。 */ scope?: CoverScope }) {
   const { config } = useUiConfig();
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<{ label: string; pct: number | null; detail?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const q = `kind=${kind}&key=${encodeURIComponent(ownerKey)}`;
+  const q = `kind=${kind}&key=${encodeURIComponent(ownerKey)}${scope ? `&scope=${scope}` : ""}`;
   const spec = { maxHeight: config.app.videoMaxHeight, kbps: config.app.videoKbps, fps: config.app.videoFps, maxMb: config.app.videoMaxMb, maxSec: config.app.videoMaxSec };
 
   const run = async (files: File[]) => {

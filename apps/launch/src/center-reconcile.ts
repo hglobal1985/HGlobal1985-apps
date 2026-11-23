@@ -31,6 +31,8 @@ const KEY_COLS: [string, string][] = [
   ["push_subscriptions", "center_key"],
   ["center_views", "center_key"],
   ["center_schedules", "center_key"],
+  ["cover_media", "center_key"],
+  ["center_cover_cfg", "center_key"],
 ];
 /** 同一列還有「顯示名稱」欄位的表：換鑰匙時一起換成中央的新名稱。 */
 const LABEL_COLS: Record<string, string> = {
@@ -73,7 +75,7 @@ export async function reconcileCenters(db: D1Database, labels: string[]): Promis
       stmts.push(db.prepare(`UPDATE OR IGNORE ${t} SET ${c} = ?${lc ? `, ${lc} = ?` : ""} WHERE ${c} = ?`).bind(...(lc ? [nk, label, oldKey] : [nk, oldKey])));
     }
     // 主鍵撞到新鑰匙而沒換成的重複列直接刪掉（新鑰匙那邊已經有同一筆）。
-    for (const t of ["center_art", "center_info", "center_names", "center_subscriptions", "center_views", "center_broadcast_cfg", "course_editors", "review_group_members"]) {
+    for (const t of ["center_art", "center_info", "center_names", "center_subscriptions", "center_views", "center_broadcast_cfg", "course_editors", "review_group_members", "center_cover_cfg"]) {
       stmts.push(db.prepare(`DELETE FROM ${t} WHERE ${KEY_COLS.find((x) => x[0] === t)![1]} = ?`).bind(oldKey));
     }
     stmts.push(db.prepare("UPDATE OR IGNORE page_views SET key = ? WHERE kind = 'center' AND key = ?").bind(nk, oldKey));

@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { createElement, useState } from "react";
 import { Image, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
-import { api, resolveUrl, type CoverMediaItem, type CoverMediaKind } from "@/api/client";
+import { api, resolveUrl, type CoverMediaItem, type CoverMediaKind, type CoverScope } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
@@ -19,7 +19,7 @@ const COLS = 3;
  * 與封面輪播是同一份資料（cover_media）：這裡新增的照片與短影音，會直接出現在封面輪播；管理者可上傳、整理順序、刪除。
  * 點照片開全螢幕看圖（可左右翻整本相簿）；點影片開播放視窗。
  */
-export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }: { kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void }) {
+export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, scope, emptyHint }: { kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void; /** 中心的儲存區（cover＝封面編輯、edm＝EDM 分頁）；系列、課程不用給。 */ scope?: CoverScope; emptyHint?: string }) {
   const { c } = useTheme();
   const thumb = useThumb();
   const [w, setW] = useState(0);
@@ -34,14 +34,14 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }:
     if (i < 0 || j < 0 || j >= ids.length) return;
     [ids[i], ids[j]] = [ids[j]!, ids[i]!];
     try {
-      await api("POST", "/admin/cover-media/order", { kind, key: ownerKey, ids });
+      await api("POST", "/admin/cover-media/order", { kind, key: ownerKey, ids, ...(scope ? { scope } : {}) });
       onChanged();
     } catch (e) {
       flashText((e as Error).message);
     }
   };
   const remove = async (x: CoverMediaItem) => {
-    if (!(await confirmAsk(x.kind === "video" ? "刪除影片" : "刪除照片", "確定刪除？刪除後無法復原，封面輪播也會一起移除。", "刪除"))) return;
+    if (!(await confirmAsk(x.kind === "video" ? "刪除影片" : "刪除照片", "確定刪除？刪除後無法復原。", "刪除"))) return;
     try {
       await api("DELETE", `/admin/cover-media/${x.id}`);
       onChanged();
@@ -52,7 +52,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged }:
   };
   return (
     <View style={{ gap: space.md }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      {!items.length ? <EmptyState icon="images-outline" title="還沒有照片" body={canEdit ? "按右下角「新增教材 › 上傳照片影音」新增，照片與短影音會自動成為封面輪播。" : undefined} /> : null}
+      {!items.length ? <EmptyState icon="images-outline" title="還沒有照片" body={canEdit ? emptyHint ?? "按右下角「新增教材 › 上傳照片影音」新增。" : undefined} /> : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
         {items.map((x, i) => (
           <View key={x.id} style={{ width: tile || "33%", height: tile || 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: c.surfaceMuted }}>

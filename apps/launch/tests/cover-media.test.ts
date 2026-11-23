@@ -81,3 +81,43 @@ test("封面輪播與相簿：上傳照片與影片、排序、Range 播放、�
   assert.equal((await call("PUT", "/admin/cover-media?kind=series&key=U40&w=10&h=10", { token: admin, bytes: jpeg })).status, 200);
   assert.equal((await call<Item[]>("GET", "/cover-media?kind=series&key=U40")).data.length, 1);
 });
+
+test("封面輪播照片與 EDM 分頁照片分開儲存：各自上限、各自排序、封面輪播是否顯示 EDM（業主 2026-11-23）", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown; bytes?: Uint8Array } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.bytes ? {} : { "content-type": "application/json" }), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.bytes ? (opts.bytes as unknown as BodyInit) : opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  const login = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", { body: { sub } })).data.token;
+  const [admin, student] = await Promise.all([login("demo-admin"), login("demo-student")]);
+  type Item = { id: string; scope: string; width: number };
+  const C = encodeURIComponent("台北中心");
+  const put = (scope: string | null, w: number) => call<{ id: string }>("PUT", `/admin/cover-media?kind=center&key=${C}&w=${w}&h=800${scope ? `&scope=${scope}` : ""}`, { token: admin, bytes: jpeg });
+
+  const e1 = await put("edm", 1200);
+  const e2 = await put(null, 1300); // 沒帶 scope：中心當 edm（舊版相簿上傳）
+  const c1 = await put("cover", 1400);
+  const c2 = await put("cover", 1500);
+  assert.ok(e1.data.id && e2.data.id && c1.data.id && c2.data.id);
+  const all = (await call<Item[]>("GET", `/cover-media?kind=center&key=${C}`)).data;
+  assert.deepEqual(all.map((x) => [x.scope, x.width]), [["cover", 1400], ["cover", 1500], ["edm", 1200], ["edm", 1300]], "兩區各自排序，公開讀取兩區都回（封面在前）");
+
+  // 排序只動指定的那一區
+  await call("POST", "/admin/cover-media/order", { token: admin, body: { kind: "center", key: "台北中心", scope: "cover", ids: [c2.data.id, c1.data.id] } });
+  const after = (await call<Item[]>("GET", `/cover-media?kind=center&key=${C}`)).data;
+  assert.deepEqual(after.map((x) => [x.scope, x.width]), [["cover", 1500], ["cover", 1400], ["edm", 1200], ["edm", 1300]], "封面區重排，EDM 區不變");
+
+  // 系列、課程只有封面區：就算帶 scope=edm 也一律存成 cover
+  const s1 = await call<{ id: string }>("PUT", `/admin/cover-media?kind=series&key=${encodeURIComponent("某系列")}&w=100&h=100&scope=edm`, { token: admin, bytes: jpeg });
+  assert.equal(s1.status, 200);
+  assert.equal((await call<Item[]>("GET", `/cover-media?kind=series&key=${encodeURIComponent("某系列")}`)).data[0]!.scope, "cover");
+
+  // 封面輪播是否顯示 EDM：沒設定＝預設打勾；只有能編輯該中心封面的人可以改
+  assert.deepEqual((await call("GET", `/cover-media/config?center=${C}`)).data, { showEdm: true });
+  assert.equal((await call("PUT", "/admin/cover-media/config", { token: student, body: { kind: "center", key: "台北中心", showEdm: false } })).status, 403);
+  assert.deepEqual((await call("PUT", "/admin/cover-media/config", { token: admin, body: { kind: "center", key: "台北中心", showEdm: false } })).data, { showEdm: false });
+  assert.deepEqual((await call("GET", `/cover-media/config?center=${C}`)).data, { showEdm: false });
+  assert.deepEqual((await call("PUT", "/admin/cover-media/config", { token: admin, body: { kind: "center", key: "台北中心", showEdm: true } })).data, { showEdm: true });
+  assert.deepEqual((await call("GET", `/cover-media/config?center=${C}`)).data, { showEdm: true });
+});

@@ -66,6 +66,7 @@ export type {
   StaffMember,
   CoverMediaItem,
   CoverMediaKind,
+  CoverScope,
   StaffRole,
   StaffSearch,
   LibraryItem,
