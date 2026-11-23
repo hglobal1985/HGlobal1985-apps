@@ -16,7 +16,7 @@ export const PUSH_TEXT: Record<PushState, string> = {
 };
 
 /** 基本資料面板第一步驟的「手機推播」一列（業主 2026-11-22）：這支裝置的開關，按下立刻生效，不用按儲存；其他狀態只在下方多一行小字。 */
-export function PushSwitchRow({ banner }: { banner?: boolean } = {}) {
+export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮小版（業主 2026-11-23：放在本名旁邊的小位置）：單行 40 高、較小字與圖示。 */ compact?: boolean } = {}) {
   const { c, scheme } = useTheme();
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -56,15 +56,17 @@ export function PushSwitchRow({ banner }: { banner?: boolean } = {}) {
           accessibilityLabel="開啟手機推播"
           disabled={!canToggle}
           onPress={() => !busy && void toggle(!on)}
-          style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: space.sm, opacity: 1 }}
+          style={{ flexDirection: "row", alignItems: "center", gap: compact ? 6 : space.sm, minHeight: compact ? 40 : 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: compact ? 8 : space.sm, opacity: 1 }}
         >
-          <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.2)" }}>
-            <Icon name="notifications" size={20} color={fg} />
-          </View>
+          {compact ? null : (
+            <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.2)" }}>
+              <Icon name="notifications" size={20} color={fg} />
+            </View>
+          )}
           <View style={{ flex: 1 }}>
-            <AppText style={{ fontWeight: "900", fontSize: 22, lineHeight: 28, color: fg }}>{on ? "手機推播已開啟" : "按此開啟手機推播"}</AppText>
+            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>{compact ? (on ? "推播已開啟" : "開啟推播") : on ? "手機推播已開啟" : "按此開啟手機推播"}</AppText>
           </View>
-          <Icon name={on ? "checkbox" : "square-outline"} size={34} color={fg} />
+          <Icon name={on ? "checkbox" : "square-outline"} size={compact ? 22 : 34} color={fg} />
         </Pressable>
         {hint ? (
           <AppText variant="caption" tone={err ? "danger" : "muted"} numberOfLines={2}>
