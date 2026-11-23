@@ -193,18 +193,18 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       const center = hg ? (st.education_center.trim() === NONE_TERM ? "" : st.education_center) : t ? NONE_TERM : "";
       return { ...st, education_system: v, education_center: center };
     });
-  const missing: Key[] = data ? ([!vals.display_name.trim() && "display_name", amway && !vals.education_system.trim() && "education_system", amway && systemHg && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
+  const missing: Key[] = data ? ([!vals.legal_name.trim() && "legal_name", !vals.display_name.trim() && "display_name", amway && !vals.education_system.trim() && "education_system", amway && systemHg && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
 
   /** 三欄窄版用的短標籤：審核通過→通過、審核中...→審核中。 */
   const shortTag = (t: string | undefined) => (t === "審核通過" ? "通過" : t === "審核中..." ? "審核中" : t);
 
   /** 標籤：沒填 → 「必填」；填了就隱藏；中心、獎銜（沒被改動時）等待審核 → 「審核中...」、已通過審核 → 「審核通過」（外觀都同必填）。 */
-  const tagFor = (key: "education_system" | "education_center" | "rank" | "display_name", reviewed = false): string | undefined => {
+  const tagFor = (key: "education_system" | "education_center" | "rank" | "display_name" | "legal_name", reviewed = false): string | undefined => {
     const v = vals[key];
     // 「必填」標籤依目前的選擇動態顯示（業主 2026-11-23）：中心只有系統是寰宇才需要填（非寰宇自動「無」、還沒選系統時還不能選），其他情況不顯示。
     if (key === "education_center" && !systemHg) return undefined;
     if (!v.trim()) return "必填";
-    if (reviewed && data && key !== "display_name") {
+    if (reviewed && data && key !== "display_name" && key !== "legal_name") {
       const f = data.fields[key];
       if (initial && v === initial[key]) {
         if (f.pending !== null) return "審核中...";
@@ -329,8 +329,8 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
             <>
               <View style={[styles.line, { alignItems: "flex-end" }]}>
                 <View style={{ flex: 1 }}>
-                  <Row>
-                    <Label text="本名（付費課程對帳用）" />
+                  <Row bad={showBad && missing.includes("legal_name")}>
+                    <Label text="本名（付費課程對帳用）" tag={tagFor("legal_name")} />
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
                 </View>

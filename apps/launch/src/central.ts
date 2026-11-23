@@ -215,11 +215,16 @@ export async function profileGaps(sub: string, token: string, email: string | nu
   // 會員中心暫時查不到（例如剛註冊、資料還沒建好）時回 undefined：不快取，下次進來再問，才不會把「沒有缺漏」記住。
   return cached(`gaps:${sub}:${email ? 1 : 0}`, 60_000, async (): Promise<string[] | undefined> => {
     const gaps: string[] = [];
-    // Email 不列入提醒：會員用 Google 登入，信箱由會員中心預設帶入 Google 信箱（見交接文件）。
+    // Email 不列入提醒（業主 2026-11-23：Email 自動帶入 Google 信箱、非必填）：會員用 Google 登入，信箱由會員中心預設帶入。
     void email;
     {
-      const b = await amwayMe(sub, token);
+      const [b, doc] = await Promise.all([amwayMe(sub, token), profileDoc(sub, token)]);
       if (!b) return undefined;
+      // 本名必填（業主 2026-11-23）：沒填也要提醒（暫時讀不到個人資料時不誤報）。
+      if (doc) {
+        const ln = doc.fields?.legal_name?.value;
+        if (typeof ln !== "string" || !ln.trim()) gaps.push("本名");
+      }
       // 新會員還沒勾選「我是 Amway 會員」也要提醒（視窗會引導到會員中心勾選並填寫）。
       if (b.enabled !== true) gaps.push("Amway 會員資料");
       else {
