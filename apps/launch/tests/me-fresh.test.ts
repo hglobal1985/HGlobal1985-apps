@@ -22,12 +22,13 @@ test("新會員：沒勾 Amway 也會提醒；會員中心暫時查不到不記�
   // 模擬會員中心：amway 內容可隨時改，也可模擬暫時故障。
   let amway: unknown = { enabled: false, fields: {} };
   let amwayDown = false;
+  let legalName = "王小明"; // 本名必填（業主 2026-11-23）
   setCentralFetch((url) => {
     const ok = (b: unknown) => Promise.resolve(new Response(JSON.stringify(b), { status: 200 }));
     if (url.endsWith("/oauth/jwks")) return ok({ keys: [jwk] });
     if (url.endsWith("/v1/me/amway")) return amwayDown ? Promise.resolve(new Response("{}", { status: 503 })) : ok(amway);
     if (url.endsWith("/v1/amway/field-definitions")) return ok([{ key: "rank", options: [{ value: "none", label: "無" }, { value: "gold", label: "金章" }] }]);
-    if (url.endsWith("/v1/me/profile")) return ok({ fields: { display_name: { value: "新會員" } } });
+    if (url.endsWith("/v1/me/profile")) return ok({ fields: { display_name: { value: "新會員" }, legal_name: { value: legalName } } });
     if (url.endsWith("/v1/eligibility/context")) return ok({ member_id: "m_new", roles: [], hglobal_verified: false, center: null });
     if (url.includes("/v1/vocab/suggestions")) return ok({ suggestions: [] });
     return Promise.resolve(new Response("{}", { status: 404 }));
@@ -48,4 +49,10 @@ test("新會員：沒勾 Amway 也會提醒；會員中心暫時查不到不記�
   const fresh = await me("?fresh=1");
   assert.equal(fresh.rankLabel, "金章");
   assert.deepEqual(fresh.profileMissing ?? [], []);
+
+  // ④ 本名必填：沒填本名也要提醒（Email 不列入）；補上後 fresh=1 立刻不再提醒
+  legalName = "";
+  assert.deepEqual((await me("?fresh=1")).profileMissing, ["本名"]);
+  legalName = "王小明";
+  assert.deepEqual((await me("?fresh=1")).profileMissing ?? [], []);
 });
