@@ -69,6 +69,13 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
                 </View>
               ) : null}
             </Pressable>
+            {scope === "edm" && x.eventDate ? (
+              <View style={{ position: "absolute", left: 4, top: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.6)" }} pointerEvents="none">
+                <AppText variant="caption" style={{ color: "#fff", fontSize: 11, lineHeight: 14, fontWeight: "700" }} {...NO_SCALE}>
+                  {x.eventDate.slice(5).replace("-", "/")}
+                </AppText>
+              </View>
+            ) : null}
             {x.courseId ? (
               <View style={styles.courseTag} pointerEvents="none">
                 <Ionicons name="link" size={11} color="#fff" {...NO_SCALE} />
@@ -79,9 +86,9 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
             ) : null}
             {canEdit ? (
               <View style={styles.tools} pointerEvents="box-none">
-                <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
+                {scope === "edm" ? null : <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-back" size={16} color="#fff" {...NO_SCALE} />
-                </Pressable>
+                </Pressable>}
                 {x.courseId ? (
                   <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="更換照片" onPress={() => replace(x)} style={[styles.tbtn, { backgroundColor: "rgba(12,96,60,0.95)" }]}>
                     <Ionicons name="swap-horizontal" size={16} color="#fff" {...NO_SCALE} />
@@ -91,9 +98,9 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
                     <Ionicons name="trash" size={15} color="#fff" {...NO_SCALE} />
                   </Pressable>
                 )}
-                <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
+                {scope === "edm" ? null : <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-forward" size={16} color="#fff" {...NO_SCALE} />
-                </Pressable>
+                </Pressable>}
               </View>
             ) : null}
           </View>

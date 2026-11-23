@@ -7,14 +7,14 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section } from "@/ui";
 
-type Kind = "speech" | "text" | "embedding";
+type Kind = "speech" | "text" | "embedding" | "vision";
 type Model = { id: string; name: string; vendor: string; kind: Kind; cost: string; costLevel: "低" | "中" | "高"; strengths: string; bestFor: string; needsKey: boolean };
 type Job = { key: string; label: string; desc: string; kind: Kind; default: string };
 type ClaudeUsage = { month: string; spentUsd: number; capUsd: number; stopped: boolean; resetsAt: string; capChoices: number[] };
 type Usage = { claude: ClaudeUsage; claudeMonthlyCapUsd: number; freeOnly: boolean; capEnabled: boolean; dailyCap: number; day: string; used: number; freeDaily: number; stopped: boolean; resumesAt: string; capChoices: number[] };
 type KeyInfo = { key: string; label: string; ready: boolean; need: string; steps: string };
 type Data = { jobs: Job[]; models: Model[]; selection: Record<string, string>; usage: Usage; keys: KeyInfo[] };
-const KIND_LABEL: Record<Kind, string> = { speech: "語音轉文字", text: "文字整理", embedding: "語意搜尋" };
+const KIND_LABEL: Record<Kind, string> = { speech: "語音轉文字", text: "文字整理", embedding: "語意搜尋", vision: "圖片辨識" };
 const COLS = [
   { label: "模型", w: 150 },
   { label: "種類", w: 90 },
@@ -238,6 +238,7 @@ export default function AiModelsScreen() {
                           <AppText variant="headline">
                             {m.name}
                             {m.id === job.default ? "（預設）" : ""}
+                            {on ? "　✓ 目前使用" : ""}
                           </AppText>
                           <AppText variant="caption" tone="muted">
                             花費：{m.costLevel}　{m.needsKey ? (locked ? "沒有免費額度（已鎖定）" : "需另外申請金鑰") : "不需金鑰"}

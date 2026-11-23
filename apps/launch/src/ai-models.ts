@@ -1,7 +1,7 @@
 /** AI 模型清單與各項工作選用的模型（超級管理員在「設定 → AI 模型」切換；選擇存在 ui_settings 的 ai_models 一筆 JSON）。 */
 import type { D1Database } from "./d1.ts";
 
-export type AiKind = "speech" | "text" | "embedding";
+export type AiKind = "speech" | "text" | "embedding" | "vision";
 export type AiModel = {
   id: string;
   name: string;
@@ -25,6 +25,7 @@ export type AiJob = { key: string; label: string; desc: string; kind: AiKind; de
 export const AI_JOBS: AiJob[] = [
   { key: "transcribe", label: "逐字稿（語音轉文字）", desc: "把課程影片／音檔的聲音轉成逐字稿", kind: "speech", default: "@cf/openai/whisper-large-v3-turbo" },
   { key: "keywords", label: "關鍵字與 hashtag", desc: "從逐字稿整理重點關鍵字、hashtag、摘要", kind: "text", default: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" },
+  { key: "edm_vision", label: "EDM 圖片辨識（文字與活動日期）", desc: "中心 EDM 上傳後，由 AI 讀出海報文字與活動日期，用於搜尋，並讓 EDM 依活動日期排序", kind: "vision", default: "@cf/meta/llama-3.2-11b-vision-instruct" },
   { key: "embedding", label: "語意搜尋", desc: "把文字轉成向量，讓搜尋「疼痛」也找得到「不舒服」", kind: "embedding", default: "@cf/baai/bge-m3" },
 ];
 
@@ -35,6 +36,9 @@ export const AI_MODELS: AiModel[] = [
   { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B", vendor: "Cloudflare（Meta 模型）", kind: "text", cost: "約 US$0.293／百萬字進、US$2.253／百萬字出", costLevel: "中", strengths: "理解力與中文表現比 8B 好很多，仍在 Cloudflare 內不需金鑰", bestFor: "關鍵字、hashtag、摘要（預設）", neurons: { perMInput: 26668, perMOutput: 204805 }, needsKey: false },
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", vendor: "Anthropic", kind: "text", cost: "US$0.10／百萬 token 進、US$0.50／百萬 token 出（單次輸入超過 10 萬 token 為 $0.50／$2.50）；需另外申請金鑰，沒有每日免費額度", costLevel: "低", strengths: "中文整理與歸納品質高、速度快，Claude 裡最便宜", bestFor: "品質要求較高的摘要與關鍵字", usd: { perMInput: 0.1, perMOutput: 0.5, longInput: 0.5, longOutput: 2.5 }, needsKey: true },
   { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", vendor: "Anthropic", kind: "text", cost: "US$2／百萬 token 進、US$10／百萬 token 出；需另外申請金鑰，沒有每日免費額度", costLevel: "中", strengths: "理解與寫作最細緻，能處理很長的逐字稿", bestFor: "重要課程的精修摘要；比 Haiku 貴 20 倍，日常不建議", usd: { perMInput: 2, perMOutput: 10 }, needsKey: true },
+  { id: "@cf/meta/llama-3.2-11b-vision-instruct", name: "Llama 3.2 11B Vision", vendor: "Cloudflare（Meta 模型）", kind: "vision", cost: "約 US$0.0485／百萬字進、US$0.676／百萬字出（辨識一張 EDM 約 US$0.0004）；每天免費額度約可辨識 80 張", costLevel: "低", strengths: "最省額度的視覺模型，能讀海報上的文字與日期；中文小字偶爾漏字", bestFor: "EDM 圖片辨識的首選（預設）；第一次使用會自動同意 Meta 授權", neurons: { perMInput: 4409, perMOutput: 61455 }, needsKey: false },
+  { id: "@cf/google/gemma-3-12b-it", name: "Gemma 3 12B", vendor: "Cloudflare（Google 模型）", kind: "vision", cost: "約 US$0.345／百萬字進、US$0.556／百萬字出（辨識一張 EDM 約 US$0.001）；每天免費額度約可辨識 35 張", costLevel: "中", strengths: "多語言（140 多種）圖文理解，中文海報文字辨識比 Llama 3.2 穩", bestFor: "海報字多、版面複雜，Llama 3.2 讀不準時改用", neurons: { perMInput: 31371, perMOutput: 50560 }, needsKey: false },
+  { id: "@cf/meta/llama-4-scout-17b-16e-instruct", name: "Llama 4 Scout 17B", vendor: "Cloudflare（Meta 模型）", kind: "vision", cost: "約 US$0.27／百萬字進、US$0.85／百萬字出（辨識一張 EDM 約 US$0.001）；每天免費額度約可辨識 40 張", costLevel: "中", strengths: "原生多模態，圖片與文字理解最強，長日期、表格排版也讀得準", bestFor: "要求辨識準確、張數不多時", neurons: { perMInput: 24545, perMOutput: 77273 }, needsKey: false },
   { id: "@cf/baai/bge-m3", name: "BGE-M3", vendor: "Cloudflare（BAAI 模型）", kind: "embedding", cost: "約 US$0.0118／百萬字", costLevel: "低", strengths: "多語言（100 多種），中文與中英混用表現好", bestFor: "語意搜尋的首選（預設）", neurons: { perMInput: 1073 }, needsKey: false },
 ];
 

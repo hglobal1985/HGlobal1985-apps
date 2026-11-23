@@ -556,6 +556,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const canAnnounce = activeCenter !== ALL ? canEditArt : isSuperAdmin(member);
   const announceTargets: BroadcastTarget[] = activeCenter !== ALL ? [{ scope: "center", name: activeCenter, label: `${centerTitle(activeCenter)}公告` }] : [{ scope: "home", label: "首頁公告" }];
   const cm = useCoverMedia("center", activeCenter === ALL ? null : activeCenter);
+  // 中心 EDM 搜尋（業主 2026-11-23）：上方搜尋框輸入的字，比對 AI 從海報辨識出的文字與活動日期。
+  const edmShown = useMemo(() => {
+    const k = q.trim().toLowerCase();
+    return k ? cm.edm.filter((x) => `${x.eventDate ?? ""} ${x.text ?? ""}`.toLowerCase().includes(k)) : cm.edm;
+  }, [cm.edm, q]);
   const centerHero =
     activeCenter !== ALL ? <CenterHero art={art} media={cm.carousel} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
@@ -603,7 +608,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {centerPage && tab === "album" ? (
-        <CoverAlbum kind="center" scope="edm" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={cm.edm} canEdit={canEditArt} onChanged={cm.reload} />
+        <CoverAlbum kind="center" scope="edm" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={edmShown} canEdit={canEditArt} onChanged={cm.reload} emptyHint={q.trim() ? "找不到符合的 EDM" : undefined} />
       ) : chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
