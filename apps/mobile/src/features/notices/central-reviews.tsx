@@ -28,7 +28,7 @@ const text = (v: unknown): string => {
   return JSON.stringify(v);
 };
 
-type HistoryRow = { id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; final_text: string; status: string; decided_by_name: string; decided_at: string };
+type HistoryRow = { id: string; field_label: string; applicant_name: string; legal_name: string | null; upline_platinum: string | null; upline_diamond: string | null; has_member: boolean; from_text: string; to_text: string; final_text: string; status: string; decided_by_name: string; decided_at: string };
 
 export const hhmm = (iso: string) => {
   const d = new Date(iso);
@@ -149,7 +149,7 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
               <Card style={{ paddingVertical: 4 }}>
                 {g.rows.map((h, i) => {
                   const ok = h.status === "approved";
-                  const name = h.applicant_name || "會員";
+                  const name = applicantLabel(h.legal_name, h.applicant_name) || "會員";
                   const content = h.final_text ? `${h.final_text}（審核者修改）` : h.to_text;
                   return (
                     <View key={h.id} style={[styles.hrow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderColor: c.border }]}>
@@ -166,6 +166,11 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
                         <AppText variant="caption" tone="muted">
                           {[content, h.decided_by_name ? `審核 ${h.decided_by_name}` : ""].filter(Boolean).join(" · ")}
                         </AppText>
+                        {h.has_member ? (
+                          <AppText variant="caption" tone="muted">
+                            上手白金：{h.upline_platinum ?? "未提供"}　上手鑽石：{h.upline_diamond ?? "未提供"}
+                          </AppText>
+                        ) : null}
                       </View>
                       <View style={{ alignItems: "flex-end", gap: 2 }}>
                         <View style={{ borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2, backgroundColor: ok ? c.accentSoft : c.dangerSoft }}>

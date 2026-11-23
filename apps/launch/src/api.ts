@@ -5009,11 +5009,17 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       // 已處理的申請紀錄（保留，不會從通知頁消失）：自己處理過的；超級管理員看全部。
       const s = requireMember(ctx);
-      const sql = "SELECT id, field_label, COALESCE(NULLIF(applicant_name, ''), (SELECT r2.applicant_name FROM review_log r2 WHERE r2.applicant_sub = review_log.applicant_sub AND r2.applicant_sub IS NOT NULL AND r2.applicant_name <> '' ORDER BY r2.created_at DESC LIMIT 1), '') AS applicant_name, from_text, to_text, final_text, status, decided_by_name, decided_at FROM review_log WHERE status <> 'pending'" + (s.role === "admin" ? "" : " AND decided_by_sub = ?") + " ORDER BY decided_at DESC LIMIT 100";
-      const { results } = await (s.role === "admin" ? ctx.db.prepare(sql) : ctx.db.prepare(sql).bind(s.sub)).all<{ id: string; field_label: string; applicant_name: string; from_text: string; to_text: string; final_text: string; status: string; decided_by_name: string; decided_at: string }>();
+      const sql = "SELECT id, field_label, COALESCE(NULLIF(applicant_name, ''), (SELECT r2.applicant_name FROM review_log r2 WHERE r2.applicant_sub = review_log.applicant_sub AND r2.applicant_sub IS NOT NULL AND r2.applicant_name <> '' ORDER BY r2.created_at DESC LIMIT 1), '') AS applicant_name, applicant_sub, from_text, to_text, final_text, status, decided_by_name, decided_at FROM review_log WHERE status <> 'pending'" + (s.role === "admin" ? "" : " AND decided_by_sub = ?") + " ORDER BY decided_at DESC LIMIT 100";
+      const { results } = await (s.role === "admin" ? ctx.db.prepare(sql) : ctx.db.prepare(sql).bind(s.sub)).all<{ id: string; field_label: string; applicant_name: string; applicant_sub: string | null; from_text: string; to_text: string; final_text: string; status: string; decided_by_name: string; decided_at: string }>();
+      // 申請人的本名與上手白金／鑽石（中央即時提供、不保存；讀不到就不顯示）。
+      const subs = [...new Set(results.map((r) => r.applicant_sub).filter((x): x is string => !!x))].slice(0, 100);
+      const [legal, uplines] = subs.length ? await Promise.all([lookupLegalNames(ctx.env.CENTRAL_SERVICE_SECRET, subs).catch(() => new Map<string, string>()), lookupUplines(ctx.env.CENTRAL_SERVICE_SECRET, subs).catch(() => undefined)]) : [new Map<string, string>(), undefined];
       // 獎銜顯示正式中文名稱（資料裡存的是代號）。
       const names = s.kind === "central" ? await rankOptions(s.token).catch(() => new Map<string, string>()) : new Map<string, string>();
-      return results.map((r) => (r.field_label === "獎銜" ? { ...r, from_text: names.get(r.from_text) ?? r.from_text, to_text: names.get(r.to_text) ?? r.to_text, final_text: names.get(r.final_text) ?? r.final_text } : r));
+      return results.map(({ applicant_sub: sub, ...r0 }) => {
+        const r = { ...r0, legal_name: (sub && legal.get(sub)) || null, upline_platinum: (sub && uplines?.get(sub)?.platinum) || null, upline_diamond: (sub && uplines?.get(sub)?.diamond) || null, has_member: !!sub };
+        return r.field_label === "獎銜" ? { ...r, from_text: names.get(r.from_text) ?? r.from_text, to_text: names.get(r.to_text) ?? r.to_text, final_text: names.get(r.final_text) ?? r.final_text } : r;
+      });
     },
   ],
   [
