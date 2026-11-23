@@ -13,7 +13,7 @@ import { fadedStyle } from "@/ui/fade-style";
  * - `ListSection`＝區塊標題列（區塊名稱＋教材數量），內容是 0 就淡化。
  * 用在：中心頁「清單」、系列頁「清單」（`CenterListCard`）、教材卡頁「清單」（`MaterialRow`、`FullVersionList`）。要改清單的樣子只改這個檔案。
  */
-export function CompactRow({ leading, title, meta, actions, onPress, highlight, faded, label }: { leading?: ReactNode; title: string; meta?: ReactNode; actions?: ReactNode; onPress?: () => void; highlight?: boolean; faded?: boolean; label?: string }) {
+export function CompactRow({ leading, title, titleLines = 1, meta, actions, onPress, highlight, faded, label }: { /** 標題最多幾行（預設 1；教材列用 2，太長自動加高，業主 2026-11-23）。 */ titleLines?: number; leading?: ReactNode; title: string; meta?: ReactNode; actions?: ReactNode; onPress?: () => void; highlight?: boolean; faded?: boolean; label?: string }) {
   const { c } = useTheme();
   return (
     <View style={faded ? fadedStyle : undefined}>
@@ -26,7 +26,7 @@ export function CompactRow({ leading, title, meta, actions, onPress, highlight, 
       >
         {leading}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <AppText variant="headline" numberOfLines={1} style={styles.tight}>
+          <AppText variant="headline" numberOfLines={titleLines} style={styles.tight}>
             {title}
           </AppText>
           {meta}

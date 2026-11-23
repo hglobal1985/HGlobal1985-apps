@@ -60,6 +60,7 @@ export function MaterialRow({ course, lesson, listStyle, playingId, onPlay, onBl
       leading={leading}
       highlight={playing}
       title={lesson.title}
+      titleLines={2}
       meta={<MetaLine date={lesson.eventDate ? eventDays(lesson.eventDate, null) : undefined} text={text || undefined} />}
       actions={<RowActions course={course} lesson={lesson}>{link?.linkUrl && !isDownloadUrl(link.linkUrl) ? <MaterialShare course={course} lesson={link} /> : ls && !lesson.full && lesson.ready && !lesson.locked ? <ListItemShare course={course} lesson={lesson} /> : null}</RowActions>}
       onPress={
