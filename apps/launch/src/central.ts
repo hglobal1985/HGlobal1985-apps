@@ -513,6 +513,23 @@ export async function saveContactEmail(sub: string, token: string, email: string
   return true;
 }
 
+/**
+ * App 內直接刪除帳號（中央串接指令 2026-11-23.3，三、9）：用會員自己的 Access Token ＋ 剛重新驗證拿到的 reauth_token，
+ * POST /v1/me/delete-account。成功＝中央帳號已匿名化、所有 App 登出、Amway 資料全清；失敗把中央的白話訊息原樣帶回（不寫日誌）。
+ */
+export async function centralDeleteAccount(sub: string, token: string, reauthToken: string): Promise<{ ok: true } | { ok: false; status: number; code: string; message: string }> {
+  const res = await callCentral(token, "/v1/me/delete-account", { method: "POST", body: JSON.stringify({ reauth_token: reauthToken }) });
+  if (!res) return { ok: false, status: 502, code: "central_unavailable", message: "會員中心暫時連不上，帳號沒有刪除，請稍後再試" };
+  if (res.ok) {
+    forgetMember(sub);
+    return { ok: true };
+  }
+  const e = ((await res.json().catch(() => null)) as { error?: { code?: unknown; message?: unknown } } | null)?.error;
+  const code = typeof e?.code === "string" ? e.code : "central_error";
+  const message = typeof e?.message === "string" && e.message ? e.message : "帳號沒有刪除，請稍後再試";
+  return { ok: false, status: res.status, code, message };
+}
+
 /** 寫入或查詢後，丟掉這位會員在記憶體裡的中央資料快取（下一次讀取會拿到最新的）。 */
 export function forgetMember(sub: string): void {
   for (const k of [...memo.keys()]) if (k.includes(`:${sub}`)) memo.delete(k);
@@ -621,8 +638,8 @@ export async function centralAddJobTitle(secret: string | undefined, value: stri
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
 
 /** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由業主在中央後台勾選，不在程式內宣稱）。 */
-export const INTEGRATED_VERSION = "2026-11-23.2";
-export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile"];
+export const INTEGRATED_VERSION = "2026-11-23.3";
+export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile", "in_app_delete"];
 export const SIGNATURE_TOLERANCE_SECONDS = 300;
 
 const te = new TextEncoder();

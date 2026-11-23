@@ -18,6 +18,7 @@ const REFRESH_KEY = "hglobal.learn.refresh";
 const ACCESS_KEY = "hglobal.learn.access";
 const ACCESS_EXP_KEY = "hglobal.learn.access-expiry";
 const PENDING_KEY = "hglobal.learn.pending";
+const REAUTH_KEY = "hglobal.learn.reauth";
 
 /**
  * 「登入進行中」的暫存（業主 2026-11-21 回報：登出後再登入常出現「登入狀態已失效」）：
@@ -58,7 +59,7 @@ function takeTemp(key: string): string | null {
 type TokenPair = { access_token: string; refresh_token: string; expires_in: number };
 type SignIn = TokenPair & { user: { member_id: string; status: string } };
 export type AppStatus = { status: "active" | "paused" | "killed"; min_version: string };
-type Pending = { nonce: string; state: string; created: number; returnTo: string };
+type Pending = { nonce: string; state: string; created: number; returnTo: string; /** delete＝刪除帳號的重新驗證（不是登入） */ purpose?: "delete" };
 
 let access: string | null = null;
 let expiry = 0;
@@ -269,8 +270,69 @@ export async function finishWebReturn(): Promise<string> {
   const raw = takeTemp(PENDING_KEY);
   if (!raw) throw new CentralError(400, "no_pending", "登入狀態已失效，請重新登入");
   const pending = JSON.parse(raw) as Pending;
+  if (pending.purpose === "delete") {
+    // 刪除帳號的重新驗證：拿到 reauth_token 先暫存，由 /auth/done 接著呼叫刪除（10 分鐘內有效）。
+    const token = await reauthFrom(new URLSearchParams(fragment), pending);
+    putTemp(REAUTH_KEY, JSON.stringify({ token, at: Date.now() }));
+    return safePath(pending.returnTo);
+  }
   await finish(new URLSearchParams(fragment), pending);
   return safePath(pending.returnTo);
+}
+
+// ---------- 刪除帳號的重新驗證（中央串接指令 2026-11-23.3，三、9）----------
+// 會員再按一次 Google 登入 → id_token 連同 nonce 送 POST /v1/auth/reauth（帶會員自己的 Access Token）→ reauth_token（10 分鐘，只能用來刪帳號）。
+
+async function reauthFrom(params: URLSearchParams, pending: Pending): Promise<string> {
+  if (params.get("state") !== pending.state) throw new CentralError(400, "state", "驗證失敗，請重新操作一次");
+  if (params.get("error")) throw new CentralError(400, "cancelled", "已取消，帳號沒有刪除");
+  const idToken = params.get("id_token");
+  if (!idToken) throw new CentralError(400, "no_token", "沒有取得驗證資料，請重新操作一次");
+  const token = await centralToken();
+  if (!token) throw new CentralError(401, "unauthenticated", "登入已過期，請重新登入後再刪除帳號");
+  try {
+    return (await central<{ reauth_token: string }>("/v1/auth/reauth", "POST", { id_token: idToken, nonce: pending.nonce }, token)).reauth_token;
+  } catch (e) {
+    if (e instanceof CentralError && e.status === 403) throw new CentralError(403, e.code, "請用登入時的同一個 Google 帳號重新驗證");
+    throw e instanceof CentralError && e.status === 0 ? e : new CentralError(e instanceof CentralError ? e.status : 400, "reauth_failed", "重新驗證失敗，帳號沒有刪除，請再試一次");
+  }
+}
+
+/** 開始刪除帳號的重新驗證。手機：開登入視窗，成功回傳 reauthToken；網頁：整頁導向（回來後由 /auth/done 接手，用 takeReauthToken 取得）。 */
+export async function startDeleteReauth(): Promise<{ status: "ok"; reauthToken: string } | { status: "cancelled" | "redirecting" }> {
+  const status = await appStatus();
+  if (status.status !== "active") throw new CentralError(503, "app_unavailable", "目前正在維護中，請稍後再試");
+  const { nonce } = await central<{ nonce: string }>("/v1/auth/nonce", "POST", { app_id: APP_ID });
+  const pending: Pending = { nonce, state: randomHex(), created: Date.now(), returnTo: "/me", purpose: "delete" };
+  const digest = (await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce)).toLowerCase();
+  const url = new URL(`${CENTRAL_URL}/auth/google/start`);
+  url.searchParams.set("app_id", APP_ID);
+  url.searchParams.set("nonce", digest);
+  url.searchParams.set("return", web ? WEB_RETURN : NATIVE_RETURN);
+  url.searchParams.set("state", pending.state);
+  url.searchParams.set("purpose", "delete_account");
+  if (web) {
+    putTemp(PENDING_KEY, JSON.stringify(pending));
+    globalThis.location.assign(url.toString());
+    return { status: "redirecting" };
+  }
+  const result = await WebBrowser.openAuthSessionAsync(url.toString(), NATIVE_RETURN);
+  if (result.type !== "success") return { status: "cancelled" };
+  const back = new URL(result.url);
+  if (back.protocol !== "learn:" || back.hostname !== "auth" || back.pathname !== "/google") throw new CentralError(400, "bad_return", "驗證回傳網址無效");
+  return { status: "ok", reauthToken: await reauthFrom(back.searchParams, pending) };
+}
+
+/** 網頁版：重新驗證回來後取出暫存的 reauth_token（只能用一次、超過 10 分鐘失效）。 */
+export function takeReauthToken(): string | null {
+  const raw = takeTemp(REAUTH_KEY);
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as { token?: string; at?: number };
+    return v.token && Date.now() - (v.at ?? 0) < 10 * 60_000 ? v.token : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 登出。all＝true：登出所有 App、所有裝置與會員中心網站（POST /v1/auth/logout-all）；否則只登出這個 App 的這次登入。 */

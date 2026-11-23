@@ -81,7 +81,7 @@ import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
 import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, recordEvent, recordItemHit, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
-import { lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { centralDeleteAccount, lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -3662,6 +3662,27 @@ const routes: [string, RegExp, Handler][] = [
       // 清除這位會員在本 App 的所有資料（會員中心 webhook 通知刪除帳號時也走同一條）。
       const s = requireMember(ctx);
       await purgeMember(ctx.db, s.sub, s.sub, "member.delete_app_data");
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/me\/delete-account$/,
+    async (ctx) => {
+      // App 內直接刪除帳號（業主 2026-11-23；中央串接指令 2026-11-23.3 三、9）：App 先讓會員重新登入一次拿到 reauth_token，
+      // 這裡用會員自己的 Token 呼叫中央刪除；中央成功才清掉本 App 的所有資料，失敗就完全不動並把中央的白話原因帶回。
+      const s = requireMember(ctx);
+      if (s.kind !== "central") return fail(400, "central_only", "只有中央會員可以使用");
+      const body = await readJson<{ reauth_token?: unknown }>(ctx.req);
+      const reauth = typeof body.reauth_token === "string" ? body.reauth_token : "";
+      if (!reauth) return fail(422, "reauth_required", "請先重新登入確認，才能刪除帳號");
+      const r = await centralDeleteAccount(s.sub, s.token, reauth);
+      if (!r.ok) {
+        // 中央 401 reauth_required 改成 422，避免 App 把它當成「登入過期」而自動換發重試。
+        const status = r.code === "reauth_required" || r.status === 401 ? 422 : r.status >= 500 ? 502 : r.status;
+        return fail(status, r.code === "unauthenticated" ? "reauth_required" : r.code, r.message);
+      }
+      await purgeMember(ctx.db, s.sub, s.sub, "member.delete_account_in_app");
       return { ok: true };
     },
   ],

@@ -5,6 +5,7 @@ import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-nati
 import { confirmAsk } from "@/features/confirm";
 import { MemberHeader } from "@/features/member-header";
 import { useProfileGate } from "@/features/profile-gate";
+import { startDeleteReauth } from "@/api/central";
 import { openAccountCenter } from "@/features/account-link";
 import type { AppConfig, LibraryMine, Member } from "@/api/client";
 import { canManageCourses, canManageEditors } from "@/lib/roles";
@@ -32,7 +33,7 @@ function SiteFooter() {
 }
 
 export default function MeScreen() {
-  const { member, ready, signInGoogle, signInDemo, signOut, deleteAccount, refreshMember } = useSession();
+  const { member, ready, signInGoogle, signInDemo, signOut, deleteAccount, deleteCentralAccount, refreshMember } = useSession();
   // 進入設定頁就向會員中心更新一次獎銜與資料（1 分鐘內不重複）：App 沒有重新整理鈕，這裡是最自然的更新時機。
   useFocusEffect(
     useCallback(() => {
@@ -68,13 +69,17 @@ export default function MeScreen() {
     const ok = await confirmAsk(
       "刪除帳號",
       central
-        ? "將刪除你在本 App 的所有資料（學習紀錄、報名紀錄、徽章、通知）並登出，接著帶你前往完整版會員中心刪除會員帳號。此操作無法復原。"
+        ? "會刪除你在所有寰宇 App 的帳號與資料（包含會員中心的個人資料與 Amway 資料、本 App 的學習紀錄、報名紀錄、徽章、通知），無法復原。\n\n確定後會請你再按一次 Google 登入確認身分。"
         : "將刪除這個測試帳號在本 App 的所有資料（學習紀錄、報名紀錄、徽章、通知）。",
       "確定刪除",
     );
     if (!ok) return;
-    await run("delete", deleteAccount, central ? "已刪除你在本 App 的資料並登出。請在完整版會員中心完成帳號刪除。" : "已刪除測試帳號的資料。");
-    if (central) openAccountCenter();
+    if (!central) return run("delete", deleteAccount, "已刪除測試帳號的資料。");
+    // App 內直接刪除（中央串接指令 2026-11-23.3）：重新驗證 → 中央刪除 → 成功才清本 App 資料；網頁版整頁跳去驗證，回來由 /auth/done 接手。
+    await run("delete", async () => {
+      const r = await startDeleteReauth();
+      if (r.status === "ok") await deleteCentralAccount(r.reauthToken);
+    });
   };
 
   return (
@@ -170,7 +175,7 @@ export default function MeScreen() {
             {!member.demo ? (
               <ListRow icon="person-circle-outline" title="完整版會員中心" subtitle="修改基本資料" onPress={openAccountCenter} />
             ) : null}
-            <ListRow icon="trash-outline" title="刪除帳號" subtitle="刪除本 App 的所有資料，並前往完整版會員中心刪除會員帳號" onPress={removeAccount} />
+            <ListRow icon="trash-outline" title="刪除帳號" subtitle="刪除你在所有寰宇 App 的帳號與資料" onPress={removeAccount} />
           </Card>
         </Section>
       ) : null}
