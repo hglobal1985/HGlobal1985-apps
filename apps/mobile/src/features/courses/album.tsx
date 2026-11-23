@@ -3,10 +3,12 @@ import { createElement, useState } from "react";
 import { Image, Modal, Platform, Pressable, StyleSheet, View } from "react-native";
 import { api, resolveUrl, type CoverMediaItem, type CoverMediaKind, type CoverScope } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
+import { replaceAlbumPhoto } from "@/features/uploads/album-replace";
+import { useUiConfig } from "@/state/ui-config";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { EmptyState } from "@/ui";
+import { AppText, EmptyState } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EdmLightbox } from "./edm-viewer";
 
@@ -22,6 +24,7 @@ const COLS = 3;
 export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, scope, emptyHint }: { kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void; /** 中心的儲存區（cover＝封面編輯、edm＝EDM 分頁）；系列、課程不用給。 */ scope?: CoverScope; emptyHint?: string }) {
   const { c } = useTheme();
   const thumb = useThumb();
+  const { config } = useUiConfig();
   const [w, setW] = useState(0);
   const [view, setView] = useState<string | null>(null); // 看哪張圖（照片編號）
   const [play, setPlay] = useState<CoverMediaItem | null>(null);
@@ -50,6 +53,8 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
       flashText((e as Error).message);
     }
   };
+  // 綁定課程的 EDM 不能刪，只能更換照片（業主 2026-11-23）。
+  const replace = (x: CoverMediaItem) => replaceAlbumPhoto(x.id, { maxSide: config.app.centerMaxSide, quality: config.app.centerQuality / 100 }, onChanged);
   return (
     <View style={{ gap: space.md }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
       {!items.length ? <EmptyState icon="images-outline" title={scope === "edm" ? "還沒有 EDM" : "還沒有照片"} body={canEdit ? emptyHint ?? (scope === "edm" ? "按右下角「新增教材 › 上傳EDM」新增。" : undefined) : undefined} /> : null}
@@ -64,14 +69,28 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
                 </View>
               ) : null}
             </Pressable>
+            {x.courseId ? (
+              <View style={styles.courseTag} pointerEvents="none">
+                <Ionicons name="link" size={11} color="#fff" {...NO_SCALE} />
+                <AppText variant="caption" numberOfLines={1} style={{ color: "#fff", fontSize: 11, lineHeight: 14, flexShrink: 1 }} {...NO_SCALE}>
+                  {x.courseTitle || "課程"}
+                </AppText>
+              </View>
+            ) : null}
             {canEdit ? (
               <View style={styles.tools} pointerEvents="box-none">
                 <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-back" size={16} color="#fff" {...NO_SCALE} />
                 </Pressable>
-                <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="刪除" onPress={() => remove(x)} style={[styles.tbtn, { backgroundColor: "rgba(179,38,30,0.9)" }]}>
-                  <Ionicons name="trash" size={15} color="#fff" {...NO_SCALE} />
-                </Pressable>
+                {x.courseId ? (
+                  <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="更換照片" onPress={() => replace(x)} style={[styles.tbtn, { backgroundColor: "rgba(12,96,60,0.95)" }]}>
+                    <Ionicons name="swap-horizontal" size={16} color="#fff" {...NO_SCALE} />
+                  </Pressable>
+                ) : (
+                  <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="刪除" onPress={() => remove(x)} style={[styles.tbtn, { backgroundColor: "rgba(179,38,30,0.9)" }]}>
+                    <Ionicons name="trash" size={15} color="#fff" {...NO_SCALE} />
+                  </Pressable>
+                )}
                 <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-forward" size={16} color="#fff" {...NO_SCALE} />
                 </Pressable>
@@ -102,6 +121,7 @@ function VideoModal({ item, onClose }: { item: CoverMediaItem; onClose: () => vo
 }
 
 const styles = StyleSheet.create({
+  courseTag: { position: "absolute", left: 4, right: 4, top: 4, flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 8, backgroundColor: "rgba(12,96,60,0.88)" },
   playBadge: { position: "absolute", right: 6, bottom: 6, width: 34, height: 34, borderRadius: 17, backgroundColor: "rgba(0,0,0,0.55)", alignItems: "center", justifyContent: "center" },
   tools: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 4, paddingVertical: 3, backgroundColor: "rgba(0,0,0,0.35)" },
   tbtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
