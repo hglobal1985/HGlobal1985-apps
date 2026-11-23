@@ -8,7 +8,8 @@ import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
 import { BroadcastComposer } from "@/features/broadcast/broadcast-composer";
 import { AddMaterialFab } from "@/features/course-edit/add-material-fab";
 import { PageHeader } from "@/features/page-header";
-import { isSuperAdmin } from "@/lib/roles";
+import { NewCourseSheet } from "@/features/admin-parts";
+import { canCreateCourse, isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 import { portraitColumns, tileColumns } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
@@ -53,6 +54,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const cm = useCoverMedia("series", series);
   const [applyOpen, setApplyOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [newOpen, setNewOpen] = useState(false);
   const [bcTick, setBcTick] = useState(0);
   const [boxW, setBoxW] = useState(0);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -242,10 +244,11 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
             {gridBlock("清單卡", listCards, listCols)}
           </View>
         ) : null}
-        {admin ? <View style={{ height: 64 }} /> : null}
+        {admin || canCreateCourse(member) ? <View style={{ height: 64 }} /> : null}
       </Screen>
-      {/* 右下角「＋」：超級管理員新增公告（目前這個系列，或首頁公告）。 */}
-      {admin ? <AddMaterialFab kinds={["announce"]} onPick={() => setComposeOpen(true)} /> : null}
+      {/* 右下角「＋」（業主 2026-11-23：除了中心卡，每個頁面都要有新增鈕）：有新增權限的人可新增教材卡（系列預先選好目前這個系列）；超級管理員另可新增公告（目前這個系列，或首頁公告）。 */}
+      {admin || canCreateCourse(member) ? <AddMaterialFab kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(admin ? (["announce"] as const) : [])]} onPick={(k) => (k === "announce" ? setComposeOpen(true) : setNewOpen(true))} /> : null}
+      {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultSeries={series !== UNCATEGORIZED ? series : undefined} /> : null}
       {composeOpen ? (
         <BroadcastComposer
           targets={[...(series !== UNCATEGORIZED ? [{ scope: "series" as const, name: series, label: `${shownTitle}系列公告` }] : []), { scope: "home" as const, label: "首頁公告" }]}

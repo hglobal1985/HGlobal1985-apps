@@ -20,6 +20,7 @@ import { lessonHref } from "@/lib/lesson-href";
 import { BlockEditList, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
 import type { SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { AddMaterialFab } from "@/features/course-edit/add-material-fab";
 import { Check } from "@/ui/check";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { PageHeader } from "@/features/page-header";
@@ -513,6 +514,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       ) : null}
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
+      {/* 右下角「＋新增教材」（業主 2026-11-23：每張卡的頁面都要有新增鈕）：編輯模式、有修改權限才顯示。 */}
+      {editing && canEditContent && !sheet && !lessonSheet ? <AddMaterialFab kinds={["material"]} onPick={() => (setMaterialBlock(undefined), setSheet("newMaterial"))} /> : null}
       {lessonSheet ? <LessonSheet course={course} lesson={course.lessons.find((l) => l.id === lessonSheet.id) ?? lessonSheet} onClose={() => setLessonSheet(null)} /> : null}
     </View>
   );
