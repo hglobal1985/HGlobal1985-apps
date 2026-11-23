@@ -16,6 +16,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 import { FileUploadModule } from "@/features/uploads/file-upload-module";
 import { BrandIcon } from "@/ui/brand-icon";
 import { EditSheet } from "./edit-sheet";
+import { YoutubeImportSheet } from "./youtube-import";
 
 /**
  * 「其他教材」的新增與編輯面板（業主 2026-11-16 改版）：只有三個東西——
@@ -105,6 +106,7 @@ function ytIdOfUrl(u: URL | null): string | null {
 function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: CourseDetail; lesson?: Lesson; onClose: () => void; afterBlock?: string }) {
   const { c } = useTheme();
   const { invalidate } = useSession();
+  const [ytOpen, setYtOpen] = useState(false);
   // 清單卡的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
   const baseLink = lesson?.linkUrl ?? (lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
   const [url, setUrl] = useState(baseLink);
@@ -231,6 +233,15 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
           <FileUploadModule courseId={course.id} onUploaded={onFiles} onBusyChange={setBusy} />
         </FormBlock>
       ) : null}
+      {!lesson ? (
+        <FormBlock title="YouTube 播放清單" hint="貼播放清單網址，一次匯入所有影片當教材；之後可再同步新影片，也會出現在「設定 › 同步 YouTube 清單」。">
+          <Pressable accessibilityRole="button" accessibilityLabel="匯入 YouTube 播放清單" onPress={() => setYtOpen(true)} style={({ pressed }) => [{ minHeight: minTouch, borderRadius: radius.md, borderWidth: 1.5, borderColor: c.accent, backgroundColor: pressed ? c.accentSoft : c.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }]}>
+            <Icon name="logo-youtube" size={22} color={c.accentText} />
+            <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>匯入 YouTube 播放清單</AppText>
+          </Pressable>
+        </FormBlock>
+      ) : null}
+      {ytOpen ? <YoutubeImportSheet course={course} onClose={() => setYtOpen(false)} onDone={onClose} /> : null}
       {!lesson ? (
         <AppText variant="callout" tone="muted" style={{ fontWeight: "700" }}>
           或貼上外部連結

@@ -1434,6 +1434,12 @@ async function managerVia(ctx: Ctx, sql: string, id: string, what: string): Prom
   if (!row) return fail(404, "not_found", `找不到這個${what}`);
   return requireCourseManager(ctx, row.course_id);
 }
+/** 同步設定的管理權：超級管理員，或有該設定所屬課程修改權限的人（業主 2026-11-23：課程頁也能匯入、管理 YouTube 播放清單）。 */
+async function requireSyncManager(ctx: Ctx, syncId: string): Promise<Session> {
+  const s = requireMember(ctx);
+  if (s.roles.includes("super_admin")) return s;
+  return managerVia(ctx, "SELECT course_id FROM youtube_syncs WHERE id = ?", syncId, "同步設定");
+}
 const requireLessonManager = (ctx: Ctx, id: string) => managerVia(ctx, "SELECT course_id FROM lessons WHERE id = ?", id, "章節");
 /** 可以新增課程的人：總部、有中心的會長與音控、有「新增」權限的小編。 */
 async function requireCourseCreator(ctx: Ctx): Promise<Session> {
@@ -4560,12 +4566,27 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "GET",
+    /^\/admin\/courses\/([\w-]+)\/youtube-syncs$/,
+    async (ctx, [courseId]) => {
+      // 這張教材卡自己的同步清單（課程設定「YouTube 播放清單」用）。
+      await requireCourseManager(ctx, courseId!);
+      const { results } = await ctx.db
+        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.sort_mode AS sortMode, y.sort_locked AS sortLocked, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id WHERE y.course_id = ? ORDER BY y.rowid DESC")
+        .bind(courseId)
+        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
+      const { defaultSyncFormat, SYNC_FORMAT_HELP, SYNC_SORT_LABEL } = await import("./imports.ts");
+      return { syncs: results.map((r) => ({ ...r, titleFormat: r.titleFormat || defaultSyncFormat(r.titlePrefix) })), keyReady: !!ctx.env.YOUTUBE_API_KEY, formatHelp: SYNC_FORMAT_HELP, sortLabels: SYNC_SORT_LABEL };
+    },
+  ],
+  [
     "POST",
     /^\/admin\/youtube-syncs$/,
     async (ctx) => {
       // 新增一份同步設定（業主 2026-11-20，超級管理員）：貼播放清單網址，選「放進哪一張教材卡」（或直接新建一張）與教材名稱前綴。
-      const s = requireSuperAdmin(ctx);
-      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; sortMode?: unknown; label?: unknown }>(ctx.req);
+      // 課程頁的「匯入 YouTube 播放清單」（業主 2026-11-23）：有該課程修改權限的人也能為「這張卡」新增並立刻匯入（syncNow）；新建教材卡仍只有超級管理員。
+      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; sortMode?: unknown; label?: unknown; syncNow?: unknown }>(ctx.req);
+      const s = typeof body.courseId === "string" && body.courseId ? await requireCourseManager(ctx, body.courseId) : requireSuperAdmin(ctx);
       const { playlistIdOf, defaultSyncFormat, asSortMode } = await import("./imports.ts");
       const playlistId = typeof body.url === "string" ? playlistIdOf(body.url) : null;
       if (!playlistId) return fail(400, "invalid_playlist", "請貼上 YouTube 播放清單的網址（網址裡要有 list=…）");
@@ -4587,6 +4608,11 @@ const routes: [string, RegExp, Handler][] = [
       const format = (typeof body.titleFormat === "string" ? body.titleFormat.trim() : "").slice(0, 120) || defaultSyncFormat(prefix);
       await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix, title_format, sort_mode) VALUES (?, ?, ?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix, format, asSortMode(body.sortMode)).run();
       await audit(ctx.db, s.sub, "youtube_sync.create", "youtube_sync", id, playlistId).run();
+      if (body.syncNow === true) {
+        const { runYoutubeSync } = await import("./imports.ts");
+        const out = await runYoutubeSync(ctx.env, id);
+        return { id, courseId, imported: out.imported, note: out.note };
+      }
       return { id, courseId };
     },
   ],
@@ -4594,7 +4620,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/youtube-syncs\/([\w-]+)\/sync$/,
     async (ctx, [id]) => {
-      requireSuperAdmin(ctx);
+      await requireSyncManager(ctx, id!);
       const { runYoutubeSync } = await import("./imports.ts");
       const out = await runYoutubeSync(ctx.env, id!);
       return out;
@@ -4605,7 +4631,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/youtube-syncs\/([\w-]+)$/,
     async (ctx, [id]) => {
       // 修改這份同步的規則：命名規則、排序規則、解除手動排序鎖定（業主 2026-11-20）。命名只影響之後匯入的；已匯入的要按「依規則重新命名」。
-      const s = requireSuperAdmin(ctx);
+      const s = await requireSyncManager(ctx, id!);
       const body = await readJson<{ titleFormat?: unknown; sortMode?: unknown; unlock?: unknown }>(ctx.req);
       const { asSortMode } = await import("./imports.ts");
       const format = typeof body.titleFormat === "string" ? body.titleFormat.trim().slice(0, 120) : "";
@@ -4621,7 +4647,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/youtube-syncs\/([\w-]+)\/rename$/,
     async (ctx, [id]) => {
-      requireSuperAdmin(ctx);
+      await requireSyncManager(ctx, id!);
       const { renameYoutubeSync } = await import("./imports.ts");
       return renameYoutubeSync(ctx.env, id!);
     },
@@ -4630,7 +4656,7 @@ const routes: [string, RegExp, Handler][] = [
     "DELETE",
     /^\/admin\/youtube-syncs\/([\w-]+)$/,
     async (ctx, [id]) => {
-      requireSuperAdmin(ctx);
+      await requireSyncManager(ctx, id!);
       await ctx.db.prepare("DELETE FROM youtube_syncs WHERE id = ?").bind(id).run();
       return { ok: true };
     },
