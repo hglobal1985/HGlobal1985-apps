@@ -10,6 +10,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
+import { SuggestField, SuggestList, useSuggestions } from "@/features/admin/suggest-input";
 
 type FieldView = { value: string; pending: string | null; status: string };
 type View_ = {
@@ -20,17 +21,17 @@ type View_ = {
   enabled: boolean;
   hglobal: boolean;
   hglobalSystems: string[];
-  fields: Record<"education_system" | "education_center" | "rank", FieldView>;
+  fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", FieldView>;
   rankOptions: { value: string; label: string }[];
 };
-type Key = "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank";
+type Key = "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond";
 
 const FIELD_H = 40;
 const OTHER = "__other";
 const NONE_TERM = "無";
 /** 欄位要顯示的內容：有等待審核的新值就顯示新值（使用者剛填的），沒有才顯示目前生效的值。 */
 const shown = (f: { value: string; pending: string | null }) => f.pending ?? f.value;
-const formVals = (d: View_): Record<Key, string> => ({ legal_name: d.legalName, display_name: d.nickname, contact_email: d.email || d.googleEmail || "", education_system: shown(d.fields.education_system), education_center: shown(d.fields.education_center), rank: shown(d.fields.rank) });
+const formVals = (d: View_): Record<Key, string> => ({ legal_name: d.legalName, display_name: d.nickname, contact_email: d.email || d.googleEmail || "", education_system: shown(d.fields.education_system), education_center: shown(d.fields.education_center), rank: shown(d.fields.rank), upline_platinum: shown(d.fields.upline_platinum), upline_diamond: shown(d.fields.upline_diamond) });
 const norm = (s: string) => s.trim().toLowerCase();
 
 /** 欄位標籤：必填欄位旁有橘色「必填」小標籤（中央視覺規範）；「變更需再重新審核」一律固定顯示在第二行（業主 2026-11-22）；reserveNote＝同一排其他欄位有第二行時，這欄也留一行空間，下拉框才會對齊。 */
@@ -143,7 +144,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const { invalidate, refreshMember } = useSession();
   const [data, setData] = useState<View_ | null>(first ?? null);
   const [error, setError] = useState<string | null>(null);
-  const [vals, setVals] = useState<Record<Key, string>>({ legal_name: "", display_name: "", contact_email: "", education_system: "", education_center: "", rank: "" });
+  const [vals, setVals] = useState<Record<Key, string>>({ legal_name: "", display_name: "", contact_email: "", education_system: "", education_center: "", rank: "", upline_platinum: "", upline_diamond: "" });
   const [terms, setTerms] = useState<{ education_system: string[]; education_center: string[] }>({ education_system: [], education_center: [] });
   const [otherPick, setOtherPick] = useState<{ education_system?: boolean; education_center?: boolean }>({});
   const [openKey, setOpenKey] = useState<string | null>(null); // 目前展開的下拉選單：展開中的那一列要蓋在所有列的上面
@@ -180,6 +181,10 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   }, [data?.enabled, wantAmway]);
 
   const amway = !!data?.enabled || wantAmway;
+  // 上手白金／上手鑽石（業主 2026-11-23）：自由輸入＋中央關聯詞（輸入時列出建議、點選填入）；兩欄的建議清單放在兩欄下方整列。
+  const [uplineFocus, setUplineFocus] = useState<"upline_platinum" | "upline_diamond" | null>(null);
+  const platSug = useSuggestions(vals.upline_platinum, "upline_platinum", amway && uplineFocus === "upline_platinum");
+  const diamSug = useSuggestions(vals.upline_diamond, "upline_diamond", amway && uplineFocus === "upline_diamond");
   // Email 還空著時自動帶入 Google 登入信箱（業主 2026-11-23）：「原本的值」仍是空的，所以按儲存會一併寫回會員中心。
   const initial = data ? { ...formVals(data), contact_email: data.email } : null;
   const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name" || k === "contact_email") && vals[k].trim() !== initial[k].trim()) : [];
@@ -395,6 +400,16 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                         cenCol.node
                       )}
                     </View>
+                    {/* 上手白金｜上手鑽石（選填）：兩欄並排，輸入時下方列出中央會員的關聯詞可點選。 */}
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                      {(["upline_platinum", "upline_diamond"] as const).map((k) => (
+                        <View key={k} style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                          <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
+                          <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} placeholder="選填" />
+                        </View>
+                      ))}
+                    </View>
+                    {uplineFocus ? <SuggestList list={uplineFocus === "upline_platinum" ? platSug : diamSug} q={vals[uplineFocus]} onPick={(v) => (set(uplineFocus)(v), setUplineFocus(null))} /> : null}
                     {!sysCol.other && cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
                   </>
                 ) : null}
