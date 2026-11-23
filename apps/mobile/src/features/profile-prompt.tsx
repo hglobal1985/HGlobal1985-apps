@@ -16,6 +16,7 @@ type View_ = {
   legalName: string;
   nickname: string;
   email: string;
+  googleEmail?: string;
   enabled: boolean;
   hglobal: boolean;
   hglobalSystems: string[];
@@ -29,7 +30,7 @@ const OTHER = "__other";
 const NONE_TERM = "無";
 /** 欄位要顯示的內容：有等待審核的新值就顯示新值（使用者剛填的），沒有才顯示目前生效的值。 */
 const shown = (f: { value: string; pending: string | null }) => f.pending ?? f.value;
-const formVals = (d: View_): Record<Key, string> => ({ legal_name: d.legalName, display_name: d.nickname, contact_email: d.email, education_system: shown(d.fields.education_system), education_center: shown(d.fields.education_center), rank: shown(d.fields.rank) });
+const formVals = (d: View_): Record<Key, string> => ({ legal_name: d.legalName, display_name: d.nickname, contact_email: d.email || d.googleEmail || "", education_system: shown(d.fields.education_system), education_center: shown(d.fields.education_center), rank: shown(d.fields.rank) });
 const norm = (s: string) => s.trim().toLowerCase();
 
 /** 欄位標籤：必填欄位旁有橘色「必填」小標籤（中央視覺規範）；「變更需再重新審核」一律固定顯示在第二行（業主 2026-11-22）；reserveNote＝同一排其他欄位有第二行時，這欄也留一行空間，下拉框才會對齊。 */
@@ -59,9 +60,10 @@ function Label({ text, tag, note, reserveNote }: { text: string; tag?: string; n
 }
 
 /** 必填沒填時，整列用 2px 橘框＋淡橘底標示（中央視覺規範）。 */
-function Row({ bad, z, children }: { bad?: boolean; z?: number; children: React.ReactNode }) {
+function Row({ bad, z, fixed, children }: { bad?: boolean; z?: number; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，業主 2026-11-23）。 */ fixed?: boolean; children: React.ReactNode }) {
   const { c } = useTheme();
-  return <View style={[{ gap: 2, zIndex: z ?? 1 }, bad && { borderWidth: 2, borderColor: c.warning, backgroundColor: c.warningSoft, borderRadius: radius.md, padding: 4 }]}>{children}</View>;
+  const box = { borderWidth: 2, borderRadius: radius.md, padding: 4 };
+  return <View style={[{ gap: 2, zIndex: z ?? 1 }, fixed && { ...box, borderColor: "transparent" }, bad && { ...box, borderColor: c.warning, backgroundColor: c.warningSoft }]}>{children}</View>;
 }
 
 function Input({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
@@ -105,12 +107,12 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
     });
   };
   return (
-    <View ref={box} collapsable={false} style={pop ? { alignSelf: "flex-start", maxWidth: "100%", zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
-      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null, keepWidth ? { width: lastW.current || 88 } : null]}>
-        <AppText style={pop ? { flexShrink: 1 } : { flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
+    <View ref={box} collapsable={false} style={pop ? { alignSelf: "stretch", minWidth: 0, zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
+      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
+        <AppText style={pop ? { flex: 1, minWidth: 0 } : { flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
           {label}
         </AppText>
-        <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 16 : 20} color={c.textMuted} />
+        <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 14 : 20} color={c.textMuted} />
       </Pressable>
       {open ? (
         <View style={[styles.dropdown, pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
@@ -178,7 +180,8 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   }, [data?.enabled, wantAmway]);
 
   const amway = !!data?.enabled || wantAmway;
-  const initial = data ? formVals(data) : null;
+  // Email 還空著時自動帶入 Google 登入信箱（業主 2026-11-23）：「原本的值」仍是空的，所以按儲存會一併寫回會員中心。
+  const initial = data ? { ...formVals(data), contact_email: data.email } : null;
   const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name" || k === "contact_email") && vals[k].trim() !== initial[k].trim()) : [];
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
@@ -253,7 +256,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
   /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
   const colBox = (key: string, children: React.ReactNode) => (
-    <View key={key} style={{ flexShrink: 1, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
+    <View key={key} style={{ flex: 1, flexBasis: 0, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
       {children}
     </View>
   );
@@ -282,7 +285,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       other,
       node: colBox(
         key,
-        <Row z={openKey === key ? 100 : 1} bad={showBad && missing.includes(key)}>
+        <Row fixed z={openKey === key ? 100 : 1} bad={showBad && missing.includes(key)}>
           <Label text={label} tag={shortTag(tagFor(key, isCenter))} note={isCenter ? noteFor("education_center") : undefined} reserveNote={anyNote} />
           <Dropdown
             pop={pop}
@@ -360,7 +363,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                     <View style={{ flexDirection: "row", gap: 8, zIndex: 30, alignItems: "flex-start" }}>
                       {colBox(
                         "rank",
-                        <Row z={openKey === "rank" ? 100 : 1} bad={showBad && missing.includes("rank")}>
+                        <Row fixed z={openKey === "rank" ? 100 : 1} bad={showBad && missing.includes("rank")}>
                           <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} reserveNote={anyNote} />
                           <Dropdown
                             pop="left"
@@ -380,7 +383,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                       {sysCol.other ? (
                         // 系統選「其他」：隱藏中心欄，原位置改成自訂系統的輸入欄（業主 2026-11-23）。
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Row bad={showBad && missing.includes("education_system")}>
+                          <Row fixed bad={showBad && missing.includes("education_system")}>
                             <Label text="自訂系統" tag={shortTag(tagFor("education_system"))} reserveNote={anyNote} />
                             <Input value={vals.education_system} onChange={setSystem} placeholder="請輸入系統名稱" />
                           </Row>
