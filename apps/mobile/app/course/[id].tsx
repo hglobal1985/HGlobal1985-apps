@@ -514,8 +514,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       ) : null}
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
-      {/* 右下角「＋新增教材」（業主 2026-11-23：每張卡的頁面都要有新增鈕）：編輯模式、有修改權限才顯示。 */}
-      {editing && canEditContent && !sheet && !lessonSheet ? <AddMaterialFab kinds={["material"]} onPick={() => (setMaterialBlock(undefined), setSheet("newMaterial"))} /> : null}
+      {/* 右下角「＋新增教材」（業主 2026-11-23：每張卡的頁面都要有新增鈕）：有修改權限就顯示（不必先進編輯模式，業主 2026-11-23 再次回報點進卡片沒有新增鈕）；播放中隱藏。 */}
+      {canEditContent && !sheet && !lessonSheet && (editing || !playLesson) ? <AddMaterialFab kinds={["material"]} onPick={() => (setMaterialBlock(undefined), setSheet("newMaterial"))} /> : null}
       {lessonSheet ? <LessonSheet course={course} lesson={course.lessons.find((l) => l.id === lessonSheet.id) ?? lessonSheet} onClose={() => setLessonSheet(null)} /> : null}
     </View>
   );
