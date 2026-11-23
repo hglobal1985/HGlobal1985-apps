@@ -21,6 +21,9 @@ import { BlockEditList, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonShee
 import type { SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { AddMaterialFab } from "@/features/course-edit/add-material-fab";
+import { NewCourseSheet } from "@/features/admin-parts";
+import { BroadcastComposer } from "@/features/broadcast/broadcast-composer";
+import { canCreateCourse, isSuperAdmin } from "@/lib/roles";
 import { Check } from "@/ui/check";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { PageHeader } from "@/features/page-header";
@@ -100,6 +103,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
     if (!editing) setSettingsOpen(false);
   }, [editing]);
   const [pickBlock, setPickBlock] = useState<string | null>(null); // 「移動教材」要移進哪個區塊
+  const [newCardOpen, setNewCardOpen] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);
   const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
   const [lessonSheet, setLessonSheet] = useState<Lesson | null>(null);
   const [lessonBusy, setLessonBusy] = useState(false);
@@ -515,7 +520,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
       {/* 右下角「＋新增教材」（業主 2026-11-23：每張卡的頁面都要有新增鈕）：有修改權限就顯示（不必先進編輯模式，業主 2026-11-23 再次回報點進卡片沒有新增鈕）；播放中隱藏。 */}
-      {canEditContent && !sheet && !lessonSheet && (editing || !playLesson) ? <AddMaterialFab kinds={["material"]} onPick={() => (setMaterialBlock(undefined), setSheet("newMaterial"))} /> : null}
+      {canEditContent && !sheet && !lessonSheet && !newCardOpen && !composeOpen && (editing || !playLesson) ? <AddMaterialFab kinds={["material", ...(canCreateCourse(member) ? (["course"] as const) : []), ...(isSuperAdmin(member) ? (["announce"] as const) : [])]} onPick={(k) => (k === "material" ? (setMaterialBlock(undefined), setSheet("newMaterial")) : k === "announce" ? setComposeOpen(true) : setNewCardOpen(true))} /> : null}
+      {newCardOpen ? <NewCourseSheet onClose={() => setNewCardOpen(false)} defaultSeries={course.series || undefined} /> : null}
+      {composeOpen ? <BroadcastComposer targets={[...(course.series ? [{ scope: "series" as const, name: course.series, label: `${course.series}系列公告` }] : []), { scope: "home" as const, label: "首頁公告" }]} onClose={() => setComposeOpen(false)} onDone={() => undefined} /> : null}
       {lessonSheet ? <LessonSheet course={course} lesson={course.lessons.find((l) => l.id === lessonSheet.id) ?? lessonSheet} onClose={() => setLessonSheet(null)} /> : null}
     </View>
   );
