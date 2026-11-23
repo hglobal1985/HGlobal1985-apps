@@ -567,7 +567,7 @@ export async function rankBadges(token: string): Promise<Map<string, RankBadgeIn
 }
 
 export type AmwayFieldView = { value: string; pending: string | null; status: string };
-export type CentralProfileView = { legalName: string; nickname: string; email: string; /** 會員自己的 Google 登入信箱（中央 info.google_email）；聯絡信箱還空著時，面板用它預先帶入。只即時回給本人，不保存。 */ googleEmail: string; enabled: boolean; hglobal: boolean; hglobalSystems: string[]; fields: Record<"education_system" | "education_center" | "rank", AmwayFieldView>; rankOptions: RankOption[] };
+export type CentralProfileView = { legalName: string; nickname: string; email: string; /** 會員自己的 Google 登入信箱（中央 info.google_email）；聯絡信箱還空著時，面板用它預先帶入。只即時回給本人，不保存。 */ googleEmail: string; enabled: boolean; hglobal: boolean; hglobalSystems: string[]; fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", AmwayFieldView>; rankOptions: RankOption[] };
 const textOf = (v: unknown): string => (typeof v === "string" ? v : v && typeof v === "object" && typeof (v as { option?: unknown }).option === "string" ? (v as { option: string }).option : "");
 
 /** 資料補填視窗要顯示的欄位（即時讀取、不快取、不保存）：真實姓名、培訓系統、地區教育中心、獎銜。 */
@@ -578,11 +578,11 @@ export async function centralProfileView(sub: string, token: string): Promise<Ce
   const f = (k: string): AmwayFieldView => ({ value: textOf(a.fields?.[k]?.value), pending: a.fields?.[k]?.pending_value != null ? textOf(a.fields[k].pending_value) : null, status: a.fields?.[k]?.status ?? "not_required" });
   const em = p.fields?.contact_email?.value;
   const nn = p.fields?.display_name?.value;
-  return { legalName: typeof p.fields?.legal_name?.value === "string" ? p.fields.legal_name.value : "", nickname: typeof nn === "string" ? nn : "", email: typeof em === "string" ? em.trim() : "", googleEmail: typeof p.info?.google_email === "string" ? p.info.google_email.trim() : "", enabled: a.enabled === true, hglobal: a.hglobal === true, hglobalSystems: Array.isArray(a.hglobal_systems) ? a.hglobal_systems.filter((x): x is string => typeof x === "string") : [], fields: { education_system: f("education_system"), education_center: f("education_center"), rank: f("rank") }, rankOptions: opts };
+  return { legalName: typeof p.fields?.legal_name?.value === "string" ? p.fields.legal_name.value : "", nickname: typeof nn === "string" ? nn : "", email: typeof em === "string" ? em.trim() : "", googleEmail: typeof p.info?.google_email === "string" ? p.info.google_email.trim() : "", enabled: a.enabled === true, hglobal: a.hglobal === true, hglobalSystems: Array.isArray(a.hglobal_systems) ? a.hglobal_systems.filter((x): x is string => typeof x === "string") : [], fields: { education_system: f("education_system"), education_center: f("education_center"), rank: f("rank"), upline_platinum: f("upline_platinum"), upline_diamond: f("upline_diamond") }, rankOptions: opts };
 }
 
 /** 把一個欄位寫回會員中心（用會員本人的 token）。失敗時回中央的錯誤訊息。 */
-export async function centralWriteField(token: string, key: "legal_name" | "display_name" | "education_system" | "education_center" | "rank", value: string | null): Promise<{ ok: true; status: string | null } | { ok: false; status: number; message: string }> {
+export async function centralWriteField(token: string, key: "legal_name" | "display_name" | "education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", value: string | null): Promise<{ ok: true; status: string | null } | { ok: false; status: number; message: string }> {
   const path = key === "legal_name" || key === "display_name" ? `/v1/me/profile/fields/${key}` : `/v1/me/amway/fields/${key}`;
   const res = await callCentral(token, path, { method: "PUT", body: JSON.stringify({ value }) });
   if (!res) return { ok: false, status: 502, message: "會員中心暫時無法連線，請稍後再試" };
@@ -601,7 +601,7 @@ export async function centralEnableAmway(token: string): Promise<string | null> 
 }
 
 /** 關聯詞建議（培訓系統、地區教育中心、職稱）。職稱不強迫選，只是建議，會員可自己輸入。 */
-export async function centralSuggest(token: string, pool: "education_system" | "education_center" | "job_title", q: string): Promise<string[]> {
+export async function centralSuggest(token: string, pool: "education_system" | "education_center" | "job_title" | "upline_platinum" | "upline_diamond", q: string): Promise<string[]> {
   const res = await callCentral(token, `/v1/vocab/suggestions?pool=${pool}&q=${encodeURIComponent(q.slice(0, 30))}`);
   if (!res?.ok) return [];
   const b = (await res.json().catch(() => null)) as { suggestions?: unknown[] } | null;

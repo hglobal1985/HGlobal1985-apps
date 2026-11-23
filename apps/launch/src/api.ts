@@ -5527,8 +5527,8 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(400, "central_only", "只有中央會員可以使用");
       const body = await readJson<{ changes?: unknown; key?: unknown; value?: unknown; enableAmway?: unknown }>(ctx.req);
-      type Change = { key: "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank"; value: string | null };
-      const keys = ["legal_name", "display_name", "contact_email", "education_system", "education_center", "rank"] as const;
+      type Change = { key: "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond"; value: string | null };
+      const keys = ["legal_name", "display_name", "contact_email", "education_system", "education_center", "rank", "upline_platinum", "upline_diamond"] as const;
       const enable = body.enableAmway === true;
       const raw = Array.isArray(body.changes) ? body.changes : enable ? [] : [{ key: body.key, value: body.value }];
       if ((!raw.length && !enable) || raw.length > 8) return fail(400, "invalid_request", "沒有要儲存的內容");
@@ -5589,7 +5589,7 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       if (s.kind !== "central") return [];
       const pool = ctx.url.searchParams.get("pool");
-      if (pool !== "education_system" && pool !== "education_center" && pool !== "job_title") return fail(400, "invalid_pool", "不支援這個詞庫");
+      if (pool !== "education_system" && pool !== "education_center" && pool !== "job_title" && pool !== "upline_platinum" && pool !== "upline_diamond") return fail(400, "invalid_pool", "不支援這個詞庫");
       return centralSuggest(s.token, pool, ctx.url.searchParams.get("q") ?? "");
     },
   ],

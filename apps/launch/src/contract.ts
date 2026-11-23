@@ -608,7 +608,7 @@ export type ProfileForm = {
   hglobal: boolean;
   /** 中央標為寰宇的「培訓系統」詞（選到其中一個，中心改用中心清單）。 */
   hglobalSystems: string[];
-  fields: Record<"education_system" | "education_center" | "rank", { value: string; pending: string | null; status: string }>;
+  fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", { value: string; pending: string | null; status: string }>;
   rankOptions: { value: string; label: string }[];
 };
 

@@ -26,7 +26,7 @@ function Highlight({ text, q, color }: { text: string; q: string; color: string 
  * 要改關連詞的呈現只改這個元件；目前用在主講人／分享者的「職稱」（詞庫：中央會員系統 job_title）。
  */
 /** 關連詞查詢：有輸入（≥1 個字）且游標在欄位內才查，延遲 200ms，回傳最多 50 筆。 */
-export function useSuggestions(value: string, pool: "job_title" | "sharer_name", active: boolean): string[] {
+export function useSuggestions(value: string, pool: "job_title" | "sharer_name" | "upline_platinum" | "upline_diamond", active: boolean): string[] {
   const [list, setList] = useState<string[]>([]);
   const seq = useRef(0);
   const q = value.trim();
