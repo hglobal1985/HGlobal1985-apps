@@ -13,7 +13,7 @@ export function CenterEditSheet({ center, address, art, onClose, onAddressSaved,
     <EditSheet title={`編輯${centerTitle(center)}`} onClose={onClose} hideSave>
       <CenterNameField key={center} center={center} />
       <CenterAddressField center={center} current={address} onSaved={onAddressSaved} />
-      <CenterCoverPhotos center={center} art={art} onArtChanged={onArtChanged} onChanged={onCoverChanged} />
+      <CenterCoverPhotos center={center} onChanged={() => { onCoverChanged(); onArtChanged(); }} />
       <CenterBroadcastEditor center={center} onChanged={onBroadcastChanged} />
       <CenterScheduleEditor center={center} onChanged={onScheduleChanged} />
     </EditSheet>
