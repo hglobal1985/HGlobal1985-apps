@@ -83,10 +83,11 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
 /**
  * 自訂下拉選單（不用系統原生選單）：依螢幕剩餘空間自動往下或往上展開；選項超過 12 個時上方有搜尋框。
  */
-function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop }: { pop?: "left" | "center" | "right"; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
+function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth }: { pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
   const box = useRef<HostInstance>(null);
+  const lastW = useRef(0); // 最近一次「正常顯示」時的欄位寬度
     const [pos, setPos] = useState({ up: false, max: 240, left: 0, w: 220 });
   const toggle = () => {
     if (open) return onOpenChange(false);
@@ -105,7 +106,7 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
   };
   return (
     <View ref={box} collapsable={false} style={pop ? { alignSelf: "flex-start", maxWidth: "100%", zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
-      <Pressable onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
+      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null, keepWidth ? { width: lastW.current || 88 } : null]}>
         <AppText style={pop ? { flexShrink: 1 } : { flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
           {label}
         </AppText>
@@ -285,6 +286,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
           <Label text={label} tag={shortTag(tagFor(key, isCenter))} note={isCenter ? noteFor("education_center") : undefined} reserveNote={anyNote} />
           <Dropdown
             pop={pop}
+            keepWidth={blocked || none}
             options={options}
             value={sel}
             label={blocked ? (sysVal && sysVal !== "" ? "無" : "先選系統") : none ? "無" : other ? "其他" : v || "（未選擇）"}
@@ -345,10 +347,13 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
               </Row>
               {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
               <View style={[styles.amwayCard, { backgroundColor: c.surfaceMuted }]}>
-                <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={[styles.none, { minHeight: 32 }]}>
-                  <Icon name={amway ? "checkbox" : "square-outline"} size={26} color={amway ? c.accentText : c.textMuted} />
-                  <AppText style={{ fontWeight: "800" }}>我是 Amway 會員</AppText>
-                </Pressable>
+                {/* 勾選之後這一列自動隱藏（業主 2026-11-23）：只剩三欄。 */}
+                {!amway ? (
+                  <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={[styles.none, { minHeight: 32 }]}>
+                    <Icon name={amway ? "checkbox" : "square-outline"} size={26} color={amway ? c.accentText : c.textMuted} />
+                    <AppText style={{ fontWeight: "800" }}>我是 Amway 會員</AppText>
+                  </Pressable>
+                ) : null}
                 {amway ? (
                   <>
                     {/* 順序：獎銜 > 系統 > 中心（業主 2026-11-22）。獎銜一律可選；中心只有系統是寰宇才能選。 */}
@@ -359,6 +364,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                           <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} reserveNote={anyNote} />
                           <Dropdown
                             pop="left"
+                            keepWidth={rankNone}
                             options={data.rankOptions.filter((o) => o.value !== "none").map((o) => ({ value: o.value, label: o.label }))}
                             value={rankNone ? "" : vals.rank}
                             label={rankNone ? "無" : vals.rank ? rankLabel(vals.rank) : "請選擇"}
