@@ -2,6 +2,7 @@ import { revokeLegacyDriveLink } from "./material-files.ts";
 import { ensureBrandCards } from "./brand-cards.ts";
 import { backfillYoutube } from "./youtube.ts";
 import { processFirstSyncs, processImportJobs } from "./imports.ts";
+import { indexSearchVectors } from "./semantic-search.ts";
 import { handleApi } from "./api.ts";
 import type { Env } from "./d1.ts";
 import { resolveShareMeta, withShareMeta } from "./og.ts";
@@ -43,6 +44,7 @@ export function createWorker(staticFiles: StaticFiles) {
         await processFirstSyncs(env).catch((e) => console.error("first syncs", e instanceof Error ? e.message : "error"));
         await ensureBrandCards(env).catch((e) => console.error("brand cards", e instanceof Error ? e.message : "error"));
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
+        await indexSearchVectors(env).catch((e) => console.error("search vectors", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));
       })();
       if (exec) exec.waitUntil(job);
