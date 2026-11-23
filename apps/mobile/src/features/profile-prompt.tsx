@@ -313,7 +313,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
           <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
             <Icon name="open-outline" size={20} color={c.accentText} />
             <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
-              前往完整版會員中心完善更多資料
+              前往完整版會員中心
             </Text>
           </Pressable>
           {msg ? (
