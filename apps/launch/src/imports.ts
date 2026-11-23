@@ -292,7 +292,10 @@ export const defaultSyncFormat = (name: string): string => `{年}年{月}月 ${n
  * 例：規則「{年}年{月}月{日}日 王老師小線對焦」＋影片日期 2026-03-14 →「2026年3月14日 王老師小線對焦」。
  * 年月先看影片標題裡寫的「2026年11月」，沒有就用影片日期；日期判讀不到的欄位連同後面的單位字（年／月／日）一起省略。
  */
-export function syncTitle(format: string, videoTitle: string, date: string | null): string {
+/** 「移除文字」欄位（逗號、頓號或換行分開的多段文字）→ 清單。 */
+export const parseStrip = (text: string | null | undefined): string[] => (text ?? "").split(/[\n,，、]+/).map((x) => x.trim()).filter(Boolean).slice(0, 20);
+
+export function syncTitle(format: string, videoTitle: string, date: string | null, strip: string[] = []): string {
   const t = videoTitle.replace(/\s+/g, " ");
   const ym = /(\d{4})\s*年\s*(\d{1,2})\s*月(?:\s*(\d{1,2})\s*[日號])?/.exec(t);
   const d = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? "");
@@ -301,15 +304,28 @@ export function syncTitle(format: string, videoTitle: string, date: string | nul
   // 日：標題有寫就用；否則影片日期的月份與（標題或影片）月份一致時才用影片日期。
   const day = ym?.[3] ? String(Number(ym[3])) : d && (!ym || Number(ym[2]) === Number(d[2])) ? String(Number(d[3])) : "";
   const host = /主持(?:人)?\s*[:：]?\s*([^\s（）()【】[\]|｜,，、/／\-－—~～]{1,8})/.exec(t)?.[1] ?? "";
-  return format
+  const out = format
     .replace(/[（(][^（）()]*\{主持\}[^（）()]*[）)]/g, (m) => (host ? m : ""))
     .replace(/\{年\}\s*年?/g, year ? `${year}年` : "")
     .replace(/\{月\}\s*月?/g, month ? `${month}月` : "")
     .replace(/\{日\}\s*[日號]?/g, day ? `${day}日` : "")
     .replace(/\{主持\}/g, host)
-    .replace(/\{標題\}/g, t)
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/\{標題\}/g, t);
+  // 移除指定的文字（業主 2026-11-23）：對最後產生的名稱做，所以影片標題與規則裡的字都能移除。
+  return strip.reduce((acc, x) => acc.split(x).join(""), out).replace(/\s+/g, " ").trim();
+}
+
+/** 一批新影片的教材名稱：同批或和卡內原有的教材同名就加「（月/日）」；規則含 {日} 時不加。匯入與預覽共用。 */
+export function syncNamesFor(items: { title: string; date: string | null }[], fmt: string, strip: string[], existing: Set<string>): string[] {
+  const base = items.map((it) => syncTitle(fmt, it.title, it.date, strip).slice(0, 120) || it.title);
+  const count = new Map<string, number>();
+  for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
+  const hasDay = fmt.includes("{日}");
+  return base.map((n, i) => {
+    if (hasDay || ((count.get(n) ?? 0) < 2 && !existing.has(n))) return n;
+    const d = /^\d{4}-(\d{2})-(\d{2})/.exec(items[i]!.date ?? "");
+    return d ? `${n}（${Number(d[1])}/${Number(d[2])}）` : n;
+  });
 }
 
 /**
@@ -318,7 +334,7 @@ export function syncTitle(format: string, videoTitle: string, date: string | nul
  */
 export async function runYoutubeSync(env: Env, syncId: string): Promise<{ imported: number; note: string }> {
   const db = env.DB;
-  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format, sort_mode, sort_locked FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
+  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format, strip_text, sort_mode, sort_locked FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ strip_text: string; id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
   if (!sync) return { imported: 0, note: "找不到這個同步設定" };
   const finish = async (out: { imported: number; note: string }) => {
     // 只有「依日期新到舊」且沒有被手動鎖定時，才整張重排（手動排序永遠優先，業主 2026-11-20）。
@@ -337,17 +353,8 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   const ids = items.map(() => `${sync.course_id}-${short()}`);
   const lines: string[] = [];
   // 名稱一樣的教材才加日期（業主 2026-11-20）：同一批裡、或和這張卡原本就有的教材同名，就在名稱後面加「（月/日）」。
-  const base = items.map((it) => syncTitle(sync.title_format || defaultSyncFormat(sync.title_prefix), it.title, it.date).slice(0, 120) || it.title);
   const existing = new Set((await db.prepare("SELECT title FROM lessons WHERE course_id = ?").bind(sync.course_id).all<{ title: string }>()).results.map((r) => r.title));
-  const count = new Map<string, number>();
-  for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
-  // 命名規則本身已含 {日} 時，名稱已經有日期，不再加「（月/日）」（業主 2026-11-20：規則之外不可多出尾巴）。
-  const hasDay = (sync.title_format || defaultSyncFormat(sync.title_prefix)).includes("{日}");
-  const names = base.map((n, i) => {
-    if (hasDay || ((count.get(n) ?? 0) < 2 && !existing.has(n))) return n;
-    const d = /^\d{4}-(\d{2})-(\d{2})/.exec(items[i]!.date ?? "");
-    return d ? `${n}（${Number(d[1])}/${Number(d[2])}）` : n;
-  });
+  const names = syncNamesFor(items, sync.title_format || defaultSyncFormat(sync.title_prefix), parseStrip(sync.strip_text), existing);
   await db.batch(
     items.map((it, i) => {
       const name = names[i]!;
@@ -371,7 +378,7 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
  */
 export async function renameYoutubeSync(env: Env, syncId: string): Promise<{ renamed: number; note: string }> {
   const db = env.DB;
-  const sync = await db.prepare("SELECT playlist_id, course_id, title_prefix, title_format, sort_mode, sort_locked FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
+  const sync = await db.prepare("SELECT playlist_id, course_id, title_prefix, title_format, strip_text, sort_mode, sort_locked FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ strip_text: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
   if (!sync) return { renamed: 0, note: "找不到這個同步設定" };
   if (!env.YOUTUBE_API_KEY) return { renamed: 0, note: "尚未設定 YouTube 金鑰" };
   const read = await readPlaylist(env.YOUTUBE_API_KEY, sync.playlist_id, new Set());
@@ -380,7 +387,7 @@ export async function renameYoutubeSync(env: Env, syncId: string): Promise<{ ren
   const byVideo = new Map(read.items.map((it) => [it.id, it]));
   const targets = rows.filter((r) => byVideo.has(r.media_ref));
   const fmt = sync.title_format || defaultSyncFormat(sync.title_prefix);
-  const base = targets.map((r) => syncTitle(fmt, byVideo.get(r.media_ref)!.title, byVideo.get(r.media_ref)!.date).slice(0, 120) || r.title);
+  const base = targets.map((r) => syncTitle(fmt, byVideo.get(r.media_ref)!.title, byVideo.get(r.media_ref)!.date, parseStrip(sync.strip_text)).slice(0, 120) || r.title);
   const count = new Map<string, number>();
   for (const n of base) count.set(n, (count.get(n) ?? 0) + 1);
   const stmts = targets.flatMap((r, i) => {
