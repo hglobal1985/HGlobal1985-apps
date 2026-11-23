@@ -39,9 +39,6 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
   const chipLabel = (ym: string) => (ym.slice(0, 4) === now.slice(0, 4) ? `${Number(ym.slice(5))}月` : `${ym.slice(0, 4)}/${Number(ym.slice(5))}`);
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel={`放大${ymLabel(sel.ym)}課表`} onPress={() => setZoom(true)} style={styles.img}>
-        <Image source={{ uri: thumb(resolveUrl(sel.url), Math.min(winW, 720)) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
-      </Pressable>
       {items.length > 1 ? (
         // 月份小鈕在左、「歷年課表」在同一列最右邊（業主 2026-11-21）；上方不再有「本月課表」標題。
         <View style={styles.chipRow}>
@@ -76,6 +73,10 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
           </AppText>
         </Pressable>
       ) : null}
+      {/* 課表圖放最下方（業主 2026-11-23）：月份、歷年課表、地址、導航都在圖上方。 */}
+      <Pressable accessibilityRole="button" accessibilityLabel={`放大${ymLabel(sel.ym)}課表`} onPress={() => setZoom(true)} style={styles.img}>
+        <Image source={{ uri: thumb(resolveUrl(sel.url), Math.min(winW, 720)) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+      </Pressable>
       {zoom ? <EdmLightbox uri={sel.url} title={`${title} ${ymLabel(sel.ym)}課表`} items={items.map((x) => ({ uri: x.url, title: `${title} ${ymLabel(x.ym)}課表` }))} index={Math.max(0, items.findIndex((x) => x.ym === sel.ym))} onClose={() => setZoom(false)} /> : null}
       {all ? (
         <BottomSheet onClose={() => setAll(false)}>
