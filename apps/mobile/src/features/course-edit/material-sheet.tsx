@@ -229,16 +229,16 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   return (
     <EditSheet title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
       {!lesson ? (
-        <FormBlock title="上傳檔案" hint="圖片、照片、文件（PDF、Word、PowerPoint、Excel、文字檔）；不可上傳影片。可以從這支手機或電腦選檔案，也可以從你自己的 Google 雲端硬碟選擇（系統會幫你轉存到行動大學的儲存空間）。單檔大小有上限，選好就會直接上傳並建立教材；之後誰能下載，跟著這份課程或清單的規則。">
-          <FileUploadModule courseId={course.id} onUploaded={onFiles} onBusyChange={setBusy} />
-        </FormBlock>
-      ) : null}
-      {!lesson ? (
         <FormBlock title="YouTube 播放清單" hint="貼播放清單網址，一次匯入所有影片當教材；之後可再同步新影片，也會出現在「設定 › 同步 YouTube 清單」。">
           <Pressable accessibilityRole="button" accessibilityLabel="匯入 YouTube 播放清單" onPress={() => setYtOpen(true)} style={({ pressed }) => [{ minHeight: minTouch, borderRadius: radius.md, borderWidth: 1.5, borderColor: c.accent, backgroundColor: pressed ? c.accentSoft : c.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }]}>
             <Icon name="logo-youtube" size={22} color={c.accentText} />
             <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>匯入 YouTube 播放清單</AppText>
           </Pressable>
+        </FormBlock>
+      ) : null}
+      {!lesson ? (
+        <FormBlock title="上傳檔案" hint="圖片、照片、文件（PDF、Word、PowerPoint、Excel、文字檔）；不可上傳影片。可以從這支手機或電腦選檔案，也可以從你自己的 Google 雲端硬碟選擇（系統會幫你轉存到行動大學的儲存空間）。單檔大小有上限，選好就會直接上傳並建立教材；之後誰能下載，跟著這份課程或清單的規則。">
+          <FileUploadModule courseId={course.id} onUploaded={onFiles} onBusyChange={setBusy} />
         </FormBlock>
       ) : null}
       {ytOpen ? <YoutubeImportSheet course={course} onClose={() => setYtOpen(false)} onDone={onClose} /> : null}
