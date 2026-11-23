@@ -140,7 +140,7 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
 export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void; initial?: View_ | null }) {
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
-  const { invalidate } = useSession();
+  const { invalidate, refreshMember } = useSession();
   const [data, setData] = useState<View_ | null>(first ?? null);
   const [error, setError] = useState<string | null>(null);
   const [vals, setVals] = useState<Record<Key, string>>({ legal_name: "", display_name: "", contact_email: "", education_system: "", education_center: "", rank: "" });
@@ -242,6 +242,9 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       setShowBad(false);
       setMsg(r.errors.length ? { ok: false, text: r.errors[0] } : { ok: true, text: r.pending ? "已儲存，部分欄位等待審核" : "已儲存到會員中心" });
       invalidate();
+      // 儲存成功後立刻重新取一次會員資料（業主 2026-11-23 回報本名按儲存後再進來又變空白）：
+      // 首頁／設定頁保存的是開啟 App 時帶來的舊資料（含 profileForm、profileMissing），不更新的話再開面板會看到舊值，還會再次誤判「資料不全」而彈出。
+      if (!r.errors.length) await refreshMember(0).catch(() => undefined);
       if (!r.errors.length) onClose(); // 儲存成功就自動關閉視窗（業主 2026-11-19）
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
