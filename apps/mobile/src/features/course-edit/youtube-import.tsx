@@ -1,0 +1,146 @@
+import { useState } from "react";
+import { StyleSheet, View } from "react-native";
+import { api, type CourseDetail } from "@/api/client";
+import { confirmAsk } from "@/features/confirm";
+import { useApi, useSession } from "@/state/session";
+import { space } from "@/theme/tokens";
+import { AppText, Button, Card, Chips, ErrorView, Field, LoadingView, NoticeBox } from "@/ui";
+import { flashText } from "@/ui/flash-notice";
+import { EditSheet } from "./edit-sheet";
+
+type Sync = { id: string; label: string; url: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string };
+type SyncList = { syncs: Sync[]; keyReady: boolean; formatHelp: string; sortLabels: Record<string, string> };
+
+const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { hour12: false }) : "還沒同步過");
+
+/**
+ * 匯入 YouTube 播放清單（業主 2026-11-23，B：「新增教材」面板裡的入口）：貼播放清單網址，立刻把影片匯成這張教材卡的教材，
+ * 同時建立一份同步設定——之後清單有新影片，在課程設定「YouTube 播放清單」或「設定 › 同步 YouTube 清單」按「同步」就會補進來。
+ */
+export function YoutubeImportSheet({ course, onClose, onDone }: { course: CourseDetail; onClose: () => void; onDone?: () => void }) {
+  const { invalidate } = useSession();
+  const list = useApi<SyncList>(`/admin/courses/${course.id}/youtube-syncs`);
+  const [url, setUrl] = useState("");
+  const [format, setFormat] = useState("");
+  const [sortMode, setSortMode] = useState("date_desc");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url.trim()) return setError("請貼上播放清單網址");
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api<{ imported?: number; note?: string }>("POST", "/admin/youtube-syncs", { url: url.trim(), courseId: course.id, titlePrefix: course.title, ...(format.trim() ? { titleFormat: format.trim() } : {}), sortMode, syncNow: true });
+      flashText(r.imported ? `已匯入 ${r.imported} 支影片，並加入同步清單` : r.note || "已加入同步清單");
+      invalidate();
+      onDone?.();
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <EditSheet title="匯入 YouTube 播放清單" onClose={onClose} onSave={submit} saveLabel="匯入" dirty={!!url.trim()} busy={busy} error={error}>
+      {list.data && !list.data.keyReady ? <NoticeBox tone="warning" text="尚未設定 YouTube 金鑰，目前無法匯入。" /> : null}
+      <Field label="YouTube 播放清單網址" value={url} onChange={setUrl} placeholder="https://www.youtube.com/playlist?list=…" />
+      <Field label="命名規則（選填，沒填＝「2026年11月 名稱（主持xxx）」）" value={format} onChange={setFormat} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
+      {list.data ? <AppText variant="caption" tone="muted">{list.data.formatHelp}</AppText> : null}
+      {list.data ? <Chips title="排序規則" label="排序規則" options={Object.entries(list.data.sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} /> : null}
+      <AppText variant="caption" tone="muted">匯入的影片會放在這張教材卡的最上面（不開區塊）；已經加過的影片不會重複。這份清單也會出現在「設定 › 同步 YouTube 清單」。</AppText>
+    </EditSheet>
+  );
+}
+
+/** 課程設定「YouTube 播放清單」（C）：這張教材卡的同步清單——匯入新的、立刻同步、修改規則、刪除。 */
+export function YoutubeSyncSheet({ course, onClose }: { course: CourseDetail; onClose: () => void }) {
+  const { invalidate } = useSession();
+  const list = useApi<SyncList>(`/admin/courses/${course.id}/youtube-syncs`);
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Sync | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const run = async (s: Sync) => {
+    setBusyId(s.id);
+    try {
+      const r = await api<{ imported: number; note: string }>("POST", `/admin/youtube-syncs/${s.id}/sync`);
+      flashText(r.imported ? `已同步 ${r.imported} 支新影片` : r.note || "沒有新的影片");
+      invalidate();
+      list.reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const remove = async (s: Sync) => {
+    if (!(await confirmAsk("刪除同步設定", "確定刪除這份同步設定？已經匯入的教材不會被刪掉。", "刪除"))) return;
+    try {
+      await api("DELETE", `/admin/youtube-syncs/${s.id}`);
+      list.reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    }
+  };
+  return (
+    <EditSheet title="YouTube 播放清單" onClose={onClose} hideSave>
+      {!list.data ? (
+        list.error ? <ErrorView message={list.error} onRetry={list.reload} /> : <LoadingView />
+      ) : (
+        <>
+          <AppText variant="callout" tone="muted">貼上 YouTube 播放清單的網址就會匯入影片；之後清單有新影片，按「同步」補進來（已加過的不會重複）。這裡的清單也會出現在「設定 › 同步 YouTube 清單」。</AppText>
+          {!list.data.keyReady ? <NoticeBox tone="warning" text="尚未設定 YouTube 金鑰，目前無法同步。" /> : null}
+          <Button label="匯入 YouTube 播放清單" icon="logo-youtube" onPress={() => setAdding(true)} fullWidth />
+          {list.data.syncs.map((s) => (
+            <Card key={s.id} style={{ gap: space.sm }}>
+              <AppText variant="caption" tone="muted" numberOfLines={1}>{s.url}</AppText>
+              <AppText variant="caption">{`命名規則：${s.titleFormat}`}</AppText>
+              <AppText variant="caption">{`排序規則：${list.data!.sortLabels[s.sortMode] ?? s.sortMode}`}</AppText>
+              <AppText variant="caption" tone="muted">{`上次同步：${when(s.lastSyncedAt)}${s.lastSyncedAt ? `（新增 ${s.lastImported} 支）` : ""}`}</AppText>
+              {s.lastNote ? <AppText variant="caption" tone="muted" numberOfLines={4}>{s.lastNote}</AppText> : null}
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}><Button variant="secondary" label="修改規則" onPress={() => setEditing(s)} fullWidth /></View>
+                <View style={{ flex: 1 }}><Button label="同步" icon="sync" loading={busyId === s.id} onPress={() => void run(s)} fullWidth /></View>
+              </View>
+              <Button variant="cancel" label="刪除" onPress={() => void remove(s)} fullWidth />
+            </Card>
+          ))}
+          {!list.data.syncs.length ? <AppText variant="callout" tone="muted">這張教材卡還沒有匯入過播放清單。</AppText> : null}
+        </>
+      )}
+      {adding ? <YoutubeImportSheet course={course} onClose={() => setAdding(false)} onDone={list.reload} /> : null}
+      {editing && list.data ? <RulesSheet sync={editing} help={list.data.formatHelp} sortLabels={list.data.sortLabels} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); }} /> : null}
+    </EditSheet>
+  );
+}
+
+function RulesSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; help: string; sortLabels: Record<string, string>; onClose: () => void; onDone: () => void }) {
+  const [fmt, setFmt] = useState(sync.titleFormat);
+  const [sortMode, setSortMode] = useState(sync.sortMode);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const submit = async () => {
+    if (!fmt.trim()) return setError("請輸入命名規則");
+    setBusy(true);
+    setError(null);
+    try {
+      await api("PATCH", `/admin/youtube-syncs/${sync.id}`, { titleFormat: fmt.trim(), sortMode });
+      flashText("已儲存同步規則");
+      onDone();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <EditSheet title="修改同步規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat || sortMode !== sync.sortMode} busy={busy} error={error}>
+      <Field label="命名規則" value={fmt} onChange={setFmt} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
+      <AppText variant="caption" tone="muted">{help}</AppText>
+      <Chips title="排序規則" label="排序規則" options={Object.entries(sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} />
+      <AppText variant="caption" tone="muted">只影響之後匯入的教材；要解除手動排序鎖定或重新命名已匯入的，請到「設定 › 同步 YouTube 清單」。</AppText>
+    </EditSheet>
+  );
+}
+
+const styles = StyleSheet.create({ row: { flexDirection: "row", gap: space.sm } });
