@@ -8,7 +8,7 @@ import { shareLink } from "@/lib/share";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { BrandCover, Card, LoadingLadybug, ThumbFallback } from "@/ui";
+import { BrandCover, Card, LoadingLadybug, CourseCover } from "@/ui";
 import { BrandIcon } from "@/ui/brand-icon";
 import { TYPE_INFO } from "@/features/link-types";
 import { lessonHref } from "@/lib/lesson-href";
@@ -48,7 +48,7 @@ function CenterListRow({ course, trailing }: { course: CourseSummary; trailing?:
       onPress={() => router.push(`/course/${course.id}`)}
       leading={
         <View style={styles.thumb}>
-          {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: thumb(resolveUrl(img), 160) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <ThumbFallback />}
+          {course.brand ? <BrandCover brand={course.brand} fill /> : img ? <Image source={{ uri: thumb(resolveUrl(img), 160) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <CourseCover theme={course.theme} label={course.category} title={course.title} fill />}
         </View>
       }
       title={course.title}
