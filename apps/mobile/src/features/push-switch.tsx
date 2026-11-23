@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Platform, Switch, View } from "react-native";
+import { Platform, Pressable, Switch, View } from "react-native";
 import { trackFeature } from "@/lib/feature-track";
 import { disablePush, enablePush, pushState, type PushState } from "@/lib/web-push";
 import { useTheme } from "@/theme/theme";
@@ -17,7 +17,7 @@ export const PUSH_TEXT: Record<PushState, string> = {
 
 /** 基本資料面板第一步驟的「手機推播」一列（業主 2026-11-22）：這支裝置的開關，按下立刻生效，不用按儲存；其他狀態只在下方多一行小字。 */
 export function PushSwitchRow({ banner }: { banner?: boolean } = {}) {
-  const { c } = useTheme();
+  const { c, scheme } = useTheme();
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -39,16 +39,47 @@ export function PushSwitchRow({ banner }: { banner?: boolean } = {}) {
   };
   const canToggle = state === "on" || state === "off";
   const hint = err ?? (Platform.OS !== "web" ? "App 版的推播會在正式上架時開放。" : state && state !== "on" && state !== "off" ? PUSH_TEXT[state] : null);
+  const on = state === "on";
+  // 橫幅版（業主 2026-11-23）：整列可點、打勾開啟；沒開啟＝整列紅色（含圖示），開啟後整列變綠色。
+  if (banner) {
+    const bg = on ? c.accent : c.danger;
+    const fg = on ? c.textOnAccent : scheme === "dark" ? "#601410" : "#FFFFFF";
+    return (
+      <View style={{ gap: 4 }}>
+        <Pressable
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: on, disabled: busy || !canToggle }}
+          accessibilityLabel="開啟手機推播"
+          disabled={busy || !canToggle}
+          onPress={() => void toggle(!on)}
+          style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: space.sm, opacity: busy ? 0.7 : 1 }}
+        >
+          <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.2)" }}>
+            <Icon name="notifications" size={20} color={fg} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText style={{ fontWeight: "900", fontSize: 22, lineHeight: 28, color: fg }}>{on ? "手機推播已開啟" : "按此開啟手機推播"}</AppText>
+          </View>
+          <Icon name={on ? "checkbox" : "square-outline"} size={34} color={fg} />
+        </Pressable>
+        {hint ? (
+          <AppText variant="caption" tone={err ? "danger" : "muted"} numberOfLines={2}>
+            {hint}
+          </AppText>
+        ) : null}
+      </View>
+    );
+  }
   return (
     <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: banner ? 64 : 46, borderRadius: radius.md, backgroundColor: banner ? c.accent : c.surfaceMuted, paddingHorizontal: space.sm }}>
-        <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: banner ? "rgba(255,255,255,0.2)" : c.accentSoft }}>
-          <Icon name="notifications" size={20} color={banner ? "#FFFFFF" : c.accentText} />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 46, borderRadius: radius.md, backgroundColor: c.surfaceMuted, paddingHorizontal: space.sm }}>
+        <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: c.accentSoft }}>
+          <Icon name="notifications" size={20} color={c.accentText} />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText style={{ fontWeight: "900", fontSize: banner ? 22 : 16, lineHeight: banner ? 28 : 22, color: banner ? c.textOnAccent : undefined }}>{banner ? "強烈建議開啟手機推播" : "開啟手機推播"}</AppText>
+          <AppText style={{ fontWeight: "900", fontSize: 16, lineHeight: 22 }}>開啟手機推播</AppText>
         </View>
-        <Switch value={state === "on"} disabled={busy || !canToggle} onValueChange={toggle} trackColor={{ false: banner ? "rgba(255,255,255,0.3)" : c.border, true: banner ? c.warning : c.accent }} thumbColor="#FFFFFF" ios_backgroundColor={c.border} accessibilityLabel="手機推播開關" />
+        <Switch value={on} disabled={busy || !canToggle} onValueChange={toggle} trackColor={{ false: c.border, true: c.accent }} thumbColor="#FFFFFF" ios_backgroundColor={c.border} accessibilityLabel="手機推播開關" />
       </View>
       {hint ? (
         <AppText variant="caption" tone={err ? "danger" : "muted"} numberOfLines={2}>
