@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router, useGlobalSearchParams, usePathname, type Href } from "expo-router";
+import { router, usePathname, type Href } from "expo-router";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,7 +43,6 @@ export function BottomBar() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
-  const globalParams = useGlobalSearchParams();
   const unread = useUnreadCount();
   const lib = useLibraryMode();
   const [keyboard, setKeyboard] = useState(false);
@@ -63,17 +62,11 @@ export function BottomBar() {
   // 網頁（加到主畫面的 App）：選單下方若有沒被畫面蓋到的區塊，底色與選單同色，不會露出白色。
   const barBg = lib ? LIB.card : c.navBar;
   const hidden = pathname.startsWith("/auth") || keyboard;
-  // 記住課程分頁最後停留的頁面：網頁用網址列（含 ?center=… 這類條件），App 用路徑加上不在路徑裡的參數。
+  // 記住課程分頁最後停留的頁面：只記導覽套件的路徑（不用網址列：課程頁自己會把網址列改成中心短網址等，拿去導覽會卡住，業主 2026-11-23 回報再點「課程」沒反應）。
+  // 寰宇大學（/courses）的篩選與中心頁狀態本來就留在畫面上，回 /courses 即可還原。
   useEffect(() => {
-    if (!tabs[1]!.match(pathname)) return;
-    if (Platform.OS === "web" && typeof location !== "undefined") {
-      lastCoursesHref = location.pathname + location.search;
-      return;
-    }
-    const q = new URLSearchParams();
-    for (const [k, v] of Object.entries(globalParams)) if (typeof v === "string" && !pathname.includes(v)) q.set(k, v);
-    lastCoursesHref = q.toString() ? `${pathname}?${q.toString()}` : pathname;
-  }, [pathname, globalParams]);
+    if (tabs[1]!.match(pathname)) lastCoursesHref = pathname;
+  }, [pathname]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || hidden) return;
     const el = document.documentElement;
