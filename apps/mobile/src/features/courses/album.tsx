@@ -60,7 +60,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
       {!items.length ? <EmptyState icon="images-outline" title={scope === "edm" ? "還沒有 EDM" : "還沒有照片"} body={canEdit ? emptyHint ?? (scope === "edm" ? "按右下角「新增教材 › 上傳EDM」新增。" : undefined) : undefined} /> : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
         {items.map((x, i) => (
-          <View key={x.id} style={{ width: tile || "33%", height: tile || 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: c.surfaceMuted }}>
+          <View key={x.id} style={{ width: tile || "33%", height: tile ? (scope === "edm" ? Math.round((tile * 4) / 3) : tile) : 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: c.surfaceMuted }}>
             <Pressable accessibilityRole="button" accessibilityLabel={x.kind === "video" ? "播放影片" : "放大照片"} onPress={() => (x.kind === "video" ? setPlay(x) : setView(x.id))} style={StyleSheet.absoluteFill}>
               {x.kind === "image" || x.posterUrl ? <Image source={{ uri: thumb(resolveUrl(x.kind === "video" ? x.posterUrl! : x.url), 480) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: "#222" }]} />}
               {x.kind === "video" ? (
