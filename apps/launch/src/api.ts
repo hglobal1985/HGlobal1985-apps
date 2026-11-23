@@ -5352,7 +5352,7 @@ const routes: [string, RegExp, Handler][] = [
         if (key === "contact_email" && v && !validEmail(v.toLowerCase())) return fail(400, "invalid_email", "Email 格式不正確");
         changes.push({ key, value: v === "" ? null : key === "contact_email" ? v!.toLowerCase() : v });
       }
-      // 資料正本在會員中心：直接寫過去（不保存、不寫日誌）。除了獎銜（要先有系統與中心）以外同時送出，最後再送獎銜。
+      // 資料正本在會員中心：直接寫過去（不保存、不寫日誌）。獎銜以外的欄位同時送出，最後再送獎銜（中央 2026-11-23.1 起獎銜不再被系統、中心卡住，順序只是習慣）。
       const errors: string[] = [];
       let pending = false;
       // 勾選「我是 Amway 會員」（業主 2026-11-19：資料視窗內直接勾）：先開啟，後面的系統、中心、獎銜才寫得進去。
