@@ -448,7 +448,7 @@ export type NoticeCategory = "review" | "subscribe" | "comment" | "other";
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string; category: NoticeCategory; pending?: boolean };
 
 /** 中央的一筆「獎銜、中心」新申請（只即時顯示，不保存）。 */
-export type CentralReview = { id: string; /** 申請人（只在審核者本人開啟時即時讀取，不保存）。 */ member_id?: string; display_name: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
+export type CentralReview = { id: string; /** 申請人（只在審核者本人開啟時即時讀取，不保存）。 */ member_id?: string; display_name: string | null; /** 申請人本名與上手（中央即時提供，不保存；讀不到就沒有）。 */ legal_name?: string | null; upline_platinum?: string | null; upline_diamond?: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
 /** available＝false：這位會員沒有審核權限、或中央暫時不可用（畫面直接不顯示審核區）。 */
 /** App 內指派職務（業主 2026-11-21，中央串接指令 2026-11-21.1）：職務選項一律用中央回傳的 assignable_roles，不寫死。 */
 /** 每個封面（中心、課程、系列）最多放幾張照片／影片（業主 2026-11-21）。 */

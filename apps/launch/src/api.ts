@@ -82,7 +82,7 @@ import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
 import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, recordEvent, recordItemHit, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
-import { centralDeleteAccount, lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { centralDeleteAccount, lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, lookupLegalNames, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -4993,7 +4993,14 @@ const routes: [string, RegExp, Handler][] = [
       // 通知頁「審核」分類：中央的獎銜、中心新申請（即時讀取、不保存）。非中央會員或沒有權限＝available:false。
       const s = requireMember(ctx);
       if (s.kind !== "central") return { available: false, scope: null, reviews: [] };
-      return centralReviews(s.token);
+      const res = await centralReviews(s.token);
+      // 申請人的本名與上手白金／鑽石（中央即時提供、不保存；任何一項讀不到就不顯示那一項）。
+      const subs = res.reviews.map((r) => r.member_id).filter((x): x is string => !!x);
+      if (subs.length) {
+        const [names, uplines] = await Promise.all([lookupLegalNames(ctx.env.CENTRAL_SERVICE_SECRET, subs).catch(() => new Map<string, string>()), lookupUplines(ctx.env.CENTRAL_SERVICE_SECRET, subs).catch(() => undefined)]);
+        res.reviews = res.reviews.map((r) => (r.member_id ? { ...r, legal_name: names.get(r.member_id) ?? null, upline_platinum: uplines?.get(r.member_id)?.platinum ?? null, upline_diamond: uplines?.get(r.member_id)?.diamond ?? null } : r));
+      }
+      return res;
     },
   ],
   [

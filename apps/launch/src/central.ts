@@ -808,6 +808,49 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
 }
 
 /**
+ * 審核通知用：申請人的本名（業主 2026-11-23：通知裡的審核申請要顯示本名與上手白金／鑽石）。
+ * 與上手分開查（欄位 legal_name 要業主在中央「平台設定」勾選，沒勾回 403 就整批當作沒有，不影響上手查詢）；
+ * 只放記憶體 10 分鐘、不寫資料庫與日誌，失敗不快取。
+ */
+export async function lookupLegalNames(secret: string | undefined, subs: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const ids = [...new Set(subs)].slice(0, 100);
+  const need: string[] = [];
+  for (const id of ids) {
+    const hit = memo.get(`lgl:${id}`);
+    if (hit && hit.until > Date.now()) {
+      if (hit.value) out.set(id, hit.value as string);
+    } else need.push(id);
+  }
+  if (!need.length || !secret) return out;
+  const token = await serviceToken(secret);
+  if (!token) return out;
+  try {
+    const res = await centralFetch(`${CENTRAL}/v1/apps/${APP_ID}/members/lookup`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ member_ids: need, fields: ["legal_name"], use: "display" }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.status === 401) svcToken = null;
+    if (!res.ok) return out;
+    const b = (await res.json().catch(() => null)) as { members?: unknown[] } | null;
+    for (const raw of b?.members ?? []) {
+      const m = raw as { member_id?: unknown; id?: unknown; fields?: Record<string, unknown>; legal_name?: unknown };
+      const id = typeof m.member_id === "string" ? m.member_id : typeof m.id === "string" ? m.id : "";
+      const v = m.fields?.legal_name ?? m.legal_name;
+      const name = typeof v === "string" ? v.trim().slice(0, 50) : "";
+      if (!id) continue;
+      memo.set(`lgl:${id}`, { value: name, until: Date.now() + 600_000 });
+      if (name) out.set(id, name);
+    }
+  } catch {
+    /* 讀不到就只顯示暱稱 */
+  }
+  return out;
+}
+
+/**
  * 清單分享者名片的獎銜與獎章圖（業主 2026-11-21；Amway 資料，**不寫資料庫、不寫日誌**，只放記憶體短暫快取 10 分鐘）：
  * 串接指令 2026-11-22.1：用服務 Token 呼叫 `POST /v1/apps/learn/members/lookup`（fields＝rank，use＝display），
  * 中央直接回 `rank_label`（獎銜中文名稱）與 `rank_badge`（`badge_url`＋`badge:{width,height,art_top,art_bottom}`）；
