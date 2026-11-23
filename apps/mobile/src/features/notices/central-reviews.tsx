@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { api, type CentralReview, type CentralReviews, type Rank } from "@/api/client";
+import { api, applicantLabel, type CentralReview, type CentralReviews, type Rank } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { dateTime } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
@@ -63,7 +63,7 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
   const rankName = (code: unknown) => ranks.data?.find((r) => r.code === code)?.name ?? text(code);
   const show = (r: CentralReview, v: unknown) => (r.field_key === "rank" ? rankName(v) : text(v));
   const decide = async (r: CentralReview, decision: "approve" | "reject", value?: unknown, valueLabel?: string) => {
-    const who = r.display_name || "這位會員";
+    const who = applicantLabel(r.legal_name, r.display_name) || "這位會員";
     const ok = await confirmAsk(value !== undefined ? "修改後通過" : decision === "approve" ? "通過申請" : "不通過申請", value !== undefined ? `${who}申請「${r.field_label}」：${show(r, r.requested_value)}。\n你要改成「${valueLabel}」後通過，系統會通知申請人「經審核者修改後通過」。確定嗎？` : `${who}申請「${r.field_label}」：${show(r, r.current_value)} → ${show(r, r.requested_value)}。${decision === "approve" ? "通過後會員中心會立刻更新並通知對方。" : "不通過會通知對方，原本的資料不變。"}`, decision === "approve" ? "通過" : "不通過");
     if (!ok) return;
     setBusy(r.id);
@@ -93,7 +93,7 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
         data.reviews.map((r) => (
           <Card key={r.id} style={{ gap: space.xs }}>
             <AppText variant="headline">
-              {r.display_name || "會員"}　申請{r.field_label}
+              {applicantLabel(r.legal_name, r.display_name) || "會員"}　申請{r.field_label}
             </AppText>
             <AppText variant="body">
               {show(r, r.current_value)} → <AppText variant="body" style={{ fontWeight: "800" }}>{show(r, r.requested_value)}</AppText>
@@ -101,6 +101,11 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
             <AppText variant="caption" tone="muted">
               {[r.center ? `中心：${r.center}` : "", dateTime(r.created_at)].filter(Boolean).join("　")}
             </AppText>
+            {r.upline_platinum || r.upline_diamond ? (
+              <AppText variant="caption" tone="muted">
+                上手白金：{r.upline_platinum ?? "—"}　上手鑽石：{r.upline_diamond ?? "—"}
+              </AppText>
+            ) : null}
             <View style={styles.actions}>
               <Pressable accessibilityRole="button" accessibilityLabel="不通過" disabled={busy === r.id} onPress={() => void decide(r, "reject")} style={({ pressed }) => [styles.btn, { borderColor: c.border, backgroundColor: c.surface }, pressed && { opacity: 0.7 }]}>
                 <AppText variant="callout" style={{ fontWeight: "800" }}>
