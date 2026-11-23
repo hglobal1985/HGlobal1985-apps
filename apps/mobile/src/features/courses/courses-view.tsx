@@ -595,7 +595,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
       {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {centerPage ? (
-        <SegmentTabs options={[{ key: "course", label: "EDM" }, { key: "list", label: "清單" }, { key: "album", label: "相簿" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
+        <SegmentTabs options={[{ key: "album", label: "EDM" }, { key: "course", label: "收看課程" }, { key: "list", label: "列表" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
       ) : flat && nCourse > 0 && nList > 0 ? (
         <SegmentTabs options={[{ key: "course", label: `課程 ${nCourse}` }, { key: "list", label: `清單 ${nList}` }]} value={tab} onChange={setKindTab} />
       ) : null}
@@ -675,7 +675,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     {newOpen === "photos" && activeCenter !== ALL ? (
       <BottomSheet onClose={() => setNewOpen(null)}>
         <AppText variant="headline">{`上傳${centerTitle(activeCenter)}照片影音`}</AppText>
-        <AppText variant="caption" tone="muted">上傳的照片與短影音會放進「相簿」，也會自動成為封面輪播。</AppText>
+        <AppText variant="caption" tone="muted">上傳的照片與短影音會放進「EDM」，也會自動成為封面輪播。</AppText>
         <AlbumUploadButton kind="center" ownerKey={activeCenter} count={cm.items.length} onDone={cm.reload} />
       </BottomSheet>
     ) : null}
