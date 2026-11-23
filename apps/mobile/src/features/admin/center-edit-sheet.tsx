@@ -4,7 +4,6 @@ import type { CenterArt } from "@/api/client";
 import { CenterAddressField } from "./center-address-field";
 import { CenterBroadcastEditor } from "./center-broadcast-editor";
 import { CenterCoverPhotos } from "./center-cover-photos";
-import { CenterEdm } from "./center-edm";
 import { CenterScheduleEditor } from "./center-schedule-editor";
 import { CenterNameField } from "./center-name-field";
 
@@ -14,8 +13,7 @@ export function CenterEditSheet({ center, address, art, onClose, onAddressSaved,
     <EditSheet title={`編輯${centerTitle(center)}`} onClose={onClose} hideSave>
       <CenterNameField key={center} center={center} />
       <CenterAddressField center={center} current={address} onSaved={onAddressSaved} />
-      <CenterEdm center={center} art={art} onChanged={onArtChanged} />
-      <CenterCoverPhotos center={center} onChanged={onCoverChanged} />
+      <CenterCoverPhotos center={center} art={art} onArtChanged={onArtChanged} onChanged={onCoverChanged} />
       <CenterBroadcastEditor center={center} onChanged={onBroadcastChanged} />
       <CenterScheduleEditor center={center} onChanged={onScheduleChanged} />
     </EditSheet>
