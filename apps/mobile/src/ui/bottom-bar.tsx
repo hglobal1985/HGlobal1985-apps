@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router, usePathname, type Href } from "expo-router";
+import { router, useGlobalSearchParams, usePathname, type Href } from "expo-router";
 import { useEffect, useState, type ComponentProps } from "react";
 import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +29,13 @@ const tabs: { href: Href; title: string; icon: IconName; active: IconName; build
 ];
 
 /**
+ * 課程分頁最後停留的頁面（業主 2026-11-23）：在課程分頁裡（寰宇大學、系列、課程內頁、短網址…）看到哪一頁，就記住；
+ * 切到其他分頁再按「課程」會回到那一頁；人已經在課程分頁裡再按一次「課程」，才回到課程首頁（所有系列）。
+ * 只記在這次開啟期間（記憶體），不存裝置。
+ */
+let lastCoursesHref: string | null = null;
+
+/**
  * 底部分頁列：放在根版面，所有頁面（課程、上課、報名、管理、設定…）都會顯示，不會被推入的頁面蓋掉。
  * 登入中繼頁（/auth/*）與手機鍵盤開啟時隱藏。
  */
@@ -36,6 +43,7 @@ export function BottomBar() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const globalParams = useGlobalSearchParams();
   const unread = useUnreadCount();
   const lib = useLibraryMode();
   const [keyboard, setKeyboard] = useState(false);
@@ -55,6 +63,17 @@ export function BottomBar() {
   // 網頁（加到主畫面的 App）：選單下方若有沒被畫面蓋到的區塊，底色與選單同色，不會露出白色。
   const barBg = lib ? LIB.card : c.navBar;
   const hidden = pathname.startsWith("/auth") || keyboard;
+  // 記住課程分頁最後停留的頁面：網頁用網址列（含 ?center=… 這類條件），App 用路徑加上不在路徑裡的參數。
+  useEffect(() => {
+    if (!tabs[1]!.match(pathname)) return;
+    if (Platform.OS === "web" && typeof location !== "undefined") {
+      lastCoursesHref = location.pathname + location.search;
+      return;
+    }
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(globalParams)) if (typeof v === "string" && !pathname.includes(v)) q.set(k, v);
+    lastCoursesHref = q.toString() ? `${pathname}?${q.toString()}` : pathname;
+  }, [pathname, globalParams]);
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined" || hidden) return;
     const el = document.documentElement;
@@ -74,7 +93,14 @@ export function BottomBar() {
         const color = lib ? LIB.muted : on ? c.navPillText : "#FFFFFF";
         return (
           <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => {
-            if (t.title === "課程") requestCoursesReset();
+            if (t.title === "課程") {
+              // 已經在課程分頁裡再按一次＝回課程首頁（所有系列）；從別的分頁回來＝回到上次停留的那一頁（業主 2026-11-23）。
+              if (t.match(pathname)) {
+                requestCoursesReset();
+                router.navigate(t.href);
+              } else router.navigate((lastCoursesHref ?? t.href) as Href);
+              return;
+            }
             router.navigate(t.href);
           }}>
             <View style={[styles.cell, on && { backgroundColor: c.navPill }]}>
