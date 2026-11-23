@@ -32,19 +32,27 @@ const shown = (f: { value: string; pending: string | null }) => f.pending ?? f.v
 const formVals = (d: View_): Record<Key, string> => ({ legal_name: d.legalName, display_name: d.nickname, contact_email: d.email, education_system: shown(d.fields.education_system), education_center: shown(d.fields.education_center), rank: shown(d.fields.rank) });
 const norm = (s: string) => s.trim().toLowerCase();
 
-/** 欄位標籤：必填欄位旁有橘色「必填」小標籤（中央視覺規範）；等待審核的欄位加上醒目的橘色說明。 */
-function Label({ text, tag, note }: { text: string; tag?: string; note?: string }) {
+/** 欄位標籤：必填欄位旁有橘色「必填」小標籤（中央視覺規範）；「變更需再重新審核」一律固定顯示在第二行（業主 2026-11-22）；reserveNote＝同一排其他欄位有第二行時，這欄也留一行空間，下拉框才會對齊。 */
+function Label({ text, tag, note, reserveNote }: { text: string; tag?: string; note?: string; reserveNote?: boolean }) {
   const { c } = useTheme();
   return (
-    <View style={styles.labelRow}>
-      <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
-        {text}
-      </AppText>
-      {note ? <Text style={{ color: c.warning, fontSize: 12, fontWeight: "800" }}>{note}</Text> : null}
-      {tag ? (
-        <View style={[styles.req, { backgroundColor: c.warningSoft, borderColor: c.warning }]}>
-          <Text style={{ color: c.warning, fontSize: 12, fontWeight: "800" }}>{tag}</Text>
-        </View>
+    <View>
+      <View style={styles.labelRow}>
+        <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
+          {text}
+        </AppText>
+        {tag ? (
+          <View style={[styles.req, { backgroundColor: c.warningSoft, borderColor: c.warning }]}>
+            <Text style={{ color: c.warning, fontSize: 12, fontWeight: "800" }}>{tag}</Text>
+          </View>
+        ) : null}
+      </View>
+      {note ? (
+        <Text numberOfLines={1} style={{ color: c.warning, fontSize: 12, fontWeight: "800", lineHeight: 16 }}>
+          {note}
+        </Text>
+      ) : reserveNote ? (
+        <View style={{ height: 16 }} />
       ) : null}
     </View>
   );
@@ -79,8 +87,7 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
   const box = useRef<HostInstance>(null);
-  const [q, setQ] = useState("");
-  const [pos, setPos] = useState({ up: false, max: 240, left: 0, w: 220 });
+    const [pos, setPos] = useState({ up: false, max: 240, left: 0, w: 220 });
   const toggle = () => {
     if (open) return onOpenChange(false);
     box.current?.measureInWindow((x, y, w, h) => {
@@ -88,29 +95,26 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
       const above = y - 24;
       const up = below < 240 && above > below;
       // 窄欄（三欄表單）的選項面板：寬度放寬，並以欄位為中心、夾在螢幕左右各 16 之內（不再超出畫面）。
-      const popW = Math.min(240, winW - 32);
-      const left = Math.min(Math.max(x + (w - popW) / 2, 16), winW - 16 - popW) - x;
+      // 選項面板寬度＝剛好放得下最長的選項（不小於欄位本身），並夾在螢幕左右各 16 之內。
+      const est = Math.max(0, ...options.map((o) => [...o.label].reduce((n, ch) => n + (/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 16 : 9), 0))) + 36;
+      const popW = Math.min(winW - 32, Math.max(w, est));
+      const left = Math.min(Math.max(x, 16), winW - 16 - popW) - x;
       setPos({ up, max: Math.max(140, Math.min(300, up ? above : below)), left, w: popW });
-      setQ("");
       onOpenChange(true);
     });
   };
-  const list = q.trim() ? options.filter((o) => o.label.toLowerCase().includes(q.trim().toLowerCase())) : options;
   return (
-    <View ref={box} collapsable={false} style={{ flex: 1, zIndex: open ? 50 : 1 }}>
+    <View ref={box} collapsable={false} style={pop ? { alignSelf: "flex-start", maxWidth: "100%", zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
       <Pressable onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
-        <AppText style={{ flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
+        <AppText style={pop ? { flexShrink: 1 } : { flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
           {label}
         </AppText>
         <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 16 : 20} color={c.textMuted} />
       </Pressable>
       {open ? (
         <View style={[styles.dropdown, pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
-          {options.length > 12 ? (
-            <TextInput value={q} onChangeText={setQ} placeholder="搜尋" placeholderTextColor={c.textMuted} autoCapitalize="none" style={[styles.search, { color: c.text, borderColor: c.border }]} />
-          ) : null}
           <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-            {list.map((o) => (
+            {options.map((o) => (
               <Pressable key={o.value} onPress={() => (onPick(o.value), onOpenChange(false))} accessibilityRole="button" style={[styles.opt, o.value === value && { backgroundColor: c.accentSoft }]}>
                 <AppText numberOfLines={1}>{o.label}</AppText>
               </Pressable>
@@ -175,12 +179,19 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const amway = !!data?.enabled || wantAmway;
   const initial = data ? formVals(data) : null;
   const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name" || k === "contact_email") && vals[k].trim() !== initial[k].trim()) : [];
-  const canRank = !!vals.education_system.trim() && !!vals.education_center.trim();
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
-  /** 目前（還沒儲存）選的系統是不是寰宇：沒選就看中央判斷的整體狀態。 */
-  const systemHg = data ? (vals.education_system.trim() && vals.education_system !== NONE_TERM ? data.hglobalSystems.some((t) => norm(t) === norm(vals.education_system)) : data.hglobal) : false;
-  const centerListed = systemHg && terms.education_center.length > 0 && vals.education_center !== undefined;
+  /** 選的系統是不是寰宇：只有寰宇才能選「中心」（業主 2026-11-22）；其他系統、「無」、還沒選，中心都不能選。 */
+  const sysVal = vals.education_system.trim();
+  const systemHg = !!data && !!sysVal && sysVal !== NONE_TERM && data.hglobalSystems.some((t) => norm(t) === norm(sysVal));
+  /** 換系統時中心跟著連動：非寰宇的系統（含「無」）中心自動填「無」（中央規定三欄必填）；回到寰宇就清空讓會員自己選。 */
+  const setSystem = (v: string) =>
+    setVals((st) => {
+      const t = v.trim();
+      const hg = !!data && !!t && t !== NONE_TERM && data.hglobalSystems.some((h) => norm(h) === norm(t));
+      const center = hg ? (st.education_center.trim() === NONE_TERM ? "" : st.education_center) : t ? NONE_TERM : "";
+      return { ...st, education_system: v, education_center: center };
+    });
   const missing: Key[] = data ? ([!vals.display_name.trim() && "display_name", amway && !vals.education_system.trim() && "education_system", amway && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
 
   /** 三欄窄版用的短標籤：審核通過→通過、審核中...→審核中。 */
@@ -233,46 +244,57 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     }
   };
 
+  const anyNote = !!(noteFor("education_center") || noteFor("rank"));
+  /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
+  const colBox = (key: string, children: React.ReactNode) => (
+    <View key={key} style={{ flexShrink: 1, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
+      {children}
+    </View>
+  );
   /** 系統／中心：清單選單＋「其他」自訂輸入＋下方的「無」勾選框（三欄緊湊表單的一欄）。 */
   const listedCol = (key: "education_system" | "education_center", label: string, pop: "left" | "center" | "right") => {
     const v = vals[key];
     const none = v.trim() === NONE_TERM;
+    const isCenter = key === "education_center";
+    const blocked = isCenter && !systemHg; // 中心只有系統是寰宇才能選
     const list = terms[key];
-    const other = !none && (otherPick[key] ?? (!!v.trim() && !list.includes(v)));
+    const other = !blocked && !none && (otherPick[key] ?? (!!v.trim() && !list.includes(v)));
     const sel = none ? "" : other ? OTHER : v;
     const options = [{ value: "", label: "（未選擇）" }, ...list.map((t) => ({ value: t, label: t })), { value: OTHER, label: "其他" }];
+    const onPick = (p: string) => {
+      const val = p === OTHER ? "" : p;
+      setOtherPick((st) => ({ ...st, [key]: p === OTHER }));
+      if (isCenter) set(key)(val);
+      else setSystem(val);
+    };
+    const toggleNone = () => {
+      setOtherPick((st) => ({ ...st, [key]: false }));
+      if (isCenter) set(key)(none ? "" : NONE_TERM);
+      else setSystem(none ? "" : NONE_TERM);
+    };
     return {
       other,
-      node: (
-        <View style={{ flex: key === "education_center" ? 1.5 : 0.9, minWidth: 0 }}>
-          <Row z={openKey === key ? 100 : key === "education_system" ? 30 : 20} bad={showBad && missing.includes(key)}>
-            <Label text={label} tag={shortTag(tagFor(key, key === "education_center"))} note={key === "education_center" ? noteFor("education_center") : undefined} />
-            <Dropdown
-              pop={pop}
-              options={options}
-              value={sel}
-              label={none ? "無" : other ? "其他" : v || "（未選擇）"}
-              disabled={none}
-              open={openKey === key}
-              onOpenChange={(o) => setOpenKey(o ? key : null)}
-              onPick={(p) => {
-                if (p === OTHER) {
-                  setOtherPick((s) => ({ ...s, [key]: true }));
-                  set(key)("");
-                } else {
-                  setOtherPick((s) => ({ ...s, [key]: false }));
-                  set(key)(p);
-                }
-              }}
-            />
-            <NoneBox on={none} onToggle={() => (setOtherPick((s) => ({ ...s, [key]: false })), set(key)(none ? "" : NONE_TERM))} />
-          </Row>
-        </View>
+      node: colBox(
+        key,
+        <Row z={openKey === key ? 100 : 1} bad={showBad && missing.includes(key)}>
+          <Label text={label} tag={shortTag(tagFor(key, isCenter))} note={isCenter ? noteFor("education_center") : undefined} reserveNote={anyNote} />
+          <Dropdown
+            pop={pop}
+            options={options}
+            value={sel}
+            label={blocked ? (sysVal && sysVal !== "" ? "無" : "先選系統") : none ? "無" : other ? "其他" : v || "（未選擇）"}
+            disabled={blocked || none}
+            open={openKey === key}
+            onOpenChange={(o) => setOpenKey(o ? key : null)}
+            onPick={onPick}
+          />
+          <NoneBox on={blocked ? !!sysVal : none} disabled={blocked} onToggle={toggleNone} />
+        </Row>,
       ),
     };
   };
-  const sysCol = listedCol("education_system", "系統", "left");
-  const cenCol = centerListed ? listedCol("education_center", "中心", "center") : null;
+  const sysCol = listedCol("education_system", "系統", "center");
+  const cenCol = listedCol("education_center", "中心", "right");
 
   return (
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
@@ -324,52 +346,33 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                 </Pressable>
                 {amway ? (
                   <>
-                    <View style={{ flexDirection: "row", gap: 6, zIndex: 30 }}>
-                      {sysCol.node}
-                      {cenCol ? (
-                        cenCol.node
-                      ) : (
-                        <View style={{ flex: 1.5, minWidth: 0 }}>
-                          <Row z={20} bad={showBad && missing.includes("education_center")}>
-                            <Label text="中心" tag={shortTag(tagFor("education_center", true))} note={noteFor("education_center")} />
-                            {vals.education_center.trim() === NONE_TERM ? (
-                              <View style={[styles.input, { borderColor: c.border, backgroundColor: c.surfaceMuted, justifyContent: "center" }]}>
-                                <AppText tone="muted">無</AppText>
-                              </View>
-                            ) : (
-                              <Input value={vals.education_center} onChange={set("education_center")} />
-                            )}
-                            <NoneBox on={vals.education_center.trim() === NONE_TERM} onToggle={() => set("education_center")(vals.education_center.trim() === NONE_TERM ? "" : NONE_TERM)} />
-                          </Row>
-                        </View>
-                      )}
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Row z={openKey === "rank" ? 100 : 10} bad={showBad && missing.includes("rank")}>
-                          <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} />
+                    {/* 順序：獎銜 > 系統 > 中心（業主 2026-11-22）。獎銜一律可選；中心只有系統是寰宇才能選。 */}
+                    <View style={{ flexDirection: "row", gap: 8, zIndex: 30, alignItems: "flex-start" }}>
+                      {colBox(
+                        "rank",
+                        <Row z={openKey === "rank" ? 100 : 1} bad={showBad && missing.includes("rank")}>
+                          <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} reserveNote={anyNote} />
                           <Dropdown
-                            pop="right"
+                            pop="left"
                             options={data.rankOptions.filter((o) => o.value !== "none").map((o) => ({ value: o.value, label: o.label }))}
                             value={rankNone ? "" : vals.rank}
-                            label={!canRank ? "請先填" : rankNone ? "無" : vals.rank ? rankLabel(vals.rank) : "請選擇"}
-                            disabled={!canRank || rankNone}
+                            label={rankNone ? "無" : vals.rank ? rankLabel(vals.rank) : "請選擇"}
+                            disabled={rankNone}
                             open={openKey === "rank"}
                             onOpenChange={(o) => setOpenKey(o ? "rank" : null)}
                             onPick={set("rank")}
                           />
-                          <NoneBox on={rankNone} disabled={!canRank} onToggle={() => set("rank")(rankNone ? "" : "none")} />
-                        </Row>
-                      </View>
+                          <NoneBox on={rankNone} onToggle={() => set("rank")(rankNone ? "" : "none")} />
+                        </Row>,
+                      )}
+                      {sysCol.node}
+                      {cenCol.node}
                     </View>
-                    {sysCol.other ? <Input value={vals.education_system} onChange={set("education_system")} placeholder="系統：請輸入自訂內容" /> : null}
-                    {cenCol?.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
+                    {sysCol.other ? <Input value={vals.education_system} onChange={setSystem} placeholder="系統：請輸入自訂內容" /> : null}
+                    {cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
                   </>
                 ) : null}
               </View>
-              {data.enabled ? (
-                <AppText variant="caption" tone="muted" style={{ textAlign: "center" }}>
-                  已勾選；要取消請到會員中心。
-                </AppText>
-              ) : null}
             </>
           ) : null}
       </ScrollView>
@@ -390,7 +393,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: space.sm, width: "100%" },
   btn: { minHeight: 44, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm },
   line: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  labelRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 4, minHeight: 24 },
+  labelRow: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 24 },
   req: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1 },
   input: { minHeight: FIELD_H, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
   none: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 36, minWidth: 60 },
