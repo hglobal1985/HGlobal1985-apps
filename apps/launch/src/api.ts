@@ -4653,6 +4653,38 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "POST",
+    /^\/admin\/youtube-syncs\/([\w-]+)\/delete-with-materials$/,
+    async (ctx, [id]) => {
+      // 刪除清單與關聯教材（業主 2026-11-23）：重新讀播放清單，這張卡裡來源是清單內影片的 YouTube 教材全部刪除，再刪同步設定。
+      // 讀不到播放清單就整個不動（避免只刪一半）；教材沒有記錄「是哪份同步匯入的」，所以以影片編號比對。
+      const s = await requireSyncManager(ctx, id!);
+      const sync = await ctx.db.prepare("SELECT course_id, playlist_id FROM youtube_syncs WHERE id = ?").bind(id).first<{ course_id: string; playlist_id: string }>();
+      if (!sync) return fail(404, "not_found", "找不到這份同步設定");
+      if (!ctx.env.YOUTUBE_API_KEY) return fail(503, "youtube_key_missing", "尚未設定 YouTube 金鑰，無法判斷哪些教材屬於這份清單；請改用「只刪除清單」");
+      const { readPlaylist } = await import("./imports.ts");
+      const read = await readPlaylist(ctx.env.YOUTUBE_API_KEY, sync.playlist_id, new Set());
+      if ("error" in read) return fail(502, "playlist_unreadable", `${read.error}；為了不誤刪，什麼都沒有刪除`);
+      const vids = read.items.map((i) => i.id);
+      const files: string[] = [];
+      let deleted = 0;
+      for (let i = 0; i < vids.length; i += 60) {
+        const chunk = vids.slice(i, i + 60);
+        const marks = chunk.map(() => "?").join(",");
+        const { results } = await ctx.db.prepare(`SELECT id, cover_key, poster_key FROM lessons WHERE course_id = ? AND kind = 'material' AND media_type = 'youtube' AND media_ref IN (${marks})`).bind(sync.course_id, ...chunk).all<{ id: string; cover_key: string | null; poster_key: string | null }>();
+        for (const r of results) {
+          files.push(...(await attachmentKeys(ctx.db, "lesson_id", r.id)), ...[r.cover_key, r.poster_key].filter((k): k is string => !!k));
+        }
+        if (results.length) await ctx.db.batch(results.map((r) => ctx.db.prepare("DELETE FROM lessons WHERE id = ?").bind(r.id)));
+        deleted += results.length;
+      }
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM youtube_syncs WHERE id = ?").bind(id), audit(ctx.db, s.sub, "youtube_sync.delete_with_materials", "youtube_sync", id!, String(deleted))]);
+      await renumber(ctx.db, sync.course_id);
+      await deleteR2Files(ctx.env, files);
+      return { ok: true, deleted };
+    },
+  ],
+  [
     "DELETE",
     /^\/admin\/youtube-syncs\/([\w-]+)$/,
     async (ctx, [id]) => {
