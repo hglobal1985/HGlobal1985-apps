@@ -220,3 +220,12 @@ test("已手動排序（鎖定）的卡：新影片依日期插入正確位置�
   // 手動順序 a(2026)、b(2020)、c(2024) 原樣保留；n1(2027) 在最上面；n2(2022) 插在第一個比它舊的 b(2020) 前面；n3(2019) 放教材最後
   assert.deepEqual(order, ["2027新", "a", "2022新", "b", "c", "2019新"]);
 });
+
+test("命名規則：{標題}＝影片原標題；移除文字從最後的名稱拿掉；預覽與匯入共用同一套命名", async () => {
+  const { syncTitle, syncNamesFor, parseStrip } = await import("../src/imports.ts");
+  assert.equal(syncTitle("{標題}", "【直播】王老師小線對焦 完整版", "2026-03-14"), "【直播】王老師小線對焦 完整版");
+  assert.deepEqual(parseStrip("【直播】, 完整版\n 、"), ["【直播】", "完整版"]);
+  assert.equal(syncTitle("{標題}", "【直播】王老師小線對焦 完整版", "2026-03-14", parseStrip("【直播】, 完整版")), "王老師小線對焦");
+  const names = syncNamesFor([{ title: "A 影片", date: "2026-03-14" }, { title: "A 影片", date: "2026-03-20" }], "{標題}", [], new Set());
+  assert.deepEqual(names, ["A 影片（3/14）", "A 影片（3/20）"]);
+});

@@ -3,12 +3,13 @@ import { StyleSheet, View } from "react-native";
 import { api, type CourseSummary } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { SyncNamingFields } from "@/features/course-edit/youtube-import";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
-type Sync = { id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string };
+type Sync = { stripText?: string; id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string };
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { hour12: false }) : "還沒同步過");
 
@@ -119,6 +120,7 @@ export default function YoutubeSyncsScreen() {
 
 function FormatSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; help: string; sortLabels: Record<string, string>; onClose: () => void; onDone: () => void }) {
   const [fmt, setFmt] = useState(sync.titleFormat);
+  const [strip, setStrip] = useState(sync.stripText ?? "");
   const [sortMode, setSortMode] = useState(sync.sortMode);
   const [unlock, setUnlock] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -128,7 +130,7 @@ function FormatSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; 
     setBusy(true);
     setError(null);
     try {
-      await api("PATCH", `/admin/youtube-syncs/${sync.id}`, { titleFormat: fmt.trim(), sortMode, ...(unlock ? { unlock: true } : {}) });
+      await api("PATCH", `/admin/youtube-syncs/${sync.id}`, { titleFormat: fmt.trim(), stripText: strip, sortMode, ...(unlock ? { unlock: true } : {}) });
       flashText("已儲存同步規則");
       onDone();
     } catch (e) {
@@ -138,9 +140,8 @@ function FormatSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; 
     }
   };
   return (
-    <EditSheet title="修改同步規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat || sortMode !== sync.sortMode || unlock} busy={busy} error={error}>
-      <Field label="命名規則" value={fmt} onChange={setFmt} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
-      <AppText variant="caption" tone="muted">{help}</AppText>
+    <EditSheet title="修改同步規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat || sortMode !== sync.sortMode || unlock || strip !== (sync.stripText ?? "")} busy={busy} error={error}>
+      <SyncNamingFields url={sync.url} courseId={sync.courseId} format={fmt} setFormat={setFmt} strip={strip} setStrip={setStrip} help={help} />
       <AppText variant="caption" tone="muted">{"範例：「{年}年{月}月{日}日 王老師小線對焦」→「2026年3月14日 王老師小線對焦」。只影響之後匯入的教材；已匯入的請按「依規則重新命名」。"}</AppText>
       <Chips title="排序規則" label="排序規則" options={Object.entries(sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} />
       <AppText variant="caption" tone="muted">你在課程頁手動調整過這張卡的順序，系統會自動「鎖定手動排序」：之後同步不會重排你排好的：「依日期」規則會把新影片依日期插入正確位置；選「放最上面／最後面」就照選的放。</AppText>
@@ -158,6 +159,7 @@ function AddSheet({ help, sortLabels, onClose, onDone }: { help: string; sortLab
   const [courseId, setCourseId] = useState("");
   const [prefix, setPrefix] = useState("");
   const [format, setFormat] = useState("");
+  const [strip, setStrip] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const noChapter = (cards.data ?? []).filter((x) => x.isList);
@@ -168,7 +170,7 @@ function AddSheet({ help, sortLabels, onClose, onDone }: { help: string; sortLab
     setBusy(true);
     setError(null);
     try {
-      await api("POST", "/admin/youtube-syncs", { url: url.trim(), ...(mode === "new" ? { newCardTitle: newTitle.trim() } : { courseId }), titlePrefix: prefix.trim() || (mode === "new" ? newTitle.trim() : ""), ...(format.trim() ? { titleFormat: format.trim() } : {}), sortMode });
+      await api("POST", "/admin/youtube-syncs", { url: url.trim(), ...(mode === "new" ? { newCardTitle: newTitle.trim() } : { courseId }), titlePrefix: prefix.trim() || (mode === "new" ? newTitle.trim() : ""), ...(format.trim() ? { titleFormat: format.trim() } : {}), stripText: strip, sortMode });
       flashText("已新增，按「同步」就會匯入影片");
       onDone();
     } catch (e) {
@@ -187,8 +189,7 @@ function AddSheet({ help, sortLabels, onClose, onDone }: { help: string; sortLab
         <Chips label="現有的教材卡（只列純教材卡）" options={noChapter.map((x) => ({ key: x.id, label: x.title }))} value={courseId} onChange={setCourseId} />
       )}
       <Field label="教材名稱（選填，預設同教材卡名稱）" value={prefix} onChange={setPrefix} placeholder="例如：會長翡翠鑽石會議" />
-      <Field label="命名規則（選填，沒填＝「2026年11月 名稱（主持xxx）」）" value={format} onChange={setFormat} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
-      <AppText variant="caption" tone="muted">{help}</AppText>
+      <SyncNamingFields url={url} courseId={mode === "old" ? courseId : undefined} prefix={prefix.trim() || (mode === "new" ? newTitle.trim() : "")} format={format} setFormat={setFormat} strip={strip} setStrip={setStrip} help={help} />
       <Chips title="排序規則" label="排序規則" options={Object.entries(sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} />
     </EditSheet>
   );

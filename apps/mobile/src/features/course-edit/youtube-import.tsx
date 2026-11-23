@@ -4,12 +4,56 @@ import { api, type CourseDetail } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, ErrorView, Field, LoadingView, NoticeBox } from "@/ui";
+import { AppText, Button, Card, Check, Chips, ErrorView, Field, LoadingView, NoticeBox } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { EditSheet } from "./edit-sheet";
 
-type Sync = { id: string; label: string; url: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string };
+type Sync = { stripText?: string; courseId?: string; id: string; label: string; url: string; titleFormat: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string };
 type SyncList = { syncs: Sync[]; keyReady: boolean; formatHelp: string; sortLabels: Record<string, string> };
+
+/** 「教材名稱＝YouTube 影片名稱」勾選時使用的命名規則（{標題}＝影片原標題）。 */
+export const TITLE_ONLY = "{標題}";
+
+/**
+ * 命名設定（業主 2026-11-23）：勾選「教材名稱＝YouTube 影片名稱」＝規則 {標題}；否則自訂命名規則；
+ * 另有「移除文字」（多段用逗號或換行分開，會從最後的名稱裡拿掉）與「預覽」（純文字列出匯入後的教材名稱，不寫入任何資料）。
+ * 課程頁的匯入／修改規則與設定頁的新增／修改規則共用。
+ */
+export function SyncNamingFields({ url, courseId, prefix, format, setFormat, strip, setStrip, help }: { url: string; courseId?: string; prefix?: string; format: string; setFormat: (v: string) => void; strip: string; setStrip: (v: string) => void; help?: string }) {
+  const [preview, setPreview] = useState<{ total: number; names: string[] } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const same = format.trim() === TITLE_ONLY;
+  const run = async () => {
+    if (!url.trim()) return setErr("請先貼上播放清單網址");
+    setBusy(true);
+    setErr(null);
+    try {
+      setPreview(await api<{ total: number; names: string[] }>("POST", "/admin/youtube-syncs/preview", { url: url.trim(), ...(courseId ? { courseId } : {}), titlePrefix: prefix ?? "", titleFormat: format.trim(), stripText: strip }));
+    } catch (e) {
+      setPreview(null);
+      setErr((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <Check label="教材名稱＝YouTube 影片名稱" value={same} onChange={(v) => setFormat(v ? TITLE_ONLY : "")} />
+      {same ? null : <Field label="命名規則（選填，沒填＝「2026年11月 名稱（主持xxx）」）" value={format} onChange={setFormat} placeholder="{年}年{月}月{日}日 王老師小線對焦" />}
+      {same || !help ? null : <AppText variant="caption" tone="muted">{help}</AppText>}
+      <Field label="移除文字（選填；多段用逗號或換行分開）" value={strip} onChange={setStrip} placeholder="例如：【直播】, 完整版" />
+      <Button variant="secondary" label="預覽教材名稱" icon="eye-outline" loading={busy} onPress={() => void run()} fullWidth />
+      {err ? <AppText variant="caption" tone="danger">{err}</AppText> : null}
+      {preview ? (
+        <Card style={{ gap: 4 }}>
+          <AppText variant="caption" tone="muted">{preview.total ? `匯入後的教材名稱（共 ${preview.total} 支${preview.total > preview.names.length ? `，只列前 ${preview.names.length} 支` : ""}）` : "沒有新的影片可匯入"}</AppText>
+          {preview.names.map((n, i) => <AppText key={`${i}-${n}`} variant="callout">{`${i + 1}. ${n}`}</AppText>)}
+        </Card>
+      ) : null}
+    </>
+  );
+}
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { hour12: false }) : "還沒同步過");
 
@@ -22,6 +66,7 @@ export function YoutubeImportSheet({ course, onClose, onDone }: { course: Course
   const list = useApi<SyncList>(`/admin/courses/${course.id}/youtube-syncs`);
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState("");
+  const [strip, setStrip] = useState("");
   const [sortMode, setSortMode] = useState("date_desc");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +75,7 @@ export function YoutubeImportSheet({ course, onClose, onDone }: { course: Course
     setBusy(true);
     setError(null);
     try {
-      const r = await api<{ imported?: number; note?: string }>("POST", "/admin/youtube-syncs", { url: url.trim(), courseId: course.id, titlePrefix: course.title, ...(format.trim() ? { titleFormat: format.trim() } : {}), sortMode, syncNow: true });
+      const r = await api<{ imported?: number; note?: string }>("POST", "/admin/youtube-syncs", { url: url.trim(), courseId: course.id, titlePrefix: course.title, ...(format.trim() ? { titleFormat: format.trim() } : {}), stripText: strip, sortMode, syncNow: true });
       flashText(r.imported ? `已匯入 ${r.imported} 支影片，並加入同步清單` : r.note || "已加入同步清單");
       invalidate();
       onDone?.();
@@ -45,8 +90,7 @@ export function YoutubeImportSheet({ course, onClose, onDone }: { course: Course
     <EditSheet title="匯入 YouTube 播放清單" onClose={onClose} onSave={submit} saveLabel="匯入" dirty={!!url.trim()} busy={busy} error={error}>
       {list.data && !list.data.keyReady ? <NoticeBox tone="warning" text="尚未設定 YouTube 金鑰，目前無法匯入。" /> : null}
       <Field label="YouTube 播放清單網址" value={url} onChange={setUrl} placeholder="https://www.youtube.com/playlist?list=…" />
-      <Field label="命名規則（選填，沒填＝「2026年11月 名稱（主持xxx）」）" value={format} onChange={setFormat} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
-      {list.data ? <AppText variant="caption" tone="muted">{list.data.formatHelp}</AppText> : null}
+      <SyncNamingFields url={url} courseId={course.id} prefix={course.title} format={format} setFormat={setFormat} strip={strip} setStrip={setStrip} help={list.data?.formatHelp} />
       {list.data ? <Chips title="排序規則" label="排序規則" options={Object.entries(list.data.sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} /> : null}
       <AppText variant="caption" tone="muted">匯入的影片會放在這張教材卡的最上面（不開區塊）；已經加過的影片不會重複。這份清單也會出現在「設定 › 同步 YouTube 清單」。</AppText>
     </EditSheet>
@@ -131,6 +175,7 @@ export function YoutubeSyncSheet({ course, onClose }: { course: CourseDetail; on
 
 function RulesSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; help: string; sortLabels: Record<string, string>; onClose: () => void; onDone: () => void }) {
   const [fmt, setFmt] = useState(sync.titleFormat);
+  const [strip, setStrip] = useState(sync.stripText ?? "");
   const [sortMode, setSortMode] = useState(sync.sortMode);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +184,7 @@ function RulesSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; h
     setBusy(true);
     setError(null);
     try {
-      await api("PATCH", `/admin/youtube-syncs/${sync.id}`, { titleFormat: fmt.trim(), sortMode });
+      await api("PATCH", `/admin/youtube-syncs/${sync.id}`, { titleFormat: fmt.trim(), stripText: strip, sortMode });
       flashText("已儲存同步規則");
       onDone();
     } catch (e) {
@@ -149,9 +194,8 @@ function RulesSheet({ sync, help, sortLabels, onClose, onDone }: { sync: Sync; h
     }
   };
   return (
-    <EditSheet title="修改同步規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat || sortMode !== sync.sortMode} busy={busy} error={error}>
-      <Field label="命名規則" value={fmt} onChange={setFmt} placeholder="{年}年{月}月{日}日 王老師小線對焦" />
-      <AppText variant="caption" tone="muted">{help}</AppText>
+    <EditSheet title="修改同步規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat || sortMode !== sync.sortMode || strip !== (sync.stripText ?? "")} busy={busy} error={error}>
+      <SyncNamingFields url={sync.url} courseId={sync.courseId} format={fmt} setFormat={setFmt} strip={strip} setStrip={setStrip} help={help} />
       <Chips title="排序規則" label="排序規則" options={Object.entries(sortLabels).map(([key, label]) => ({ key, label }))} value={sortMode} onChange={setSortMode} />
       <AppText variant="caption" tone="muted">只影響之後匯入的教材；要解除手動排序鎖定或重新命名已匯入的，請到「設定 › 同步 YouTube 清單」。</AppText>
     </EditSheet>
