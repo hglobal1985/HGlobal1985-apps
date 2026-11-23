@@ -23,6 +23,9 @@ export default function NoticesScreen() {
   const centralCount = central.data?.available ? central.data.reviews.length : 0;
   const count = (cat: NoticeCategory) => (data ?? []).filter((n) => n.category === cat && !n.read).length + (cat === "review" ? centralCount : 0);
   const list = (data ?? []).filter((n) => mode === "all" || n.category === mode);
+  // 審核相關而且還沒處理的置頂（伺服器標 pending）；訂閱、留言分頁不需要。
+  const pinned = mode === "all" || mode === "review" ? list.filter((n) => n.pending) : [];
+  const rest = pinned.length ? list.filter((n) => !n.pending) : list;
   const MODES: { key: "all" | NoticeCategory; label: string }[] = [
     { key: "all", label: "全部" },
     { key: "review", label: "審核" },
@@ -40,6 +43,29 @@ export default function NoticesScreen() {
     await api("POST", "/notifications/read-all").catch(() => undefined);
     invalidate();
   };
+  const renderRow = (n: Notice, i: number) => (
+      <Pressable key={n.id} accessibilityRole="button" accessibilityLabel={`${n.title}${n.read ? "" : "，未讀"}`} onPress={() => open(n)} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, minHeight: 64 }, i > 0 && { borderTopWidth: 1, borderColor: c.border }, pressed && { opacity: 0.7 }]}>
+        <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: n.read ? c.surfaceMuted : c.accentSoft }}>
+          <Ionicons name={n.category === "review" ? "ribbon-outline" : n.category === "comment" ? "chatbubble-outline" : "notifications-outline"} size={20} color={n.read ? c.textMuted : c.accentText} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <AppText variant="body" numberOfLines={2} style={{ fontWeight: n.read ? "600" : "800" }}>
+            {n.title}
+          </AppText>
+          {n.body ? (
+            <AppText variant="caption" tone="muted" numberOfLines={1}>
+              {n.body}
+            </AppText>
+          ) : null}
+        </View>
+        <View style={{ alignItems: "flex-end", gap: 4 }}>
+          <AppText variant="caption" tone="muted">
+            {hhmm(n.createdAt)}
+          </AppText>
+          {!n.read ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.accent }} /> : <View style={{ width: 10, height: 10 }} />}
+        </View>
+      </Pressable>
+  );
   if (!member)
     return (
       <Screen>
@@ -83,36 +109,29 @@ export default function NoticesScreen() {
       </View>
       {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
       {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title={mode === "all" ? "目前沒有通知" : "這個分類目前沒有通知"} body={mode === "all" ? "報名課程或報名有進度時，會在這裡通知你。" : undefined} /> : null}
-      {groupByDay(list, (n) => n.createdAt).map((g) => (
+      {/* 審核相關而且還沒處理的一律置頂（業主 2026-11-23）：在「全部」與「審核」都放在最上面，處理完（或已讀）才回到下面依日期排列。 */}
+      {mode === "all" && centralCount ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`有 ${centralCount} 筆獎銜或中心申請等待你審核`} onPress={() => setMode("review")} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 64, paddingHorizontal: space.md, borderRadius: radius.lg, borderWidth: 2, borderColor: c.accent, backgroundColor: c.accentSoft, marginTop: space.xs }, pressed && { opacity: 0.7 }]}>
+          <Ionicons name="pin" size={20} color={c.accentText} />
+          <AppText variant="body" style={{ flex: 1, fontWeight: "800", color: c.accentText }}>{`有 ${centralCount} 筆獎銜／中心申請等待你審核`}</AppText>
+          <Ionicons name="chevron-forward" size={20} color={c.accentText} />
+        </Pressable>
+      ) : null}
+      {pinned.length ? (
+        <View style={{ gap: 6, marginTop: space.xs }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Ionicons name="pin" size={14} color={c.accentText} />
+            <AppText variant="caption" style={{ fontWeight: "800", color: c.accentText }}>{`等待處理的審核（${pinned.length}）`}</AppText>
+          </View>
+          <Card style={{ paddingVertical: 4, borderWidth: 2, borderColor: c.accent }}>{pinned.map((n, i) => renderRow(n, i))}</Card>
+        </View>
+      ) : null}
+      {groupByDay(rest, (n) => n.createdAt).map((g) => (
         <View key={g.day} style={{ gap: 6, marginTop: space.xs }}>
           <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
             {g.day}
           </AppText>
-          <Card style={{ paddingVertical: 4 }}>
-            {g.rows.map((n, i) => (
-              <Pressable key={n.id} accessibilityRole="button" accessibilityLabel={`${n.title}${n.read ? "" : "，未讀"}`} onPress={() => open(n)} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, minHeight: 64 }, i > 0 && { borderTopWidth: 1, borderColor: c.border }, pressed && { opacity: 0.7 }]}>
-                <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: n.read ? c.surfaceMuted : c.accentSoft }}>
-                  <Ionicons name={n.category === "review" ? "ribbon-outline" : n.category === "comment" ? "chatbubble-outline" : "notifications-outline"} size={20} color={n.read ? c.textMuted : c.accentText} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <AppText variant="body" numberOfLines={2} style={{ fontWeight: n.read ? "600" : "800" }}>
-                    {n.title}
-                  </AppText>
-                  {n.body ? (
-                    <AppText variant="caption" tone="muted" numberOfLines={1}>
-                      {n.body}
-                    </AppText>
-                  ) : null}
-                </View>
-                <View style={{ alignItems: "flex-end", gap: 4 }}>
-                  <AppText variant="caption" tone="muted">
-                    {hhmm(n.createdAt)}
-                  </AppText>
-                  {!n.read ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.accent }} /> : <View style={{ width: 10, height: 10 }} />}
-                </View>
-              </Pressable>
-            ))}
-          </Card>
+          <Card style={{ paddingVertical: 4 }}>{g.rows.map((n, i) => renderRow(n, i))}</Card>
         </View>
       ))}
       {preview ? (
