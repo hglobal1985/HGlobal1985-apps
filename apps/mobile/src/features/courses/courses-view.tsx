@@ -326,7 +326,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 中心頁三個分頁一律都在（相簿、EDM、清單），不顯示數量（業主 2026-11-21）；沒點過時才依內容挑預設。
   const [tabPicked, setTabPicked] = useState(false);
   // 業主 2026-11-21：EDM＝該中心所有卡片的縮圖格；清單＝同樣這批卡片改成清單列表（一列一張）；相簿＝照片。沒有任何卡片時預設相簿。
-  const autoTab: "album" | "course" | "list" = centerPage && groups.length === 0 ? "album" : kindTab === "list" ? "list" : "course";
+  // 中心頁沒點過分頁時一律停在第一個「EDM」（照片；業主 2026-11-23），不再依有沒有卡片挑預設。
+  const autoTab: "album" | "course" | "list" = centerPage ? "album" : kindTab === "list" ? "list" : "course";
   const tab: "album" | "course" | "list" = centerPage && tabPicked ? kindTab : autoTab;
   const flatShown = groups;
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
