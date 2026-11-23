@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, Dimensions, Platform } from "react-native";
 import { api } from "@/api/client";
 
@@ -22,9 +23,21 @@ function detect(): { device: "mobile" | "tablet" | "desktop"; os: "ios" | "andro
   return { device: "desktop", os: "other" };
 }
 
+/** 「這是業主本人的裝置」記號（業主 2026-11-23）：管理員在這個瀏覽器／手機登入過就留下，之後未登入、換測試帳號也不列入統計。 */
+const OWNER_KEY = "learn.usage.owner";
+let ownerDevice = false;
+const ownerReady = AsyncStorage.getItem(OWNER_KEY).then((v) => void (ownerDevice = v === "1")).catch(() => undefined);
+
+/** 管理員登入後呼叫：存裝置記號，並請伺服器記下這個網路。 */
+export function markOwnerDevice() {
+  ownerDevice = true;
+  void AsyncStorage.setItem(OWNER_KEY, "1").catch(() => undefined);
+  void api("POST", "/usage/owner").catch(() => undefined);
+}
+
 export function trackUsage(kind: Kind, target?: string) {
   try {
-    void api("POST", "/usage", { kind, ...detect(), ...(target ? { target } : {}) }).catch(() => undefined);
+    void ownerReady.then(() => api("POST", "/usage", { kind, ...detect(), ...(target ? { target } : {}), ...(ownerDevice ? { owner: 1 } : {}) })).catch(() => undefined);
   } catch {
     /* 統計失敗不影響使用 */
   }
