@@ -675,9 +675,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     {newOpen === "schedule" && activeCenter !== ALL ? <CenterScheduleSheet center={activeCenter} onClose={() => setNewOpen(null)} onChanged={sch.reload} /> : null}
     {newOpen === "photos" && activeCenter !== ALL ? (
       <BottomSheet onClose={() => setNewOpen(null)}>
-        <AppText variant="headline">{`上傳${centerTitle(activeCenter)}照片影音`}</AppText>
+        <AppText variant="headline">{`上傳${centerTitle(activeCenter)}EDM`}</AppText>
         <AppText variant="caption" tone="muted">上傳的照片與短影音會放進「EDM」分頁（和封面輪播照片分開存放）；封面是否一起輪播 EDM，到右上角「編輯」的「封面輪播照片」設定（預設會）。</AppText>
-        <AlbumUploadButton kind="center" scope="edm" ownerKey={activeCenter} count={cm.edm.length} onDone={cm.reload} />
+        <AlbumUploadButton kind="center" scope="edm" label="上傳EDM" ownerKey={activeCenter} count={cm.edm.length} onDone={cm.reload} />
       </BottomSheet>
     ) : null}
     {newOpen && newOpen !== "schedule" && newOpen !== "announce" && newOpen !== "photos" ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}

@@ -52,7 +52,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
   };
   return (
     <View style={{ gap: space.md }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      {!items.length ? <EmptyState icon="images-outline" title="還沒有照片" body={canEdit ? emptyHint ?? "按右下角「新增教材 › 上傳照片影音」新增。" : undefined} /> : null}
+      {!items.length ? <EmptyState icon="images-outline" title={scope === "edm" ? "還沒有 EDM" : "還沒有照片"} body={canEdit ? emptyHint ?? (scope === "edm" ? "按右下角「新增教材 › 上傳EDM」新增。" : undefined) : undefined} /> : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
         {items.map((x, i) => (
           <View key={x.id} style={{ width: tile || "33%", height: tile || 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: c.surfaceMuted }}>
