@@ -228,8 +228,8 @@ export async function profileGaps(sub: string, token: string, email: string | nu
       // 新會員還沒勾選「我是 Amway 會員」也要提醒（視窗會引導到會員中心勾選並填寫）。
       if (b.enabled !== true) gaps.push("Amway 會員資料");
       else {
-        // 只檢查核心三欄（培訓系統、地區教育中心、獎銜）；推薦人與各上手因人而異（可能沒有），不列入提醒。
-        const core = ["education_system", "education_center", "rank"];
+        // 檢查獎銜、系統、中心與上手白金、上手鑽石（業主 2026-11-23：上手兩欄也必填，沒填就自動彈出面板）；推薦人不列入。
+        const core = ["education_system", "education_center", "rank", "upline_platinum", "upline_diamond"];
         const empty = core.some((k) => {
           const f = b.fields?.[k];
           return !f || ((f.value == null || f.value === "") && (f.pending_value == null || f.pending_value === ""));

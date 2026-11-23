@@ -45,7 +45,7 @@ test("新會員：沒勾 Amway 也會提醒；會員中心暫時查不到不記�
   assert.ok(((await me()).profileMissing ?? []).length > 0);
 
   // ③ 會員中心審核通過獎銜後：一般請求可能還是舊的快取，fresh=1 一定拿到最新
-  amway = { enabled: true, fields: { education_system: { value: "寰宇" }, education_center: { value: "台北 100" }, rank: { value: "gold" } } };
+  amway = { enabled: true, fields: { education_system: { value: "寰宇" }, education_center: { value: "台北 100" }, rank: { value: "gold" }, upline_platinum: { value: "王大明" }, upline_diamond: { value: "李小華" } } };
   const fresh = await me("?fresh=1");
   assert.equal(fresh.rankLabel, "金章");
   assert.deepEqual(fresh.profileMissing ?? [], []);
