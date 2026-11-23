@@ -93,6 +93,7 @@ import { drawZoneVideoBadges } from "./zone-video-badges.ts";
 import { isCoverKey, isKeyInUse, listInUseCards, listUnusedCovers, type InUseCard } from "./cover-library.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
+import { ocrEdmImage, ocrPending } from "./edm-vision.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
@@ -2430,7 +2431,7 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; kind?: string; poster_key?: string | null };
 const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
 const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
-function coverItem(r: { id: string; scope: CoverScope; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
+function coverItem(r: { id: string; scope: CoverScope; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
     scope: r.scope === "edm" ? "edm" : "cover",
@@ -2441,6 +2442,7 @@ function coverItem(r: { id: string; scope: CoverScope; course_id?: string | null
     width: r.width,
     height: r.height,
     durationSec: r.duration_sec,
+    ...(r.scope === "edm" ? { eventDate: r.event_date ?? null, text: r.ocr_text ?? "" } : {}),
   };
 }
 /** 儲存區（業主 2026-11-23）：只有中心有「EDM」分頁；系列、課程一律只有 cover。沒帶或不認得時，中心當 edm（舊版 App 的相簿上傳）。 */
@@ -2449,9 +2451,9 @@ const coverScopeOf = (kind: CoverMediaKind, v: unknown): CoverScope => (kind !==
 async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, scope?: CoverScope): Promise<CoverMediaItem[]> {
   const where = (kind === "center" ? "cm.owner_kind = 'center' AND cm.center_key = ?" : "cm.owner_kind = ? AND cm.owner_key = ?") + (scope ? " AND cm.scope = ?" : "");
   // 課程 EDM（綁定課程的照片）不受 100 張上限限制，所以讀取上限放寬。
-  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, cm.position, cm.created_at, cm.rowid LIMIT 2000`);
+  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, cm.ocr_text, cm.event_date, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, CASE WHEN cm.scope = 'edm' THEN cm.event_date IS NULL ELSE 0 END, CASE WHEN cm.scope = 'edm' THEN cm.event_date END DESC, cm.position, cm.created_at, cm.rowid LIMIT 2000`);
   const args = [...(kind === "center" ? [lookup] : [kind, lookup]), ...(scope ? [scope] : [])];
-  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; ocr_text: string | null; event_date: string | null; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
   return results.map(coverItem);
 }
 /**
@@ -2475,7 +2477,7 @@ async function reconcileCenterEdm(db: D1Database, key: string): Promise<void> {
     // 課程不在這裡了（改中心、下架、刪除、移除 EDM）：只拿掉綁定的照片紀錄，檔案歸課程管，不刪檔
     db.prepare(`DELETE FROM cover_media WHERE owner_kind = 'center' AND center_key = ?1 AND course_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM courses c WHERE c.id = cover_media.course_id AND ${ok})`).bind(key),
     // 課程換了 EDM：同步新的檔案（寬高重新量）
-    db.prepare(`UPDATE cover_media SET r2_key = (SELECT c.edm_key FROM courses c WHERE c.id = cover_media.course_id), width = 0, height = 0 WHERE owner_kind = 'center' AND center_key = ?1 AND course_id IS NOT NULL AND r2_key <> (SELECT c.edm_key FROM courses c WHERE c.id = cover_media.course_id)`).bind(key),
+    db.prepare(`UPDATE cover_media SET r2_key = (SELECT c.edm_key FROM courses c WHERE c.id = cover_media.course_id), width = 0, height = 0, ocr_status = '', ocr_text = '', event_date = NULL WHERE owner_kind = 'center' AND center_key = ?1 AND course_id IS NOT NULL AND r2_key <> (SELECT c.edm_key FROM courses c WHERE c.id = cover_media.course_id)`).bind(key),
     // 還沒綁定的課程 EDM：新增（接在最後面，依課程建立時間）
     db.prepare(
       `INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, width, height, position, created_by, scope, course_id)
@@ -3985,6 +3987,8 @@ const routes: [string, RegExp, Handler][] = [
       const lookup = kind === "center" ? centerKey(key) : key;
       if (kind === "center") await reconcileCenterEdm(ctx.db, lookup).catch(() => undefined); // 課程 EDM 自動併入中心 EDM 空間
       await fillImageDims(ctx.env, ctx.db, kind, lookup);
+      // 還沒辨識的中心 EDM 圖（舊的、課程併入的）每次讀取在背景補辨識幾張，慢慢補齊。
+      if (kind === "center" && ctx.defer) ctx.defer(ocrPending(ctx.env, ctx.db, 2).catch(() => undefined));
       return coverItems(ctx.db, kind, lookup);
     },
   ],
@@ -4003,6 +4007,8 @@ const routes: [string, RegExp, Handler][] = [
       const key = `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${renameForType("x.jpg", shrunk.type).split(".").pop()}`;
       await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       const id = await addCoverRow(ctx.db, o, { kind: "image", r2Key: key, posterKey: null, width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")), durationSec: 0, bytes: shrunk.data.byteLength, by: o.s.sub });
+      // 中心 EDM：上傳後在背景用視覺模型辨識文字與活動日期（搜尋與依日期排序用）；失敗不影響上傳。
+      if (o.kind === "center" && o.scope === "edm" && ctx.defer) ctx.defer(ocrEdmImage(ctx.env, ctx.db, id).catch(() => undefined));
       return { id, items: await coverItems(ctx.db, o.kind, o.lookup) };
     },
   ],
@@ -4082,7 +4088,7 @@ const routes: [string, RegExp, Handler][] = [
       await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       const size = imageSize(new Uint8Array(shrunk.data as ArrayBuffer)) ?? { width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")) };
       await ctx.db.batch([
-        ctx.db.prepare("UPDATE cover_media SET r2_key = ?, width = ?, height = ?, bytes = ? WHERE id = ?").bind(key, size.width, size.height, shrunk.data.byteLength, id),
+        ctx.db.prepare("UPDATE cover_media SET r2_key = ?, width = ?, height = ?, bytes = ?, ocr_status = '', ocr_text = '', event_date = NULL WHERE id = ?").bind(key, size.width, size.height, shrunk.data.byteLength, id),
         ...(row.course_id ? [ctx.db.prepare("UPDATE courses SET edm_key = ?, cover_rect = NULL, art_version = art_version + 1 WHERE id = ?").bind(key, row.course_id)] : []),
         audit(ctx.db, s.sub, "cover_media.replace", row.owner_kind, row.center_key ?? row.owner_key, id),
       ]);
