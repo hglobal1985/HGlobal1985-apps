@@ -246,7 +246,10 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     }
   };
 
-  const anyNote = !!(noteFor("education_center") || noteFor("rank"));
+  // 系統選「其他」時中心欄被隱藏，它的「變更需再重新審核」也不算（不然其他欄會多留一行空白）。
+  const sysNone = vals.education_system.trim() === NONE_TERM;
+  const sysIsOther = !sysNone && (otherPick.education_system ?? (!!sysVal && !terms.education_system.includes(vals.education_system)));
+  const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
   /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
   const colBox = (key: string, children: React.ReactNode) => (
     <View key={key} style={{ flexShrink: 1, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
@@ -368,10 +371,19 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                         </Row>,
                       )}
                       {sysCol.node}
-                      {cenCol.node}
+                      {sysCol.other ? (
+                        // 系統選「其他」：隱藏中心欄，原位置改成自訂系統的輸入欄（業主 2026-11-23）。
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Row bad={showBad && missing.includes("education_system")}>
+                            <Label text="自訂系統" tag={shortTag(tagFor("education_system"))} reserveNote={anyNote} />
+                            <Input value={vals.education_system} onChange={setSystem} placeholder="請輸入系統名稱" />
+                          </Row>
+                        </View>
+                      ) : (
+                        cenCol.node
+                      )}
                     </View>
-                    {sysCol.other ? <Input value={vals.education_system} onChange={setSystem} placeholder="系統：請輸入自訂內容" /> : null}
-                    {cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
+                    {!sysCol.other && cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
                   </>
                 ) : null}
               </View>
