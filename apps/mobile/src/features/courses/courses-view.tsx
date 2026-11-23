@@ -33,7 +33,8 @@ import { flashMode } from "./mode-flash";
 import { ZoneMoveSheet, zoneLabel } from "./zone-move-sheet";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
-import { buildSearchIndex, matchCourses, matchLessons, suggestTerms, type SearchLesson } from "./course-search";
+import { buildSearchIndex, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, suggestTerms, type SearchLesson } from "./course-search";
+import { useSemantic } from "./use-semantic";
 import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses, type SeriesGroup } from "./sort";
 import { useApi, useSession } from "@/state/session";
@@ -294,7 +295,29 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
   const needIndex = wantIndex || chapterMode;
   const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? []) : null), [needIndex, courses, searchData.data]);
-  const matched = searchIndex ? matchCourses(searchIndex, q) : null;
+  // 打錯字也找得到（業主 2026-11-23）：完全比對沒有結果時，先用模糊比對（差 1～2 個字），再用 AI 語意搜尋找意思相近的；兩者合併顯示並標示「相近結果」。
+  const exact = searchIndex ? (chapterMode ? matchLessons(searchIndex, q) : matchCourses(searchIndex, q)) : null;
+  const noExact = !!exact && exact.size === 0;
+  const semantic = useSemantic(q, noExact);
+  const near = useMemo(() => {
+    if (!noExact || !searchIndex) return null;
+    const out = new Set<string>();
+    if (chapterMode) {
+      for (const id of fuzzyLessons(searchIndex, q)) out.add(id);
+      for (const id of semantic.lessons) if (searchIndex.lessonHay.has(id)) out.add(id);
+    } else {
+      for (const id of fuzzyCourses(searchIndex, q)) out.add(id);
+      const byLesson = new Map((searchData.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
+      for (const id of semantic.courses) if (searchIndex.haystack.has(id)) out.add(id);
+      for (const lid of semantic.lessons) {
+        const cid = byLesson.get(lid);
+        if (cid && searchIndex.haystack.has(cid)) out.add(cid);
+      }
+    }
+    return out;
+  }, [noExact, searchIndex, q, chapterMode, semantic.courses, semantic.lessons, searchData.data]);
+  const nearMode = !!near && near.size > 0;
+  const matched = nearMode && !chapterMode ? near : searchIndex ? (chapterMode ? matchCourses(searchIndex, q) : exact) : null;
   const terms = searchIndex && q.trim() && q !== picked ? suggestTerms(searchIndex, q) : [];
   // 搜尋時不受兩頁分流限制（搜得到所有課程）；其餘只看目前這一頁的課程。
   const list = (matched ? courses : pool).filter((x) => (matched ? matched.has(x.id) : inCategory(x) && inCenter(x) ));
@@ -398,7 +421,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const chapterItems = useMemo<ChapterItem[]>(() => {
     if (!chapterMode) return [];
     const byId = new Map(courses.map((x) => [x.id, x]));
-    const hit = searchIndex ? matchLessons(searchIndex, q) : null;
+    const hit = nearMode ? near : exact;
     const canWatch = (x: (typeof courses)[number]) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
     const rand = (id: string) => {
       let h = shuffleSeed | 0;
@@ -414,7 +437,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [chapterMode, courses, searchData.data, searchIndex, q, category, brandSel, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chapterMode, courses, searchData.data, searchIndex, q, nearMode, near, exact, category, brandSel, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
   // 一列幾張（業主 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
   const cols = flat ? portraitColumns(boxW) : tileColumns(boxW);
@@ -612,17 +635,19 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       ) : chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
-          {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}
+          {nearMode ? <AppText variant="caption" tone="muted">找不到完全符合的，以下是相近的結果</AppText> : null}
+          {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={semantic.loading ? "正在找相近的結果…" : q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}
           <ChapterList items={chapterItems} />
         </>
       ) : (
         <>
+          {nearMode ? <AppText variant="caption" tone="muted">找不到完全符合的，以下是相近的結果</AppText> : null}
           {data && !groups.length && !(mode === "center" && center === ALL) ? (
             mode === "center" && !matched && !selCats.length ? (
               // 中心頁完全沒有課程：固定提示文字（地址由中心的編輯面板設定；沒設定就不顯示地址那一行）
               <EmptyState icon="library-outline" title="線上課程準備中" body={["線下課程週週精彩", centerInfo.data?.[normCenter(center)] ? `地址：${centerInfo.data[normCenter(center)]}` : "", "請洽中心負責人"].filter(Boolean).join("\n")} />
             ) : (
-              <EmptyState icon="library-outline" title={matched ? "找不到符合的課程" : "沒有符合條件的課程"} />
+              <EmptyState icon="library-outline" title={semantic.loading ? "正在找相近的結果…" : matched ? "找不到符合的課程" : "沒有符合條件的課程"} />
             )
           ) : null}
           {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (

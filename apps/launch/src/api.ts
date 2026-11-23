@@ -4384,6 +4384,16 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/search\/semantic$/,
+    async (ctx) => {
+      // 語意搜尋（業主 2026-11-23）：只回「意思相近的課程與章節編號」；前端只顯示自己（依權限）已取得索引裡有的，所以這裡不洩漏任何內容。
+      requireMember(ctx);
+      const { semanticSearch } = await import("./semantic-search.ts");
+      return semanticSearch(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "");
+    },
+  ],
+  [
+    "GET",
     /^\/search-index$/,
     async (ctx) => {
       // 「全部課程」搜尋與「章節」模式用：已上架課程每一堂的章節標題、分享者（姓名、獎銜、職稱）、日期、長度，

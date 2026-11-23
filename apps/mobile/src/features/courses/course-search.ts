@@ -84,3 +84,42 @@ export function suggestTerms(index: SearchIndex, q: string, limit = 8): SearchTe
   hit.sort((a, b) => Number(b.text.toLowerCase().startsWith(last)) - Number(a.text.toLowerCase().startsWith(last)) || a.text.length - b.text.length);
   return hit.slice(0, limit);
 }
+
+/**
+ * 模糊比對（業主 2026-11-23，容錯打錯字）：在一段文字裡找「最多差 k 個字」的相似片段（Sellers 近似子字串比對）。
+ * 差 k 個字＝漏字、多字、錯字都算；例：「益支源」找得到「益之源」。
+ */
+export function approxIncludes(text: string, pat: string, k: number): boolean {
+  const p = [...pat];
+  const m = p.length;
+  if (!m) return true;
+  let prev = Array.from({ length: m + 1 }, (_, i) => i);
+  for (const ch of text) {
+    const cur = [0];
+    for (let i = 1; i <= m; i++) cur[i] = Math.min(prev[i]! + 1, cur[i - 1]! + 1, prev[i - 1]! + (p[i - 1] === ch ? 0 : 1));
+    if (cur[m]! <= k) return true;
+    prev = cur;
+  }
+  return false;
+}
+/** 容許的差異字數：1～2 個字必須完全一樣（太短會亂配）、3～4 個字差 1、5 個字以上差 2。 */
+const allowance = (len: number) => (len <= 2 ? 0 : len <= 4 ? 1 : 2);
+const fuzzyHit = (hay: string, w: string) => {
+  if (hay.includes(w)) return true;
+  const k = allowance([...w].length);
+  return k > 0 && hay.split("\u0001").some((f) => f && approxIncludes(f, w, k));
+};
+/** 模糊比對的課程編號（空白搜尋＝null）。只在完全比對沒有結果時才用。 */
+export function fuzzyCourses(index: SearchIndex, q: string): Set<string> {
+  const t = tokens(q);
+  const out = new Set<string>();
+  if (t.length) for (const [id, hay] of index.haystack) if (t.every((w) => fuzzyHit(hay, w))) out.add(id);
+  return out;
+}
+/** 章節模式的模糊比對。 */
+export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
+  const t = tokens(q);
+  const out = new Set<string>();
+  if (t.length) for (const [id, hay] of index.lessonHay) if (t.every((w) => fuzzyHit(hay, w))) out.add(id);
+  return out;
+}
