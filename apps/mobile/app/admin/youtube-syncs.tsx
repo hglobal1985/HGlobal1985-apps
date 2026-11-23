@@ -58,6 +58,19 @@ export default function YoutubeSyncsScreen() {
       flashText((e as Error).message);
     }
   };
+  const removeAll = async (s: Sync) => {
+    if (!(await confirmAsk("刪除清單與關聯教材", `會刪除「${s.label || s.courseTitle}」的同步設定，以及「${s.courseTitle}」裡來源是這個播放清單影片的所有教材（含學員的相關紀錄），無法復原。確定刪除？`, "全部刪除"))) return;
+    setBusyId(s.id);
+    try {
+      const r = await api<{ deleted: number }>("POST", `/admin/youtube-syncs/${s.id}/delete-with-materials`);
+      flashText(`已刪除清單與 ${r.deleted} 個教材`);
+      list.reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setBusyId(null);
+    }
+  };
   return (
     <Screen header={false}>
       <AppText variant="callout" tone="muted">
@@ -86,12 +99,13 @@ export default function YoutubeSyncsScreen() {
             </View>
             <View style={styles.row}>
               <View style={{ flex: 1 }}>
-                <Button variant="cancel" label="刪除" onPress={() => void remove(s)} fullWidth />
+                <Button variant="cancel" label="只刪除清單" onPress={() => void remove(s)} fullWidth />
               </View>
               <View style={{ flex: 1 }}>
                 <Button label="同步" icon="sync" loading={busyId === s.id} onPress={() => void run(s)} fullWidth />
               </View>
             </View>
+            <Button variant="cancel" label="刪除清單與關聯教材" loading={busyId === s.id} onPress={() => void removeAll(s)} fullWidth />
           </Card>
         ))
       ) : (
