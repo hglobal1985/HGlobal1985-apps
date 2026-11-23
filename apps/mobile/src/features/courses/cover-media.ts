@@ -33,7 +33,7 @@ export function buildSlides(items: CoverMediaItem[]): CoverSlide[] {
   while (i < items.length) {
     const it = items[i]!;
     if (!isPortrait(it)) {
-      out.push({ key: it.id, items: [it] });
+      out.push({ key: `${it.id}#${out.length}`, items: [it] });
       i++;
       continue;
     }
@@ -46,7 +46,7 @@ export function buildSlides(items: CoverMediaItem[]): CoverSlide[] {
         // 從這一組後面接著找，沒有不同的就重複
         for (let n = 0; chunk.length < 3; n++) chunk.push(others.length ? others[n % others.length]! : chunk[n % chunk.length]!);
       }
-      out.push({ key: chunk.map((x) => x.id).join("+") + `#${k}`, items: chunk });
+      out.push({ key: chunk.map((x) => x.id).join("+") + `#${out.length}`, items: chunk });
     }
   }
   return out;

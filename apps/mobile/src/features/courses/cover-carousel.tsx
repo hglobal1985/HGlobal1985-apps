@@ -59,7 +59,8 @@ export function CoverCarousel({ items, width, height, onOpen, paused = false }: 
   ).current;
 
   if (!cur) return null;
-  const imgOf = (x: CoverMediaItem, w: number) => <Image key={x.id} source={{ uri: thumb(resolveUrl(x.kind === "video" ? x.posterUrl ?? x.url : x.url), Math.max(320, Math.round(w))) }} style={{ flex: 1, height }} resizeMode="cover" accessibilityIgnoresInvertColors />;
+  // key 要加上位置：湊不滿三張時同一張照片會重複出現，編號相同的 key 會讓網頁換張時亂堆出多餘的小塊（業主 2026-11-23 回報封面輪播變成九條重複畫面）。
+  const imgOf = (x: CoverMediaItem, w: number, i: number) => <Image key={`${i}-${x.id}`} source={{ uri: thumb(resolveUrl(x.kind === "video" ? x.posterUrl ?? x.url : x.url), Math.max(320, Math.round(w))) }} style={{ flex: 1, height }} resizeMode="cover" accessibilityIgnoresInvertColors />;
   return (
     <View style={{ width, height, backgroundColor: "#000", overflow: "hidden" }} {...pan.panHandlers} {...(Platform.OS === "web" ? ({ style: { width, height, backgroundColor: "#000", overflow: "hidden", touchAction: "pan-y" } } as object) : {})}>
       <Animated.View style={{ flex: 1, opacity: fade, flexDirection: "row", gap: cur.items.length > 1 ? 2 : 0 }}>
@@ -76,7 +77,7 @@ export function CoverCarousel({ items, width, height, onOpen, paused = false }: 
             style: { width, height, objectFit: video.height > video.width * 1.05 ? "contain" : "cover", background: "#000" },
           })
         ) : (
-          cur.items.map((x) => imgOf(x, cur.items.length > 1 ? width / 3 : width))
+          cur.items.map((x, i) => imgOf(x, cur.items.length > 1 ? width / 3 : width, i))
         )}
       </Animated.View>
       {/* 點一下：開全螢幕看圖（影片不開，影片就在原地播放）。 */}
