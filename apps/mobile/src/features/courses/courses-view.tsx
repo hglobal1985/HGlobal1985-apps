@@ -557,7 +557,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const announceTargets: BroadcastTarget[] = activeCenter !== ALL ? [{ scope: "center", name: activeCenter, label: `${centerTitle(activeCenter)}公告` }] : [{ scope: "home", label: "首頁公告" }];
   const cm = useCoverMedia("center", activeCenter === ALL ? null : activeCenter);
   const centerHero =
-    activeCenter !== ALL ? <CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
+    activeCenter !== ALL ? <CenterHero art={art} media={cm.carousel} scrollY={scrollY} stats={stats} title={centerTitle(activeCenter)} /> : undefined;
   const centerAddress = activeCenter !== ALL ? centerInfo.data?.[normCenter(activeCenter)] : undefined;
   const { width: winWidth, height: winHeight } = useWindowDimensions();
   const archivedBlock =
@@ -603,7 +603,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {centerPage && tab === "album" ? (
-        <CoverAlbum kind="center" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={cm.items} canEdit={canEditArt} onChanged={cm.reload} />
+        <CoverAlbum kind="center" scope="edm" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={cm.edm} canEdit={canEditArt} onChanged={cm.reload} />
       ) : chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
@@ -676,13 +676,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     {newOpen === "photos" && activeCenter !== ALL ? (
       <BottomSheet onClose={() => setNewOpen(null)}>
         <AppText variant="headline">{`上傳${centerTitle(activeCenter)}照片影音`}</AppText>
-        <AppText variant="caption" tone="muted">上傳的照片與短影音會放進「EDM」，也會自動成為封面輪播。</AppText>
-        <AlbumUploadButton kind="center" ownerKey={activeCenter} count={cm.items.length} onDone={cm.reload} />
+        <AppText variant="caption" tone="muted">上傳的照片與短影音會放進「EDM」分頁（和封面輪播照片分開存放）；封面是否一起輪播 EDM，到右上角「編輯」的「封面輪播照片」設定（預設會）。</AppText>
+        <AlbumUploadButton kind="center" scope="edm" ownerKey={activeCenter} count={cm.edm.length} onDone={cm.reload} />
       </BottomSheet>
     ) : null}
     {newOpen && newOpen !== "schedule" && newOpen !== "announce" && newOpen !== "photos" ? <NewCourseSheet list={newOpen === "list"} onClose={() => setNewOpen(null)} defaultCenter={activeCenter !== ALL ? activeCenter : undefined} /> : null}
     {artOpen && activeCenter !== ALL ? (
-      <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={() => setBcTick((n) => n + 1)} onScheduleChanged={sch.reload} />
+      <CenterEditSheet center={activeCenter} address={centerInfo.data?.[normCenter(activeCenter)] ?? ""} art={art} onClose={() => setArtOpen(false)} onAddressSaved={centerInfo.reload} onArtChanged={centerArt.reload} onBroadcastChanged={() => setBcTick((n) => n + 1)} onScheduleChanged={sch.reload} onCoverChanged={cm.reload} />
     ) : null}
     </View>
   );

@@ -453,8 +453,10 @@ export type CentralReview = { id: string; /** 申請人（只在審核者本人�
 /** 每個封面（中心、課程、系列）最多放幾張照片／影片（業主 2026-11-21）。 */
 export const COVER_MEDIA_MAX = 100;
 export type CoverMediaKind = "center" | "series" | "course";
+/** 儲存區（業主 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，上限各 100 張；系列、課程只有 cover。 */
+export type CoverScope = "cover" | "edm";
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
-export type CoverMediaItem = { id: string; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number };
+export type CoverMediaItem = { id: string; scope: CoverScope; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number };
 export type StaffRole = { value: string; label: string };
 export type StaffMember = { memberId: string; name: string; center: string; roles: string[] };
 /** available＝false：中央判斷沒有權限（任何非 200 都當沒有權限）；members 只在這次請求即時讀取，不保存。 */

@@ -74,6 +74,7 @@ import {
   THUMB_WIDE_WIDTHS,
   COVER_MEDIA_MAX,
   type CoverMediaKind,
+  type CoverScope,
   type CoverMediaItem,
   LIST_COVER_COLORS,
 } from "./contract.ts";
@@ -2428,9 +2429,10 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; kind?: string; poster_key?: string | null };
 const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
 const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
-function coverItem(r: { id: string; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
+function coverItem(r: { id: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
+    scope: r.scope === "edm" ? "edm" : "cover",
     kind: r.kind,
     url: r.kind === "video" ? `/api/v2/media/album?k=${encodeURIComponent(r.r2_key)}` : pubUrl(r.r2_key, 0),
     posterUrl: r.poster_key ? pubUrl(r.poster_key, 0) : null,
@@ -2439,38 +2441,45 @@ function coverItem(r: { id: string; kind: "image" | "video"; r2_key: string; pos
     durationSec: r.duration_sec,
   };
 }
-/** lookup：center＝中心鑰匙（centerKey）；series＝系列名稱；course＝課程編號。 */
-async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string): Promise<CoverMediaItem[]> {
-  const where = kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?";
-  const st = db.prepare(`SELECT id, kind, r2_key, poster_key, width, height, duration_sec FROM cover_media WHERE ${where} ORDER BY position, created_at LIMIT ${COVER_MEDIA_MAX}`);
-  const { results } = await (kind === "center" ? st.bind(lookup) : st.bind(kind, lookup)).all<{ id: string; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+/** 儲存區（業主 2026-11-23）：只有中心有「EDM」分頁；系列、課程一律只有 cover。沒帶或不認得時，中心當 edm（舊版 App 的相簿上傳）。 */
+const coverScopeOf = (kind: CoverMediaKind, v: unknown): CoverScope => (kind !== "center" ? "cover" : v === "cover" ? "cover" : "edm");
+/** lookup：center＝中心鑰匙（centerKey）；series＝系列名稱；course＝課程編號。scope 有給就只取那一區，沒給＝兩區都取（公開讀取用）。 */
+async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, scope?: CoverScope): Promise<CoverMediaItem[]> {
+  const where = (kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?") + (scope ? " AND scope = ?" : "");
+  const st = db.prepare(`SELECT id, scope, kind, r2_key, poster_key, width, height, duration_sec FROM cover_media WHERE ${where} ORDER BY scope, position, created_at LIMIT ${COVER_MEDIA_MAX * 2}`);
+  const args = [...(kind === "center" ? [lookup] : [kind, lookup]), ...(scope ? [scope] : [])];
+  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
   return results.map(coverItem);
 }
 /** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
-async function requireCoverOwner(ctx: Ctx, fromBody = false): Promise<{ s: Session; kind: CoverMediaKind; lookup: string; centerKey: string | null; ownerKey: string }> {
+async function requireCoverOwner(ctx: Ctx, fromBody = false): Promise<{ s: Session; kind: CoverMediaKind; lookup: string; centerKey: string | null; ownerKey: string; scope: CoverScope }> {
   let kind: CoverMediaKind;
   let key: string;
+  let scopeRaw: unknown;
   if (fromBody) {
     const c = ctx.req.clone();
-    const b = (await c.json().catch(() => ({}))) as { kind?: unknown; key?: unknown };
+    const b = (await c.json().catch(() => ({}))) as { kind?: unknown; key?: unknown; scope?: unknown };
     kind = coverKindOf(typeof b.kind === "string" ? b.kind : null);
     key = typeof b.key === "string" ? b.key.trim().slice(0, 100) : "";
+    scopeRaw = b.scope;
   } else {
     kind = coverKindOf(ctx.url.searchParams.get("kind"));
     key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
+    scopeRaw = ctx.url.searchParams.get("scope");
   }
+  const scope = coverScopeOf(kind, scopeRaw);
   if (!key) fail(400, "invalid_key", "請指定要放封面的位置");
   if (kind === "center") {
     const { s, center } = await requireCenterArt(ctx, key);
-    return { s, kind, lookup: center.key, centerKey: center.key, ownerKey: "" };
+    return { s, kind, lookup: center.key, centerKey: center.key, ownerKey: "", scope };
   }
   if (kind === "series") {
     const s = requireSuperAdmin(ctx);
-    return { s, kind, lookup: key, centerKey: null, ownerKey: key };
+    return { s, kind, lookup: key, centerKey: null, ownerKey: key, scope };
   }
   const s = requireMember(ctx);
   await requireCourseArt(ctx, s, key);
-  return { s, kind, lookup: key, centerKey: null, ownerKey: key };
+  return { s, kind, lookup: key, centerKey: null, ownerKey: key, scope };
 }
 /** 刪除、換預覽圖時：依資料列所屬的封面檢查權限。 */
 async function requireCoverRowOwner(ctx: Ctx, row: CoverRow): Promise<Session> {
@@ -2483,16 +2492,16 @@ async function requireCoverRowOwner(ctx: Ctx, row: CoverRow): Promise<Session> {
   else await requireCourseArt(ctx, s, row.owner_key);
   return s;
 }
-async function coverRoom(db: D1Database, o: { kind: CoverMediaKind; lookup: string }): Promise<void> {
-  if ((await coverItems(db, o.kind, o.lookup)).length >= COVER_MEDIA_MAX) fail(409, "album_full", `最多放 ${COVER_MEDIA_MAX} 張，請先刪除一些`);
+async function coverRoom(db: D1Database, o: { kind: CoverMediaKind; lookup: string; scope: CoverScope }): Promise<void> {
+  if ((await coverItems(db, o.kind, o.lookup, o.scope)).length >= COVER_MEDIA_MAX) fail(409, "album_full", `最多放 ${COVER_MEDIA_MAX} 張，請先刪除一些`);
 }
-async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind; centerKey: string | null; ownerKey: string }, x: { kind: "image" | "video"; r2Key: string; posterKey: string | null; width: number; height: number; durationSec: number; bytes: number; by: string }): Promise<string> {
+async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind; centerKey: string | null; ownerKey: string; scope: CoverScope }, x: { kind: "image" | "video"; r2Key: string; posterKey: string | null; width: number; height: number; durationSec: number; bytes: number; by: string }): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const where = o.kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?";
-  const st = db.prepare(`SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cover_media WHERE ${where}`);
-  const pos = (await (o.kind === "center" ? st.bind(o.centerKey) : st.bind(o.kind, o.ownerKey)).first<{ p: number }>())?.p ?? 0;
+  const st = db.prepare(`SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cover_media WHERE ${where} AND scope = ?`);
+  const pos = (await (o.kind === "center" ? st.bind(o.centerKey, o.scope) : st.bind(o.kind, o.ownerKey, o.scope)).first<{ p: number }>())?.p ?? 0;
   await db.batch([
-    db.prepare("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, poster_key, width, height, duration_sec, bytes, position, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, o.kind, o.centerKey, o.ownerKey, x.kind, x.r2Key, x.posterKey, x.width, x.height, x.durationSec, x.bytes, pos, x.by),
+    db.prepare("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, poster_key, width, height, duration_sec, bytes, position, created_by, scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, o.kind, o.centerKey, o.ownerKey, x.kind, x.r2Key, x.posterKey, x.width, x.height, x.durationSec, x.bytes, pos, x.by, o.scope),
     audit(db, x.by, "cover_media.add", o.kind, o.centerKey ?? o.ownerKey, id),
   ]);
   return id;
@@ -3994,10 +4003,37 @@ const routes: [string, RegExp, Handler][] = [
       const o = await requireCoverOwner(ctx, true);
       const body = await readJson<{ ids?: unknown }>(ctx.req);
       const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string").slice(0, COVER_MEDIA_MAX) : [];
-      const cur = (await coverItems(ctx.db, o.kind, o.lookup)).map((x) => x.id);
+      const cur = (await coverItems(ctx.db, o.kind, o.lookup, o.scope)).map((x) => x.id);
       const next = [...ids.filter((x) => cur.includes(x)), ...cur.filter((x) => !ids.includes(x))];
       await ctx.db.batch(next.map((id, i) => ctx.db.prepare("UPDATE cover_media SET position = ? WHERE id = ?").bind(i, id)));
       return { items: await coverItems(ctx.db, o.kind, o.lookup) };
+    },
+  ],
+  [
+    "GET",
+    /^\/cover-media\/config$/,
+    async (ctx) => {
+      // 中心封面「是否輪播 EDM」（業主 2026-11-23）：公開讀取；沒有設定＝預設打勾（true）。?center=中心名稱
+      const key = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 100);
+      if (!key) return { showEdm: true };
+      const row = await ctx.db.prepare("SELECT show_edm FROM center_cover_cfg WHERE center_key = ?").bind(centerKey(key)).first<{ show_edm: number }>();
+      return { showEdm: row ? row.show_edm === 1 : true };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/cover-media\/config$/,
+    async (ctx) => {
+      // 設定中心封面要不要連 EDM 分頁的照片一起輪播；權限＝能編輯該中心封面的人。body: { kind: "center", key, showEdm }
+      const o = await requireCoverOwner(ctx, true);
+      if (o.kind !== "center") return fail(400, "center_only", "只有中心封面可以設定");
+      const body = await readJson<{ showEdm?: unknown }>(ctx.req);
+      const show = body.showEdm === false ? 0 : 1;
+      await ctx.db.batch([
+        ctx.db.prepare("INSERT INTO center_cover_cfg (center_key, show_edm) VALUES (?, ?) ON CONFLICT(center_key) DO UPDATE SET show_edm = excluded.show_edm").bind(o.lookup, show),
+        audit(ctx.db, o.s.sub, "cover_media.show_edm", "center", o.lookup, String(show)),
+      ]);
+      return { showEdm: show === 1 };
     },
   ],
   [
