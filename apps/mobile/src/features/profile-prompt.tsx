@@ -10,7 +10,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
-import { SuggestField, SuggestList, useSuggestions } from "@/features/admin/suggest-input";
+import { SuggestField, useSuggestions } from "@/features/admin/suggest-input";
 
 type FieldView = { value: string; pending: string | null; status: string };
 type View_ = {
@@ -77,8 +77,8 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
   const { c } = useTheme();
   return (
     <Pressable onPress={onToggle} disabled={disabled} accessibilityRole="checkbox" accessibilityState={{ checked: on, disabled }} accessibilityLabel="無" style={[styles.none, { opacity: disabled ? 0.45 : 1 }]}>
-      <Icon name={on ? "checkbox" : "square-outline"} size={26} color={on ? c.accentText : c.textMuted} />
-      <AppText style={{ fontWeight: "700" }}>無</AppText>
+      <Icon name={on ? "checkbox" : "square-outline"} size={18} color={on ? c.accentText : c.textMuted} />
+      <AppText variant="caption" style={{ fontWeight: "700", fontSize: 13 }}>無</AppText>
     </Pressable>
   );
 }
@@ -183,11 +183,14 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const amway = !!data?.enabled || wantAmway;
   // 上手白金／上手鑽石（業主 2026-11-23）：自由輸入＋中央關聯詞（輸入時列出建議、點選填入）；兩欄的建議清單放在兩欄下方整列。
   const [uplineFocus, setUplineFocus] = useState<"upline_platinum" | "upline_diamond" | null>(null);
-  const platSug = useSuggestions(vals.upline_platinum, "upline_platinum", amway && uplineFocus === "upline_platinum");
+  // 上手白金的關聯詞同時來自上手鑽石的詞庫（業主 2026-11-23）：兩個詞庫合併、去重。
+  const platOwn = useSuggestions(vals.upline_platinum, "upline_platinum", amway && uplineFocus === "upline_platinum");
+  const platFromDiamond = useSuggestions(vals.upline_platinum, "upline_diamond", amway && uplineFocus === "upline_platinum");
+  const platSug = [...new Set([...platOwn, ...platFromDiamond])].slice(0, 50);
   const diamSug = useSuggestions(vals.upline_diamond, "upline_diamond", amway && uplineFocus === "upline_diamond");
   // Email 還空著時自動帶入 Google 登入信箱（業主 2026-11-23）：「原本的值」仍是空的，所以按儲存會一併寫回會員中心。
   const initial = data ? { ...formVals(data), contact_email: data.email } : null;
-  const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name" || k === "contact_email") && vals[k].trim() !== initial[k].trim()) : [];
+  const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name") && vals[k].trim() !== initial[k].trim()) : [];
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
   /** 選的系統是不是寰宇：只有寰宇才能選「中心」（業主 2026-11-22）；其他系統、「無」、還沒選，中心都不能選。 */
@@ -352,10 +355,6 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                   </Row>
                 </View>
               </View>
-              <Row>
-                <Label text="Email" />
-                <Input value={vals.contact_email} onChange={set("contact_email")} />
-              </Row>
               {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
               <View style={[styles.amwayCard, { backgroundColor: c.surfaceMuted }]}>
                 {/* 勾選之後這一列自動隱藏（業主 2026-11-23）：只剩三欄。 */}
@@ -401,7 +400,19 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                       )}
                     </View>
                     {/* 上手白金｜上手鑽石（選填）：兩欄並排，輸入時下方列出中央會員的關聯詞可點選。 */}
-                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", zIndex: uplineFocus ? 100 : 1 }}>
+                      {/* 關聯詞往上展開，視覺同上方的下拉選單（業主 2026-11-23）。 */}
+                      {uplineFocus && (uplineFocus === "upline_platinum" ? platSug : diamSug).length ? (
+                        <View style={[styles.dropdown, { bottom: "100%", marginBottom: 4, maxHeight: 220, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
+                          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                            {(uplineFocus === "upline_platinum" ? platSug : diamSug).map((x) => (
+                              <Pressable key={x} onPress={() => (set(uplineFocus)(x), setUplineFocus(null))} accessibilityRole="button" accessibilityLabel={`選用 ${x}`} style={styles.opt}>
+                                <AppText numberOfLines={1}>{x}</AppText>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      ) : null}
                       {(["upline_platinum", "upline_diamond"] as const).map((k) => (
                         <View key={k} style={{ flex: 1, minWidth: 0, gap: 2 }}>
                           <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
@@ -409,7 +420,6 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                         </View>
                       ))}
                     </View>
-                    {uplineFocus ? <SuggestList list={uplineFocus === "upline_platinum" ? platSug : diamSug} q={vals[uplineFocus]} onPick={(v) => (set(uplineFocus)(v), setUplineFocus(null))} /> : null}
                     {!sysCol.other && cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
                   </>
                 ) : null}
@@ -437,7 +447,7 @@ const styles = StyleSheet.create({
   labelRow: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 24 },
   req: { borderWidth: 1, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 1 },
   input: { minHeight: FIELD_H, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md, fontSize: 16 },
-  none: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 36, minWidth: 60 },
+  none: { flexDirection: "row", alignItems: "center", gap: 3, minHeight: 28, minWidth: 48 },
   dropdown: { position: "absolute", left: 0, right: 0, borderWidth: 1, borderRadius: radius.md, zIndex: 60, overflow: "hidden" },
   search: { minHeight: 40, borderBottomWidth: 1, paddingHorizontal: space.md, fontSize: 15 },
   opt: { minHeight: 44, paddingHorizontal: space.md, justifyContent: "center" },
