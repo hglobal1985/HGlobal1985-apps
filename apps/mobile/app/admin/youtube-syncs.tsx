@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { api, type CourseSummary } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
-import { SyncNamingFields } from "@/features/course-edit/youtube-import";
+import { SyncNamingFields, TITLE_ONLY } from "@/features/course-edit/youtube-import";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen } from "@/ui";
@@ -158,7 +158,7 @@ function AddSheet({ help, sortLabels, onClose, onDone }: { help: string; sortLab
   const [newTitle, setNewTitle] = useState("");
   const [courseId, setCourseId] = useState("");
   const [prefix, setPrefix] = useState("");
-  const [format, setFormat] = useState("");
+  const [format, setFormat] = useState(TITLE_ONLY); // 預設勾選「教材名稱＝YouTube 影片名稱」（業主 2026-11-23）
   const [strip, setStrip] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

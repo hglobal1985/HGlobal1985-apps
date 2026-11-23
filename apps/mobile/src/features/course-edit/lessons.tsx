@@ -518,17 +518,33 @@ export function PickMaterialsSheet({ items, blockId, onMove, onClose }: { items:
       else n.add(id);
       return n;
     });
+  // 每個區塊可「一鍵全選」（業主 2026-11-23）：只算還不在目標區塊的教材；全部都選了就變成「取消全選」。
+  const selectable = (blockKey: string | null) => (blockKey === blockId ? [] : rows.filter((r) => !r.l.section && r.block === blockKey).map((r) => r.l.id));
+  const GroupHead = ({ title, ids }: { title: string; ids: string[] }) => {
+    const all = ids.length > 0 && ids.every((id) => sel.has(id));
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, paddingTop: space.sm }}>
+        <AppText variant="callout" numberOfLines={1} style={{ flex: 1, fontWeight: "800", color: c.accentText }}>
+          {title}
+        </AppText>
+        {ids.length ? (
+          <Pressable accessibilityRole="button" accessibilityLabel={`${all ? "取消全選" : "全選"} ${title}`} onPress={() => setSel((x) => { const n = new Set(x); for (const id of ids) all ? n.delete(id) : n.add(id); return n; })} style={{ minHeight: minTouch - 8, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1.5, borderColor: c.accent, justifyContent: "center" }}>
+            <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }}>{all ? "取消全選" : `全選（${ids.length}）`}</AppText>
+          </Pressable>
+        ) : null}
+      </View>
+    );
+  };
   return (
     <BottomSheet onClose={onClose}>
       <AppText variant="headline" numberOfLines={2}>
         勾選要移到「{target?.title}」的教材
       </AppText>
       <SheetScroll>
+        {rows[0] && !rows[0].l.section && selectable(null).length ? <GroupHead title="未歸區塊的教材" ids={selectable(null)} /> : null}
         {rows.map(({ l, block }) =>
           l.section ? (
-            <AppText key={l.id} variant="callout" style={{ fontWeight: "800", color: c.accentText, paddingTop: space.sm }}>
-              📂 {l.title}
-            </AppText>
+            <GroupHead key={l.id} title={`📂 ${l.title}`} ids={selectable(l.id)} />
           ) : (
             <Pressable key={l.id} accessibilityRole="checkbox" accessibilityState={{ checked: sel.has(l.id), disabled: block === blockId }} disabled={block === blockId} onPress={() => toggle(l.id)} style={{ minHeight: minTouch, flexDirection: "row", alignItems: "center", gap: space.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border, opacity: block === blockId ? 0.4 : 1 }}>
               <Icon name={sel.has(l.id) || block === blockId ? "checkbox" : "square-outline"} size={26} color={sel.has(l.id) || block === blockId ? c.accent : c.textMuted} />
