@@ -1,7 +1,8 @@
 import { Button } from "@/ui/button";
 import { trackFeature } from "@/lib/feature-track";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type HostInstance, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { createPortal } from "react-dom";
+import { type HostInstance, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { api } from "@/api/client";
 import { openAccountCenter } from "@/features/account-link";
 import { PushSwitchRow } from "@/features/push-switch";
@@ -186,8 +187,20 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   // 上手白金的關聯詞同時來自上手鑽石的詞庫（業主 2026-11-23）：兩個詞庫合併、去重。
   const platOwn = useSuggestions(vals.upline_platinum, "upline_platinum", amway && uplineFocus === "upline_platinum");
   const platFromDiamond = useSuggestions(vals.upline_platinum, "upline_diamond", amway && uplineFocus === "upline_platinum");
-  const platSug = [...new Set([...platOwn, ...platFromDiamond])].slice(0, 50);
   const diamSug = useSuggestions(vals.upline_diamond, "upline_diamond", amway && uplineFocus === "upline_diamond");
+  const platSug = [...new Set([...platOwn, ...platFromDiamond])].slice(0, 50);
+  // 關聯詞選單：各自顯示在自己欄位的正上方、同寬；網頁版用 portal 掛到最上層，不被上拉視窗的邊緣遮住（業主 2026-11-23）。
+  const platBox = useRef<HostInstance>(null);
+  const diamBox = useRef<HostInstance>(null);
+  const [popRect, setPopRect] = useState<{ x: number; y: number; w: number } | null>(null);
+  const upList = uplineFocus === "upline_platinum" ? platSug : uplineFocus === "upline_diamond" ? diamSug : [];
+  useEffect(() => {
+    if (!uplineFocus) return setPopRect(null);
+    const measure = () => (uplineFocus === "upline_platinum" ? platBox : diamBox).current?.measureInWindow((x, y, w) => setPopRect({ x, y, w }));
+    measure();
+    const t = setTimeout(measure, 350); // 鍵盤升起、面板捲動之後再量一次
+    return () => clearTimeout(t);
+  }, [uplineFocus, upList.length]);
   // Email 還空著時自動帶入 Google 登入信箱（業主 2026-11-23）：「原本的值」仍是空的，所以按儲存會一併寫回會員中心。
   const initial = data ? { ...formVals(data), contact_email: data.email } : null;
   const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name") && vals[k].trim() !== initial[k].trim()) : [];
@@ -317,6 +330,22 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const sysCol = listedCol("education_system", "系統", "center");
   const cenCol = listedCol("education_center", "中心", "right");
 
+  const popup =
+    uplineFocus && upList.length && popRect ? (
+      <View
+        pointerEvents="auto"
+        style={[styles.dropdown, { position: Platform.OS === "web" ? ("fixed" as never) : "absolute", left: popRect.x, width: popRect.w, right: "auto" as never, bottom: Platform.OS === "web" ? Math.round(window.innerHeight - popRect.y + 4) : Math.round(winH - popRect.y + 4), maxHeight: Math.min(220, Math.max(88, popRect.y - 12)), zIndex: 30000, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 20 }]}
+      >
+        <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+          {upList.map((x) => (
+            <Pressable key={x} onPress={() => (set(uplineFocus)(x), setUplineFocus(null))} accessibilityRole="button" accessibilityLabel={`選用 ${x}`} style={styles.opt}>
+              <AppText numberOfLines={1}>{x}</AppText>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    ) : null;
+
   return (
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
     <BottomSheet onClose={onClose}>
@@ -348,7 +377,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
                 </View>
-                <View style={{ flex: 1, minWidth: 0, paddingBottom: 6 }}>
+                <View style={{ flex: 1, minWidth: 0, }}>
                   <PushSwitchRow banner compact />
                 </View>
               </View>
@@ -365,20 +394,8 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                   <>
                     {/* 上手白金｜上手鑽石（必填）：兩欄並排，輸入時下方列出中央會員的關聯詞可點選。 */}
                     <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", zIndex: uplineFocus ? 100 : 1 }}>
-                      {/* 關聯詞往上展開，視覺同上方的下拉選單（業主 2026-11-23）。 */}
-                      {uplineFocus && (uplineFocus === "upline_platinum" ? platSug : diamSug).length ? (
-                        <View style={[styles.dropdown, { bottom: "100%", marginBottom: 4, maxHeight: 220, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
-                          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                            {(uplineFocus === "upline_platinum" ? platSug : diamSug).map((x) => (
-                              <Pressable key={x} onPress={() => (set(uplineFocus)(x), setUplineFocus(null))} accessibilityRole="button" accessibilityLabel={`選用 ${x}`} style={styles.opt}>
-                                <AppText numberOfLines={1}>{x}</AppText>
-                              </Pressable>
-                            ))}
-                          </ScrollView>
-                        </View>
-                      ) : null}
                       {(["upline_platinum", "upline_diamond"] as const).map((k) => (
-                        <View key={k} style={{ flex: 1, minWidth: 0 }}>
+                        <View key={k} ref={k === "upline_platinum" ? platBox : diamBox} collapsable={false} style={{ flex: 1, minWidth: 0 }}>
                          <Row fixed bad={showBad && missing.includes(k)}>
                           <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
                           <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
@@ -434,6 +451,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
           <Button label="儲存" icon="save-outline" onPress={save} disabled={busy || (!changed.length && !(wantAmway && !data?.enabled))} loading={busy} fullWidth />
         </View>
       </View>
+    {popup && Platform.OS === "web" ? createPortal(popup, document.body) : popup}
     </BottomSheet>
   );
 }
