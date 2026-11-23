@@ -5932,7 +5932,7 @@ const routes: [string, RegExp, Handler][] = [
       const key = ctx.url.searchParams.get("k") ?? "";
       const bucket = ctx.env.MEDIA;
       if (!bucket || !/^(edm|cover|series|center|lesson|brand|schedule|album|listbg|listcover)\/[\w-]+\/[\w.-]+$/.test(key)) return new Response("Not found", { status: 404 });
-      const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : key.startsWith("album/") ? await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first() : key.startsWith("listbg/") ? await ctx.db.prepare("SELECT 1 AS ok FROM list_cover_bgs WHERE image_key = ?").bind(key).first() : key.startsWith("listcover/") ? await ctx.db.prepare("SELECT 1 AS ok FROM my_lists WHERE cover_key = ?").bind(key).first() : null); // D1 一個查詢最多串 5 個 UNION，課表另外查
+      const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : key.startsWith("album/") ? await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first() : key.startsWith("listbg/") ? await ctx.db.prepare("SELECT 1 AS ok FROM list_cover_bgs WHERE image_key = ?").bind(key).first() : key.startsWith("listcover/") ? await ctx.db.prepare("SELECT 1 AS ok FROM my_lists WHERE cover_key = ?").bind(key).first() : null) ?? (await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first()); // D1 一個查詢最多串 5 個 UNION，課表另外查
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
       // 即時縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受設定頁勾選的幾種，避免縮圖次數暴增）。
@@ -6294,7 +6294,7 @@ const routes: [string, RegExp, Handler][] = [
       ]);
       const byKey = new Map<string, { label: string; keys: string[] }>();
       for (const p of pics.results) {
-        const e = byKey.get(p.center_key) ?? { label: p.owner_key, keys: [] };
+        const e = byKey.get(p.center_key) ?? { label: p.owner_key || p.center_key, keys: [] };
         e.keys.push(p.r2_key);
         byKey.set(p.center_key, e);
       }

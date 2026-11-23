@@ -8,7 +8,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, ZONES, type CenterArt, type CourseSummary, type Zone } from "@/api/client";
 import { AddMaterialFab, type AddKind } from "@/features/course-edit/add-material-fab";
 import { CenterEditSheet, CenterScheduleSheet, NewCourseSheet } from "@/features/admin-parts";
-import { centerTitle } from "@/features/format";
+import { centerKeyOf, centerTitle } from "@/features/format";
 import { canCreateCourse, canManageCourses, isSuperAdmin } from "@/lib/roles";
 import { flashText } from "@/ui/flash-notice";
 import { HeaderInvite } from "@/features/invite-button";
@@ -288,7 +288,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         .sort((a, b) => b.materials - a.materials || a.name.localeCompare(b.name, "zh-Hant")),
     [centers, courses, category, brandSel], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const art = activeCenter !== ALL ? centerArt.data?.find((a) => a.center === activeCenter) : undefined;
+  const art = activeCenter !== ALL ? centerArt.data?.find((a) => a.centerKey === centerKeyOf(activeCenter) || a.center === activeCenter) : undefined;
   const canEditArt = activeCenter !== ALL && !!rights && (rights.all || (rights.center === activeCenter && (rights.manageEditors || !!rights.editor?.editOthers)));
   const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter)));
   const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
@@ -637,7 +637,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           {centerPage && tab === "list" && groups.length ? <CenterMaterialsCard courseIds={groups.map((g) => g.nearest.id)} /> : null}
           <View style={styles.grid} onLayout={(e) => setBoxW(Math.floor(e.nativeEvent.layout.width))}>
             {tileW && mode === "center" && center === ALL
-              ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
+              ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.centerKey === centerKeyOf(name) || x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
             {/* 三個專區（業主 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
             {tileW && flat && !(centerPage && tab === "list") ? flatShown.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
@@ -654,7 +654,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
                     {zi === 0 && mode === "series" && !matched && centerCounts.length ? (
                       <>
                         <ZoneBand text="寰宇教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} />
-                        {opened.centers ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />) : null}
+                        {opened.centers ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.centerKey === centerKeyOf(name) || x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => openCenter(name)} />) : null}
                       </>
                     ) : null}
                   </Fragment>

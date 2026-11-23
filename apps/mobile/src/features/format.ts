@@ -63,7 +63,7 @@ export function eventDays(start: string | null | undefined, end?: string | null)
 /** 單位名稱不顯示教育中心的數字代碼：「飛登 013」→「飛登」。 */
 
 let customCenterNames: Record<string, string> = {};
-const centerKeyOf = (l: string) => l.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+export const centerKeyOf = (l: string) => l.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
 /** 載入教育中心的自訂名稱（由 state/center-names.tsx 的 CenterNamesProvider 設定）。 */
 export const setCenterNames = (m: Record<string, string>) => {
   customCenterNames = m;
