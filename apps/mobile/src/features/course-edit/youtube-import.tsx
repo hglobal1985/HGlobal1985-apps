@@ -65,7 +65,7 @@ export function YoutubeImportSheet({ course, onClose, onDone }: { course: Course
   const { invalidate } = useSession();
   const list = useApi<SyncList>(`/admin/courses/${course.id}/youtube-syncs`);
   const [url, setUrl] = useState("");
-  const [format, setFormat] = useState("");
+  const [format, setFormat] = useState(TITLE_ONLY); // 預設勾選「教材名稱＝YouTube 影片名稱」（業主 2026-11-23）
   const [strip, setStrip] = useState("");
   const [sortMode, setSortMode] = useState("date_desc");
   const [busy, setBusy] = useState(false);
