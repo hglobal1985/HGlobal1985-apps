@@ -101,9 +101,9 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
             <AppText variant="caption" tone="muted">
               {[r.center ? `中心：${r.center}` : "", dateTime(r.created_at)].filter(Boolean).join("　")}
             </AppText>
-            {r.upline_platinum || r.upline_diamond ? (
+            {r.member_id ? (
               <AppText variant="caption" tone="muted">
-                上手白金：{r.upline_platinum ?? "—"}　上手鑽石：{r.upline_diamond ?? "—"}
+                上手白金：{r.upline_platinum ?? "未提供"}　上手鑽石：{r.upline_diamond ?? "未提供"}
               </AppText>
             ) : null}
             <View style={styles.actions}>
