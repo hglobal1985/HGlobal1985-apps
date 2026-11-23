@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Card, ErrorView, LoadingView, Screen } from "@/ui";
+import { AppText, Card, Check, ErrorView, LoadingView, Screen } from "@/ui";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 /**
@@ -59,7 +59,7 @@ const ChipRow = ({ title, children }: { title: string; children: React.ReactNode
   </View>
 );
 
-function Custom() {
+function Custom({ admin }: { admin: boolean }) {
   const { c } = useTheme();
   const [kinds, setKinds] = useState<string[]>(["visit"]);
   const [rows, setRows] = useState<Dim>("device");
@@ -68,7 +68,7 @@ function Custom() {
   const [os, setOs] = useState("");
   const [slot, setSlot] = useState("");
   const [days, setDays] = useState(30);
-  const qs = `kinds=${kinds.join(",")}&rows=${rows}${cols ? `&cols=${cols}` : ""}&days=${days}${device ? `&device=${device}` : ""}${os ? `&os=${os}` : ""}${slot ? `&slot=${slot}` : ""}`;
+  const qs = `kinds=${kinds.join(",")}&rows=${rows}${cols ? `&cols=${cols}` : ""}&days=${days}${device ? `&device=${device}` : ""}${os ? `&os=${os}` : ""}${slot ? `&slot=${slot}` : ""}${admin ? "&admin=1" : ""}`;
   const { data, error, loading, reload } = useApi<Table>(`/admin/usage?${qs}`);
   const toggle = (k: string) => setKinds((v) => (v.includes(k) ? (v.length > 1 ? v.filter((x) => x !== k) : v) : [...v, k]));
   const max = Math.max(1, ...(data?.rows.flatMap((r) => (data.cols.length ? r.cells : [r.total])) ?? [1]));
@@ -259,9 +259,9 @@ function Bars({ d }: { d: Table }) {
   );
 }
 
-function Question({ q, open, onToggle }: { q: Q; open: boolean; onToggle: () => void }) {
+function Question({ q, open, onToggle, admin }: { q: Q; open: boolean; onToggle: () => void; admin: boolean }) {
   const { c } = useTheme();
-  const { data, error, loading, reload } = useApi<Table>(open ? `/admin/usage?${q.qs}` : null);
+  const { data, error, loading, reload } = useApi<Table>(open ? `/admin/usage?${q.qs}${admin ? "&admin=1" : ""}` : null);
   const max = Math.max(1, ...(data?.rows.flatMap((r) => r.cells) ?? [1]));
   return (
     <View style={{ gap: 6 }}>
@@ -316,7 +316,7 @@ function Question({ q, open, onToggle }: { q: Q; open: boolean; onToggle: () => 
                 )
               ) : null}
               <AppText variant="caption" tone="muted">
-                近 30 天・{data.since.slice(5).replace("-", "/")} 起・匿名統計
+                近 30 天・{data.since.slice(5).replace("-", "/")} 起・匿名統計{admin ? "・含管理員操作" : ""}
               </AppText>
             </>
           ) : null}
@@ -334,13 +334,20 @@ export default function UsageScreen() {
   const { c } = useTheme();
   const [openQ, setOpenQ] = useState<string | null>(QUESTIONS[0]!.title);
   const [custom, setCustom] = useState(false);
+  const [admin, setAdmin] = useState(false); // 包含管理員（業主本人）操作；預設不含（業主 2026-11-23）
   return (
     <Screen>
       <AppText variant="caption" tone="muted">
         點一個問題，直接看答案。資料從 2026/11/22 開始累計，時間是台灣時間。
       </AppText>
+      <Card style={{ gap: 2 }}>
+        <Check label="包含管理員操作" value={admin} onChange={setAdmin} />
+        <AppText variant="caption" tone="muted">
+          預設不勾：管理員本人（含用過的裝置與網路）的操作不列入統計。
+        </AppText>
+      </Card>
       {QUESTIONS.map((q) => (
-        <Question key={q.title} q={q} open={openQ === q.title} onToggle={() => setOpenQ(openQ === q.title ? null : q.title)} />
+        <Question key={q.title} q={q} admin={admin} open={openQ === q.title} onToggle={() => setOpenQ(openQ === q.title ? null : q.title)} />
       ))}
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: custom }} onPress={() => setCustom((v) => !v)} style={[styles.q, { borderStyle: "dashed", borderColor: c.accent, backgroundColor: c.surface }]}>
         <View style={[styles.qIcon, { backgroundColor: c.accentSoft }]}>
@@ -351,7 +358,7 @@ export default function UsageScreen() {
         </AppText>
         <Ionicons name={custom ? "chevron-down" : "chevron-forward"} size={18} color={c.accentText} />
       </Pressable>
-      {custom ? <Custom /> : null}
+      {custom ? <Custom admin={admin} /> : null}
     </Screen>
   );
 }

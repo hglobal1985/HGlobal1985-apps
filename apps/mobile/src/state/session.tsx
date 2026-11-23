@@ -3,6 +3,7 @@ import { useFocusEffect } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { setFeatureTrackSignedIn } from "@/lib/feature-track";
+import { markOwnerDevice } from "@/lib/usage";
 import { clearCentral, handleWebSsoReturn, hasCentralSession, refresh as refreshCentral, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
 import { api, cachedGet, clearApiCache, loadToken, peekCache, prefetchCommon, saveToken, type Member } from "@/api/client";
 
@@ -118,6 +119,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
   // 回到 App／網頁（切回分頁、從背景回來）時，距離上次更新超過 10 分鐘才重新向伺服器（會員中心）拿一次最新的會員資料與獎銜；獎銜很少變動，不用頻繁詢問。
   // 開啟、重新整理一律立刻更新；App 沒有重新整理鈕，改用「下拉重新整理」（Screen）與「進入設定頁」（me.tsx）。
+  // 管理員登入：記下「這是業主本人的裝置／網路」，之後的操作不列入使用統計（業主 2026-11-23）。
+  const isAdminMember = member?.role === "admin";
+  useEffect(() => {
+    if (isAdminMember) markOwnerDevice();
+  }, [isAdminMember, memberSub]);
   useEffect(() => {
     if (!memberSub) return;
     const sub = AppState.addEventListener("change", (st) => st === "active" && void refreshMember(10 * 60_000));

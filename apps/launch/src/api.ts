@@ -96,7 +96,7 @@ import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnecti
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
-import { parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
+import { isOwnerNet, markOwnerNet, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
 import { collectMuxStats } from "./mux-stats.ts";
 import { audioUrl, sniffImage, verifyAudioUrl } from "./media.ts";
 import { checkMuxPlayback, listMuxAssets, MuxApiError, muxPlaybackUrl, muxThumbnail } from "./mux.ts";
@@ -350,6 +350,9 @@ async function notifyReviewResult(db: D1Database, sub: string, what: string): Pr
 /** 申請內容轉成文字（中央的值可能是字串或 {option, custom_text}）。 */
 const reviewText = (v: unknown): string => (v == null || v === "" ? "" : typeof v === "string" ? v : typeof v === "object" && "option" in (v as object) ? String((v as { option: unknown }).option ?? "") : String(v)).slice(0, 80);
 const REVIEW_FIELD_LABEL: Record<string, string> = { rank: "獎銜", education_center: "中心", education_system: "系統" };
+
+/** 業主本人（管理員帳號或超級管理員）；使用統計用來排除本人的操作。 */
+const isOwnerSession = (s: Session | null): boolean => !!s && (s.role === "admin" || s.roles.includes("super_admin"));
 
 /** 統計分析：超級管理員、總部秘書一定可以；其他職務要被超級管理員指定。 */
 async function canViewStats(ctx: Ctx, s: Session): Promise<boolean> {
@@ -4346,7 +4349,18 @@ const routes: [string, RegExp, Handler][] = [
     if (hit && hit.t > now - 60_000 && hit.n >= 60) return { ok: true };
     usageHits.set(ip, hit && hit.t > now - 60_000 ? { t: hit.t, n: hit.n + 1 } : { t: now, n: 1 });
     if (usageHits.size > 2000) usageHits.clear();
-    await recordUsage(ctx.db, await readJson<Record<string, unknown>>(ctx.req).catch(() => ({}))).catch(() => undefined);
+    const body = await readJson<Record<string, unknown>>(ctx.req).catch(() => ({}) as Record<string, unknown>);
+    // 業主本人的操作不列入統計（2026-11-23）：管理員帳號、管理員用過的裝置（App 帶 owner=1）、管理員用過的網路（無痕／未登入也認得）。
+    const adminNow = isOwnerSession(ctx.session);
+    if (adminNow) await markOwnerNet(ctx.db, ip).catch(() => undefined);
+    const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false));
+    await recordUsage(ctx.db, body, mine).catch(() => undefined);
+    return { ok: true };
+  }],
+  // 管理員登入後，App 通知一次：記下這個網路（裝置記號由 App 自己存）。
+  ["POST", /^\/usage\/owner$/, async (ctx) => {
+    if (!isOwnerSession(ctx.session)) return { ok: false };
+    await markOwnerNet(ctx.db, ctx.req.headers.get("cf-connecting-ip") ?? "").catch(() => undefined);
     return { ok: true };
   }],
   ["GET", /^\/admin\/usage$/, async (ctx) => {
