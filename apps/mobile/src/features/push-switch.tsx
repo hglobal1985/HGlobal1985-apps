@@ -26,13 +26,17 @@ export function PushSwitchRow({ banner }: { banner?: boolean } = {}) {
     pushState().then(setState).catch(() => setState("unsupported"));
   }, []);
   const toggle = async (v: boolean) => {
+    // 按下去立刻變色（業主 2026-11-23：以前要等好幾秒向瀏覽器與伺服器登記完才變綠）；登記完再用真實結果校正，失敗就退回原狀。
+    const before = state;
     setBusy(true);
     setErr(null);
+    setState(v ? "on" : "off");
     try {
       const next = v ? await enablePush() : await disablePush();
       if (v && next === "on") trackFeature("push_enable");
       setState(next);
     } catch (e) {
+      setState(before);
       setErr(e instanceof Error ? e.message : "開啟失敗，請稍後再試");
     }
     setBusy(false);
@@ -50,9 +54,9 @@ export function PushSwitchRow({ banner }: { banner?: boolean } = {}) {
           accessibilityRole="checkbox"
           accessibilityState={{ checked: on, disabled: busy || !canToggle }}
           accessibilityLabel="開啟手機推播"
-          disabled={busy || !canToggle}
-          onPress={() => void toggle(!on)}
-          style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: space.sm, opacity: busy ? 0.7 : 1 }}
+          disabled={!canToggle}
+          onPress={() => !busy && void toggle(!on)}
+          style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: space.sm, opacity: 1 }}
         >
           <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.2)" }}>
             <Icon name="notifications" size={20} color={fg} />

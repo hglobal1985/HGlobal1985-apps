@@ -28,7 +28,7 @@ test("新會員：沒勾 Amway 也會提醒；會員中心暫時查不到不記�
     if (url.endsWith("/oauth/jwks")) return ok({ keys: [jwk] });
     if (url.endsWith("/v1/me/amway")) return amwayDown ? Promise.resolve(new Response("{}", { status: 503 })) : ok(amway);
     if (url.endsWith("/v1/amway/field-definitions")) return ok([{ key: "rank", options: [{ value: "none", label: "無" }, { value: "gold", label: "金章" }] }]);
-    if (url.endsWith("/v1/me/profile")) return ok({ fields: { display_name: { value: "新會員" }, legal_name: { value: legalName } } });
+    if (url.endsWith("/v1/me/profile")) return ok({ fields: { display_name: { value: "新會員" }, legal_name: { value: legalName } }, info: { google_email: "g@example.com" } });
     if (url.endsWith("/v1/eligibility/context")) return ok({ member_id: "m_new", roles: [], hglobal_verified: false, center: null });
     if (url.includes("/v1/vocab/suggestions")) return ok({ suggestions: [] });
     return Promise.resolve(new Response("{}", { status: 404 }));
@@ -49,6 +49,11 @@ test("新會員：沒勾 Amway 也會提醒；會員中心暫時查不到不記�
   const fresh = await me("?fresh=1");
   assert.equal(fresh.rankLabel, "金章");
   assert.deepEqual(fresh.profileMissing ?? [], []);
+
+  // Email 自動帶入 Google 登入信箱（中央 info.google_email；聯絡信箱空著時面板預先帶入）
+  const view = (await (await handleApi(new Request("https://learn.test/api/v2/me/central-profile", { headers: { authorization: `Bearer ${token("m_new")}` } }), env)).json()) as { email: string; googleEmail: string };
+  assert.equal(view.googleEmail, "g@example.com");
+  assert.equal(view.email, "");
 
   // ④ 本名必填：沒填本名也要提醒（Email 不列入）；補上後 fresh=1 立刻不再提醒
   legalName = "";

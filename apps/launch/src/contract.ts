@@ -591,6 +591,8 @@ export type ProfileForm = {
   /** 暱稱（中央會員的 display_name）。 */
   nickname: string;
   email: string;
+  /** 會員自己的 Google 登入信箱（中央 info.google_email；聯絡信箱還空著時預先帶入，不保存）。 */
+  googleEmail?: string;
   enabled: boolean;
   hglobal: boolean;
   /** 中央標為寰宇的「培訓系統」詞（選到其中一個，中心改用中心清單）。 */

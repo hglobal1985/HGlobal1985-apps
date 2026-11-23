@@ -160,7 +160,7 @@ async function callCentral(token: string, path: string, init: RequestInit = {}):
 }
 
 /** 顯示名稱與頭像網址（頭像在會員中心本來就是公開的；只放記憶體快取，不寫入資料庫）。不是 Amway 資料。 */
-type ProfileDoc = { fields?: Record<string, { value?: unknown }>; avatar?: { url?: unknown } };
+type ProfileDoc = { fields?: Record<string, { value?: unknown }>; avatar?: { url?: unknown }; info?: { google_email?: unknown } };
 /** GET /v1/me/profile 只打一次（名稱、頭像、聯絡信箱、真實姓名共用；放記憶體 2 分鐘）。查不到回 undefined。 */
 async function profileDoc(sub: string, token: string): Promise<ProfileDoc | undefined> {
   return cached(`pdoc:${sub}`, 120_000, async () => {
@@ -550,7 +550,7 @@ export async function rankBadges(token: string): Promise<Map<string, RankBadgeIn
 }
 
 export type AmwayFieldView = { value: string; pending: string | null; status: string };
-export type CentralProfileView = { legalName: string; nickname: string; email: string; enabled: boolean; hglobal: boolean; hglobalSystems: string[]; fields: Record<"education_system" | "education_center" | "rank", AmwayFieldView>; rankOptions: RankOption[] };
+export type CentralProfileView = { legalName: string; nickname: string; email: string; /** 會員自己的 Google 登入信箱（中央 info.google_email）；聯絡信箱還空著時，面板用它預先帶入。只即時回給本人，不保存。 */ googleEmail: string; enabled: boolean; hglobal: boolean; hglobalSystems: string[]; fields: Record<"education_system" | "education_center" | "rank", AmwayFieldView>; rankOptions: RankOption[] };
 const textOf = (v: unknown): string => (typeof v === "string" ? v : v && typeof v === "object" && typeof (v as { option?: unknown }).option === "string" ? (v as { option: string }).option : "");
 
 /** 資料補填視窗要顯示的欄位（即時讀取、不快取、不保存）：真實姓名、培訓系統、地區教育中心、獎銜。 */
@@ -561,7 +561,7 @@ export async function centralProfileView(sub: string, token: string): Promise<Ce
   const f = (k: string): AmwayFieldView => ({ value: textOf(a.fields?.[k]?.value), pending: a.fields?.[k]?.pending_value != null ? textOf(a.fields[k].pending_value) : null, status: a.fields?.[k]?.status ?? "not_required" });
   const em = p.fields?.contact_email?.value;
   const nn = p.fields?.display_name?.value;
-  return { legalName: typeof p.fields?.legal_name?.value === "string" ? p.fields.legal_name.value : "", nickname: typeof nn === "string" ? nn : "", email: typeof em === "string" ? em.trim() : "", enabled: a.enabled === true, hglobal: a.hglobal === true, hglobalSystems: Array.isArray(a.hglobal_systems) ? a.hglobal_systems.filter((x): x is string => typeof x === "string") : [], fields: { education_system: f("education_system"), education_center: f("education_center"), rank: f("rank") }, rankOptions: opts };
+  return { legalName: typeof p.fields?.legal_name?.value === "string" ? p.fields.legal_name.value : "", nickname: typeof nn === "string" ? nn : "", email: typeof em === "string" ? em.trim() : "", googleEmail: typeof p.info?.google_email === "string" ? p.info.google_email.trim() : "", enabled: a.enabled === true, hglobal: a.hglobal === true, hglobalSystems: Array.isArray(a.hglobal_systems) ? a.hglobal_systems.filter((x): x is string => typeof x === "string") : [], fields: { education_system: f("education_system"), education_center: f("education_center"), rank: f("rank") }, rankOptions: opts };
 }
 
 /** 把一個欄位寫回會員中心（用會員本人的 token）。失敗時回中央的錯誤訊息。 */
