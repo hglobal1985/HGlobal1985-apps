@@ -342,7 +342,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
   // 中心頁的「課程｜清單」切換（業主 2026-11-21 方案 A）：兩種都有才顯示切換，只有一種就直接顯示那一種。
   // 業主 2026-11-21：中心頁第一個分頁是「相簿」（與封面輪播同一份資料）；預設仍停在課程，課程與清單都沒有時預設相簿。
-  const [kindTab, setKindTab] = useState<"album" | "course" | "list">("course");
+  const [kindTab, setKindTab] = useState<"album" | "schedule" | "course" | "list">("course");
   const nList = flat ? groups.filter((g) => g.nearest.isList).length : 0;
   const nCourse = flat ? groups.length - nList : 0;
   const centerPage = flat && activeCenter !== ALL;
@@ -350,8 +350,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [tabPicked, setTabPicked] = useState(false);
   // 業主 2026-11-21：EDM＝該中心所有卡片的縮圖格；清單＝同樣這批卡片改成清單列表（一列一張）；相簿＝照片。沒有任何卡片時預設相簿。
   // 中心頁沒點過分頁時一律停在第一個「EDM」（照片；業主 2026-11-23），不再依有沒有卡片挑預設。
-  const autoTab: "album" | "course" | "list" = centerPage ? "album" : kindTab === "list" ? "list" : "course";
-  const tab: "album" | "course" | "list" = centerPage && tabPicked ? kindTab : autoTab;
+  const autoTab: "album" | "schedule" | "course" | "list" = centerPage ? "album" : kindTab === "list" ? "list" : "course";
+  const tab: "album" | "schedule" | "course" | "list" = centerPage && tabPicked ? kindTab : autoTab;
   const flatShown = groups;
   const [moveTo, setMoveTo] = useState<Zone | null>(null);
   const [opened, setOpened] = useState<Record<string, boolean>>(() => ({ ...zoneOpenMemory }));
@@ -622,9 +622,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       <LoginPrompt />
       {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
       {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
-      {activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : centerAddress ? <CenterAddress address={centerAddress} /> : null}
+      {/* 課表改放進中心頁「課表」分頁（業主 2026-11-23）；非中心頁維持原樣。 */}
+      {!centerPage && activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : !centerPage && centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {centerPage ? (
-        <SegmentTabs options={[{ key: "album", label: "EDM" }, { key: "course", label: "收看課程" }, { key: "list", label: "列表" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
+        <SegmentTabs options={[{ key: "album", label: "EDM" }, { key: "schedule", label: "課表" }, { key: "course", label: "重播" }, { key: "list", label: "列表" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
       ) : flat && nCourse > 0 && nList > 0 ? (
         <SegmentTabs options={[{ key: "course", label: `課程 ${nCourse}` }, { key: "list", label: `清單 ${nList}` }]} value={tab} onChange={setKindTab} />
       ) : null}
@@ -632,6 +633,13 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {loading && !data ? <LoadingView /> : null}
       {centerPage && tab === "album" ? (
         <CoverAlbum kind="center" scope="edm" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={edmShown} canEdit={canEditArt} onChanged={cm.reload} emptyHint={q.trim() ? "找不到符合的 EDM" : undefined} />
+      ) : centerPage && tab === "schedule" ? (
+        sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : (
+          <>
+            {centerAddress ? <CenterAddress address={centerAddress} /> : null}
+            <EmptyState icon="calendar-outline" title="還沒有課表" body="中心上傳課表後會顯示在這裡" />
+          </>
+        )
       ) : chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
