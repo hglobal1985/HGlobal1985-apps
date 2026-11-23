@@ -204,7 +204,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       const center = hg ? (st.education_center.trim() === NONE_TERM ? "" : st.education_center) : t ? NONE_TERM : "";
       return { ...st, education_system: v, education_center: center };
     });
-  const missing: Key[] = data ? ([!vals.legal_name.trim() && "legal_name", !vals.display_name.trim() && "display_name", amway && !vals.education_system.trim() && "education_system", amway && systemHg && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
+  const missing: Key[] = data ? ([!vals.legal_name.trim() && "legal_name", amway && !vals.upline_platinum.trim() && "upline_platinum", amway && !vals.upline_diamond.trim() && "upline_diamond", amway && !vals.education_system.trim() && "education_system", amway && systemHg && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
 
   /** 三欄窄版用的短標籤：審核通過→通過、審核中...→審核中。 */
   const shortTag = (t: string | undefined) => (t === "審核通過" ? "通過" : t === "審核中..." ? "審核中" : t);
@@ -214,7 +214,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     const v = vals[key];
     // 「必填」標籤依目前的選擇動態顯示（業主 2026-11-23）：中心只有系統是寰宇才需要填（非寰宇自動「無」、還沒選系統時還不能選），其他情況不顯示。
     if (key === "education_center" && !systemHg) return undefined;
-    if (!v.trim()) return "必填";
+    if (!v.trim()) return undefined; // 不再顯示「必填」膠囊（業主 2026-11-23）：全部欄位都必填，未填按儲存會擋下並標橘框
     if (reviewed && data && key !== "display_name" && key !== "legal_name") {
       const f = data.fields[key];
       if (initial && v === initial[key]) {
@@ -338,21 +338,18 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
             </AppText>
           ) : null}
           {!data && !error ? <AppText tone="muted">讀取中…</AppText> : null}
-          <PushSwitchRow banner />
           {data ? (
             <>
+              {/* 本名（四個中文字寬）＋縮小的手機推播（業主 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
               <View style={[styles.line, { alignItems: "flex-end" }]}>
-                <View style={{ flex: 1 }}>
+                <View style={{ width: 128 }}>
                   <Row bad={showBad && missing.includes("legal_name")}>
-                    <Label text="本名（付費課程對帳用）" tag={tagFor("legal_name")} />
+                    <Label text="本名" />
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Row bad={showBad && missing.includes("display_name")}>
-                    <Label text="暱稱" tag={tagFor("display_name")} />
-                    <Input value={vals.display_name} onChange={set("display_name")} />
-                  </Row>
+                <View style={{ flex: 1, minWidth: 0, paddingBottom: 6 }}>
+                  <PushSwitchRow banner compact />
                 </View>
               </View>
               {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
@@ -366,6 +363,29 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                 ) : null}
                 {amway ? (
                   <>
+                    {/* 上手白金｜上手鑽石（必填）：兩欄並排，輸入時下方列出中央會員的關聯詞可點選。 */}
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", zIndex: uplineFocus ? 100 : 1 }}>
+                      {/* 關聯詞往上展開，視覺同上方的下拉選單（業主 2026-11-23）。 */}
+                      {uplineFocus && (uplineFocus === "upline_platinum" ? platSug : diamSug).length ? (
+                        <View style={[styles.dropdown, { bottom: "100%", marginBottom: 4, maxHeight: 220, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
+                          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                            {(uplineFocus === "upline_platinum" ? platSug : diamSug).map((x) => (
+                              <Pressable key={x} onPress={() => (set(uplineFocus)(x), setUplineFocus(null))} accessibilityRole="button" accessibilityLabel={`選用 ${x}`} style={styles.opt}>
+                                <AppText numberOfLines={1}>{x}</AppText>
+                              </Pressable>
+                            ))}
+                          </ScrollView>
+                        </View>
+                      ) : null}
+                      {(["upline_platinum", "upline_diamond"] as const).map((k) => (
+                        <View key={k} style={{ flex: 1, minWidth: 0 }}>
+                         <Row fixed bad={showBad && missing.includes(k)}>
+                          <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
+                          <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
+                         </Row>
+                        </View>
+                      ))}
+                    </View>
                     {/* 順序：獎銜 > 系統 > 中心（業主 2026-11-22）。獎銜一律可選；中心只有系統是寰宇才能選。 */}
                     <View style={{ flexDirection: "row", gap: 8, zIndex: 30, alignItems: "flex-start" }}>
                       {colBox(
@@ -398,27 +418,6 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
                       ) : (
                         cenCol.node
                       )}
-                    </View>
-                    {/* 上手白金｜上手鑽石（選填）：兩欄並排，輸入時下方列出中央會員的關聯詞可點選。 */}
-                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", zIndex: uplineFocus ? 100 : 1 }}>
-                      {/* 關聯詞往上展開，視覺同上方的下拉選單（業主 2026-11-23）。 */}
-                      {uplineFocus && (uplineFocus === "upline_platinum" ? platSug : diamSug).length ? (
-                        <View style={[styles.dropdown, { bottom: "100%", marginBottom: 4, maxHeight: 220, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
-                          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                            {(uplineFocus === "upline_platinum" ? platSug : diamSug).map((x) => (
-                              <Pressable key={x} onPress={() => (set(uplineFocus)(x), setUplineFocus(null))} accessibilityRole="button" accessibilityLabel={`選用 ${x}`} style={styles.opt}>
-                                <AppText numberOfLines={1}>{x}</AppText>
-                              </Pressable>
-                            ))}
-                          </ScrollView>
-                        </View>
-                      ) : null}
-                      {(["upline_platinum", "upline_diamond"] as const).map((k) => (
-                        <View key={k} style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                          <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
-                          <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} placeholder="選填" />
-                        </View>
-                      ))}
                     </View>
                     {!sysCol.other && cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
                   </>
