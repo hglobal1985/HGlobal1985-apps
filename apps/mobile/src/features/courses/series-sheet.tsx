@@ -10,7 +10,7 @@ import { ChapterList } from "./lesson-list";
 import { eventDays } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { BrandCover, AppText, Button, SheetAction, SheetRow, SheetThumb, ThumbFallback } from "@/ui";
+import { BrandCover, AppText, Button, SheetAction, SheetRow, SheetThumb, CourseCover } from "@/ui";
 import { SheetIconBox } from "@/ui/sheet-row";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
@@ -67,7 +67,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
                 ) : b.brand ? (
                   <BrandCover brand={b.brand} fill />
                 ) : (
-                  <ThumbFallback />
+                  <CourseCover theme="" label="" title={b.title} fill />
                 )}
               </SheetThumb>
             }
@@ -150,7 +150,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             }}
             leading={
               <SheetThumb>
-                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: thumb(resolveUrl((x.coverUrl || x.edmUrl) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <ThumbFallback />}
+                {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: thumb(resolveUrl((x.coverUrl || x.edmUrl) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <CourseCover theme="" label="" title={x.title} fill />}
               </SheetThumb>
             }
             // 素材：清單卡名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）
