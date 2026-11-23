@@ -6283,17 +6283,40 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/center-art$/,
     async (ctx): Promise<CenterArt[]> => {
-      const { results } = await ctx.db
-        .prepare("SELECT center_key, center_label, edm_key, art_version, cover_key, cover_rect, edm_view_y FROM center_art ORDER BY center_label")
-        .all<{ center_key: string; center_label: string; edm_key: string; art_version: number; cover_key: string | null; cover_rect: string | null; edm_view_y: number }>();
-      return results.map((r) => ({
-        centerKey: r.center_key,
-        center: r.center_label,
-        edmUrl: pubUrl(r.edm_key, r.art_version),
-        coverUrl: r.cover_key ? pubUrl(r.cover_key, r.art_version) : null,
-        coverRect: parseCoverRect(r.cover_rect),
-        edmViewY: r.edm_view_y,
-      }));
+      // 中心封面（業主 2026-11-23）：每次讀取，從該中心「封面上傳庫」（cover_media 的封面區照片）隨機挑一張；沒有任何封面照片才退回舊的單張首頁圖。
+      const [arts, pics] = await Promise.all([
+        ctx.db
+          .prepare("SELECT center_key, center_label, edm_key, art_version, cover_key, cover_rect, edm_view_y FROM center_art ORDER BY center_label")
+          .all<{ center_key: string; center_label: string; edm_key: string; art_version: number; cover_key: string | null; cover_rect: string | null; edm_view_y: number }>(),
+        ctx.db
+          .prepare("SELECT center_key, owner_key, r2_key FROM cover_media WHERE owner_kind = 'center' AND scope = 'cover' AND kind = 'image' AND center_key IS NOT NULL")
+          .all<{ center_key: string; owner_key: string; r2_key: string }>(),
+      ]);
+      const byKey = new Map<string, { label: string; keys: string[] }>();
+      for (const p of pics.results) {
+        const e = byKey.get(p.center_key) ?? { label: p.owner_key, keys: [] };
+        e.keys.push(p.r2_key);
+        byKey.set(p.center_key, e);
+      }
+      const pick = (keys: string[]) => pubUrl(keys[Math.floor(Math.random() * keys.length)]!, 0);
+      const out: CenterArt[] = arts.results.map((r) => {
+        const lib = byKey.get(r.center_key);
+        byKey.delete(r.center_key);
+        const url = lib ? pick(lib.keys) : null;
+        return {
+          centerKey: r.center_key,
+          center: r.center_label,
+          edmUrl: url ?? pubUrl(r.edm_key, r.art_version),
+          coverUrl: url ?? (r.cover_key ? pubUrl(r.cover_key, r.art_version) : null),
+          coverRect: url ? null : parseCoverRect(r.cover_rect),
+          edmViewY: url ? 0 : r.edm_view_y,
+        };
+      });
+      for (const [k, lib] of byKey) {
+        const url = pick(lib.keys);
+        out.push({ centerKey: k, center: lib.label, edmUrl: url, coverUrl: url, coverRect: null, edmViewY: 0 });
+      }
+      return out;
     },
   ],
   [
