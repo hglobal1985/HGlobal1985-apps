@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect } from "expo-router";
 import type { Member } from "@/api/client";
 import { ProfilePrompt } from "./profile-prompt";
@@ -12,13 +12,26 @@ export function useProfileGate(member: Member | null | undefined) {
   const [open, setOpen] = useState(false);
   const memberRef = useRef(member);
   memberRef.current = member;
-  // 只在「進入畫面」那一刻判斷（不依賴 member 變動，才不會在使用者關掉之後因為資料重新整理又彈出）。
+  // 「這次進入畫面還沒判斷過」：App 剛開啟時，進首頁那一刻會員資料常常還沒載入（member 是空的），
+  // 以前就直接略過、要切到別的分頁再回來才會彈（業主 2026-11-23）；現在資料一到就補判斷一次，之後不再因資料重新整理而彈出。
+  const pending = useRef(false);
+  const check = useCallback(() => {
+    const m = memberRef.current;
+    if (!pending.current || !m) return;
+    pending.current = false;
+    if (!m.demo && m.profileMissing?.length) setOpen(true);
+  }, []);
   useFocusEffect(
     useCallback(() => {
-      const m = memberRef.current;
-      if (m && !m.demo && m.profileMissing?.length) setOpen(true);
-    }, []),
+      pending.current = true;
+      check();
+      return () => {
+        pending.current = false;
+      };
+    }, [check]),
   );
+  const memberSub = member?.sub;
+  useEffect(check, [memberSub, check]);
   const element = open && member ? <ProfilePrompt onClose={() => setOpen(false)} initial={member.profileForm ?? null} /> : null;
   return { open: () => setOpen(true), element };
 }
