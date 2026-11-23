@@ -4672,10 +4672,16 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       const n = noticeScope(s);
       const { results } = await ctx.db
-        .prepare(`SELECT id, title, body, link, read_at, created_at FROM notifications WHERE ${n.sql} ORDER BY created_at DESC LIMIT 100`)
+        // order_status：「有新的報名待審核」這類通知連到 /admin/orders/<報名編號>，用那筆報名現在的狀態判斷有沒有處理過（業主 2026-11-23）。
+        .prepare(`SELECT id, title, body, link, read_at, created_at, (SELECT o.status FROM orders o WHERE notifications.link LIKE '/admin/orders/%' AND o.id = substr(notifications.link, 15)) AS order_status FROM notifications WHERE ${n.sql} ORDER BY created_at DESC LIMIT 100`)
         .bind(...n.args)
-        .all<{ id: string; title: string; body: string; link: string; read_at: string | null; created_at: string }>();
-      return results.map((x): Notice => ({ id: x.id, title: x.title, body: x.body, link: x.link, read: !!x.read_at, createdAt: x.created_at, category: noticeCategory(x.title, x.link) }));
+        .all<{ id: string; title: string; body: string; link: string; read_at: string | null; created_at: string; order_status: string | null }>();
+      return results.map((x): Notice => {
+        const category = noticeCategory(x.title, x.link);
+        // 審核相關而且還沒處理：待審報名的通知看那筆報名是不是還在待審（就算已讀也算）；其他審核通知（結果、申請進度…）看有沒有讀過。
+        const pending = category === "review" && (x.order_status !== null ? x.order_status === "pending" : !x.read_at);
+        return { id: x.id, title: x.title, body: x.body, link: x.link, read: !!x.read_at, createdAt: x.created_at, category, ...(pending ? { pending: true } : {}) };
+      });
     },
   ],
   // ---------- 我的書櫃 ----------
