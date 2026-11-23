@@ -68,12 +68,12 @@ export default function MeScreen() {
     const ok = await confirmAsk(
       "刪除帳號",
       central
-        ? "將刪除你在本 App 的所有資料（學習紀錄、報名紀錄、徽章、通知）並登出，接著帶你前往會員中心刪除會員帳號。此操作無法復原。"
+        ? "將刪除你在本 App 的所有資料（學習紀錄、報名紀錄、徽章、通知）並登出，接著帶你前往完整版會員中心刪除會員帳號。此操作無法復原。"
         : "將刪除這個測試帳號在本 App 的所有資料（學習紀錄、報名紀錄、徽章、通知）。",
       "確定刪除",
     );
     if (!ok) return;
-    await run("delete", deleteAccount, central ? "已刪除你在本 App 的資料並登出。請在會員中心完成帳號刪除。" : "已刪除測試帳號的資料。");
+    await run("delete", deleteAccount, central ? "已刪除你在本 App 的資料並登出。請在完整版會員中心完成帳號刪除。" : "已刪除測試帳號的資料。");
     if (central) openAccountCenter();
   };
 
@@ -168,9 +168,9 @@ export default function MeScreen() {
         <Section title="帳號">
           <Card style={{ paddingVertical: 0 }}>
             {!member.demo ? (
-              <ListRow icon="person-circle-outline" title="會員中心" subtitle="修改基本資料" onPress={openAccountCenter} />
+              <ListRow icon="person-circle-outline" title="完整版會員中心" subtitle="修改基本資料" onPress={openAccountCenter} />
             ) : null}
-            <ListRow icon="trash-outline" title="刪除帳號" subtitle="刪除本 App 的所有資料，並前往會員中心刪除會員帳號" onPress={removeAccount} />
+            <ListRow icon="trash-outline" title="刪除帳號" subtitle="刪除本 App 的所有資料，並前往完整版會員中心刪除會員帳號" onPress={removeAccount} />
           </Card>
         </Section>
       ) : null}
