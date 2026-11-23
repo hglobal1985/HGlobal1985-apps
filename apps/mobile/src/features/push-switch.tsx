@@ -41,15 +41,12 @@ export function PushSwitchRow({ banner }: { banner?: boolean } = {}) {
   const hint = err ?? (Platform.OS !== "web" ? "App 版的推播會在正式上架時開放。" : state && state !== "on" && state !== "off" ? PUSH_TEXT[state] : null);
   return (
     <View style={{ gap: 4 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: 46, borderRadius: radius.md, backgroundColor: banner ? c.accent : c.surfaceMuted, paddingHorizontal: space.sm }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: banner ? 64 : 46, borderRadius: radius.md, backgroundColor: banner ? c.accent : c.surfaceMuted, paddingHorizontal: space.sm }}>
         <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: banner ? "rgba(255,255,255,0.2)" : c.accentSoft }}>
           <Icon name="notifications" size={20} color={banner ? "#FFFFFF" : c.accentText} />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText style={{ fontWeight: "800", color: banner ? c.textOnAccent : undefined }}>開啟手機推播</AppText>
-          <AppText variant="caption" tone={banner ? undefined : "muted"} style={banner ? { color: c.textOnAccent, opacity: 0.85 } : undefined} numberOfLines={1}>
-            開課提醒、報名與審核結果
-          </AppText>
+          <AppText style={{ fontWeight: "900", fontSize: banner ? 22 : 16, lineHeight: banner ? 28 : 22, color: banner ? c.textOnAccent : undefined }}>{banner ? "強烈建議開啟手機推播" : "開啟手機推播"}</AppText>
         </View>
         <Switch value={state === "on"} disabled={busy || !canToggle} onValueChange={toggle} trackColor={{ false: banner ? "rgba(255,255,255,0.3)" : c.border, true: banner ? c.warning : c.accent }} thumbColor="#FFFFFF" ios_backgroundColor={c.border} accessibilityLabel="手機推播開關" />
       </View>
