@@ -35,6 +35,10 @@ import {
   type CourseCan,
   type CourseEditor,
   type CenterArt,
+  type ThumbBadge,
+  type ThumbBadgeKind,
+  type ThumbBadgeRow,
+  THUMB_BADGE_KINDS,
   type SeriesArt,
   type SeriesSetting,
   type EditorCandidate,
@@ -2560,6 +2564,24 @@ async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind
   return id;
 }
 
+/** 縮圖符號的權限：課程＝能編輯那門課的人；系列＝超級管理員；中心＝該中心的編輯者（與中心封面相同）。 */
+async function thumbBadgeTarget(ctx: Ctx, kindRaw: unknown, keyRaw: unknown): Promise<{ s: Session; kind: ThumbBadgeKind; key: string }> {
+  const kind = THUMB_BADGE_KINDS.find((k) => k === kindRaw) ?? fail(400, "invalid_kind", "種類不正確");
+  const raw = typeof keyRaw === "string" ? keyRaw.trim().slice(0, 100) : "";
+  if (!raw) fail(400, "key_required", "缺少對象");
+  if (kind === "course") {
+    if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(raw).first())) fail(404, "not_found", "找不到這門課程");
+    await requireCourseArt(ctx, requireMember(ctx), raw);
+    return { s: requireMember(ctx), kind, key: raw };
+  }
+  if (kind === "series") {
+    const s = requireSuperAdmin(ctx);
+    if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE series = ? LIMIT 1").bind(raw).first())) fail(404, "not_found", "找不到這個系列卡");
+    return { s, kind, key: raw };
+  }
+  const { s, center } = await requireCenterArt(ctx, raw);
+  return { s, kind, key: center.key };
+}
 async function requireCenterArt(ctx: Ctx, label: string | null): Promise<{ s: Session; center: { key: string; label: string } }> {
   const s = requireMember(ctx);
   const rights = await rightsOf(ctx);
@@ -6295,6 +6317,64 @@ const routes: [string, RegExp, Handler][] = [
       if (res.meta?.changes === 0) fail(404, "not_found", "找不到這位小編");
       await ctx.db.batch([notify(ctx.db, { sub: sub! }, `您已不是「${center.label}」的小編`, `${s.name || "管理者"}取消了您在${center.label}的小編身分；之前的課程仍保留。`, "/courses")]);
       return listEditors(ctx, center);
+    },
+  ],
+  // ---------- 縮圖符號（業主 2026-11-23）：系列卡、課程卡、中心卡的小縮圖符號與顏色 ----------
+  [
+    "GET",
+    /^\/thumb-badges$/,
+    async (ctx): Promise<ThumbBadge[]> => {
+      const { results } = await ctx.db.prepare("SELECT kind, key, symbol, fg, bg FROM thumb_badges").all<ThumbBadge>();
+      return results;
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/thumb-badges$/,
+    async (ctx): Promise<ThumbBadgeRow[]> => {
+      // 設定頁總覽：所有課程、系列、中心與各自目前的縮圖符號（超級管理員）。
+      const s = requireSuperAdmin(ctx);
+      const [courses, series, badges, centers] = await Promise.all([
+        ctx.db.prepare("SELECT id, title, series FROM courses ORDER BY series, title").all<{ id: string; title: string; series: string }>(),
+        ctx.db.prepare("SELECT DISTINCT series FROM courses WHERE series <> '' ORDER BY series").all<{ series: string }>(),
+        ctx.db.prepare("SELECT kind, key, symbol, fg, bg FROM thumb_badges").all<ThumbBadge>(),
+        s.kind === "central" ? centerList(s.token).catch(() => [] as string[]) : Promise.resolve([] as string[]),
+      ]);
+      const map = new Map(badges.results.map((b) => [`${b.kind}:${b.key}`, b]));
+      const row = (kind: ThumbBadgeKind, key: string, label: string, sub: string): ThumbBadgeRow => ({ kind, key, label, sub, badge: map.get(`${kind}:${key}`) ?? null });
+      return [
+        ...centers.map((c) => row("center", centerKey(c), c, "中心卡")),
+        ...series.results.map((r) => row("series", r.series, r.series, "系列卡")),
+        ...courses.results.map((r) => row("course", r.id, r.title, r.series ? `課程卡・${r.series}` : "課程卡")),
+      ];
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/thumb-badges$/,
+    async (ctx) => {
+      const b = await readJson<{ kind?: unknown; key?: unknown; symbol?: unknown; fg?: unknown; bg?: unknown }>(ctx.req);
+      const { kind, key, s } = await thumbBadgeTarget(ctx, b.kind, b.key);
+      const symbol = typeof b.symbol === "string" ? b.symbol.trim() : "";
+      if (!symbol) fail(400, "symbol_required", "請輸入符號（emoji 或最多 4 個字）");
+      if ([...symbol].length > 4) fail(400, "symbol_too_long", "符號最多 4 個字");
+      const hex = (v: unknown, d: string) => (typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toUpperCase() : d);
+      const fg = hex(b.fg, "#FFFFFF");
+      const bg = hex(b.bg, "#0C603C");
+      await ctx.db.batch([
+        ctx.db.prepare("INSERT INTO thumb_badges (kind, key, symbol, fg, bg, updated_by) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(kind, key) DO UPDATE SET symbol = excluded.symbol, fg = excluded.fg, bg = excluded.bg, updated_by = excluded.updated_by, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(kind, key, symbol, fg, bg, s.sub),
+        audit(ctx.db, s.sub, "thumb_badge.set", kind, key),
+      ]);
+      return { kind, key, symbol, fg, bg } satisfies ThumbBadge;
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/thumb-badges$/,
+    async (ctx) => {
+      const { kind, key, s } = await thumbBadgeTarget(ctx, ctx.url.searchParams.get("kind"), ctx.url.searchParams.get("key"));
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM thumb_badges WHERE kind = ? AND key = ?").bind(kind, key), audit(ctx.db, s.sub, "thumb_badge.clear", kind, key)]);
+      return { ok: true };
     },
   ],
   // ---------- 中心 EDM（全部課程頁選了中心才顯示） ----------
