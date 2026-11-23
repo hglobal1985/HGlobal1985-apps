@@ -5,7 +5,8 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { resolveUrl } from "@/api/client";
 import { centerTitle } from "@/features/format";
 import { useCenterNames } from "@/state/center-names";
-import { AppText } from "@/ui";
+import { useThumbBadge } from "@/lib/thumb-badges";
+import { AppText, ThumbBadgeView } from "@/ui";
 import { CardCount } from "@/ui/card-count";
 
 /**
@@ -16,11 +17,14 @@ export function CenterTile({ name, edmUrl, width, count, onPress }: { name: stri
   const thumb = useThumb();
   useCenterNames();
   const title = centerTitle(name);
+  const badge = useThumbBadge("center", name);
   const height = Math.round((width * 10) / 16);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={() => (trackUsage("card_center", name), onPress())} style={[styles.card, { width, height }, edmUrl ? { backgroundColor: "#fff" } : null]}>
       {edmUrl ? (
         <Image source={{ uri: thumb(resolveUrl(edmUrl), width) }} style={{ width, height }} resizeMode="cover" />
+      ) : badge ? (
+        <ThumbBadgeView symbol={badge.symbol} fg={badge.fg} bg={badge.bg} />
       ) : (
         <Gradient id="brand" from="#2F5D3A" to="#4C8A5B" fromOpacity={1} toOpacity={1} diagonal />
       )}

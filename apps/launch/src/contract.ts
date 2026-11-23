@@ -458,6 +458,14 @@ export type CoverMediaKind = "center" | "series" | "course";
 export type CoverScope = "cover" | "edm";
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
 export type CoverMediaItem = { id: string; scope: CoverScope; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
+/** 縮圖符號（業主 2026-11-23）：系列卡、課程卡、中心卡的小縮圖。symbol＝emoji 或短文字（最多 4 個字）；fg 文字色、bg 底色（#RRGGBB）。 */
+export type ThumbBadgeKind = "course" | "series" | "center";
+export type ThumbBadge = { kind: ThumbBadgeKind; key: string; symbol: string; fg: string; bg: string };
+/** 設定頁總覽的一列：沒設定時 badge 是 null。 */
+export type ThumbBadgeRow = { kind: ThumbBadgeKind; key: string; label: string; sub: string; badge: ThumbBadge | null };
+/** 縮圖符號的色票（畫面上點選；也可輸入自訂色碼）。 */
+export const THUMB_BADGE_COLORS = ["#0C603C", "#2F5D3A", "#4C8A5B", "#8B6F47", "#B3261E", "#D97706", "#E6B422", "#2563A8", "#6B4FA0", "#374151", "#FFFFFF", "#F4EFE6"] as const;
+export const THUMB_BADGE_KINDS: ThumbBadgeKind[] = ["course", "series", "center"];
 export type StaffRole = { value: string; label: string };
 export type StaffMember = { memberId: string; name: string; center: string; roles: string[] };
 /** available＝false：中央判斷沒有權限（任何非 200 都當沒有權限）；members 只在這次請求即時讀取，不保存。 */

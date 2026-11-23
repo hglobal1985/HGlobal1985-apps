@@ -7,7 +7,7 @@ import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, CourseCover } from "@/ui";
+import { AppText, CardThumb } from "@/ui";
 import type { SearchLesson } from "./course-search";
 import { SpeakerMark } from "./speaker-mark";
 import { SummaryMark } from "./summary-mark";
@@ -40,7 +40,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
               {lesson.coverUrl || course.coverUrl || course.edmUrl ? (
                 <Image source={{ uri: thumb(resolveUrl((lesson.coverUrl || course.coverUrl || course.edmUrl) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
               ) : (
-                <CourseCover theme={course.theme} label={course.category} title={lesson.title} fill />
+                <CardThumb kind="course" id={course.id} />
               )}
             </View>
             <View style={styles.mid}>

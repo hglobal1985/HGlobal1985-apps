@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Image, Platform, StyleSheet, View } from "react-native";
 import { LIST_COVER_COLORS, resolveUrl } from "@/api/client";
 import { radius } from "@/theme/tokens";
-import { AppText, CourseCover } from "@/ui";
+import { AppText, ThumbFallback } from "@/ui";
 import { fitFontSize } from "@/ui/course-cover";
 
 export type ListCoverMode = "item" | "text";
@@ -61,7 +61,7 @@ export function ListCover({ mode, imageUrl, bgUrl, color, title, text, height = 
       ) : imageUrl ? (
         <Image source={{ uri: resolveUrl(imageUrl) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />
       ) : (
-        <CourseCover theme="" label="" title={title} fill />
+        <ThumbFallback />
       )}
       {children}
     </View>

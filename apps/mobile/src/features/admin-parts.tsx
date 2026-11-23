@@ -31,6 +31,7 @@ export const CenterScheduleSheet = lazyPart(bundle, "CenterScheduleSheet");
 // 書櫃（features/library/library-manage.tsx）、關鍵字管理（app/admin/keywords.tsx）
 export const TimeRangePicker = lazyPart(bundle, "TimeRangePicker");
 export const SeriesEdm = lazyPart(bundle, "SeriesEdm");
+export const ThumbBadgeEditor = lazyPart(bundle, "ThumbBadgeEditor");
 
 // 系列頁（features/courses/series-page.tsx）
 export const SeriesCoverSheet = lazyPart(bundle, "SeriesCoverSheet");

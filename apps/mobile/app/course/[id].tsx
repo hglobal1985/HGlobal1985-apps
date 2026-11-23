@@ -17,7 +17,7 @@ import { PlayerControls } from "@/features/player/player-controls";
 import { PlayerSlot } from "@/features/player/player-slot";
 import { useLessonSession } from "@/features/player/use-lesson-session";
 import { lessonHref } from "@/lib/lesson-href";
-import { BlockEditList, EdmManager, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
+import { BlockEditList, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
 import type { SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { Check } from "@/ui/check";
@@ -504,6 +504,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       {sheet === "art" ? (
         <EditSheet title="EDM 與封面" onClose={() => setSheet(null)} hideSave>
           <EdmManager course={course} onChanged={invalidate} />
+          <ThumbBadgeEditor kind="course" id={course.id} label={course.title} />
         </EditSheet>
       ) : sheet === "newLesson" || sheet === "newMaterial" || sheet === "newSection" ? (
         sheet === "newMaterial" ? <NewMaterialSheet course={course} afterBlock={materialBlock} onClose={() => setSheet(null)} /> : sheet === "newSection" ? <SectionTitleSheet course={course} onClose={() => setSheet(null)} /> : <NewLessonSheet course={course} onClose={() => setSheet(null)} />
