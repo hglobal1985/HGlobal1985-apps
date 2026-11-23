@@ -86,7 +86,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
             ) : null}
             {canEdit ? (
               <View style={styles.tools} pointerEvents="box-none">
-                {scope === "edm" ? null : <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
+                {<Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-back" size={16} color="#fff" {...NO_SCALE} />
                 </Pressable>}
                 {x.courseId ? (
@@ -98,7 +98,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
                     <Ionicons name="trash" size={15} color="#fff" {...NO_SCALE} />
                   </Pressable>
                 )}
-                {scope === "edm" ? null : <Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
+                {<Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往後移" disabled={i === items.length - 1} onPress={() => move(x.id, 1)} style={[styles.tbtn, i === items.length - 1 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-forward" size={16} color="#fff" {...NO_SCALE} />
                 </Pressable>}
               </View>
