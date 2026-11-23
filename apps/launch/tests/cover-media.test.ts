@@ -121,3 +121,62 @@ test("封面輪播照片與 EDM 分頁照片分開儲存：各自上限、各自
   assert.deepEqual((await call("PUT", "/admin/cover-media/config", { token: admin, body: { kind: "center", key: "台北中心", showEdm: true } })).data, { showEdm: true });
   assert.deepEqual((await call("GET", `/cover-media/config?center=${C}`)).data, { showEdm: true });
 });
+
+test("課程 EDM 併入中心 EDM 空間：已上傳與未來上傳的自動綁定；綁定的不能刪只能更換；同步換圖、下架、改中心（業主 2026-11-23）", async () => {
+  const bucket = memR2();
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: bucket };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown; bytes?: Uint8Array } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.bytes ? {} : { "content-type": "application/json" }), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.bytes ? (opts.bytes as unknown as BodyInit) : opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  const admin = (await call<{ token: string }>("POST", "/auth/demo", { body: { sub: "demo-admin" } })).data.token;
+  type Item = { id: string; scope: string; courseId?: string; courseTitle?: string; url: string; width: number; height: number };
+  const C = encodeURIComponent("台北中心");
+  const list = async (center = C) => (await call<Item[]>("GET", `/cover-media?kind=center&key=${center}`)).data;
+
+  // 已經上傳的課程 EDM：台北中心主辦、已發佈、有 EDM
+  await bucket.put("edm/c-a/old.jpg", jpeg);
+  await db.prepare("UPDATE courses SET host_center_key = '台北中心', edm_key = 'edm/c-a/old.jpg', status = 'published' WHERE id = 'start'").run();
+  const own = await call<{ id: string }>("PUT", `/admin/cover-media?kind=center&key=${C}&w=1200&h=800&scope=edm`, { token: admin, bytes: jpeg }); // 手動上傳的 EDM（沒綁課程）
+  let items = await list();
+  const bound = items.filter((x) => x.courseId);
+  assert.equal(bound.length, 1, "課程 EDM 自動出現在中心 EDM 空間");
+  assert.equal(bound[0]!.courseId, "start");
+  assert.ok(bound[0]!.courseTitle);
+  assert.equal(bound[0]!.scope, "edm");
+  assert.equal(items.length, 2);
+
+  // 綁定的不能刪；沒綁定的照舊能刪
+  const del = await call<{ error: { code: string; message: string } }>("DELETE", `/admin/cover-media/${bound[0]!.id}`, { token: admin });
+  assert.equal(del.status, 409);
+  assert.equal(del.data.error.code, "bound_to_course");
+  assert.equal((await call("DELETE", `/admin/cover-media/${own.data.id}`, { token: admin })).status, 200);
+
+  // 更換照片：同時換掉那堂課的 EDM
+  const rep = await call<{ items: Item[] }>("PUT", `/admin/cover-media/${bound[0]!.id}/replace?w=600&h=900`, { token: admin, bytes: jpeg });
+  assert.equal(rep.status, 200);
+  const course = await db.prepare("SELECT edm_key FROM courses WHERE id = 'start'").first<{ edm_key: string }>();
+  assert.notEqual(course!.edm_key, "edm/c-a/old.jpg");
+  assert.ok(course!.edm_key.startsWith("edm/start/"), "新檔仍放在這堂課自己的路徑");
+  assert.equal((await bucket.head("edm/c-a/old.jpg")), null, "舊檔已刪");
+  items = await list();
+  assert.equal(items.filter((x) => x.courseId).length, 1);
+  assert.equal((await call("PUT", `/admin/cover-media/${bound[0]!.id}/replace`, { bytes: jpeg })).status, 401, "沒登入不能更換");
+
+  // 未來上傳／課程自己換 EDM：下次讀取自動同步，仍然只有一張
+  await db.prepare("UPDATE courses SET edm_key = 'edm/start/other.jpg' WHERE id = 'start'").run();
+  await bucket.put("edm/start/other.jpg", jpeg);
+  items = await list();
+  assert.equal(items.filter((x) => x.courseId).length, 1);
+  assert.ok(items.find((x) => x.courseId)!.url.includes("other.jpg"));
+
+  // 改到別的中心：整張跟著搬過去；下架：從空間拿掉（檔案仍歸課程）
+  await db.prepare("UPDATE courses SET host_center_key = '台中中心' WHERE id = 'start'").run();
+  assert.equal((await list()).filter((x) => x.courseId).length, 0);
+  assert.equal((await list(encodeURIComponent("台中中心"))).filter((x) => x.courseId).length, 1);
+  await db.prepare("UPDATE courses SET status = 'draft' WHERE id = 'start'").run();
+  assert.equal((await list(encodeURIComponent("台中中心"))).filter((x) => x.courseId).length, 0);
+  assert.ok(await bucket.head("edm/start/other.jpg"), "課程自己的檔案沒被刪");
+});

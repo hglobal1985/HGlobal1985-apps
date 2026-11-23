@@ -99,6 +99,7 @@ import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
 import { isOwnerNet, markOwnerNet, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
 import { collectMuxStats } from "./mux-stats.ts";
+import { imageSize } from "./image-size.ts";
 import { audioUrl, sniffImage, verifyAudioUrl } from "./media.ts";
 import { checkMuxPlayback, listMuxAssets, MuxApiError, muxPlaybackUrl, muxThumbnail } from "./mux.ts";
 
@@ -2429,10 +2430,11 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; kind?: string; poster_key?: string | null };
 const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
 const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
-function coverItem(r: { id: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
+function coverItem(r: { id: string; scope: CoverScope; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
     scope: r.scope === "edm" ? "edm" : "cover",
+    ...(r.course_id ? { courseId: r.course_id, courseTitle: r.course_title ?? "" } : {}),
     kind: r.kind,
     url: r.kind === "video" ? `/api/v2/media/album?k=${encodeURIComponent(r.r2_key)}` : pubUrl(r.r2_key, 0),
     posterUrl: r.poster_key ? pubUrl(r.poster_key, 0) : null,
@@ -2445,11 +2447,60 @@ function coverItem(r: { id: string; scope: CoverScope; kind: "image" | "video"; 
 const coverScopeOf = (kind: CoverMediaKind, v: unknown): CoverScope => (kind !== "center" ? "cover" : v === "cover" ? "cover" : "edm");
 /** lookup：center＝中心鑰匙（centerKey）；series＝系列名稱；course＝課程編號。scope 有給就只取那一區，沒給＝兩區都取（公開讀取用）。 */
 async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, scope?: CoverScope): Promise<CoverMediaItem[]> {
-  const where = (kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?") + (scope ? " AND scope = ?" : "");
-  const st = db.prepare(`SELECT id, scope, kind, r2_key, poster_key, width, height, duration_sec FROM cover_media WHERE ${where} ORDER BY scope, position, created_at LIMIT ${COVER_MEDIA_MAX * 2}`);
+  const where = (kind === "center" ? "cm.owner_kind = 'center' AND cm.center_key = ?" : "cm.owner_kind = ? AND cm.owner_key = ?") + (scope ? " AND cm.scope = ?" : "");
+  // 課程 EDM（綁定課程的照片）不受 100 張上限限制，所以讀取上限放寬。
+  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, cm.position, cm.created_at, cm.rowid LIMIT 2000`);
   const args = [...(kind === "center" ? [lookup] : [kind, lookup]), ...(scope ? [scope] : [])];
-  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
   return results.map(coverItem);
+}
+/**
+ * 課程 EDM 併入中心 EDM 空間（業主 2026-11-23）：中心主辦、已發佈、有 EDM 的課程，其 EDM 圖自動成為該中心 EDM 空間（scope = edm）的一張，用 course_id 綁定；
+ * 課程換圖、改主辦中心、下架、刪除，這裡跟著同步。每次讀中心先用一個便宜的查詢檢查，有差異才寫入（所以已上傳和未來上傳的都會自動併入）。
+ */
+async function reconcileCenterEdm(db: D1Database, key: string): Promise<void> {
+  const ok = "c.host_center_key = ?1 AND c.status = 'published' AND c.edm_key IS NOT NULL";
+  const need = await db
+    .prepare(
+      `SELECT 1 AS x WHERE EXISTS (SELECT 1 FROM courses c WHERE ${ok} AND NOT EXISTS (SELECT 1 FROM cover_media m WHERE m.course_id = c.id AND m.center_key = ?1 AND m.r2_key = c.edm_key))
+       OR EXISTS (SELECT 1 FROM cover_media m WHERE m.owner_kind = 'center' AND m.center_key = ?1 AND m.course_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM courses c WHERE c.id = m.course_id AND ${ok} AND c.edm_key = m.r2_key))`,
+    )
+    .bind(key)
+    .first();
+  if (!need) return;
+  const base = "(SELECT COALESCE(MAX(position), -1) FROM cover_media WHERE owner_kind = 'center' AND center_key = ?1 AND scope = 'edm')";
+  await db.batch([
+    // 課程改主辦到這個中心：把原本在別的中心的綁定照片搬過來
+    db.prepare(`UPDATE cover_media SET center_key = ?1, scope = 'edm', position = ${base} + 1 WHERE owner_kind = 'center' AND course_id IN (SELECT c.id FROM courses c WHERE ${ok}) AND center_key <> ?1`).bind(key),
+    // 課程不在這裡了（改中心、下架、刪除、移除 EDM）：只拿掉綁定的照片紀錄，檔案歸課程管，不刪檔
+    db.prepare(`DELETE FROM cover_media WHERE owner_kind = 'center' AND center_key = ?1 AND course_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM courses c WHERE c.id = cover_media.course_id AND ${ok})`).bind(key),
+    // 課程換了 EDM：同步新的檔案（寬高重新量）
+    db.prepare(`UPDATE cover_media SET r2_key = (SELECT c.edm_key FROM courses c WHERE c.id = cover_media.course_id), width = 0, height = 0 WHERE owner_kind = 'center' AND center_key = ?1 AND course_id IS NOT NULL AND r2_key <> (SELECT c.edm_key FROM courses c WHERE c.id = cover_media.course_id)`).bind(key),
+    // 還沒綁定的課程 EDM：新增（接在最後面，依課程建立時間）
+    db.prepare(
+      `INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, width, height, position, created_by, scope, course_id)
+       SELECT lower(hex(randomblob(8))), 'center', ?1, '', 'image', c.edm_key, 0, 0, ${base} + ROW_NUMBER() OVER (ORDER BY c.created_at, c.id), 'course-edm', 'edm', c.id
+       FROM courses c WHERE ${ok} AND NOT EXISTS (SELECT 1 FROM cover_media m WHERE m.course_id = c.id)`,
+    ).bind(key),
+  ]);
+}
+/** 舊照片沒有記寬高（0）時，從檔頭量出來存回去（一次最多 6 張）；封面輪播要靠它判斷橫式或直式。 */
+async function fillImageDims(env: Env, db: D1Database, kind: CoverMediaKind, lookup: string): Promise<void> {
+  const bucket = env.MEDIA;
+  if (!bucket) return;
+  const where = kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?";
+  const st = db.prepare(`SELECT id, r2_key FROM cover_media WHERE ${where} AND kind = 'image' AND (width <= 0 OR height <= 0) LIMIT 6`);
+  const { results } = await (kind === "center" ? st.bind(lookup) : st.bind(kind, lookup)).all<{ id: string; r2_key: string }>();
+  for (const r of results) {
+    try {
+      const o = await bucket.get(r.r2_key, { range: { offset: 0, length: 131072 } });
+      if (!o) continue;
+      const size = imageSize(new Uint8Array(await new Response((o as unknown as { body: ReadableStream }).body).arrayBuffer()));
+      if (size) await db.prepare("UPDATE cover_media SET width = ?, height = ? WHERE id = ?").bind(Math.min(20000, size.width), Math.min(20000, size.height), r.id).run();
+    } catch {
+      /* 量不出來就維持原狀，下次再試 */
+    }
+  }
 }
 /** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
 async function requireCoverOwner(ctx: Ctx, fromBody = false): Promise<{ s: Session; kind: CoverMediaKind; lookup: string; centerKey: string | null; ownerKey: string; scope: CoverScope }> {
@@ -2493,7 +2544,7 @@ async function requireCoverRowOwner(ctx: Ctx, row: CoverRow): Promise<Session> {
   return s;
 }
 async function coverRoom(db: D1Database, o: { kind: CoverMediaKind; lookup: string; scope: CoverScope }): Promise<void> {
-  if ((await coverItems(db, o.kind, o.lookup, o.scope)).length >= COVER_MEDIA_MAX) fail(409, "album_full", `最多放 ${COVER_MEDIA_MAX} 張，請先刪除一些`);
+  if ((await coverItems(db, o.kind, o.lookup, o.scope)).filter((x) => !x.courseId).length >= COVER_MEDIA_MAX) fail(409, "album_full", `最多放 ${COVER_MEDIA_MAX} 張，請先刪除一些`);
 }
 async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind; centerKey: string | null; ownerKey: string; scope: CoverScope }, x: { kind: "image" | "video"; r2Key: string; posterKey: string | null; width: number; height: number; durationSec: number; bytes: number; by: string }): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -3931,7 +3982,10 @@ const routes: [string, RegExp, Handler][] = [
       const kind = coverKindOf(ctx.url.searchParams.get("kind"));
       const key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
       if (!key) return [];
-      return coverItems(ctx.db, kind, kind === "center" ? centerKey(key) : key);
+      const lookup = kind === "center" ? centerKey(key) : key;
+      if (kind === "center") await reconcileCenterEdm(ctx.db, lookup).catch(() => undefined); // 課程 EDM 自動併入中心 EDM 空間
+      await fillImageDims(ctx.env, ctx.db, kind, lookup);
+      return coverItems(ctx.db, kind, lookup);
     },
   ],
   [
@@ -4010,6 +4064,35 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "PUT",
+    /^\/admin\/cover-media\/([\w-]{1,40})\/replace$/,
+    async (ctx, [id]) => {
+      // 更換照片（業主 2026-11-23）：內文是新的圖片檔（瀏覽器已壓縮）。綁定課程的 EDM 同時換掉那堂課的 EDM。?w&h
+      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, kind, r2_key, course_id FROM cover_media WHERE id = ?").bind(id).first<CoverRow & { r2_key: string; course_id: string | null }>();
+      if (!row) return fail(404, "not_found", "找不到這個項目");
+      if (row.kind !== "image") return fail(400, "image_only", "只能更換照片");
+      const s = await requireCoverRowOwner(ctx, row);
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const data = new Uint8Array(await ctx.req.arrayBuffer());
+      if (!data.byteLength || data.byteLength > 8 * 1024 * 1024) fail(413, "invalid_size", "圖片大小需在 8MB 以內（上傳時會自動壓縮）");
+      const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, row.course_id ? "edm" : "center");
+      const ext = renameForType("x.jpg", shrunk.type).split(".").pop();
+      const key = row.course_id ? `edm/${row.course_id}/${crypto.randomUUID()}.${ext}` : `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${ext}`;
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
+      const size = imageSize(new Uint8Array(shrunk.data as ArrayBuffer)) ?? { width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")) };
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE cover_media SET r2_key = ?, width = ?, height = ?, bytes = ? WHERE id = ?").bind(key, size.width, size.height, shrunk.data.byteLength, id),
+        ...(row.course_id ? [ctx.db.prepare("UPDATE courses SET edm_key = ?, cover_rect = NULL, art_version = art_version + 1 WHERE id = ?").bind(key, row.course_id)] : []),
+        audit(ctx.db, s.sub, "cover_media.replace", row.owner_kind, row.center_key ?? row.owner_key, id),
+      ]);
+      const shared = await ctx.db.prepare("SELECT 1 AS ok FROM center_art WHERE edm_key = ? OR cover_key = ?").bind(row.r2_key, row.r2_key).first();
+      if (!shared) await bucket.delete(row.r2_key).catch(() => undefined);
+      const kind = row.owner_kind as CoverMediaKind;
+      return { id, items: await coverItems(ctx.db, kind, kind === "center" ? row.center_key ?? "" : row.owner_key) };
+    },
+  ],
+  [
     "GET",
     /^\/cover-media\/config$/,
     async (ctx) => {
@@ -4040,9 +4123,11 @@ const routes: [string, RegExp, Handler][] = [
     "DELETE",
     /^\/admin\/cover-media\/([\w-]{1,40})$/,
     async (ctx, [id]) => {
-      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, r2_key, poster_key FROM cover_media WHERE id = ?").bind(id).first<CoverRow & { r2_key: string }>();
+      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, r2_key, poster_key, course_id FROM cover_media WHERE id = ?").bind(id).first<CoverRow & { r2_key: string; course_id: string | null }>();
       if (!row) return fail(404, "not_found", "找不到這個項目");
       const s = await requireCoverRowOwner(ctx, row);
+      // 綁定課程的 EDM 不能刪（業主 2026-11-23），只能更換照片。
+      if (row.course_id) return fail(409, "bound_to_course", "這張 EDM 已經綁定課程，無法刪除，只能更換照片");
       await ctx.db.batch([ctx.db.prepare("DELETE FROM cover_media WHERE id = ?").bind(id), audit(ctx.db, s.sub, "cover_media.delete", row.owner_kind, row.center_key ?? row.owner_key, id)]);
       // 檔案徹底刪除；中心原本的首頁圖（相簿第一張）還被中心首頁圖設定用著時不刪。
       for (const k of [row.r2_key, row.poster_key]) {
