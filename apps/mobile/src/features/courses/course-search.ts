@@ -144,8 +144,10 @@ export function charsCourses(index: SearchIndex, q: string): Set<string> {
  */
 export function rankCourses(index: SearchIndex, list: CourseSummary[], q: string, near: { phonetic?: string[]; semantic?: string[]; fuzzy?: Set<string>; chars?: Set<string> } = {}): CourseSummary[] {
   const t = tokens(q);
-  const phon = new Map((near.phonetic ?? []).map((id, i, a) => [id, 2.9 - (i / Math.max(1, a.length)) * 0.4]));
-  const sem = new Map((near.semantic ?? []).map((id, i, a) => [id, 1 - (i / Math.max(1, a.length)) * 0.4]));
+  // 同一堂課可能先以「課程名稱」再以「章節」命中：只留第一次（名稱命中在前、分數較高），後面重複的不能把分數蓋低。
+  const uniq = (a: string[] = []) => [...new Set(a)];
+  const phon = new Map(uniq(near.phonetic).map((id, i, a) => [id, 2.9 - (i / Math.max(1, a.length)) * 0.4]));
+  const sem = new Map(uniq(near.semantic).map((id, i, a) => [id, 1 - (i / Math.max(1, a.length)) * 0.4]));
   const rel = (c: CourseSummary): number => {
     const hay = index.haystack.get(c.id) ?? "";
     const parts = hay.split("\u0001");
