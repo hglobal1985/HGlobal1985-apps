@@ -1059,7 +1059,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     // 封面＝來源清單的系列封面（上傳的封面優先，沒有再用首頁圖）；之後來源修改，這裡自動一致。
     const key = art?.cover_key || art?.edm_key;
     if (key) linkCover.set(l.id, pubUrl(key, art!.art_version));
-    else if (sec.ckey) linkCover.set(l.id, pubUrl(sec.ckey, sec.cver)); // 系列沒有封面時用來源課程自己的封面（實戰百寶箱，業主 2026-11-24）
+    else if (sec.ckey) linkCover.set(l.id, pubUrl(sec.ckey, sec.cver)); // 系列沒有封面時用來源課程自己的封面（成交百寶箱，業主 2026-11-24）
   });
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
   const linkRows = { results: sourceCourses.length ? [...ownLinks, ...(await linkRowsOf(ctx.db, sourceCourses))] : ownLinks };
@@ -4627,7 +4627,7 @@ const routes: [string, RegExp, Handler][] = [
       const bodyApp = (body.app && typeof body.app === "object" ? body.app : {}) as { rec?: object };
       const next = normalizeConfig({ ...cur, ...body, ribbons: { ...cur.ribbons, ...((body.ribbons as object) ?? {}) }, app: { ...cur.app, ...bodyApp, rec: { ...cur.app.rec, ...(bodyApp.rec ?? {}) } }, share: { ...cur.share, ...((body.share as object) ?? {}) } });
       await saveConfig(ctx.db, next);
-      if (body.seriesOrder !== undefined) await syncTreasureFromSeriesOrder(ctx.db).catch(() => undefined); // 品牌館卡片順序 → 實戰百寶箱區塊順序
+      if (body.seriesOrder !== undefined) await syncTreasureFromSeriesOrder(ctx.db).catch(() => undefined); // 品牌館卡片順序 → 成交百寶箱區塊順序
       await audit(ctx.db, s.sub, "ui_config.update", "ui_config", "ui_config", Object.keys(body).join(",")).run();
       return next;
     },
@@ -6788,7 +6788,7 @@ const routes: [string, RegExp, Handler][] = [
       const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM brand_logos").first<{ m: number }>();
       await ctx.db.batch([ctx.db.prepare("INSERT INTO brand_logos (id, name, sort_order) VALUES (?, ?, ?)").bind(id, name, (max?.m ?? 0) + 1), audit(ctx.db, s.sub, "brand.create", "brand", id, name)]);
       await ensureBrandCards(ctx.env, id).catch(() => undefined); // 新品牌自動有一張資訊卡（業主 2026-11-18）
-      await ensureTreasureLinks(ctx.env, id).catch(() => undefined); // 實戰百寶箱也補一個該品牌的區塊與品牌卡最前面的連結區塊
+      await ensureTreasureLinks(ctx.env, id).catch(() => undefined); // 成交百寶箱也補一個該品牌的區塊與品牌卡最前面的連結區塊
       return { id };
     },
   ],
@@ -6820,7 +6820,7 @@ const routes: [string, RegExp, Handler][] = [
       const r = await ctx.db.prepare(`UPDATE brand_logos SET ${sets.map(([c]) => `${c} = ?`).join(", ")} WHERE id = ?`).bind(...sets.map(([, v]) => v), id).run();
       if (r.meta?.changes === 0) return fail(404, "not_found", "找不到這個品牌");
       await audit(ctx.db, s.sub, "brand.update", "brand", id, sets.map(([c]) => c).join(",")).run();
-      if (body.name !== undefined) await ensureTreasureLinks(ctx.env, id).catch(() => undefined); // 品牌改名，實戰百寶箱的區塊名稱跟著改
+      if (body.name !== undefined) await ensureTreasureLinks(ctx.env, id).catch(() => undefined); // 品牌改名，成交百寶箱的區塊名稱跟著改
       return { ok: true };
     },
   ],
@@ -7634,7 +7634,7 @@ const routes: [string, RegExp, Handler][] = [
         ]);
       } else if (foreignStmts.length) await ctx.db.batch([...foreignStmts, audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId)]);
       else fail(400, "invalid_order", "順序不正確，請重新整理後再試");
-      if (courseId === (await treasureCourseId(ctx.db).catch(() => null))) await syncSeriesOrderFromTreasure(ctx.db).catch(() => undefined); // 實戰百寶箱區塊順序 → 品牌館卡片順序
+      if (courseId === (await treasureCourseId(ctx.db).catch(() => null))) await syncSeriesOrderFromTreasure(ctx.db).catch(() => undefined); // 成交百寶箱區塊順序 → 品牌館卡片順序
       // 使用者手動調整過順序：這張卡的「同步 YouTube 清單」從此不再自動重排，只把新影片放進去（業主 2026-11-20）。
       await ctx.db.prepare("UPDATE youtube_syncs SET sort_locked = 1 WHERE course_id = ?").bind(courseId).run();
       if (ctx.url.searchParams.get("lite") === "1") return { ok: true };
