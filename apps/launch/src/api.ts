@@ -4468,6 +4468,15 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/search\/phonetic$/,
+    async (ctx) => {
+      // 同音搜尋（業主 2026-11-24）：語音辨識錯字（一支援＝益之源）；不用 AI、訪客也能用，只回編號。
+      const { phoneticSearch } = await import("./phonetic-search.ts");
+      return phoneticSearch(ctx.db, ctx.url.searchParams.get("q") ?? "");
+    },
+  ],
+  [
+    "GET",
     /^\/search-index$/,
     async (ctx) => {
       // 「全部課程」搜尋與「章節」模式用：已上架課程每一堂的章節標題、分享者（姓名、獎銜、職稱）、日期、長度，

@@ -34,7 +34,8 @@ import { flashMode } from "./mode-flash";
 import { ZoneMoveSheet, zoneLabel } from "./zone-move-sheet";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
-import { buildSearchIndex, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, suggestTerms, type SearchLesson } from "./course-search";
+import { buildSearchIndex, charsCourses, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
+import { usePhonetic } from "./use-phonetic";
 import { useSemantic } from "./use-semantic";
 import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses, type SeriesGroup } from "./sort";
@@ -300,28 +301,38 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const exact = searchIndex ? (chapterMode ? matchLessons(searchIndex, q) : matchCourses(searchIndex, q)) : null;
   const noExact = !!exact && exact.size === 0;
   const semantic = useSemantic(q, noExact);
+  const phonetic = usePhonetic(q, noExact);
+  // 搜尋結果的關聯性順序（至尊模式共用 rankCourses）：同音、模糊、字元比對、AI 語意各自的順序傳給排序。
+  const nearInfo = useMemo(() => {
+    if (!noExact || !searchIndex || chapterMode) return null;
+    const byLesson = new Map((searchData.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
+    const lc = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && searchIndex.haystack.has(x));
+    return {
+      fuzzy: fuzzyCourses(searchIndex, q),
+      chars: charsCourses(searchIndex, q),
+      phonetic: [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
+      semantic: [...semantic.courses, ...lc(semantic.lessons)].filter((id) => searchIndex.haystack.has(id)),
+    };
+  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, searchData.data]);
   const near = useMemo(() => {
     if (!noExact || !searchIndex) return null;
     const out = new Set<string>();
     if (chapterMode) {
       for (const id of fuzzyLessons(searchIndex, q)) out.add(id);
       for (const id of semantic.lessons) if (searchIndex.lessonHay.has(id)) out.add(id);
-    } else {
-      for (const id of fuzzyCourses(searchIndex, q)) out.add(id);
-      const byLesson = new Map((searchData.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
-      for (const id of semantic.courses) if (searchIndex.haystack.has(id)) out.add(id);
-      for (const lid of semantic.lessons) {
-        const cid = byLesson.get(lid);
-        if (cid && searchIndex.haystack.has(cid)) out.add(cid);
-      }
+      for (const id of phonetic.lessons) if (searchIndex.lessonHay.has(id)) out.add(id);
+    } else if (nearInfo) {
+      for (const id of [...nearInfo.fuzzy, ...nearInfo.chars, ...nearInfo.phonetic, ...nearInfo.semantic]) out.add(id);
     }
     return out;
-  }, [noExact, searchIndex, q, chapterMode, semantic.courses, semantic.lessons, searchData.data]);
+  }, [noExact, searchIndex, q, chapterMode, semantic.lessons, phonetic.lessons, nearInfo]);
   const nearMode = !!near && near.size > 0;
   const matched = nearMode && !chapterMode ? near : searchIndex ? (chapterMode ? matchCourses(searchIndex, q) : exact) : null;
   const terms = searchIndex && q.trim() && q !== picked ? suggestTerms(searchIndex, q) : [];
   // 搜尋時不受兩頁分流限制（搜得到所有課程）；其餘只看目前這一頁的課程。
-  const list = (matched ? courses : pool).filter((x) => (matched ? matched.has(x.id) : inCategory(x) && inCenter(x) ));
+  const filtered = (matched ? courses : pool).filter((x) => (matched ? matched.has(x.id) : inCategory(x) && inCenter(x) ));
+  // 搜尋結果排序（業主 2026-11-24，至尊模式共用）：關聯性高 > 日期最新 > 已報名；有搜尋時不再套系列手動排序。
+  const list = useMemo(() => (matched && searchIndex && !chapterMode ? rankCourses(searchIndex, filtered, q, nearInfo ?? {}) : filtered), [matched, searchIndex, chapterMode, filtered, q, nearInfo]);
   const pickTerm = (text: string) => {
     const head = q.trim().split(/\s+/).slice(0, -1).join(" ");
     const next = head ? `${head} ${text}` : text;
@@ -337,8 +348,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     // 搜尋時不受這些限制（搜得到所有課程）。
     const all = groupBySeries(list, pool);
     const shown = matched ? all : all.filter((g) => (!g.nearest.series || seriesSettings.listed(g.nearest.series)) && (seriesSettings.admin || g.sessions.some((x) => !x.seriesHidden)));
-    return orderGroups(shown, orderOverride ?? config.seriesOrder ?? []);
-  }, [flat, list, pool, config.seriesOrder, orderOverride, matched, seriesSettings]);
+    return matched && !chapterMode ? shown : orderGroups(shown, orderOverride ?? config.seriesOrder ?? []);
+  }, [flat, list, pool, config.seriesOrder, orderOverride, matched, chapterMode, seriesSettings]);
   // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、清單專區（整組都是清單類別的）。
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
   // 中心頁的「課程｜清單」切換（業主 2026-11-21 方案 A）：兩種都有才顯示切換，只有一種就直接顯示那一種。
@@ -645,7 +656,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
           {nearMode ? <AppText variant="caption" tone="muted">找不到完全符合的，以下是相近的結果</AppText> : null}
-          {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={semantic.loading ? "正在找相近的結果…" : q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}
+          {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}
           <ChapterList items={chapterItems} />
         </>
       ) : (
@@ -656,7 +667,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               // 中心頁完全沒有課程：固定提示文字（地址由中心的編輯面板設定；沒設定就不顯示地址那一行）
               <EmptyState icon="library-outline" title="線上課程準備中" body={["線下課程週週精彩", centerInfo.data?.[normCenter(center)] ? `地址：${centerInfo.data[normCenter(center)]}` : "", "請洽中心負責人"].filter(Boolean).join("\n")} />
             ) : (
-              <EmptyState icon="library-outline" title={semantic.loading ? "正在找相近的結果…" : matched ? "找不到符合的課程" : "沒有符合條件的課程"} />
+              <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : matched ? "找不到符合的課程" : "沒有符合條件的課程"} />
             )
           ) : null}
           {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (

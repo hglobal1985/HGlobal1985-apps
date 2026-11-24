@@ -136,3 +136,28 @@ export function charsCourses(index: SearchIndex, q: string): Set<string> {
   for (const [id, hay] of index.haystack) if (chars.every((ch) => hay.includes(ch))) out.add(id);
   return out;
 }
+
+/**
+ * 搜尋結果排序（業主 2026-11-24）：關聯性高 > 日期最新 > 已報名；至尊、超派共用這一個。
+ * 關聯性：課程名稱完全包含（名稱就是查詢字最高）＞主講人／系列／獎銜包含＞章節或日期包含＞同音＞模糊＞字元比對＞AI 語意（依伺服器給的相似度順序）。
+ * near.phonetic／near.semantic 是伺服器依相似度排好的課程編號。
+ */
+export function rankCourses(index: SearchIndex, list: CourseSummary[], q: string, near: { phonetic?: string[]; semantic?: string[]; fuzzy?: Set<string>; chars?: Set<string> } = {}): CourseSummary[] {
+  const t = tokens(q);
+  const phon = new Map((near.phonetic ?? []).map((id, i, a) => [id, 2.9 - (i / Math.max(1, a.length)) * 0.4]));
+  const sem = new Map((near.semantic ?? []).map((id, i, a) => [id, 1 - (i / Math.max(1, a.length)) * 0.4]));
+  const rel = (c: CourseSummary): number => {
+    const hay = index.haystack.get(c.id) ?? "";
+    const parts = hay.split("\u0001");
+    if (t.length && t.every((w) => parts[0]!.includes(w))) return parts[0] === q.trim().toLowerCase() ? 6 : 5;
+    if (t.length && t.every((w) => parts.slice(0, 5).some((p) => p.includes(w)))) return 4;
+    if (t.length && t.every((w) => hay.includes(w))) return 3;
+    return Math.max(phon.get(c.id) ?? 0, near.fuzzy?.has(c.id) ? 2 : 0, near.chars?.has(c.id) ? 1.5 : 0, sem.get(c.id) ?? 0);
+  };
+  const date = (c: CourseSummary) => c.eventStart || c.createdAt || "";
+  const enrolled = (c: CourseSummary) => (c.enrollment === "opened" ? 2 : c.enrollment === "pending" ? 1 : 0);
+  return list
+    .map((c) => ({ c, r: rel(c) }))
+    .sort((a, b) => b.r - a.r || (date(b.c) > date(a.c) ? 1 : date(b.c) < date(a.c) ? -1 : 0) || enrolled(b.c) - enrolled(a.c))
+    .map((x) => x.c);
+}
