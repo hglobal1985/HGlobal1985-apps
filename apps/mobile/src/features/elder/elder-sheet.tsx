@@ -15,24 +15,24 @@ import { Check } from "@/ui/check";
 import { flashText } from "@/ui/flash-notice";
 import { CrownIcon } from "./crown-icon";
 
-/** 從創客模式切到至尊模式（底部「至尊」鍵）：直接切換並回到首頁（大搜尋框）。 */
+/** 從超派模式切到至尊模式（底部「至尊」鍵）：直接切換並回到首頁（大搜尋框）。 */
 export function switchToElder() {
   setElder({ on: true });
   router.navigate("/");
   setTimeout(() => flashText("已切換到至尊模式"), 300);
 }
 
-/** 換回創客模式前先確認（業主 2026-11-24：避免長輩誤按）。 */
+/** 換回超派模式前先確認（業主 2026-11-24：避免長輩誤按）。 */
 export async function askSwitchToMaker() {
-  const ok = await confirmSheet({ title: "要換成「創客模式」嗎？", message: "字會變小，並顯示全部功能：我的清單、留言板、書櫃、學習成就、設定…", confirmLabel: "換過去", cancelLabel: "取消" });
+  const ok = await confirmSheet({ title: "要換成「超派模式」嗎？", message: "字會變小，並顯示全部功能：我的清單、留言板、書櫃、學習成就、設定…", confirmLabel: "換過去", cancelLabel: "取消" });
   if (!ok) return;
   setElder({ on: false });
-  setTimeout(() => flashText("已換回創客模式"), 300);
+  setTimeout(() => flashText("已換回超派模式"), 300);
 }
 
 /**
- * 至尊模式的面板（按底部「創客」鍵打開）：字體大小（－／＋，邊看範例字邊調）、跟著手機字體大小、
- * 訂單紀錄、帳號（設定頁）、換回創客模式。至尊模式不顯示「設定」分頁，這些都放這裡（業主 2026-11-24，B 方案）。
+ * 至尊模式的面板（按底部「超派」鍵打開）：字體大小（－／＋，邊看範例字邊調）、跟著手機字體大小、
+ * 訂單紀錄、帳號（設定頁）、換回超派模式。至尊模式不顯示「設定」分頁，這些都放這裡（業主 2026-11-24，B 方案）。
  * 字體改變等面板關閉才套用到全站（全站要重新排版，面板開著時先用範例字預覽）。
  */
 export function ElderSheet({ onClose }: { onClose: () => void }) {
@@ -83,8 +83,8 @@ export function ElderSheet({ onClose }: { onClose: () => void }) {
       </View>
       <Button
         variant="cancel"
-        icon="construct-outline"
-        label="換回創客模式"
+        icon="rocket-outline"
+        label="換回超派模式"
         onPress={() => {
           close();
           void askSwitchToMaker();
