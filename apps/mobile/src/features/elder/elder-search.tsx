@@ -270,8 +270,7 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
           </AppText>
         </View>
       </View>
-      {/* 箭頭往左靠（負邊距抵掉列間距），標題右邊與箭頭只留一點點空隙才換行（業主 2026-11-24） */}
-      <Ionicons name="chevron-forward" size={26} color={c.accent} style={{ marginLeft: -space.sm }} />
+      {/* 不放右側箭頭（業主 2026-11-24：讓標題文字完整呈現），整列都可以點。 */}
     </Pressable>
   );
 }
