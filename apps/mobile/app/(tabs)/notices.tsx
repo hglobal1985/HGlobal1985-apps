@@ -12,6 +12,7 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { AppText, GuestGate, Button, Card, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
 import { radius, space } from "@/theme/tokens";
+import { UI_SCALE } from "@/theme/ui-scale";
 
 export default function NoticesScreen() {
   const elder = useElderOn();
@@ -117,8 +118,8 @@ export default function NoticesScreen() {
           const on = mode === m.key;
           const n = count(m.key);
           return (
-            <Pressable key={m.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${m.label}${n ? `，${n} 則未處理` : ""}`} onPress={() => (trackFeature("notices_filter"), setMode(m.key))} style={{ flex: 1, minWidth: 0, minHeight: elder ? 56 : 44, borderRadius: radius.md, borderWidth: 1, borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 }}>
-              <AppText variant="callout" numberOfLines={1} style={{ fontWeight: "800", color: on ? c.textOnAccent : c.text }}>
+            <Pressable key={m.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${m.label}${n ? `，${n} 則未處理` : ""}`} onPress={() => (trackFeature("notices_filter"), setMode(m.key))} style={{ flex: 1, minWidth: 0, minHeight: elder ? Math.round(72 * UI_SCALE) : 44, borderRadius: elder ? radius.lg + 6 : radius.md, borderWidth: elder ? 4 : 1, borderColor: on ? c.accent : elder ? c.accent : c.border, backgroundColor: on ? c.accent : c.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 }}>
+              <AppText variant={elder ? "headline" : "callout"} numberOfLines={1} style={{ fontWeight: "800", color: on ? c.textOnAccent : c.text }}>
                 {m.label}
               </AppText>
               {n ? (

@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { type HostInstance, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
+import { UI_SCALE } from "@/theme/ui-scale";
 import { AppText } from "./text";
 import { Icon } from "./icon";
 
@@ -14,7 +15,7 @@ const FIELD_H = 40;
 /**
  * 自訂下拉選單（不用系統原生選單）：依螢幕剩餘空間自動往下或往上展開；選項超過 12 個時上方有搜尋框。
  */
-export function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth, flow }: { /** 一欄堆疊版面（至尊模式頁）：選項直接展開在欄位下方、把後面的內容往下推，不浮在畫面上被別的元件蓋住。 */ flow?: boolean; pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth, flow, big }: { /** 至尊模式大尺寸：跟首頁／課程的搜尋框同款（粗綠框、高 80）。 */ big?: boolean; /** 一欄堆疊版面（至尊模式頁）：選項直接展開在欄位下方、把後面的內容往下推，不浮在畫面上被別的元件蓋住。 */ flow?: boolean; pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
   const box = useRef<HostInstance>(null);
@@ -37,18 +38,25 @@ export function Dropdown({ options, value, label, disabled, onPick, open, onOpen
   };
   return (
     <View ref={box} collapsable={false} style={flow ? { width: "100%" } : pop ? { alignSelf: "stretch", minWidth: 0, zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
-      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
-        <AppText style={pop ? { flex: 1, minWidth: 0 } : { flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
+      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, big ? { minHeight: Math.round(80 * UI_SCALE), borderWidth: 4, borderColor: c.accent, borderRadius: radius.lg + 6 } : null, { borderColor: big ? c.accent : c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
+        <AppText variant={big ? "headline" : undefined} style={pop ? { flex: 1, minWidth: 0 } : { flex: 1 }} numberOfLines={big ? 2 : 1} tone={disabled || !value ? "muted" : undefined}>
           {label}
         </AppText>
-        <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 14 : 20} color={c.textMuted} />
+        <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 14 : big ? 28 : 20} color={c.textMuted} />
       </Pressable>
       {open ? (
-        <View style={[styles.dropdown, pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }, flow ? { position: "relative", top: undefined, bottom: undefined, left: undefined, right: undefined, width: "100%", marginTop: 4, maxHeight: 360, shadowOpacity: 0, elevation: 0 } : null]}>
+        <View
+          style={[
+            styles.dropdown,
+            flow
+              ? { position: "relative", width: "100%", marginTop: 4, maxHeight: 360, borderWidth: big ? 4 : 2, borderColor: big ? c.accent : c.accentText, backgroundColor: c.surface }
+              : [pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }],
+          ]}
+        >
           <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
             {options.map((o) => (
               <Pressable key={o.value} onPress={() => (onPick(o.value), onOpenChange(false))} accessibilityRole="button" style={[styles.opt, o.value === value && { backgroundColor: c.accentSoft }]}>
-                <AppText numberOfLines={1}>{o.label}</AppText>
+                <AppText numberOfLines={big ? 2 : 1} variant={big ? "headline" : undefined}>{o.label}</AppText>
               </Pressable>
             ))}
           </ScrollView>
