@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useBandExtra } from "./band-extra";
 import { CollapseTopRow, CompactTitleBar } from "./collapse-band";
 import { reportPlayerScroll } from "@/features/player/shrink";
 import { Animated, Platform, ScrollView, StyleSheet, View } from "react-native";
@@ -77,6 +78,8 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const refreshControl = usePullRefresh();
   const [slot, setSlot] = useState<ReactNode>(null);
+  const bandExtra = useBandExtra();
+  const [areaH, setAreaH] = useState(0); // 捲動區的高度（撐出「下滑縮小」需要的捲動空間用）
   const bar = footer ?? slot;
   // 大螢幕版面（業主 2026-11-18）：內容寬度與左右留白依畫面寬度（theme/layout.ts）。
   const lay = useLayout();
@@ -93,7 +96,7 @@ export function Screen({
         </View>
       </View>
     ) : null}
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1 }} onLayout={(e) => setAreaH(Math.round(e.nativeEvent.layout.height))}>
     {header && title && !top && !topBar ? <CompactTitleBar title={title} top={insets.top} bg={c.surface} border={c.border} color={c.text} /> : null}
     {hero ? <View style={[styles.heroLayer, { backgroundColor: c.background }]}>{hero}</View> : null}
     <Scroller
@@ -104,6 +107,7 @@ export function Screen({
         styles.content,
         gutter,
         { paddingTop: (top ? space.md : (header ? insets.top : 0) + (tight ? space.xs : space.lg)) + (hero ? heroHeight : 0), paddingBottom: space.xxl },
+        bandExtra && areaH ? { minHeight: areaH + bandExtra } : null,
       ]}
       contentInsetAdjustmentBehavior="automatic"
     >

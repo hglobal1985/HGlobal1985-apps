@@ -1,4 +1,5 @@
 import * as Crypto from "expo-crypto";
+import { UPGRADING_MSG } from "../../../launch/src/contract";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
@@ -84,13 +85,13 @@ async function central<T>(path: string, method = "GET", body?: unknown, token?: 
       body: body ? JSON.stringify(body) : undefined,
     });
   } catch {
-    throw new CentralError(0, "network", "登入服務暫時連不上，請稍後再試");
+    throw new CentralError(0, "network", UPGRADING_MSG);
   }
   if (!res.ok) {
     const e = ((await res.json().catch(() => null)) as { error?: { code?: string } } | null)?.error;
     const code = e?.code ?? "central_error";
     const message =
-      code === "app_unavailable" ? "目前正在維護中，請稍後再試" : code === "account_disabled" ? "此帳號已停用，請聯絡客服" : "登入失敗，請再試一次";
+      code === "app_unavailable" ? UPGRADING_MSG : code === "account_disabled" ? "此帳號已停用，請聯絡客服" : "登入失敗，請再試一次";
     throw new CentralError(res.status, code, message);
   }
   return (res.status === 204 ? undefined : await res.json()) as T;
@@ -227,7 +228,7 @@ const safePath = (p: string) => (p.startsWith("/") && !p.startsWith("//") && !p.
 /** 開始 Google 登入。Web 會整頁導向（回傳 "redirecting"）；App 開系統登入視窗。 */
 export async function signInWithGoogle(returnTo = "/me"): Promise<"ok" | "cancelled" | "redirecting"> {
   const status = await appStatus();
-  if (status.status !== "active") throw new CentralError(503, "app_unavailable", "目前正在維護中，請稍後再試");
+  if (status.status !== "active") throw new CentralError(503, "app_unavailable", UPGRADING_MSG);
   const { nonce } = await central<{ nonce: string }>("/v1/auth/nonce", "POST", { app_id: APP_ID });
   const pending: Pending = { nonce, state: randomHex(), created: Date.now(), returnTo: safePath(returnTo) };
   const digest = (await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce)).toLowerCase();
@@ -301,7 +302,7 @@ async function reauthFrom(params: URLSearchParams, pending: Pending): Promise<st
 /** 開始刪除帳號的重新驗證。手機：開登入視窗，成功回傳 reauthToken；網頁：整頁導向（回來後由 /auth/done 接手，用 takeReauthToken 取得）。 */
 export async function startDeleteReauth(): Promise<{ status: "ok"; reauthToken: string } | { status: "cancelled" | "redirecting" }> {
   const status = await appStatus();
-  if (status.status !== "active") throw new CentralError(503, "app_unavailable", "目前正在維護中，請稍後再試");
+  if (status.status !== "active") throw new CentralError(503, "app_unavailable", UPGRADING_MSG);
   const { nonce } = await central<{ nonce: string }>("/v1/auth/nonce", "POST", { app_id: APP_ID });
   const pending: Pending = { nonce, state: randomHex(), created: Date.now(), returnTo: "/me", purpose: "delete" };
   const digest = (await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, nonce)).toLowerCase();

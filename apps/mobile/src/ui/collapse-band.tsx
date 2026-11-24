@@ -1,6 +1,7 @@
 import { usePathname } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
+import { setBandExtra } from "./band-extra";
 import { resetBandScroll, useBandScroll } from "./band-scroll";
 import { useModeProfile } from "@/lib/app-mode";
 import { space } from "@/theme/tokens";
@@ -75,6 +76,12 @@ export function CollapseBand({ children, enabled = true }: { children: ReactNode
   const y = useBandScroll();
   const [full, setFull] = useState(0); // 展開時的高度（只在沒縮時量）
   useEffect(() => resetBandScroll(), []);
+  // 登記需要的額外捲動空間（內容短的頁面也要捲得到縮完；見 band-extra.ts）。
+  useEffect(() => {
+    if (!enabled || !full) return;
+    setBandExtra(2 * (full - COMPACT_H) + 24);
+    return () => setBandExtra(0);
+  }, [enabled, full]);
   if (!enabled) return <View>{children}</View>;
   const range = collapseRange(full || 1);
   const shown = full ? Math.max(COMPACT_H, full - Math.min(y, range)) : undefined;

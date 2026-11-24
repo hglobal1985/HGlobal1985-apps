@@ -1202,3 +1202,6 @@ export const LIST_COVER_COLORS: { hex: string; to: string; name: string }[] = [
   { hex: "#C2517A", to: "#E57AA0", name: "玫瑰粉" },
   { hex: "#137C83", to: "#3FB5AE", name: "湖水青" },
 ];
+
+/** 網站暫時無法服務（部署更新、系統錯誤、會員中心連不上、維護中…）時，全站統一顯示的白話提示（業主 2026-11-24 改文字）。後端、App 都用這一句。 */
+export const UPGRADING_MSG = "網站功能正在升級中、請稍候再試";
