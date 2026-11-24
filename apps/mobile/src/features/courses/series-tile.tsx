@@ -11,7 +11,7 @@ import { BrandCover, CornerRibbon, CourseCover } from "@/ui";
 import { ribbonsFor } from "./ribbons";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
 import { CardCount } from "@/ui/card-count";
-import { BlockSheet, MaterialsSheet, SeriesSheet } from "./series-sheet";
+import { BlockSheet, MaterialsSheet, SeriesSheet, shownBlocks } from "./series-sheet";
 import { useSeriesSettings } from "./series-settings";
 import { nearestOf, type SeriesGroup } from "./sort";
 
@@ -72,6 +72,7 @@ export function TileCover({ rep, width, height, flat, inSeries, title }: { rep: 
 export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup; width: number; flat?: boolean }) {
   const { c } = useTheme();
   const { member } = useSession();
+  const isAdmin = member?.role === "admin";
   const { config } = useUiConfig();
   const thumb = useThumb();
   const [sheet, setSheet] = useState(false);
@@ -126,8 +127,8 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
       </Pressable>
       {sheet && hasSeries && !soloSeries ? <SeriesSheet title={settings.titleOf(rep.series)} items={sessions} showAllSeries={rep.series} onClose={() => setSheet(false)} /> : null}
       {sheet && flat ? <CourseLessonsSheet course={rep} onClose={() => setSheet(false)} /> : null}
-      {sheet && !flat && (soloSeries || !hasSeries) && rep.blocks.length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : null}
-      {sheet && !flat && (soloSeries || !hasSeries) && !rep.blocks.length ? <MaterialsSheet course={rep} onClose={() => setSheet(false)} /> : null}
+      {sheet && !flat && (soloSeries || !hasSeries) && shownBlocks(rep, isAdmin).length ? <BlockSheet course={rep} onClose={() => setSheet(false)} /> : null}
+      {sheet && !flat && (soloSeries || !hasSeries) && !shownBlocks(rep, isAdmin).length ? <MaterialsSheet course={rep} onClose={() => setSheet(false)} /> : null}
     </View>
   );
 }

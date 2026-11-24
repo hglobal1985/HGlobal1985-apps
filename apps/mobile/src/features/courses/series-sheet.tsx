@@ -39,8 +39,12 @@ function StatusChip({ course }: { course: CourseSummary }) {
  * 清單的區塊選單（業主 2026-11-18）：清單有勾「顯示在上拉選單」的區塊時，點寰宇大學的小卡彈出這個。
  * 每列＝封面（手動上傳 > 品牌 logo > 預設圖）＋區塊名稱＋灰色數字（只顯示數量）；點一列進清單頁、自動捲到該區塊並展開。
  */
+/** 上拉選單要列出的區塊：沒內容（教材數加照片數是 0）的區塊不對外展示，只有管理員看得到（淡化）。業主 2026-11-24。 */
+export const shownBlocks = (course: CourseSummary, admin: boolean) => course.blocks.filter((b) => b.count > 0 || admin);
+
 export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
   const thumb = useThumb();
+  const admin = useSession().member?.role === "admin";
   const open = (block?: string) => {
     onClose();
     router.push(block ? { pathname: "/course/[id]", params: { id: course.id, block } } : `/course/${course.id}`);
@@ -54,7 +58,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
         <SheetAction label="完整清單" accessibilityLabel={`進入「${course.title}」完整清單`} onPress={() => open()} />
       </View>
       <SheetScroll>
-        {course.blocks.map((b) => (
+        {shownBlocks(course, admin).map((b) => (
           <SheetRow
             key={b.id}
             accessibilityLabel={`${b.title}，有${b.count}個教材`}
