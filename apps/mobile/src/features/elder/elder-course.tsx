@@ -11,7 +11,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { fadedStyle } from "@/ui/fade-style";
-import { BlockPhotos, hasBlockPhotos } from "@/features/courses/block-photos";
+import { BlockPhotos, blockPhotoCount, hasBlockPhotos } from "@/features/courses/block-photos";
 import { AppText, NoticeBox, Screen } from "@/ui";
 
 /** 至尊模式課程頁要列的項目：有章節列章節；只有教材（清單卡）就列教材。分類標題、完整版不列。 */
@@ -84,13 +84,30 @@ const YELLOW = {
 
 const ALBUM = "__album";
 
+/** 連結區塊的來源課程對你鎖住（業主 2026-11-24）：大鎖頭＋原因（至尊模式版，粗框、大字，不是照抄超派的半透明遮罩）。 */
+function ElderLock({ lines }: { lines?: string[] }) {
+  const { c } = useTheme();
+  return (
+    <View accessibilityRole="alert" style={{ flexDirection: "row", alignItems: "center", gap: space.md, padding: space.lg, borderRadius: radius.lg, borderWidth: 4, borderColor: c.border, backgroundColor: c.surfaceMuted }}>
+      <Ionicons name="lock-closed" size={40} color={c.textMuted} />
+      <View style={{ flex: 1, gap: 4 }}>
+        {(lines?.length ? lines : ["目前無法使用"]).map((t, i) => (
+          <AppText key={i} variant={i === 0 ? "headline" : "callout"} style={{ fontWeight: i === 0 ? "800" : "600" }}>
+            {t}
+          </AppText>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 /** 區塊清單：每個區塊一張大列（標題＋教材數＋展開箭頭），預設全部收起、同一時間只展開一個（與超派模式 BLOCK_BEHAVIOR 一致）。 */
 function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
   const { c } = useTheme();
   const [open, setOpen] = useState<string | null>(null);
   const [albumOpen, setAlbumOpen] = useState<string | null>(null); // 相簿裡展開的區塊（業主 2026-11-24）
-  const albumGroups = blocks.filter((b) => !!b.head.photoKey && !!b.head.photos?.length);
-  const albumTotal = albumGroups.reduce((n, b) => n + (b.head.photos?.length ?? 0), 0);
+  const albumGroups = blocks.filter((b) => !!b.head.photoKey && blockPhotoCount(b.head) > 0);
+  const albumTotal = albumGroups.reduce((n, b) => n + blockPhotoCount(b.head), 0);
   useEffect(() => {
     if (open !== ALBUM || !albumOpen || typeof document === "undefined") return;
     const t = setTimeout(() => document.getElementById(`alb-${albumOpen}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
@@ -105,17 +122,18 @@ function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blo
         const empty = b.items.length === 0 && !hasBlockPhotos(b.head);
         return (
           <View key={b.head.id} style={[{ gap: space.sm }, empty ? fadedStyle : null]} pointerEvents={empty ? "none" : "auto"}>
-            <ElderBlockHeader title={b.head.title} sub={`${b.items.length + (b.head.photos?.length ?? 0)} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
-            {on && hasBlockPhotos(b.head) ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={`瀏覽本區照片，共 ${b.head.photos!.length} 張`} onPress={() => (setAlbumOpen(b.head.id), setOpen(ALBUM))} style={[styles.block, { backgroundColor: c.surfaceMuted, borderWidth: 2, borderColor: c.accent }]}>
+            <ElderBlockHeader title={b.head.title} sub={`${b.items.length + blockPhotoCount(b.head)} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
+            {on && b.head.blockLocked ? <ElderLock lines={b.head.lockLines} /> : null}
+            {on && !b.head.blockLocked && hasBlockPhotos(b.head) ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={`瀏覽本區照片，共 ${blockPhotoCount(b.head)} 張`} onPress={() => (setAlbumOpen(b.head.id), setOpen(ALBUM))} style={[styles.block, { backgroundColor: c.surfaceMuted, borderWidth: 2, borderColor: c.accent }]}>
                 <Ionicons name="images" size={26} color={c.accentText} />
                 <AppText variant="headline" style={{ flex: 1, color: c.accentText, fontWeight: "800" }}>
                   瀏覽本區照片
                 </AppText>
-                <AppText variant="callout" style={{ color: c.accentText }}>{`${b.head.photos!.length} 張`}</AppText>
+                <AppText variant="callout" style={{ color: c.accentText }}>{`${blockPhotoCount(b.head)} 張`}</AppText>
               </Pressable>
             ) : null}
-            {on ? b.items.map(renderRow) : null}
+            {on && !b.head.blockLocked ? b.items.map(renderRow) : null}
           </View>
         );
       })}
@@ -125,8 +143,8 @@ function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blo
           {open === ALBUM
             ? albumGroups.map((g) => (
                 <View key={g.head.id} nativeID={`alb-${g.head.id}`} style={{ gap: space.sm }}>
-                  <ElderBlockHeader title={g.head.title} sub={`${g.head.photos!.length} 張`} on={albumOpen === g.head.id} onPress={() => setAlbumOpen(albumOpen === g.head.id ? null : g.head.id)} />
-                  {albumOpen === g.head.id ? <BlockPhotos head={g.head} /> : null}
+                  <ElderBlockHeader title={g.head.title} sub={`${blockPhotoCount(g.head)} 張`} on={albumOpen === g.head.id} onPress={() => setAlbumOpen(albumOpen === g.head.id ? null : g.head.id)} />
+                  {albumOpen === g.head.id ? (g.head.blockLocked ? <ElderLock lines={g.head.lockLines} /> : <BlockPhotos head={g.head} />) : null}
                 </View>
               ))
             : null}

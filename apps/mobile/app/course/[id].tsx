@@ -228,7 +228,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const registerIsAction = !!registerNode && ((registerNode as { type?: unknown }).type === Button || (registerNode as { type?: unknown }).type === InviteJoin);
   const stickyAction = course.enrollment === "pending" ? pendingRow() : registerIsAction ? registerNode : null;
   const stickyNotice = registerNode && !registerIsAction ? registerNode : null;
-  const needRank = member && !course.eligible ? `限${course.minRank.name}獎銜以上報名${course.allowPresident ? "（會長也可報名）" : ""}` : null;
+  const needRank = !course.eligible && course.minRank.code !== "none" ? `限${course.minRank.name}獎銜以上${course.isList ? "使用" : "報名"}${course.allowPresident ? `（會長也可${course.isList ? "使用" : "報名"}）` : ""}` : null; // 不符合的原因（遮罩上顯示；訪客也看得到門檻，業主 2026-11-24）
 
   // 套裝課程（業主 2026-11-19）：第一個區塊之前的章節仍在「課程章節」；從第一個區塊起（含放進區塊的章節）都歸區塊管理。
   const nonFull = course.lessons.filter((l) => !l.full);
@@ -522,7 +522,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
               <FullVersionList course={blockView} openBlock={block} layout={listLayout} albumOpen={albumOpen} onBrowsePhotos={(id) => (setAlbumOpen(id), setListLayout("album"))} onPhotosChanged={reload} playingId={editing ? null : playingId} onPlay={playLesson_} />
               {/* 沒有權限時，其他教材也蓋上同一個大鎖頭（業主 2026-11-20）。 */}
               {!editing && materialsLocked ? (
-                <LockMask lines={[lockedText]} />
+                <LockMask lines={[lockedText, ...(needRank ? [needRank] : [])]} />
               ) : null}
             </View>
           </Section>

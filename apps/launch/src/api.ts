@@ -995,6 +995,33 @@ function linkRowsOf(db: D1Database, courseIds: string[]) {
 /** 連結區塊的來源：來源清單裡，那個區塊之後、下一個區塊之前的項目。 */
 const LINKED_ITEMS_SQL = `SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet, link_block_id FROM lessons WHERE course_id = ? AND position > ? AND position < COALESCE((SELECT MIN(position) FROM lessons WHERE course_id = ? AND kind = 'section' AND position > ?), 1000000000) AND kind <> 'section' AND is_full = 0 ORDER BY position`;
 
+/**
+ * 某門課程對目前使用者的鎖定狀態（與課程頁 lockedAll 同一條規則）。連結區塊（品牌卡的「成交百寶箱」）與區塊照片，一律用「來源課程最新的報名資格設定」判斷（業主 2026-11-24）：
+ * 例如成交百寶箱設「12% 以上（會長也可）、不用報名」，符合的人直接瀏覽，不符合的人看到鎖頭遮罩與原因。lines＝遮罩上的文字。
+ */
+type LockState = { locked: boolean; manages: boolean; lines: string[] };
+async function lockStateOf(ctx: Ctx, row: CourseRow, rankMap: Map<string, Rank>, state: MemberState, rights: Rights | null, eligibility: Map<string, boolean>): Promise<LockState> {
+  const s = ctx.session;
+  const can = s && rights ? courseCan(rights, s, row) : { edit: false, remove: false, restore: false };
+  const manages = can.edit || can.remove || can.restore;
+  const eligible = row.invite_only === 1 || row.min_rank_code === "none" || eligibility.get(row.min_rank_code) === true || byPresident(s, row);
+  const watchFree = !!s && materialLike(row) && row.status === "published" && row.price_twd === 0 && row.price_tba !== 1 && (row.min_rank_code === "none" || eligibility.get(row.min_rank_code) === true || byPresident(s, row));
+  const rankLocked = !manages && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.invite_only !== 1 && row.min_rank_code !== "none" && !eligible;
+  const scopeBlocked = !manages && !scopeAllows(row.view_scope, s) && !keepsAccess(state, row);
+  const locked = scopeBlocked || ((!manages || !materialLike(row)) && (rankLocked || !(state.enrolled.has(row.id) || (row.is_public === 1 && materialLike(row)) || watchFree)));
+  if (!locked) return { locked: false, manages, lines: [] };
+  const need = row.min_rank_code !== "none" ? `限${rankMap.get(row.min_rank_code)?.name ?? row.min_rank_code}獎銜以上使用${row.allow_president === 1 ? "（會長也可）" : ""}` : "";
+  const first = !s ? "登入並符合獎銜才能使用" : !eligible ? "獎銜不符，目前無法使用" : "報名後才能使用";
+  return { locked: true, manages, lines: [first, ...(need && !eligible ? [need] : [])] };
+}
+/** 區塊照片的 owner_key（課程編號或區塊編號）→ 這個人現在能不能看（公開讀取照片清單用）。 */
+async function lockStateOfKey(ctx: Ctx, courseId: string): Promise<LockState> {
+  const row = await ctx.db.prepare(`${COURSE_SELECT} WHERE c.id = ?`).bind(courseId).first<CourseRow>();
+  if (!row) return { locked: false, manages: false, lines: [] };
+  const [rankMap, state, rights] = await Promise.all([ranks(ctx.db), memberCourseState(ctx.db, ctx.session?.sub), ctx.session ? rightsOf(ctx) : Promise.resolve(null)]);
+  return lockStateOf(ctx, row, rankMap, state, rights, await eligibilityFor(ctx.session, rankMap, row.min_rank_code === "none" ? [] : [row.min_rank_code]));
+}
+
 async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const s = ctx.session;
   // 這一頁需要的資料全部同時查（2026-11-21 載入速度優化：以前一個查完才查下一個，課程頁要等 12 趟資料庫來回）。
@@ -1096,6 +1123,15 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
   const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.invite_only !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
   const lockedAll = (!admin || !materialLike(row)) && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && materialLike(row)) || watchFree));
+  // 連結區塊的來源課程各自的鎖定狀態（業主 2026-11-24）：連結過來的教材與照片，用來源課程最新的報名資格設定判斷。
+  const srcLock = new Map<string, LockState>();
+  const srcIds = [...new Set(sourceCourses)];
+  if (srcIds.length) {
+    const srcRows = (await Promise.all(srcIds.map((sid) => ctx.db.prepare(`${COURSE_SELECT} WHERE c.id = ?`).bind(sid).first<CourseRow>()))).filter((r): r is CourseRow => !!r);
+    const srcElig = await eligibilityFor(s, rankMap, [...new Set(srcRows.map((r) => r.min_rank_code).filter((c) => c !== "none"))]);
+    for (const r of srcRows) srcLock.set(r.id, await lockStateOf(ctx, r, rankMap, state, rights, srcElig));
+  }
+  const lockOf = (l: { id: string; src?: string }): LockState | undefined => srcLock.get(l.src ?? sourceCourseOf.get(l.id) ?? "");
   return {
     ...summaryNow,
     canRoster,
@@ -1108,7 +1144,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       position: groupPos.get(l.id)!,
       material: l.kind === "material" || l.kind === "section",
       ...(l.kind === "section"
-        ? { section: true, ...(l.link_block_id ? { linkedBlockId: l.link_block_id, linkedCourseId: sourceCourseOf.get(l.id) } : {}), inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key), ...(photoKeyOf.has(l.id) ? { photoKey: photoKeyOf.get(l.id), photos: photosOf.get(photoKeyOf.get(l.id)!) ?? [] } : {}) }
+        ? { section: true, ...(l.link_block_id ? { linkedBlockId: l.link_block_id, linkedCourseId: sourceCourseOf.get(l.id) } : {}), inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key), ...(l.link_block_id && lockOf(l)?.locked ? { blockLocked: true, lockLines: lockOf(l)!.lines } : {}), ...(photoKeyOf.has(l.id) ? (() => { const all = photosOf.get(photoKeyOf.get(l.id)!) ?? []; const hide = l.link_block_id ? !!lockOf(l)?.locked : lockedAll && !admin; return { photoKey: photoKeyOf.get(l.id), photoCount: all.length, photos: hide ? [] : all }; })() : {}) }
         : {}),
       ...(l.is_full === 1 ? { full: true } : {}),
       title: l.title,
@@ -1131,10 +1167,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
       // 完全公開的課程：任何人（含訪客與會員）都可以看章節，不需要報名。
-      locked: lockedAll,
+      locked: l.kind === "section" ? lockedAll : (lockOf(l)?.locked ?? lockedAll),
       // 清單項目的圖示類型（連結類型，或清單裡的 YouTube 影片）；規則在 link-rules.ts（業主 2026-11-18）。
       ...(l.kind === "material" && !l.is_full && itemIconType(linkOf.get(l.id)?.type, l.media_type, true) ? { iconType: itemIconType(linkOf.get(l.id)?.type, l.media_type, true) } : {}),
-      ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...(lockedAll && !admin ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
+      ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...((lockOf(l)?.locked ?? lockedAll) && !(lockOf(l)?.manages ?? admin) ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
       ...(admin ? { media: { type: l.media_type, ref: l.media_ref } } : {}),
     }))],
@@ -4049,6 +4085,14 @@ const routes: [string, RegExp, Handler][] = [
       const kind = coverKindOf(ctx.url.searchParams.get("kind"));
       const key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
       if (!key) return [];
+      // 區塊照片（業主 2026-11-24）：照片屬於區塊時，依該區塊所屬課程最新的報名資格設定判斷，鎖住的人拿不到照片清單。
+      if (kind === "course") {
+        const blk = await ctx.db.prepare("SELECT course_id FROM lessons WHERE id = ? AND kind = 'section'").bind(key).first<{ course_id: string }>();
+        if (blk) {
+          const lk = await lockStateOfKey(ctx, blk.course_id);
+          if (lk.locked && !lk.manages) return [];
+        }
+      }
       const lookup = kind === "center" ? centerKey(key) : key;
       if (kind === "center") await reconcileCenterEdm(ctx.db, lookup).catch(() => undefined); // 課程 EDM 自動併入中心 EDM 空間
       await fillImageDims(ctx.env, ctx.db, kind, lookup);

@@ -13,4 +13,5 @@ export function BlockPhotos({ head }: { head: Lesson }) {
 }
 
 /** 區塊有沒有照片（學員端判斷「這個區塊不是空的」用）。 */
-export const hasBlockPhotos = (head: Lesson) => !!head.photos?.length;
+export const blockPhotoCount = (head: Lesson) => head.photoCount ?? head.photos?.length ?? 0;
+export const hasBlockPhotos = (head: Lesson) => blockPhotoCount(head) > 0;
