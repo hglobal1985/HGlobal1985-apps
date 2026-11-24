@@ -242,7 +242,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   const inBlockChapters = new Set(pkgBlocks ? nonFull.slice(firstSec).filter((l) => !l.material).map((l) => l.id) : []);
   const blockView: CourseDetail = pkgBlocks ? { ...course, lessons: course.lessons.filter((l) => l.material || inBlockChapters.has(l.id)).map((l) => (inBlockChapters.has(l.id) ? { ...l, material: true } : l)) } : course;
   const materialItems = blockView.lessons.filter((l) => l.material && !l.section);
-  const materialsLocked = materialItems.length > 0 && materialItems.every((l) => l.locked);
+  // 沒有教材列、只有區塊照片的課程（成交百寶箱）：改看區塊本身有沒有被鎖（業主 2026-11-24 回報相簿沒出現鎖頭遮罩）。
+  const blockHeads = blockView.lessons.filter((l) => l.material && l.section);
+  const materialsLocked = materialItems.length > 0 ? materialItems.every((l) => l.locked) : blockHeads.length > 0 && blockHeads.every((l) => l.locked);
   const chapterView: CourseDetail = pkgBlocks ? { ...course, lessons: lessons } : course;
   /** 重新編號：章節、教材各自從 1 開始（完整版課程影片不編號）。 */
   const renumber = (list: Lesson[]): Lesson[] => {
