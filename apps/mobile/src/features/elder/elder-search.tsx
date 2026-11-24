@@ -88,11 +88,6 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
 
   const header = (
     <View style={{ gap: space.md }}>
-      {mode === "browse" ? (
-        <AppText variant="title" accessibilityRole="header">
-          全部課程
-        </AppText>
-      ) : null}
       <View style={[styles.box, { borderColor: c.accent, backgroundColor: c.surface }]}>
         <Ionicons name="search" size={24} color={c.textMuted} />
         <TextInput
