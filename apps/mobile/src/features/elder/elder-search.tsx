@@ -167,7 +167,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
               ) : (
                 <View style={{ gap: space.md }}>
                   {ELDER_ZONES.map((z) => (
-                    <ElderZoneCard key={z.id} zone={z} count={all.filter((x) => elderZoneOf(x) === z.id).length} onPress={() => setZone(z.id)} />
+                    <ElderZoneCard key={z.id} zone={z} count={all.filter((x) => elderZoneOf(x) === z.id).reduce((n, x) => n + x.materialCount, 0)} onPress={() => setZone(z.id)} />
                   ))}
                 </View>
               )
