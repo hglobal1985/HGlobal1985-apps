@@ -59,7 +59,7 @@ function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blo
                 </AppText>
                 <AppText variant="callout" style={{ color: on || hasPlaying ? c.textOnAccent : c.accentText }}>{`${b.items.length} 項教材`}</AppText>
               </View>
-              <Ionicons name={on ? "chevron-up" : "chevron-down"} size={30} color={on || hasPlaying ? c.textOnAccent : c.accentText} />
+              <Ionicons name={on ? "chevron-up" : "chevron-down"} size={26} color={on || hasPlaying ? c.textOnAccent : c.accentText} />
             </Pressable>
             {on ? b.items.map(renderRow) : null}
           </View>
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, minHeight: 60, borderRadius: radius.lg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg + 4, paddingHorizontal: space.md, paddingVertical: space.md, minHeight: 76 },
   num: { borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  block: { flexDirection: "row", alignItems: "center", gap: space.md, borderRadius: radius.lg + 4, paddingHorizontal: space.md, paddingVertical: space.md, minHeight: 76 },
+  block: { flexDirection: "row", alignItems: "center", gap: 2, borderRadius: radius.lg + 4, paddingLeft: space.md, paddingRight: space.xs, paddingVertical: space.md, minHeight: 76 },
   lockBox: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg, padding: space.md },
   info: { borderWidth: 2, borderRadius: radius.lg + 4, padding: space.md, gap: space.sm },
   infoLine: { flexDirection: "row", alignItems: "flex-start", gap: space.sm },
