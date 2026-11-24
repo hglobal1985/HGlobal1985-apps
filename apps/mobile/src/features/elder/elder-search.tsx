@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState } from "react";
 import { FlatList, Image, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -12,8 +12,6 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
-import { elderTextScale } from "@/lib/elder-mode";
-import { fitFontSize } from "@/ui/course-cover";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
 import { TileCover } from "@/features/courses/series-tile";
@@ -174,7 +172,6 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         </View>
       ) : null}
       {listMode ? (
-        <TitleSizeScope key={`${key}|${zone}|${sub?.key}`}>
         <FlatList
           style={styles.fill}
           contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]}
@@ -194,7 +191,6 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} />}
           initialNumToRender={8}
         />
-        </TitleSizeScope>
       ) : (
         <View style={[styles.inner, pad, { flex: 1, gap: space.md, paddingBottom: space.md }]}>
           {body}
@@ -276,38 +272,18 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
 }
 
 /**
- * 列上的課程標題：字級自動放到最大（業主 2026-11-24：標題要最大化、靠封面右邊排滿之後才換行），
- * 在封面右邊、標籤上方剩下的空間裡，找塞得進去的最大字級（字少就很大、字多才縮小換行）。
- * 畫字時會再乘「平板倍數 × 至尊倍數」，所以在放大前的尺寸上算。
+ * 列上的課程標題：所有列同一個固定字級，依剩餘寬度自然換行（業主 2026-11-24 撤銷「自動算字級／對齊斷行」：
+ * 那會讓斷行落在奇怪的地方，例如「中山中／心 288」）。字級已乘上全站放大倍數，不要再自己算。
  */
+const TITLE_SIZE = 22;
 function FitTitle({ text }: { text: string }) {
-  const [box, setBox] = useState({ w: 0, h: 0 });
-  const { min, report } = useContext(TitleSize);
-  const k = UI_SCALE * elderTextScale();
-  const own = box.w && box.h ? fitFontSize(text, box.w / k, (box.h / k) * 0.95, 44, 14) : null;
-  useEffect(() => {
-    if (own !== null) report(own);
-  }, [own, report]);
-  // 字級往下對齊到「剛好一行排滿 n 個字」：全形字斷行處才會貼齊右邊（業主 2026-11-24：斷行要更靠近箭頭），不會留下不到一個字的空隙。
-  const raw = Math.min(own ?? 20, min);
-  const inner = box.w ? box.w / k - 1 : 0;
-  const fs = inner > 0 ? inner / Math.ceil(inner / raw) : raw;
   return (
-    <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
-      <AppText style={{ fontSize: fs, lineHeight: Math.round(fs * 1.2), fontWeight: "800" }}>{text}</AppText>
+    <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }}>
+      <AppText numberOfLines={4} style={{ fontSize: TITLE_SIZE, lineHeight: Math.round(TITLE_SIZE * 1.3), fontWeight: "800" }}>
+        {text}
+      </AppText>
     </View>
   );
-}
-
-/**
- * 同一份清單的所有標題統一字級（業主 2026-11-24）：每一列算出自己塞得進去的最大字級，整份清單取其中最小的，大家一樣大。
- * 換清單（換分類／搜尋）時用 key 重建，重新算。
- */
-const TitleSize = createContext<{ min: number; report: (s: number) => void }>({ min: 44, report: () => undefined });
-function TitleSizeScope({ children }: { children: ReactNode }) {
-  const [min, setMin] = useState(44);
-  const value = useMemo(() => ({ min, report: (s: number) => setMin((m) => Math.min(m, s)) }), [min]);
-  return <TitleSize.Provider value={value}>{children}</TitleSize.Provider>;
 }
 
 const styles = StyleSheet.create({
