@@ -8,6 +8,7 @@ import { usePlayer } from "./use-player";
  */
 export const SHRINK_PX = 140;
 let p = 0;
+let py = 0; // 捲動位移（像素），封面縮小模組（ui/collapse-band）用
 let scrollTop: (() => void) | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
@@ -16,14 +17,25 @@ const emit = () => subs.forEach((f) => f());
 export function reportPlayerScroll(y: number, top?: () => void) {
   if (top) scrollTop = top;
   const n = Math.min(1, Math.max(0, y / SHRINK_PX));
-  if (n === p) return;
+  const ny = Math.max(0, Math.round(y));
+  if (n === p && ny === py) return;
   p = n;
+  py = ny;
   emit();
 }
 export function resetPlayerShrink() {
-  if (p === 0) return;
+  if (p === 0 && py === 0) return;
   p = 0;
+  py = 0;
   emit();
+}
+/** 頁面捲動位移（像素，App 版）。 */
+export function usePlayerScrollPx(): number {
+  return useSyncExternalStore(
+    (f) => (subs.add(f), () => void subs.delete(f)),
+    () => py,
+    () => 0,
+  );
 }
 export const scrollPlayerPageTop = () => scrollTop?.();
 

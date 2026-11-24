@@ -436,6 +436,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           stage={stage}
           legacy={playLegacy ? session.playback : null}
           onLegacyEnd={session.onLegacyEnd}
+          collapseIdle={!lay.split}
           idle={<EdmStage course={course} stats={course.isList ? stats : undefined} canManageAlbum={editing} />}
           idleBar={firstPlayable || playLesson ? { minutes: (playLesson ?? firstPlayable)!.minutes, loading: !!playLesson, onPlay: () => firstPlayable && !playLesson && playLesson_(firstPlayable.id) } : null}
         />
