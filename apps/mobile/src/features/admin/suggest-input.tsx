@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useBorderW } from "@/lib/elder-mode";
 import { Pressable, ScrollView, StyleSheet, TextInput, View, type StyleProp, type TextStyle } from "react-native";
 import { api } from "@/api/client";
 import { useTheme } from "@/theme/theme";
@@ -68,6 +69,7 @@ export function SuggestList({ list, q, onPick }: { list: string[]; q: string; on
 /** 只有輸入框（清單由外面放，例如兩欄並排時清單要放在整列下方）。 */
 export function SuggestField({ value, onChange, onFocusChange, accessibilityLabel, placeholder, maxLength = 50, inputStyle }: { value: string; onChange: (v: string) => void; onFocusChange: (f: boolean) => void; accessibilityLabel: string; placeholder?: string; maxLength?: number; inputStyle?: StyleProp<TextStyle> }) {
   const { c } = useTheme();
+  const bw = useBorderW(1);
   return (
     <TextInput
       value={value}
@@ -78,7 +80,7 @@ export function SuggestField({ value, onChange, onFocusChange, accessibilityLabe
       placeholderTextColor={c.textMuted}
       accessibilityLabel={accessibilityLabel}
       autoCorrect={false}
-      style={[styles.box, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }, inputStyle]}
+      style={[styles.box, type.body, { color: c.text, borderColor: c.border, borderWidth: bw, backgroundColor: c.surface }, inputStyle]}
     />
   );
 }

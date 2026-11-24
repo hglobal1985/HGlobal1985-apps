@@ -1,10 +1,9 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useBorderW } from "@/lib/elder-mode";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { MODE_PROFILES } from "@/lib/app-mode";
 import { ANCHOR_ID, rememberAnchor } from "@/lib/keep-scroll";
-import { ELDER_DEFAULT, ELDER_MAX, ELDER_MIN, elderTextScale, setElder, systemFontScale, useElder } from "@/lib/elder-mode";
+import { ELDER_DEFAULT, ELDER_MAX, ELDER_MIN, elderTextScale, setElder, systemFontScale, useBorderW, useElder, useElderOn } from "@/lib/elder-mode";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
@@ -35,6 +34,7 @@ let savedSize: number | null = null;
 
 export function FontSizeCard() {
   const bw = useBorderW(1);
+  const elderOn = useElderOn();
   // 改字體會重建畫面；改之前記住這張卡在螢幕上的位置，重建後捲回來讓它留在原處（業主 2026-11-24）。
   const setKeep = (patch: Parameters<typeof setElder>[0]) => (rememberAnchor(), setElder(patch));
   const { c } = useTheme();
@@ -57,7 +57,7 @@ export function FontSizeCard() {
     </Pressable>
   );
   return (
-    <View nativeID={ANCHOR_ID} style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw }]}>
+    <View nativeID={ANCHOR_ID} style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, borderWidth: elderOn ? 0 : 1 }]}>
       {toggle("文字加粗", prefs.bold, (v) => setKeep({ bold: v }))}
       {toggle("跟著手機字體大小", follow, (v) => {
         // 勾選＝字體設定立刻復原成預設（舊的自訂大小先記起來）；取消勾選＝還原剛才的自訂大小（業主 2026-11-24）。

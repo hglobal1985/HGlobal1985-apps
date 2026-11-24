@@ -10,7 +10,8 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="courses" />
       <Tabs.Screen name="learning" />
-      <Tabs.Screen name="notices" />
+      {/* 通知頁一開站就載入（業主 2026-11-24 回報第一次進通知整頁空白）：不等第一次點才下載程式檔。 */}
+      <Tabs.Screen name="notices" options={{ lazy: false }} />
       <Tabs.Screen name="me" />
     </Tabs>
   );
