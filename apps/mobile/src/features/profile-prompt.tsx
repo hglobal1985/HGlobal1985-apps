@@ -1,5 +1,6 @@
 import { Button } from "@/ui/button";
-import { useBorderW, useElderOn } from "@/lib/elder-mode";
+import { useModeProfile } from "@/lib/app-mode";
+import { useBorderW } from "@/lib/elder-mode";
 import { trackFeature } from "@/lib/feature-track";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -529,7 +530,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
 /** lift＝有下拉選單展開：網頁的每個 View 都是獨立堆疊層，外框也要提到最上層，選單才不會被後面的按鈕、卡片蓋住（業主 2026-11-24）。 */
 function Wrap({ inline, onClose, lift, children }: { inline: boolean; onClose: () => void; lift: boolean; children: ReactNode }) {
   const { c } = useTheme();
-  const elderOn = useElderOn();
+  const elderOn = useModeProfile().bigLayout; // 大字版面＝至尊模式：大區塊不畫外框
   return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border, borderWidth: elderOn ? 0 : 1, zIndex: lift ? 500 : 1 }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
 }
 
