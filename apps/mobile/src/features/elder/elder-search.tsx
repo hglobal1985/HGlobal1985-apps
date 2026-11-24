@@ -51,7 +51,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const [sub, setSub] = useState<Row | null>(null); // 系列／中心再往下一層
   const input = useRef<{ focus: () => void } | null>(null);
   // 搜尋索引（章節標題、分享者、日期…）：開始找的時候才下載。
-  const wantIndex = q.trim().length > 0 || mode === "browse";
+  const wantIndex = q.trim().length > 0;
   const idx = useApi<{ lessons: SearchLesson[] }>(wantIndex ? "/search-index" : null);
   const voice = useVoice((text, final) => {
     setHeard(text);
@@ -163,7 +163,8 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const listMode = !body && !(!searching && mode === "home");
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
-      <View style={[styles.inner, pad, { paddingTop: insets.top + space.md, paddingBottom: space.sm }]}>{header}</View>
+      {/* 課程分頁不再有搜尋框（業主 2026-11-24：移除置頂搜尋）；搜尋只在首頁。 */}
+      {mode === "home" ? <View style={[styles.inner, pad, { paddingTop: insets.top + space.md, paddingBottom: space.sm }]}>{header}</View> : <View style={{ height: insets.top + space.md }} />}
       {inZone ? <ElderZoneBackdrop zone={zoneDef!} /> : null}
       {inZone ? (
         <View style={[styles.inner, pad, { paddingBottom: space.sm }]}>
