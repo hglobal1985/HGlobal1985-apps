@@ -44,16 +44,30 @@ export function restoreScroll() {
   anchorTop = null;
   // 有記住字體設定卡的位置：重建後把它捲回螢幕上同樣的高度（始終跟著調整區塊）。
   if (want !== null) {
-    let n = 0;
+    // 重建後內容會陸續載入（會員資料表單等）、高度還會變，所以持續跟 3 秒；使用者自己碰螢幕或滾動就停止。
+    const t0 = Date.now();
+    let stop = false;
+    const halt = () => {
+      stop = true;
+    };
+    const evs = ["touchstart", "wheel", "pointerdown", "keydown"] as const;
+    evs.forEach((e) => window.addEventListener(e, halt, { once: true, passive: true }));
     const follow = () => {
+      if (stop || Date.now() - t0 > 3000) {
+        evs.forEach((e) => window.removeEventListener(e, halt));
+        return;
+      }
       const el = document.getElementById(ANCHOR_ID);
       if (el) {
         let p: HTMLElement | null = el.parentElement;
         while (p && !(p.scrollHeight > p.clientHeight + 4 && ["auto", "scroll"].includes(getComputedStyle(p).overflowY))) p = p.parentElement;
         const d = el.getBoundingClientRect().top - want;
-        if (p && Math.abs(d) > 1) p.scrollTop += d;
+        if (Math.abs(d) > 1) {
+          if (p) p.scrollTop += d;
+          else window.scrollBy(0, d);
+        }
       }
-      if (++n < 12) requestAnimationFrame(follow);
+      requestAnimationFrame(follow);
     };
     requestAnimationFrame(follow);
     return;
