@@ -30,7 +30,8 @@ export function buildSearchIndex(courses: CourseSummary[], lessons: SearchLesson
   const haystack = new Map<string, string>();
   const lessonHay = new Map<string, string>();
   for (const c of courses) {
-    const parts: string[] = [c.title, c.series, c.teacher, c.teacherRankName, c.teacherTitle];
+    // 搜尋範圍也含「主辦中心、主辦／指導單位、分類、品牌」與「EDM」關鍵字（有 EDM 海報的課程；業主 2026-11-24：搜「新竹 EDM」不可沒有結果）。
+    const parts: string[] = [c.title, c.series, c.teacher, c.teacherRankName, c.teacherTitle, c.hostCenter, c.hostUnit, c.guidanceUnit, c.category, c.brandName ?? "", c.edmUrl ? "EDM 海報" : ""];
     const courseParts: string[] = [...parts];
     add("課程", c.title);
     add("系列", c.series);
