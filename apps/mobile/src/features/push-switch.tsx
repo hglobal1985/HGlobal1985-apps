@@ -44,6 +44,8 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
   const canToggle = state === "on" || state === "off";
   const hint = err ?? (Platform.OS !== "web" ? "App 版的推播會在正式上架時開放。" : state && state !== "on" && state !== "off" ? PUSH_TEXT[state] : null);
   const on = state === "on";
+  /** 按鈕文字顯示目前狀態（業主 2026-11-24）。 */
+  const label = state === "on" ? "訊息通知：已開啟" : state === "off" ? "訊息通知：未開啟" : state === null ? "訊息通知" : state === "denied" ? "訊息通知：已被封鎖" : "訊息通知：無法使用";
   // 橫幅版（業主 2026-11-23）：整列可點、打勾開啟；沒開啟＝整列紅色（含圖示），開啟後整列變綠色。
   if (banner) {
     const bg = on ? c.accent : c.danger;
@@ -67,7 +69,7 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
             </View>
           )}
           <View style={{ flex: 1 }}>
-            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>訊息通知</AppText>
+            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>{label}</AppText>
           </View>
           <Icon name={on ? "checkbox" : "square-outline"} size={compact ? 22 : 34} color={fg} />
         </Pressable>
