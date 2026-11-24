@@ -376,10 +376,11 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           list={course.isList ? { title: course.title } : undefined}
           backTo="/courses"
         />
+        {/* 課程頁封面只留點閱數、不放訂閱鈕（業主 2026-11-24：報名＝自動訂閱）。 */}
         <ElderCourse
           course={course}
           player={player}
-          cover={<EdmStage course={course} stats={stats} />}
+          cover={<EdmStage course={course} stats={{ ...stats, subscribe: undefined }} />}
           announce={<ElderBroadcastBox center={course.hostCenter || undefined} series={course.series || undefined} />}
           playingId={playLesson ? playLesson.id : null}
           onPlay={playLesson_}
