@@ -55,28 +55,33 @@ export function fmtOf(fields: FieldDef[]): string {
   return (h >>> 0).toString(36);
 }
 
-/** 去掉模型愛用的 Markdown 符號（** ### * 條列），留下乾淨的純文字。 */
+/**
+ * 去掉 AI 自己加的話（業主 2026-11-24：只能留海報上的文字）：開場白（「好的」「圖片上有以下文字：」「這是一個…活動」）、
+ * 「今天是…」「活動舉辦日期應該是…」這類判斷猜測，以及 Markdown 符號（** ### 條列）。
+ */
 export function cleanOcrText(s: string): string {
-  return s
-    .replace(/\\n/g, "\n")
-    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
-    .replace(/\*\*/g, "")
-    .replace(/^\s*[*•]\s+/gm, "")
-    .replace(/[ \t]+/g, " ")
+  const talk = /^(好的|好，|以下|根據|這是|這張|這份|圖片(上|中|裡)?(有|的|顯示|內容)|海報(上|中|裡)?(有|的|顯示|內容)|圖中|看起來|似乎|可能|應該|推測|判斷|注意|備註|說明)/;
+  let t = s.replace(/\\n/g, "\n").replace(/^\s{0,3}#{1,6}\s*/gm, "").replace(/\*\*/g, "").replace(/^\s*[*•]\s+/gm, "");
+  t = t.replace(/^[\s\S]*?(以下文字|文字如下|文字內容如下|如下)\s*[：:]\s*/, ""); // 「…圖片上有以下文字：」之前的開場白整段拿掉
+  t = t.replace(/[，,]?\s*今天是[^。\n]*[。]?/g, "").replace(/[，,]?\s*(活動(舉辦)?日期|日期)\s*(應該|可能|推測|大概)[^。\n]*[。]?/g, "");
+  return t
+    .split("\n")
+    .map((l) => l.replace(/[ \t]+/g, " ").trim())
+    .filter((l) => l && !talk.test(l))
+    .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
 export type Structured = { f: [string, string][]; o: string };
 
-export function buildPrompt(text: string, fields: FieldDef[], today: string): { system: string; user: string } {
+export function buildPrompt(text: string, fields: FieldDef[], _today = ""): { system: string; user: string } {
   const list = fields.map((f) => `- ${f.name}${f.hint ? `：${f.hint}` : ""}`).join("\n");
   const system = `你是活動海報資訊整理員。使用者會給你從活動海報（EDM）辨識出來的文字，請照指定的欄位整理。規則：
-1. 只能使用文字裡有的資訊，不可以自己編造或猜測；找不到的欄位填空字串 ""。
-2. 內容盡量保留原文用字，不要改寫、不要加評論；同一欄有多項時用換行分開。
-3. 無法歸入任何欄位、但有意義的內容，全部放進「${OTHER}」。
-4. 日期若海報沒寫年份，用最接近今天（${today}）的合理年份，寫成「2026/11/24（二）」這種樣式。
-5. 只回傳一個 JSON 物件，不要任何說明、不要 Markdown。`;
+1. 每個欄位只能放海報文字裡「原本就有」的字句，一個字都不可以自己加；絕對不可以寫你自己的話、判斷、推測、補充、說明或年份。海報沒寫的，該欄位一律填空字串 ""。
+2. 盡量照原文抄寫，不要改寫、不要摘要、不要加評論；同一欄有多項時用換行分開。
+3. 無法歸入任何欄位、但海報上有的文字，全部放進「${OTHER}」。
+4. 只回傳一個 JSON 物件，不要任何說明、不要 Markdown。`;
   const keys = [...fields.map((f) => f.name), OTHER].map((k) => `"${k}": ""`).join(", ");
   const user = `欄位：\n${list}\n- ${OTHER}：無法歸入上面任何欄位的內容\n\n回傳格式：{${keys}}\n\n海報文字：\n${text.slice(0, 4000)}`;
   return { system, user };
