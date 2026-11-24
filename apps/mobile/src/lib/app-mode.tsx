@@ -28,7 +28,9 @@ export type FeatureKey =
   /** 課程頁管理員的「編輯」模式。 */
   | "adminEdit"
   /** 右下角「＋新增」浮動鈕（新增教材、課程、公告…）。 */
-  | "addButton";
+  | "addButton"
+  /** 設定頁的「刪除帳號」鈕（業主 2026-11-24：至尊模式移除，超派模式仍有——上架商店規定 App 內要有刪除帳號入口）。 */
+  | "deleteAccount";
 
 /** 底部主選單的分頁（模式鍵固定在最右邊，不在這裡）。 */
 export type TabKey = "home" | "courses" | "learning" | "notices" | "settings";
@@ -75,7 +77,7 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     confirmLeave: true,
     sheets: "page",
     modeKey: "page",
-    features: { addToList: false, comments: false, achievements: false, myLists: false, library: false, manageSection: false, adminEdit: false, addButton: false },
+    features: { addToList: false, comments: false, achievements: false, myLists: false, library: false, manageSection: false, adminEdit: false, addButton: false, deleteAccount: false },
   },
   // 超派模式：原本的完整版。
   super: {
@@ -91,7 +93,7 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     confirmLeave: false,
     sheets: "sheet",
     modeKey: "switch",
-    features: { addToList: true, comments: true, achievements: true, myLists: true, library: true, manageSection: true, adminEdit: true, addButton: true },
+    features: { addToList: true, comments: true, achievements: true, myLists: true, library: true, manageSection: true, adminEdit: true, addButton: true, deleteAccount: true },
   },
 };
 
