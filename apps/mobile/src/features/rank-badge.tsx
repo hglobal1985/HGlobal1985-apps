@@ -5,7 +5,7 @@ import { resolveUrl } from "@/api/client";
 /** 徽章高度：92（業主 2026-11-14：48→72→108，再縮小 15% 到 92）。圖是直式（380×720），寬度依比例。要改大小只改這裡，閃光球大小會跟著縮放。 */
 export const BADGE_SIZE = 92;
 const K = BADGE_SIZE / 72; // 閃光球的大小以 72 高為基準，隨徽章等比縮放
-const BADGE_W = Math.round((BADGE_SIZE * 380) / 720);
+export const BADGE_W = Math.round((BADGE_SIZE * 380) / 720);
 
 /** 閃光球的位置（圖案範圍內的比例 x、y）、大小、出現時間點。多顆錯開，像星星此起彼落地閃。 */
 const SPARKS = [

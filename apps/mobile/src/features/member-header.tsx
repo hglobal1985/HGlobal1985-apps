@@ -4,7 +4,7 @@ import type { Member } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
 import { AppText } from "@/ui";
-import { RankBadge } from "./rank-badge";
+import { BADGE_SIZE, BADGE_W, RankBadge } from "./rank-badge";
 
 const AVATAR = 48; // 大頭照尺寸；徽章在版面上只佔這個高度（上下間距維持原樣）
 
@@ -46,7 +46,14 @@ export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { 
           </AppText>
           {rankTag ? <View style={styles.stackRank}>{rankTag}</View> : null}
         </View>
-        {hasBadge ? <RankBadge url={member.rankBadge!} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={Math.round(av * 1.9 * 1.5)} /> : null}
+        {hasBadge ? (
+          // 獎章放大用 transform（不佔版面），列高只等於頭像高度，上下不留大片空白（業主 2026-11-24）。
+          <View style={{ width: Math.round(BADGE_W * 1.4), height: av, alignItems: "center", justifyContent: "center" }}>
+            <View style={{ transform: [{ scale: 1.4 }] }}>
+              <RankBadge url={member.rankBadge!} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={BADGE_SIZE} />
+            </View>
+          </View>
+        ) : null}
       </Pressable>
     );
   }
