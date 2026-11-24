@@ -7,12 +7,19 @@ import { requestCoursesReset } from "@/lib/courses-reset";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
 import { getBottomGap, onBottomGap } from "@/lib/bottom-gap";
 import { useUnreadCount } from "@/state/unread";
+import { useElderOn } from "@/lib/elder-mode";
+import { CrownIcon } from "@/features/elder/crown-icon";
+import { ElderSheet, switchToElder } from "@/features/elder/elder-sheet";
 import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
 
 /** 底部分頁列高度（業主 2026-11-20：比一般工具列矮一點）。 */
 const navHeight = Math.round((UI_SCALE > 1 ? 58 : 50) * UI_SCALE);
+/** 至尊模式（業主 2026-11-24）：底部選單加高、字與圖示加大（固定大小，不跟著至尊字體倍數再放大，否則四個分頁會擠不下）。 */
+const elderNavHeight = Math.round((UI_SCALE > 1 ? 80 : 72) * UI_SCALE);
+/** 只吃平板／電腦倍數、不吃至尊模式倍數（lib/global-scale.ts）。 */
+const UI_ONLY = { dataSet: { uiOnly: "" } } as object;
 import { AppText } from "./text";
 import { UniversityIcon } from "./university-icon";
 
@@ -45,13 +52,17 @@ export function BottomBar() {
   const pathname = usePathname();
   const unread = useUnreadCount();
   const lib = useLibraryMode();
+  // 至尊模式：不顯示「設定」分頁；最右邊的模式鍵（創客模式顯示「至尊」、至尊模式顯示「創客」）。
+  const elder = useElderOn();
+  const [modeOpen, setModeOpen] = useState(false);
+  const shown = elder ? tabs.filter((t) => t.title !== "設定") : tabs;
   const [keyboard, setKeyboard] = useState(false);
   // 加到主畫面的 App 底部多出的一塊（lib/bottom-gap.ts）：它本身就是底部安全距離，選單不再額外留白；一般瀏覽器分頁沒有這一塊，才自己留一點。
   const [edge, setEdge] = useState(getBottomGap());
   useEffect(() => onBottomGap(setEdge), []);
   // 大螢幕（業主 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
   const { large } = useLayout();
-  const iconSize = UI_SCALE > 1 ? 30 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（業主 2026-11-20）
+  const iconSize = elder ? (UI_SCALE > 1 ? 36 : 30) : UI_SCALE > 1 ? 30 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（業主 2026-11-20）
   const iconBox = Math.round((iconSize + 4) * UI_SCALE); // 圖示本身會被全站放大，外框也要跟著放大，否則圖示會壓到下面的文字
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -76,16 +87,19 @@ export function BottomBar() {
       el.style.backgroundColor = old;
     };
   }, [barBg, hidden]);
-  if (hidden) return null;
+  if (hidden) return modeOpen ? <ElderSheet onClose={() => setModeOpen(false)} /> : null;
+  const labelSize = elder ? (UI_SCALE > 1 ? 19 : 17) : UI_SCALE > 1 ? 16 : 12;
+  const tabStyle = [styles.tab, elder && { minHeight: elderNavHeight }];
   return (
-    <View style={[styles.bar, { backgroundColor: lib ? LIB.card : c.navBar, paddingBottom: edge > 0 ? 0 : Math.min(insets.bottom, UI_SCALE > 1 ? 8 : 20) }]} accessibilityRole="tablist">
+    <>
+    <View style={[styles.bar, elder && { minHeight: elderNavHeight }, { backgroundColor: lib ? LIB.card : c.navBar, paddingBottom: edge > 0 ? 0 : Math.min(insets.bottom, UI_SCALE > 1 ? 8 : 20) }]} accessibilityRole="tablist">
       <View style={[styles.row, large && styles.rowLarge]}>
-      {tabs.map((t) => {
+      {shown.map((t) => {
         const on = !lib && t.match(pathname);
         // 方案 1（業主 2026-11-20）：整條深綠實心、白字白圖示；目前所在分頁是黃色膠囊＋深色字。書櫃模式維持咖啡色舊樣式。
         const color = lib ? LIB.muted : on ? c.navPillText : "#FFFFFF";
         return (
-          <Pressable key={t.title} style={styles.tab} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => {
+          <Pressable key={t.title} style={tabStyle} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => {
             if (t.title === "課程") {
               // 已經在課程分頁裡再按一次＝回課程首頁（所有系列）；從別的分頁回來＝回到上次停留的那一頁（業主 2026-11-23）。
               if (t.match(pathname)) {
@@ -96,26 +110,46 @@ export function BottomBar() {
             }
             router.navigate(t.href);
           }}>
-            <View style={[styles.cell, on && { backgroundColor: c.navPill }]}>
+            <View style={[styles.cell, elder && styles.cellElder, on && { backgroundColor: c.navPill }]}>
               <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
-                {t.building ? <UniversityIcon size={iconSize} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={iconSize} color={color} />}
+                {t.building ? <UniversityIcon size={iconSize} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={iconSize} color={color} {...({ uiOnly: true } as object)} />}
                 {t.title === "通知" && unread > 0 ? (
                   <View style={[styles.badge, { backgroundColor: "#E0382E", borderColor: lib ? LIB.card : c.navBar }]}>
-                    <AppText variant="caption" style={{ color: "#FFFFFF", fontSize: 10, lineHeight: 12, fontWeight: "700" }}>
+                    <AppText variant="caption" style={{ color: "#FFFFFF", fontSize: elder ? 13 : 10, lineHeight: elder ? 15 : 12, fontWeight: "700" }} {...UI_ONLY}>
                       {unread > 9 ? "9+" : String(unread)}
                     </AppText>
                   </View>
                 ) : null}
               </View>
-              <AppText variant="caption" numberOfLines={1} style={{ color, fontWeight: "800", fontSize: UI_SCALE > 1 ? 16 : 12, lineHeight: UI_SCALE > 1 ? 20 : 14 }}>
+              <AppText variant="caption" numberOfLines={1} style={{ color, fontWeight: "800", fontSize: labelSize, lineHeight: Math.round(labelSize * 1.2) }} {...UI_ONLY}>
                 {t.title}
               </AppText>
             </View>
           </Pressable>
         );
       })}
+      {/* 模式鍵（業主 2026-11-24）：放在「設定」右邊。創客模式按「至尊」直接切換；至尊模式按「創客」打開面板（字體大小、訂單紀錄、帳號、換回創客模式）。書櫃頁面不顯示。 */}
+      {lib ? null : (
+        <Pressable
+          style={tabStyle}
+          accessibilityRole="button"
+          accessibilityLabel={elder ? "使用模式：至尊模式。按這裡調整字體、看訂單紀錄、帳號，或換回創客模式" : "切換到至尊模式（大字簡易版）"}
+          onPress={() => (elder ? setModeOpen(true) : switchToElder())}
+        >
+          <View style={[styles.cell, styles.modeKey, elder && styles.cellElder, { backgroundColor: c.navPill }]}>
+            <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
+              {elder ? <Ionicons name="construct" size={iconSize - 4} color={c.navPillText} {...({ uiOnly: true } as object)} /> : <CrownIcon size={Math.round(iconSize * UI_SCALE)} color={c.navPillText} />}
+            </View>
+            <AppText variant="caption" numberOfLines={1} style={{ color: c.navPillText, fontWeight: "800", fontSize: labelSize, lineHeight: Math.round(labelSize * 1.2) }} {...UI_ONLY}>
+              {elder ? "創客" : "至尊"}
+            </AppText>
+          </View>
+        </Pressable>
+      )}
       </View>
     </View>
+    {modeOpen ? <ElderSheet onClose={() => setModeOpen(false)} /> : null}
+    </>
   );
 }
 
@@ -124,6 +158,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", width: "100%" },
   rowLarge: { maxWidth: 760 },
   tab: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 3, paddingBottom: 3, minHeight: navHeight },
-  cell: { alignItems: "center", justifyContent: "center", gap: UI_SCALE > 1 ? 4 : 1, paddingVertical: UI_SCALE > 1 ? 6 : 3, paddingHorizontal: 12, borderRadius: 16, minWidth: UI_SCALE > 1 ? 100 : 60 },
+  cell: { alignItems: "center", justifyContent: "center", gap: UI_SCALE > 1 ? 4 : 1, paddingVertical: UI_SCALE > 1 ? 6 : 3, paddingHorizontal: UI_SCALE > 1 ? 12 : 8, borderRadius: 16, minWidth: UI_SCALE > 1 ? 100 : 56 },
+  cellElder: { paddingHorizontal: 6, paddingVertical: UI_SCALE > 1 ? 8 : 6, minWidth: UI_SCALE > 1 ? 110 : 66 },
+  modeKey: { borderWidth: 2, borderColor: "#FFFFFF" },
   badge: { position: "absolute", top: -4, right: -12, minWidth: 16, height: 16, borderRadius: 8, borderWidth: 1.5, paddingHorizontal: 3, alignItems: "center", justifyContent: "center" },
 });

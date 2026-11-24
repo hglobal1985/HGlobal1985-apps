@@ -27,6 +27,8 @@ import { canCreateCourse, isSuperAdmin } from "@/lib/roles";
 import { Check } from "@/ui/check";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { PageHeader } from "@/features/page-header";
+import { ElderCourse } from "@/features/elder/elder-course";
+import { useElderOn } from "@/lib/elder-mode";
 import { useApi, useSession } from "@/state/session";
 import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
@@ -58,6 +60,8 @@ export function chapterFromParams(params: Record<string, unknown>): number | und
 export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: string; edit?: string; lesson?: string; chapter?: number; block?: string }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
+  // 至尊模式（業主 2026-11-24）：沒有管理員編輯模式，版面改成 ElderCourse（上課／介紹兩頁）。
+  const elder = useElderOn();
   const lay = useLayout();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
   // 剛儲存回來的最新資料（重新載入完成前先用它，避免下一次儲存誤判「別人剛改過」）。
@@ -81,7 +85,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "success"; text: string } | null>(null);
   // 原地編輯：有權限的人在工具列按「編輯」進入；可「預覽」切回學員看到的樣子。
-  const manages = !!(course?.can?.edit || course?.can?.remove || course?.can?.restore);
+  const manages = !elder && !!(course?.can?.edit || course?.can?.remove || course?.can?.restore);
   const [mode, setMode] = useState<Mode>("view");
   useEffect(() => {
     if (edit === "1" && manages) setMode("edit");
@@ -345,6 +349,53 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const statusText = course.status === "published" ? "上架中" : course.status === "archived" ? "已下架封存" : "未上架";
   const canEditContent = !!course.can?.edit;
   const onSaved = (d: CourseDetail) => setSaved(d);
+
+  if (elder) {
+    const player = stage ? (
+      <View>
+        {stage.audio ? (
+          <InlineAudio trackKey={stage.key} />
+        ) : (
+          <>
+            <PlayerSlot trackKey={stage.key} />
+            <PlayerControls />
+          </>
+        )}
+      </View>
+    ) : playLegacy && session.playback ? (
+      <LessonPlayer playback={session.playback} onSegmentEnd={session.onLegacyEnd} />
+    ) : null;
+    return (
+      <View style={{ flex: 1 }}>
+        <PageHeader
+          title={course.title}
+          path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
+          course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
+          list={course.isList ? { title: course.title } : undefined}
+          backTo="/courses"
+        />
+        <ElderCourse
+          course={course}
+          player={player}
+          cover={<EdmStage course={course} canManageAlbum={false} />}
+          playingId={playLesson ? playLesson.id : null}
+          onPlay={playLesson_}
+          action={stickyAction}
+          notice={stickyNotice}
+          message={
+            <>
+              {message ? <NoticeBox tone={message.tone} text={message.text} /> : null}
+              {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
+              {playLesson && session.engineError ? <NoticeBox tone="danger" text={session.engineError} /> : null}
+              {!member ? <LoginPrompt /> : null}
+            </>
+          }
+          locked={allLocked}
+          lockedLines={[lockedText, ...(needRank ? [needRank] : [])]}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>

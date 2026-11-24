@@ -9,6 +9,7 @@ import { startDeleteReauth } from "@/api/central";
 import { openAccountCenter } from "@/features/account-link";
 import type { AppConfig, LibraryMine, Member } from "@/api/client";
 import { canManageCourses, canManageEditors } from "@/lib/roles";
+import { useElderOn } from "@/lib/elder-mode";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
@@ -51,6 +52,8 @@ export default function MeScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "success"; text: string } | null>(null);
   const isWeb = Platform.OS === "web";
+  // 至尊模式（業主 2026-11-24）：這頁只從模式面板的「帳號」進來；不顯示我的清單、我的書櫃與管理功能。
+  const elder = useElderOn();
 
   const run = async (key: string, fn: () => Promise<void>, done?: string) => {
     setBusy(key);
@@ -131,13 +134,13 @@ export default function MeScreen() {
 
       {member && isWeb ? (
         <Card style={{ paddingVertical: 0 }}>
-          <ListRow icon="list-outline" title="我的清單" subtitle="自己建立的清單：分享網址、點擊人數、備註" onPress={() => router.push("/my-lists")} />
-          <ListRow icon="library-outline" title="我的書櫃" subtitle={myLibrary.data?.library ? "個人專屬頁面：書架、影片、簡報、連結，可設密碼" : "尚未解鎖書櫃鑰匙"} onPress={() => router.push("/library")} />
+          {elder ? null : <ListRow icon="list-outline" title="我的清單" subtitle="自己建立的清單：分享網址、點擊人數、備註" onPress={() => router.push("/my-lists")} />}
+          {elder ? null : <ListRow icon="library-outline" title="我的書櫃" subtitle={myLibrary.data?.library ? "個人專屬頁面：書架、影片、簡報、連結，可設密碼" : "尚未解鎖書櫃鑰匙"} onPress={() => router.push("/library")} />}
           <ListRow icon="document-text-outline" title="訂單紀錄" onPress={() => router.push("/orders")} />
         </Card>
       ) : null}
 
-      {member && (member.reviewer || member.role === "admin" || canManageCourses(member) || member.canViewStats) ? (
+      {member && !elder && (member.reviewer || member.role === "admin" || canManageCourses(member) || member.canViewStats) ? (
         <Section title="管理">
           <Card style={{ paddingVertical: 0 }}>
             {canManageEditors(member) ? <ListRow icon="people-circle-outline" title="小編管理" subtitle="指派同中心的會員協助編輯課程與章節" onPress={() => router.push("/admin/editors")} /> : null}

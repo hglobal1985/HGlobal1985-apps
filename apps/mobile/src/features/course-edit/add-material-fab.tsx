@@ -1,3 +1,4 @@
+import { useElderOn } from "@/lib/elder-mode";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -24,7 +25,12 @@ const OPTIONS: { key: AddKind; label: string; sub?: string; icon: React.Componen
  * 全部課程右下角的「＋新增教材」（業主 2026-11-16）：按一下往上展開兩個選項——「新增課程」與「新增清單（影片／檔案）」；
  * 點選項、點背景或再按一次按鈕都會收起。選項是大膠囊（高 52），單手拇指就按得到。
  */
-export function AddMaterialFab({ onPick, kinds = ["course"] }: { onPick: (k: AddKind) => void; /** 要顯示哪些選項（預設只有新增教材卡；中心頁有權限時加上 schedule）。 */ kinds?: AddKind[] }) {
+/** 至尊模式（業主 2026-11-24）不顯示管理用的「＋新增」鈕。 */
+export function AddMaterialFab(props: { onPick: (k: AddKind) => void; /** 要顯示哪些選項（預設只有新增教材卡；中心頁有權限時加上 schedule）。 */ kinds?: AddKind[] }) {
+  return useElderOn() ? null : <AddMaterialFabInner {...props} />;
+}
+
+function AddMaterialFabInner({ onPick, kinds = ["course"] }: { onPick: (k: AddKind) => void; /** 要顯示哪些選項（預設只有新增教材卡；中心頁有權限時加上 schedule）。 */ kinds?: AddKind[] }) {
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;

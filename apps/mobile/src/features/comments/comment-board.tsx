@@ -1,3 +1,4 @@
+import { useElderOn } from "@/lib/elder-mode";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
@@ -15,7 +16,12 @@ import { BottomSheet } from "@/ui/bottom-sheet";
  * 課程頁（預設）：每則留言只顯示前幾行，點一則先從下方彈出完整內容與操作；按住面板往上拉（或按右上角「完整留言板」）進入完整留言頁。
  * 完整留言頁（full）：全文直接顯示、操作鈕直接放在每則留言下方；focusId 是從彈出面板帶進來的那一則（加上強調框）。
  */
-export function CommentBoard({ courseId, full = false, focusId }: { courseId: string; full?: boolean; focusId?: string }) {
+/** 至尊模式（業主 2026-11-24）不顯示留言板。 */
+export function CommentBoard(props: { courseId: string; full?: boolean; focusId?: string }) {
+  return useElderOn() ? null : <CommentBoardInner {...props} />;
+}
+
+function CommentBoardInner({ courseId, full = false, focusId }: { courseId: string; full?: boolean; focusId?: string }) {
   const { c } = useTheme();
   const { member, invalidate } = useSession();
   const { data, error } = useApi<CourseComment[]>(`/courses/${courseId}/comments`);
