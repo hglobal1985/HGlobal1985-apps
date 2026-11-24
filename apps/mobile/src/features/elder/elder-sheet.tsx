@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { confirmSheet } from "@/features/confirm";
+import { MODE_PROFILES } from "@/lib/app-mode";
 import { ELDER_MAX, ELDER_MIN, elderTextScale, getElder, setElder, systemFontScale } from "@/lib/elder-mode";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -19,15 +20,15 @@ import { CrownIcon } from "./crown-icon";
 export function switchToElder() {
   setElder({ on: true });
   router.navigate("/");
-  setTimeout(() => flashText("已切換到至尊模式"), 300);
+  setTimeout(() => flashText(`已切換到${MODE_PROFILES.elder.name}模式`), 300);
 }
 
 /** 換回超派模式前先確認（業主 2026-11-24：避免長輩誤按）。 */
 export async function askSwitchToMaker() {
-  const ok = await confirmSheet({ title: "要換成「超派模式」嗎？", message: "字會變小，並顯示全部功能：我的清單、留言板、書櫃、學習成就、設定…", confirmLabel: "換過去", cancelLabel: "取消" });
+  const ok = await confirmSheet({ title: `要換成「${MODE_PROFILES.super.name}模式」嗎？`, message: "字會變小，並顯示全部功能：我的清單、留言板、書櫃、學習成就、設定…", confirmLabel: "換過去", cancelLabel: "取消" });
   if (!ok) return;
   setElder({ on: false });
-  setTimeout(() => flashText("已換回超派模式"), 300);
+  setTimeout(() => flashText(`已換回${MODE_PROFILES.super.name}模式`), 300);
 }
 
 /**

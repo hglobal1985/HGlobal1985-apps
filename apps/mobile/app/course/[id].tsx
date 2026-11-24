@@ -28,7 +28,7 @@ import { Check } from "@/ui/check";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { PageHeader } from "@/features/page-header";
 import { ElderCourse } from "@/features/elder/elder-course";
-import { useElderOn } from "@/lib/elder-mode";
+import { useModeProfile } from "@/lib/app-mode";
 import { useApi, useSession } from "@/state/session";
 import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
@@ -61,7 +61,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
   // 至尊模式（業主 2026-11-24）：沒有管理員編輯模式，版面改成 ElderCourse（上課／介紹兩頁）。
-  const elder = useElderOn();
+  const profile = useModeProfile();
+  const elder = profile.coursePage === "twoTabs";
   const lay = useLayout();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
   // 剛儲存回來的最新資料（重新載入完成前先用它，避免下一次儲存誤判「別人剛改過」）。
@@ -85,7 +86,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "success"; text: string } | null>(null);
   // 原地編輯：有權限的人在工具列按「編輯」進入；可「預覽」切回學員看到的樣子。
-  const manages = !elder && !!(course?.can?.edit || course?.can?.remove || course?.can?.restore);
+  const manages = profile.features.adminEdit && !!(course?.can?.edit || course?.can?.remove || course?.can?.restore);
   const [mode, setMode] = useState<Mode>("view");
   useEffect(() => {
     if (edit === "1" && manages) setMode("edit");

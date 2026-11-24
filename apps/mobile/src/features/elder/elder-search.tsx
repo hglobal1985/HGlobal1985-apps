@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useMemo, useRef, useState } from "react";
-import { FlatList, Image, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { FlatList, Image, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { buildSearchIndex, fuzzyCourses, matchCourses, type SearchLesson } from "@/features/courses/course-search";
@@ -103,7 +103,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
 
   const body =
     voice.listening ? (
-      <Listening heard={heard} onStop={voice.stop} />
+      <Listening heard={heard} levels={voice.levels} onStop={voice.stop} />
     ) : courses.error && !courses.data ? (
       <ErrorView message={courses.error} onRetry={courses.reload} />
     ) : !courses.data ? (
@@ -163,14 +163,16 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   );
 }
 
-/** 「正在聽…」：聲波＋聽到的字＋停止鈕。 */
-function Listening({ heard, onStop }: { heard: string | null; onStop: () => void }) {
+/** 「正在聽…」：跟著聲音大小即時高低跳動的音波＋聽到的字＋停止鈕（業主 2026-11-24）。 */
+function Listening({ heard, levels, onStop }: { heard: string | null; levels: number[]; onStop: () => void }) {
   const { c } = useTheme();
+  const max = Math.round(120 * UI_SCALE);
+  const min = Math.round(14 * UI_SCALE);
   return (
     <View style={styles.center} accessibilityLiveRegion="polite">
-      <View style={styles.wave}>
-        {[40, 80, 110, 70, 100, 50, 90, 36].map((h, i) => (
-          <View key={i} style={{ width: 14 * UI_SCALE, height: h * UI_SCALE, borderRadius: 8, backgroundColor: c.accent }} />
+      <View style={[styles.wave, { height: max }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        {levels.map((v, i) => (
+          <View key={i} style={[{ width: Math.round(14 * UI_SCALE), height: Math.round(min + v * (max - min)), borderRadius: 8, backgroundColor: c.accent }, WAVE_ANIM]} />
         ))}
       </View>
       <AppText variant="title">正在聽…</AppText>
@@ -185,6 +187,9 @@ function Listening({ heard, onStop }: { heard: string | null; onStop: () => void
     </View>
   );
 }
+
+/** 網頁版音波高度變化加一點過渡，看起來比較順。 */
+const WAVE_ANIM = (Platform.OS === "web" ? { transitionProperty: "height", transitionDuration: "90ms", transitionTimingFunction: "ease-out" } : {}) as object;
 
 /** 至尊模式的課程列：大縮圖、大字標題、狀態（已報名／審核中／免費／付費）。整列都可以點。 */
 export function ElderCourseRow({ course }: { course: CourseSummary }) {
@@ -223,7 +228,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingVertical: space.md },
   micWrap: { padding: 18, borderRadius: 999 },
   mic: { width: Math.round(170 * UI_SCALE), height: Math.round(170 * UI_SCALE), borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  wave: { flexDirection: "row", alignItems: "center", gap: 8, height: 120 * UI_SCALE },
+  wave: { flexDirection: "row", alignItems: "center", gap: 8 },
   stop: { minHeight: 64, minWidth: 200, borderWidth: 3, borderRadius: radius.lg, alignItems: "center", justifyContent: "center", marginTop: space.md },
   cont: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 76, borderRadius: radius.lg + 4, paddingHorizontal: space.lg, paddingVertical: space.md },
   row: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg + 4, padding: space.md, marginBottom: space.md },
