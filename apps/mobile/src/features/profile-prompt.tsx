@@ -453,7 +453,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                 )}
               </View>
               {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
-              <View style={[styles.amwayCard, { backgroundColor: c.surfaceMuted, zIndex: openKey || uplineFocus ? 500 : 5 }]}>
+              <View style={[styles.amwayCard, { zIndex: openKey || uplineFocus ? 500 : 5 }, inline ? { padding: 0 } : { backgroundColor: c.surfaceMuted }]}>
                 {/* 勾選之後這一列自動隱藏（業主 2026-11-23）：只剩三欄。 */}
                 {!amway ? (
                   <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={[styles.none, { minHeight: 32 }]}>

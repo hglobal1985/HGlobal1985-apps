@@ -1,3 +1,4 @@
+import { useElderOn } from "@/lib/elder-mode";
 import { lessonHref } from "@/lib/lesson-href";
 import { router } from "expo-router";
 import { useFocusEffect } from "expo-router";
@@ -14,6 +15,7 @@ import { CardGrid, GuestGate, AppText, Button, Card, EmptyState, ErrorView, Load
 import { flashText } from "@/ui/flash-notice";
 
 export default function LearningScreen() {
+  const elder = useElderOn();
   const { member } = useSession();
   const { data, error, loading, reload } = useApi<CourseSummary[]>(member ? "/courses" : null);
   const [last, setLast] = useState<LastLesson | null>(null);
@@ -61,7 +63,7 @@ export default function LearningScreen() {
       wide
       top={
         enrolled.length ? (
-          <View style={styles.filters}>
+          <View style={[styles.filters, elder && { flexDirection: "column" }]}>
             <Select label="費用" value={kind} options={[{ key: "", label: "全部（免費與付費）" }, { key: "free", label: "免費" }, { key: "paid", label: "付費" }]} onChange={setKind} />
             <Select label="系列" value={seriesSel} options={[{ key: "", label: "全部系列" }, ...seriesList.map((x) => ({ key: x, label: x }))]} onChange={setSeriesSel} />
           </View>

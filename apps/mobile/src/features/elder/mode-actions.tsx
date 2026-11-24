@@ -53,6 +53,7 @@ export function FontSizeCard() {
   );
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+      {toggle("文字加粗", prefs.bold, (v) => setElder({ bold: v }))}
       {toggle("跟著手機字體大小", follow, (v) => setElder({ followSystem: v }), sys !== 1 ? `手機目前 ${Math.round(sys * 100)}%` : undefined)}
       <View style={[styles.row, { alignItems: "center" }, dim]} pointerEvents={follow ? "none" : "auto"}>
         <StepButton label="字變小" icon="remove" disabled={follow || prefs.size <= ELDER_MIN} onPress={() => step(-0.1)} outline />
@@ -78,7 +79,6 @@ export function FontSizeCard() {
           );
         })}
       </View>
-      {toggle("文字加粗", prefs.bold, (v) => setElder({ bold: v }), "全部文字變粗，更容易看清楚")}
     </View>
   );
 }
