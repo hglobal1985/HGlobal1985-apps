@@ -262,7 +262,7 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
       <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
         {coverUrl ? <Image source={{ uri: thumb(resolveUrl(coverUrl), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <TileCover rep={course} width={w} height={h} flat={!series} inSeries={!!series} title={label} />}
       </View>
-      <View style={{ flex: 1, height: h, gap: 6, minWidth: 0 }}>
+      <View style={{ flex: 1, height: h, gap: 6, minWidth: 0, paddingLeft: space.md }}>
         <FitTitle text={label} />
         <View style={[styles.tag, { backgroundColor: strong ? c.accent : c.accentSoft }]}>
           <AppText variant="callout" style={{ color: strong ? c.textOnAccent : c.accentText, fontWeight: "700" }}>
