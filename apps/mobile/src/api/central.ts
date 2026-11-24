@@ -459,6 +459,27 @@ export async function webSsoAdopt(next: string): Promise<boolean> {
   }
 }
 
+/**
+ * 開啟完整版會員中心（業主 2026-11-24；中央串接指令 2026-11-24.1 檢查清單 37）：已登入就不再要求選 Google 帳號。
+ * 每次都先取新的 sso_token → web-code（單次、2 分鐘，不快取）→ 用 /auth/sso/adopt 開啟，return 固定 /my/edit；
+ * 任何一步失敗（沒登入、連不上）才直接開 /my/edit。回傳要開啟的網址。
+ */
+export async function accountCenterUrl(): Promise<string> {
+  try {
+    const token = await centralToken();
+    if (!token) return ACCOUNT_URL;
+    const { sso_token } = await central<{ sso_token: string }>("/v1/auth/sso/start", "POST", {}, token);
+    const { code } = await central<{ code: string }>("/v1/auth/sso/web-code", "POST", { sso_token }, token);
+    const url = new URL(`${CENTRAL_URL}/auth/sso/adopt`);
+    url.searchParams.set("c", code);
+    url.searchParams.set("app_id", APP_ID);
+    url.searchParams.set("return", ACCOUNT_URL);
+    return url.toString();
+  } catch {
+    return ACCOUNT_URL;
+  }
+}
+
 /** 網頁版登出：清除本機後導向會員中心登出這個瀏覽器的所有 App。 */
 export function webSsoLogout(next = "/me"): void {
   if (!web) return;
