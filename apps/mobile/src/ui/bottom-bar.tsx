@@ -9,7 +9,7 @@ import { getBottomGap, onBottomGap } from "@/lib/bottom-gap";
 import { useUnreadCount } from "@/state/unread";
 import { MODE_PROFILES, useModeProfile, type TabKey } from "@/lib/app-mode";
 import { CrownIcon } from "@/features/elder/crown-icon";
-import { ElderSheet, switchToElder } from "@/features/elder/elder-sheet";
+import { switchToElder } from "@/features/elder/mode-actions";
 import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
@@ -27,7 +27,7 @@ import { UniversityIcon } from "./university-icon";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 /** 短網址（/縮寫）：單層路徑且不是網站固定頁面。 */
-const FIXED = new Set(["/me", "/learning", "/notices", "/achievements", "/orders", "/courses", "/admin", "/settings", "/auth"]);
+const FIXED = new Set(["/me", "/mode", "/learning", "/notices", "/achievements", "/orders", "/courses", "/admin", "/settings", "/auth"]);
 const isShortLink = (p: string) => /^\/[a-z0-9-]{2,30}$/i.test(p) && !FIXED.has(p);
 const tabs: { key: TabKey; href: Href; title: string; icon: IconName; active: IconName; building?: boolean; match: (p: string) => boolean }[] = [
   { key: "home", href: "/", title: "首頁", icon: "home-outline", active: "home", match: (p) => p === "/" },
@@ -58,7 +58,6 @@ export function BottomBar() {
   // 要顯示哪些分頁、選單要不要放大、模式鍵的文字，都看使用模式設定檔（lib/app-mode.tsx）。
   const profile = useModeProfile();
   const elder = profile.bigNav;
-  const [modeOpen, setModeOpen] = useState(false);
   const shown = profile.tabs.map((k) => tabs.find((t) => t.key === k)!).filter(Boolean);
   const [keyboard, setKeyboard] = useState(false);
   // 加到主畫面的 App 底部多出的一塊（lib/bottom-gap.ts）：它本身就是底部安全距離，選單不再額外留白；一般瀏覽器分頁沒有這一塊，才自己留一點。
@@ -91,7 +90,10 @@ export function BottomBar() {
       el.style.backgroundColor = old;
     };
   }, [barBg, hidden]);
-  if (hidden) return modeOpen ? <ElderSheet onClose={() => setModeOpen(false)} /> : null;
+  if (hidden) return null;
+  // 在模式頁（/mode）時，模式鍵跟其他分頁一樣亮起黃色膠囊。
+  const modeOn = !lib && pathname === "/mode";
+  const modeColor = modeOn ? c.navPillText : "#FFFFFF";
   const labelSize = elder ? (UI_SCALE > 1 ? 19 : 17) : UI_SCALE > 1 ? 16 : 12;
   const tabStyle = [styles.tab, elder && { minHeight: elderNavHeight }];
   return (
@@ -139,13 +141,13 @@ export function BottomBar() {
           style={tabStyle}
           accessibilityRole="button"
           accessibilityLabel={profile.key === "elder" ? `目前是${profile.name}模式。按這裡調整字體、看訂單紀錄、帳號，或換回${MODE_PROFILES.super.name}模式` : `目前是${profile.name}模式。按這裡切換到${MODE_PROFILES.elder.name}模式（大字簡易版）`}
-          onPress={() => (profile.key === "elder" ? setModeOpen(true) : switchToElder())}
+          onPress={() => (profile.modeKey === "page" ? router.navigate("/mode") : switchToElder())}
         >
-          <View style={[styles.cell, elder && styles.cellElder]}>
+          <View style={[styles.cell, elder && styles.cellElder, modeOn && { backgroundColor: c.navPill }]}>
             <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
-              {profile.key === "elder" ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color="#FFFFFF" /> : <Ionicons name={MAKER_ICON} size={iconSize} color="#FFFFFF" {...({ uiOnly: true } as object)} />}
+              {profile.key === "elder" ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color={modeColor} /> : <Ionicons name={MAKER_ICON} size={iconSize} color={modeColor} {...({ uiOnly: true } as object)} />}
             </View>
-            <AppText variant="caption" numberOfLines={1} style={{ color: "#FFFFFF", fontWeight: "800", fontSize: labelSize, lineHeight: Math.round(labelSize * 1.2) }} {...UI_ONLY}>
+            <AppText variant="caption" numberOfLines={1} style={{ color: modeColor, fontWeight: "800", fontSize: labelSize, lineHeight: Math.round(labelSize * 1.2) }} {...UI_ONLY}>
               {profile.name}
             </AppText>
           </View>
@@ -153,7 +155,6 @@ export function BottomBar() {
       )}
       </View>
     </View>
-    {modeOpen ? <ElderSheet onClose={() => setModeOpen(false)} /> : null}
     </>
   );
 }

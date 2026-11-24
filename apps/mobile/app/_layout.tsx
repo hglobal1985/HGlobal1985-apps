@@ -85,6 +85,7 @@ function AppStack() {
             <Stack.Screen name="admin/ai-text" options={{ title: "AI 文字辨識" }} />
             <Stack.Screen name="admin/thumb-badges" options={{ title: "縮圖符號" }} />
             <Stack.Screen name="achievements" options={{ title: "學習成就" }} />
+            <Stack.Screen name="mode" options={{ title: "至尊模式" }} />
             <Stack.Screen name="admin/achievements" options={{ title: "徽章任務設定" }} />
             <Stack.Screen name="admin/brand-logos" options={{ title: "品牌 Logo" }} />
             <Stack.Screen name="admin/list-cover-bgs" options={{ title: "清單封面底圖" }} />
