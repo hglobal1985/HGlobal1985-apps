@@ -231,7 +231,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
     if (reviewed && data && key !== "display_name" && key !== "legal_name") {
       const f = data.fields[key];
       if (initial && v === initial[key]) {
-        if (f.pending !== null) return "審核中...";
+        if (f.pending !== null || f.status === "pending") return "審核中..."; // 一切以中央回傳的 status 為準（2026-11-24.2：獎銜一律審核、寰宇時中心也審核）
         if (f.status === "approved") return "審核通過";
       }
     }
