@@ -8,6 +8,7 @@ import { buildSearchIndex, charsCourses, fuzzyCourses, matchCourses, rankCourses
 import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
 import { useThumb } from "@/lib/thumb";
+import { useProfileRedirect } from "@/features/profile-gate";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, radius, space } from "@/theme/tokens";
@@ -47,6 +48,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { member } = useSession();
+  useProfileRedirect(member); // 會員資料沒填完：登入後自動帶到至尊模式頁、捲到沒填的欄位（業主 2026-11-24）
   const courses = useApi<CourseSummary[]>("/courses");
   const [q, setQ] = useState("");
   const [heard, setHeard] = useState<string | null>(null);

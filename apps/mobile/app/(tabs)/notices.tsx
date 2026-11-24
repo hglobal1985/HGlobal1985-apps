@@ -1,4 +1,4 @@
-import { useElderOn } from "@/lib/elder-mode";
+import { useModeProfile } from "@/lib/app-mode";
 import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, type Href } from "expo-router";
@@ -16,7 +16,7 @@ import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 
 export default function NoticesScreen() {
-  const elder = useElderOn();
+  const elder = useModeProfile().bigLayout; // 大字版面（至尊模式）：一欄直排、內文展開、不顯示大標題
   const { c } = useTheme();
   const { member, invalidate } = useSession();
   const { data, error, loading, reload } = useApi<Notice[]>(member ? "/notifications" : null);

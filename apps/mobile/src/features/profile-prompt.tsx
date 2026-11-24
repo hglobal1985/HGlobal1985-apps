@@ -66,10 +66,10 @@ function Label({ text, tag, note, reserveNote }: { text: string; tag?: string; n
 }
 
 /** 必填沒填時，整列用 2px 橘框＋淡橘底標示（中央視覺規範）。 */
-function Row({ bad, z, fixed, children }: { bad?: boolean; z?: number; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，業主 2026-11-23）。 */ fixed?: boolean; children: ReactNode }) {
+function Row({ bad, z, fixed, anchor, children }: { bad?: boolean; z?: number; /** 欄位代號：給「跳到沒填的欄位」定位用（nativeID＝pf-代號）。 */ anchor?: string; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，業主 2026-11-23）。 */ fixed?: boolean; children: ReactNode }) {
   const { c } = useTheme();
   const box = { borderWidth: 2, borderRadius: radius.md, padding: 4 };
-  return <View style={[{ gap: 2, zIndex: z ?? 1 }, fixed && { ...box, borderColor: "transparent" }, bad && { ...box, borderColor: c.warning, backgroundColor: c.warningSoft }]}>{children}</View>;
+  return <View nativeID={anchor ? `pf-${anchor}` : undefined} style={[{ gap: 2, zIndex: z ?? 1 }, fixed && { ...box, borderColor: "transparent" }, bad && { ...box, borderColor: c.warning, backgroundColor: c.warningSoft }]}>{children}</View>;
 }
 
 function Input({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
@@ -126,7 +126,7 @@ function FieldLine({ stack, children }: { stack: boolean; children: ReactNode })
  * 完善個人資料表單（兩種模式共用同一份，業主 2026-11-24：欄位改了兩邊自動一起變）。
  * inline＝直接放在頁面裡（至尊模式的模式頁，沒有「關閉」鈕、儲存後不關閉）；預設＝上拉選單。
  */
-export function ProfilePrompt({ onClose, initial: first, inline = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean }) {
+export function ProfilePrompt({ onClose, initial: first, inline = false, focusMissing = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean; /** 資料載入後，標出沒填的欄位並捲到第一個（至尊模式登入後自動帶到模式頁，業主 2026-11-24）。 */ focusMissing?: boolean }) {
   /** 一欄由上往下排（至尊模式頁，字放大後三欄橫排會被擠爛）；上拉選單版維持原本的緊湊三欄。 */
   const stack = inline;
   const { c } = useTheme();
@@ -272,6 +272,17 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
     return f.status === "approved" && f.pending === null ? "變更需再重新審核" : undefined;
   };
 
+  // 至尊模式登入後自動帶到模式頁（focusMissing）：表單資料到了就標出沒填的欄位、捲到第一個，只做一次。
+  const focused = useRef(false);
+  const firstMissing = missing[0];
+  useEffect(() => {
+    if (!focusMissing || focused.current || !data) return;
+    focused.current = true;
+    if (!firstMissing) return;
+    setShowBad(true);
+    setMsg({ ok: false, text: "請先把標示的欄位填好，再按儲存" });
+    if (Platform.OS === "web" && typeof document !== "undefined") setTimeout(() => document.getElementById(`pf-${firstMissing}`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 400);
+  }, [focusMissing, data, firstMissing]);
   const save = async () => {
     if (missing.length) {
       setShowBad(true);
@@ -335,7 +346,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
       other,
       node: colBox(
         key,
-        <Row fixed z={openKey === key ? 100 : 1} bad={showBad && missing.includes(key)}>
+        <Row fixed z={openKey === key ? 100 : 1} anchor={key} bad={showBad && missing.includes(key)}>
           <Label text={label} tag={shortTag(tagFor(key, isCenter))} note={isCenter ? noteFor("education_center") : undefined} reserveNote={anyNote} />
           <FieldLine stack={stack}>
           <Dropdown
@@ -395,7 +406,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
               {/* 本名（四個中文字寬）＋縮小的手機推播（業主 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
               <View style={stack ? { gap: space.sm } : [styles.line, { alignItems: "flex-end" }]}>
                 <View style={stack ? { width: "100%" } : { width: 128 }}>
-                  <Row bad={showBad && missing.includes("legal_name")}>
+                  <Row anchor={"legal_name"} bad={showBad && missing.includes("legal_name")}>
                     <Label text="本名" />
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
@@ -421,7 +432,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                     <View style={stack ? { gap: 8 } : { flexDirection: "row", gap: 8, alignItems: "flex-start", zIndex: uplineFocus ? 100 : 1 }}>
                       {(["upline_platinum", "upline_diamond"] as const).map((k) => (
                         <View key={k} ref={k === "upline_platinum" ? platBox : diamBox} collapsable={false} style={stack ? { width: "100%" } : { flex: 1, minWidth: 0 }}>
-                         <Row fixed bad={showBad && missing.includes(k)}>
+                         <Row fixed anchor={k} bad={showBad && missing.includes(k)}>
                           <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
                           <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
                          </Row>
@@ -432,7 +443,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                     <View style={stack ? { gap: 8 } : { flexDirection: "row", gap: 8, zIndex: 30, alignItems: "flex-start" }}>
                       {colBox(
                         "rank",
-                        <Row fixed z={openKey === "rank" ? 100 : 1} bad={showBad && missing.includes("rank")}>
+                        <Row fixed z={openKey === "rank" ? 100 : 1} anchor={"rank"} bad={showBad && missing.includes("rank")}>
                           <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} reserveNote={anyNote} />
                           <FieldLine stack={stack}>
                           <Dropdown
@@ -454,7 +465,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                       {sysCol.other ? (
                         // 系統選「其他」：隱藏中心欄，原位置改成自訂系統的輸入欄（業主 2026-11-23）。
                         <View style={stack ? { width: "100%" } : { flex: 1, minWidth: 0 }}>
-                          <Row fixed bad={showBad && missing.includes("education_system")}>
+                          <Row fixed anchor={"education_system"} bad={showBad && missing.includes("education_system")}>
                             <Label text="自訂系統" tag={shortTag(tagFor("education_system"))} reserveNote={anyNote} />
                             <Input value={vals.education_system} onChange={setSystem} placeholder="請輸入系統名稱" />
                           </Row>

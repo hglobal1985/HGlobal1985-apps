@@ -29,6 +29,8 @@ export type FeatureKey =
   | "adminEdit"
   /** 右下角「＋新增」浮動鈕（新增教材、課程、公告…）。 */
   | "addButton"
+  /** 學習中頁的「系列」篩選（業主 2026-11-24：至尊模式拿掉）。 */
+  | "seriesFilter"
   /** 設定頁的「刪除帳號」鈕（業主 2026-11-24：至尊模式移除，超派模式仍有——上架商店規定 App 內要有刪除帳號入口）。 */
   | "deleteAccount";
 
@@ -51,6 +53,8 @@ export type ModeProfile = {
   bigNav: boolean;
   /** 頁面大標題（標題、未讀數、右側按鈕）上下堆疊，不橫擠（字放大後標題才不會被擠成一字一行）。 */
   stackHeaders: boolean;
+  /** 大字版面（至尊）：清單一欄由上往下、內文直接展開、不顯示頁面大標題，篩選改用大標籤／大下拉（通知、學習中…）。 */
+  bigLayout: boolean;
   /** 字體可以自訂、可以跟著手機字體。 */
   fontAdjustable: boolean;
   /** 離開這個模式前要先確認（防誤按）。 */
@@ -73,11 +77,12 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     coursePage: "twoTabs",
     bigNav: true,
     stackHeaders: true,
+    bigLayout: true,
     fontAdjustable: true,
     confirmLeave: true,
     sheets: "page",
     modeKey: "page",
-    features: { addToList: false, comments: false, achievements: false, myLists: false, library: false, manageSection: false, adminEdit: false, addButton: false, deleteAccount: false },
+    features: { addToList: false, comments: false, achievements: false, myLists: false, library: false, manageSection: false, adminEdit: false, addButton: false, seriesFilter: false, deleteAccount: false },
   },
   // 超派模式：原本的完整版。
   super: {
@@ -89,11 +94,12 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     coursePage: "classic",
     bigNav: false,
     stackHeaders: false,
+    bigLayout: false,
     fontAdjustable: false,
     confirmLeave: false,
     sheets: "sheet",
     modeKey: "switch",
-    features: { addToList: true, comments: true, achievements: true, myLists: true, library: true, manageSection: true, adminEdit: true, addButton: true, deleteAccount: true },
+    features: { addToList: true, comments: true, achievements: true, myLists: true, library: true, manageSection: true, adminEdit: true, addButton: true, seriesFilter: true, deleteAccount: true },
   },
 };
 
