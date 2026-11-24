@@ -14,7 +14,7 @@ import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
-import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
+import { ELDER_ZONES, ElderZoneBackdrop, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -157,10 +157,19 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   // 搜尋框固定在最上面、與下方內容分開（業主 2026-11-24 驗證回報：打一個字畫面就換成另一棵元件樹，輸入框被重建、鍵盤收起，只留得下第一個字）。
   // 不論有沒有結果、是否在聽，搜尋框永遠是同一個位置的同一個元件，才不會中斷輸入。
   const pad = { paddingHorizontal: space.md };
+  // 進入分類後：標題條固定在搜尋框下面（不隨清單捲走）、背景有該分類的浮水印大圖示（業主 2026-11-24，選 E 款）。
+  const zoneDef = ELDER_ZONES.find((z) => z.id === zone);
+  const inZone = mode === "browse" && !searching && !!zoneDef;
   const listMode = !body && !(!searching && mode === "home");
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
       <View style={[styles.inner, pad, { paddingTop: insets.top + space.md, paddingBottom: space.sm }]}>{header}</View>
+      {inZone ? <ElderZoneBackdrop zone={zoneDef!} /> : null}
+      {inZone ? (
+        <View style={[styles.inner, pad, { paddingBottom: space.sm }]}>
+          <ElderZoneHeader zone={zoneDef!} sub={sub?.title} onBack={() => (sub ? setSub(null) : setZone(null))} />
+        </View>
+      ) : null}
       {listMode ? (
         <FlatList
           style={styles.fill}
@@ -170,16 +179,12 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListHeaderComponent={
-            mode === "browse" && !searching ? (
-              zone ? (
-                <ElderZoneHeader zone={ELDER_ZONES.find((z) => z.id === zone)!} sub={sub?.title} onBack={() => (sub ? setSub(null) : setZone(null))} />
-              ) : (
-                <View style={{ gap: space.md }}>
-                  {ELDER_ZONES.map((z) => (
-                    <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
-                  ))}
-                </View>
-              )
+            mode === "browse" && !searching && !zone ? (
+              <View style={{ gap: space.md }}>
+                {ELDER_ZONES.map((z) => (
+                  <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
+                ))}
+              </View>
             ) : undefined
           }
           renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} />}
