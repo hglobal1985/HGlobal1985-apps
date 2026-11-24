@@ -12,6 +12,7 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
+import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
 import { useVoice } from "./use-voice";
 
@@ -240,7 +241,7 @@ export function ElderCourseRow({ course }: { course: CourseSummary }) {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   inner: { width: "100%", maxWidth: maxContentWidth, alignSelf: "center" },
-  box: { flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: 4, borderRadius: radius.lg + 6, paddingLeft: space.lg, paddingRight: space.sm, paddingVertical: space.sm, minHeight: Math.round(80 * UI_SCALE) },
+  box: { flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: ELDER_FIELD.borderWidth, borderRadius: ELDER_FIELD.radius, paddingLeft: space.lg, paddingRight: space.sm, paddingVertical: space.sm, minHeight: Math.round(80 * UI_SCALE) },
   input: { flex: 1, fontSize: 20, lineHeight: 28, paddingVertical: space.sm, minWidth: 0, outlineStyle: "none" } as object,
   boxBtn: { width: Math.round(56 * UI_SCALE), height: Math.round(56 * UI_SCALE), borderRadius: radius.lg, alignItems: "center", justifyContent: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingVertical: space.md },

@@ -54,3 +54,4 @@
 - **至尊模式移除頁面大標題（業主 2026-11-24）**：通知頁（含「N 則未讀」副標）、課程分頁的「全部課程」不再顯示標題；學習中頁本來就沒有。超派模式照舊。
 - **至尊模式上方控制項統一成「搜尋框同款」（業主 2026-11-24）**：通知四個標籤、學習中的下拉篩選，外觀與首頁／課程的搜尋框一致：粗 4px 綠框、大圓角（`radius.lg+6`）、高 `72～80 × UI_SCALE`、字用 `headline`。下拉走 `Dropdown big`（`Select` 在至尊模式自動帶）。
 - **Dropdown 原地展開錯位根因（業主 2026-11-24 第二次回報）**：樣式陣列裡用 `top: undefined` 想蓋掉前面的 `top` 在 react-native-web 不會生效，relative 的選項框還是被往下推。**不可用 undefined 覆蓋樣式，要用條件式分開組樣式**（已改 `ui/dropdown.tsx`）。
+- **至尊模式專用控制項模組（業主 2026-11-24 永久指示）**：`src/ui/elder-controls.tsx`＝`ELDER_FIELD`（框線 4px、圓角 `radius.lg+6`、高度 80／標籤 72，皆 × `UI_SCALE`）＋`ElderTabs`（一列平分的標籤、選中實心綠、紅點貼右上角）。通知頁至尊模式用 `ElderTabs`；`Dropdown big` 與首頁／課程搜尋框（`elder-search.tsx`）都吃 `ELDER_FIELD`。**要改至尊模式控制項的外觀只改這個檔案**；超派模式不受影響。
