@@ -15,7 +15,9 @@ function listen() {
     "scroll",
     (e) => {
       const el = e.target as HTMLElement | null;
-      if (!el || el === (document as unknown) || el.clientHeight < 200 || el.scrollHeight - el.clientHeight < 40) return;
+      if (!el || el === (document as unknown)) return;
+      // 頁面主要捲動區（Screen 的 Scroller 有 data-stable-gutter 標記）一律算，不管視窗多矮；其他的捲動區要夠高、真的能捲才算。
+      if (!el.hasAttribute?.("data-stable-gutter") && (el.clientHeight < 200 || el.scrollHeight - el.clientHeight < 40)) return;
       const n = Math.max(0, Math.round(el.scrollTop));
       if (n === y) return;
       y = n;

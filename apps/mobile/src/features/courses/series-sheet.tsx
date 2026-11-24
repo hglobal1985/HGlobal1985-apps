@@ -39,8 +39,12 @@ function StatusChip({ course }: { course: CourseSummary }) {
  * 清單的區塊選單（業主 2026-11-18）：清單有勾「顯示在上拉選單」的區塊時，點寰宇大學的小卡彈出這個。
  * 每列＝封面（手動上傳 > 品牌 logo > 預設圖）＋區塊名稱＋灰色數字（只顯示數量）；點一列進清單頁、自動捲到該區塊並展開。
  */
-/** 上拉選單要列出的區塊：沒內容（教材數加照片數是 0）的區塊不對外展示，只有管理員看得到（淡化）。業主 2026-11-24。 */
-export const shownBlocks = (course: CourseSummary, admin: boolean) => course.blocks.filter((b) => b.count > 0 || admin);
+/**
+ * 上拉選單的「0 教材」規則（業主 2026-11-24）：免費課程教材是 0 ＝ 隱藏、不列在上拉選單；付費課程就算教材是 0 也一律列出（讓人看得到有這門課）。
+ * 管理員永遠看得到（淡化）。區塊（教材數加照片數）與卡片（教材數）同一條規則。
+ */
+export const hideEmptyInSheet = (course: { paid: boolean }, count: number, admin: boolean) => !admin && !course.paid && count === 0;
+export const shownBlocks = (course: CourseSummary, admin: boolean) => course.blocks.filter((b) => !hideEmptyInSheet(course, b.count, admin));
 
 export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
   const thumb = useThumb();
@@ -127,6 +131,7 @@ export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onC
 /** 「還有 N 個梯次」：從下方彈出，列出同系列所有梯次（日期＋狀態），點一列進入那一場的課程頁。 */
 export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllSeries }: { title: string; items: CourseSummary[]; onClose: () => void; onPick?: (c: CourseSummary) => void; currentId?: string; showAllSeries?: string }) {
   const thumb = useThumb();
+  const admin = useSession().member?.role === "admin";
   const links = useApi<{ kind: string; value: string; slug: string }[]>(showAllSeries ? "/short-links" : null);
   /** 顯示該系列全部梯次（全部展開）：有設定短網址就用短網址，沒有用 /series/系列名稱。 */
   const showAll = () => {
@@ -143,7 +148,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
         {showAllSeries ? <SheetAction label="顯示全部" accessibilityLabel={`顯示「${showAllSeries}」全部梯次`} onPress={showAll} /> : null}
       </View>
       <SheetScroll>
-        {seriesOrdered(items).map((x) => (
+        {seriesOrdered(items).filter((x) => !hideEmptyInSheet(x, x.materialCount, admin)).map((x) => (
           <SheetRow
             key={x.id}
             accessibilityLabel={`${x.title} ${x.eventStart ?? ""}`}
