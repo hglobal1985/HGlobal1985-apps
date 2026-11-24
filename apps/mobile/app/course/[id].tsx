@@ -25,6 +25,7 @@ import { CollapseToggle } from "@/ui/collapse-toggle";
 import { PageHeader } from "@/features/page-header";
 import { centerTitle } from "@/features/format";
 import { useSeriesSettings } from "@/features/courses/series-settings";
+import { albumTotal } from "@/features/courses/block-album";
 import { LessonStage } from "@/features/player/lesson-stage";
 import { ElderCourse } from "@/features/elder/elder-course";
 import { ElderBroadcastBox } from "@/features/elder/elder-broadcast";
@@ -75,8 +76,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（進入頁面時點閱 +1，算進主辦中心、所屬系列與這門課自己的封面）。
   const stats = useCoverStats("course", data?.id ?? null, `/course/${id}`, data?.isList ? "清單" : "課程");
   // 教材區右上角「縮圖／詳細列表」切換：每次進入課程卡頁一律從「縮圖」開始（業主 2026-11-21，不再記住上次的選擇）；區塊預設全部收起。
-  const [listLayout, setListLayout] = useState<"thumb" | "detail">("thumb");
-  const pickLayout = (v: "thumb" | "detail") => setListLayout(v);
+  const [listLayout, setListLayout] = useState<"thumb" | "detail" | "album">("thumb");
+  const [albumOpen, setAlbumOpen] = useState<string | null>(null); // 相簿分頁自動展開的區塊（「瀏覽本區照片」跳過來，業主 2026-11-24）
+  const pickLayout = (v: "thumb" | "detail" | "album") => (setListLayout(v), v !== "album" && setAlbumOpen(null));
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
   const opQueue = useRef<Promise<unknown>>(Promise.resolve());
@@ -514,10 +516,10 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         {!(editing && canEditContent) && blockView.lessons.some((l) => l.material) ? (
           <Section title="">
             {course.lessons.some((l) => l.section) ? (
-              <SegmentTabs options={[{ key: "detail", label: "清單" }, { key: "thumb", label: "縮圖" }]} value={listLayout} onChange={pickLayout} />
+              <SegmentTabs options={[{ key: "detail", label: "清單" }, { key: "thumb", label: "縮圖" }, ...(albumTotal(course) ? [{ key: "album" as const, label: "相簿" }] : [])]} value={listLayout} onChange={pickLayout} />
             ) : null}
             <View style={!editing && materialsLocked ? { minHeight: 230 } : undefined}>
-              <FullVersionList course={blockView} openBlock={block} layout={listLayout} playingId={editing ? null : playingId} onPlay={playLesson_} />
+              <FullVersionList course={blockView} openBlock={block} layout={listLayout} albumOpen={albumOpen} onBrowsePhotos={(id) => (setAlbumOpen(id), setListLayout("album"))} onPhotosChanged={reload} playingId={editing ? null : playingId} onPlay={playLesson_} />
               {/* 沒有權限時，其他教材也蓋上同一個大鎖頭（業主 2026-11-20）。 */}
               {!editing && materialsLocked ? (
                 <LockMask lines={[lockedText]} />
