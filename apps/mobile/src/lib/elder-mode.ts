@@ -74,10 +74,10 @@ function applyWrap() {
   const el = document.documentElement;
   if (prefs.on) el.setAttribute("data-elder", "1");
   else el.removeAttribute("data-elder");
-  if (!document.getElementById("elder-wrap-2")) {
+  if (!document.getElementById("elder-wrap-3")) {
     const st = document.createElement("style");
-    st.id = "elder-wrap-2";
-    st.textContent = 'html[data-elder="1"] div[dir="auto"]:not([data-plainwrap]),html[data-elder="1"] span[dir="auto"]:not([data-plainwrap]){text-wrap:balance}';
+    st.id = "elder-wrap-3";
+    st.textContent = ""; // 不再平均斷行（業主 2026-11-24：至尊模式所有頁面一律依寬度自然換行）
     document.head.appendChild(st);
   }
 }

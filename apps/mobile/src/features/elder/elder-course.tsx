@@ -26,6 +26,49 @@ export function elderExtras(course: CourseDetail): Lesson[] {
   return [...course.lessons.filter((l) => l.full && !l.section), ...course.lessons.filter((l) => l.material && !l.section && !l.full)];
 }
 
+type BlockGroup = { head: Lesson; items: Lesson[] };
+/** 切成：區塊前面沒歸區塊的教材＋各區塊（標題＋底下的教材）；沒有可看教材的區塊不列。 */
+function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lead: Lesson[]; blocks: BlockGroup[] } {
+  const lead: Lesson[] = [];
+  const blocks: BlockGroup[] = [];
+  for (const l of course.lessons.filter((x) => x.material)) {
+    if (l.full) continue;
+    if (l.section) blocks.push({ head: l, items: [] });
+    else if (blocks.length) blocks[blocks.length - 1]!.items.push(l);
+    else lead.push(l);
+  }
+  return { lead: lead.filter(shown), blocks: blocks.map((b) => ({ ...b, items: b.items.filter(shown) })).filter((b) => b.items.length) };
+}
+
+/** 區塊清單：每個區塊一張大列（標題＋教材數＋展開箭頭），預設全部收起、同一時間只展開一個（與超派模式 BLOCK_BEHAVIOR 一致）。 */
+function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
+  const { c } = useTheme();
+  const [open, setOpen] = useState<string | null>(null);
+  return (
+    <>
+      {lead.map(renderRow)}
+      {blocks.map((b) => {
+        const on = open === b.head.id;
+        const hasPlaying = b.items.some((l) => l.id === playingId);
+        return (
+          <View key={b.head.id} style={{ gap: space.sm }}>
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${b.items.length} 項教材，${on ? "點一下收起" : "點一下展開"}`} onPress={() => setOpen(on ? null : b.head.id)} style={[styles.block, { backgroundColor: on || hasPlaying ? c.accent : c.accentSoft }]}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText variant="headline" style={{ color: on || hasPlaying ? c.textOnAccent : c.accentText, fontWeight: "800" }}>
+                  {b.head.title}
+                </AppText>
+                <AppText variant="callout" style={{ color: on || hasPlaying ? c.textOnAccent : c.accentText }}>{`${b.items.length} 項教材`}</AppText>
+              </View>
+              <Ionicons name={on ? "chevron-up" : "chevron-down"} size={30} color={on || hasPlaying ? c.textOnAccent : c.accentText} />
+            </Pressable>
+            {on ? b.items.map(renderRow) : null}
+          </View>
+        );
+      })}
+    </>
+  );
+}
+
 /** 其他教材若是外部連結／下載檔案，點下去開連結或下載（和超派模式的教材列一樣），不是播放。 */
 function openMaterial(l: Lesson): boolean {
   if (!l.linkType || l.full || !l.linkUrl) return false;
@@ -80,6 +123,9 @@ export function ElderCourse({
   const next = current ?? items.find((l) => can(l) && !l.completed) ?? null;
   const rest = items.filter((l) => l !== next);
   const extras = elderExtras(course);
+  // 區塊（清單卡的「區塊 > 教材」，業主 2026-11-24：至尊模式也要顯示、預設收起）：區塊底下的教材＝排在它後面、下一個區塊之前；超派模式 `lesson-list.tsx` 同一規則。
+  const blockMode = course.lessons.some((l) => l.section);
+  const blocks = splitBlocks(course, (l) => l.ready || !!l.linkUrl);
   const ordered = [...(next ? [next] : []), ...rest.filter((l) => !l.completed), ...rest.filter((l) => l.completed)];
   const done = items.filter((l) => l.completed).length;
   const word = items.some((l) => !l.material) ? "課" : "部";
@@ -132,7 +178,15 @@ export function ElderCourse({
                 </View>
               </Pressable>
             ) : null}
-            {ordered.map((l) => (
+            {blockMode ? (
+              <BlockList
+                lead={blocks.lead}
+                blocks={blocks.blocks}
+                playingId={playingId}
+                renderRow={(l) => <LessonRow key={l.id} lesson={l} highlight={false} playing={l.id === playingId} onPress={() => (can(l) ? (openMaterial(l) ? undefined : onPlay(l.id)) : l.locked ? setTab("intro") : undefined)} />}
+              />
+            ) : null}
+            {(blockMode ? [] : ordered).map((l) => (
               <LessonRow key={l.id} lesson={l} highlight={l === next} playing={l.id === playingId} onPress={() => (can(l) ? (openMaterial(l) ? undefined : onPlay(l.id)) : l.locked ? setTab("intro") : undefined)} />
             ))}
             {extras.length ? (
@@ -227,6 +281,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, minHeight: 60, borderRadius: radius.lg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg + 4, paddingHorizontal: space.md, paddingVertical: space.md, minHeight: 76 },
   num: { borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  block: { flexDirection: "row", alignItems: "center", gap: space.md, borderRadius: radius.lg + 4, paddingHorizontal: space.md, paddingVertical: space.md, minHeight: 76 },
   lockBox: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg, padding: space.md },
   info: { borderWidth: 2, borderRadius: radius.lg + 4, padding: space.md, gap: space.sm },
   infoLine: { flexDirection: "row", alignItems: "flex-start", gap: space.sm },
