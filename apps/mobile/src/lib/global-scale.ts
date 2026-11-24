@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { StyleSheet, Text, TextInput } from "react-native";
 import { UI_SCALE } from "@/theme/ui-scale";
-import { elderTextScale } from "./elder-mode";
+import { elderTextScale, getElder } from "./elder-mode";
 
 /**
  * 全站字體與圖示統一放大（倍數見 theme/ui-scale.ts）：在 Text、TextInput、Ionicons 這三個最底層元件上，
@@ -16,11 +16,13 @@ for (const C of [Text, TextInput] as unknown as { defaultProps?: Record<string, 
 {
   /** 全部倍數＝平板／電腦倍數 × 至尊模式倍數（每次畫字時讀，切換模式後重建畫面就會用新倍數）。 */
   const full = () => UI_SCALE * elderTextScale();
-  const scaled = (style: unknown, k: number) => {
-    if (k === 1) return style;
+  const scaled = (style: unknown, k: number, bold = false) => {
+    if (k === 1 && !bold) return style;
     const f = StyleSheet.flatten(style as never) as Record<string, unknown> | undefined;
     if (!f || (f.fontSize == null && f.lineHeight == null)) return style;
     const o = { ...f };
+    // 至尊模式「文字加粗」：一般（400～500）的字一律加到 700，原本就粗的不動。
+    if (bold && (o.fontWeight == null || o.fontWeight === "normal" || o.fontWeight === "400" || o.fontWeight === "500" || o.fontWeight === 400 || o.fontWeight === 500)) o.fontWeight = "700";
     if (typeof o.fontSize === "number") o.fontSize = Math.round(o.fontSize * k);
     if (typeof o.lineHeight === "number") o.lineHeight = Math.round(o.lineHeight * k);
     return o;
@@ -31,8 +33,10 @@ for (const C of [Text, TextInput] as unknown as { defaultProps?: Record<string, 
     if (typeof orig === "function")
       C.render = ((p: P, r: unknown) => {
         if (p.dataSet && p.dataSet.noScale !== undefined) return orig(p, r);
-        const k = p.dataSet && p.dataSet.uiOnly !== undefined ? UI_SCALE : full();
-        return orig(k === 1 ? p : { ...p, style: scaled(p.style, k) }, r);
+        const ui = p.dataSet && p.dataSet.uiOnly !== undefined;
+        const k = ui ? UI_SCALE : full();
+        const bold = !ui && getElder().on && getElder().bold;
+        return orig(k === 1 && !bold ? p : { ...p, style: scaled(p.style, k, bold) }, r);
       }) as unknown as AnyFn;
   }
   // 圖示：外層把 size 乘平板／電腦倍數，裡面的字型圖示（Text）再由上面的 Text 規則放大一次（平板原本就是這樣，維持不變）。

@@ -3,7 +3,8 @@ import { useEffect } from "react";
 import { hasUnsaved, runGuarded } from "@/lib/unsaved-guard";
 import { View } from "react-native";
 import { MemberHeader } from "@/features/member-header";
-import { ProfilePrompt } from "@/features/profile-prompt";
+import { PushSwitchRow } from "@/features/push-switch";
+import { AccountCenterLink, ProfilePrompt } from "@/features/profile-prompt";
 import { MODE_PROFILES } from "@/lib/app-mode";
 import { useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
@@ -30,6 +31,13 @@ export function ModePage() {
   );
   return (
     <Screen>
+      {/* 最上方：訊息通知（勾選）→ 前往完整版會員中心 → 並排「訂單紀錄｜超派模式」（業主 2026-11-24） */}
+      {member ? (
+        <>
+          <PushSwitchRow banner />
+          {member.demo ? null : <AccountCenterLink />}
+        </>
+      ) : null}
       {/* 最上方並排：訂單紀錄｜超派模式（業主 2026-11-24） */}
       <View style={{ flexDirection: "row", gap: space.sm }}>
         <View style={{ flex: 1 }}>
@@ -49,7 +57,7 @@ export function ModePage() {
         <GuestGate body="登入後即可報名課程、記錄學習進度。" />
       ) : null}
       <FontSizeCard />
-      <Button variant="secondary" icon="person-circle-outline" label={member ? "帳號" : "登入"} onPress={() => runGuarded(() => router.push("/me"))} fullWidth />
+      {member ? null : <Button variant="secondary" icon="person-circle-outline" label="登入" onPress={() => runGuarded(() => router.push("/me"))} fullWidth />}
     </Screen>
   );
 }

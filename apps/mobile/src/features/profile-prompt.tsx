@@ -88,7 +88,11 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
 }
 
 /** 「前往完整版會員中心」：強制單行、依畫面寬度自動縮小字體（業主 2026-11-24；網頁不支援 adjustsFontSizeToFit，所以自己用寬度與字數算）。 */
-function FitLink({ onPress, color, text }: { onPress: () => void; color: string; text: string }) {
+export function AccountCenterLink() {
+  const { c } = useTheme();
+  const onPress = openAccountCenter;
+  const color = c.accentText;
+  const text = "前往完整版會員中心";
   const [w, setW] = useState(0);
   const chars = [...text].length;
   // 畫字時會再乘「平板倍數 × 至尊倍數」（lib/global-scale.ts），圖示也一樣：所以先在「放大前」的尺寸上算，剛好塞滿一行。
@@ -420,7 +424,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
     <Wrap inline={inline} onClose={onClose} lift={!!openKey || !!uplineFocus}>
       <Body inline={inline} lift={!!openKey || !!uplineFocus} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
-          <FitLink onPress={openAccountCenter} color={c.accentText} text="前往完整版會員中心" />
+          {stack ? null : <AccountCenterLink />}
           {msg ? (
             <AppText variant="caption" tone={msg.ok ? "success" : "danger"} numberOfLines={2}>
               {msg.text}
@@ -442,9 +446,11 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
                 </View>
-                <View style={stack ? { width: "100%" } : { flex: 1, minWidth: 0, }}>
-                  <PushSwitchRow banner compact={!stack} />
-                </View>
+                {stack ? null : (
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <PushSwitchRow banner compact />
+                  </View>
+                )}
               </View>
               {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
               <View style={[styles.amwayCard, { backgroundColor: c.surfaceMuted, zIndex: openKey || uplineFocus ? 500 : 5 }]}>
@@ -516,11 +522,17 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
             尚未儲存
           </AppText>
           <AppText>資料還沒有儲存。請按「儲存」；不想存就按「放棄」，會還原成原本的資料，並留在這一頁。</AppText>
-          <Button variant="cancel" label="放棄" icon="close" onPress={() => { if (data) apply(data); setLeaving(null); setUnsavedGuard(null); }} fullWidth />
         </View>
       ) : null}
       <View ref={saveBox} collapsable={false} style={styles.actions}>
-        {inline ? null : (
+        {inline ? (
+          // 至尊模式頁：有未儲存的改動時，「放棄」在儲存鈕左邊、同一列（業主 2026-11-24）。
+          dirty ? (
+            <View style={{ flex: 1 }}>
+              <Button variant="cancel" label="放棄" icon="close" onPress={() => { if (data) apply(data); setLeaving(null); setUnsavedGuard(null); }} fullWidth />
+            </View>
+          ) : null
+        ) : (
           <View style={{ flex: 1 }}>
             <Button variant="cancel" label="關閉" icon="close" onPress={onClose} fullWidth />
           </View>
