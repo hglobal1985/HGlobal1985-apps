@@ -55,8 +55,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
   const H = collapsed ? MINI_CIRCLE : mh + MINI_BAR; // 小視窗＝按鈕列＋畫面；位置記的是整組左上角
   const clampPos = (p: Pos): Pos => ({ x: Math.min(area.w - W - MINI_MARGIN, Math.max(MINI_MARGIN, p.x)), y: Math.min(area.h - H - MINI_MARGIN, Math.max(MINI_MARGIN, p.y)) });
   const cur = clampPos(saved ?? { x: area.w - W - 12, y: area.h - H - 12 });
-  const live = useRef({ cur, clampPos, onTap });
-  live.current = { cur, clampPos, onTap };
+  const live = useRef<{ cur: Pos; clampPos: (p: Pos) => Pos; onTap?: () => void; collapsed: boolean; restore: () => void }>({ cur, clampPos, onTap, collapsed, restore: () => undefined });
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const savedRef = useRef<Pos | null>(null);
   const persist = (p: Pos) => {
@@ -85,6 +84,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
           drag.current = null;
           if (!d) return;
           if (d.moved) return void (savedRef.current && persist(savedRef.current));
+          if (live.current.collapsed) return live.current.restore(); // 點一下小圓圖＝恢復小視窗（拖曳時不會觸發）
           live.current.onTap?.(); // 點一下畫面只會喚醒三顆按鈕（onGrant 已做）；有傳 onTap 才另外做事（影片是暫停／播放，封面沒有）
         },
         onPanResponderTerminate: () => {
@@ -104,6 +104,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
     persist(p);
     setCollapsed(toCircle);
   };
+  live.current = { cur, clampPos, onTap, collapsed, restore: () => resize(false) };
   const buttons = [
     { key: "min", label: "最小化（縮成小圓圖）", glyph: MINI_GLYPHS.min, color: MINI_BTN_COLORS.min, act: () => resize(true) },
     { key: "max", label: maximizeLabel, glyph: MINI_GLYPHS.max, color: MINI_BTN_COLORS.max, act: onMaximize },
@@ -114,13 +115,13 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
       {visible && area.w ? (
         <View {...responder.panHandlers} accessibilityLabel={label} style={[{ position: "absolute", left: cur.x, top: cur.y, width: W, opacity }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab", userSelect: "none", WebkitUserSelect: "none" } as object) : null]}>
           {collapsed ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="恢復小視窗（可按住拖曳移動）" onPress={() => resize(false)} style={{ width: MINI_CIRCLE, height: MINI_CIRCLE }}>
+            <View accessibilityRole="button" accessibilityLabel="恢復小視窗（可按住拖曳移動）" style={{ width: MINI_CIRCLE, height: MINI_CIRCLE }}>
               <GradientFrame width={MINI_CIRCLE} height={MINI_CIRCLE} radius={MINI_CIRCLE / 2} flush>
                 <View pointerEvents="none" style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: MINI_CIRCLE / 2 }}>
                   {circleContent}
                 </View>
               </GradientFrame>
-            </Pressable>
+            </View>
           ) : (
             <>
               <View pointerEvents={ctl ? "auto" : "none"} style={{ height: MINI_BAR, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 12, paddingHorizontal: 10, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: MINI_BAR_BG, opacity: ctl ? 1 : 0 }}>
