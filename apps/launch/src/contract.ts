@@ -443,7 +443,7 @@ export type ReviewGroup = {
 };
 
 /** 通知分類（通知頁的檢視模式：全部／審核／訂閱／留言；業主 2026-11-17）。 */
-export type NoticeCategory = "review" | "subscribe" | "comment" | "other";
+export type NoticeCategory = "review" | "subscribe" | "comment" | "achievement" | "other";
 /** pending＝審核相關而且還沒處理（業主 2026-11-23：通知頁一律置頂）：待審的報名通知＝那筆報名還在待審；其他審核通知＝還沒讀。 */
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string; category: NoticeCategory; pending?: boolean };
 

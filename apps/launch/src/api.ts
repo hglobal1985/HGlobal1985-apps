@@ -339,6 +339,7 @@ function notify(db: D1Database, to: { sub: string } | { role: "admin" } | { role
 
 /** 通知分類（業主 2026-11-17）：留言、訂閱（中心／系列有新課程、章節、教材、公告）、審核（報名審核與結果、審核人員指派），其餘＝其他（只在「全部」看到）。 */
 function noticeCategory(title: string, link: string): NoticeCategory {
+  if (/獲得學習徽章/.test(title)) return "achievement";
   if (/留言|回覆/.test(title)) return "comment";
   if (/有新(課程|清單|章節|教材)|廣播公告|已送出「新/.test(title)) return "subscribe";
   if (/審核|等待|報名已|課程已開通|繳費確認|開通已撤銷|報名有|邀請碼|已成為課程報名|^你的.{1,6}申請|^已送出.{1,6}申請/.test(title) || link.startsWith("/admin/orders")) return "review";
