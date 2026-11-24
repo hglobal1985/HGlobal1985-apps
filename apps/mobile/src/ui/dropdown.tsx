@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { type HostInstance, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { UI_SCALE } from "@/theme/ui-scale";
+import { ELDER_FIELD } from "./elder-controls";
 import { AppText } from "./text";
 import { Icon } from "./icon";
 
@@ -38,7 +38,7 @@ export function Dropdown({ options, value, label, disabled, onPick, open, onOpen
   };
   return (
     <View ref={box} collapsable={false} style={flow ? { width: "100%" } : pop ? { alignSelf: "stretch", minWidth: 0, zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
-      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, big ? { minHeight: Math.round(80 * UI_SCALE), borderWidth: 4, borderColor: c.accent, borderRadius: radius.lg + 6 } : null, { borderColor: big ? c.accent : c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
+      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, big ? { minHeight: ELDER_FIELD.height(), borderWidth: ELDER_FIELD.borderWidth, borderColor: c.accent, borderRadius: ELDER_FIELD.radius } : null, { borderColor: big ? c.accent : c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
         <AppText variant={big ? "headline" : undefined} style={pop ? { flex: 1, minWidth: 0 } : { flex: 1 }} numberOfLines={big ? 2 : 1} tone={disabled || !value ? "muted" : undefined}>
           {label}
         </AppText>
@@ -49,7 +49,7 @@ export function Dropdown({ options, value, label, disabled, onPick, open, onOpen
           style={[
             styles.dropdown,
             flow
-              ? { position: "relative", width: "100%", marginTop: 4, maxHeight: 360, borderWidth: big ? 4 : 2, borderColor: big ? c.accent : c.accentText, backgroundColor: c.surface }
+              ? { position: "relative", width: "100%", marginTop: 4, maxHeight: 360, borderWidth: big ? ELDER_FIELD.borderWidth : 2, borderColor: big ? c.accent : c.accentText, backgroundColor: c.surface }
               : [pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }],
           ]}
         >

@@ -10,6 +10,7 @@ import { CentralReviewList, groupByDay, hhmm, useCentralReviews } from "@/featur
 import { NoticeSheet } from "@/features/notices/notice-sheet";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
+import { ElderTabs } from "@/ui/elder-controls";
 import { AppText, GuestGate, Button, Card, EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
@@ -113,7 +114,12 @@ export default function NoticesScreen() {
     >
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
-      <View style={{ flexDirection: "row", gap: elder ? 6 : 8, marginBottom: space.sm }} accessibilityRole="radiogroup">
+      {elder ? (
+        <View style={{ marginBottom: space.sm }}>
+          <ElderTabs tabs={MODES.map((m) => ({ key: m.key, label: m.label, count: count(m.key) }))} value={mode} onChange={(k) => (trackFeature("notices_filter"), setMode(k))} />
+        </View>
+      ) : (
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: space.sm }} accessibilityRole="radiogroup">
         {MODES.map((m) => {
           const on = mode === m.key;
           const n = count(m.key);
@@ -133,6 +139,7 @@ export default function NoticesScreen() {
           );
         })}
       </View>
+      )}
       {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
       {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
       {/* 審核相關而且還沒處理的一律置頂（業主 2026-11-23）：在「全部」與「審核」都放在最上面，處理完（或已讀）才回到下面依日期排列。 */}
