@@ -2,7 +2,7 @@ import type { D1Database, Env } from "./d1.ts";
 
 /**
  * 區塊照片（業主 2026-11-24）：開放區塊照片的課程（courses.block_photos = 1），區塊裡「以教材檔案上傳的圖片」自動搬進相簿——
- * 檔案複製到相簿專用位置（album/…，網頁才讀得到）、照片依原本順序排進該區塊的相簿，原本的教材列移除。可重複執行；每次最多處理 15 個。
+ * 檔案複製到相簿專用位置（album/…，網頁才讀得到）、照片依原本順序排進該區塊的相簿，原本的教材列移除。可重複執行；每次最多處理 60 個；打開開放區塊照片的課程頁時也會立刻觸發（`kickFilePhotos`，同一個程序一分鐘最多一次）。
  */
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
 
@@ -19,7 +19,7 @@ export async function migrateFilePhotos(env: Env): Promise<number> {
        JOIN lesson_attachments a ON a.lesson_id = l.id AND a.kind = 'file' AND a.content_type LIKE 'image/%'
        WHERE l.kind = 'material' AND l.is_full = 0
          AND (SELECT COUNT(*) FROM lesson_attachments x WHERE x.lesson_id = l.id) = 1
-       ORDER BY l.course_id, l.position LIMIT 15`,
+       ORDER BY l.course_id, l.position LIMIT 60`,
     )
     .all<{ lesson_id: string; course_id: string; att_id: string; r2_key: string | null; content_type: string; size: number; block_id: string | null }>();
   let done = 0;
@@ -41,4 +41,13 @@ export async function migrateFilePhotos(env: Env): Promise<number> {
     done++;
   }
   return done;
+}
+
+let lastKick = 0;
+/** 打開開放區塊照片的課程頁時，背景立刻搬一次（不用等排程）。 */
+export function kickFilePhotos(env: Env, defer: (p: Promise<unknown>) => void): void {
+  const now = Date.now();
+  if (now - lastKick < 60_000) return;
+  lastKick = now;
+  defer(migrateFilePhotos(env).catch(() => undefined));
 }

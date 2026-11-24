@@ -1,6 +1,7 @@
 import { ensureBrandCards } from "./brand-cards.ts";
 import { reserveThumb, thumbUsage } from "./thumb-quota.ts";
 import { scenePending } from "./scene-vision.ts";
+import { kickFilePhotos } from "./block-photos.ts";
 import { ensureTreasureLinks, syncSeriesOrderFromTreasure, syncTreasureFromSeriesOrder, treasureCourseId } from "./treasure-box.ts";
 import { renameForType, shrinkImage, shrinkStored } from "./image-store.ts";
 import { flushPushes, vapidPublicKey } from "./push.ts";
@@ -1078,6 +1079,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   ctx.brands = brands;
   ctx.blocks = blocks;
   // 區塊照片（業主 2026-11-24）：開放的課程，每個區塊帶出自己的照片（cover_media，owner_key＝區塊編號；連結區塊用來源區塊）。
+  if (row.block_photos === 1 && ctx.defer) kickFilePhotos(ctx.env, ctx.defer);
   const photosOf = new Map<string, CoverMediaItem[]>();
   const photoKeys = [...new Set(photoKeyOf.values())];
   if (photoKeys.length) {
