@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Platform } from "react-native";
 import { setFeatureTrackSignedIn } from "@/lib/feature-track";
 import { markOwnerDevice } from "@/lib/usage";
+import { reportClientError } from "@/lib/error-report";
 import { clearCentral, handleWebSsoReturn, hasCentralSession, refresh as refreshCentral, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
 import { api, cachedGet, clearApiCache, loadToken, peekCache, prefetchCommon, saveToken, type Member } from "@/api/client";
 
@@ -265,6 +266,16 @@ export function useApi<T>(path: string | null, opts: { early?: boolean } = {}): 
     }, [load]),
   );
   const reload = useCallback(() => load(true), [load]);
+  // 讀取超過 12 秒還沒有資料（業主 2026-11-24 回報至尊模式「學習中」一直轉圈、本機重現不出來）：自動重抓一次，並把當時狀態回報到錯誤紀錄，方便追查。
+  const stuck = !!path && data === undefined && !error && (loading || !ready);
+  useEffect(() => {
+    if (!stuck) return;
+    const t = setTimeout(() => {
+      reportClientError("stuck", new Error(`讀取超過 12 秒：${path}`), JSON.stringify({ ready, loading, signedIn: !!member, ssoGiveUp, loadedOnce: loadedOnce.current, seq: seq.current }));
+      load(true);
+    }, 12_000);
+    return () => clearTimeout(t);
+  }, [stuck]); // eslint-disable-line react-hooks/exhaustive-deps
   void opts;
   // 沒有要抓的資料（path 為 null，例如訪客、沒有權限）＝不是「讀取中」，以免畫面一直轉圈（2026-11-21）。
   return { data, error, loading: !!path && (loading || (!ready && data === undefined)), reload };
