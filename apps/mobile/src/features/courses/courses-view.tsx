@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { clearCoursesReset, consumeCoursesReset, onCoursesReset } from "@/lib/courses-reset";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { overlayPopRecent } from "@/lib/back-close";
 import { Animated, BackHandler, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api, ZONES, type CenterArt, type CourseSummary, type Zone } from "@/api/client";
@@ -537,7 +538,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     const onPop = () => {
-      if (!pushedRef.current) return;
+      if (!pushedRef.current || overlayPopRecent()) return; // 全螢幕看圖用「上一頁」關閉時，不算離開中心頁
       // 退回到「中心頁」那一筆紀錄（網址還是中心頁的網址，例如從課程頁、上課頁按返回回來）＝還在中心頁，維持目前的中心；
       // 退回到它下面那一筆（網址是沒選中心的清單）才是真的離開中心頁，回到中心清單。
       // 用網址判斷（不用 history.state，因為導覽套件會改寫紀錄的 state）。
