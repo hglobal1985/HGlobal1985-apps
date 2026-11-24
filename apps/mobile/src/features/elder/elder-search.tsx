@@ -12,6 +12,8 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
+import { elderTextScale } from "@/lib/elder-mode";
+import { fitFontSize } from "@/ui/course-cover";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
 import { TileCover } from "@/features/courses/series-tile";
@@ -258,10 +260,8 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
       <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
         {coverUrl ? <Image source={{ uri: thumb(resolveUrl(coverUrl), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <TileCover rep={course} width={w} height={h} flat={!series} inSeries={!!series} title={label} />}
       </View>
-      <View style={{ flex: 1, gap: 6 }}>
-        <AppText variant="headline" numberOfLines={3}>
-          {label}
-        </AppText>
+      <View style={{ flex: 1, height: h, gap: 6, minWidth: 0 }}>
+        <FitTitle text={label} />
         <View style={[styles.tag, { backgroundColor: strong ? c.accent : c.accentSoft }]}>
           <AppText variant="callout" style={{ color: strong ? c.textOnAccent : c.accentText, fontWeight: "700" }}>
             {tag}
@@ -270,6 +270,22 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
       </View>
       <Ionicons name="chevron-forward" size={26} color={c.accent} />
     </Pressable>
+  );
+}
+
+/**
+ * 列上的課程標題：字級自動放到最大（業主 2026-11-24：標題要最大化、靠封面右邊排滿之後才換行），
+ * 在封面右邊、標籤上方剩下的空間裡，找塞得進去的最大字級（字少就很大、字多才縮小換行）。
+ * 畫字時會再乘「平板倍數 × 至尊倍數」，所以在放大前的尺寸上算。
+ */
+function FitTitle({ text }: { text: string }) {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const k = UI_SCALE * elderTextScale();
+  const fs = box.w && box.h ? fitFontSize(text, box.w / k, (box.h / k) * 0.95, 44, 14) : 20;
+  return (
+    <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
+      <AppText style={{ fontSize: fs, lineHeight: Math.round(fs * 1.2), fontWeight: "800" }}>{text}</AppText>
+    </View>
   );
 }
 
