@@ -5723,6 +5723,7 @@ const routes: [string, RegExp, Handler][] = [
       }
       // 資料正本在會員中心：直接寫過去（不保存、不寫日誌）。獎銜以外的欄位同時送出，最後再送獎銜（中央 2026-11-23.1 起獎銜不再被系統、中心卡住，順序只是習慣）。
       const errors: string[] = [];
+      let systemNotice: string | null = null; // 中央擋下「自訂系統含寰宇中心名稱」(use_hglobal_center)：原文回給畫面顯示在系統欄下方，不當一般錯誤
       let pending = false;
       // 勾選「我是 Amway 會員」（業主 2026-11-19：資料視窗內直接勾）：先開啟，後面的系統、中心、獎銜才寫得進去。
       if (enable) {
@@ -5736,8 +5737,10 @@ const routes: [string, RegExp, Handler][] = [
           return;
         }
         const r = await centralWriteField(s.token, c.key, c.value);
-        if (!r.ok) errors.push(r.message);
-        else if (r.status === "pending") {
+        if (!r.ok) {
+          if (c.key === "education_system" && r.reason === "use_hglobal_center") systemNotice = r.message;
+          else errors.push(r.message);
+        } else if (r.status === "pending") {
           pending = true;
           pendingKeys.push(c);
         }
@@ -5759,7 +5762,7 @@ const routes: [string, RegExp, Handler][] = [
       forgetMember(s.sub);
       // 把最新的欄位狀態一起回傳，畫面不用再多問一趟。
       const form = await centralProfileView(s.sub, s.token).catch(() => null);
-      return { ok: errors.length === 0, errors, pending, form };
+      return { ok: errors.length === 0 && !systemNotice, errors, pending, form, systemNotice };
     },
   ],
   [
