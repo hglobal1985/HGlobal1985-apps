@@ -6,15 +6,15 @@ import { createPortal } from "react-dom";
 import { useSession } from "@/state/session";
 import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.web";
 import { engine } from "./engine.web";
-import { IDENTITY, clampZoom, zoomAt, type Zoom } from "./zoom-math";
 import { usePlayer } from "./use-player";
-import { zoomHintOnce } from "./zoom-hint";
 
 const POS_KEY = "hglobal:learn:mini-pos";
 const MARGIN = 8;
 const CIRCLE = 84;
 /** 小視窗上方的視窗按鈕列高度（業主 2026-11-24：最小化／最大化／關閉放在播放外框上方，位置仿 Windows、顏色仿 Mac）。 */
 const BAR = 34;
+/** 頁面往下滑多少像素，影片就完全縮成迷你播放器。 */
+const SHRINK_PX = 140;
 
 type Pos = { x: number; y: number };
 const floatWidth = () => Math.round(Math.min(240, Math.max(180, window.innerWidth * 0.55)));
@@ -50,6 +50,12 @@ export function PlayerLayer() {
   const dismissed = useRef(false); // 使用者在橫放時自己按了縮小／退出全螢幕：這次橫放不再自動進入
   const realFs = useRef(false);
   const [pFull, setPFull] = useState(false);
+  // 往下滑頁面時，內嵌影片慢慢縮成迷你播放器（業主 2026-11-24）：scrollP＝頁面捲動的進度（0～1）、shrinkC＝畫面上平滑後的進度；
+  // 暫停播放且手機橫放（空間不夠）也直接縮成迷你。shrunk＝已完全縮成迷你播放器（顯示三顆按鈕、可拖曳）。
+  const scrollP = useRef(0);
+  const scroller = useRef<HTMLElement | null>(null);
+  const shrinkC = useRef(0);
+  const [shrunk, setShrunk] = useState(false);
   const [barOn, setBarOn] = useState(true); // 全螢幕控制列：2 秒沒動作自動隱藏，點畫面任意處再顯示
   const barTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const barHold = useRef(false);
@@ -135,11 +141,6 @@ export function PlayerLayer() {
   const hostRef = useRef<HTMLDivElement>(null);
   const pos = useRef<Pos | null>(null);
   const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean; hidden?: boolean } | null>(null);
-  const zoomLayer = useRef<HTMLDivElement>(null);
-  const gesture = useRef<HTMLDivElement>(null);
-  const lastTap = useRef({ t: 0, x: 0, y: 0 });
-  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tapInfo = useRef<{ x: number; y: number; t: number; multi: boolean } | null>(null);
   // YouTube 影片上的點擊一律擋掉（業主永久指示：不讓使用者點到 YouTube 自己的按鈕與連結，播放暫停只用下方控制列）。
   // 業主 2026-11-17：LINE 等 App 內建瀏覽器也一律封鎖（不再有「第一次播放前放行」的例外），使用者要改用系統瀏覽器開啟才能播放（見紅色警示條）。
   // 迷你播放器的三顆按鈕：1 秒沒有觸摸就自動隱藏，再摸到迷你播放器才會再顯示。
@@ -151,9 +152,6 @@ export function PlayerLayer() {
     ctlTimer.current = setTimeout(() => setCtl(false), 1000);
   };
   const justSwitched = () => engine.recentlySwitched();
-  const zoom = useRef<Zoom>(IDENTITY);
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const pinch = useRef<{ dist: number; mx: number; my: number } | null>(null);
   const t = s.track;
   const isAudio = t?.mode === "audio";
   const inlineSlot = !!t && s.slotKey === t.key;
@@ -161,83 +159,10 @@ export function PlayerLayer() {
   const inline = !!t && !isAudio && inlineSlot;
   const floating = !!t && !inlineSlot && (!isAudio || s.collapsed);
   const circle = floating && s.collapsed;
-  const windowed = floating && !s.collapsed;
+  const windowed = (floating && !s.collapsed) || (inline && shrunk);
 
-  // 影片放大：雙指（手機）或滾輪（電腦）放大縮小，縮小不低於 100%；放大後按住拖曳查看其他區域。只用在 Mux／示範影片，在課程頁內嵌時才有。
-  const canZoom = inline && (t?.mode === "video" || t?.mode === "youtube");
-  const applyZoom = (z: Zoom) => {
-    zoom.current = z;
-    // 沒放大時單指上下滑要能捲動頁面（業主 2026-11-24：影片區不可擋住滑動）；放大後才由影片區自己接管拖曳。
-    if (gesture.current) gesture.current.style.touchAction = z.s > 1 ? "none" : "pan-y";
-    if (zoomLayer.current) zoomLayer.current.style.transform = z.s === 1 ? "none" : `translate(${z.x}px, ${z.y}px) scale(${z.s})`;
-  };
-  const boxSize = () => {
-    const r = gesture.current?.getBoundingClientRect(); // 手勢層不會被縮放，量它才是影片區塊的實際大小
-    return { w: r?.width ?? 1, h: r?.height ?? 1, left: r?.left ?? 0, top: r?.top ?? 0 };
-  };
-  useEffect(() => {
-    applyZoom(IDENTITY); // 換一堂或離開課程頁就還原
-  }, [t?.key, canZoom]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const el = gesture.current;
-    if (!canZoom || !el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const b = boxSize();
-      applyZoom(zoomAt(zoom.current, zoom.current.s * Math.exp(-e.deltaY * 0.002), e.clientX - b.left, e.clientY - b.top, b.w, b.h));
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [canZoom]); // eslint-disable-line react-hooks/exhaustive-deps
-  // 手勢狀態保險：播放狀態或影片一換，就清掉殘留的觸控記錄（手指放開的訊息偶爾會遺失，殘留會讓之後的點擊、捲動判斷卡住）。
-  useEffect(() => {
-    pointers.current.clear();
-    pinch.current = null;
-    tapInfo.current = null;
-  }, [s.playing, t?.key]); // eslint-disable-line react-hooks/exhaustive-deps
-  const zDown = (e: PointerEvent<HTMLDivElement>) => {
-    engine.pokeHint(); // 觸摸影片就顯示操作提示
-    // 影片任意處點兩下：還原 100% 原始比例。
-    const now = Date.now();
-    const lt = lastTap.current;
-    if (pointers.current.size === 0 && now - lt.t < 320 && Math.hypot(e.clientX - lt.x, e.clientY - lt.y) < 40) {
-      if (tapTimer.current) clearTimeout(tapTimer.current); // 點兩下是還原大小，不算「點一下播放／暫停」
-      tapTimer.current = null;
-      applyZoom(IDENTITY);
-      lastTap.current = { t: 0, x: 0, y: 0 };
-    } else lastTap.current = { t: now, x: e.clientX, y: e.clientY };
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    tapInfo.current = pointers.current.size === 1 ? { x: e.clientX, y: e.clientY, t: now, multi: false } : { ...(tapInfo.current ?? { x: 0, y: 0, t: now }), multi: true };
-    e.currentTarget.setPointerCapture(e.pointerId);
-    if (pointers.current.size === 2) {
-      const [a, b] = [...pointers.current.values()];
-      pinch.current = { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y), mx: (a!.x + b!.x) / 2, my: (a!.y + b!.y) / 2 };
-    }
-  };
-  const zMove = (e: PointerEvent<HTMLDivElement>) => {
-    const prev = pointers.current.get(e.pointerId);
-    if (!prev) return;
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const b = boxSize();
-    if (pointers.current.size >= 2 && pinch.current) {
-      const [p1, p2] = [...pointers.current.values()];
-      const dist = Math.hypot(p1!.x - p2!.x, p1!.y - p2!.y);
-      const mx = (p1!.x + p2!.x) / 2;
-      const my = (p1!.y + p2!.y) / 2;
-      let z = zoomAt(zoom.current, zoom.current.s * (dist / (pinch.current.dist || dist)), mx - b.left, my - b.top, b.w, b.h);
-      z = clampZoom({ ...z, x: z.x + (mx - pinch.current.mx), y: z.y + (my - pinch.current.my) }, b.w, b.h); // 兩指一起移動也會平移
-      applyZoom(z);
-      pinch.current = { dist, mx, my };
-    } else if (zoom.current.s > 1) {
-      applyZoom(clampZoom({ ...zoom.current, x: zoom.current.x + (e.clientX - prev.x), y: zoom.current.y + (e.clientY - prev.y) }, b.w, b.h));
-    }
-  };
-  const zUp = (e: PointerEvent<HTMLDivElement>) => {
-    pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinch.current = null;
-    // 點一下影片不做任何事（業主永久指示 2026-11-17：播放／暫停只能用下方控制列）；點兩下仍是還原大小。
-    if (pointers.current.size === 0) tapInfo.current = null;
-  };
+  // 影片區的點擊擋板（只擋 YouTube 自己的按鈕與連結；播放暫停只用下方控制列）。已移除雙指放大與拖曳（業主 2026-11-24）。
+  const canBlock = inline && !shrunk && (t?.mode === "video" || t?.mode === "youtube");
 
   useEffect(() => {
     if (windowed) wakeCtl();
@@ -245,12 +170,6 @@ export function PlayerLayer() {
       if (ctlTimer.current) clearTimeout(ctlTimer.current);
     };
   }, [windowed, t?.key]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // 操作提示：進入影片、觸摸影片、拖曳時間軸時顯示，3.5 秒沒操作就自動消失。
-  useEffect(() => {
-    if (!s.hintAt) return;
-    if (canZoom) zoomHintOnce();
-  }, [s.hintAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 播放／暫停時，外框的反光流動跟著動或停。
   useEffect(() => {
@@ -339,10 +258,27 @@ export function PlayerLayer() {
     };
   }, []);
 
+  useEffect(() => {
+    const onScroll = (e: Event) => {
+      const el = e.target as HTMLElement | null;
+      if (!el || el === (document as unknown) || el.clientHeight < 200 || el.scrollHeight - el.clientHeight < 40) return; // 只看頁面主要的上下捲動區
+      scroller.current = el;
+      scrollP.current = Math.min(1, Math.max(0, el.scrollTop / SHRINK_PX));
+    };
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, []);
+  useEffect(() => {
+    scrollP.current = 0;
+    shrinkC.current = 0;
+  }, [s.slotKey, t?.key]);
+
   // 每個畫面更新時對齊位置：內嵌＝貼齊課程頁的播放區塊；浮動＝使用者拖曳過的位置；縮小＝小圓圖。
   useEffect(() => {
     let raf = 0;
     let last = "";
+    const landMq = window.matchMedia?.("(orientation: landscape)");
+    const coarseMq = window.matchMedia?.("(pointer: coarse)");
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const box = boxRef.current;
@@ -359,7 +295,27 @@ export function PlayerLayer() {
           css = `0|0|${window.innerWidth}|${window.innerHeight}|0`; // 橫放全螢幕：鋪滿整個視窗
         } else if (tr.mode !== "audio" && slot && slot.isConnected) {
           const r = slot.getBoundingClientRect();
-          if (r.width > 0) css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
+          const band = slot.parentElement as HTMLElement | null;
+          const phoneLand = !!coarseMq?.matches && !!landMq?.matches && window.innerHeight < 520;
+          const target = Math.max(scrollP.current, phoneLand && !sn.playing && !fullRef.current ? 1 : 0);
+          shrinkC.current += (target - shrinkC.current) * 0.3;
+          if (Math.abs(target - shrinkC.current) < 0.01) shrinkC.current = target;
+          const pr = shrinkC.current;
+          // 舞台區塊跟著縮矮，頁面的課程文字才看得到更多內容。
+          if (band) {
+            band.style.overflow = pr > 0 ? "hidden" : "";
+            band.style.height = pr > 0 ? `${Math.round(slot.offsetHeight * (1 - pr))}px` : "";
+          }
+          const atMini = pr >= 0.99;
+          setShrunk((v) => (v === atMini ? v : atMini));
+          if (r.width > 0 && pr <= 0) css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
+          else if (r.width > 0) {
+            const mw = floatWidth();
+            const mh = Math.round((mw * 9) / 16);
+            const mp = clamp(pos.current ?? { x: window.innerWidth - mw - 12, y: Math.max(MARGIN, bottomEdge() - mh - BAR - 12) }, mw, mh + BAR);
+            const f = (a: number, b: number) => Math.round(a + (b - a) * pr);
+            css = `${f(r.left, mp.x)}|${f(r.top, mp.y + BAR)}|${f(r.width, mw)}|${f(r.height, mh)}|${atMini ? 1 : 3}`;
+          }
         } else if (sn.slotKey !== tr.key && (tr.mode !== "audio" || sn.collapsed) && !engine.isPip()) {
           // 影片已經浮到手機桌面（系統浮動視窗）時，頁面內的迷你播放器不顯示，避免出現兩個小視窗。
           const isCircle = sn.collapsed;
@@ -392,7 +348,7 @@ export function PlayerLayer() {
         top: `${tp}px`,
         width: `${w}px`,
         height: `${h}px`,
-        borderRadius: fl === "2" ? "50%" : fl === "1" ? "14px" : "0",
+        borderRadius: fl === "2" ? "50%" : fl === "1" || fl === "3" ? "14px" : "0",
         ...frameBoxStyle(framed),
       });
       box.style.animationPlayState = engine.getSnapshot().playing ? "running" : "paused"; // 暫停播放時，外框反光也暫停
@@ -442,6 +398,8 @@ export function PlayerLayer() {
   };
   /** 最大化＝進入這支影片的課程頁。 */
   const maximize = () => {
+    // 已在課程頁、只是被滑動縮成迷你：回到頁面最上方就會自動還原。
+    if (inline && shrunk) return void scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
     if (t) router.push(lessonHref(t.courseId, t.lessonId) as never);
   };
   const upBar = () => {
@@ -516,7 +474,7 @@ export function PlayerLayer() {
         </div>
       ) : null}
       <div style={{ position: "absolute", inset: "var(--pad, 0px)", borderRadius: "inherit", overflow: "hidden", background: "#000" }}>
-      <div ref={zoomLayer} style={{ position: "absolute", inset: 0, transformOrigin: "0 0" }}>
+      <div style={{ position: "absolute", inset: 0 }}>
         <div ref={hostRef} style={{ position: "absolute", inset: 0, display: yt ? "none" : "block" }} />
         {yt ? (
           <iframe
@@ -532,7 +490,7 @@ export function PlayerLayer() {
         ) : null}
       </div>
       {/* 影片上的點擊一律擋掉（只用下方控制列）；僅 App 內建瀏覽器第一次播放前放行，見上面 everPlayed 的說明。 */}
-      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} onLostPointerCapture={zUp} style={{ position: "absolute", inset: 0, touchAction: "pan-y", cursor: "grab", pointerEvents: "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
+      {canBlock ? <div data-no-pull-refresh="" style={{ position: "absolute", inset: 0, touchAction: "pan-y", pointerEvents: "auto" }} aria-hidden /> : null}
       {circle ? (
         <div style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", background: "#000", borderRadius: "50%", overflow: "hidden" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="恢復迷你播放器（可按住拖曳移動）">
           <img src={art} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", animation: "hg-spin 8s linear infinite", animationPlayState: s.playing ? "running" : "paused", pointerEvents: "none" }} />

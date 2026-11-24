@@ -43,6 +43,18 @@ export function canSuggestInstall(): boolean {
 
 /** Android：跳出系統安裝視窗；回傳 true＝使用者同意。沒有事件（iPhone 等）回傳 null，呼叫端改顯示教學。 */
 export async function installNative(): Promise<boolean | null> {
+  // Android 的安裝許可事件有時要等幾秒才送來（業主 2026-11-24：至尊頁按了卻變成要手動操作）：還沒收到就先等最多 3 秒，收到就直接跳出系統安裝視窗。
+  if (!deferred && !isIos() && isMobile()) {
+    await new Promise<void>((resolve) => {
+      const done = () => {
+        subs.delete(done);
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(done, 3000);
+      subs.add(done);
+    });
+  }
   if (!deferred) return null;
   const d = deferred;
   deferred = null;
