@@ -7,6 +7,16 @@ import { Platform } from "react-native";
  */
 let ratio = 0;
 let installed = false;
+export const ANCHOR_ID = "font-card-anchor";
+let anchorTop: number | null = null;
+
+/** 改字體之前呼叫：記住「字體設定卡」目前在螢幕上的高度位置。 */
+export function rememberAnchor() {
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  const el = document.getElementById(ANCHOR_ID);
+  anchorTop = el ? el.getBoundingClientRect().top : null;
+}
+
 
 function install() {
   if (installed || Platform.OS !== "web" || typeof document === "undefined") return;
@@ -29,7 +39,26 @@ export function trackScroll() {
 
 /** 重建後呼叫：把頁面捲回重建前的位置（內容還在載入時多試幾次）。 */
 export function restoreScroll() {
-  if (Platform.OS !== "web" || typeof document === "undefined" || ratio <= 0) return;
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  const want = anchorTop;
+  anchorTop = null;
+  // 有記住字體設定卡的位置：重建後把它捲回螢幕上同樣的高度（始終跟著調整區塊）。
+  if (want !== null) {
+    let n = 0;
+    const follow = () => {
+      const el = document.getElementById(ANCHOR_ID);
+      if (el) {
+        let p: HTMLElement | null = el.parentElement;
+        while (p && !(p.scrollHeight > p.clientHeight + 4 && ["auto", "scroll"].includes(getComputedStyle(p).overflowY))) p = p.parentElement;
+        const d = el.getBoundingClientRect().top - want;
+        if (p && Math.abs(d) > 1) p.scrollTop += d;
+      }
+      if (++n < 12) requestAnimationFrame(follow);
+    };
+    requestAnimationFrame(follow);
+    return;
+  }
+  if (ratio <= 0) return;
   const target = ratio;
   let tries = 0;
   const go = () => {
