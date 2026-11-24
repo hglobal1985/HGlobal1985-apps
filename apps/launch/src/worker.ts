@@ -44,7 +44,7 @@ export function createWorker(staticFiles: StaticFiles) {
         await processImportJobs(env).catch((e) => console.error("import jobs", e instanceof Error ? e.message : "error"));
         await processFirstSyncs(env).catch((e) => console.error("first syncs", e instanceof Error ? e.message : "error"));
         await ensureBrandCards(env).catch((e) => console.error("brand cards", e instanceof Error ? e.message : "error"));
-        await ensureTreasureLinks(env).catch((e) => console.error("treasure links", e instanceof Error ? e.message : "error")); // 實戰百寶箱 ↔ 品牌館（業主 2026-11-24）
+        await ensureTreasureLinks(env).catch((e) => console.error("treasure links", e instanceof Error ? e.message : "error")); // 成交百寶箱 ↔ 品牌館（業主 2026-11-24）
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
         await indexSearchVectors(env).catch((e) => console.error("search vectors", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));

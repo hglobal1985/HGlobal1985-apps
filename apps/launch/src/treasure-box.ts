@@ -3,13 +3,13 @@ import { brandCardId } from "./brand-cards.ts";
 import { loadConfig, saveConfig } from "./ui-config.ts";
 
 /**
- * 實戰百寶箱 ↔ 安麗品牌館（業主 2026-11-24）：
- * - 「實戰百寶箱」課程卡裡，每個品牌一個區塊（名稱、logo＝品牌資料，內容只存這一份）。
- * - 每張品牌卡的最前面多一個「實戰百寶箱」連結區塊，內容與封面＝實戰百寶箱裡同品牌的區塊（沿用 lessons.link_block_id）。
- * - 13 個品牌的順序兩邊共用：品牌館的卡片順序（ui_config.seriesOrder 的 c:cb品牌編號）＝實戰百寶箱的區塊順序，任一邊調整另一邊跟著變。
+ * 成交百寶箱 ↔ 安麗品牌館（業主 2026-11-24）：
+ * - 「成交百寶箱」課程卡裡，每個品牌一個區塊（名稱、logo＝品牌資料，內容只存這一份）。
+ * - 每張品牌卡的最前面多一個「成交百寶箱」連結區塊，內容與封面＝成交百寶箱裡同品牌的區塊（沿用 lessons.link_block_id）。
+ * - 13 個品牌的順序兩邊共用：品牌館的卡片順序（ui_config.seriesOrder 的 c:cb品牌編號）＝成交百寶箱的區塊順序，任一邊調整另一邊跟著變。
  */
 export const TREASURE_COURSE_ID = "cqqxw4z2";
-export const TREASURE_TITLE = "實戰百寶箱";
+export const TREASURE_TITLE = "成交百寶箱";
 const BRAND_KEY = "c:cb";
 const short = () => crypto.randomUUID().slice(0, 6);
 
@@ -28,7 +28,7 @@ async function brandOrder(db: D1Database): Promise<string[]> {
   return [...uniq, ...brands.filter((id) => !uniq.includes(id))];
 }
 
-/** 把實戰百寶箱的品牌區塊（連同底下的教材）依品牌順序重排；沒變就不動，回傳有沒有重排。 */
+/** 把成交百寶箱的品牌區塊（連同底下的教材）依品牌順序重排；沒變就不動，回傳有沒有重排。 */
 export async function reorderTreasureBlocks(db: D1Database, courseId: string, order: string[]): Promise<boolean> {
   const rows = (await db.prepare("SELECT id, kind, brand_id, position FROM lessons WHERE course_id = ? ORDER BY position").bind(courseId).all<{ id: string; kind: string; brand_id: string | null; position: number }>()).results;
   type G = { head: (typeof rows)[number] | null; rows: typeof rows };
@@ -52,14 +52,14 @@ export async function reorderTreasureBlocks(db: D1Database, courseId: string, or
   return true;
 }
 
-/** 品牌館卡片順序改了（或新增品牌）→ 實戰百寶箱的區塊跟著排。 */
+/** 品牌館卡片順序改了（或新增品牌）→ 成交百寶箱的區塊跟著排。 */
 export async function syncTreasureFromSeriesOrder(db: D1Database): Promise<void> {
   const course = await treasureCourseId(db);
   if (!course) return;
   await reorderTreasureBlocks(db, course, await brandOrder(db));
 }
 
-/** 實戰百寶箱的區塊順序改了 → 品牌館卡片的手動排序跟著改（其他系列、課程的排序位置不動）。 */
+/** 成交百寶箱的區塊順序改了 → 品牌館卡片的手動排序跟著改（其他系列、課程的排序位置不動）。 */
 export async function syncSeriesOrderFromTreasure(db: D1Database): Promise<void> {
   const course = await treasureCourseId(db);
   if (!course) return;
@@ -75,7 +75,7 @@ export async function syncSeriesOrderFromTreasure(db: D1Database): Promise<void>
 }
 
 /**
- * 補齊：實戰百寶箱裡每個品牌一個區塊（名稱跟著品牌）＋每張品牌卡最前面的「實戰百寶箱」連結區塊。可重複執行；回傳新建的區塊數。
+ * 補齊：成交百寶箱裡每個品牌一個區塊（名稱跟著品牌）＋每張品牌卡最前面的「成交百寶箱」連結區塊。可重複執行；回傳新建的區塊數。
  * only＝只處理這個品牌（新增品牌、品牌改名時用）。
  */
 export async function ensureTreasureLinks(env: Env, only?: string): Promise<number> {

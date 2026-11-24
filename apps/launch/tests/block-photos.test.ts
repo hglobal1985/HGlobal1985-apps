@@ -34,7 +34,7 @@ test("區塊新增照片：只有開放的課程可以、照片屬於區塊、�
   const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: memR2() };
   const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
   await run("INSERT INTO brand_logos (id, name, sort_order) VALUES ('ba', '紐崔萊', 1)");
-  await run("INSERT INTO courses (id, title, is_list, status, series, view_scope, is_public, zone) VALUES ('cqqxw4z2', '實戰百寶箱', 0, 'published', '實戰百寶箱', 'all', 1, 'hglobal'), ('cother', '別的課', 0, 'published', '', 'all', 1, 'hglobal')");
+  await run("INSERT INTO courses (id, title, is_list, status, series, view_scope, is_public, zone) VALUES ('cqqxw4z2', '成交百寶箱', 0, 'published', '成交百寶箱', 'all', 1, 'hglobal'), ('cother', '別的課', 0, 'published', '', 'all', 1, 'hglobal')");
   await run("UPDATE courses SET block_photos = 1 WHERE id = 'cqqxw4z2'");
   await run("INSERT INTO lessons (id, course_id, position, title, kind, media_type) VALUES ('osec', 'cother', 1, '別的區塊', 'section', 'demo')");
   await ensureBrandCards(env);
@@ -64,10 +64,10 @@ test("區塊新增照片：只有開放的課程可以、照片屬於區塊、�
   assert.equal(head.photoKey, blk);
   assert.equal(head.photos?.length, 1);
   assert.equal(course.blockPhotos, true);
-  // 品牌卡的「實戰百寶箱」連結區塊：看到同一批照片（照片只存來源一份）
+  // 品牌卡的「成交百寶箱」連結區塊：看到同一批照片（照片只存來源一份）
   const card = (await call<CourseDetail>("GET", "/courses/cbba", { token: adm })).data;
   const link = card.lessons[0]!;
-  assert.equal(link.title, "實戰百寶箱");
+  assert.equal(link.title, "成交百寶箱");
   assert.equal(link.photoKey, blk);
   assert.equal(link.photos?.length, 1);
   // 沒開放的課程不帶照片欄位
