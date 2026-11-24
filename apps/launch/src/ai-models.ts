@@ -26,6 +26,7 @@ export const AI_JOBS: AiJob[] = [
   { key: "transcribe", label: "逐字稿（語音轉文字）", desc: "把課程影片／音檔的聲音轉成逐字稿", kind: "speech", default: "@cf/openai/whisper-large-v3-turbo" },
   { key: "keywords", label: "關鍵字與 hashtag", desc: "從逐字稿整理重點關鍵字、hashtag、摘要", kind: "text", default: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" },
   { key: "edm_vision", label: "EDM 圖片辨識（文字與活動日期）", desc: "中心 EDM 上傳後，由 AI 讀出海報文字與活動日期，用於搜尋，並讓 EDM 依活動日期排序", kind: "vision", default: "@cf/meta/llama-3.2-11b-vision-instruct" },
+  { key: "photo_scene", label: "相簿照片場景辨識", desc: "相簿（例如成交百寶箱）上傳的照片，由 AI 認出行為、場景、物品，用於搜尋（分類標籤＝場景）", kind: "vision", default: "@cf/meta/llama-3.2-11b-vision-instruct" },
   { key: "edm_structure", label: "EDM 文字整理（套入欄位格式）", desc: "把 EDM 辨識出的文字，照「設定 › AI 文字辨識」的欄位格式（日期、時間、主題、講師…）整理好，歸不進去的放「其他內容」；只讀文字、不看圖，所以很省額度", kind: "text", default: "@cf/google/gemma-4-26b-a4b-it" },
   { key: "embedding", label: "語意搜尋", desc: "把文字轉成向量，讓搜尋「疼痛」也找得到「不舒服」", kind: "embedding", default: "@cf/baai/bge-m3" },
 ];

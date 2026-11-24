@@ -108,6 +108,10 @@ export function normalizeThumb(raw: unknown): ThumbSettings {
     trim: Math.round(n(r.trim, d.trim, 0, 500)),
     borderWidth: Math.round(n(r.borderWidth, d.borderWidth, 0, 50)),
     borderColor: hex(r.borderColor, d.borderColor),
+    quota: (() => {
+      const q = (r.quota && typeof r.quota === "object" ? r.quota : {}) as Record<string, unknown>;
+      return { monthly: Math.round(n(q.monthly, d.quota.monthly, 100, 1_000_000)), edmPct: Math.round(n(q.edmPct, d.quota.edmPct, 0, 100)), albumPct: Math.round(n(q.albumPct, d.quota.albumPct, 0, 100)) };
+    })(),
   };
 }
 

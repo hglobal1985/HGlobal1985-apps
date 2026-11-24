@@ -11,6 +11,22 @@ import { AppText, Button, Card, Chips, ErrorView, LoadingView, NoticeBox, Screen
 
 type Status = { binding: boolean; lastError: { at: string; key: string; w: number; message: string } | null; samples: string[]; totalCovers: number };
 type Probe = { w: number; kb: number | null; header: string };
+type Usage = { month: string; monthly: number; used: number; remaining: number; classes: { cls: string; label: string; priority: number; used: number; cap: number; remaining: number }[]; groups: { cls: string; label: string; used: number }[] };
+
+/** 一條用量進度條：已用／上限，剩餘額度寫在右邊。 */
+function UsageBar({ label, used, cap, remaining }: { label: string; used: number; cap: number; remaining: number }) {
+  const { c } = useTheme();
+  const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+  return (
+    <View style={{ gap: 4 }}>
+      <AppText variant="body" style={{ fontWeight: "700" }}>{label}</AppText>
+      <View style={{ height: 10, borderRadius: 5, backgroundColor: c.surfaceMuted, overflow: "hidden" }}>
+        <View style={{ width: `${pct}%`, height: "100%", backgroundColor: pct >= 100 ? c.danger : c.accent }} />
+      </View>
+      <AppText variant="caption" tone="muted">{`已用 ${used} 張／上限 ${cap} 張・剩餘 ${remaining} 張`}</AppText>
+    </View>
+  );
+}
 
 const KB_TARGET = 30;
 const pctVal = (v: number) => Math.round(v * 100);
@@ -27,6 +43,7 @@ export default function ThumbnailsScreen() {
   useEffect(() => setT(saved), [JSON.stringify(saved)]);
   const set = <K extends keyof ThumbSettings>(k: K, v: ThumbSettings[K]) => setT((x) => ({ ...x, [k]: v }));
   const status = useApi<Status>("/admin/thumb/status");
+  const usage = useApi<Usage>("/admin/thumb/usage");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [probes, setProbes] = useState<Probe[] | null>(null);
@@ -85,6 +102,36 @@ export default function ThumbnailsScreen() {
             Cloudflare 免費方案每月可做 5,000 種「不重複縮圖」；超過時只是不縮（直接顯示原圖），不會收費。目前約 {st.totalCovers} 張封面 × {saved.widths.length} 種寬度 ≈ {unique} 種，遠低於額度。
           </AppText>
           {!st.binding ? <NoticeBox tone="danger" text="伺服器沒有接上圖片縮放功能（IMAGES），縮圖不會生效。" /> : null}
+        </Card>
+      </Section>
+
+      <Section title="額度與優先順序">
+        <Card>
+          <AppText variant="body">優先順序：① 封面（課程、系列、中心照片）＞ ② 中心 EDM ＞ ③ 其他相簿（成交百寶箱）。低優先的用到上限就改回傳原圖（不縮），額度預留給更高優先的。</AppText>
+          {usage.data ? (
+            <>
+              <UsageBar label={`本月總額度（${usage.data.month}）`} used={usage.data.used} cap={usage.data.monthly} remaining={usage.data.remaining} />
+              {usage.data.classes.map((k) => (
+                <UsageBar key={k.cls} label={`${k.priority}. ${k.label}`} used={k.used} cap={k.cap} remaining={k.remaining} />
+              ))}
+              <AppText variant="body" style={{ fontWeight: "700" }}>各區塊使用的縮圖張數</AppText>
+              {usage.data.groups.length ? (
+                usage.data.groups.map((g, i) => (
+                  <View key={`${g.cls}${i}`} style={styles.row}>
+                    <AppText variant="callout" style={{ flex: 1 }} numberOfLines={2}>{g.label}</AppText>
+                    <AppText variant="callout" tone="muted">{`${g.used} 張`}</AppText>
+                  </View>
+                ))
+              ) : (
+                <AppText tone="muted">本月還沒有縮圖紀錄。</AppText>
+              )}
+            </>
+          ) : (
+            <AppText tone="muted">讀取中…</AppText>
+          )}
+          <Stepper label="每月縮圖額度" hint="Cloudflare 免費方案每月 5,000 種不重複縮圖" value={t.quota.monthly} min={100} max={100000} step={500} unit="張" onChange={(v) => set("quota", { ...t.quota, monthly: v })} />
+          <Stepper label="中心 EDM 最多用到" hint="用到這個比例就不再縮 EDM，留給封面" value={t.quota.edmPct} min={0} max={100} step={5} unit="%" onChange={(v) => set("quota", { ...t.quota, edmPct: v })} />
+          <Stepper label="其他相簿最多用到" hint="用到這個比例就不再縮相簿照片，留給封面與 EDM" value={t.quota.albumPct} min={0} max={100} step={5} unit="%" onChange={(v) => set("quota", { ...t.quota, albumPct: v })} />
         </Card>
       </Section>
 

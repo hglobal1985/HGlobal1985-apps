@@ -463,7 +463,7 @@ export type CoverMediaKind = "center" | "series" | "course";
 /** 儲存區（業主 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，上限各 100 張；系列、課程只有 cover。 */
 export type CoverScope = "cover" | "edm";
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
-export type CoverMediaItem = { id: string; scope: CoverScope; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
+export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（業主 2026-11-24）。 */ scene?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
 /** 縮圖符號（業主 2026-11-23）：系列卡、課程卡、中心卡的小縮圖。symbol＝emoji 或短文字（最多 4 個字）；fg 文字色、bg 底色（#RRGGBB）。 */
 export type ThumbBadgeKind = "course" | "series" | "center";
 export type ThumbBadge = { kind: ThumbBadgeKind; key: string; symbol: string; fg: string; bg: string };
@@ -1014,6 +1014,8 @@ export type ThumbSettings = {
   trim: number;
   borderWidth: number;
   borderColor: string;
+  /** 每月縮圖額度與優先順序（業主 2026-11-24）：封面 > 中心 EDM > 其他相簿；EDM、相簿各自最多用到額度的幾％（預留給更高優先的）。 */
+  quota: { monthly: number; edmPct: number; albumPct: number };
 };
 export const THUMB_WIDTH_CHOICES = [240, 320, 480, 640, 800, 960, 1280, 1600];
 /** 平板、電腦用的大尺寸（業主 2026-11-20）：固定可用，不必在設定頁勾選。 */
@@ -1099,7 +1101,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   videoMaxMb: 25,
   videoMaxSec: 60,
   storeFormat: "jpeg",
-  thumb: { enabled: false, widths: [320, 480, 640], height: 0, fit: "scale-down", gravity: "auto", format: "auto", quality: 70, qualityLevel: "", anim: true, metadata: "none", rotate: 0, flip: "", blur: 0, sharpen: 0, brightness: 1, contrast: 1, gamma: 1, saturation: 1, background: "", trim: 0, borderWidth: 0, borderColor: "#ffffff" },
+  thumb: { enabled: false, widths: [320, 480, 640], height: 0, fit: "scale-down", gravity: "auto", format: "auto", quality: 70, qualityLevel: "", anim: true, metadata: "none", rotate: 0, flip: "", blur: 0, sharpen: 0, brightness: 1, contrast: 1, gamma: 1, saturation: 1, background: "", trim: 0, borderWidth: 0, borderColor: "#ffffff", quota: { monthly: 5000, edmPct: 90, albumPct: 70 } },
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
   { key: "president", title: "會長" },

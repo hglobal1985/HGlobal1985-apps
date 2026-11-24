@@ -1,4 +1,6 @@
 import { ensureBrandCards } from "./brand-cards.ts";
+import { reserveThumb, thumbUsage } from "./thumb-quota.ts";
+import { scenePending } from "./scene-vision.ts";
 import { ensureTreasureLinks, syncSeriesOrderFromTreasure, syncTreasureFromSeriesOrder, treasureCourseId } from "./treasure-box.ts";
 import { renameForType, shrinkImage, shrinkStored } from "./image-store.ts";
 import { flushPushes, vapidPublicKey } from "./push.ts";
@@ -100,7 +102,7 @@ import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { ocrEdmImage, ocrPending } from "./edm-vision.ts";
 import { DEFAULT_FIELDS, OTHER as EDM_OTHER, cleanOcrText, fmtOf, loadFields, normalizeFields, saveFields, structureEdm, structurePending, structureStats, type Structured } from "./edm-structure.ts";
-import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
+import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, loadSettings as loadAiSettings, todayUsed as aiTodayUsed, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
@@ -1080,9 +1082,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const photoKeys = [...new Set(photoKeyOf.values())];
   if (photoKeys.length) {
     const { results } = await ctx.db
-      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
+      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec, scene_text FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
       .bind(...photoKeys)
-      .all<{ id: string; owner_key: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+      .all<{ id: string; owner_key: string; scene_text: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
     for (const r of results) photosOf.set(r.owner_key, [...(photosOf.get(r.owner_key) ?? []), coverItem(r)]);
   }
   const [eligibility, canRoster, registrations] = await Promise.all([eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]), canSeeRoster(ctx, s, row, manages), manages ? registrationCount(ctx.db, id) : Promise.resolve(0)]);
@@ -2460,7 +2462,7 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; kind?: string; poster_key?: string | null };
 const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
 const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
-function coverItem(r: { id: string; scope: CoverScope; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
+function coverItem(r: { id: string; scope: CoverScope; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
     scope: r.scope === "edm" ? "edm" : "cover",
@@ -2472,6 +2474,7 @@ function coverItem(r: { id: string; scope: CoverScope; ocr_text?: string | null;
     height: r.height,
     durationSec: r.duration_sec,
     ...(r.scope === "edm" ? { eventDate: r.event_date ?? null, text: r.ocr_text ?? "" } : {}),
+    ...(r.scene_text ? { scene: r.scene_text } : {}),
   };
 }
 /** 儲存區（業主 2026-11-23）：只有中心有「EDM」分頁；系列、課程一律只有 cover。沒帶或不認得時，中心當 edm（舊版 App 的相簿上傳）。 */
@@ -4069,6 +4072,7 @@ const routes: [string, RegExp, Handler][] = [
       const id = await addCoverRow(ctx.db, o, { kind: "image", r2Key: key, posterKey: null, width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")), durationSec: 0, bytes: shrunk.data.byteLength, by: o.s.sub });
       // 中心 EDM：上傳後在背景用視覺模型辨識文字與活動日期（搜尋與依日期排序用）；失敗不影響上傳。
       if (o.kind === "center" && o.scope === "edm" && ctx.defer) ctx.defer(ocrEdmImage(ctx.env, ctx.db, id).catch(() => undefined));
+      if (o.kind === "course" && ctx.defer) ctx.defer(scenePending(ctx.env, ctx.db, 2).catch(() => undefined)); // 區塊照片：上傳後背景辨識場景（業主 2026-11-24）
       return { id, items: await coverItems(ctx.db, o.kind, o.lookup) };
     },
   ],
@@ -6208,6 +6212,10 @@ const routes: [string, RegExp, Handler][] = [
             console.log("thumb_cache_failed", e instanceof Error ? e.message : String(e));
             cache = null;
           }
+          // 縮圖額度（業主 2026-11-24）：封面 > 中心 EDM > 其他相簿；這一級到上限就不縮、回原圖（短快取，之後額度恢復或調整再縮）。
+          if (!(await reserveThumb(ctx.db, t.quota, key, w).catch(() => true))) {
+            return new Response(obj.body, { headers: { "content-type": type, "cache-control": "public, max-age=600", "x-content-type-options": "nosniff", "x-thumb": "quota" } });
+          }
           try {
             const src = await ctx.env.IMAGES.input(obj.body).transform(thumbTransform(t, w)).output({ format: `image/${fmt}`, ...thumbOutput(t) });
             const body = await src.response().arrayBuffer();
@@ -6236,6 +6244,44 @@ const routes: [string, RegExp, Handler][] = [
       return new Response(obj.body, {
         headers: { "content-type": obj.httpMetadata?.contentType ?? "image/jpeg", "cache-control": "public, max-age=31536000, immutable", "x-content-type-options": "nosniff" },
       });
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/ai\/progress$/,
+    async (ctx) => {
+      // 設定 › AI 文字辨識：中心 EDM 文字辨識、相簿場景辨識的完成張數與進度，以及今天的 AI 額度（已用、剩餘）。
+      requireSuperAdmin(ctx);
+      const [ocr, scene, st, used] = await Promise.all([
+        ctx.db
+          .prepare("SELECT center_key AS grp, COUNT(*) AS total, SUM(ocr_status = 'done') AS done, SUM(ocr_status = 'failed') AS failed FROM cover_media WHERE owner_kind = 'center' AND scope = 'edm' AND kind = 'image' GROUP BY center_key ORDER BY total DESC")
+          .all<{ grp: string | null; total: number; done: number; failed: number }>(),
+        ctx.db
+          .prepare("SELECT cm.owner_key AS grp, c.title || ' › ' || l.title AS label, COUNT(*) AS total, SUM(cm.scene_status = 'done') AS done, SUM(cm.scene_status = 'failed') AS failed FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.kind = 'image' GROUP BY cm.owner_key ORDER BY total DESC")
+          .all<{ grp: string; label: string; total: number; done: number; failed: number }>(),
+        loadAiSettings(ctx.db),
+        aiTodayUsed(ctx.db),
+      ]);
+      const pack = (rows: { label: string; total: number; done: number; failed: number }[]) => {
+        const total = rows.reduce((n, r) => n + r.total, 0);
+        const done = rows.reduce((n, r) => n + (r.done ?? 0), 0);
+        const failed = rows.reduce((n, r) => n + (r.failed ?? 0), 0);
+        return { total, done, failed, pending: total - done - failed, groups: rows.map((r) => ({ label: r.label, total: r.total, done: r.done ?? 0, failed: r.failed ?? 0 })) };
+      };
+      return {
+        ocr: pack(ocr.results.map((r) => ({ label: r.grp || "（未知中心）", total: r.total, done: r.done, failed: r.failed }))),
+        scene: pack(scene.results),
+        ai: { capEnabled: st.capEnabled, dailyCap: st.dailyCap, used, remaining: Math.max(0, st.dailyCap - used) },
+      };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/thumb\/usage$/,
+    async (ctx) => {
+      // 設定 › Cloudflare即時縮圖：本月縮圖用量（各優先等級與各細項的張數、總額度、剩餘額度）。
+      requireSuperAdmin(ctx);
+      return thumbUsage(ctx.db, (await loadConfig(ctx.db)).app.thumb.quota);
     },
   ],
   [

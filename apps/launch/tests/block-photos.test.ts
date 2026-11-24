@@ -86,10 +86,10 @@ test("區塊裡以教材檔案上傳的圖片：自動搬進相簿（保持順�
   const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
   await run("INSERT INTO courses (id, title, is_list, status, series, view_scope, is_public, zone, block_photos) VALUES ('cbox', '成交百寶箱', 0, 'published', '', 'all', 1, 'hglobal', 1), ('cno', '沒開放', 0, 'published', '', 'all', 1, 'hglobal', 0)");
   await run("INSERT INTO lessons (id, course_id, position, title, kind, media_type) VALUES ('sec1', 'cbox', 1, '家庭清潔', 'section', 'demo'), ('i1', 'cbox', 2, '照片一', 'material', 'demo'), ('i2', 'cbox', 3, '照片二', 'material', 'demo'), ('f1', 'cbox', 4, '講義', 'material', 'demo'), ('n1', 'cno', 1, '別課照片', 'material', 'demo')");
-  await bucket.put("file/cbox/a/one.jpg", jpeg, { httpMetadata: { contentType: "image/jpeg" } });
-  await bucket.put("file/cbox/b/two.jpg", jpeg, { httpMetadata: { contentType: "image/jpeg" } });
-  await bucket.put("file/cbox/c/doc.pdf", jpeg, { httpMetadata: { contentType: "application/pdf" } });
-  await bucket.put("file/cno/d/x.jpg", jpeg, { httpMetadata: { contentType: "image/jpeg" } });
+  await bucket.put("file/cbox/a/one.jpg", jpeg.buffer as ArrayBuffer, { httpMetadata: { contentType: "image/jpeg" } });
+  await bucket.put("file/cbox/b/two.jpg", jpeg.buffer as ArrayBuffer, { httpMetadata: { contentType: "image/jpeg" } });
+  await bucket.put("file/cbox/c/doc.pdf", jpeg.buffer as ArrayBuffer, { httpMetadata: { contentType: "application/pdf" } });
+  await bucket.put("file/cno/d/x.jpg", jpeg.buffer as ArrayBuffer, { httpMetadata: { contentType: "image/jpeg" } });
   const att = (id: string, lesson: string, course: string, key: string, type: string) => run("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, created_by) VALUES (?, ?, ?, 'x', ?, 10, ?, 'file', 'u')", id, lesson, course, key, type);
   await att("a1", "i1", "cbox", "file/cbox/a/one.jpg", "image/jpeg");
   await att("a2", "i2", "cbox", "file/cbox/b/two.jpg", "image/jpeg");
