@@ -155,6 +155,10 @@ export const engine = {
     player.currentTime = to;
   },
   /** 切換到下一個倍數（1 → 1.2 → 1.5 → 1.8 → 2 → 1）。 */
+  /** 長按快轉：r＝暫時倍數；null＝還原。 */
+  holdRate(r: number | null) {
+    if (player) player.playbackRate = r ?? userRate;
+  },
   cycleRate() {
     userRate = nextRate(userRate);
     if (player) player.playbackRate = userRate;

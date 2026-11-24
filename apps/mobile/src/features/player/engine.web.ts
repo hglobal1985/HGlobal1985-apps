@@ -48,14 +48,17 @@ let userRate = (() => {
   }
 })();
 /** YouTube 內嵌播放器只支援固定檔位（1.25、1.75…），1.2、1.8 用最接近的檔位。 */
+/** 長按快轉暫時用的倍數（不存檔；放開就還原成使用者選的倍數）。 */
+let heldRate: number | null = null;
+const rateNow = () => heldRate ?? userRate;
 const ytRate = (r: number) => ({ 1.2: 1.25, 1.8: 1.75 } as Record<number, number>)[r] ?? r;
 function applyRate() {
   for (const el of [video, audio]) {
     if (!el) continue;
-    el.defaultPlaybackRate = userRate;
-    el.playbackRate = userRate;
+    el.defaultPlaybackRate = rateNow();
+    el.playbackRate = rateNow();
   }
-  if (snap.track?.mode === "youtube") ytCommand("setPlaybackRate", [ytRate(userRate)]);
+  if (snap.track?.mode === "youtube") ytCommand("setPlaybackRate", [ytRate(rateNow())]);
 }
 
 let pipActive = false;
@@ -80,7 +83,7 @@ function wire(el: HTMLMediaElement) {
     if (!mine()) return;
     intent = true;
     emit({ playing: true });
-    if (el.playbackRate !== userRate) el.playbackRate = userRate; // 部分瀏覽器換來源後會把倍數重設
+    if (el.playbackRate !== rateNow()) el.playbackRate = rateNow(); // 部分瀏覽器換來源後會把倍數重設
   });
   el.addEventListener("pause", () => {
     if (!mine()) return;
@@ -166,8 +169,8 @@ function clearPendingReady(el: HTMLMediaElement | null) {
 function attach(el: HTMLMediaElement, t: Track, startAt: number, autoplay: boolean, keep: (h: { destroy(): void } | null) => void) {
   const url = urlOf(t);
   const myLoad = snap.loadId; // 這一次載入的編號；之後的非同步回呼用它確認「還是這一次」
-  el.defaultPlaybackRate = userRate; // 換來源時瀏覽器會回到預設倍數，所以預設值也一起設
-  el.playbackRate = userRate;
+  el.defaultPlaybackRate = rateNow(); // 換來源時瀏覽器會回到預設倍數，所以預設值也一起設
+  el.playbackRate = rateNow();
   clearPendingReady(el);
   const onReady = () => {
     pendingReady.delete(el);
@@ -340,7 +343,7 @@ if (typeof window !== "undefined") {
     const state = d.event === "onStateChange" ? (d.info as number) : d.event === "infoDelivery" && typeof d.info === "object" ? d.info?.playerState : undefined;
     if (state === 1) {
       emit({ playing: true, segmentEnded: false, loading: false });
-      if (userRate !== 1) ytCommand("setPlaybackRate", [ytRate(userRate)]);
+      if (rateNow() !== 1) ytCommand("setPlaybackRate", [ytRate(rateNow())]);
     }
     else if (state === 3) emit({ loading: true }); // 緩衝中：播放鈕顯示小瓢蟲
     else if (state === 2) emit({ playing: false, loading: false });
@@ -535,6 +538,11 @@ export const engine = {
     emit({ ...EMPTY, slotKey: snap.slotKey, rate: userRate, loadId: snap.loadId + 1 }); // 編號只增不減：舊的非同步回呼一律作廢
   },
   /** 切換到下一個倍數（1 → 1.2 → 1.5 → 1.8 → 2 → 1）。 */
+  /** 長按快轉：r＝暫時倍數；null＝還原。YouTube 內嵌播放器最高只有 2 倍。 */
+  holdRate(r: number | null) {
+    heldRate = r;
+    applyRate();
+  },
   cycleRate() {
     userRate = nextRate(userRate);
     try {

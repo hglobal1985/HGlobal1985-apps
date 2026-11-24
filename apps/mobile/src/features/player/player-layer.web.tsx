@@ -27,6 +27,8 @@ const clamp = (p: Pos, w: number, h: number): Pos => ({
 });
 
 // 迷你播放器的按鈕：實心黑底白字（業主 2026-11-17：取消半透明）。
+/** 長按快轉的最高倍數：YouTube 內嵌播放器最高 2 倍（不分會員、免費，Premium 不影響內嵌播放速度）。 */
+const MAX_RATE = 2;
 const btn: CSSProperties = { position: "absolute", border: 0, borderRadius: 999, background: "#000", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation", font: "700 16px sans-serif", padding: 0 };
 
 /**
@@ -57,24 +59,59 @@ export function PlayerLayer() {
     if (barTimer.current) clearTimeout(barTimer.current);
     if (!barHold.current) barTimer.current = setTimeout(() => setBarOn(false), 2000);
   }, []);
-  const hideBar = () => {
-    if (barTimer.current) clearTimeout(barTimer.current);
-    barOnRef.current = false;
-    setBarOn(false);
+  // 全螢幕手勢（業主 2026-11-24）：點左半邊＝倒退 10 秒、點右半邊＝快轉 10 秒；連續點（每次間隔不到 0.7 秒）每下 30 秒；
+  // 長按＝用最快速度（2 倍）播放，放開還原。每次都在畫面上顯示簡短提示。控制列：碰一下畫面就顯示，2 秒沒動作自動隱藏。
+  const [gHint, setGHint] = useState<{ text: string; side: "l" | "r" | "c"; n: number } | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showHint = (text: string, side: "l" | "r" | "c", hold = false) => {
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    setGHint((h) => ({ text, side, n: (h?.n ?? 0) + 1 }));
+    if (!hold) hintTimer.current = setTimeout(() => setGHint(null), 800);
   };
-  // 點一下畫面（不是控制列、也不是拖曳）：控制列顯示中就立刻隱藏，隱藏中就顯示（業主 2026-11-24）。
+  const combo = useRef<{ side: "l" | "r"; total: number; at: number } | null>(null);
+  const press = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holding = useRef(false);
   const barDown = (e: PointerEvent<HTMLDivElement>) => {
     barHold.current = true;
     if (barTimer.current) clearTimeout(barTimer.current);
     tap.current = { x: e.clientX, y: e.clientY, t: Date.now(), onBar: !!barRef.current?.contains(e.target as Node), wasOn: barOnRef.current };
+    if (!(fullRef.current || document.fullscreenElement === boxRef.current) || tap.current.onBar) return;
+    if (press.current) clearTimeout(press.current);
+    press.current = setTimeout(() => {
+      holding.current = true;
+      engine.holdRate(MAX_RATE);
+      showHint(`${MAX_RATE}× 快轉中`, "c", true);
+    }, 400);
+  };
+  const endHold = () => {
+    if (press.current) clearTimeout(press.current);
+    press.current = null;
+    if (holding.current) {
+      holding.current = false;
+      engine.holdRate(null);
+      setGHint(null);
+    }
   };
   const barUp = (e: PointerEvent<HTMLDivElement>) => {
     barHold.current = false;
     const d = tap.current;
     tap.current = null;
-    const isTap = !!d && !d.onBar && Date.now() - d.t < 500 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 12;
-    if (isTap && d.wasOn) hideBar();
-    else wakeBar();
+    const wasHolding = holding.current;
+    endHold();
+    wakeBar();
+    const inFull = fullRef.current || document.fullscreenElement === boxRef.current;
+    const isTap = !!d && !wasHolding && !d.onBar && Date.now() - d.t < 400 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 12;
+    if (!isTap || !inFull) return;
+    const r = boxRef.current?.getBoundingClientRect();
+    const side: "l" | "r" = e.clientX < (r ? r.left + r.width / 2 : window.innerWidth / 2) ? "l" : "r";
+    const now = Date.now();
+    const c = combo.current;
+    const chain = !!c && c.side === side && now - c.at < 700;
+    const step = chain ? 30 : 10;
+    const total = chain ? c!.total + step : step;
+    combo.current = { side, total, at: now };
+    engine.skip(side === "l" ? -step : step);
+    showHint(side === "l" ? `⏪ 倒退 ${total} 秒` : `快轉 ${total} 秒 ⏩`, side);
   };
   const [fsOn, setFsOn] = useState(false); // 這個播放框正處於瀏覽器全螢幕
   useEffect(() => {
@@ -432,12 +469,17 @@ export function PlayerLayer() {
   else if (!ytSrc.current) ytSrc.current = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt.videoId)}?controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&rel=0&modestbranding=1&autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${range}`;
   const art = s.artworkUrl ? (/^(https?:|blob:|data:)/.test(s.artworkUrl) ? s.artworkUrl : s.artworkUrl) : "/icon-512.png";
   return createPortal(
-    <div ref={boxRef} onPointerDownCapture={barDown} onPointerUpCapture={barUp} onPointerCancelCapture={() => { barHold.current = false; tap.current = null; wakeBar(); }} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
+    <div ref={boxRef} onPointerDownCapture={barDown} onPointerUpCapture={barUp} onPointerCancelCapture={() => { barHold.current = false; tap.current = null; endHold(); wakeBar(); }} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
       <style>{`@keyframes hg-spin{to{transform:rotate(360deg)}}${FRAME_KEYFRAMES}`}</style>
       {pFull ? (
         <button type="button" aria-label="縮小回原本大小" onClick={() => exitRef.current?.()} style={{ position: "absolute", top: 10, left: 10, zIndex: 5, opacity: barOn ? 1 : 0, pointerEvents: barOn ? "auto" : "none", transition: "opacity 0.25s", minHeight: 44, padding: "0 16px", borderRadius: 22, border: 0, background: "rgba(0,0,0,0.55)", color: "#fff", font: "700 15px system-ui, sans-serif" }}>
           縮小
         </button>
+      ) : null}
+      {gHint && (pFull || fsOn) ? (
+        <div key={gHint.n} style={{ position: "absolute", top: "42%", zIndex: 7, pointerEvents: "none", ...(gHint.side === "l" ? { left: "10%" } : gHint.side === "r" ? { right: "10%" } : { left: "50%", transform: "translateX(-50%)" }), padding: "10px 18px", borderRadius: 24, background: "rgba(0,0,0,0.6)", color: "#fff", font: "800 20px system-ui, sans-serif" }}>
+          {gHint.text}
+        </div>
       ) : null}
       {pFull || fsOn ? (
         // 全螢幕裡看不到頁面下方的播放控制列，所以在播放框內放同一個控制列（時間軸、播放／暫停、倍速…；業主 2026-11-24 回報時間軸不見了）
