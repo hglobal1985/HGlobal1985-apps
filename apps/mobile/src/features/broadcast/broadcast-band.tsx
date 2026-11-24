@@ -1,4 +1,5 @@
 import { trackFeature } from "@/lib/feature-track";
+import { useFeature } from "@/lib/app-mode";
 import { useEffect, useRef, useState } from "react";
 import { Animated, PanResponder, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { api } from "@/api/client";
@@ -81,12 +82,29 @@ export function BroadcastBand({ items, seconds, onOpen, labelOf, gutter: gutterO
 
 /** 全部公告：日期＋內容（用統一的上拉面板，高度依內容自動調整）；有權限的人每則下面有「修改」「刪除」（業主 2026-11-21：不必另外進設定頁）。 */
 export function BroadcastSheet({ title, items, onClose, onChanged }: { title: string; items: Items; onClose: () => void; onChanged?: () => void }) {
+  useEffect(() => trackFeature("broadcast_open"), []);
+  return (
+    <BottomSheet onClose={onClose}>
+      <AppText variant="headline">{title}</AppText>
+      <SheetScroll>
+        <BroadcastList items={items} onChanged={onChanged} />
+      </SheetScroll>
+      <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
+    </BottomSheet>
+  );
+}
+
+/**
+ * 公告清單本體（日期＋完整內容；有權限的人可修改、刪除）：超派模式的公告面板與至尊模式展開的公告區塊共用同一份（業主 2026-11-24）。
+ * 修改／刪除鈕要不要顯示由模式設定檔決定（至尊模式 adminEdit＝false 不顯示）。
+ */
+export function BroadcastList({ items, onChanged }: { items: Items; onChanged?: () => void }) {
   const { c } = useTheme();
+  const adminEdit = useFeature("adminEdit");
   const [editId, setEditId] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => trackFeature("broadcast_open"), []);
   const run = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true);
     setError(null);
@@ -106,39 +124,35 @@ export function BroadcastSheet({ title, items, onClose, onChanged }: { title: st
     await run(() => api("DELETE", `/admin/broadcasts/${id}`), "已刪除公告");
   };
   return (
-    <BottomSheet onClose={onClose}>
-      <AppText variant="headline">{title}</AppText>
+    <>
       {error ? <NoticeBox tone="danger" text={error} /> : null}
-      <SheetScroll>
-        {items.map((x) => (
-          <View key={x.id} style={[styles.row, { borderTopColor: c.border }]}>
-            <AppText variant="callout" tone="muted" style={{ fontWeight: "700" }}>
-              {x.date}
-            </AppText>
-            {editId === x.id ? (
-              <>
-                <TextInput value={text} onChangeText={setText} multiline maxLength={300} accessibilityLabel="公告內容" placeholderTextColor={c.textMuted} style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
+      {items.map((x) => (
+        <View key={x.id} style={[styles.row, { borderTopColor: c.border }]}>
+          <AppText variant="callout" tone="muted" style={{ fontWeight: "700" }}>
+            {x.date}
+          </AppText>
+          {editId === x.id ? (
+            <>
+              <TextInput value={text} onChangeText={setText} multiline maxLength={300} accessibilityLabel="公告內容" placeholderTextColor={c.textMuted} style={[styles.input, type.body, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />
+              <View style={styles.btns}>
+                <Button variant="cancel" label="取消" disabled={busy} onPress={() => setEditId(null)} />
+                <Button label="儲存" loading={busy} disabled={busy || !text.trim()} onPress={() => void save(x.id)} />
+              </View>
+            </>
+          ) : (
+            <>
+              <AppText variant="body">{x.text}</AppText>
+              {x.canEdit && adminEdit ? (
                 <View style={styles.btns}>
-                  <Button variant="cancel" label="取消" disabled={busy} onPress={() => setEditId(null)} />
-                  <Button label="儲存" loading={busy} disabled={busy || !text.trim()} onPress={() => void save(x.id)} />
+                  <Button variant="secondary" label="修改" disabled={busy} onPress={() => (setEditId(x.id), setText(x.text))} />
+                  <Button variant="ghost" label="刪除" disabled={busy} onPress={() => void remove(x.id)} />
                 </View>
-              </>
-            ) : (
-              <>
-                <AppText variant="body">{x.text}</AppText>
-                {x.canEdit ? (
-                  <View style={styles.btns}>
-                    <Button variant="secondary" label="修改" disabled={busy} onPress={() => (setEditId(x.id), setText(x.text))} />
-                    <Button variant="ghost" label="刪除" disabled={busy} onPress={() => void remove(x.id)} />
-                  </View>
-                ) : null}
-              </>
-            )}
-          </View>
-        ))}
-      </SheetScroll>
-      <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
-    </BottomSheet>
+              ) : null}
+            </>
+          )}
+        </View>
+      ))}
+    </>
   );
 }
 

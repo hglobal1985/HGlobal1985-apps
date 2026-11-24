@@ -28,6 +28,7 @@ import { Check } from "@/ui/check";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { PageHeader } from "@/features/page-header";
 import { ElderCourse } from "@/features/elder/elder-course";
+import { ElderBroadcastBox } from "@/features/elder/elder-broadcast";
 import { useModeProfile } from "@/lib/app-mode";
 import { useApi, useSession } from "@/state/session";
 import { useLayout } from "@/theme/layout";
@@ -378,8 +379,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
         <ElderCourse
           course={course}
           player={player}
-          cover={<EdmStage course={course} canManageAlbum={false} />}
-          announce={<BroadcastZone center={course.hostCenter || undefined} series={course.series || undefined} title="公告" />}
+          cover={<EdmStage course={course} stats={stats} />}
+          announce={<ElderBroadcastBox center={course.hostCenter || undefined} series={course.series || undefined} />}
           playingId={playLesson ? playLesson.id : null}
           onPlay={playLesson_}
           action={stickyAction}
