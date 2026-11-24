@@ -379,6 +379,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           course={course}
           player={player}
           cover={<EdmStage course={course} canManageAlbum={false} />}
+          announce={<BroadcastZone center={course.hostCenter || undefined} series={course.series || undefined} title="公告" />}
           playingId={playLesson ? playLesson.id : null}
           onPlay={playLesson_}
           action={stickyAction}

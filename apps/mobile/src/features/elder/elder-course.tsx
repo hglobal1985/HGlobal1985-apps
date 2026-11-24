@@ -1,8 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { centerTitle } from "@/features/format";
+import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
+import { trackFeature } from "@/lib/feature-track";
+import { flashText } from "@/ui/flash-notice";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
@@ -15,6 +18,24 @@ export function elderItems(course: CourseDetail): Lesson[] {
 }
 
 /**
+ * 有章節時，課程頁最後面另外列「其他教材」：完整版影片＋其他教材（簡報、文件、外部連結、下載）。
+ * 超派模式的課程頁都有這一區，至尊模式原本漏掉（業主 2026-11-24 要求對照超派模式補齊）。分類標題不列。
+ */
+export function elderExtras(course: CourseDetail): Lesson[] {
+  if (!course.lessons.some((l) => !l.material && !l.section && !l.full)) return [];
+  return [...course.lessons.filter((l) => l.full && !l.section), ...course.lessons.filter((l) => l.material && !l.section && !l.full)];
+}
+
+/** 其他教材若是外部連結／下載檔案，點下去開連結或下載（和超派模式的教材列一樣），不是播放。 */
+function openMaterial(l: Lesson): boolean {
+  if (!l.linkType || l.full || !l.linkUrl) return false;
+  trackFeature("open_material");
+  if (isDownloadUrl(l.linkUrl)) void downloadMaterial(l.linkUrl);
+  else void Linking.openURL(l.linkUrl).catch(() => flashText("無法開啟連結"));
+  return true;
+}
+
+/**
  * 至尊模式的課程頁（業主 2026-11-24，B 方案；課程頁採方案 2）：上方兩個大分頁「上課／介紹」。
  * 上課＝下一課排第一、最顯眼（正在播放的那一課優先），接著其他還沒上的，已上完的放最後（淡色）；整列都能點。
  * 介紹＝封面（EDM）、課程名稱、主講人、堂數與時間、費用、報名按鈕。沒有「唸給我聽」（教材本身都是影音）。
@@ -24,6 +45,7 @@ export function ElderCourse({
   course,
   player,
   cover,
+  announce,
   playingId,
   onPlay,
   action,
@@ -37,6 +59,8 @@ export function ElderCourse({
   player: ReactNode;
   /** 介紹頁的封面（EDM）。 */
   cover: ReactNode;
+  /** 主辦中心與所屬系列的公告（介紹頁最上面；和超派模式課程頁同一條）。 */
+  announce?: ReactNode;
   playingId: string | null;
   onPlay: (id: string) => void;
   /** 報名／審核中按鈕（沒有為 null）。 */
@@ -51,10 +75,11 @@ export function ElderCourse({
   const { c } = useTheme();
   const [tab, setTab] = useState<"learn" | "intro">(locked ? "intro" : "learn");
   const items = elderItems(course);
-  const can = (l: Lesson) => !l.locked && l.ready;
+  const can = (l: Lesson) => !l.locked && (l.ready || !!l.linkUrl);
   const current = items.find((l) => l.id === playingId);
   const next = current ?? items.find((l) => can(l) && !l.completed) ?? null;
   const rest = items.filter((l) => l !== next);
+  const extras = elderExtras(course);
   const ordered = [...(next ? [next] : []), ...rest.filter((l) => !l.completed), ...rest.filter((l) => l.completed)];
   const done = items.filter((l) => l.completed).length;
   const word = items.some((l) => !l.material) ? "課" : "部";
@@ -108,11 +133,22 @@ export function ElderCourse({
               </Pressable>
             ) : null}
             {ordered.map((l) => (
-              <LessonRow key={l.id} lesson={l} highlight={l === next} playing={l.id === playingId} onPress={() => (can(l) ? onPlay(l.id) : l.locked ? setTab("intro") : undefined)} />
+              <LessonRow key={l.id} lesson={l} highlight={l === next} playing={l.id === playingId} onPress={() => (can(l) ? (openMaterial(l) ? undefined : onPlay(l.id)) : l.locked ? setTab("intro") : undefined)} />
             ))}
+            {extras.length ? (
+              <>
+                <AppText variant="title" accessibilityRole="header" style={{ marginTop: space.md }}>
+                  其他教材
+                </AppText>
+                {extras.map((l) => (
+                  <LessonRow key={l.id} lesson={l} highlight={false} playing={l.id === playingId} onPress={() => (l.locked ? setTab("intro") : can(l) ? (openMaterial(l) ? undefined : onPlay(l.id)) : undefined)} />
+                ))}
+              </>
+            ) : null}
           </>
         ) : (
           <>
+            {announce}
             {cover}
             <View style={[styles.info, { backgroundColor: c.surface, borderColor: c.border }]}>
               {teacher ? <InfoLine icon="person" text={`主講：${teacher}`} /> : null}
@@ -154,7 +190,8 @@ function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson;
   const { c } = useTheme();
   const fg = highlight ? c.textOnAccent : c.text;
   const circle = Math.round(44 * UI_SCALE);
-  const status = !l.ready ? "敬請期待" : l.locked ? "報名後才能看" : playing ? "播放中" : l.minutes ? `${Math.max(1, Math.round(l.minutes))} 分鐘` : null;
+  const link = !!l.linkType && !l.full && !!l.linkUrl;
+  const status = !l.ready && !link ? "敬請期待" : l.locked ? "報名後才能看" : link ? (isDownloadUrl(l.linkUrl!) ? "按一下下載" : "按一下開啟") : playing ? "播放中" : l.minutes ? `${Math.max(1, Math.round(l.minutes))} 分鐘` : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -180,7 +217,7 @@ function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson;
           </AppText>
         ) : null}
       </View>
-      {l.locked ? <Ionicons name="lock-closed" size={26} color={c.textMuted} /> : l.ready ? <Ionicons name={playing ? "volume-high" : "play"} size={highlight ? 34 : 26} color={highlight ? c.navPill : c.accent} /> : null}
+      {l.locked ? <Ionicons name="lock-closed" size={26} color={c.textMuted} /> : l.ready || link ? <Ionicons name={link ? (isDownloadUrl(l.linkUrl!) ? "download-outline" : "open-outline") : playing ? "volume-high" : "play"} size={highlight ? 34 : 26} color={highlight ? c.navPill : c.accent} /> : null}
     </Pressable>
   );
 }

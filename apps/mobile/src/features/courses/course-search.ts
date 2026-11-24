@@ -123,3 +123,16 @@ export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
   if (t.length) for (const [id, hay] of index.lessonHay) if (t.every((w) => fuzzyHit(hay, w))) out.add(id);
   return out;
 }
+
+/**
+ * 字元比對（業主 2026-11-24：語音輸入「線上白金」要找得到「安麗與白金線上溝通會」）：
+ * 查詢的每個字（不分順序）都出現在同一門課的文字裡就算符合；至少 3 個字才用，避免太短亂配。
+ * 只在完全比對與模糊比對都沒結果時才用，且不需要 AI，額度用完也找得到。
+ */
+export function charsCourses(index: SearchIndex, q: string): Set<string> {
+  const chars = [...new Set([...q.toLowerCase().replace(/\s+/g, "")])];
+  const out = new Set<string>();
+  if (chars.length < 3) return out;
+  for (const [id, hay] of index.haystack) if (chars.every((ch) => hay.includes(ch))) out.add(id);
+  return out;
+}
