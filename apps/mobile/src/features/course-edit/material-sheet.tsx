@@ -16,7 +16,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 import { FileUploadModule } from "@/features/uploads/file-upload-module";
 import { BrandIcon } from "@/ui/brand-icon";
 import { EditSheet } from "./edit-sheet";
-import { YoutubeImportSheet } from "./youtube-import";
+import { AppPlayerCheck, YoutubeImportSheet } from "./youtube-import";
 
 /**
  * 「其他教材」的新增與編輯面板（業主 2026-11-16 改版）：只有三個東西——
@@ -110,6 +110,9 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   // 清單卡的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
   const baseLink = lesson?.linkUrl ?? (lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
   const [url, setUrl] = useState(baseLink);
+  // 使用行動大學播放器（業主 2026-11-24，預設勾選）：新增一律先勾；編輯時，存成影片來源的＝勾、存成外部連結的＝不勾。
+  const baseApp = lesson ? lesson.media?.type === "youtube" || !lesson.linkUrl : true;
+  const [appPlayer, setAppPlayer] = useState(baseApp);
   const [title, setTitle] = useState(lesson?.title ?? "");
   const lastAuto = useRef<string>(lesson?.title ?? ""); // 最近一次自動填入的名稱：名稱還是這個（或空白）時，換連結才會自動換名稱；自己改過的不會被蓋掉
   const lastAutoDate = useRef<string>(lesson?.eventDate ?? "");
@@ -126,7 +129,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const parsed = parseHttpsUrl(url);
   const fileType = parsed ? classifyLink(parsed) : null;
   const ytId = fileType === "youtube" ? ytIdOfUrl(parsed) : null;
-  const dirty = lesson ? theme !== !!lesson.isSpeaker || url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
+  const dirty = lesson ? appPlayer !== baseApp || theme !== !!lesson.isSpeaker || url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
 
   // 連結一變（貼上或手動輸入，停下來 0.6 秒後），請伺服器代為讀取網頁標題。
   useEffect(() => {
@@ -195,10 +198,10 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
     try {
       const dateBody = { eventDate: evDate || null };
       let lessonId = lesson?.id;
-      if (lesson) await api("PUT", `/admin/lessons/${lesson.id}/material`, { url: parsed.toString(), title, ...dateBody });
+      if (lesson) await api("PUT", `/admin/lessons/${lesson.id}/material`, { url: parsed.toString(), title, appPlayer, ...dateBody });
       else {
         const before = new Set(course.lessons.map((l) => l.id));
-        const d = await api<CourseDetail>("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title, ...dateBody });
+        const d = await api<CourseDetail>("POST", `/admin/courses/${course.id}/materials`, { url: parsed.toString(), title, appPlayer, ...dateBody });
         lessonId = d.lessons.find((l) => !before.has(l.id))?.id;
         // 指定區塊：把新教材移到該區塊的最上面（區塊標題的正下方）。
         if (afterBlock && lessonId) {
@@ -214,7 +217,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
       // 主題（業主 2026-11-19）：每個區塊（沒有區塊就整份）只能有一個，勾新的伺服器會取消原本那個。
       if (lesson && theme !== !!lesson.isSpeaker) await api("PATCH", `/admin/lessons/${lesson.id}`, { isSpeaker: theme });
       // 影片時間軸區間：連結換成別支影片時伺服器會清空區間，所以一律在儲存連結之後再寫入。
-      if (ytId && lessonId && (secOf(trim.start) !== null || secOf(trim.end) !== null || lesson?.start != null || lesson?.end != null)) await api("PATCH", `/admin/lessons/${lessonId}`, { startSeconds: secOf(trim.start), endSeconds: secOf(trim.end) });
+      if (ytId && appPlayer && lessonId && (secOf(trim.start) !== null || secOf(trim.end) !== null || lesson?.start != null || lesson?.end != null)) await api("PATCH", `/admin/lessons/${lessonId}`, { startSeconds: secOf(trim.start), endSeconds: secOf(trim.end) });
       invalidate();
       onClose();
     } catch (e) {
@@ -299,7 +302,8 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
       </View>
       <DateSelect label="日期（選填；貼上連結會自動帶入連結的日期，可自行修改）" value={evDate} onChange={setEvDate} />
       {lesson ? <ThemeCheck value={theme} onChange={setTheme} /> : null}
-      {ytId ? (
+      {fileType === "youtube" ? <AppPlayerCheck value={appPlayer} onChange={setAppPlayer} /> : null}
+      {ytId && appPlayer ? (
         <TimeRangeFields
           draft={{ kind: "youtube", ref: ytId, start: trim.start, end: trim.end, audio: null, toEnd: toEnd }}
           set={(patch) => {

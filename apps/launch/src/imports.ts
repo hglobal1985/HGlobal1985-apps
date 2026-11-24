@@ -328,13 +328,24 @@ export function syncNamesFor(items: { title: string; date: string | null }[], fm
   });
 }
 
+/** 這張卡已經有的 YouTube 影片編號：影片來源，加上存成外部連結的 YouTube 網址（沒勾「使用行動大學播放器」的），同步時都不重複匯入。 */
+export async function existingVideoIds(db: D1Database, courseId: string): Promise<Set<string>> {
+  const have = new Set((await db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_ref IS NOT NULL").bind(courseId).all<{ media_ref: string }>()).results.map((r) => r.media_ref));
+  const links = await db.prepare("SELECT link_url FROM lesson_attachments WHERE course_id = ? AND kind = 'link' AND att_type = 'youtube'").bind(courseId).all<{ link_url: string }>();
+  for (const r of links.results) {
+    const m = /(?:[?&]v=|youtu\.be\/|\/(?:live|shorts|embed)\/)([A-Za-z0-9_-]{11})/.exec(r.link_url ?? "");
+    if (m) have.add(m[1]!);
+  }
+  return have;
+}
+
 /**
  * 同步一份 YouTube 播放清單到教材卡（業主 2026-11-20）：只加還沒有的影片（用影片編號比對，已存在的不重複），
  * 每支影片一個教材（不開區塊），名稱依 syncTitle，日期＝影片日期，分鐘數由排程補。結果記在這份同步設定上。
  */
 export async function runYoutubeSync(env: Env, syncId: string): Promise<{ imported: number; note: string }> {
   const db = env.DB;
-  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format, strip_text, sort_mode, sort_locked FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ strip_text: string; id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
+  const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format, strip_text, sort_mode, sort_locked, use_app_player FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ use_app_player: number; strip_text: string; id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
   if (!sync) return { imported: 0, note: "找不到這個同步設定" };
   const finish = async (out: { imported: number; note: string }) => {
     // 只有「依日期新到舊」且沒有被手動鎖定時，才整張重排（手動排序永遠優先，業主 2026-11-20）。
@@ -343,7 +354,7 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
     return out;
   };
   if (!env.YOUTUBE_API_KEY) return finish({ imported: 0, note: "尚未設定 YouTube 金鑰" });
-  const have = new Set((await db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_ref IS NOT NULL").bind(sync.course_id).all<{ media_ref: string }>()).results.map((r) => r.media_ref));
+  const have = await existingVideoIds(db, sync.course_id);
   const read = await readPlaylist(env.YOUTUBE_API_KEY, sync.playlist_id, have);
   if ("error" in read) return finish({ imported: 0, note: read.error });
   if (!read.items.length) return finish({ imported: 0, note: "沒有新的影片（都已經同步過了）" });
@@ -355,11 +366,17 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   // 名稱一樣的教材才加日期（業主 2026-11-20）：同一批裡、或和這張卡原本就有的教材同名，就在名稱後面加「（月/日）」。
   const existing = new Set((await db.prepare("SELECT title FROM lessons WHERE course_id = ?").bind(sync.course_id).all<{ title: string }>()).results.map((r) => r.title));
   const names = syncNamesFor(items, sync.title_format || defaultSyncFormat(sync.title_prefix), parseStrip(sync.strip_text), existing);
+  // 使用行動大學播放器（業主 2026-11-24，預設）：存成影片來源在 App 內播放；沒勾＝存成外部連結，點了開新網頁到 YouTube。
+  const appPlayer = sync.use_app_player !== 0;
   await db.batch(
-    items.map((it, i) => {
+    items.flatMap((it, i) => {
       const name = names[i]!;
       lines.push(`${name}｜${it.title}`);
-      return db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, event_date, kind) VALUES (?, ?, ?, ?, 0, 'youtube', ?, ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.id, it.date);
+      if (appPlayer) return [db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, media_ref, event_date, kind) VALUES (?, ?, ?, ?, 0, 'youtube', ?, ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.id, it.date)];
+      return [
+        db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, event_date, kind) VALUES (?, ?, ?, ?, 0, 'demo', ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, it.date),
+        db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, 'youtube', 'system')").bind(crypto.randomUUID(), ids[i]!, sync.course_id, name, `https://www.youtube.com/watch?v=${it.id}`),
+      ];
     }),
   );
   // 新影片的位置：依排序規則。依日期（預設）：沒鎖定＝finish 時整張重排；已手動排序鎖定＝只把新影片依日期插入、不動其餘。
