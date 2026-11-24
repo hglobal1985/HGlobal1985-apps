@@ -7,6 +7,7 @@ import { resolveUrl, type CourseSummary } from "@/api/client";
 import { buildSearchIndex, charsCourses, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
 import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
+import { SceneHits } from "@/features/courses/scene-hits";
 import { useThumb } from "@/lib/thumb";
 import { useProfileRedirect } from "@/features/profile-gate";
 import { useApi, useSession } from "@/state/session";
@@ -135,6 +136,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       {searching ? (
         <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : "找不到這個課程，換個字試試看"}</AppText>
       ) : null}
+      {searching ? <SceneHits q={q} big /> : null}
     </View>
   );
 

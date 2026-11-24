@@ -102,10 +102,10 @@ function ElderLock({ lines }: { lines?: string[] }) {
 }
 
 /** 區塊清單：每個區塊一張大列（標題＋教材數＋展開箭頭），預設全部收起、同一時間只展開一個（與超派模式 BLOCK_BEHAVIOR 一致）。 */
-function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
+function BlockList({ lead, blocks, playingId, renderRow, albumFocus }: { albumFocus?: string; lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
   const { c } = useTheme();
-  const [open, setOpen] = useState<string | null>(null);
-  const [albumOpen, setAlbumOpen] = useState<string | null>(null); // 相簿裡展開的區塊（業主 2026-11-24）
+  const [open, setOpen] = useState<string | null>(albumFocus ? ALBUM : null);
+  const [albumOpen, setAlbumOpen] = useState<string | null>(albumFocus ?? null); // 相簿裡展開的區塊（業主 2026-11-24）
   const albumGroups = blocks.filter((b) => !!b.head.photoKey && blockPhotoCount(b.head) > 0);
   const albumTotal = albumGroups.reduce((n, b) => n + blockPhotoCount(b.head), 0);
   useEffect(() => {
@@ -181,7 +181,10 @@ export function ElderCourse({
   message,
   locked,
   lockedLines,
+  albumFocus,
 }: {
+  /** 從搜尋的「場景」結果進來：直接展開相簿的這個區塊（業主 2026-11-24）。 */
+  albumFocus?: string;
   course: CourseDetail;
   /** 播放器（還沒播放為 null）。 */
   player: ReactNode;
@@ -269,6 +272,7 @@ export function ElderCourse({
             ) : null}
             {blockMode ? (
               <BlockList
+                albumFocus={albumFocus}
                 lead={blocks.lead}
                 blocks={blocks.blocks}
                 playingId={playingId}
