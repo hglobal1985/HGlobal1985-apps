@@ -5,6 +5,7 @@ import { CoverAlbum } from "@/features/courses/album";
 import { CenterMaterialsCard } from "@/features/courses/center-list";
 import { ScheduleCard, useCenterSchedules } from "@/features/courses/center-schedule";
 import { useCoverMedia } from "@/features/courses/cover-media";
+import { canEditCenterArt } from "@/features/courses/center-rights";
 import { centerKeyOf, centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
@@ -25,7 +26,7 @@ export function ElderCenterPage({ center, courses, renderCourses }: { center: st
   const info = useApi<Record<string, string>>(member ? "/center-info" : null);
   const address = info.data?.[centerKeyOf(center)];
   const blocks: { key: "album" | "schedule" | "course" | "list"; title: string; sub?: string; body: () => ReactNode }[] = [
-    { key: "album", title: "EDM", sub: cm.edm.length ? `${cm.edm.length} 張` : undefined, body: () => <CoverAlbum kind="center" scope="edm" ownerKey={center} title={centerTitle(center)} items={cm.edm} canEdit={false} onChanged={cm.reload} /> },
+    { key: "album", title: "EDM", sub: cm.edm.length ? `${cm.edm.length} 張` : undefined, body: () => <CoverAlbum kind="center" scope="edm" ownerKey={center} title={centerTitle(center)} items={cm.edm} canEdit={canEditCenterArt(member, center)} onChanged={cm.reload} /> },
     {
       key: "schedule",
       title: "課表",

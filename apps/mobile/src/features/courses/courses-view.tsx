@@ -22,6 +22,7 @@ import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
 import { CoverAlbum } from "./album";
+import { canEditCenterArt } from "./center-rights";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { BottomSheet } from "@/ui/bottom-sheet";
 import { useCoverMedia } from "./cover-media";
@@ -292,7 +293,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     [centers, courses, category, brandSel], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const art = activeCenter !== ALL ? centerArt.data?.find((a) => a.centerKey === centerKeyOf(activeCenter) || a.center === activeCenter) : undefined;
-  const canEditArt = activeCenter !== ALL && !!rights && (rights.all || (rights.center === activeCenter && (rights.manageEditors || !!rights.editor?.editOthers)));
+  const canEditArt = activeCenter !== ALL && canEditCenterArt(member, activeCenter);
   const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter)));
   const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
   const needIndex = wantIndex || chapterMode;

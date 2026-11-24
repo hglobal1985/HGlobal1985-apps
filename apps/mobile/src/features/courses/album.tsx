@@ -5,6 +5,7 @@ import { api, resolveUrl, type CoverMediaItem, type CoverMediaKind, type CoverSc
 import { confirmAsk } from "@/features/confirm";
 import { replaceAlbumPhoto } from "@/features/uploads/album-replace";
 import { useUiConfig } from "@/state/ui-config";
+import { useFeature } from "@/lib/app-mode";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -24,6 +25,10 @@ const COLS = 3;
 export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, scope, emptyHint }: { kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void; /** 中心的儲存區（cover＝封面編輯、edm＝EDM 分頁）；系列、課程不用給。 */ scope?: CoverScope; emptyHint?: string }) {
   const { c } = useTheme();
   const thumb = useThumb();
+  // canEdit＝看的人的權限（兩種模式一樣傳）；要不要顯示排序／刪除等編輯小鈕由模式設定檔決定（至尊模式 adminEdit＝false）。
+  // 「圖片資訊」驚嘆號只看權限，兩種模式都有（業主 2026-11-24 回報至尊模式少了驚嘆號）。
+  const adminEdit = useFeature("adminEdit");
+  const editUi = canEdit && adminEdit;
   const { config } = useUiConfig();
   const [w, setW] = useState(0);
   const [view, setView] = useState<string | null>(null); // 看哪張圖（照片編號）
@@ -57,7 +62,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
   const replace = (x: CoverMediaItem) => replaceAlbumPhoto(x.id, { maxSide: config.app.centerMaxSide, quality: config.app.centerQuality / 100 }, onChanged);
   return (
     <View style={{ gap: space.md }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
-      {!items.length ? <EmptyState icon="images-outline" title={scope === "edm" ? "還沒有 EDM" : "還沒有照片"} body={canEdit ? emptyHint ?? (scope === "edm" ? "按右下角「新增教材 › 上傳EDM」新增。" : undefined) : undefined} /> : null}
+      {!items.length ? <EmptyState icon="images-outline" title={scope === "edm" ? "還沒有 EDM" : "還沒有照片"} body={editUi ? emptyHint ?? (scope === "edm" ? "按右下角「新增教材 › 上傳EDM」新增。" : undefined) : undefined} /> : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
         {items.map((x, i) => (
           <View key={x.id} style={{ width: tile || "33%", height: tile ? (scope === "edm" ? Math.round((tile * 4) / 3) : tile) : 100, borderRadius: radius.sm, overflow: "hidden", backgroundColor: c.surfaceMuted }}>
@@ -84,7 +89,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
                 </AppText>
               </View>
             ) : null}
-            {canEdit ? (
+            {editUi ? (
               <View style={styles.tools} pointerEvents="box-none">
                 {<Pressable accessibilityRole="button" hitSlop={6} accessibilityLabel="往前移" disabled={i === 0} onPress={() => move(x.id, -1)} style={[styles.tbtn, i === 0 && { opacity: 0.35 }]}>
                   <Ionicons name="chevron-back" size={16} color="#fff" {...NO_SCALE} />
