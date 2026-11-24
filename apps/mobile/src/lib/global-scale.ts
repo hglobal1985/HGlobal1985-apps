@@ -8,6 +8,8 @@ import { UI_SCALE } from "@/theme/ui-scale";
  * 圖片上的文字（例如緞帶）加 dataSet={{ noScale: "" }} 就不放大。手機倍數是 1，什麼都不做。要在根版面最早 import。
  */
 type AnyFn = (...a: never[]) => unknown;
+// 不跟著手機系統的「字體放大／輔助使用」變大（業主 2026-11-24 永久指示）：App 版面一律照 App 自己的尺寸，系統設定不可影響。
+for (const C of [Text, TextInput] as unknown as { defaultProps?: Record<string, unknown> }[]) C.defaultProps = { ...C.defaultProps, allowFontScaling: false, maxFontSizeMultiplier: 1 };
 if (UI_SCALE !== 1) {
   const scaled = (style: unknown) => {
     const f = StyleSheet.flatten(style as never) as Record<string, unknown> | undefined;

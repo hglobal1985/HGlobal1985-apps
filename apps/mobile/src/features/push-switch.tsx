@@ -58,13 +58,16 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
           onPress={() => !busy && void toggle(!on)}
           style={{ flexDirection: "row", alignItems: "center", gap: compact ? 6 : space.sm, minHeight: compact ? 40 : 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: compact ? 8 : space.sm, opacity: 1 }}
         >
-          {compact ? null : (
+          {/* 鈴鐺與主選單「通知」分頁同款：沒開啟＝線條鈴鐺、開啟＝實心鈴鐺（業主 2026-11-24）。 */}
+          {compact ? (
+            <Icon name={on ? "notifications" : "notifications-outline"} size={24} color={fg} />
+          ) : (
             <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.2)" }}>
-              <Icon name="notifications" size={20} color={fg} />
+              <Icon name={on ? "notifications" : "notifications-outline"} size={20} color={fg} />
             </View>
           )}
           <View style={{ flex: 1 }}>
-            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>{compact ? (on ? "推播已開啟" : "開啟推播") : on ? "手機推播已開啟" : "按此開啟手機推播"}</AppText>
+            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>{on ? "手機通知已開啟" : "按此開啟手機通知"}</AppText>
           </View>
           <Icon name={on ? "checkbox" : "square-outline"} size={compact ? 22 : 34} color={fg} />
         </Pressable>

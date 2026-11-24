@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/theme/theme";
@@ -32,6 +32,16 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
   const { c } = useTheme();
   useDimLayer();
   const insets = useSafeAreaInsets();
+  // 網頁（加到主畫面的 App）：面板下方若露出底部選單的綠色底色，改成面板同色，看起來是面板蓋到最底（業主 2026-11-24）。
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const el = document.documentElement;
+    const old = el.style.backgroundColor;
+    el.style.backgroundColor = c.surface;
+    return () => {
+      el.style.backgroundColor = old;
+    };
+  }, [c.surface]);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const upRef = useRef(swipeUpClose);
