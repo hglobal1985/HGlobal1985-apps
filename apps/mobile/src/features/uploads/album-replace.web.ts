@@ -1,5 +1,6 @@
-import { apiUpload } from "@/api/client";
+import { api, apiUpload } from "@/api/client";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
+import { readPhotoMeta } from "./exif-meta";
 import { flashText } from "@/ui/flash-notice";
 
 /**
@@ -19,6 +20,7 @@ export function replaceAlbumPhoto(id: string, opts: { maxSide: number; quality: 
       const s = Math.min(1, opts.maxSide / Math.max(img.naturalWidth, img.naturalHeight));
       const blob = await cropCompress(img, null, opts.maxSide, opts.quality);
       await apiUpload("PUT", `/admin/cover-media/${id}/replace?w=${Math.round(img.naturalWidth * s)}&h=${Math.round(img.naturalHeight * s)}`, blob, () => undefined);
+      await api("PUT", `/admin/cover-media/${id}/meta`, await readPhotoMeta(f, img.naturalWidth, img.naturalHeight)).catch(() => undefined);
       onDone();
       flashText("已更換照片");
     } catch (e) {

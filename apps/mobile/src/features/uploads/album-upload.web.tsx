@@ -6,6 +6,7 @@ import { useUiConfig } from "@/state/ui-config";
 import { space } from "@/theme/tokens";
 import { Button, NoticeBox } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
+import { readPhotoMeta } from "./exif-meta";
 import { compressVideo, probeVideo, videoCompressSupported } from "./video-compress";
 import { UploadProgress } from "./upload-progress";
 
@@ -46,7 +47,9 @@ export function AlbumUploadButton({ kind, ownerKey, count, onDone, scope, label 
           const img = await loadImage(f);
           const s = Math.min(1, config.app.centerMaxSide / Math.max(img.naturalWidth, img.naturalHeight));
           const blob = await cropCompress(img, null, config.app.centerMaxSide, config.app.centerQuality / 100);
-          await apiUpload("PUT", `/admin/cover-media?${q}&w=${Math.round(img.naturalWidth * s)}&h=${Math.round(img.naturalHeight * s)}`, blob, (p) => setStep({ label: `上傳照片${tag}`, pct: p }));
+          const up = await apiUpload<{ id: string }>("PUT", `/admin/cover-media?${q}&w=${Math.round(img.naturalWidth * s)}&h=${Math.round(img.naturalHeight * s)}`, blob, (p) => setStep({ label: `上傳照片${tag}`, pct: p }));
+          // 原始檔的 EXIF 與檔案資訊（圖片「資訊」面板用）；失敗不影響上傳。
+          await api("PUT", `/admin/cover-media/${up.id}/meta`, await readPhotoMeta(f, img.naturalWidth, img.naturalHeight)).catch(() => undefined);
         }
         ok++;
       }

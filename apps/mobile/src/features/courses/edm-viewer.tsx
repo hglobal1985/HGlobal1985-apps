@@ -1,4 +1,5 @@
 import { trackFeature } from "@/lib/feature-track";
+import { useBackToClose } from "@/lib/back-close";
 import { enterFullscreen, exitFullscreen } from "@/lib/fullscreen";
 import { useThumb } from "@/lib/thumb";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -21,6 +22,7 @@ import { CoverCarousel } from "./cover-carousel";
 import { useCoverMedia } from "./cover-media";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CoverBadges, type CoverStats } from "./cover-stats";
+import { EdmInfoPanel } from "./edm-info";
 
 /**
  * 課程介紹頁與教材清單頁上方的封面（業主 2026-11-18：封面上不放任何提示文字，全部封面一致；左下角固定是封面統計模組的訂閱鈕＋點閱）。
@@ -132,8 +134,9 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
  */
 /** 操作說明縮成十字圖示後，這次開啟網站期間都記住（不用每張圖再按一次）。 */
 let helpHiddenMemory = false;
-export type LightboxItem = { uri: string; title: string; bg?: string };
-export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri: string; title: string; onClose: () => void; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
+/** id＝相簿照片編號（有給、而且看的人有管理權限時，右上角多一顆「圖片資訊」驚嘆號鈕；業主 2026-11-24）。 */
+export type LightboxItem = { uri: string; title: string; bg?: string; id?: string };
+export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, index = 0 }: { uri: string; title: string; onClose: () => void; /** 看的人有管理權限時才傳 true：顯示「圖片資訊」鈕（內容含上傳者與 EXIF）。 */ showInfo?: boolean; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
   useEffect(() => trackFeature("edm_zoom"), []);
   // 真正的全螢幕：進來時收起瀏覽器的網址列與按鈕，關閉時還原（lib/fullscreen.ts；不支援的瀏覽器略過）。
   useEffect(() => {
@@ -146,6 +149,8 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
     setHideHelp(hide);
   };
   useDimLayer();
+  useBackToClose(onClose); // 瀏覽器／手機「上一頁」＝直接關閉這個全螢幕視窗（業主 2026-11-24）
+  const [infoOpen, setInfoOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const list = items && items.length ? items : [{ uri, title, bg }];
@@ -281,6 +286,7 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
   // 電腦（有滑鼠）才顯示左右切換按鈕；手機、平板橫放用手指滑動（業主 2026-11-21）。
   const desktop = Platform.OS === "web" && typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
   const imgBg = cur.bg ?? bg;
+  const canInfo = !!cur.id && showInfo;
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
@@ -305,6 +311,7 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
               <View style={styles.row} pointerEvents="box-none">
                 {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" />) : null}
+                {canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} />) : null}
                 {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
                 {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
                 {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
@@ -328,6 +335,7 @@ export function EdmLightbox({ uri, title, onClose, bg, items, index = 0 }: { uri
               </View>
             ) : null}
           </View>
+          {infoOpen && canInfo ? <EdmInfoPanel id={cur.id!} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>
     </Modal>

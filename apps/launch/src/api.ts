@@ -2565,6 +2565,7 @@ async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind
   const pos = (await (o.kind === "center" ? st.bind(o.centerKey, o.scope) : st.bind(o.kind, o.ownerKey, o.scope)).first<{ p: number }>())?.p ?? 0;
   await db.batch([
     db.prepare("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, poster_key, width, height, duration_sec, bytes, position, created_by, scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, o.kind, o.centerKey, o.ownerKey, x.kind, x.r2Key, x.posterKey, x.width, x.height, x.durationSec, x.bytes, pos, x.by, o.scope),
+    db.prepare("UPDATE cover_media SET uploader_name = ? WHERE id = ?").bind((o.s.name ?? "").slice(0, 60), id),
     audit(db, x.by, "cover_media.add", o.kind, o.centerKey ?? o.ownerKey, id),
   ]);
   return id;
@@ -4081,6 +4082,66 @@ const routes: [string, RegExp, Handler][] = [
       if (row.poster_key) await bucket.delete(row.poster_key).catch(() => undefined);
       void s;
       return { ok: true };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/cover-media\/([\w-]{1,40})\/meta$/,
+    async (ctx, [id]) => {
+      // 上傳時瀏覽器讀出的原始檔資訊與 EXIF（業主 2026-11-24）：存成 JSON，給圖片「資訊」面板顯示。
+      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, kind FROM cover_media WHERE id = ?").bind(id).first<CoverRow>();
+      if (!row) return fail(404, "not_found", "找不到這張照片");
+      await requireCoverRowOwner(ctx, row);
+      const body = await readJson<{ exif?: unknown; file?: unknown }>(ctx.req);
+      const meta = JSON.stringify({ exif: body.exif && typeof body.exif === "object" ? body.exif : {}, file: body.file && typeof body.file === "object" ? body.file : {} });
+      if (meta.length > 12000) return fail(413, "too_large", "資訊太大");
+      await ctx.db.prepare("UPDATE cover_media SET meta = ? WHERE id = ?").bind(meta, id).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/cover-media\/([\w-]{1,40})\/info$/,
+    async (ctx, [id]) => {
+      // 圖片資訊面板（業主 2026-11-24）：只有能管理這個相簿的人看得到（含上傳者姓名與 EXIF，EXIF 可能有拍攝地點）。
+      const r = await ctx.db
+        .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.course_id, cm.ocr_text, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
+        .bind(id)
+        .first<Record<string, string | number | null>>();
+      if (!r) return fail(404, "not_found", "找不到這張照片");
+      await requireCoverRowOwner(ctx, r as unknown as CoverRow);
+      let meta: { exif?: Record<string, unknown>; file?: Record<string, unknown> } = {};
+      try {
+        meta = r.meta ? (JSON.parse(String(r.meta)) as typeof meta) : {};
+      } catch {
+        meta = {};
+      }
+      const byRaw = String(r.created_by ?? "");
+      const system = byRaw === "migration" || byRaw === "course-edm";
+      return {
+        id: r.id,
+        kind: r.kind,
+        scope: r.scope,
+        width: r.width,
+        height: r.height,
+        durationSec: r.duration_sec,
+        bytes: r.bytes,
+        position: r.position,
+        ownerKind: r.owner_kind,
+        ownerKey: r.owner_kind === "center" ? r.center_key : r.owner_key,
+        uploader: system ? (byRaw === "course-edm" ? "系統（由課程 EDM 自動併入）" : "系統（舊資料搬移）") : String(r.uploader_name || r.session_name || ""),
+        uploaderSub: system ? "" : byRaw,
+        uploadedAt: r.created_at,
+        courseId: r.course_id,
+        courseTitle: r.course_title,
+        ocrStatus: r.ocr_status,
+        ocrModel: r.ocr_model,
+        ocrAt: r.ocr_at,
+        eventDate: r.event_date,
+        ocrText: r.ocr_text,
+        file: meta.file ?? {},
+        exif: meta.exif ?? {},
+      };
     },
   ],
   [
