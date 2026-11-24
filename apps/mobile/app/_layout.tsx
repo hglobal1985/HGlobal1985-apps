@@ -24,6 +24,7 @@ import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { installBottomGap } from "@/lib/bottom-gap";
 import { useElderVersion } from "@/lib/elder-mode";
+import { restoreScroll, trackScroll } from "@/lib/keep-scroll";
 import { useLayout } from "@/theme/layout";
 import { UpdateNotice } from "@/features/update-notice";
 import { BottomBar, InAppBrowserBanner, TopBar, TopBarShadow } from "@/ui";
@@ -148,6 +149,9 @@ export default function RootLayout() {
   useEffect(() => warmTabChunks(), []);
   // 至尊模式切換或改字體大小（lib/elder-mode.ts）：重建頁面，已經畫好的字才會換成新大小（業主 2026-11-24）。
   const elderV = useElderVersion();
+  useEffect(() => trackScroll(), []);
+  // 字體倍數改變、頁面重建後，捲回原本的位置（不要跳回頁首）。
+  useEffect(() => (elderV > 0 ? restoreScroll() : undefined), [elderV]);
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,
