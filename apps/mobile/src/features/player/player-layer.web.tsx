@@ -48,11 +48,34 @@ export function PlayerLayer() {
   const [barOn, setBarOn] = useState(true); // 全螢幕控制列：2 秒沒動作自動隱藏，點畫面任意處再顯示
   const barTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const barHold = useRef(false);
+  const barOnRef = useRef(true);
+  const barRef = useRef<HTMLDivElement>(null);
+  const tap = useRef<{ x: number; y: number; t: number; onBar: boolean; wasOn: boolean } | null>(null);
   const wakeBar = useCallback(() => {
+    barOnRef.current = true;
     setBarOn(true);
     if (barTimer.current) clearTimeout(barTimer.current);
     if (!barHold.current) barTimer.current = setTimeout(() => setBarOn(false), 2000);
   }, []);
+  const hideBar = () => {
+    if (barTimer.current) clearTimeout(barTimer.current);
+    barOnRef.current = false;
+    setBarOn(false);
+  };
+  // 點一下畫面（不是控制列、也不是拖曳）：控制列顯示中就立刻隱藏，隱藏中就顯示（業主 2026-11-24）。
+  const barDown = (e: PointerEvent<HTMLDivElement>) => {
+    barHold.current = true;
+    if (barTimer.current) clearTimeout(barTimer.current);
+    tap.current = { x: e.clientX, y: e.clientY, t: Date.now(), onBar: !!barRef.current?.contains(e.target as Node), wasOn: barOnRef.current };
+  };
+  const barUp = (e: PointerEvent<HTMLDivElement>) => {
+    barHold.current = false;
+    const d = tap.current;
+    tap.current = null;
+    const isTap = !!d && !d.onBar && Date.now() - d.t < 500 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 12;
+    if (isTap && d.wasOn) hideBar();
+    else wakeBar();
+  };
   const [fsOn, setFsOn] = useState(false); // 這個播放框正處於瀏覽器全螢幕
   useEffect(() => {
     if (pFull || fsOn) wakeBar();
@@ -409,7 +432,7 @@ export function PlayerLayer() {
   else if (!ytSrc.current) ytSrc.current = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt.videoId)}?controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&rel=0&modestbranding=1&autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${range}`;
   const art = s.artworkUrl ? (/^(https?:|blob:|data:)/.test(s.artworkUrl) ? s.artworkUrl : s.artworkUrl) : "/icon-512.png";
   return createPortal(
-    <div ref={boxRef} onPointerDownCapture={() => { barHold.current = true; wakeBar(); }} onPointerMoveCapture={() => barHold.current && wakeBar()} onPointerUpCapture={() => { barHold.current = false; wakeBar(); }} onPointerCancelCapture={() => { barHold.current = false; wakeBar(); }} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
+    <div ref={boxRef} onPointerDownCapture={barDown} onPointerUpCapture={barUp} onPointerCancelCapture={() => { barHold.current = false; tap.current = null; wakeBar(); }} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
       <style>{`@keyframes hg-spin{to{transform:rotate(360deg)}}${FRAME_KEYFRAMES}`}</style>
       {pFull ? (
         <button type="button" aria-label="縮小回原本大小" onClick={() => exitRef.current?.()} style={{ position: "absolute", top: 10, left: 10, zIndex: 5, opacity: barOn ? 1 : 0, pointerEvents: barOn ? "auto" : "none", transition: "opacity 0.25s", minHeight: 44, padding: "0 16px", borderRadius: 22, border: 0, background: "rgba(0,0,0,0.55)", color: "#fff", font: "700 15px system-ui, sans-serif" }}>
@@ -418,7 +441,7 @@ export function PlayerLayer() {
       ) : null}
       {pFull || fsOn ? (
         // 全螢幕裡看不到頁面下方的播放控制列，所以在播放框內放同一個控制列（時間軸、播放／暫停、倍速…；業主 2026-11-24 回報時間軸不見了）
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 6, paddingBottom: "env(safe-area-inset-bottom, 0px)", opacity: barOn ? 1 : 0, pointerEvents: barOn ? "auto" : "none", transition: "opacity 0.25s" }}>
+        <div ref={barRef} style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 6, paddingBottom: "env(safe-area-inset-bottom, 0px)", opacity: barOn ? 1 : 0, pointerEvents: barOn ? "auto" : "none", transition: "opacity 0.25s" }}>
           <PlayerControls overlay />
         </div>
       ) : null}
