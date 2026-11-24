@@ -462,7 +462,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           <Pressable key={`${t.kind}:${t.text}`} accessibilityRole="button" accessibilityLabel={`${t.kind} ${t.text}`} onPress={() => pickTerm(t.text)} style={[styles.term, { borderBottomColor: c.border }]}>
             <View style={[styles.kind, { backgroundColor: c.accentSoft }]}>
               <AppText variant="caption" style={{ color: c.accentText, fontWeight: "700" }}>
-                {t.kind}
+                {t.kind === "課程" ? "EDM" : t.kind /* 課程＝EDM 教材卡，關聯詞的標籤統一叫 EDM（業主 2026-11-24） */}
               </AppText>
             </View>
             <AppText variant="body" numberOfLines={1} style={{ flex: 1 }}>
