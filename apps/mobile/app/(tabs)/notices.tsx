@@ -2,8 +2,8 @@ import { useElderOn } from "@/lib/elder-mode";
 import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, type Href } from "expo-router";
-import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Platform, Pressable, View } from "react-native";
 import { api, type Notice, type NoticeCategory } from "@/api/client";
 import { noticeTarget } from "@/features/format";
 import { CentralReviewList, groupByDay, hhmm, useCentralReviews } from "@/features/notices/central-reviews";
@@ -20,20 +20,35 @@ export default function NoticesScreen() {
   const { data, error, loading, reload } = useApi<Notice[]>(member ? "/notifications" : null);
   const unread = (data ?? []).filter((n) => !n.read).length;
   // 檢視模式（業主 2026-11-17）：全部、審核、訂閱、留言。審核裡另外會顯示中央的獎銜、中心新申請（沒有權限就不顯示）。
-  const [mode, setMode] = useState<"all" | NoticeCategory>("all");
+  // 標籤順序與內容（業主 2026-11-24）：留言 > 訂閱 > 審核 > 成就，沒有「全部」；伺服器分類 other 歸到訂閱。預設停在第一個有未讀的標籤。
+  type Tab = "comment" | "subscribe" | "review" | "achievement";
+  const tabOf = (n: Notice): Tab => (n.category === "other" ? "subscribe" : n.category);
+  const [picked, setPicked] = useState<Tab | null>(null);
   const central = useCentralReviews();
   const centralCount = central.data?.available ? central.data.reviews.length : 0;
-  const count = (cat: NoticeCategory) => (data ?? []).filter((n) => n.category === cat && !n.read).length + (cat === "review" ? centralCount : 0);
-  const list = (data ?? []).filter((n) => mode === "all" || n.category === mode);
-  // 審核相關而且還沒處理的置頂（伺服器標 pending）；訂閱、留言分頁不需要。
-  const pinned = mode === "all" || mode === "review" ? list.filter((n) => n.pending) : [];
-  const rest = pinned.length ? list.filter((n) => !n.pending) : list;
-  const MODES: { key: "all" | NoticeCategory; label: string }[] = [
-    { key: "all", label: "全部" },
-    { key: "review", label: "審核" },
-    { key: "subscribe", label: "訂閱" },
+  const count = (cat: Tab) => (data ?? []).filter((n) => tabOf(n) === cat && !n.read).length + (cat === "review" ? centralCount : 0);
+  const MODES: { key: Tab; label: string }[] = [
     { key: "comment", label: "留言" },
+    { key: "subscribe", label: "訂閱" },
+    { key: "review", label: "審核" },
+    { key: "achievement", label: "成就" },
   ];
+  const mode: Tab = picked ?? MODES.find((m) => count(m.key) > 0)?.key ?? "comment";
+  const setMode = setPicked;
+  const list = (data ?? []).filter((n) => tabOf(n) === mode);
+  // 審核相關而且還沒處理的置頂（伺服器標 pending）；其他分頁不需要。
+  const pinned = mode === "review" ? list.filter((n) => n.pending) : [];
+  const rest = pinned.length ? list.filter((n) => !n.pending) : list;
+  // 成就分頁：畫面上看得到的成就通知自動標為已讀，不必逐則點開（業主 2026-11-24）。
+  const seen = useRef(new Set<string>());
+  const flush = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markSeen = (n: Notice) => {
+    if (n.read || seen.current.has(n.id)) return;
+    seen.current.add(n.id);
+    api("POST", `/notifications/${n.id}/read`).catch(() => undefined);
+    if (flush.current) clearTimeout(flush.current);
+    flush.current = setTimeout(invalidate, 500);
+  };
   // 點一則通知：先標為已讀並彈出摘要（完整內容），再由摘要的「前往查看」（或往上拉到最高處）進入對應頁面。
   const [preview, setPreview] = useState<Notice | null>(null);
   const open = async (n: Notice) => {
@@ -45,11 +60,12 @@ export default function NoticesScreen() {
     await api("POST", "/notifications/read-all").catch(() => undefined);
     invalidate();
   };
+  const wrapSeen = (n: Notice, row: ReactNode) => (mode === "achievement" ? <SeenRow key={n.id} onSeen={() => markSeen(n)}>{row}</SeenRow> : row);
   const renderRow = (n: Notice, i: number) => (
       <Pressable key={n.id} accessibilityRole="button" accessibilityLabel={`${n.title}${n.read ? "" : "，未讀"}`} onPress={() => open(n)} style={({ pressed }) => [{ flexDirection: elder ? "column" : "row", alignItems: elder ? "stretch" : "center", gap: elder ? 8 : 10, paddingVertical: 12, minHeight: 64 }, i > 0 && { borderTopWidth: 1, borderColor: c.border }, pressed && { opacity: 0.7 }]}>
         <View style={elder ? { flexDirection: "row", alignItems: "center", gap: 10 } : { flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: n.read ? c.surfaceMuted : c.accentSoft }}>
-          <Ionicons name={n.category === "review" ? "ribbon-outline" : n.category === "comment" ? "chatbubble-outline" : "notifications-outline"} size={20} color={n.read ? c.textMuted : c.accentText} />
+          <Ionicons name={n.category === "achievement" ? "trophy-outline" : n.category === "review" ? "ribbon-outline" : n.category === "comment" ? "chatbubble-outline" : "notifications-outline"} size={20} color={n.read ? c.textMuted : c.accentText} />
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <AppText variant="body" numberOfLines={elder ? undefined : 2} style={{ fontWeight: n.read ? "600" : "800" }}>
@@ -94,19 +110,12 @@ export default function NoticesScreen() {
         </View>
       )}
     >
-      {elder ? (
-        // 至尊模式：標題下面一欄排「全部標為已讀」「通知設定」，不擠在標題右邊（業主 2026-11-24）。
-        <View style={{ gap: space.sm }}>
-          {unread ? <Button variant="secondary" label="全部標為已讀" onPress={markAll} fullWidth /> : null}
-          <Button variant="secondary" icon="settings-outline" label="通知設定" onPress={() => router.push("/settings/notifications")} fullWidth />
-        </View>
-      ) : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       <View style={{ flexDirection: "row", gap: elder ? 6 : 8, marginBottom: space.sm }} accessibilityRole="radiogroup">
         {MODES.map((m) => {
           const on = mode === m.key;
-          const n = m.key === "all" ? unread : count(m.key);
+          const n = count(m.key);
           return (
             <Pressable key={m.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${m.label}${n ? `，${n} 則未處理` : ""}`} onPress={() => (trackFeature("notices_filter"), setMode(m.key))} style={{ flex: 1, minWidth: 0, minHeight: elder ? 56 : 44, borderRadius: radius.md, borderWidth: 1, borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 }}>
               <AppText variant="callout" numberOfLines={1} style={{ fontWeight: "800", color: on ? c.textOnAccent : c.text }}>
@@ -124,15 +133,8 @@ export default function NoticesScreen() {
         })}
       </View>
       {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
-      {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title={mode === "all" ? "目前沒有通知" : "這個分類目前沒有通知"} body={mode === "all" ? "報名課程或報名有進度時，會在這裡通知你。" : undefined} /> : null}
+      {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
       {/* 審核相關而且還沒處理的一律置頂（業主 2026-11-23）：在「全部」與「審核」都放在最上面，處理完（或已讀）才回到下面依日期排列。 */}
-      {mode === "all" && centralCount ? (
-        <Pressable accessibilityRole="button" accessibilityLabel={`有 ${centralCount} 筆獎銜或中心申請等待你審核`} onPress={() => setMode("review")} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 64, paddingHorizontal: space.md, borderRadius: radius.lg, borderWidth: 2, borderColor: c.accent, backgroundColor: c.accentSoft, marginTop: space.xs }, pressed && { opacity: 0.7 }]}>
-          <Ionicons name="pin" size={20} color={c.accentText} />
-          <AppText variant="body" style={{ flex: 1, fontWeight: "800", color: c.accentText }}>{`有 ${centralCount} 筆獎銜／中心申請等待你審核`}</AppText>
-          <Ionicons name="chevron-forward" size={20} color={c.accentText} />
-        </Pressable>
-      ) : null}
       {pinned.length ? (
         <View style={{ gap: 6, marginTop: space.xs }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -147,7 +149,7 @@ export default function NoticesScreen() {
           <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
             {g.day}
           </AppText>
-          <Card style={{ paddingVertical: 4 }}>{g.rows.map((n, i) => renderRow(n, i))}</Card>
+          <Card style={{ paddingVertical: 4 }}>{g.rows.map((n, i) => wrapSeen(n, renderRow(n, i)))}</Card>
         </View>
       ))}
       {preview ? (
@@ -155,4 +157,22 @@ export default function NoticesScreen() {
       ) : null}
     </Screen>
   );
+}
+
+/** 這一列出現在畫面上（網頁用 IntersectionObserver；App 沒有觀察器就開啟後 1 秒視為看到）就呼叫 onSeen。 */
+function SeenRow({ onSeen, children }: { onSeen: () => void; children: ReactNode }) {
+  const ref = useRef<unknown>(null);
+  const cb = useRef(onSeen);
+  cb.current = onSeen;
+  useEffect(() => {
+    const el = ref.current as Element | null;
+    if (Platform.OS === "web" && el && typeof IntersectionObserver !== "undefined") {
+      const io = new IntersectionObserver((es) => es.some((e) => e.isIntersecting) && (cb.current(), io.disconnect()), { threshold: 0.5 });
+      io.observe(el);
+      return () => io.disconnect();
+    }
+    const t = setTimeout(() => cb.current(), 1000);
+    return () => clearTimeout(t);
+  }, []);
+  return <View ref={(r: unknown) => { ref.current = r; }}>{children}</View>;
 }

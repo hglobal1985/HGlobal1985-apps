@@ -156,7 +156,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       {listMode ? (
         <FlatList
           style={styles.fill}
-          contentContainerStyle={[styles.inner, pad, { gap: space.md, paddingBottom: space.xxl }]}
+          contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]}
           data={results}
           keyExtractor={(x) => x.id}
           keyboardShouldPersistTaps="handled"
@@ -223,7 +223,7 @@ export function ElderCourseRow({ course }: { course: CourseSummary }) {
   const tag = course.isList ? "教材" : course.enrollment === "opened" ? "已報名" : course.enrollment === "pending" ? "審核中" : course.priceTba ? "費用未公布" : course.free || course.freeNow || course.watchFree ? "免費" : "付費";
   const strong = tag === "已報名";
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${course.title}，${tag}`} onPress={() => router.push(`/course/${course.id}`)} style={({ pressed }) => [styles.row, { backgroundColor: c.surface, borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${course.title}，${tag}`} onPress={() => router.push(`/course/${course.id}`)} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       <View style={[styles.thumb, { width: size, height: size, backgroundColor: c.accentSoft }]}>
         {img ? <Image source={{ uri: thumb(resolveUrl(img), size * 2) }} style={{ width: size, height: size }} resizeMode="cover" /> : <ThumbFallback />}
       </View>
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   wave: { flexDirection: "row", alignItems: "center", gap: 8 },
   stop: { minHeight: 64, minWidth: 200, borderWidth: 3, borderRadius: radius.lg, alignItems: "center", justifyContent: "center", marginTop: space.md },
   cont: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 76, borderRadius: radius.lg + 4, paddingHorizontal: space.lg, paddingVertical: space.md },
-  row: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg + 4, padding: space.md, marginBottom: space.md },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, borderBottomWidth: 1, paddingVertical: space.md },
   thumb: { borderRadius: radius.md, overflow: "hidden" },
   tag: { alignSelf: "flex-start", borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 2 },
 });

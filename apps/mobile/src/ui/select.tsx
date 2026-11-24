@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useRef, useState, type ElementRef } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { BottomSheet } from "./bottom-sheet";
+import { useModeProfile } from "@/lib/app-mode";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
@@ -26,6 +27,8 @@ export type SelectProps = {
 export function Select({ label, value, options, onChange, placeholder = "請選擇", active = false, onClear }: SelectProps) {
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
+  // 至尊模式：選項在框下方原地展開，不跳整頁（業主 2026-11-24）。
+  const inline = useModeProfile().sheets === "page";
   const scroller = useRef<ElementRef<typeof ScrollView>>(null);
   const current = options.find((o) => o.key === value);
   const index = Math.max(0, options.findIndex((o) => o.key === value));
@@ -55,7 +58,17 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
         <Ionicons name="chevron-down" size={18} color={c.textMuted} />
       </Pressable>
       )}
-      {open ? (
+      {open && inline ? (
+        <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: radius.md, backgroundColor: c.surface, overflow: "hidden" }}>
+          {options.map((o) => (
+            <Pressable key={o.key} accessibilityRole="menuitem" accessibilityState={{ selected: o.key === value }} onPress={() => { setOpen(false); onChange(o.key); }} style={[styles.item, { borderBottomColor: c.border, backgroundColor: o.key === value ? c.accentSoft : "transparent" }]}>
+              <AppText variant="body" style={{ flex: 1, fontWeight: o.key === value ? "700" : "400", color: o.danger ? c.danger : o.key === value ? c.accentText : c.text }}>{o.label}</AppText>
+              {o.key === value ? <Ionicons name="checkmark" size={22} color={c.accent} /> : null}
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+      {open && !inline ? (
         <BottomSheet onClose={() => setOpen(false)}>
           {label ? <AppText variant="headline">{label}</AppText> : null}
           <ScrollView ref={scroller} style={{ maxHeight: 380 }} onLayout={() => scroller.current?.scrollTo({ y: Math.max(0, (index - 2) * ITEM_H), animated: false })}>
