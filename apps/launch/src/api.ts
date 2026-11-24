@@ -4538,6 +4538,34 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/search\/scenes$/,
+    async (ctx) => {
+      // 相簿照片的「場景」搜尋（業主 2026-11-24）：比對 AI 辨識出的場景、行為、物品標籤；依區塊分組。鎖住的課程（獎銜、瀏覽範圍）不回結果。
+      const tokens = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase().split(/\s+/).filter((t) => t.length >= 1).slice(0, 3);
+      if (!tokens.length || tokens.join("").length < 2) return { hits: [] };
+      const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+      const { results } = await ctx.db
+        .prepare(
+          `SELECT cm.owner_key AS block_id, cm.scene_text, l.title AS block_title, l.course_id, c.title AS course_title FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.scene_status = 'done' AND c.status = 'published' AND ${tokens.map(() => "lower(cm.scene_text) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 300`,
+        )
+        .bind(...tokens.map(like))
+        .all<{ block_id: string; scene_text: string; block_title: string; course_id: string; course_title: string }>();
+      const locks = new Map<string, LockState>();
+      const groups = new Map<string, { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; tags: Set<string> }>();
+      for (const r of results) {
+        if (!locks.has(r.course_id)) locks.set(r.course_id, await lockStateOfKey(ctx, r.course_id));
+        const lk = locks.get(r.course_id)!;
+        if (lk.locked && !lk.manages) continue;
+        const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>() };
+        g.count++;
+        for (const t of r.scene_text.split("，")) if (tokens.some((k) => t.toLowerCase().includes(k))) g.tags.add(t);
+        groups.set(r.block_id, g);
+      }
+      return { hits: [...groups.values()].slice(0, 20).map((g) => ({ blockId: g.blockId, courseId: g.courseId, courseTitle: g.courseTitle, blockTitle: g.blockTitle, count: g.count, scene: [...g.tags].slice(0, 6).join("，") })) };
+    },
+  ],
+  [
+    "GET",
     /^\/search\/semantic$/,
     async (ctx) => {
       // 語意搜尋（業主 2026-11-23）：只回「意思相近的課程與章節編號」；前端只顯示自己（依權限）已取得索引裡有的，所以這裡不洩漏任何內容。

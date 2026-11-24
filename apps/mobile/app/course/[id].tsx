@@ -47,8 +47,8 @@ const isWeb = Platform.OS === "web";
  * 點章節＝原地播放（業主 2026-11-16）：上方的 EDM 換成播放器（同一個位置），章節清單不動；網址的 ?lesson=章節編號 記住播放哪一堂，舊的 /learn/… 網址會轉到這裡。
  */
 export default function CourseRoute() {
-  const params = useLocalSearchParams<{ id: string; edit?: string; lesson?: string; block?: string }>();
-  return <CourseDetailScreen id={params.id} edit={params.edit} lesson={params.lesson} block={params.block} chapter={chapterFromParams(params)} />;
+  const params = useLocalSearchParams<{ id: string; edit?: string; lesson?: string; block?: string; album?: string }>();
+  return <CourseDetailScreen id={params.id} edit={params.edit} lesson={params.lesson} block={params.block} album={params.album} chapter={chapterFromParams(params)} />;
 }
 
 /** 課程介紹頁本體（/course/編號 與課程專屬網址 /中心縮寫/英譯姓名-編號 共用）。 */
@@ -58,7 +58,7 @@ export function chapterFromParams(params: Record<string, unknown>): number | und
   return k ? Number(k) : undefined;
 }
 
-export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: string; edit?: string; lesson?: string; chapter?: number; block?: string }) {
+export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: { id: string; edit?: string; lesson?: string; chapter?: number; block?: string; album?: string }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
   // 至尊模式（業主 2026-11-24）：沒有管理員編輯模式，版面改成 ElderCourse（上課／介紹兩頁）。
@@ -76,8 +76,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（進入頁面時點閱 +1，算進主辦中心、所屬系列與這門課自己的封面）。
   const stats = useCoverStats("course", data?.id ?? null, `/course/${id}`, data?.isList ? "清單" : "課程");
   // 教材區右上角「縮圖／詳細列表」切換：每次進入課程卡頁一律從「縮圖」開始（業主 2026-11-21，不再記住上次的選擇）；區塊預設全部收起。
-  const [listLayout, setListLayout] = useState<"thumb" | "detail" | "album">("thumb");
-  const [albumOpen, setAlbumOpen] = useState<string | null>(null); // 相簿分頁自動展開的區塊（「瀏覽本區照片」跳過來，業主 2026-11-24）
+  const [listLayout, setListLayout] = useState<"thumb" | "detail" | "album">(album ? "album" : "thumb"); // 從搜尋的「場景」結果進來＝直接開相簿（業主 2026-11-24）
+  const [albumOpen, setAlbumOpen] = useState<string | null>(album ?? null); // 相簿分頁自動展開的區塊（「瀏覽本區照片」跳過來，業主 2026-11-24）
   const pickLayout = (v: "thumb" | "detail" | "album") => (setListLayout(v), v !== "album" && setAlbumOpen(null));
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
@@ -388,6 +388,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           }
           locked={allLocked}
           lockedLines={[lockedText, ...(needRank ? [needRank] : [])]}
+          albumFocus={album}
         />
       </View>
     );
