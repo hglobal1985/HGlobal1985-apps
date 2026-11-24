@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { api, type CourseDetail, type Playback } from "@/api/client";
@@ -27,6 +28,10 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   const playback = pb && pb.courseId === c?.id && pb.lessonId === lessonId ? pb.data : null;
   const [playError, setPlayError] = useState<string | null>(null);
   const player = usePlayer();
+  // 只有「正在看的這一頁」可以開始播放（業主 2026-11-24 回報：切換至尊模式時迷你播放器自己跳出來、自動播放）。
+  // 切換模式／改字體大小會重建所有頁面，連歷史裡（背景）的課程頁也重建；它網址上帶著某一堂，就會重新要求播放，播放器正空著就直接開播。
+  // 背景的課程頁只能「接上」播放器裡已經是同一堂的內容（離開課程頁後迷你播放器照常播、照常記錄進度），不能自己開始新的播放。
+  const focused = useIsFocused();
   // 手機 App 的 YouTube 仍在課程頁內嵌播放（WebView 無法跨頁保留）；其餘一律交給全站單一播放器。
   const legacyYoutube = !!lessonId && Platform.OS !== "web" && playback?.kind === "youtube";
   const [legacyDone, setLegacyDone] = useState(false);
@@ -61,6 +66,8 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   useEffect(() => {
     if (legacyYoutube) engine.close();
     if (!track) return;
+    const already = engine.getSnapshot().track?.key === track.key;
+    if (!focused && !already) return;
     let alive = true;
     engine.request(track).then((ok) => {
       if (!alive) return;
@@ -68,7 +75,7 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
         setClaimed(track.key);
         // 續播記憶：告訴學員是從上次的位置接著播（業主 2026-11-17）。
         const r = track.playback.resumeAt;
-        if (r != null) flashText(`接續上次進度，從 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
+        if (r != null && !already) flashText(`接續上次進度，從 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
         return;
       }
       const cur = engine.getSnapshot().track;
@@ -77,7 +84,7 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
     return () => {
       alive = false;
     };
-  }, [track, legacyYoutube]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [track, legacyYoutube, focused]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 沒有「完成」按鈕了：這一堂播放到結尾，自動記錄完成。
   const autoDone = useRef<string | null>(null);

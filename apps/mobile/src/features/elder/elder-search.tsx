@@ -19,6 +19,8 @@ import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
 import { TileCover } from "@/features/courses/series-tile";
 import { ElderCenterPage } from "./elder-center";
+import { ElderInvite, ElderSeriesHead } from "./elder-heads";
+import { centerTitle } from "@/features/format";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useVoice } from "./use-voice";
 
@@ -168,6 +170,8 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const inZone = mode === "browse" && !searching && !!zoneDef;
   // 進入「中心」之後：四個分頁（EDM／課表／重播／列表）改成可展開的區塊（業主 2026-11-24）。
   const centerPage = inZone && zone === "centers" && !!sub;
+  // 進入「系列」之後（業主 2026-11-24：與中心卡統一）：上方封面＋訂閱＋點閱、公告，標題區右上角邀請。
+  const seriesName = inZone && !centerPage && sub?.series ? sub.rep.series || null : null;
   const listMode = !body && !(!searching && mode === "home");
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
@@ -175,7 +179,18 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       {mode === "home" ? <View style={[styles.inner, pad, { paddingTop: insets.top + space.md, paddingBottom: space.sm }]}>{header}</View> : <View style={{ height: insets.top + space.md }} />}
       {inZone ? (
         <View style={[styles.inner, pad, { paddingBottom: space.sm }]}>
-          <ElderZoneHeader zone={zoneDef!} sub={sub?.title} onBack={() => (sub ? setSub(null) : setZone(null))} />
+          <ElderZoneHeader
+            zone={zoneDef!}
+            sub={sub?.title}
+            onBack={() => (sub ? setSub(null) : setZone(null))}
+            right={
+              centerPage ? (
+                <ElderInvite kind="center" value={sub!.title} title={centerTitle(sub!.title)} fallback={`/courses?center=${encodeURIComponent(sub!.title)}`} />
+              ) : seriesName ? (
+                <ElderInvite kind="series" value={seriesName} title={sub!.title} fallback={`/series/${encodeURIComponent(seriesName)}`} />
+              ) : undefined
+            }
+          />
         </View>
       ) : null}
       {centerPage ? (
@@ -202,7 +217,9 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListHeaderComponent={
-            mode === "browse" && !searching && !zone ? (
+            seriesName ? (
+              <ElderSeriesHead key={seriesName} series={seriesName} title={sub!.title} />
+            ) : mode === "browse" && !searching && !zone ? (
               <View style={{ gap: space.md }}>
                 {ELDER_ZONES.map((z) => (
                   <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />

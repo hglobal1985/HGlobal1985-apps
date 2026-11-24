@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { centerKeyOf } from "@/features/format";
 import { groupBySeries, orderGroups, sortCourses } from "@/features/courses/sort";
@@ -75,10 +75,10 @@ export function ElderZoneCard({ zone, count, onPress }: { zone: (typeof ELDER_ZO
 }
 
 /** 進入某一區之後的標題列：返回鍵＋分類名稱（同色帶）。 */
-export function ElderZoneHeader({ zone, sub, onBack }: { zone: (typeof ELDER_ZONES)[number]; /** 再往下一層（系列／中心）的名稱。 */ sub?: string; onBack: () => void }) {
+export function ElderZoneHeader({ zone, sub, onBack, right }: { zone: (typeof ELDER_ZONES)[number]; /** 再往下一層（系列／中心）的名稱。 */ sub?: string; onBack: () => void; /** 標題區右上角（中心卡、系列頁的「邀請」鈕，業主 2026-11-24）。 */ right?: ReactNode }) {
   const look = useZoneLook(zone.id);
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`返回，${zone.label}`} onPress={onBack} style={{ flexDirection: "row", alignItems: "center", gap: space.sm, borderRadius: 20, padding: space.md, backgroundColor: look.bg }}>
+  const bar = (
+    <Pressable accessibilityRole="button" accessibilityLabel={`返回，${zone.label}`} onPress={onBack} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space.sm, borderRadius: 20, padding: space.md, backgroundColor: right ? undefined : look.bg }}>
       <Ionicons name="chevron-back" size={30} color={look.fg} {...({ uiOnly: true } as object)} />
       <View style={{ flex: 1, minWidth: 0 }}>
         <FitTitle text={zone.label} color={look.fg} />
@@ -89,6 +89,13 @@ export function ElderZoneHeader({ zone, sub, onBack }: { zone: (typeof ELDER_ZON
         ) : null}
       </View>
     </Pressable>
+  );
+  if (!right) return bar;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs, borderRadius: 20, paddingRight: space.sm, backgroundColor: look.bg }}>
+      {bar}
+      {right}
+    </View>
   );
 }
 

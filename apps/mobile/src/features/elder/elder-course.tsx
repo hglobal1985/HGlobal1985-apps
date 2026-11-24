@@ -41,25 +41,43 @@ function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lea
 }
 
 /** 區塊標題大列（標題＋副標＋展開箭頭）：課程頁的區塊、中心頁的四個分類共用（業主 2026-11-24）。active＝綠底。 */
-export function ElderBlockHeader({ title, sub, on, active, onPress }: { title: string; sub?: string; on: boolean; active?: boolean; onPress: () => void }) {
-  const { c } = useTheme();
+export function ElderBlockHeader({ title, sub, on, active, onPress, tone, badge, subOneLine }: { title: string; sub?: string; on: boolean; active?: boolean; onPress: () => void; /** yellow＝公告（與超派公告同一組黃色，業主 2026-11-24）。 */ tone?: "yellow"; /** 未讀數：大於 0 時用紅色數字氣球暫時取代右邊的箭頭，看過就恢復箭頭。 */ badge?: number; /** 副標只顯示一行，太長用「…」（公告預覽）。 */ subOneLine?: boolean }) {
+  const { c, scheme } = useTheme();
   const hot = on || !!active;
+  const yellow = tone === "yellow" ? YELLOW[scheme] : null;
+  const bg = yellow ? (hot ? yellow.hotBg : yellow.bg) : hot ? c.accent : c.accentSoft;
+  const fg = yellow ? (hot ? yellow.hotFg : yellow.fg) : hot ? c.textOnAccent : c.accentText;
+  const n = badge ?? 0;
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${title}${sub ? `，${sub}` : ""}，${on ? "點一下收起" : "點一下展開"}`} onPress={onPress} style={[styles.block, { backgroundColor: hot ? c.accent : c.accentSoft }]}>
-      <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="headline" style={{ color: hot ? c.textOnAccent : c.accentText, fontWeight: "800" }}>
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${title}${n > 0 ? `，${n} 則未讀` : ""}${sub ? `，${sub}` : ""}，${on ? "點一下收起" : "點一下展開"}`} onPress={onPress} style={[styles.block, { backgroundColor: bg }]}>
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <AppText variant="headline" style={{ color: fg, fontWeight: "800" }}>
           {title}
         </AppText>
         {sub ? (
-          <AppText variant="callout" style={{ color: hot ? c.textOnAccent : c.accentText }}>
+          <AppText variant="callout" numberOfLines={subOneLine ? 1 : undefined} ellipsizeMode="tail" style={{ color: fg }}>
             {sub}
           </AppText>
         ) : null}
       </View>
-      <Ionicons name={on ? "chevron-up" : "chevron-down"} size={26} color={hot ? c.textOnAccent : c.accentText} />
+      {n > 0 ? (
+        <View style={[styles.badge, { backgroundColor: "#E0382E" }]}>
+          <AppText variant="headline" style={{ color: "#FFFFFF", fontWeight: "900" }}>
+            {n > 99 ? "99+" : String(n)}
+          </AppText>
+        </View>
+      ) : (
+        <Ionicons name={on ? "chevron-up" : "chevron-down"} size={26} color={fg} />
+      )}
     </Pressable>
   );
 }
+
+/** 公告黃色（與超派公告橫條 broadcast-band.tsx 同一組顏色）；展開時加深。 */
+const YELLOW = {
+  light: { bg: "#FFD43B", fg: "#5A3B00", hotBg: "#E0A800", hotFg: "#2A1D00" },
+  dark: { bg: "#F5C518", fg: "#2A1D00", hotBg: "#C99A00", hotFg: "#1A1200" },
+} as const;
 
 /** 區塊清單：每個區塊一張大列（標題＋教材數＋展開箭頭），預設全部收起、同一時間只展開一個（與超派模式 BLOCK_BEHAVIOR 一致）。 */
 function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
@@ -149,6 +167,9 @@ export function ElderCourse({
     <View style={{ flex: 1 }}>
       {player}
       <Screen header={false} footer={tab === "intro" ? action : null}>
+        {/* 課程卡首頁（業主 2026-11-24：與中心卡統一）：最上面封面（含訂閱鈕、點閱數；正在播放時上方已是播放器，不再放封面）→ 公告黃色區塊 → 上課／介紹。 */}
+        {player ? null : cover}
+        {announce}
         <View style={[styles.tabs, { backgroundColor: c.surfaceMuted }]} accessibilityRole="tablist">
           {(
             [
@@ -215,8 +236,6 @@ export function ElderCourse({
           </>
         ) : (
           <>
-            {announce}
-            {cover}
             <View style={[styles.info, { backgroundColor: c.surface, borderColor: c.border }]}>
               {teacher ? <InfoLine icon="person" text={`主講：${teacher}`} /> : null}
               {items.length ? <InfoLine icon="list" text={`${items.length} ${word}${course.totalMinutes ? `・約 ${Math.round(course.totalMinutes)} 分鐘` : ""}`} /> : null}
@@ -294,6 +313,7 @@ const styles = StyleSheet.create({
   tab: { flex: 1, minHeight: 60, borderRadius: radius.lg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg + 4, paddingHorizontal: space.md, paddingVertical: space.md, minHeight: 76 },
   num: { borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  badge: { minWidth: 40, height: 40, borderRadius: 20, paddingHorizontal: 8, marginRight: 6, alignItems: "center", justifyContent: "center" },
   block: { flexDirection: "row", alignItems: "center", gap: 2, borderRadius: radius.lg + 4, paddingLeft: space.md, paddingRight: space.xs, paddingVertical: space.md, minHeight: 76 },
   lockBox: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg, padding: space.md },
   info: { borderWidth: 2, borderRadius: radius.lg + 4, padding: space.md, gap: space.sm },
