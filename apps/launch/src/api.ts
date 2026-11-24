@@ -1415,7 +1415,16 @@ async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "�
         sent += subs.length;
       }
     }
-    if (me) await notify(ctx.db, { sub: me }, `已送出「新${what}」通知`, merged ? `${c.title.slice(0, 80)}（30 分鐘內已通知過，這次合併不重複發送）` : `${c.title.slice(0, 80)}（通知了 ${sent} 位系列訂閱者）`, link).run();
+    if (me) {
+      // 給操作者自己的「已送出」回報也合併（業主 2026-11-24：一次傳 40 張照片＝40 則通知）：30 分鐘內同一份課程只留一則，更新次數並重新標為未讀。
+      const selfTitle = `已送出「新${what}」通知`;
+      const prev = await ctx.db.prepare("SELECT id, body FROM notifications WHERE recipient_sub = ? AND title = ? AND link = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') ORDER BY created_at DESC LIMIT 1").bind(me, selfTitle, link).first<{ id: string; body: string }>();
+      if (prev) {
+        const n = Number(/共新增 (\d+) 次/.exec(prev.body)?.[1] ?? 1) + 1;
+        const base = prev.body.replace(/（30 分鐘內共新增 \d+ 次[^）]*）$/, "");
+        await ctx.db.prepare("UPDATE notifications SET body = ?, created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), read_at = NULL WHERE id = ?").bind(`${base}（30 分鐘內共新增 ${n} 次，已合併成一則通知）`.slice(0, 300), prev.id).run();
+      } else await notify(ctx.db, { sub: me }, selfTitle, `${c.title.slice(0, 80)}（${merged ? "30 分鐘內已通知過，這次合併不重複發送" : `通知了 ${sent} 位系列訂閱者`}）`, link).run();
+    }
   } catch {
     /* 通知失敗不影響新增 */
   }
