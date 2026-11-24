@@ -12,7 +12,7 @@ import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { CourseCover } from "@/ui/course-cover";
-import { AppText, BrandCover, Card, CountPill, ListRow, SaplingIcon } from "@/ui";
+import { AppText, BrandCover, Card, CountPill, ListRow, LockMask, SaplingIcon } from "@/ui";
 import { fadedStyle } from "@/ui/fade-style";
 import { SpeakerLead } from "./speaker-mark";
 import { SummaryLead } from "./summary-mark";
@@ -21,7 +21,7 @@ import { CompactRow, LIST_CARD, ListSection, MetaLine } from "./compact-row";
 import { NowPlayingIcon } from "@/ui/now-playing-icon";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { MaterialRow, RowActions, RowShare, SectionActions } from "./material-rows";
-import { BlockPhotos, hasBlockPhotos } from "./block-photos";
+import { BlockPhotos, blockPhotoCount, hasBlockPhotos } from "./block-photos";
 import { BlockAlbum, BrowsePhotosRow } from "./block-album";
 export { RowShare } from "./material-rows";
 
@@ -110,9 +110,10 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
         <View style={{ gap: space.sm }}>
           {leadShown.length ? <Card style={LIST_CARD}>{leadShown.map(itemRow)}</Card> : null}
           {visibleBlocks.map((b) => (
-            <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-              <ListSection title={b.head.title} count={b.items.filter(shown).length + (b.head.photos?.length ?? 0)} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
-              {onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
+            <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm, ...(b.head.blockLocked ? { position: "relative", minHeight: 230, overflow: "hidden" } : {}) }}>
+              {b.head.blockLocked ? <LockMask lines={b.head.lockLines ?? ["目前無法使用"]} /> : null}
+              <ListSection title={b.head.title} count={b.items.filter(shown).length + blockPhotoCount(b.head)} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
+              {b.head.blockLocked ? null : onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           ))}
@@ -143,7 +144,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
                 {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
                 <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
                   <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
-                    {b.items.filter(shown).length + (b.head.photos?.length ?? 0)}
+                    {b.items.filter(shown).length + blockPhotoCount(b.head)}
                   </AppText>
                   <Ionicons name={on ? "chevron-up" : "chevron-down"} size={12} color={c.textOnAccent} />
                 </View>
@@ -154,8 +155,9 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
             </Pressable>
           )}
           renderPanel={(b) => (
-            <Card style={LIST_CARD}>
-              {onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
+            <Card style={[LIST_CARD, b.head.blockLocked ? { position: "relative", minHeight: 230, overflow: "hidden" } : null]}>
+              {b.head.blockLocked ? <LockMask lines={b.head.lockLines ?? ["目前無法使用"]} /> : null}
+              {b.head.blockLocked ? null : onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           )}

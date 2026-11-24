@@ -106,3 +106,45 @@ test("區塊裡以教材檔案上傳的圖片：自動搬進相簿（保持順�
   assert.ok(await bucket.head("file/cno/d/x.jpg"), "沒開放的課程不動");
   assert.deepEqual((await db.prepare("SELECT id FROM lessons WHERE course_id = 'cbox' ORDER BY position").all<{ id: string }>()).results.map((r) => r.id), ["sec1", "f1"]);
 });
+
+test("成交百寶箱的報名資格（12% 以上、會長也可、不用報名）：連結區塊與照片一律照最新設定鎖住", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: memR2() };
+  const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+  await run("INSERT INTO brand_logos (id, name, sort_order) VALUES ('ba', '紐崔萊', 1)");
+  await run("INSERT INTO courses (id, title, is_list, status, series, view_scope, is_public, zone, block_photos, min_rank_code, allow_president) VALUES ('cqqxw4z2', '成交百寶箱', 0, 'published', '成交百寶箱', 'all', 0, 'hglobal', 1, 'r12', 1)");
+  await ensureBrandCards(env);
+  await ensureTreasureLinks(env);
+  const blk = (await db.prepare("SELECT id FROM lessons WHERE course_id = 'cqqxw4z2' AND brand_id = 'ba'").first<{ id: string }>())!.id;
+  await run("INSERT INTO lessons (id, course_id, position, title, kind, media_type, media_ref) VALUES ('t1', 'cqqxw4z2', 100, '百寶箱影片', 'material', 'youtube', 'AAAAAAAAAAA')");
+  await run("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, position, scope) VALUES ('ph1', 'course', NULL, ?, 'image', 'album/a/p.jpg', 0, 'cover')", blk);
+  const get = async (path: string, token?: string) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { headers: token ? { authorization: `Bearer ${token}` } : {} }), env);
+    return { status: res.status, data: (await res.json()) as CourseDetail & unknown[] };
+  };
+  // 訪客：品牌卡的成交百寶箱區塊鎖住，教材 locked、沒有網址，照片被藏起來但張數照給
+  const guest = (await get("/courses/cbba")).data as CourseDetail;
+  const head = guest.lessons[0]!;
+  assert.equal(head.title, "成交百寶箱");
+  assert.equal(head.blockLocked, true);
+  assert.deepEqual(head.lockLines, ["登入並符合獎銜才能使用", "限12%獎銜以上使用（會長也可）"]);
+  assert.equal(head.photos?.length, 0);
+  assert.equal(head.photoCount, 1);
+  assert.equal(guest.lessons.find((l) => l.id === "t1")?.locked, true);
+  assert.equal((await get(`/cover-media?kind=course&key=${blk}`)).data.length, 0, "鎖住的人拿不到區塊照片清單");
+  // 管理員：不受限
+  const login = async (sub: string) => ((await (await handleApi(new Request("https://learn.test/api/v2/auth/demo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub }) }), env)).json()) as { token: string }).token;
+  const adm = await login("demo-admin");
+  const adminView = (await get("/courses/cbba", adm)).data as CourseDetail;
+  assert.equal(adminView.lessons[0]!.blockLocked, undefined);
+  assert.equal(adminView.lessons[0]!.photos?.length, 1);
+  assert.equal((await get(`/cover-media?kind=course&key=${blk}`, adm)).data.length, 1);
+  // 把門檻改成「不限」：登入的會員立刻就能看（以最新設定為準；訪客仍要先登入，跟課程頁一樣）
+  await run("UPDATE courses SET min_rank_code = 'none' WHERE id = 'cqqxw4z2'");
+  const stu = await login("demo-student");
+  const open = (await get("/courses/cbba", stu)).data as CourseDetail;
+  assert.equal(open.lessons[0]!.blockLocked, undefined);
+  assert.equal(open.lessons[0]!.photos?.length, 1);
+  assert.equal((await get(`/cover-media?kind=course&key=${blk}`, stu)).data.length, 1);
+  assert.equal(((await get("/courses/cbba")).data as CourseDetail).lessons[0]!.blockLocked, true, "訪客仍要登入");
+});

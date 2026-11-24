@@ -278,6 +278,11 @@ export type Lesson = {
   linkedCourseId?: string;
   linkedBlockId?: string;
   /** 區塊照片：放這個區塊照片的區塊編號（連結區塊＝來源區塊）；沒有這個欄位＝這門課沒開放區塊照片。 */
+  /** 連結區塊（品牌卡的「成交百寶箱」）的來源課程對你鎖住：教材與照片要蓋鎖頭遮罩；lockLines＝遮罩文字（原因）。 */
+  blockLocked?: boolean;
+  lockLines?: string[];
+  /** 區塊照片張數（鎖住時 photos 是空的，張數仍照給）。 */
+  photoCount?: number;
   photoKey?: string;
   /** 區塊照片清單（依排序）。 */
   photos?: CoverMediaItem[];
