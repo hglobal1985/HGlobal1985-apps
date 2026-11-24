@@ -1,5 +1,6 @@
 import { lessonHref } from "@/lib/lesson-href";
 import { router } from "expo-router";
+import { PlayerControls } from "./player-controls";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "@/state/session";
@@ -44,6 +45,7 @@ export function PlayerLayer() {
   const dismissed = useRef(false); // 使用者在橫放時自己按了縮小／退出全螢幕：這次橫放不再自動進入
   const realFs = useRef(false);
   const [pFull, setPFull] = useState(false);
+  const [fsOn, setFsOn] = useState(false); // 這個播放框正處於瀏覽器全螢幕
   const exitRef = useRef<(() => void) | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const pos = useRef<Pos | null>(null);
@@ -80,6 +82,8 @@ export function PlayerLayer() {
   const canZoom = inline && (t?.mode === "video" || t?.mode === "youtube");
   const applyZoom = (z: Zoom) => {
     zoom.current = z;
+    // 沒放大時單指上下滑要能捲動頁面（業主 2026-11-24：影片區不可擋住滑動）；放大後才由影片區自己接管拖曳。
+    if (gesture.current) gesture.current.style.touchAction = z.s > 1 ? "none" : "pan-y";
     if (zoomLayer.current) zoomLayer.current.style.transform = z.s === 1 ? "none" : `translate(${z.x}px, ${z.y}px) scale(${z.s})`;
   };
   const boxSize = () => {
@@ -188,7 +192,8 @@ export function PlayerLayer() {
   useEffect(() => {
     const el = engine.element();
     const sync = () => {
-      el.controls = (!!document.fullscreenElement && document.fullscreenElement === boxRef.current) || fullRef.current;
+      el.controls = false; // 全螢幕裡改在播放框內放自家控制列（含時間軸），不用瀏覽器內建的（YouTube 本來就關掉了）
+      setFsOn(!!document.fullscreenElement && document.fullscreenElement === boxRef.current);
     };
     sync();
     document.addEventListener("fullscreenchange", sync);
@@ -215,7 +220,6 @@ export function PlayerLayer() {
     const enter = () => {
       fullRef.current = true;
       setPFull(true);
-      engine.element().controls = true; // 鋪滿視窗時外面的控制列看不到，改用瀏覽器內建控制列
       const box = boxRef.current;
       if (document.fullscreenEnabled && box && !document.fullscreenElement) {
         box.requestFullscreen().then(() => { realFs.current = true; setPFull(false); }).catch(() => undefined); // 被拒絕就維持鋪滿視窗
@@ -398,6 +402,12 @@ export function PlayerLayer() {
           縮小
         </button>
       ) : null}
+      {pFull || fsOn ? (
+        // 全螢幕裡看不到頁面下方的播放控制列，所以在播放框內放同一個控制列（時間軸、播放／暫停、倍速…；業主 2026-11-24 回報時間軸不見了）
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 6, paddingBottom: "env(safe-area-inset-bottom, 0px)", background: "rgba(0,0,0,0.0)" }}>
+          <PlayerControls />
+        </div>
+      ) : null}
       <div style={{ position: "absolute", inset: "var(--pad, 0px)", borderRadius: "inherit", overflow: "hidden", background: "#000" }}>
       <div ref={zoomLayer} style={{ position: "absolute", inset: 0, transformOrigin: "0 0" }}>
         <div ref={hostRef} style={{ position: "absolute", inset: 0, display: yt ? "none" : "block" }} />
@@ -415,7 +425,7 @@ export function PlayerLayer() {
         ) : null}
       </div>
       {/* 影片上的點擊一律擋掉（只用下方控制列）；僅 App 內建瀏覽器第一次播放前放行，見上面 everPlayed 的說明。 */}
-      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} onLostPointerCapture={zUp} style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", pointerEvents: "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
+      {canZoom ? <div ref={gesture} data-no-pull-refresh="" onPointerDown={zDown} onPointerMove={zMove} onPointerUp={zUp} onPointerCancel={zUp} onLostPointerCapture={zUp} style={{ position: "absolute", inset: 0, touchAction: "pan-y", cursor: "grab", pointerEvents: "auto" }} aria-label="影片（雙指或滾輪放大縮小）" /> : null}
       {circle ? (
         <div style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", background: "#000", borderRadius: "50%", overflow: "hidden" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="恢復迷你播放器（可按住拖曳移動）">
           <img src={art} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", animation: "hg-spin 8s linear infinite", animationPlayState: s.playing ? "running" : "paused", pointerEvents: "none" }} />
