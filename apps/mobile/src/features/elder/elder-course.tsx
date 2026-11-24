@@ -40,6 +40,27 @@ function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lea
   return { lead: lead.filter(shown), blocks: blocks.map((b) => ({ ...b, items: b.items.filter(shown) })).filter((b) => b.items.length) };
 }
 
+/** 區塊標題大列（標題＋副標＋展開箭頭）：課程頁的區塊、中心頁的四個分類共用（業主 2026-11-24）。active＝綠底。 */
+export function ElderBlockHeader({ title, sub, on, active, onPress }: { title: string; sub?: string; on: boolean; active?: boolean; onPress: () => void }) {
+  const { c } = useTheme();
+  const hot = on || !!active;
+  return (
+    <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${title}${sub ? `，${sub}` : ""}，${on ? "點一下收起" : "點一下展開"}`} onPress={onPress} style={[styles.block, { backgroundColor: hot ? c.accent : c.accentSoft }]}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <AppText variant="headline" style={{ color: hot ? c.textOnAccent : c.accentText, fontWeight: "800" }}>
+          {title}
+        </AppText>
+        {sub ? (
+          <AppText variant="callout" style={{ color: hot ? c.textOnAccent : c.accentText }}>
+            {sub}
+          </AppText>
+        ) : null}
+      </View>
+      <Ionicons name={on ? "chevron-up" : "chevron-down"} size={26} color={hot ? c.textOnAccent : c.accentText} />
+    </Pressable>
+  );
+}
+
 /** 區塊清單：每個區塊一張大列（標題＋教材數＋展開箭頭），預設全部收起、同一時間只展開一個（與超派模式 BLOCK_BEHAVIOR 一致）。 */
 function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
   const { c } = useTheme();
@@ -52,15 +73,7 @@ function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blo
         const hasPlaying = b.items.some((l) => l.id === playingId);
         return (
           <View key={b.head.id} style={{ gap: space.sm }}>
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${b.items.length} 項教材，${on ? "點一下收起" : "點一下展開"}`} onPress={() => setOpen(on ? null : b.head.id)} style={[styles.block, { backgroundColor: on || hasPlaying ? c.accent : c.accentSoft }]}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <AppText variant="headline" style={{ color: on || hasPlaying ? c.textOnAccent : c.accentText, fontWeight: "800" }}>
-                  {b.head.title}
-                </AppText>
-                <AppText variant="callout" style={{ color: on || hasPlaying ? c.textOnAccent : c.accentText }}>{`${b.items.length} 項教材`}</AppText>
-              </View>
-              <Ionicons name={on ? "chevron-up" : "chevron-down"} size={26} color={on || hasPlaying ? c.textOnAccent : c.accentText} />
-            </Pressable>
+            <ElderBlockHeader title={b.head.title} sub={`${b.items.length} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
             {on ? b.items.map(renderRow) : null}
           </View>
         );

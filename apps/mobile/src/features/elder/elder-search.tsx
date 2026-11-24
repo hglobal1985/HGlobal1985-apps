@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useMemo, useRef, useState } from "react";
-import { FlatList, Image, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { FlatList, Image, ScrollView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { buildSearchIndex, charsCourses, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
@@ -17,6 +17,7 @@ import { fitFontSize } from "@/ui/course-cover";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
 import { TileCover } from "@/features/courses/series-tile";
+import { ElderCenterPage } from "./elder-center";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useVoice } from "./use-voice";
 
@@ -163,6 +164,8 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   // 進入分類後：標題條固定在搜尋框下面（不隨清單捲走）、背景有該分類的浮水印大圖示（業主 2026-11-24，選 E 款）。
   const zoneDef = ELDER_ZONES.find((z) => z.id === zone);
   const inZone = mode === "browse" && !searching && !!zoneDef;
+  // 進入「中心」之後：四個分頁（EDM／課表／重播／列表）改成可展開的區塊（業主 2026-11-24）。
+  const centerPage = inZone && zone === "centers" && !!sub;
   const listMode = !body && !(!searching && mode === "home");
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
@@ -173,7 +176,22 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           <ElderZoneHeader zone={zoneDef!} sub={sub?.title} onBack={() => (sub ? setSub(null) : setZone(null))} />
         </View>
       ) : null}
-      {listMode ? (
+      {centerPage ? (
+        <ScrollView style={styles.fill} contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]}>
+          <ElderCenterPage
+            key={sub!.key}
+            center={sub!.title}
+            courses={sub!.children ?? []}
+            renderCourses={() => (
+              <View>
+                {(sub!.children ?? []).map((x) => (
+                  <ElderCourseRow key={x.id} course={x} count={x.materialCount} />
+                ))}
+              </View>
+            )}
+          />
+        </ScrollView>
+      ) : listMode ? (
         <FlatList
           style={styles.fill}
           contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]}
