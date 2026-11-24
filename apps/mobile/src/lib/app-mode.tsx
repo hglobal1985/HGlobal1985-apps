@@ -47,6 +47,8 @@ export type ModeProfile = {
   coursePage: "twoTabs" | "classic";
   /** 底部主選單放大（固定大小，不跟字體倍數）。 */
   bigNav: boolean;
+  /** 頁面大標題（標題、未讀數、右側按鈕）上下堆疊，不橫擠（字放大後標題才不會被擠成一字一行）。 */
+  stackHeaders: boolean;
   /** 字體可以自訂、可以跟著手機字體。 */
   fontAdjustable: boolean;
   /** 離開這個模式前要先確認（防誤按）。 */
@@ -68,6 +70,7 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     courses: "bigList",
     coursePage: "twoTabs",
     bigNav: true,
+    stackHeaders: true,
     fontAdjustable: true,
     confirmLeave: true,
     sheets: "page",
@@ -83,6 +86,7 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     courses: "classic",
     coursePage: "classic",
     bigNav: false,
+    stackHeaders: false,
     fontAdjustable: false,
     confirmLeave: false,
     sheets: "sheet",

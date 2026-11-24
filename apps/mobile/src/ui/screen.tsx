@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useModeProfile } from "@/lib/app-mode";
 import { useTheme } from "@/theme/theme";
 import { useLayout } from "@/theme/layout";
 import { space } from "@/theme/tokens";
@@ -70,6 +71,7 @@ export function Screen({
   gutter?: number;
 }) {
   const { c } = useTheme();
+  const stackHeader = useModeProfile().stackHeaders;
   const insets = useSafeAreaInsets();
   const refreshControl = usePullRefresh();
   const [slot, setSlot] = useState<ReactNode>(null);
@@ -102,8 +104,8 @@ export function Screen({
     >
       <View style={[styles.inner, maxW, { gap }]}>
         {header && (title || subtitle || right) ? (
-          <View style={styles.header}>
-            <View style={{ flex: 1 }}>
+          <View style={stackHeader ? styles.headerStack : styles.header}>
+            <View style={stackHeader ? undefined : { flex: 1 }}>
               {title ? (
                 <AppText variant="display" accessibilityRole="header">
                   {title}
@@ -115,7 +117,7 @@ export function Screen({
                 </AppText>
               ) : null}
             </View>
-            {right}
+            {stackHeader && right ? <View style={styles.headerRight}>{right}</View> : right}
           </View>
         ) : null}
         {children}
@@ -181,4 +183,6 @@ const styles = StyleSheet.create({
   footer: { alignItems: "center", paddingHorizontal: space.lg, paddingTop: space.sm, paddingBottom: space.sm, borderTopWidth: 1, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 6, shadowOffset: { width: 0, height: -2 }, elevation: 6 },
   footerInner: { width: "100%", gap: space.sm },
   header: { flexDirection: "row", alignItems: "flex-end", gap: space.md, marginBottom: space.xs },
+  headerStack: { gap: space.sm, marginBottom: space.xs },
+  headerRight: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: space.sm },
 });

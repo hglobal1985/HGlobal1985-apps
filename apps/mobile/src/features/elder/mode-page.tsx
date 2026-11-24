@@ -20,7 +20,7 @@ export function ModePage() {
       {!ready ? <LoadingView /> : null}
       {member ? (
         <>
-          <MemberHeader member={member} scale={1.5} stacked />
+          <MemberHeader member={member} scale={1.15} stacked />
           {member.demo ? null : (
             <View style={{ gap: space.sm }}>
               <AppText variant="title" accessibilityRole="header">
@@ -34,13 +34,9 @@ export function ModePage() {
         <GuestGate body="登入後即可報名課程、記錄學習進度。" />
       ) : null}
       <FontSizeCard />
-      <View style={{ flexDirection: "row", gap: space.sm }}>
-        <View style={{ flex: 1 }}>
-          <Button variant="secondary" icon="document-text-outline" label="訂單紀錄" onPress={() => router.push(member ? "/orders" : "/me")} fullWidth />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button variant="secondary" icon="person-circle-outline" label={member ? "帳號" : "登入"} onPress={() => router.push("/me")} fullWidth />
-        </View>
+      <View style={{ gap: space.sm }}>
+        <Button variant="secondary" icon="document-text-outline" label="訂單紀錄" onPress={() => router.push(member ? "/orders" : "/me")} fullWidth />
+        <Button variant="secondary" icon="person-circle-outline" label={member ? "帳號" : "登入"} onPress={() => router.push("/me")} fullWidth />
       </View>
       <Button variant="cancel" icon="rocket-outline" label={`換回${MODE_PROFILES.super.name}模式`} onPress={() => void askSwitchToMaker()} fullWidth />
     </Screen>
