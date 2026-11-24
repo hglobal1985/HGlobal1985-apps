@@ -3,6 +3,7 @@ import { router, usePathname } from "expo-router";
 import type { ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { runGuarded } from "@/lib/unsaved-guard";
 import { useTheme } from "@/theme/theme";
 import { barHeight, minTouch } from "@/theme/tokens";
 
@@ -26,7 +27,7 @@ export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTo
   return (
     <View style={styles.wrap}>
       <View style={[styles.bar, { height: barHeight + top, paddingTop: top, backgroundColor: c.surface }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="返回上一頁" hitSlop={8} onPress={back} style={styles.back}>
+        <Pressable accessibilityRole="button" accessibilityLabel="返回上一頁" hitSlop={8} onPress={() => runGuarded(back)} style={styles.back}>
           <Ionicons name="arrow-back" size={26} color={c.text} />
         </Pressable>
         <Text numberOfLines={1} accessibilityRole="header" style={[styles.title, { color: c.text }]}>
