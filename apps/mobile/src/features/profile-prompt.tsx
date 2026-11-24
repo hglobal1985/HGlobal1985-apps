@@ -515,8 +515,8 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
           <AppText variant="headline" style={{ color: c.warning }}>
             尚未儲存
           </AppText>
-          <AppText>資料還沒有儲存。請按「儲存」，或按「放棄」不儲存直接離開。</AppText>
-          <Button variant="cancel" label="放棄" icon="close" onPress={() => { const go = leaving; if (data) apply(data); setLeaving(null); setUnsavedGuard(null); go?.(); }} fullWidth />
+          <AppText>資料還沒有儲存。請按「儲存」；不想存就按「放棄」，會還原成原本的資料，並留在這一頁。</AppText>
+          <Button variant="cancel" label="放棄" icon="close" onPress={() => { if (data) apply(data); setLeaving(null); setUnsavedGuard(null); }} fullWidth />
         </View>
       ) : null}
       <View ref={saveBox} collapsable={false} style={styles.actions}>
