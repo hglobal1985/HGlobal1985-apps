@@ -44,7 +44,7 @@ export default function LearningScreen() {
   const enrolled = useMemo(() => (data ?? []).filter((c) => inLearning(c) || c.enrollment === "pending"), [data]); // eslint-disable-line react-hooks/exhaustive-deps
   // 系列篩選：列出學習中課程所屬的系列。
   const seriesList = useMemo(() => [...new Set(enrolled.map((c) => c.series).filter(Boolean))], [enrolled]);
-  const shown = (data ?? []).filter((c) => (kind === "" || (kind === "free" ? c.free : !c.free)) && (seriesSel === "" || c.series === seriesSel));
+  const shown = (data ?? []).filter((c) => (kind === "" || (kind === "free" ? c.free : !c.free)) && (elder || seriesSel === "" || c.series === seriesSel));
   // 依最近一次學習的時間排序（最近的在上面）；還沒學習過的排後面。
   const byRecent = (a: CourseSummary, b: CourseSummary) => (b.lastLearnedAt ?? "").localeCompare(a.lastLearnedAt ?? "");
   const mine = shown.filter(inLearning).sort(byRecent);
@@ -65,7 +65,7 @@ export default function LearningScreen() {
         enrolled.length ? (
           <View style={[styles.filters, elder && { flexDirection: "column" }]}>
             <Select label="費用" value={kind} options={[{ key: "", label: "全部（免費與付費）" }, { key: "free", label: "免費" }, { key: "paid", label: "付費" }]} onChange={setKind} />
-            <Select label="系列" value={seriesSel} options={[{ key: "", label: "全部系列" }, ...seriesList.map((x) => ({ key: x, label: x }))]} onChange={setSeriesSel} />
+            {elder ? null : <Select label="系列" value={seriesSel} options={[{ key: "", label: "全部系列" }, ...seriesList.map((x) => ({ key: x, label: x }))]} onChange={setSeriesSel} />}
           </View>
         ) : undefined
       }

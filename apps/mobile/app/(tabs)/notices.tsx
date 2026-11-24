@@ -103,17 +103,17 @@ export default function NoticesScreen() {
       ) : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
-      <View style={{ flexDirection: elder ? "column" : "row", gap: 8, marginBottom: space.sm }} accessibilityRole="radiogroup">
+      <View style={{ flexDirection: "row", gap: elder ? 6 : 8, marginBottom: space.sm }} accessibilityRole="radiogroup">
         {MODES.map((m) => {
           const on = mode === m.key;
           const n = m.key === "all" ? unread : count(m.key);
           return (
-            <Pressable key={m.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${m.label}${n ? `，${n} 則未處理` : ""}`} onPress={() => (trackFeature("notices_filter"), setMode(m.key))} style={{ flex: elder ? undefined : 1, minHeight: elder ? 56 : 44, borderRadius: radius.md, borderWidth: 1, borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 }}>
-              <AppText variant="callout" style={{ fontWeight: "800", color: on ? c.textOnAccent : c.text }}>
+            <Pressable key={m.key} accessibilityRole="radio" accessibilityState={{ selected: on }} accessibilityLabel={`${m.label}${n ? `，${n} 則未處理` : ""}`} onPress={() => (trackFeature("notices_filter"), setMode(m.key))} style={{ flex: 1, minWidth: 0, minHeight: elder ? 56 : 44, borderRadius: radius.md, borderWidth: 1, borderColor: on ? c.accent : c.border, backgroundColor: on ? c.accent : c.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 4 }}>
+              <AppText variant="callout" numberOfLines={1} style={{ fontWeight: "800", color: on ? c.textOnAccent : c.text }}>
                 {m.label}
               </AppText>
               {n ? (
-                <View style={{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: on ? c.textOnAccent : c.danger, alignItems: "center", justifyContent: "center" }}>
+                <View style={[{ minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4, backgroundColor: on ? c.textOnAccent : c.danger, alignItems: "center", justifyContent: "center" }, elder && { position: "absolute", top: -6, right: -2 }]}>
                   <AppText variant="caption" style={{ color: on ? c.accent : "#fff", fontWeight: "800", fontSize: 11, lineHeight: 14 }}>
                     {n > 99 ? "99+" : n}
                   </AppText>
