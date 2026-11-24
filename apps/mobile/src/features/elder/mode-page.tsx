@@ -1,4 +1,6 @@
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
+import { useEffect } from "react";
+import { hasUnsaved, runGuarded } from "@/lib/unsaved-guard";
 import { View } from "react-native";
 import { MemberHeader } from "@/features/member-header";
 import { ProfilePrompt } from "@/features/profile-prompt";
@@ -15,15 +17,26 @@ import { askSwitchToMaker, FontSizeCard } from "./mode-actions";
  */
 export function ModePage() {
   const { member, ready } = useSession();
+  // 返回（含瀏覽器／手機返回鍵）離開前：表單有未儲存的改動就攔下，交給表單顯示「尚未儲存」與「放棄」。
+  const nav = useNavigation();
+  useEffect(
+    () =>
+      (nav as unknown as { addListener: (n: string, f: (e: { preventDefault: () => void; data: { action: never } }) => void) => () => void }).addListener("beforeRemove", (e) => {
+        if (!hasUnsaved()) return;
+        e.preventDefault();
+        runGuarded(() => nav.dispatch(e.data.action));
+      }),
+    [nav],
+  );
   return (
     <Screen>
       {/* 最上方並排：訂單紀錄｜超派模式（業主 2026-11-24） */}
       <View style={{ flexDirection: "row", gap: space.sm }}>
         <View style={{ flex: 1 }}>
-          <Button variant="secondary" label="訂單紀錄" onPress={() => router.push(member ? "/orders" : "/me")} fullWidth />
+          <Button variant="secondary" label="訂單紀錄" onPress={() => runGuarded(() => router.push(member ? "/orders" : "/me"))} fullWidth />
         </View>
         <View style={{ flex: 1 }}>
-          <Button variant="cancel" label={`${MODE_PROFILES.super.name}模式`} onPress={() => void askSwitchToMaker()} fullWidth />
+          <Button variant="cancel" label={`${MODE_PROFILES.super.name}模式`} onPress={() => runGuarded(() => void askSwitchToMaker())} fullWidth />
         </View>
       </View>
       {!ready ? <LoadingView /> : null}
@@ -36,7 +49,7 @@ export function ModePage() {
         <GuestGate body="登入後即可報名課程、記錄學習進度。" />
       ) : null}
       <FontSizeCard />
-      <Button variant="secondary" icon="person-circle-outline" label={member ? "帳號" : "登入"} onPress={() => router.push("/me")} fullWidth />
+      <Button variant="secondary" icon="person-circle-outline" label={member ? "帳號" : "登入"} onPress={() => runGuarded(() => router.push("/me"))} fullWidth />
     </Screen>
   );
 }

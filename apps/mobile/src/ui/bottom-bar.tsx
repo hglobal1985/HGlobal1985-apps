@@ -5,6 +5,7 @@ import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requestCoursesReset } from "@/lib/courses-reset";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
+import { runGuarded } from "@/lib/unsaved-guard";
 import { getBottomGap, onBottomGap } from "@/lib/bottom-gap";
 import { useUnreadCount } from "@/state/unread";
 import { MODE_PROFILES, useModeProfile, type TabKey } from "@/lib/app-mode";
@@ -105,7 +106,7 @@ export function BottomBar() {
         // 方案 1（業主 2026-11-20）：整條深綠實心、白字白圖示；目前所在分頁是黃色膠囊＋深色字。書櫃模式維持咖啡色舊樣式。
         const color = lib ? LIB.muted : on ? c.navPillText : "#FFFFFF";
         return (
-          <Pressable key={t.title} style={tabStyle} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => {
+          <Pressable key={t.title} style={tabStyle} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => runGuarded(() => {
             if (t.title === "課程") {
               // 已經在課程分頁裡再按一次＝回課程首頁（所有系列）；從別的分頁回來＝回到上次停留的那一頁（業主 2026-11-23）。
               if (t.match(pathname)) {
@@ -115,7 +116,7 @@ export function BottomBar() {
               return;
             }
             router.navigate(t.href);
-          }}>
+          })}>
             <View style={[styles.cell, elder && styles.cellElder, on && { backgroundColor: c.navPill }]}>
               <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
                 {t.building ? <UniversityIcon size={iconSize} color={color} active={on} /> : <Ionicons name={on ? t.active : t.icon} size={iconSize} color={color} {...({ uiOnly: true } as object)} />}
@@ -141,7 +142,7 @@ export function BottomBar() {
           style={tabStyle}
           accessibilityRole="button"
           accessibilityLabel={profile.key === "elder" ? `目前是${profile.name}模式。按這裡調整字體、看訂單紀錄、帳號，或換回${MODE_PROFILES.super.name}模式` : `目前是${profile.name}模式。按這裡切換到${MODE_PROFILES.elder.name}模式（大字簡易版）`}
-          onPress={() => (profile.modeKey === "page" ? router.navigate("/mode") : switchToElder())}
+          onPress={() => runGuarded(() => (profile.modeKey === "page" ? router.navigate("/mode") : switchToElder()))}
         >
           <View style={[styles.cell, elder && styles.cellElder, modeOn && { backgroundColor: c.navPill }]}>
             <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>

@@ -6,8 +6,11 @@ import { type HostInstance, Platform, Pressable, ScrollView, StyleSheet, Text, T
 import { api } from "@/api/client";
 import { openAccountCenter } from "@/features/account-link";
 import { PushSwitchRow } from "@/features/push-switch";
+import { setUnsavedGuard } from "@/lib/unsaved-guard";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
+import { UI_SCALE } from "@/theme/ui-scale";
+import { elderTextScale } from "@/lib/elder-mode";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
@@ -80,6 +83,23 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
     <Pressable onPress={onToggle} disabled={disabled} accessibilityRole="checkbox" accessibilityState={{ checked: on, disabled }} accessibilityLabel="無" style={[styles.none, { opacity: disabled ? 0.45 : 1 }]}>
       <Icon name={on ? "checkbox" : "square-outline"} size={18} color={on ? c.accentText : c.textMuted} />
       <AppText variant="caption" style={{ fontWeight: "700", fontSize: 13 }}>無</AppText>
+    </Pressable>
+  );
+}
+
+/** 「前往完整版會員中心」：強制單行、依畫面寬度自動縮小字體（業主 2026-11-24；網頁不支援 adjustsFontSizeToFit，所以自己用寬度與字數算）。 */
+function FitLink({ onPress, color, text }: { onPress: () => void; color: string; text: string }) {
+  const [w, setW] = useState(0);
+  const chars = [...text].length;
+  // 畫字時會再乘「平板倍數 × 至尊倍數」（lib/global-scale.ts），圖示也一樣：所以先在「放大前」的尺寸上算，剛好塞滿一行。
+  const k = UI_SCALE * elderTextScale();
+  const size = w ? Math.max(9, Math.min(17, Math.floor(((w - 8) / k - 20) / (chars * 1.06)))) : 17;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="link" style={styles.more} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+      <Icon name="open-outline" size={20} color={color} />
+      <Text numberOfLines={1} style={{ color, fontSize: size, fontWeight: "700", flexShrink: 1 }}>
+        {text}
+      </Text>
     </Pressable>
   );
 }
@@ -215,6 +235,23 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
   // Email 還空著時自動帶入 Google 登入信箱（業主 2026-11-23）：「原本的值」仍是空的，所以按儲存會一併寫回會員中心。
   const initial = data ? { ...formVals(data), contact_email: data.email } : null;
   const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name") && vals[k].trim() !== initial[k].trim()) : [];
+  // 尚未儲存的離開攔截（業主 2026-11-24，只有至尊模式頁的表單）：有改動還沒儲存時，離開畫面前把畫面捲到儲存鈕、顯示「尚未儲存」與「放棄」。
+  const dirty = inline && (changed.length > 0 || (wantAmway && !data?.enabled));
+  const [leaving, setLeaving] = useState<(() => void) | null>(null);
+  const saveBox = useRef<HostInstance>(null);
+  useEffect(() => {
+    if (!dirty) {
+      setUnsavedGuard(null);
+      setLeaving(null);
+      return;
+    }
+    setUnsavedGuard((proceed) => {
+      setLeaving(() => proceed);
+      setTimeout(() => (saveBox.current as unknown as { scrollIntoView?: (o: object) => void } | null)?.scrollIntoView?.({ block: "center", behavior: "smooth" }), 50);
+      return false;
+    });
+    return () => setUnsavedGuard(null);
+  }, [dirty]);
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
   /** 選的系統是不是寰宇：只有寰宇才能選「中心」（業主 2026-11-22）；其他系統、「無」、還沒選，中心都不能選。 */
@@ -363,12 +400,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
     <Wrap inline={inline} onClose={onClose} lift={!!openKey || !!uplineFocus}>
       <Body inline={inline} lift={!!openKey || !!uplineFocus} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
-          <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
-            <Icon name="open-outline" size={20} color={c.accentText} />
-            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
-              前往完整版會員中心
-            </Text>
-          </Pressable>
+          <FitLink onPress={openAccountCenter} color={c.accentText} text="前往完整版會員中心" />
           {msg ? (
             <AppText variant="caption" tone={msg.ok ? "success" : "danger"} numberOfLines={2}>
               {msg.text}
@@ -458,7 +490,16 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
             </>
           ) : null}
       </Body>
-      <View style={styles.actions}>
+      {leaving ? (
+        <View accessibilityRole="alert" style={{ borderWidth: 2, borderColor: c.warning, backgroundColor: c.warningSoft, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
+          <AppText variant="headline" style={{ color: c.warning }}>
+            尚未儲存
+          </AppText>
+          <AppText>資料還沒有儲存。請按「儲存」，或按「放棄」不儲存直接離開。</AppText>
+          <Button variant="cancel" label="放棄" icon="close" onPress={() => { const go = leaving; if (data) apply(data); setLeaving(null); setUnsavedGuard(null); go?.(); }} fullWidth />
+        </View>
+      ) : null}
+      <View ref={saveBox} collapsable={false} style={styles.actions}>
         {inline ? null : (
           <View style={{ flex: 1 }}>
             <Button variant="cancel" label="關閉" icon="close" onPress={onClose} fullWidth />
