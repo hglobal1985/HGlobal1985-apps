@@ -26,6 +26,8 @@ import { PageHeader } from "@/features/page-header";
 import { centerTitle } from "@/features/format";
 import { useSeriesSettings } from "@/features/courses/series-settings";
 import { albumTotal } from "@/features/courses/block-album";
+import { CourseMiniCover } from "@/features/courses/edm-viewer";
+import { CoverMiniFloat } from "@/ui/collapse-band";
 import { LessonStage } from "@/features/player/lesson-stage";
 import { ElderCourse } from "@/features/elder/elder-course";
 import { ElderBroadcastBox } from "@/features/elder/elder-broadcast";
@@ -545,6 +547,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
+      {/* 沒在播放時，封面往下滑縮成右下角的迷你小視窗（業主 2026-11-24；成對的 CollapseBand 在 LessonStage 的 idle）。 */}
+      <CoverMiniFloat enabled={!stage && !(playLegacy && session.playback) && !lay.split} cover={<CourseMiniCover course={course} />} label={course.title} />
       {photoBlock ? <BlockPhotosSheet head={photoBlock} onClose={() => setPhotoBlock(null)} onChanged={reload} /> : null}
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}

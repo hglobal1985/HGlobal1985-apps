@@ -30,6 +30,15 @@ import { EdmInfoPanel } from "./edm-info";
  * 點一下彈出小視窗可放大縮小、下載、分享。
  * 沒有 EDM 時顯示色塊。外框用 StageFrame，高度與上課頁的影片區完全相同。
  */
+/** 封面縮成迷你小視窗時裡面顯示的封面（業主 2026-11-24；選圖規則同 EdmStage：品牌 logo ＞ EDM／封面圖 ＞ 文字封面）。 */
+export function CourseMiniCover({ course }: { course: CourseSummary }) {
+  const thumb = useThumb();
+  const uri = course.coverUrl || course.edmUrl;
+  if (course.brand) return <BrandCover brand={course.brand} fill />;
+  if (uri) return <Image source={{ uri: thumb(resolveUrl(uri), 480) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />;
+  return <CourseCover theme={course.theme} label={course.category} title={displayName(course)} fill />;
+}
+
 export function EdmStage({ course, stats, canManageAlbum = false }: { course: CourseSummary; stats?: CoverStats; /** 編輯模式：右上角出現「封面相簿」鈕（上傳輪播用的照片與短影音）。 */ canManageAlbum?: boolean }) {
   const thumb = useThumb();
   const { width: winW } = useWindowDimensions();

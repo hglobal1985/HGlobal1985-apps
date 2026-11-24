@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useBandExtra } from "./band-extra";
-import { CollapseTopRow, CompactTitleBar } from "./collapse-band";
 import { reportPlayerScroll } from "@/features/player/shrink";
 import { Animated, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -91,13 +90,10 @@ export function Screen({
     {topBar ? <View style={{ zIndex: 6 }}>{topBar}</View> : null}
     {top ? (
       <View style={[styles.top, gutter, { backgroundColor: c.background, borderBottomColor: c.border, paddingTop: (header ? insets.top : 0) + space.sm }]}>
-        <View style={[styles.topInner, maxW]}>
-          <CollapseTopRow>{top}</CollapseTopRow>
-        </View>
+        <View style={[styles.topInner, maxW]}>{top}</View>
       </View>
     ) : null}
     <View style={{ flex: 1 }} onLayout={(e) => setAreaH(Math.round(e.nativeEvent.layout.height))}>
-    {header && title && !top && !topBar ? <CompactTitleBar title={title} top={insets.top} bg={c.surface} border={c.border} color={c.text} /> : null}
     {hero ? <View style={[styles.heroLayer, { backgroundColor: c.background }]}>{hero}</View> : null}
     <Scroller
       scrollY={scrollY}
