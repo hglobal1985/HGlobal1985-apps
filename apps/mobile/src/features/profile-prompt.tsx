@@ -1,4 +1,5 @@
 import { Button } from "@/ui/button";
+import { useBorderW } from "@/lib/elder-mode";
 import { trackFeature } from "@/lib/feature-track";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -68,13 +69,15 @@ function Label({ text, tag, note, reserveNote, fit }: { /** 一行顯示、太�
 /** 必填沒填時，整列用 2px 橘框＋淡橘底標示（中央視覺規範）。 */
 function Row({ bad, z, fixed, anchor, children }: { bad?: boolean; z?: number; /** 欄位代號：給「跳到沒填的欄位」定位用（nativeID＝pf-代號）。 */ anchor?: string; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，業主 2026-11-23）。 */ fixed?: boolean; children: ReactNode }) {
   const { c } = useTheme();
-  const box = { borderWidth: 2, borderRadius: radius.md, padding: 4 };
+  const bw2 = useBorderW(2);
+  const box = { borderWidth: bw2, borderRadius: radius.md, padding: 4 };
   return <View nativeID={anchor ? `pf-${anchor}` : undefined} style={[{ gap: 2, zIndex: z ?? 1 }, fixed && { ...box, borderColor: "transparent" }, bad && { ...box, borderColor: c.warning, backgroundColor: c.warningSoft }]}>{children}</View>;
 }
 
 function Input({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   const { c } = useTheme();
-  return <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.textMuted} autoCapitalize="none" style={[styles.input, { color: c.text, borderColor: c.border, backgroundColor: c.surface }]} />;
+  const bw = useBorderW(1);
+  return <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.textMuted} autoCapitalize="none" style={[styles.input, { color: c.text, borderColor: c.border, borderWidth: bw, backgroundColor: c.surface }]} />;
 }
 
 /** 與中央會員相同的「無」勾選框：只寫一個字「無」，排在輸入框／下拉選單右邊。 */
@@ -129,6 +132,7 @@ function FieldLine({ stack, children }: { stack: boolean; children: ReactNode })
 export function ProfilePrompt({ onClose, initial: first, inline = false, focusMissing = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean; /** 資料載入後，標出沒填的欄位並捲到第一個（至尊模式登入後自動帶到模式頁，業主 2026-11-24）。 */ focusMissing?: boolean }) {
   /** 一欄由上往下排（至尊模式頁，字放大後三欄橫排會被擠爛）；上拉選單版維持原本的緊湊三欄。 */
   const stack = inline;
+  const bwWarn = useBorderW(2);
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
   const { invalidate, refreshMember } = useSession();
@@ -373,7 +377,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
     uplineFocus && upList.length && popRect ? (
       <View
         pointerEvents="auto"
-        style={[styles.dropdown, { position: Platform.OS === "web" ? ("fixed" as never) : "absolute", left: popRect.x, width: popRect.w, right: "auto" as never, bottom: Platform.OS === "web" ? Math.round(window.innerHeight - popRect.y + 4) : Math.round(winH - popRect.y + 4), maxHeight: Math.min(220, Math.max(88, popRect.y - 12)), zIndex: 30000, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 20 }]}
+        style={[styles.dropdown, { position: Platform.OS === "web" ? ("fixed" as never) : "absolute", left: popRect.x, width: popRect.w, right: "auto" as never, bottom: Platform.OS === "web" ? Math.round(window.innerHeight - popRect.y + 4) : Math.round(winH - popRect.y + 4), maxHeight: Math.min(220, Math.max(88, popRect.y - 12)), zIndex: 30000, borderWidth: bwWarn, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 20 }]}
       >
         <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
           {upList.map((x) => (
@@ -482,7 +486,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
           ) : null}
       </Body>
       {leaving ? (
-        <View accessibilityRole="alert" style={{ borderWidth: 2, borderColor: c.warning, backgroundColor: c.warningSoft, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
+        <View accessibilityRole="alert" style={{ borderWidth: bwWarn, borderColor: c.warning, backgroundColor: c.warningSoft, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
           <AppText variant="headline" style={{ color: c.warning }}>
             尚未儲存
           </AppText>
@@ -515,7 +519,8 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
 /** lift＝有下拉選單展開：網頁的每個 View 都是獨立堆疊層，外框也要提到最上層，選單才不會被後面的按鈕、卡片蓋住（業主 2026-11-24）。 */
 function Wrap({ inline, onClose, lift, children }: { inline: boolean; onClose: () => void; lift: boolean; children: ReactNode }) {
   const { c } = useTheme();
-  return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border, zIndex: lift ? 500 : 1 }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
+  const bw = useBorderW(1);
+  return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw, zIndex: lift ? 500 : 1 }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
 }
 
 /** 欄位區：上拉選單裡可捲動；放在頁面裡就跟著頁面捲。 */

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useBorderW } from "@/lib/elder-mode";
 import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -15,7 +16,8 @@ export function Card({
   accessibilityLabel?: string;
 }) {
   const { c } = useTheme();
-  const base = [styles.card, { backgroundColor: c.surface, borderColor: c.border }, style];
+  const bw = useBorderW(StyleSheet.hairlineWidth);
+  const base = [styles.card, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw }, style];
   if (!onPress) return <View style={base}>{children}</View>;
   return (
     <Pressable

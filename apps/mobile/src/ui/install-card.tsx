@@ -1,4 +1,5 @@
 import { useFocusEffect } from "expo-router";
+import { useBorderW } from "@/lib/elder-mode";
 import { useCallback, useState } from "react";
 import Svg, { Circle, Rect } from "react-native-svg";
 import { Pressable, StyleSheet, View } from "react-native";
@@ -20,6 +21,7 @@ const RED = "#B3261E";
  */
 export function InstallCard({ dismissible = false }: { dismissible?: boolean }) {
   const { c } = useTheme();
+  const bw = useBorderW(2);
   const { suggest, native } = useInstallState();
   const [hidden, setHidden] = useState(false);
   const [steps, setSteps] = useState(false);
@@ -41,7 +43,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
   const ios = isIos();
   return (
     <>
-      <View style={[styles.card, { backgroundColor: c.dangerSoft, borderColor: RED }]}>
+      <View style={[styles.card, { backgroundColor: c.dangerSoft, borderColor: RED, borderWidth: bw }]}>
         <PhoneAppIcon size={34} color={RED} />
         {/* 一行文字，空間不夠時自動換行（業主 2026-11-18） */}
         <View style={{ flex: 1, minWidth: 0 }}>

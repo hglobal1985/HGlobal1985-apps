@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useBorderW } from "@/lib/elder-mode";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { MODE_PROFILES } from "@/lib/app-mode";
@@ -33,6 +34,7 @@ export async function askSwitchToMaker() {
 let savedSize: number | null = null;
 
 export function FontSizeCard() {
+  const bw = useBorderW(1);
   // 改字體會重建畫面；改之前記住這張卡在螢幕上的位置，重建後捲回來讓它留在原處（業主 2026-11-24）。
   const setKeep = (patch: Parameters<typeof setElder>[0]) => (rememberAnchor(), setElder(patch));
   const { c } = useTheme();
@@ -55,7 +57,7 @@ export function FontSizeCard() {
     </Pressable>
   );
   return (
-    <View nativeID={ANCHOR_ID} style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+    <View nativeID={ANCHOR_ID} style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw }]}>
       {toggle("文字加粗", prefs.bold, (v) => setKeep({ bold: v }))}
       {toggle("跟著手機字體大小", follow, (v) => {
         // 勾選＝字體設定立刻復原成預設（舊的自訂大小先記起來）；取消勾選＝還原剛才的自訂大小（業主 2026-11-24）。
@@ -80,7 +82,7 @@ export function FontSizeCard() {
         {PRESETS.map((p) => {
           const on = !follow && Math.abs(prefs.size - p.size) < 0.05;
           return (
-            <Pressable key={p.label} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setKeep({ size: p.size })} style={[styles.chip, { borderColor: c.accent, backgroundColor: on ? c.accent : c.surface }]}>
+            <Pressable key={p.label} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setKeep({ size: p.size })} style={[styles.chip, { borderWidth: bw }, { borderColor: c.accent, backgroundColor: on ? c.accent : c.surface }]}>
               <AppText variant="callout" style={{ fontWeight: "800", color: on ? c.textOnAccent : c.accentText }} numberOfLines={1}>
                 {p.label}
               </AppText>
@@ -102,6 +104,7 @@ const PRESETS = [
 /** －／＋ 小按鈕（高 48，整個按鈕都能點）。 */
 function StepButton({ label, icon, onPress, disabled, outline }: { label: string; icon: "add" | "remove"; onPress: () => void; disabled?: boolean; outline?: boolean }) {
   const { c } = useTheme();
+  const bw = useBorderW(2);
   return (
     <Pressable
       accessibilityRole="button"
@@ -109,7 +112,7 @@ function StepButton({ label, icon, onPress, disabled, outline }: { label: string
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
-      style={[styles.step, { backgroundColor: outline ? c.surface : c.accent, borderColor: c.accent, opacity: disabled ? 0.4 : 1 }]}
+      style={[styles.step, { borderWidth: bw, backgroundColor: outline ? c.surface : c.accent, borderColor: c.accent, opacity: disabled ? 0.4 : 1 }]}
     >
       <Ionicons name={icon} size={26} color={outline ? c.accent : c.textOnAccent} {...({ uiOnly: true } as object)} />
     </Pressable>

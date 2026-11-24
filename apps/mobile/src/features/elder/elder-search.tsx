@@ -268,7 +268,7 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
       <AppText tone="muted" style={{ textAlign: "center" }}>
         {heard ? `聽到：「${heard}」` : "請說出想找的課程"}
       </AppText>
-      <Pressable accessibilityRole="button" onPress={onStop} style={[styles.stop, { borderColor: c.danger }]}>
+      <Pressable accessibilityRole="button" onPress={onStop} style={[styles.stop, { borderColor: c.danger, borderWidth: ELDER_FIELD.borderWidth }]}>
         <AppText variant="headline" style={{ color: c.danger }}>
           停止
         </AppText>

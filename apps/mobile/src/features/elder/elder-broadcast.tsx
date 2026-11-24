@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useBorderW } from "@/lib/elder-mode";
 import { View } from "react-native";
 import { ElderBlockHeader } from "./elder-course";
 import { BroadcastList } from "@/features/broadcast/broadcast-band";
@@ -29,6 +30,7 @@ export type ElderBlock = {
  */
 export function useElderBroadcastBlock(t: { center?: string; series?: string; /** 標題前面的來源名稱（中心或系列）：公告區要看得出是哪一個中心／系列的公告。 */ label?: string }): ElderBlock | null {
   const { c } = useTheme();
+  const bw = useBorderW(1);
   const bc = useBroadcasts(t);
   const items = bc.data?.items;
   const { unread, markAll } = useBroadcastUnread(items);
@@ -43,7 +45,7 @@ export function useElderBroadcastBlock(t: { center?: string; series?: string; /*
     badge: unread,
     onOpen: markAll,
     body: () => (
-      <View style={{ borderWidth: 1, borderColor: c.border, borderRadius: radius.lg, backgroundColor: c.surface, paddingHorizontal: space.md }}>
+      <View style={{ borderWidth: bw, borderColor: c.border, borderRadius: radius.lg, backgroundColor: c.surface, paddingHorizontal: space.md }}>
         <BroadcastList items={items} onChanged={bc.reload} />
       </View>
     ),
