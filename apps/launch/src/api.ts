@@ -98,6 +98,7 @@ import { isCoverKey, isKeyInUse, listInUseCards, listUnusedCovers, type InUseCar
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
 import { ocrEdmImage, ocrPending } from "./edm-vision.ts";
+import { DEFAULT_FIELDS, OTHER as EDM_OTHER, cleanOcrText, fmtOf, loadFields, normalizeFields, saveFields, structureEdm, structurePending, structureStats, type Structured } from "./edm-structure.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
@@ -4105,17 +4106,20 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [id]) => {
       // 圖片資訊面板（業主 2026-11-24）：只有能管理這個相簿的人看得到（含上傳者姓名與 EXIF，EXIF 可能有拍攝地點）。
       const r = await ctx.db
-        .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.course_id, cm.ocr_text, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
+        .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
         .bind(id)
         .first<Record<string, string | number | null>>();
       if (!r) return fail(404, "not_found", "找不到這張照片");
       await requireCoverRowOwner(ctx, r as unknown as CoverRow);
+      const fieldsNow = await loadFields(ctx.db);
       let meta: { exif?: Record<string, unknown>; file?: Record<string, unknown> } = {};
       try {
         meta = r.meta ? (JSON.parse(String(r.meta)) as typeof meta) : {};
       } catch {
         meta = {};
       }
+      // 還沒用目前格式整理過：背景補整理（額度用完或沒綁定 AI 就略過）
+      if (r.kind === "image" && r.ocr_text && r.ocr_fmt !== fmtOf(fieldsNow) && ctx.defer) ctx.defer(structureEdm(ctx.env, ctx.db, String(r.id)).catch(() => undefined));
       const byRaw = String(r.created_by ?? "");
       const system = byRaw === "migration" || byRaw === "course-edm";
       return {
@@ -4138,7 +4142,16 @@ const routes: [string, RegExp, Handler][] = [
         ocrModel: r.ocr_model,
         ocrAt: r.ocr_at,
         eventDate: r.event_date,
-        ocrText: r.ocr_text,
+        ocrText: cleanOcrText(String(r.ocr_text ?? "")),
+        structured: (() => {
+          // 套入「AI 文字辨識」欄位格式後的內容（業主 2026-11-24）：沒整理好時 fields 是 null，畫面改顯示清理過的原文。
+          try {
+            const st = r.ocr_fields ? (JSON.parse(String(r.ocr_fields)) as Structured) : null;
+            return { fields: st?.f ?? null, other: st?.o ?? "", stale: r.ocr_fmt !== fmtOf(fieldsNow) };
+          } catch {
+            return { fields: null, other: "", stale: true };
+          }
+        })(),
         file: meta.file ?? {},
         exif: meta.exif ?? {},
       };
@@ -6893,6 +6906,40 @@ const routes: [string, RegExp, Handler][] = [
       const who = await requireCourseStaff(ctx);
       const kind = what === "categories" ? "category" : what === "series" ? "series" : "location";
       return keywordChoices(ctx, kind, who.role !== "admin" ? (who.center?.key ?? "") : null);
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/edm-fields$/,
+    async (ctx) => {
+      // AI 文字辨識的欄位格式（業主 2026-11-24）：超級管理員自訂；EDM 辨識文字會照這個格式整理。
+      requireSuperAdmin(ctx);
+      const sel = await loadSelection(ctx.db);
+      const model = AI_MODELS.find((m) => m.id === sel.edm_structure);
+      return { fields: await loadFields(ctx.db), defaults: DEFAULT_FIELDS, other: EDM_OTHER, stats: await structureStats(ctx.db), model: model ? { id: model.id, name: model.name, cost: model.cost } : null };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/edm-fields$/,
+    async (ctx) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ fields?: unknown }>(ctx.req);
+      if (!Array.isArray(body.fields) || !body.fields.length) fail(400, "invalid_fields", "至少要有一個欄位");
+      const fields = normalizeFields(body.fields);
+      await saveFields(ctx.db, fields);
+      await audit(ctx.db, s.sub, "edm_fields.set", "ui_settings", "edm_fields", JSON.stringify(fields)).run();
+      return { fields, stats: await structureStats(ctx.db) };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/edm-fields\/run$/,
+    async (ctx) => {
+      // 現在就整理幾張還沒套用目前格式的 EDM（一次 5 張，避免一次吃光每日免費額度）。
+      requireSuperAdmin(ctx);
+      const done = await structurePending(ctx.env, ctx.db, 5);
+      return { done, stats: await structureStats(ctx.db) };
     },
   ],
   ["GET", /^\/admin\/ai-models$/, async (ctx) => (requireSuperAdmin(ctx), aiModelsView(ctx))],

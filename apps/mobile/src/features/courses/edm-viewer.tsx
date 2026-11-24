@@ -133,7 +133,7 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
 /** 操作說明縮成十字圖示後，這次開啟網站期間都記住（不用每張圖再按一次）。 */
-let helpHiddenMemory = false;
+let helpHiddenMemory = true; // 預設縮成十字圖示，點圖示才展開（業主 2026-11-24）
 /** id＝相簿照片編號（有給、而且看的人有管理權限時，右上角多一顆「圖片資訊」驚嘆號鈕；業主 2026-11-24）。 */
 export type LightboxItem = { uri: string; title: string; bg?: string; id?: string };
 export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, index = 0 }: { uri: string; title: string; onClose: () => void; /** 看的人有管理權限時才傳 true：顯示「圖片資訊」鈕（內容含上傳者與 EXIF）。 */ showInfo?: boolean; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {

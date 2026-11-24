@@ -26,6 +26,7 @@ export const AI_JOBS: AiJob[] = [
   { key: "transcribe", label: "逐字稿（語音轉文字）", desc: "把課程影片／音檔的聲音轉成逐字稿", kind: "speech", default: "@cf/openai/whisper-large-v3-turbo" },
   { key: "keywords", label: "關鍵字與 hashtag", desc: "從逐字稿整理重點關鍵字、hashtag、摘要", kind: "text", default: "@cf/meta/llama-3.3-70b-instruct-fp8-fast" },
   { key: "edm_vision", label: "EDM 圖片辨識（文字與活動日期）", desc: "中心 EDM 上傳後，由 AI 讀出海報文字與活動日期，用於搜尋，並讓 EDM 依活動日期排序", kind: "vision", default: "@cf/meta/llama-3.2-11b-vision-instruct" },
+  { key: "edm_structure", label: "EDM 文字整理（套入欄位格式）", desc: "把 EDM 辨識出的文字，照「設定 › AI 文字辨識」的欄位格式（日期、時間、主題、講師…）整理好，歸不進去的放「其他內容」；只讀文字、不看圖，所以很省額度", kind: "text", default: "@cf/google/gemma-4-26b-a4b-it" },
   { key: "embedding", label: "語意搜尋", desc: "把文字轉成向量，讓搜尋「疼痛」也找得到「不舒服」", kind: "embedding", default: "@cf/baai/bge-m3" },
 ];
 
@@ -33,6 +34,7 @@ export const AI_MODELS: AiModel[] = [
   { id: "@cf/openai/whisper-large-v3-turbo", name: "Whisper Large v3 Turbo", vendor: "Cloudflare（OpenAI 模型）", kind: "speech", cost: "約 US$0.0005／音訊分鐘（1 小時約 US$0.03）；每天免費額度約可轉 200 分鐘", costLevel: "低", strengths: "速度快、支援中文等 90 多種語言，準確度高", bestFor: "課程逐字稿的首選", neurons: { perMinute: 46.63 }, needsKey: false },
   { id: "@cf/openai/whisper", name: "Whisper（標準版）", vendor: "Cloudflare（OpenAI 模型）", kind: "speech", cost: "約 US$0.0005／音訊分鐘；每天免費額度約可轉 240 分鐘", costLevel: "低", strengths: "較舊的版本，點數略省，中文準確度略低", bestFor: "免費額度快不夠、對準確度要求不高時", neurons: { perMinute: 41.14 }, needsKey: false },
   { id: "@cf/meta/llama-3.1-8b-instruct-fp8-fast", name: "Llama 3.1 8B（快速版）", vendor: "Cloudflare（Meta 模型）", kind: "text", cost: "約 US$0.045／百萬字進、US$0.384／百萬字出", costLevel: "低", strengths: "速度快、最省額度；中文理解普通，偶爾抓錯重點", bestFor: "大量、簡單的整理（短關鍵字）", neurons: { perMInput: 4119, perMOutput: 34868 }, needsKey: false },
+  { id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B（A4B）", vendor: "Cloudflare（Google 模型）", kind: "text", cost: "約 US$0.10／百萬字進、US$0.30／百萬字出（整理一張 EDM 約 US$0.0003）；每天免費額度約可整理 300 張以上", costLevel: "低", strengths: "多語言、中文理解與照格式輸出 JSON 的能力比 Llama 8B 穩，價格卻只有 70B 的三分之一以下", bestFor: "EDM 文字整理（預設）、關鍵字與 hashtag", neurons: { perMInput: 9091, perMOutput: 27273 }, needsKey: false },
   { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", name: "Llama 3.3 70B", vendor: "Cloudflare（Meta 模型）", kind: "text", cost: "約 US$0.293／百萬字進、US$2.253／百萬字出", costLevel: "中", strengths: "理解力與中文表現比 8B 好很多，仍在 Cloudflare 內不需金鑰", bestFor: "關鍵字、hashtag、摘要（預設）", neurons: { perMInput: 26668, perMOutput: 204805 }, needsKey: false },
   { id: "claude-haiku-5-5", name: "Claude Haiku 5.5", vendor: "Anthropic", kind: "text", cost: "US$0.10／百萬 token 進、US$0.50／百萬 token 出（單次輸入超過 10 萬 token 為 $0.50／$2.50）；需另外申請金鑰，沒有每日免費額度", costLevel: "低", strengths: "中文整理與歸納品質高、速度快，Claude 裡最便宜", bestFor: "品質要求較高的摘要與關鍵字", usd: { perMInput: 0.1, perMOutput: 0.5, longInput: 0.5, longOutput: 2.5 }, needsKey: true },
   { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", vendor: "Anthropic", kind: "text", cost: "US$2／百萬 token 進、US$10／百萬 token 出；需另外申請金鑰，沒有每日免費額度", costLevel: "中", strengths: "理解與寫作最細緻，能處理很長的逐字稿", bestFor: "重要課程的精修摘要；比 Haiku 貴 20 倍，日常不建議", usd: { perMInput: 2, perMOutput: 10 }, needsKey: true },

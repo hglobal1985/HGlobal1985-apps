@@ -4,6 +4,7 @@
  */
 import type { D1Database, Env } from "./d1.ts";
 import { AiStopped, loadSelection, markExhausted, refundAi, reserveAi } from "./ai-models.ts";
+import { cleanOcrText, structureEdm, structurePending } from "./edm-structure.ts";
 
 const MAX_BYTES = 3 * 1024 * 1024;
 const toBase64 = (b: Uint8Array): string => {
@@ -59,7 +60,7 @@ export function parseVision(raw: string): { text: string; date: string | null } 
     }
   } else text = raw;
   const ok = date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date + "T00:00:00Z")) && new Date(date + "T00:00:00Z").toISOString().slice(0, 10) === date && +date.slice(0, 4) >= 2000 && +date.slice(0, 4) <= 2100;
-  const clean = text.replace(/\s+/g, " ").trim().slice(0, 3000);
+  const clean = cleanOcrText(text).slice(0, 3000);
   // 海報上有寫星期的日期比模型猜的年份可靠：兩個不一致時用文字推的；模型沒給合法日期時也用文字推。
   const inferred = inferDate(clean);
   return { text: clean, date: inferred ?? (ok ? date : null) };
@@ -88,7 +89,7 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
     throw e;
   }
   const today = new Date().toISOString().slice(0, 10);
-  const prompt = `這是一張活動海報（EDM）。請讀出圖片上所有的文字（中文為主），並找出「活動舉辦日期」。今天是 ${today}；海報上沒寫年份時，請用最接近今天的合理年份。只回傳 JSON，不要其他說明：{"text":"圖片上的全部文字","event_date":"YYYY-MM-DD 或 null"}`;
+  const prompt = `這是一張活動海報（EDM）。請讀出圖片上所有的文字（中文為主），並找出「活動舉辦日期」。今天是 ${today}；海報上沒寫年份時，請用最接近今天的合理年份。text 欄位請直接照抄圖片上的文字（依畫面由上到下、由左到右，換行用 \\n），不要分析、不要說明、不要使用 Markdown 符號（例如 ** ###）。只回傳 JSON，不要其他說明：{"text":"圖片上的全部文字","event_date":"YYYY-MM-DD 或 null"}`;
   let out = "";
   try {
     const dataUri = `data:${type};base64,${toBase64(bytes)}`;
@@ -111,7 +112,9 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
     return fail();
   }
   const { text, date } = parseVision(out);
-  await db.prepare("UPDATE cover_media SET ocr_text = ?, event_date = ?, ocr_status = 'done', ocr_model = ? WHERE id = ?").bind(text, date, model, rowId).run();
+  await db.prepare("UPDATE cover_media SET ocr_text = ?, event_date = ?, ocr_status = 'done', ocr_model = ?, ocr_fields = '', ocr_fmt = '' WHERE id = ?").bind(text, date, model, rowId).run();
+  // 接著套入欄位格式（業主 2026-11-24）；額度用完或失敗不影響辨識結果，之後背景會補整理。
+  await structureEdm(env, db, rowId).catch(() => undefined);
 }
 
 /** 背景處理還沒辨識的中心 EDM 圖（每次最多 limit 張；額度用完或沒綁定 AI 就停）。 */
@@ -131,4 +134,5 @@ export async function ocrPending(env: Env, db: D1Database, limit = 3): Promise<v
       if (e instanceof AiStopped) return;
     }
   }
+  await structurePending(env, db, 2); // 已辨識但還沒套入目前欄位格式的，慢慢補整理
 }

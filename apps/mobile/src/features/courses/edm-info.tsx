@@ -1,5 +1,6 @@
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useState } from "react";
 import { useApi } from "@/state/session";
 import { flashText } from "@/ui/flash-notice";
 import { space } from "@/theme/tokens";
@@ -26,6 +27,8 @@ export type MediaInfo = {
   ocrAt: string | null;
   eventDate: string | null;
   ocrText: string;
+  /** 套入「AI 文字辨識」欄位格式後的內容；fields 為 null＝還沒整理好（顯示清理過的原文）。 */
+  structured: { fields: [string, string][] | null; other: string; stale: boolean };
   file: { name?: string; type?: string; bytes?: number; width?: number; height?: number; lastModified?: string };
   exif: Record<string, unknown>;
 };
@@ -42,6 +45,9 @@ const when = (v?: string | null) => {
   const t = new Date(d.getTime() + 8 * 3600 * 1000).toISOString();
   return `${t.slice(0, 10)} ${t.slice(11, 16)}`;
 };
+/** 複製用：照欄位格式排好的純文字（沒整理好就是辨識原文）。 */
+const formatted = (i: MediaInfo) =>
+  i.structured.fields ? [...i.structured.fields.filter(([, v]) => v).map(([k, v]) => `${k}：${v}`), ...(i.structured.other ? [`其他內容：${i.structured.other}`] : [])].join("\n") : i.ocrText;
 const OCR_STATUS: Record<string, string> = { "": "尚未辨識（稍後會自動辨識）", working: "辨識中…", done: "已辨識", failed: "辨識失敗" };
 const OWNER: Record<string, string> = { center: "中心", series: "系列", course: "課程" };
 
@@ -64,6 +70,7 @@ const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "bo
 export function EdmInfoPanel({ id, top = 140, onClose }: { id: string; top?: number; onClose: () => void }) {
   const r = useApi<MediaInfo>(`/admin/cover-media/${id}/info`);
   const info = r.data;
+  const [showRaw, setShowRaw] = useState(false);
   const copy = async (t: string) => {
     try {
       await navigator.clipboard.writeText(t);
@@ -105,11 +112,40 @@ export function EdmInfoPanel({ id, top = 140, onClose }: { id: string; top?: num
                   <Text style={styles.sub}>{`狀態：${OCR_STATUS[info.ocrStatus] ?? info.ocrStatus}`}{info.eventDate ? `　活動日期：${info.eventDate}` : ""}</Text>
                   {info.ocrText ? (
                     <>
-                      <Text selectable style={[styles.body, SELECTABLE]}>{info.ocrText}</Text>
-                      <Pressable accessibilityRole="button" onPress={() => copy(info.ocrText)} style={styles.btn}>
-                        <Ionicons name="copy-outline" size={18} color="#fff" />
-                        <Text style={styles.btnText}>複製全部文字</Text>
-                      </Pressable>
+                      {info.structured.fields ? (
+                        <View style={{ gap: 10 }}>
+                          {info.structured.fields.filter(([, v]) => v).map(([k, v]) => (
+                            <View key={k} style={{ gap: 2 }}>
+                              <Text style={styles.fk}>{k}</Text>
+                              <Text selectable style={[styles.body, SELECTABLE]}>{v}</Text>
+                            </View>
+                          ))}
+                          {info.structured.other ? (
+                            <View style={{ gap: 2 }}>
+                              <Text style={styles.fk}>其他內容</Text>
+                              <Text selectable style={[styles.body, SELECTABLE]}>{info.structured.other}</Text>
+                            </View>
+                          ) : null}
+                          {info.structured.stale ? <Text style={styles.sub}>（欄位格式剛更新過，稍後會自動重新整理）</Text> : null}
+                        </View>
+                      ) : (
+                        <>
+                          <Text style={styles.sub}>{info.structured.stale ? "還沒套入欄位格式（AI 整理中，稍後再開會看到）；先顯示辨識原文：" : "這張無法套入欄位格式，顯示辨識原文："}</Text>
+                          <Text selectable style={[styles.body, SELECTABLE]}>{info.ocrText}</Text>
+                        </>
+                      )}
+                      <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                        <Pressable accessibilityRole="button" onPress={() => copy(formatted(info))} style={styles.btn}>
+                          <Ionicons name="copy-outline" size={18} color="#fff" />
+                          <Text style={styles.btnText}>複製全部文字</Text>
+                        </Pressable>
+                        {info.structured.fields ? (
+                          <Pressable accessibilityRole="button" onPress={() => setShowRaw((v) => !v)} style={styles.btn}>
+                            <Text style={styles.btnText}>{showRaw ? "收起辨識原文" : "看辨識原文"}</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                      {showRaw && info.structured.fields ? <Text selectable style={[styles.sub, SELECTABLE]}>{info.ocrText}</Text> : null}
                     </>
                   ) : <Text style={styles.v}>{info.ocrStatus === "done" ? "沒有辨識出文字。" : "目前還沒有辨識出的文字。"}</Text>}
                 </>
@@ -157,6 +193,7 @@ const styles = StyleSheet.create({
   x: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.15)" },
   sec: { gap: 8 },
   h: { color: "#ffd54f", fontSize: 16, fontWeight: "800" },
+  fk: { color: "#9fd8ff", fontSize: 13, fontWeight: "800" },
   sub: { color: "#ddd", fontSize: 14 },
   row: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
   k: { width: 96, color: "#bbb", fontSize: 14, lineHeight: 20 },

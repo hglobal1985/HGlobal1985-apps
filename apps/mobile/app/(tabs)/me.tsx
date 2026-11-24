@@ -158,6 +158,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="library-outline" title="書櫃管理" subtitle="產生「我的書櫃」邀請網址、查看與移除書櫃" onPress={() => router.push("/admin/libraries")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="link-outline" title="短網址" subtitle="集中設定分類、系列、中心的短網址與課程專屬網址" onPress={() => router.push("/admin/short-links")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="sparkles-outline" title="AI 模型" subtitle="切換逐字稿、關鍵字、語意搜尋用的 AI 模型，並比較花費" onPress={() => router.push("/admin/ai-models")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="document-text-outline" title="AI 文字辨識" subtitle="自訂 EDM 辨識文字要整理成哪些欄位（日期、時間、主題、講師…）" onPress={() => router.push("/admin/ai-text")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="trophy-outline" title="徽章任務設定" subtitle="依分類新增、修改所有徽章任務，並設定書櫃鑰匙門檻" onPress={() => router.push("/admin/achievements")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="images-outline" title="品牌 Logo" subtitle="上傳品牌 logo、選底圖或底色，並對應分類，課程與清單卡可用它當封面" onPress={() => router.push("/admin/brand-logos")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="happy-outline" title="縮圖符號" subtitle="總覽並設定中心卡、系列卡、課程卡的小縮圖符號（emoji 或文字）與顏色" onPress={() => router.push("/admin/thumb-badges")} /> : null}
