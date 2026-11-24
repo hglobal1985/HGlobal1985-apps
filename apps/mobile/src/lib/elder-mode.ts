@@ -14,13 +14,15 @@ export type ElderPrefs = {
   size: number;
   /** 再乘上手機系統的字體大小設定（輔助使用）。 */
   followSystem: boolean;
+  /** 全站文字加粗（業主 2026-11-24 增加，長輩看得更清楚）。 */
+  bold: boolean;
 };
 
 export const ELDER_MIN = 1.2;
 export const ELDER_MAX = 2.2;
 export const ELDER_DEFAULT = 1.5;
 const KEY = "elder-mode:v1";
-const DEFAULTS: ElderPrefs = { on: false, size: ELDER_DEFAULT, followSystem: true };
+const DEFAULTS: ElderPrefs = { on: false, size: ELDER_DEFAULT, followSystem: true, bold: false };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -29,7 +31,7 @@ function parse(raw: string | null): ElderPrefs {
   if (!raw) return DEFAULTS;
   try {
     const v = JSON.parse(raw) as Partial<ElderPrefs>;
-    return { on: v.on === true, size: clamp(round1(Number(v.size) || ELDER_DEFAULT), ELDER_MIN, ELDER_MAX), followSystem: v.followSystem !== false };
+    return { on: v.on === true, size: clamp(round1(Number(v.size) || ELDER_DEFAULT), ELDER_MIN, ELDER_MAX), followSystem: v.followSystem !== false, bold: v.bold === true };
   } catch {
     return DEFAULTS;
   }
@@ -124,7 +126,7 @@ export const elderVersion = () => version;
 export function setElder(patch: Partial<ElderPrefs>) {
   const next = { ...prefs, ...patch };
   next.size = clamp(round1(next.size), ELDER_MIN, ELDER_MAX);
-  const changed = elderTextScale(next) !== elderTextScale(prefs) || next.on !== prefs.on;
+  const changed = elderTextScale(next) !== elderTextScale(prefs) || next.on !== prefs.on || next.bold !== prefs.bold;
   prefs = next;
   applyWrap();
   if (changed) version += 1;

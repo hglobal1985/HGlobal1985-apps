@@ -15,7 +15,7 @@ const AVATAR = 48; // 大頭照尺寸；徽章在版面上只佔這個高度（�
 export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { member: Member; onPress?: () => void; scale?: number; /** 姓名一列、獎銜＋獎章一列（至尊模式頁，業主 2026-11-24）。 */ stacked?: boolean }) {
   const { c, scheme } = useTheme();
   const [failed, setFailed] = useState(false);
-  const av = Math.round(AVATAR * scale);
+  const av = Math.round(AVATAR * scale * (stacked ? 1.5 : 1)); // 至尊模式頁的頭像與獎章放大 1.5 倍（業主 2026-11-24）
   const fs = (n: number) => Math.round(n * scale);
   const avatar =
     member.avatarUrl && !failed ? (
@@ -41,7 +41,7 @@ export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { 
       <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={`${member.name}${member.rankLabel ? `，${member.rankLabel}` : ""}`} style={styles.stack}>
         {avatar}
         <View style={styles.stackText}>
-          <AppText variant="title" numberOfLines={2} style={{ fontSize: fs(hasBadge ? 17 : 20), lineHeight: fs(hasBadge ? 24 : 28) }}>
+          <AppText variant="title" numberOfLines={2} style={{ fontSize: fs(hasBadge ? 17 : 20), lineHeight: fs(hasBadge ? 24 : 28), textAlign: "center" }}>
             {member.name}
           </AppText>
           {rankTag ? <View style={styles.stackRank}>{rankTag}</View> : null}
@@ -95,6 +95,6 @@ const styles = StyleSheet.create({
   rank: { borderWidth: 1, borderColor: "#e6c48c", backgroundColor: "#fdf0e3", borderRadius: 7, paddingHorizontal: 8, paddingVertical: 2 },
   avatar: { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2 },
   stack: { flexDirection: "row", alignItems: "center", gap: space.md },
-  stackText: { flex: 1, minWidth: 0, gap: space.xs },
-  stackRank: { flexDirection: "row", alignItems: "center", gap: space.xs, flexWrap: "wrap" },
+  stackText: { flex: 1, minWidth: 0, gap: space.xs, alignItems: "center" },
+  stackRank: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.xs, flexWrap: "wrap" },
 });
