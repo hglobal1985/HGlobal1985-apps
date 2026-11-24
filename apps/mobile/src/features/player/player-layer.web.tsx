@@ -1,4 +1,5 @@
 import { lessonHref } from "@/lib/lesson-href";
+import { MINI_BAR, MINI_BTN_COLORS, MINI_CIRCLE, MINI_CTL_HIDE_MS, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, miniFloatWidth } from "@/ui/mini-spec";
 import { router } from "expo-router";
 import { PlayerControls } from "./player-controls";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
@@ -8,16 +9,16 @@ import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.w
 import { engine } from "./engine.web";
 import { usePlayer } from "./use-player";
 
-const POS_KEY = "hglobal:learn:mini-pos";
-const MARGIN = 8;
-const CIRCLE = 84;
+const POS_KEY = MINI_POS_KEY; // 小視窗的規格（位置記憶、尺寸、按鈕）集中在 ui/mini-spec.ts，封面迷你小視窗共用
+const MARGIN = MINI_MARGIN;
+const CIRCLE = MINI_CIRCLE;
 /** 小視窗上方的視窗按鈕列高度（業主 2026-11-24：最小化／最大化／關閉放在播放外框上方，位置仿 Windows、顏色仿 Mac）。 */
-const BAR = 34;
+const BAR = MINI_BAR;
 /** 頁面往下滑多少像素，影片就完全縮成迷你播放器。 */
 const SHRINK_PX = 140;
 
 type Pos = { x: number; y: number };
-const floatWidth = () => Math.round(Math.min(240, Math.max(180, window.innerWidth * 0.55)));
+const floatWidth = () => miniFloatWidth(window.innerWidth);
 
 function bottomEdge() {
   const bar = document.querySelector('[role="tablist"]');
@@ -149,7 +150,7 @@ export function PlayerLayer() {
   const wakeCtl = () => {
     setCtl(true);
     if (ctlTimer.current) clearTimeout(ctlTimer.current);
-    ctlTimer.current = setTimeout(() => setCtl(false), 1000);
+    ctlTimer.current = setTimeout(() => setCtl(false), MINI_CTL_HIDE_MS);
   };
   const justSwitched = () => engine.recentlySwitched();
   const t = s.track;
@@ -518,9 +519,9 @@ export function PlayerLayer() {
       {/* 位置仿 Windows（右上角由左到右：最小化、最大化、關閉）、顏色仿 Mac（黃、綠、紅圓點）；按鈕 26px 圓、手指好按 */}
       {(
         [
-          { label: "最小化（縮成小圓圖）", glyph: "─", color: "#FEBC2E", act: minimize },
-          { label: "最大化（進入課程頁）", glyph: "□", color: "#28C840", act: maximize },
-          { label: "關閉播放", glyph: "✕", color: "#FF5F57", act: () => engine.close() },
+          { label: "最小化（縮成小圓圖）", glyph: MINI_GLYPHS.min, color: MINI_BTN_COLORS.min, act: minimize },
+          { label: "最大化（進入課程頁）", glyph: MINI_GLYPHS.max, color: MINI_BTN_COLORS.max, act: maximize },
+          { label: "關閉播放", glyph: MINI_GLYPHS.close, color: MINI_BTN_COLORS.close, act: () => engine.close() },
         ] as const
       ).map((b) => (
         <button key={b.label} type="button" aria-label={b.label} onPointerDown={stop} onPointerUp={stop} onClick={() => !justSwitched() && b.act()} style={{ width: 26, height: 26, borderRadius: 999, border: 0, background: b.color, color: "rgba(0,0,0,0.65)", font: "900 14px/1 sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", touchAction: "manipulation" }}>

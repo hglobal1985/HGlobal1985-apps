@@ -12,7 +12,6 @@ import { CoverBadges, type CoverStats } from "./cover-stats";
 import { CoverCarousel } from "./cover-carousel";
 
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
-import { COMPACT_GAP, COMPACT_H, COMPACT_SIDE as SIDE } from "@/ui/collapse-band";
 
 /**
  * 照片完全展開時的寬與高。手機：左右滿版、16:10。頁面用高度在捲動內容最上方墊出同樣高的空間（Screen 的 heroHeight）。
@@ -42,17 +41,18 @@ export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover
   const still = useRef(new Animated.Value(0)).current;
   const images = media.filter((x) => x.kind === "image");
   const { w: heroW, h: full } = inline ? { w: boxW, h: Math.round((boxW * 10) / 16) } : centerHeroSize(winW, winH);
-  const range = Math.max(1, full - (COMPACT_H + COMPACT_GAP));
+  // 往上滑時封面跟著內容一起縮矮到不見（業主 2026-11-24：封面改縮成迷你小視窗，由 CoverMiniFloat 在右下角浮出；不再縮成窄橫幅）。
+  const range = Math.max(1, full);
   const at = (a: number, b: number) => (scrollY ?? still).interpolate({ inputRange: [0, range], outputRange: [a, b], extrapolate: "clamp" });
   const url = art ? art.coverUrl ?? art.edmUrl : null;
   const frame = inline
     ? { height: boxW ? full : 200, borderRadius: 18 }
-    : [heroW < winW ? { alignSelf: "center" as const, width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }];
+    : [heroW < winW ? { alignSelf: "center" as const, width: heroW } : null, { height: at(full, 0) }];
   return (
     <Animated.View onLayout={inline ? (e) => setBoxW(Math.round(e.nativeEvent.layout.width)) : undefined} style={[styles.box, url ? { backgroundColor: "#fff" } : null, frame]}>
       {media.length && heroW ? (
         // 封面輪播：高度固定為展開高度，往上捲縮成窄橫幅時整組跟著往上移一半，維持置中（業主 2026-11-21）。
-        <Animated.View style={{ position: "absolute", left: 0, top: 0, width: heroW, height: full, transform: [{ translateY: at(0, -(full - COMPACT_H) / 2) }] }}>
+        <Animated.View style={{ position: "absolute", left: 0, top: 0, width: heroW, height: full, transform: [{ translateY: at(0, -full / 2) }] }}>
           <CoverCarousel items={media} width={heroW} height={full} paused={openId !== null} onOpen={setOpenId} />
         </Animated.View>
       ) : url ? (
@@ -138,3 +138,18 @@ const styles = StyleSheet.create({
   chips: { position: "absolute", left: 12, right: 12, bottom: 10 },
   editCover: { position: "absolute", right: 12, top: 12, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, borderRadius: 999, backgroundColor: "rgba(0,0,0,0.55)" },
 });
+
+/** 中心頁、系列頁封面縮成迷你小視窗時裡面顯示的封面（業主 2026-11-24）：輪播第一張照片 ＞ 首頁圖 ＞ 品牌綠色底＋名稱。 */
+export function HeroMiniCover({ art, media = [], title }: { art: { coverUrl?: string | null; edmUrl?: string | null } | null | undefined; media?: CoverMediaItem[]; title: string }) {
+  const thumb = useThumb();
+  const first = media.find((x) => x.kind === "image");
+  const uri = first ? first.url : art ? art.coverUrl ?? art.edmUrl : null;
+  if (uri) return <Image source={{ uri: thumb(resolveUrl(uri), 480) }} style={StyleSheet.absoluteFill} resizeMode="cover" accessibilityIgnoresInvertColors />;
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#2F5D3A", alignItems: "center", justifyContent: "center", padding: 8 }]}>
+      <AppText variant="headline" numberOfLines={2} {...NO_SCALE} style={{ color: "#fff", fontWeight: "900", textAlign: "center" }}>
+        {title}
+      </AppText>
+    </View>
+  );
+}

@@ -20,7 +20,8 @@ import { CenterListCard, CenterMaterialsCard } from "./center-list";
 import { useSeriesSettings } from "./series-settings";
 import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
-import { CenterAddress, CenterHero, centerHeroFull } from "./center-hero";
+import { CenterAddress, CenterHero, centerHeroFull, HeroMiniCover } from "./center-hero";
+import { CoverMiniFloat } from "@/ui/collapse-band";
 import { CoverAlbum } from "./album";
 import { canEditCenterArt } from "./center-rights";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
@@ -722,6 +723,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {archivedBlock}
       {canCreateCourse(member) || canEditArt || canAnnounce ? <View style={{ height: 64 }} /> : null}
     </Screen>
+    {/* 中心封面往下滑縮成迷你小視窗（業主 2026-11-24；與影片迷你小視窗同規格，共用 ui/mini-window）。 */}
+    {activeCenter !== ALL ? <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.carousel} title={centerTitle(activeCenter)} />} label={centerTitle(activeCenter)} /> : null}
     {canCreateCourse(member) || canEditArt || canAnnounce ? (
       <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["photos", "schedule"] as const) : []), ...(canAnnounce ? (["announce"] as const) : [])]} />
     ) : null}
