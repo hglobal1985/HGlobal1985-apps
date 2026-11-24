@@ -1,5 +1,6 @@
 import { lessonHref } from "@/lib/lesson-href";
-import { MINI_BAR, MINI_BTN_COLORS, MINI_CIRCLE, MINI_CTL_HIDE_MS, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, miniFloatWidth } from "@/ui/mini-spec";
+import { MiniWindow } from "@/ui/mini-window";
+import { MINI_CIRCLE, MINI_RADIUS } from "@/ui/mini-spec";
 import { router } from "expo-router";
 import { PlayerControls } from "./player-controls";
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
@@ -9,26 +10,15 @@ import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.w
 import { engine } from "./engine.web";
 import { usePlayer } from "./use-player";
 
-const POS_KEY = MINI_POS_KEY; // 小視窗的規格（位置記憶、尺寸、按鈕）集中在 ui/mini-spec.ts，封面迷你小視窗共用
-const MARGIN = MINI_MARGIN;
 const CIRCLE = MINI_CIRCLE;
-/** 小視窗上方的視窗按鈕列高度（業主 2026-11-24：最小化／最大化／關閉放在播放外框上方，位置仿 Windows、顏色仿 Mac）。 */
-const BAR = MINI_BAR;
 /** 頁面往下滑多少像素，影片就完全縮成迷你播放器。 */
 const SHRINK_PX = 140;
 
-type Pos = { x: number; y: number };
-const floatWidth = () => miniFloatWidth(window.innerWidth);
 
 function bottomEdge() {
   const bar = document.querySelector('[role="tablist"]');
   return bar ? bar.getBoundingClientRect().top : window.innerHeight;
 }
-const clamp = (p: Pos, w: number, h: number): Pos => ({
-  x: Math.min(window.innerWidth - w - MARGIN, Math.max(MARGIN, p.x)),
-  y: Math.min(window.innerHeight - h - MARGIN, Math.max(MARGIN, p.y)),
-});
-
 // 迷你播放器的按鈕：實心黑底白字（業主 2026-11-17：取消半透明）。
 /** 長按快轉的最高倍數：YouTube 內嵌播放器最高 2 倍（不分會員、免費，Premium 不影響內嵌播放速度）。 */
 const MAX_RATE = 2;
@@ -45,7 +35,8 @@ export function PlayerLayer() {
   const s = usePlayer();
   const { ready, member } = useSession();
   const boxRef = useRef<HTMLDivElement>(null);
-  const barEl = useRef<HTMLDivElement>(null);
+  const slotRef = useRef<unknown>(null); // 共用迷你小視窗（ui/mini-window.tsx）裡放畫面的那一格；真正的影片疊在它上面
+  const [mini, setMini] = useState<"off" | "fade" | "on">("off"); // 迷你小視窗：off＝不顯示、fade＝縮小途中（只有影片在動）、on＝已縮成迷你
   // 手機、平板橫放且影片播放中＝自動全螢幕；轉回直式就還原（業主 2026-11-24）。fullRef 給 tick 用（鋪滿整個視窗），pFull 給畫面（縮小鈕）。
   const fullRef = useRef(false);
   const dismissed = useRef(false); // 使用者在橫放時自己按了縮小／退出全螢幕：這次橫放不再自動進入
@@ -140,18 +131,8 @@ export function PlayerLayer() {
   }, [pFull, fsOn, wakeBar]);
   const exitRef = useRef<(() => void) | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
-  const pos = useRef<Pos | null>(null);
-  const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean; hidden?: boolean } | null>(null);
   // YouTube 影片上的點擊一律擋掉（業主永久指示：不讓使用者點到 YouTube 自己的按鈕與連結，播放暫停只用下方控制列）。
   // 業主 2026-11-17：LINE 等 App 內建瀏覽器也一律封鎖（不再有「第一次播放前放行」的例外），使用者要改用系統瀏覽器開啟才能播放（見紅色警示條）。
-  // 迷你播放器的三顆按鈕：1 秒沒有觸摸就自動隱藏，再摸到迷你播放器才會再顯示。
-  const [ctl, setCtl] = useState(true);
-  const ctlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wakeCtl = () => {
-    setCtl(true);
-    if (ctlTimer.current) clearTimeout(ctlTimer.current);
-    ctlTimer.current = setTimeout(() => setCtl(false), MINI_CTL_HIDE_MS);
-  };
   const justSwitched = () => engine.recentlySwitched();
   const t = s.track;
   const isAudio = t?.mode === "audio";
@@ -165,13 +146,6 @@ export function PlayerLayer() {
   // 影片區的點擊擋板（只擋 YouTube 自己的按鈕與連結；播放暫停只用下方控制列）。已移除雙指放大與拖曳（業主 2026-11-24）。
   const canBlock = inline && !shrunk && (t?.mode === "video" || t?.mode === "youtube");
 
-  useEffect(() => {
-    if (windowed) wakeCtl();
-    return () => {
-      if (ctlTimer.current) clearTimeout(ctlTimer.current);
-    };
-  }, [windowed, t?.key]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // 播放／暫停時，外框的反光流動跟著動或停。
   useEffect(() => {
     if (boxRef.current) boxRef.current.style.animationPlayState = s.playing ? "running" : "paused";
@@ -180,12 +154,6 @@ export function PlayerLayer() {
   useEffect(() => {
     hostRef.current?.appendChild(engine.element());
     engine.setFullscreenTarget(boxRef.current);
-    try {
-      const raw = localStorage.getItem(POS_KEY);
-      if (raw) pos.current = JSON.parse(raw) as Pos;
-    } catch {
-      /* 沒有儲存的位置就用預設 */
-    }
   }, []);
 
   // 登出就關閉播放（不留下上一位會員的聲音）。
@@ -286,10 +254,15 @@ export function PlayerLayer() {
       if (!box) return;
       const sn = engine.getSnapshot();
       const tr = sn.track;
-      // 換章節的空檔：小視窗不顯示（聲音照常播），換好之後回到上課頁的播放區。
-      box.style.opacity = sn.switching ? "0" : "1";
-      box.style.pointerEvents = sn.switching ? "none" : "auto";
+      // 共用迷你小視窗（ui/mini-window.tsx）畫好的那一格：影片疊在它上面。MiniWindow 沒顯示時 slotRef 是空的。
+      const miniRect = () => {
+        const el = slotRef.current as unknown as HTMLElement | null;
+        const m = el && el.isConnected ? el.getBoundingClientRect() : null;
+        return m && m.width > 0 ? m : null;
+      };
+      // fl：0＝內嵌／全螢幕（無邊框）、3＝縮小途中（自帶流光邊框）、4＝在迷你小視窗的畫面格裡、5＝小圓圖（影片藏起來，畫面由 MiniWindow 畫封面）
       let css = "none";
+      let nextMini: "off" | "fade" | "on" = "off";
       if (tr) {
         const slot = sn.slotKey === tr.key ? engine.slotElement() : null;
         if (fullRef.current && tr.mode !== "audio") {
@@ -310,34 +283,31 @@ export function PlayerLayer() {
           const atMini = pr >= 0.99;
           setShrunk((v) => (v === atMini ? v : atMini));
           if (pr <= 0 && sn.collapsed) engine.setCollapsed(false); // 回到頁面最上方：小圓圖還原，不留著下次直接變圓
-          if (r.width > 0 && atMini && sn.collapsed) {
-            const p = clamp(pos.current ?? { x: window.innerWidth - CIRCLE - 12, y: Math.max(MARGIN, bottomEdge() - CIRCLE - 12) }, CIRCLE, CIRCLE);
-            css = `${p.x}|${p.y}|${CIRCLE}|${CIRCLE}|2`;
-          } else if (r.width > 0 && pr <= 0) css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
-          else if (r.width > 0) {
-            const mw = floatWidth();
-            const mh = Math.round((mw * 9) / 16);
-            const mp = clamp(pos.current ?? { x: window.innerWidth - mw - 12, y: Math.max(MARGIN, bottomEdge() - mh - BAR - 12) }, mw, mh + BAR);
-            const f = (a: number, b: number) => Math.round(a + (b - a) * pr);
-            css = `${f(r.left, mp.x)}|${f(r.top, mp.y + BAR)}|${f(r.width, mw)}|${f(r.height, mh)}|${atMini ? 1 : 3}`;
+          const m = pr > 0 ? miniRect() : null;
+          if (r.width > 0 && pr <= 0) css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
+          else if (r.width > 0 && m) {
+            nextMini = atMini ? "on" : "fade";
+            if (atMini) css = `${m.left}|${m.top}|${m.width}|${m.height}|${sn.collapsed ? 5 : 4}`;
+            else {
+              const f = (a: number, b: number) => Math.round(a + (b - a) * pr);
+              css = `${f(r.left, m.left - FRAME_PAD)}|${f(r.top, m.top - FRAME_PAD)}|${f(r.width, m.width + FRAME_PAD * 2)}|${f(r.height, m.height + FRAME_PAD * 2)}|3`;
+            }
+          } else if (r.width > 0) {
+            nextMini = "fade"; // 小視窗剛要出現、還沒量到位置：先留在原處
+            css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
           }
         } else if (sn.slotKey !== tr.key && (tr.mode !== "audio" || sn.collapsed) && !engine.isPip()) {
           // 影片已經浮到手機桌面（系統浮動視窗）時，頁面內的迷你播放器不顯示，避免出現兩個小視窗。
-          const isCircle = sn.collapsed;
-          const w = isCircle ? CIRCLE : floatWidth();
-          const h = isCircle ? CIRCLE : Math.round((w * 9) / 16);
-          const hh = isCircle ? h : h + BAR; // 小視窗＝按鈕列＋影片；pos 記的是整組左上角
-          const p = clamp(pos.current ?? { x: window.innerWidth - w - 12, y: Math.max(MARGIN, bottomEdge() - hh - 12) }, w, hh);
-          css = `${p.x}|${p.y + (isCircle ? 0 : BAR)}|${w}|${h}|${isCircle ? 2 : 1}`;
+          nextMini = "on";
+          const m = miniRect();
+          if (m) css = `${m.left}|${m.top}|${m.width}|${m.height}|${sn.collapsed ? 5 : 4}`;
         }
       }
-      // 視窗按鈕列：只有「小視窗」（不是小圓圖、不是課程頁內嵌、不是全螢幕）才顯示，貼在播放外框正上方。
-      const bar = barEl.current;
-      if (bar) {
-        const [bl, bt, bw, , bf] = css.split("|");
-        if (css !== "none" && bf === "1") Object.assign(bar.style, { display: "flex", left: `${bl}px`, top: `${Number(bt) - BAR}px`, width: `${bw}px`, opacity: sn.switching ? "0" : "1" });
-        else bar.style.display = "none";
-      }
+      if (sn.switching && nextMini === "on") nextMini = "fade"; // 換章節的空檔：小視窗不顯示（聲音照常播）
+      setMini((v) => (v === nextMini ? v : nextMini));
+      const flNow = css.split("|")[4];
+      box.style.opacity = sn.switching || flNow === "5" ? "0" : "1";
+      box.style.pointerEvents = sn.switching || flNow === "3" || flNow === "4" || flNow === "5" ? "none" : "auto"; // 迷你時觸摸交給 MiniWindow（拖曳、按鈕、點一下暫停）
       if (css === last) return;
       last = css;
       if (css === "none") {
@@ -345,7 +315,7 @@ export function PlayerLayer() {
         return;
       }
       const [l, tp, w, h, fl] = css.split("|");
-      const framed = fl !== "0";
+      const framed = fl === "3";
       box.style.setProperty("--pad", framed ? `${FRAME_PAD}px` : "0px");
       Object.assign(box.style, {
         display: "block",
@@ -353,7 +323,7 @@ export function PlayerLayer() {
         top: `${tp}px`,
         width: `${w}px`,
         height: `${h}px`,
-        borderRadius: fl === "2" ? "50%" : fl === "1" || fl === "3" ? "14px" : "0",
+        borderRadius: fl === "5" ? "50%" : fl === "3" ? `${MINI_RADIUS}px` : fl === "4" ? `${Math.max(0, MINI_RADIUS - FRAME_PAD)}px` : "0",
         ...frameBoxStyle(framed),
       });
       box.style.animationPlayState = engine.getSnapshot().playing ? "running" : "paused"; // 暫停播放時，外框反光也暫停
@@ -364,74 +334,12 @@ export function PlayerLayer() {
 
   const setFrame = useCallback((f: HTMLIFrameElement | null) => engine.setYoutubeFrame(f), []);
 
-  const size = () => {
-    const w = s.collapsed ? CIRCLE : floatWidth();
-    return { w, h: s.collapsed ? CIRCLE : Math.round((w * 9) / 16) + BAR };
-  };
-  const down = (e: PointerEvent<HTMLDivElement>) => {
-    const r = boxRef.current?.getBoundingClientRect();
-    if (!r) return;
-    drag.current = { px: e.clientX, py: e.clientY, x: r.left, y: r.top - (s.collapsed ? 0 : BAR), moved: false, hidden: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
-    wakeCtl();
-  };
-  const move = (e: PointerEvent<HTMLDivElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.px;
-    const dy = e.clientY - d.py;
-    if (!d.moved && Math.hypot(dx, dy) < 6) return;
-    d.moved = true;
-    const { w, h } = size();
-    pos.current = clamp({ x: d.x + dx, y: d.y + dy }, w, h);
-  };
-  const save = () => {
-    try {
-      localStorage.setItem(POS_KEY, JSON.stringify(pos.current));
-    } catch {
-      /* 儲存不了就算了 */
-    }
-  };
-  const up = () => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d) return;
-    if (d.moved) return save();
-    if (justSwitched()) return;
-    if (s.collapsed) restore(); // 點一下小圓圖＝恢復原本的迷你播放器
-    else engine.toggle(); // 點一下小視窗的影片＝暫停／播放（業主 2026-11-24；回課程頁改用上方的「最大化」鈕）
-  };
   /** 最大化＝進入這支影片的課程頁。 */
   const maximize = () => {
     // 已在課程頁、只是被滑動縮成迷你：回到頁面最上方就會自動還原。
     if (inline && shrunk) return void scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
     if (t) router.push(lessonHref(t.courseId, t.lessonId) as never);
   };
-  const upBar = () => {
-    const d = drag.current;
-    drag.current = null;
-    if (d?.moved) save();
-  };
-  /** 縮小／恢復時，讓小圓圖貼著小視窗的右上角（手指剛按的位置附近），恢復時再貼回來。 */
-  const resizeAround = (toCircle: boolean) => {
-    const r = boxRef.current?.getBoundingClientRect();
-    if (!r) return;
-    const from = toCircle ? floatWidth() : CIRCLE;
-    const to = toCircle ? CIRCLE : floatWidth();
-    const right = (pos.current?.x ?? r.left) + from;
-    const toH = toCircle ? CIRCLE : Math.round((to * 9) / 16);
-    pos.current = clamp({ x: right - to, y: pos.current?.y ?? (toCircle ? r.top - BAR : r.top) }, to, toH + (toCircle ? 0 : BAR));
-    save();
-  };
-  const minimize = () => {
-    if (!isAudio) resizeAround(true);
-    engine.setCollapsed(true);
-  };
-  const restore = () => {
-    if (!isAudio) resizeAround(false);
-    engine.setCollapsed(false);
-  };
-  const stop = (e: PointerEvent) => e.stopPropagation();
 
   // YouTube 的 iframe 在「連續播放 YouTube」期間固定不重建：第一次載入用網址，之後換章節用 loadVideoById 在原 iframe 內切換。
   const ytNow = t?.mode === "youtube" && t.playback.kind === "youtube" ? t.playback : null;
@@ -449,7 +357,6 @@ export function PlayerLayer() {
       engine.loadYoutube(ytNow.videoId, Math.floor(ytNow.resumeAt ?? ytNow.start ?? 0), ytNow.end || undefined);
     }
   }, [ytKeyNow, ytNow?.videoId]); // eslint-disable-line react-hooks/exhaustive-deps
-  const ctlStyle: CSSProperties = { opacity: ctl ? 1 : 0, pointerEvents: ctl ? "auto" : "none", transition: "opacity 0.2s" };
   if (typeof document === "undefined") return null;
   const yt = t?.mode === "youtube" && t.playback.kind === "youtube" ? t.playback : null;
   // 起點：有續播記憶（resumeAt）就從那一秒接著播，否則從這一堂的起點（YouTube 只接受整數秒）。
@@ -496,42 +403,34 @@ export function PlayerLayer() {
       </div>
       {/* 影片上的點擊一律擋掉（只用下方控制列）；僅 App 內建瀏覽器第一次播放前放行，見上面 everPlayed 的說明。 */}
       {canBlock ? <div data-no-pull-refresh="" style={{ position: "absolute", inset: 0, touchAction: "pan-y", pointerEvents: "auto" }} aria-hidden /> : null}
-      {circle ? (
-        <div style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab", background: "#000", borderRadius: "50%", overflow: "hidden" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="恢復迷你播放器（可按住拖曳移動）">
-          <img src={art} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", animation: "hg-spin 8s linear infinite", animationPlayState: s.playing ? "running" : "paused", pointerEvents: "none" }} />
-          {!s.playing ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)", color: "#fff", font: "700 20px sans-serif", pointerEvents: "none" }}>▶</div> : null}
-        </div>
-      ) : null}
-      {windowed ? (
-        <div data-no-pull-refresh="" style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "pointer" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label={s.playing ? "暫停（按住可拖曳移動）" : "播放（按住可拖曳移動）"}>
-          {!s.playing ? (
-            <div style={{ position: "absolute", left: "50%", top: "50%", width: 52, height: 52, transform: "translate(-50%,-50%)", borderRadius: 999, background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", font: "700 20px sans-serif", pointerEvents: "none" }}>▶</div>
-          ) : null}
-        </div>
+      {windowed && !s.playing ? (
+        <div style={{ position: "absolute", left: "50%", top: "50%", width: 52, height: 52, transform: "translate(-50%,-50%)", borderRadius: 999, background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", font: "700 20px sans-serif", pointerEvents: "none" }}>▶</div>
       ) : null}
       </div>
     </div>
-    <div
-      ref={barEl}
-      data-no-pull-refresh=""
-      onPointerDown={down}
-      onPointerMove={move}
-      onPointerUp={upBar}
-      onPointerCancel={() => (drag.current = null)}
-      style={{ position: "fixed", display: "none", zIndex: 1000, height: BAR, alignItems: "center", justifyContent: "flex-end", gap: 12, padding: "0 10px", boxSizing: "border-box", borderRadius: "12px 12px 0 0", background: "rgba(24,24,24,0.88)", touchAction: "none", cursor: "grab" }}
-    >
-      {/* 位置仿 Windows（右上角由左到右：最小化、最大化、關閉）、顏色仿 Mac（黃、綠、紅圓點）；按鈕 26px 圓、手指好按 */}
-      {(
-        [
-          { label: "最小化（縮成小圓圖）", glyph: MINI_GLYPHS.min, color: MINI_BTN_COLORS.min, act: minimize },
-          { label: "最大化（進入課程頁）", glyph: MINI_GLYPHS.max, color: MINI_BTN_COLORS.max, act: maximize },
-          { label: "關閉播放", glyph: MINI_GLYPHS.close, color: MINI_BTN_COLORS.close, act: () => engine.close() },
-        ] as const
-      ).map((b) => (
-        <button key={b.label} type="button" aria-label={b.label} onPointerDown={stop} onPointerUp={stop} onClick={() => !justSwitched() && b.act()} style={{ width: 26, height: 26, borderRadius: 999, border: 0, background: b.color, color: "rgba(0,0,0,0.65)", font: "900 14px/1 sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", touchAction: "manipulation" }}>
-          {b.glyph}
-        </button>
-      ))}
+    {/* 迷你小視窗＝全站同一個元件（ui/mini-window.tsx，封面迷你小視窗也用它）：按鈕列、拖曳、位置記憶、小圓圖都由它負責；這裡只提供畫面格（影片疊在上面）與動作 */}
+    <div style={{ position: "fixed", inset: 0, zIndex: 999, pointerEvents: "none" }}>
+      <MiniWindow
+        visible={mini !== "off" && !pFull && !fsOn}
+        opacity={mini === "on" ? 1 : 0}
+        windowContent={<div style={{ width: "100%", height: "100%", background: "#000" }} />}
+        circleContent={
+          <div style={{ position: "relative", width: "100%", height: "100%", background: "#000" }}>
+            <img src={art} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%", animation: "hg-spin 8s linear infinite", animationPlayState: s.playing ? "running" : "paused" }} />
+            {!s.playing ? <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.35)", color: "#fff", font: "700 20px sans-serif" }}>▶</div> : null}
+          </div>
+        }
+        label={s.playing ? "暫停（按住可拖曳移動）" : "播放（按住可拖曳移動）"}
+        maximizeLabel="最大化（進入課程頁）"
+        onMaximize={() => !justSwitched() && maximize()}
+        onClose={() => !justSwitched() && engine.close()}
+        onTap={() => !justSwitched() && engine.toggle()}
+        collapsed={s.collapsed}
+        onCollapsedChange={(v) => engine.setCollapsed(v)}
+        slotRef={slotRef}
+        running={s.playing}
+        getBottomEdge={bottomEdge}
+      />
     </div>
     </>,
     document.body,
