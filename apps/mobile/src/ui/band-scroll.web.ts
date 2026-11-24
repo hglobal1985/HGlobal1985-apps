@@ -6,6 +6,7 @@ import { useSyncExternalStore } from "react";
  */
 let y = 0;
 let on = false;
+let scroller: HTMLElement | null = null;
 const subs = new Set<() => void>();
 const emit = () => subs.forEach((f) => f());
 function listen() {
@@ -18,6 +19,7 @@ function listen() {
       if (!el || el === (document as unknown)) return;
       // 頁面主要捲動區（Screen 的 Scroller 有 data-stable-gutter 標記）一律算，不管視窗多矮；其他的捲動區要夠高、真的能捲才算。
       if (!el.hasAttribute?.("data-stable-gutter") && (el.clientHeight < 200 || el.scrollHeight - el.clientHeight < 40)) return;
+      scroller = el;
       const n = Math.max(0, Math.round(el.scrollTop));
       if (n === y) return;
       y = n;
@@ -38,4 +40,8 @@ export function resetBandScroll() {
   if (y === 0) return;
   y = 0;
   emit();
+}
+/** 回到頁面頂端（迷你封面按一下）。 */
+export function scrollBandTop() {
+  scroller?.scrollTo({ top: 0, behavior: "smooth" });
 }
