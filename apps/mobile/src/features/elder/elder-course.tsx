@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useBorderW } from "@/lib/elder-mode";
 import { useState, type ReactNode } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
@@ -147,6 +148,7 @@ export function ElderCourse({
   lockedLines: string[];
 }) {
   const { c } = useTheme();
+  const bw = useBorderW(2);
   const [tab, setTab] = useState<"learn" | "intro">(locked ? "intro" : "learn");
   const items = elderItems(course);
   const can = (l: Lesson) => !l.locked && (l.ready || !!l.linkUrl);
@@ -200,7 +202,7 @@ export function ElderCourse({
               <NoticeBox text="課程內容準備中，敬請期待。" />
             )}
             {locked ? (
-              <Pressable accessibilityRole="button" onPress={() => setTab("intro")} style={[styles.lockBox, { backgroundColor: c.warningSoft, borderColor: c.warning }]}>
+              <Pressable accessibilityRole="button" onPress={() => setTab("intro")} style={[styles.lockBox, { backgroundColor: c.warningSoft, borderColor: c.warning, borderWidth: bw }]}>
                 <Ionicons name="lock-closed" size={28} color={c.warning} />
                 <View style={{ flex: 1 }}>
                   {lockedLines.map((t) => (
@@ -236,7 +238,7 @@ export function ElderCourse({
           </>
         ) : (
           <>
-            <View style={[styles.info, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={[styles.info, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw }]}>
               {teacher ? <InfoLine icon="person" text={`主講：${teacher}`} /> : null}
               {items.length ? <InfoLine icon="list" text={`${items.length} ${word}${course.totalMinutes ? `・約 ${Math.round(course.totalMinutes)} 分鐘` : ""}`} /> : null}
               {date ? <InfoLine icon="calendar" text={date} /> : null}
@@ -274,6 +276,7 @@ function InfoLine({ icon, text, strong }: { icon: "person" | "list" | "calendar"
 /** 一課一列：下一課（或正在播放）是實心綠底大列；已上完的淡色打勾；鎖住的顯示鎖頭。 */
 function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson; highlight: boolean; playing: boolean; onPress: () => void }) {
   const { c } = useTheme();
+  const bw = useBorderW(2);
   const fg = highlight ? c.textOnAccent : c.text;
   const circle = Math.round(44 * UI_SCALE);
   const link = !!l.linkType && !l.full && !!l.linkUrl;
@@ -285,7 +288,7 @@ function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson;
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        highlight ? { backgroundColor: c.accent, borderColor: c.accent, minHeight: 96 } : { backgroundColor: c.surface, borderColor: c.border },
+        highlight ? { backgroundColor: c.accent, borderColor: c.accent, minHeight: 96, borderWidth: bw } : { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw },
         l.completed && !highlight && { opacity: 0.6 },
         pressed && { opacity: 0.8 },
       ]}

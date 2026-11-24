@@ -145,5 +145,13 @@ export function setElder(patch: Partial<ElderPrefs>) {
 export const useElder = () => useSyncExternalStore(subscribe, getElder, getElder);
 /** true＝至尊模式。 */
 export const useElderOn = () => useSyncExternalStore(subscribe, () => prefs.on, () => prefs.on);
+/**
+ * 至尊模式所有框線的粗細（業主 2026-11-24 永久指示：一律跟首頁的深綠色粗框 4px 一樣，紅框、灰框、輸入框都算）。
+ * 元件一律用 `useBorderW(原本粗細)`：至尊模式回傳 4，其他模式維持原本粗細。顏色不變。
+ */
+export const ELDER_BORDER = 4;
+export function useBorderW(base: number): number {
+  return useElderOn() ? ELDER_BORDER : base;
+}
 /** 根版面用：全站字體倍數改變時換一個新值。 */
 export const useElderVersion = () => useSyncExternalStore(subscribe, elderVersion, elderVersion);

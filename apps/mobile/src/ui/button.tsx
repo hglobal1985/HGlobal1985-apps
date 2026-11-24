@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from "react-native";
+import { useBorderW } from "@/lib/elder-mode";
 import { LoadingLadybug } from "./loading-ladybug";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
@@ -25,6 +26,7 @@ export function Button({
   fullWidth?: boolean;
 }) {
   const { c } = useTheme();
+  const bw = useBorderW(1);
   const look = {
     primary: { bg: c.accent, fg: c.textOnAccent, border: c.accent },
     secondary: { bg: c.surface, fg: c.text, border: c.border },
@@ -44,7 +46,7 @@ export function Button({
       accessibilityState={{ disabled: !!inactive, busy: !!loading }}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor: look.bg, borderColor: look.border },
+        { backgroundColor: look.bg, borderColor: look.border, borderWidth: bw },
         fullWidth && { alignSelf: "stretch" },
         inactive && { opacity: 0.5 },
         pressed && { opacity: 0.8 },

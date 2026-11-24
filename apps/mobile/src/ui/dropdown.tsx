@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useBorderW } from "@/lib/elder-mode";
 import { type HostInstance, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -17,6 +18,8 @@ const FIELD_H = 40;
  */
 export function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth, flow, big }: { /** 至尊模式大尺寸：跟首頁／課程的搜尋框同款（粗綠框、高 80）。 */ big?: boolean; /** 一欄堆疊版面（至尊模式頁）：選項直接展開在欄位下方、把後面的內容往下推，不浮在畫面上被別的元件蓋住。 */ flow?: boolean; pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { c } = useTheme();
+  const bw = useBorderW(1);
+  const bw2 = useBorderW(2);
   const { height: winH, width: winW } = useWindowDimensions();
   const box = useRef<HostInstance>(null);
   const lastW = useRef(0); // 最近一次「正常顯示」時的欄位寬度
@@ -38,7 +41,7 @@ export function Dropdown({ options, value, label, disabled, onPick, open, onOpen
   };
   return (
     <View ref={box} collapsable={false} style={flow ? { width: "100%" } : pop ? { alignSelf: "stretch", minWidth: 0, zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
-      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, big ? { minHeight: ELDER_FIELD.height(), borderWidth: ELDER_FIELD.borderWidth, borderColor: c.accent, borderRadius: ELDER_FIELD.radius } : null, { borderColor: big ? c.accent : c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
+      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, big ? { minHeight: ELDER_FIELD.height(), borderWidth: ELDER_FIELD.borderWidth, borderColor: c.accent, borderRadius: ELDER_FIELD.radius } : null, { borderColor: big ? c.accent : c.border, borderWidth: big ? ELDER_FIELD.borderWidth : bw, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
         <AppText variant={big ? "headline" : undefined} style={pop ? { flex: 1, minWidth: 0 } : { flex: 1 }} numberOfLines={big ? 2 : 1} tone={disabled || !value ? "muted" : undefined}>
           {label}
         </AppText>
@@ -49,8 +52,8 @@ export function Dropdown({ options, value, label, disabled, onPick, open, onOpen
           style={[
             styles.dropdown,
             flow
-              ? { position: "relative", width: "100%", marginTop: 4, maxHeight: 360, borderWidth: big ? ELDER_FIELD.borderWidth : 2, borderColor: big ? c.accent : c.accentText, backgroundColor: c.surface }
-              : [pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }],
+              ? { position: "relative", width: "100%", marginTop: 4, maxHeight: 360, borderWidth: big ? ELDER_FIELD.borderWidth : bw2, borderColor: big ? c.accent : c.accentText, backgroundColor: c.surface }
+              : [pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: bw2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }],
           ]}
         >
           <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
