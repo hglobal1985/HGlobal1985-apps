@@ -2,7 +2,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useState } from "react";
 import Svg, { Circle, Rect } from "react-native-svg";
 import { Pressable, StyleSheet, View } from "react-native";
-import { installNative, isIos, isIpad, useInstallState } from "@/lib/install-app";
+import { installNative, isIos, isIpad, likelyInstalledAndroid, useInstallState } from "@/lib/install-app";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
@@ -60,6 +60,9 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
         <BottomSheet onClose={() => setSteps(false)}>
           <View style={{ gap: space.sm }}>
             <AppText variant="headline">加入主畫面</AppText>
+            {!ios && likelyInstalledAndroid() ? (
+              <AppText style={{ fontWeight: "800", color: RED }}>這支手機可能已經安裝過了（例如從超派模式裝過）：請直接從手機桌面點「寰宇行動大學」圖示開啟，就是 App 版。若桌面找不到，再照下面步驟安裝。</AppText>
+            ) : null}
             {ios ? (
               <>
                 <AppText>1. 用 Safari 開啟本網站（不是在 LINE 或其他 App 裡）。</AppText>
