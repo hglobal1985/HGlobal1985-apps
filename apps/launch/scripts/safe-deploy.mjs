@@ -72,6 +72,8 @@ if (missingDeps().length) {
   if (still.length) die(`套件還是缺：${still.join("、")}。不可以帶著缺的套件部署，請檢查 package.json 與網路。`);
 }
 
+// 至尊／超派模式同步檢查（業主 2026-11-24）：至尊模式寫死權限、畫面自己判斷模式＝擋下不部署（apps/mobile/scripts/check-mode-parity.mjs）。
+run(`node ${new URL("../../mobile/scripts/check-mode-parity.mjs", import.meta.url).pathname}`);
 run("npm run build:web -w @learn/mobile");
 run("npm run embed");
 run("npx --yes wrangler@4 d1 migrations apply learn-v2 --remote");
