@@ -34,23 +34,22 @@ export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { 
       </AppText>
     </View>
   ) : null;
-  if (stacked)
+  if (stacked) {
+    // 有獎章時（業主 2026-11-24）：姓名字體縮小一點，獎章放在右邊、高度與頭像一樣大。
+    const hasBadge = !!member.rankBadge;
     return (
       <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={`${member.name}${member.rankLabel ? `，${member.rankLabel}` : ""}`} style={styles.stack}>
         {avatar}
         <View style={styles.stackText}>
-          <AppText variant="title" numberOfLines={2} style={{ fontSize: fs(20), lineHeight: fs(28) }}>
+          <AppText variant="title" numberOfLines={2} style={{ fontSize: fs(hasBadge ? 17 : 20), lineHeight: fs(hasBadge ? 24 : 28) }}>
             {member.name}
           </AppText>
-          {member.rankLabel || member.rankBadge ? (
-            <View style={styles.stackRank}>
-              {rankTag}
-              {member.rankBadge ? <RankBadge url={member.rankBadge} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={Math.round(AVATAR * scale * 0.8)} /> : null}
-            </View>
-          ) : null}
+          {rankTag ? <View style={styles.stackRank}>{rankTag}</View> : null}
         </View>
+        {hasBadge ? <RankBadge url={member.rankBadge!} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={av} /> : null}
       </Pressable>
     );
+  }
   return (
     <Pressable
       onPress={onPress}

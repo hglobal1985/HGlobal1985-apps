@@ -84,6 +84,11 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
   );
 }
 
+/** 一欄堆疊版面（至尊模式頁）：下拉選單與右邊的「無」勾選框並排同一列（業主 2026-11-24）；三欄版面維持原樣（無在選單下方）。 */
+function FieldLine({ stack, children }: { stack: boolean; children: ReactNode }) {
+  return stack ? <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>{children}</View> : <>{children}</>;
+}
+
 /**
  * 自訂下拉選單（不用系統原生選單）：依螢幕剩餘空間自動往下或往上展開；選項超過 12 個時上方有搜尋框。
  */
@@ -286,7 +291,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
   const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
   /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
   const colBox = (key: string, children: ReactNode) => (
-    <View key={key} style={stack ? { width: "100%" } : { flex: 1, flexBasis: 0, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
+    <View key={key} style={stack ? { width: "100%", zIndex: openKey === key ? 100 : 1 } : { flex: 1, flexBasis: 0, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
       {children}
     </View>
   );
@@ -317,9 +322,9 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
         key,
         <Row fixed z={openKey === key ? 100 : 1} bad={showBad && missing.includes(key)}>
           <Label text={label} tag={shortTag(tagFor(key, isCenter))} note={isCenter ? noteFor("education_center") : undefined} reserveNote={anyNote} />
+          <FieldLine stack={stack}>
           <Dropdown
-            flow={stack}
-            pop={pop}
+            pop={stack ? undefined : pop}
             keepWidth={blocked || none}
             options={options}
             value={sel}
@@ -330,6 +335,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
             onPick={onPick}
           />
           <NoneBox on={blocked ? !!sysVal : none} disabled={blocked} onToggle={toggleNone} />
+          </FieldLine>
         </Row>,
       ),
     };
@@ -359,7 +365,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
       <Body inline={inline} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
           <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
             <Icon name="open-outline" size={20} color={c.accentText} />
-            <Text numberOfLines={stack ? undefined : 1} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
               前往完整版會員中心
             </Text>
           </Pressable>
@@ -416,9 +422,9 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                         "rank",
                         <Row fixed z={openKey === "rank" ? 100 : 1} bad={showBad && missing.includes("rank")}>
                           <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} reserveNote={anyNote} />
+                          <FieldLine stack={stack}>
                           <Dropdown
-                            flow={stack}
-                            pop="left"
+                            pop={stack ? undefined : "left"}
                             keepWidth={rankNone}
                             options={data.rankOptions.filter((o) => o.value !== "none").map((o) => ({ value: o.value, label: o.label }))}
                             value={rankNone ? "" : vals.rank}
@@ -429,6 +435,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                             onPick={set("rank")}
                           />
                           <NoneBox on={rankNone} onToggle={() => set("rank")(rankNone ? "" : "none")} />
+                          </FieldLine>
                         </Row>,
                       )}
                       {sysCol.node}
