@@ -141,12 +141,26 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       </View>
     ) : null;
 
-  const page = { paddingTop: insets.top + space.md, paddingHorizontal: space.md, gap: space.md };
-  if (body || !searching && mode === "home")
-    return (
-      <View style={[styles.fill, { backgroundColor: c.background }]}>
-        <View style={[styles.inner, page, { flex: 1, paddingBottom: space.md }]}>
-          {header}
+  // 搜尋框固定在最上面、與下方內容分開（業主 2026-11-24 驗證回報：打一個字畫面就換成另一棵元件樹，輸入框被重建、鍵盤收起，只留得下第一個字）。
+  // 不論有沒有結果、是否在聽，搜尋框永遠是同一個位置的同一個元件，才不會中斷輸入。
+  const pad = { paddingHorizontal: space.md };
+  const listMode = !body && !(!searching && mode === "home");
+  return (
+    <View style={[styles.fill, { backgroundColor: c.background }]}>
+      <View style={[styles.inner, pad, { paddingTop: insets.top + space.md, paddingBottom: space.sm }]}>{header}</View>
+      {listMode ? (
+        <FlatList
+          style={styles.fill}
+          contentContainerStyle={[styles.inner, pad, { gap: space.md, paddingBottom: space.xxl }]}
+          data={results}
+          keyExtractor={(x) => x.id}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          renderItem={({ item }) => <ElderCourseRow course={item} />}
+          initialNumToRender={8}
+        />
+      ) : (
+        <View style={[styles.inner, pad, { flex: 1, gap: space.md, paddingBottom: space.md }]}>
           {body}
           {cont && !voice.listening ? (
             <Pressable accessibilityRole="button" accessibilityLabel={`繼續上課：${cont.title}`} onPress={() => router.push(`/course/${cont.id}`)} style={({ pressed }) => [styles.cont, { backgroundColor: c.navPill, opacity: pressed ? 0.85 : 1 }]}>
@@ -162,20 +176,8 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
             </Pressable>
           ) : null}
         </View>
-      </View>
-    );
-  return (
-    <FlatList
-      style={[styles.fill, { backgroundColor: c.background }]}
-      contentContainerStyle={[styles.inner, page, { paddingBottom: space.xxl }]}
-      data={results}
-      keyExtractor={(x) => x.id}
-      ListHeaderComponent={header}
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      renderItem={({ item }) => <ElderCourseRow course={item} />}
-      initialNumToRender={8}
-    />
+      )}
+    </View>
   );
 }
 
