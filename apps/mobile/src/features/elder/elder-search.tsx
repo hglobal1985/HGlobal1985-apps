@@ -264,13 +264,14 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
       </View>
       <View style={{ flex: 1, height: h, gap: 6, minWidth: 0 }}>
         <FitTitle text={label} />
-        <View style={[styles.tag, { alignSelf: "flex-end", backgroundColor: strong ? c.accent : c.accentSoft }]}>
+        <View style={[styles.tag, { backgroundColor: strong ? c.accent : c.accentSoft }]}>
           <AppText variant="callout" style={{ color: strong ? c.textOnAccent : c.accentText, fontWeight: "700" }}>
             {tag}
           </AppText>
         </View>
       </View>
-      <Ionicons name="chevron-forward" size={26} color={c.accent} />
+      {/* 箭頭往左靠（負邊距抵掉列間距），標題右邊與箭頭只留一點點空隙才換行（業主 2026-11-24） */}
+      <Ionicons name="chevron-forward" size={26} color={c.accent} style={{ marginLeft: -space.sm }} />
     </Pressable>
   );
 }
@@ -291,7 +292,7 @@ function FitTitle({ text }: { text: string }) {
   const fs = Math.min(own ?? 20, min);
   return (
     <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
-      <AppText style={{ fontSize: fs, lineHeight: Math.round(fs * 1.2), fontWeight: "800", textAlign: "right" }}>{text}</AppText>
+      <AppText style={{ fontSize: fs, lineHeight: Math.round(fs * 1.2), fontWeight: "800" }}>{text}</AppText>
     </View>
   );
 }
