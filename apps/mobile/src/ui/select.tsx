@@ -37,7 +37,7 @@ export function Select({ label, value, options, onChange, placeholder = "請選�
     return (
       // 至尊模式篩選是一欄直排：不能用 flex:1（會在直排裡被撐高，下拉整個錯位）。
       <View style={{ alignSelf: "stretch", minWidth: 0 }}>
-        <Dropdown flow options={options.map((o) => ({ value: o.key, label: o.label }))} value={value} label={current?.label ?? placeholder} onPick={onChange} open={open} onOpenChange={setOpen} />
+        <Dropdown flow big options={options.map((o) => ({ value: o.key, label: o.label }))} value={value} label={current?.label ?? placeholder} onPick={onChange} open={open} onOpenChange={setOpen} />
       </View>
     );
   return (
