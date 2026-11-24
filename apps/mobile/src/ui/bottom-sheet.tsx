@@ -1,3 +1,5 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useModeProfile } from "@/lib/app-mode";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Modal, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +32,7 @@ function inScrolledList(target: unknown): boolean {
  */
 export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand, expandLabel }: { onClose: () => void; children: ReactNode; swipeUpClose?: boolean; onExpand?: () => void; expandLabel?: string }) {
   const { c } = useTheme();
+  const asPage = useModeProfile().sheets === "page";
   useDimLayer();
   const insets = useSafeAreaInsets();
   // 網頁（加到主畫面的 App）：面板下方若露出底部選單的綠色底色，改成面板同色，看起來是面板蓋到最底（業主 2026-11-24）。
@@ -102,6 +105,26 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
     });
   // 下滑關閉與上拉展開都只能「按住最上方灰色膠囊」拖曳才生效（業主 2026-11-22 全網設定）；面板其他地方、背景都不再有拖曳手勢（內容照常捲動、點背景仍會關閉）。
   const handlePan = useRef(makePan(true)).current;
+  // 至尊模式一律不用上拉選單（業主 2026-11-24）：同一個元件改成整頁顯示（上方大大的「返回」），內容整頁捲動。
+  // 全站所有上拉選單（確認、選擇、資料編輯…）都經過這裡，所以兩種模式的功能永遠一致，只是呈現方式不同。
+  if (asPage)
+    return (
+      <Modal animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+        <View style={[styles.page, { backgroundColor: c.background, paddingTop: insets.top }]} accessibilityViewIsModal>
+          <View style={[styles.pageBar, { borderBottomColor: c.border, backgroundColor: c.surface }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="返回" onPress={onClose} hitSlop={8} style={styles.pageBack}>
+              <Ionicons name="chevron-back" size={30} color={c.accentText} />
+              <AppText variant="title" style={{ color: c.accentText }}>
+                返回
+              </AppText>
+            </Pressable>
+          </View>
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.pageBody, { paddingBottom: space.xxl + insets.bottom }, sheetMax ? { width: "100%", maxWidth: sheetMax, alignSelf: "center" } : null]} keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
+        </View>
+      </Modal>
+    );
   return (
     <Modal transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
@@ -136,6 +159,10 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: "flex-end", ...dimStyle },
+  page: { flex: 1 },
+  pageBar: { minHeight: 64, justifyContent: "center", paddingHorizontal: space.md, borderBottomWidth: 1 },
+  pageBack: { flexDirection: "row", alignItems: "center", gap: 4, minHeight: 56, alignSelf: "flex-start", paddingRight: space.lg },
+  pageBody: { padding: space.lg, gap: space.md },
   sheet: { borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: space.lg, gap: space.md },
   fill: { position: "absolute", left: 0, right: 0, top: "100%", height: 1200 },
   hint: { position: "absolute", left: 0, right: 0, top: -40, alignItems: "center" },

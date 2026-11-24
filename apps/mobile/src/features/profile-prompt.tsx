@@ -1,6 +1,6 @@
 import { Button } from "@/ui/button";
 import { trackFeature } from "@/lib/feature-track";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { type HostInstance, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { api } from "@/api/client";
@@ -62,7 +62,7 @@ function Label({ text, tag, note, reserveNote }: { text: string; tag?: string; n
 }
 
 /** 必填沒填時，整列用 2px 橘框＋淡橘底標示（中央視覺規範）。 */
-function Row({ bad, z, fixed, children }: { bad?: boolean; z?: number; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，業主 2026-11-23）。 */ fixed?: boolean; children: React.ReactNode }) {
+function Row({ bad, z, fixed, children }: { bad?: boolean; z?: number; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，業主 2026-11-23）。 */ fixed?: boolean; children: ReactNode }) {
   const { c } = useTheme();
   const box = { borderWidth: 2, borderRadius: radius.md, padding: 4 };
   return <View style={[{ gap: 2, zIndex: z ?? 1 }, fixed && { ...box, borderColor: "transparent" }, bad && { ...box, borderColor: c.warning, backgroundColor: c.warningSoft }]}>{children}</View>;
@@ -139,7 +139,11 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
  * 系統是清單選單＋「其他」自訂；中心在所選系統是寰宇時是清單選單＋「其他」，否則是一般輸入框；
  * 必填沒填時標示橘框，不送出。直接用會員本人的身分寫回會員中心（行動大學不保存）。
  */
-export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void; initial?: View_ | null }) {
+/**
+ * 完善個人資料表單（兩種模式共用同一份，業主 2026-11-24：欄位改了兩邊自動一起變）。
+ * inline＝直接放在頁面裡（至尊模式的模式頁，沒有「關閉」鈕、儲存後不關閉）；預設＝上拉選單。
+ */
+export function ProfilePrompt({ onClose, initial: first, inline = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean }) {
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
   const { invalidate, refreshMember } = useSession();
@@ -266,7 +270,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
       // 儲存成功後立刻重新取一次會員資料（業主 2026-11-23 回報本名按儲存後再進來又變空白）：
       // 首頁／設定頁保存的是開啟 App 時帶來的舊資料（含 profileForm、profileMissing），不更新的話再開面板會看到舊值，還會再次誤判「資料不全」而彈出。
       if (!r.errors.length) await refreshMember(0).catch(() => undefined);
-      if (!r.errors.length) onClose(); // 儲存成功就自動關閉視窗（業主 2026-11-19）
+      if (!r.errors.length && !inline) onClose(); // 儲存成功就自動關閉視窗（業主 2026-11-19）；放在頁面裡的不關閉
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -279,7 +283,7 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
   const sysIsOther = !sysNone && (otherPick.education_system ?? (!!sysVal && !terms.education_system.includes(vals.education_system)));
   const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
   /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
-  const colBox = (key: string, children: React.ReactNode) => (
+  const colBox = (key: string, children: ReactNode) => (
     <View key={key} style={{ flex: 1, flexBasis: 0, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
       {children}
     </View>
@@ -348,8 +352,8 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
 
   return (
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
-    <BottomSheet onClose={onClose}>
-      <ScrollView style={{ maxHeight: Math.round(winH * (winH >= winW ? 0.86 : 0.5)) }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+    <Wrap inline={inline} onClose={onClose}>
+      <Body inline={inline} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
           <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
             <Icon name="open-outline" size={20} color={c.accentText} />
             <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
@@ -442,22 +446,42 @@ export function ProfilePrompt({ onClose, initial: first }: { onClose: () => void
               </View>
             </>
           ) : null}
-      </ScrollView>
+      </Body>
       <View style={styles.actions}>
-        <View style={{ flex: 1 }}>
-          <Button variant="cancel" label="關閉" icon="close" onPress={onClose} fullWidth />
-        </View>
+        {inline ? null : (
+          <View style={{ flex: 1 }}>
+            <Button variant="cancel" label="關閉" icon="close" onPress={onClose} fullWidth />
+          </View>
+        )}
         <View style={{ flex: 1 }}>
           <Button label="儲存" icon="save-outline" onPress={save} disabled={busy || (!changed.length && !(wantAmway && !data?.enabled))} loading={busy} fullWidth />
         </View>
       </View>
     {popup && Platform.OS === "web" ? createPortal(popup, document.body) : popup}
-    </BottomSheet>
+    </Wrap>
+  );
+}
+
+/** 外框：上拉選單，或放在頁面裡的卡片。 */
+function Wrap({ inline, onClose, children }: { inline: boolean; onClose: () => void; children: ReactNode }) {
+  const { c } = useTheme();
+  return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
+}
+
+/** 欄位區：上拉選單裡可捲動；放在頁面裡就跟著頁面捲。 */
+function Body({ inline, maxH, children }: { inline: boolean; maxH: number; children: ReactNode }) {
+  return inline ? (
+    <View style={styles.sheetBody}>{children}</View>
+  ) : (
+    <ScrollView style={{ maxHeight: maxH }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      {children}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   sheetBody: { gap: space.xs, paddingBottom: space.xs },
+  inlineCard: { borderWidth: 1, borderRadius: radius.lg, padding: space.md, gap: space.md },
   actions: { flexDirection: "row", gap: space.sm, width: "100%" },
   btn: { minHeight: 44, borderRadius: radius.md, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: space.sm },
   line: { flexDirection: "row", alignItems: "center", gap: space.sm },

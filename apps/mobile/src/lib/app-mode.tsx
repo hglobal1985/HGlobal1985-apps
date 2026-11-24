@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useElderOn } from "./elder-mode";
 
 /**
@@ -50,6 +51,10 @@ export type ModeProfile = {
   fontAdjustable: boolean;
   /** 離開這個模式前要先確認（防誤按）。 */
   confirmLeave: boolean;
+  /** 上拉選單的呈現方式：sheet＝從下方拉出的面板；page＝整頁顯示（至尊模式一律禁止上拉選單，業主 2026-11-24）。 */
+  sheets: "sheet" | "page";
+  /** 按模式鍵：page＝進入整頁的模式頁（/mode）；switch＝直接切到另一個模式。 */
+  modeKey: "page" | "switch";
   features: Record<FeatureKey, boolean>;
 };
 
@@ -65,6 +70,8 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     bigNav: true,
     fontAdjustable: true,
     confirmLeave: true,
+    sheets: "page",
+    modeKey: "page",
     features: { addToList: false, comments: false, achievements: false, myLists: false, library: false, manageSection: false, adminEdit: false, addButton: false },
   },
   // 超派模式：原本的完整版。
@@ -78,6 +85,8 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     bigNav: false,
     fontAdjustable: false,
     confirmLeave: false,
+    sheets: "sheet",
+    modeKey: "switch",
     features: { addToList: true, comments: true, achievements: true, myLists: true, library: true, manageSection: true, adminEdit: true, addButton: true },
   },
 };
@@ -93,6 +102,6 @@ export function useFeature(key: FeatureKey): boolean {
 }
 
 /** 包住某個功能：目前模式沒開就不顯示（元件也不會掛載、不會抓資料）。 */
-export function ModeGate({ feature, children }: { feature: FeatureKey; children: React.ReactNode }) {
+export function ModeGate({ feature, children }: { feature: FeatureKey; children: ReactNode }) {
   return useFeature(feature) ? <>{children}</> : null;
 }
