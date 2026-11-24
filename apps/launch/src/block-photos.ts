@@ -25,8 +25,15 @@ export async function migrateFilePhotos(env: Env): Promise<number> {
   let done = 0;
   for (const r of results) {
     if (!r.r2_key || !r.block_id) continue; // 不在任何區塊裡的圖片教材不動
+    // 先「認領」：刪掉附件列，只有一個執行者會刪成功（排程和打開頁面可能同時在跑，避免同一張搬兩次）。
+    const claim = await db.prepare("DELETE FROM lesson_attachments WHERE id = ?").bind(r.att_id).run();
+    if (!claim.meta?.changes) continue;
+    const restore = () => db.prepare("INSERT OR IGNORE INTO lesson_attachments (id, lesson_id, course_id, name, r2_key, size, content_type, kind, created_by) VALUES (?, ?, ?, '圖片', ?, ?, ?, 'file', 'migration')").bind(r.att_id, r.lesson_id, r.course_id, r.r2_key, r.size, r.content_type).run();
     const obj = await bucket.get(r.r2_key).catch(() => null);
-    if (!obj) continue;
+    if (!obj) {
+      await restore();
+      continue;
+    }
     const bytes = await new Response(obj.body).arrayBuffer();
     const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
     const key = `album/${id}/${crypto.randomUUID()}.${EXT[r.content_type] ?? "jpg"}`;
@@ -34,9 +41,11 @@ export async function migrateFilePhotos(env: Env): Promise<number> {
     const pos = ((await db.prepare("SELECT COALESCE(MAX(position), -1) + 1 AS p FROM cover_media WHERE owner_kind = 'course' AND owner_key = ? AND scope = 'cover'").bind(r.block_id).first<{ p: number }>())?.p ?? 0);
     await db.batch([
       db.prepare("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, width, height, bytes, position, created_by, scope) VALUES (?, 'course', NULL, ?, 'image', ?, 0, 0, ?, ?, 'migration', 'cover')").bind(id, r.block_id, key, r.size, pos),
-      db.prepare("DELETE FROM lesson_attachments WHERE lesson_id = ?").bind(r.lesson_id),
       db.prepare("DELETE FROM lessons WHERE id = ?").bind(r.lesson_id),
-    ]);
+    ]).catch(async (e) => {
+      await restore();
+      throw e;
+    });
     await bucket.delete(r.r2_key).catch(() => undefined);
     done++;
   }
