@@ -180,7 +180,7 @@ export default function MeScreen() {
             {!member.demo ? (
               <ListRow icon="person-circle-outline" title="完整版會員中心" subtitle="修改基本資料" onPress={openAccountCenter} />
             ) : null}
-            <ListRow icon="trash-outline" title="刪除帳號" subtitle="刪除你在所有寰宇 App 的帳號與資料" onPress={removeAccount} />
+            {features.deleteAccount ? <ListRow icon="trash-outline" title="刪除帳號" subtitle="刪除你在所有寰宇 App 的帳號與資料" onPress={removeAccount} /> : null}
           </Card>
         </Section>
       ) : null}
