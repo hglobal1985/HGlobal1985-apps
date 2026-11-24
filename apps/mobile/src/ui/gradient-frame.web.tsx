@@ -31,12 +31,12 @@ export function frameBoxStyle(on: boolean): CSSProperties {
  * 邊框元件：外面是流光漸層邊框，裡面放內容（內容底色用主題的表面色）。
  * width／height／radius 決定外框大小與圓角；running＝false 時流光暫停。
  */
-export function GradientFrame({ width, height, radius = 20, running = true, children }: { width: number | string; height: number | string; radius?: number; running?: boolean; children: ReactNode }) {
+export function GradientFrame({ width, height, radius = 20, running = true, flush = false, children }: { width: number | string; height: number | string; radius?: number; running?: boolean; /** true＝內容鋪滿邊框裡面（沒有左右留白、不置中；迷你小視窗用）。 */ flush?: boolean; children: ReactNode }) {
   const { c } = useTheme();
   return (
     <div style={{ width, height, boxSizing: "border-box", padding: FRAME_PAD, borderRadius: radius, display: "flex", ...frameBoxStyle(true), animationPlayState: running ? "running" : "paused" }}>
       <style>{FRAME_KEYFRAMES}</style>
-      <div style={{ flex: 1, minWidth: 0, borderRadius: Math.max(0, radius - FRAME_PAD), background: c.surface, overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "0 8px" }}>{children}</div>
+      <div style={{ flex: 1, minWidth: 0, borderRadius: Math.max(0, radius - FRAME_PAD), background: c.surface, overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: flush ? 0 : "0 8px" }}>{children}</div>
     </div>
   );
 }

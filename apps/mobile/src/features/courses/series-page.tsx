@@ -17,7 +17,8 @@ import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, Field, LoadingView, LoginPrompt, NoticeBox, Screen, SegmentTabs } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { TopBarButton } from "@/ui/top-bar";
-import { CenterHero, centerHeroFull } from "./center-hero";
+import { CenterHero, centerHeroFull, HeroMiniCover } from "./center-hero";
+import { CoverMiniFloat } from "@/ui/collapse-band";
 import { CoverAlbum } from "./album";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { useCoverMedia } from "./cover-media";
@@ -246,6 +247,8 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         ) : null}
         {admin || canCreateCourse(member) ? <View style={{ height: 64 }} /> : null}
       </Screen>
+      {/* 系列封面往下滑縮成迷你小視窗（業主 2026-11-24；與影片迷你小視窗同規格）。 */}
+      <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.items} title={shownTitle} />} label={shownTitle} />
       {/* 右下角「＋」（業主 2026-11-23：除了中心卡，每個頁面都要有新增鈕）：有新增權限的人可新增教材卡（系列預先選好目前這個系列）；超級管理員另可新增公告（目前這個系列，或首頁公告）。 */}
       {admin || canCreateCourse(member) ? <AddMaterialFab kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(admin ? (["announce"] as const) : [])]} onPick={(k) => (k === "announce" ? setComposeOpen(true) : setNewOpen(true))} /> : null}
       {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultSeries={series !== UNCATEGORIZED ? series : undefined} /> : null}
