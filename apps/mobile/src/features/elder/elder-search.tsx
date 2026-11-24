@@ -14,6 +14,7 @@ import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
+import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, elderZoneOf, type ElderZone } from "./elder-zones";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -45,6 +46,8 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const courses = useApi<CourseSummary[]>("/courses");
   const [q, setQ] = useState("");
   const [heard, setHeard] = useState<string | null>(null);
+  // 課程分頁的四大分類（業主 2026-11-24，D 款）：null＝顯示四張大卡；選了一區＝列出該區課程。
+  const [zone, setZone] = useState<ElderZone | null>(null);
   const input = useRef<{ focus: () => void } | null>(null);
   // 搜尋索引（章節標題、分享者、日期…）：開始找的時候才下載。
   const wantIndex = q.trim().length > 0 || mode === "browse";
@@ -65,7 +68,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const phonetic = usePhonetic(key, noExact);
   // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
   const results = useMemo(() => {
-    if (!key) return mode === "browse" ? order(all) : [];
+    if (!key) return mode === "browse" ? (zone ? order(all.filter((x) => elderZoneOf(x) === zone)) : []) : [];
     const byLesson = new Map((idx.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
     const lessonCourses = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && index.haystack.has(x));
     let ids: Set<string> = exact ?? new Set();
@@ -79,7 +82,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       near = { phonetic: phon, semantic: sem, fuzzy, chars };
     }
     return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
-  }, [key, index, all, mode, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data]);
+  }, [key, index, all, mode, zone, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data]);
   const cont = mode === "home" ? lastCourse(courses.data ?? []) : null;
   const searching = q.trim().length > 0;
   const mic = () => {
@@ -157,6 +160,19 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           keyExtractor={(x) => x.id}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          ListHeaderComponent={
+            mode === "browse" && !searching ? (
+              zone ? (
+                <ElderZoneHeader zone={ELDER_ZONES.find((z) => z.id === zone)!} onBack={() => setZone(null)} />
+              ) : (
+                <View style={{ gap: space.md }}>
+                  {ELDER_ZONES.map((z) => (
+                    <ElderZoneCard key={z.id} zone={z} count={all.filter((x) => elderZoneOf(x) === z.id).length} onPress={() => setZone(z.id)} />
+                  ))}
+                </View>
+              )
+            ) : undefined
+          }
           renderItem={({ item }) => <ElderCourseRow course={item} />}
           initialNumToRender={8}
         />
