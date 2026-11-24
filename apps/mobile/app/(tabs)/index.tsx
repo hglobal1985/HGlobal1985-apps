@@ -9,7 +9,7 @@ import { useProfileGate } from "@/features/profile-gate";
 import { HOME_INFO_SPACE, HomeRail } from "@/features/courses/home-rail";
 import { collapseSeries } from "@/features/courses/sort";
 import { useApi, useSession } from "@/state/session";
-import { useElderOn } from "@/lib/elder-mode";
+import { useModeProfile } from "@/lib/app-mode";
 import { ElderSearch } from "@/features/elder/elder-search";
 import { useUiConfig } from "@/state/ui-config";
 import { useLayout } from "@/theme/layout";
@@ -26,7 +26,7 @@ import { AppText, BrandTitle, ErrorView, InstallCard, LoginPrompt, LoadingView, 
 
 /** 首頁：至尊模式（業主 2026-11-24）改成大搜尋框＋大麥克風（features/elder/elder-search.tsx）；超派模式照舊。 */
 export default function HomeRoute() {
-  return useElderOn() ? <ElderSearch mode="home" /> : <HomeScreen />;
+  return useModeProfile().home === "voice" ? <ElderSearch mode="home" /> : <HomeScreen />;
 }
 
 function HomeScreen() {

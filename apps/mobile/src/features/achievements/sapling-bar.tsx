@@ -1,4 +1,4 @@
-import { useElderOn } from "@/lib/elder-mode";
+import { useFeature } from "@/lib/app-mode";
 import { useState } from "react";
 import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -17,9 +17,9 @@ import { conditionText } from "./text";
  * 「學習中」最上方（業主 2026-11-16）：小樹苗累計（每學完一堂課長一棵）與「學習成就」並排一列；
  * 下面直接列出已解鎖的成就圖示，點一下以「全螢幕文字提醒」顯示該成就的達成條件。
  */
-/** 至尊模式（業主 2026-11-24）不顯示學習成就（小樹苗）。 */
+/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（業主 2026-11-24）不顯示學習成就（小樹苗）。 */
 export function SaplingBar(props: { saplings: number }) {
-  return useElderOn() ? null : <SaplingBarInner {...props} />;
+  return !useFeature("achievements") ? null : <SaplingBarInner {...props} />;
 }
 
 function SaplingBarInner({ saplings }: { saplings: number }) {

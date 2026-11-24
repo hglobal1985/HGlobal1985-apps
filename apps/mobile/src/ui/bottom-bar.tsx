@@ -7,7 +7,7 @@ import { requestCoursesReset } from "@/lib/courses-reset";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
 import { getBottomGap, onBottomGap } from "@/lib/bottom-gap";
 import { useUnreadCount } from "@/state/unread";
-import { useElderOn } from "@/lib/elder-mode";
+import { MODE_PROFILES, useModeProfile, type TabKey } from "@/lib/app-mode";
 import { CrownIcon } from "@/features/elder/crown-icon";
 import { ElderSheet, switchToElder } from "@/features/elder/elder-sheet";
 import { useLayout } from "@/theme/layout";
@@ -29,12 +29,12 @@ type IconName = ComponentProps<typeof Ionicons>["name"];
 /** 短網址（/縮寫）：單層路徑且不是網站固定頁面。 */
 const FIXED = new Set(["/me", "/learning", "/notices", "/achievements", "/orders", "/courses", "/admin", "/settings", "/auth"]);
 const isShortLink = (p: string) => /^\/[a-z0-9-]{2,30}$/i.test(p) && !FIXED.has(p);
-const tabs: { href: Href; title: string; icon: IconName; active: IconName; building?: boolean; match: (p: string) => boolean }[] = [
-  { href: "/", title: "首頁", icon: "home-outline", active: "home", match: (p) => p === "/" },
-  { href: "/courses", title: "課程", icon: "library-outline", active: "library", building: true, match: (p) => p === "/courses" || p.startsWith("/course/") || p.startsWith("/series/") || isShortLink(p) },
-  { href: "/learning", title: "學習中", icon: "play-circle-outline", active: "play-circle", match: (p) => p === "/learning" || p.startsWith("/learn/") },
-  { href: "/notices", title: "通知", icon: "notifications-outline", active: "notifications", match: (p) => p === "/notices" },
-  { href: "/me", title: "設定", icon: "person-circle-outline", active: "person-circle", match: (p) => p === "/me" || p.startsWith("/orders") || p.startsWith("/admin") || p.startsWith("/settings") },
+const tabs: { key: TabKey; href: Href; title: string; icon: IconName; active: IconName; building?: boolean; match: (p: string) => boolean }[] = [
+  { key: "home", href: "/", title: "首頁", icon: "home-outline", active: "home", match: (p) => p === "/" },
+  { key: "courses", href: "/courses", title: "課程", icon: "library-outline", active: "library", building: true, match: (p) => p === "/courses" || p.startsWith("/course/") || p.startsWith("/series/") || isShortLink(p) },
+  { key: "learning", href: "/learning", title: "學習中", icon: "play-circle-outline", active: "play-circle", match: (p) => p === "/learning" || p.startsWith("/learn/") },
+  { key: "notices", href: "/notices", title: "通知", icon: "notifications-outline", active: "notifications", match: (p) => p === "/notices" },
+  { key: "settings", href: "/me", title: "設定", icon: "person-circle-outline", active: "person-circle", match: (p) => p === "/me" || p.startsWith("/orders") || p.startsWith("/admin") || p.startsWith("/settings") },
 ];
 
 /**
@@ -55,9 +55,11 @@ export function BottomBar() {
   const unread = useUnreadCount();
   const lib = useLibraryMode();
   // 至尊模式：不顯示「設定」分頁；最右邊的模式鍵（超派模式顯示「至尊」、至尊模式顯示「超派」）。
-  const elder = useElderOn();
+  // 要顯示哪些分頁、選單要不要放大、模式鍵的文字，都看使用模式設定檔（lib/app-mode.tsx）。
+  const profile = useModeProfile();
+  const elder = profile.bigNav;
   const [modeOpen, setModeOpen] = useState(false);
-  const shown = elder ? tabs.filter((t) => t.title !== "設定") : tabs;
+  const shown = profile.tabs.map((k) => tabs.find((t) => t.key === k)!).filter(Boolean);
   const [keyboard, setKeyboard] = useState(false);
   // 加到主畫面的 App 底部多出的一塊（lib/bottom-gap.ts）：它本身就是底部安全距離，選單不再額外留白；一般瀏覽器分頁沒有這一塊，才自己留一點。
   const [edge, setEdge] = useState(getBottomGap());
@@ -136,15 +138,15 @@ export function BottomBar() {
         <Pressable
           style={tabStyle}
           accessibilityRole="button"
-          accessibilityLabel={elder ? "目前是至尊模式。按這裡調整字體、看訂單紀錄、帳號，或換回超派模式" : "目前是超派模式。按這裡切換到至尊模式（大字簡易版）"}
-          onPress={() => (elder ? setModeOpen(true) : switchToElder())}
+          accessibilityLabel={profile.key === "elder" ? `目前是${profile.name}模式。按這裡調整字體、看訂單紀錄、帳號，或換回${MODE_PROFILES.super.name}模式` : `目前是${profile.name}模式。按這裡切換到${MODE_PROFILES.elder.name}模式（大字簡易版）`}
+          onPress={() => (profile.key === "elder" ? setModeOpen(true) : switchToElder())}
         >
           <View style={[styles.cell, elder && styles.cellElder]}>
             <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
-              {elder ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color="#FFFFFF" /> : <Ionicons name={MAKER_ICON} size={iconSize} color="#FFFFFF" {...({ uiOnly: true } as object)} />}
+              {profile.key === "elder" ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color="#FFFFFF" /> : <Ionicons name={MAKER_ICON} size={iconSize} color="#FFFFFF" {...({ uiOnly: true } as object)} />}
             </View>
             <AppText variant="caption" numberOfLines={1} style={{ color: "#FFFFFF", fontWeight: "800", fontSize: labelSize, lineHeight: Math.round(labelSize * 1.2) }} {...UI_ONLY}>
-              {elder ? "至尊" : "超派"}
+              {profile.name}
             </AppText>
           </View>
         </Pressable>
