@@ -361,8 +361,8 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
 
   return (
     // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
-    <Wrap inline={inline} onClose={onClose}>
-      <Body inline={inline} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
+    <Wrap inline={inline} onClose={onClose} lift={!!openKey || !!uplineFocus}>
+      <Body inline={inline} lift={!!openKey || !!uplineFocus} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
           <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
             <Icon name="open-outline" size={20} color={c.accentText} />
             <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
@@ -474,15 +474,16 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
 }
 
 /** 外框：上拉選單，或放在頁面裡的卡片。 */
-function Wrap({ inline, onClose, children }: { inline: boolean; onClose: () => void; children: ReactNode }) {
+/** lift＝有下拉選單展開：網頁的每個 View 都是獨立堆疊層，外框也要提到最上層，選單才不會被後面的按鈕、卡片蓋住（業主 2026-11-24）。 */
+function Wrap({ inline, onClose, lift, children }: { inline: boolean; onClose: () => void; lift: boolean; children: ReactNode }) {
   const { c } = useTheme();
-  return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
+  return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border, zIndex: lift ? 500 : 1 }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
 }
 
 /** 欄位區：上拉選單裡可捲動；放在頁面裡就跟著頁面捲。 */
-function Body({ inline, maxH, children }: { inline: boolean; maxH: number; children: ReactNode }) {
+function Body({ inline, lift, maxH, children }: { inline: boolean; lift: boolean; maxH: number; children: ReactNode }) {
   return inline ? (
-    <View style={styles.sheetBody}>{children}</View>
+    <View style={[styles.sheetBody, { zIndex: lift ? 500 : 1 }]}>{children}</View>
   ) : (
     <ScrollView style={{ maxHeight: maxH }} contentContainerStyle={styles.sheetBody} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       {children}
