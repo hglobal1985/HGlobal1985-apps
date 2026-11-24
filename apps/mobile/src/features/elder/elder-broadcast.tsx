@@ -16,6 +16,7 @@ export type ElderBlock = {
   tone?: "yellow";
   badge?: number;
   subOneLine?: boolean;
+  titleFit?: boolean;
   /** 展開時要做的事（公告：全部標為已讀）。 */
   onOpen?: () => void;
 };
@@ -26,7 +27,7 @@ export type ElderBlock = {
  * 展開＝每一則公告的完整內容（與超派公告面板同一個 BroadcastList，新的在上、含日期）。
  * 資料與超派同一個來源（useBroadcasts：中心＋所屬系列）。沒有公告就不顯示（回傳 null）。
  */
-export function useElderBroadcastBlock(t: { center?: string; series?: string }): ElderBlock | null {
+export function useElderBroadcastBlock(t: { center?: string; series?: string; /** 標題前面的來源名稱（中心或系列）：公告區要看得出是哪一個中心／系列的公告。 */ label?: string }): ElderBlock | null {
   const { c } = useTheme();
   const bc = useBroadcasts(t);
   const items = bc.data?.items;
@@ -34,7 +35,8 @@ export function useElderBroadcastBlock(t: { center?: string; series?: string }):
   if (!items?.length) return null;
   return {
     key: "announce",
-    title: `公告（${items.length} 則）`,
+    title: `${t.label ?? ""}公告（${items.length} 則）`,
+    titleFit: true,
     sub: items[0]!.text.replace(/\s+/g, " "),
     subOneLine: true,
     tone: "yellow",
@@ -49,13 +51,13 @@ export function useElderBroadcastBlock(t: { center?: string; series?: string }):
 }
 
 /** 單獨一條公告區塊（課程頁用；中心卡、系列頁把 useElderBroadcastBlock 放進自己的區塊清單，才能「同時只展開一個」）。 */
-export function ElderBroadcastBox(t: { center?: string; series?: string }) {
+export function ElderBroadcastBox(t: { center?: string; series?: string; label?: string }) {
   const block = useElderBroadcastBlock(t);
   const [open, setOpen] = useState(false);
   if (!block) return null;
   return (
     <View style={{ gap: space.sm }}>
-      <ElderBlockHeader title={block.title} sub={block.sub} subOneLine tone="yellow" badge={block.badge} on={open} onPress={() => (open ? setOpen(false) : (setOpen(true), block.onOpen?.()))} />
+      <ElderBlockHeader title={block.title} titleFit sub={block.sub} subOneLine tone="yellow" badge={block.badge} on={open} onPress={() => (open ? setOpen(false) : (setOpen(true), block.onOpen?.()))} />
       {open ? block.body() : null}
     </View>
   );

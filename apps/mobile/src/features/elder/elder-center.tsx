@@ -33,7 +33,7 @@ export function ElderCenterPage({ center, courses, renderCourses }: { center: st
   const art = centerArt.data?.find((a) => a.centerKey === centerKeyOf(center) || a.center === center);
   const stats = useCoverStats("center", center, `/courses?center=${encodeURIComponent(center)}`);
   // 公告（業主 2026-11-24）：黃色區塊排第一個，有未讀時右邊是紅色數字氣球；展開＝全部公告的完整內容並標為已讀。
-  const announce = useElderBroadcastBlock({ center });
+  const announce = useElderBroadcastBlock({ center, label: centerTitle(center) });
   const blocks: ElderBlock[] = [
     ...(announce ? [announce] : []),
     { key: "album", title: "EDM", sub: cm.edm.length ? `${cm.edm.length} 張` : undefined, body: () => <CoverAlbum kind="center" scope="edm" ownerKey={center} title={centerTitle(center)} items={cm.edm} canEdit={canEditCenterArt(member, center)} onChanged={cm.reload} /> },
@@ -53,7 +53,7 @@ export function ElderCenterPage({ center, courses, renderCourses }: { center: st
         const on = open === b.key;
         return (
           <View key={b.key} style={{ gap: space.sm }}>
-            <ElderBlockHeader title={b.title} sub={b.sub} subOneLine={b.subOneLine} tone={b.tone} badge={b.badge} on={on} onPress={() => (on ? setOpen(null) : (setOpen(b.key), b.onOpen?.()))} />
+            <ElderBlockHeader title={b.title} sub={b.sub} subOneLine={b.subOneLine} titleFit={b.titleFit} tone={b.tone} badge={b.badge} on={on} onPress={() => (on ? setOpen(null) : (setOpen(b.key), b.onOpen?.()))} />
             {on ? b.body() : null}
           </View>
         );

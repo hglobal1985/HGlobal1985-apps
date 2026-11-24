@@ -41,7 +41,7 @@ function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lea
 }
 
 /** 區塊標題大列（標題＋副標＋展開箭頭）：課程頁的區塊、中心頁的四個分類共用（業主 2026-11-24）。active＝綠底。 */
-export function ElderBlockHeader({ title, sub, on, active, onPress, tone, badge, subOneLine }: { title: string; sub?: string; on: boolean; active?: boolean; onPress: () => void; /** yellow＝公告（與超派公告同一組黃色，業主 2026-11-24）。 */ tone?: "yellow"; /** 未讀數：大於 0 時用紅色數字氣球暫時取代右邊的箭頭，看過就恢復箭頭。 */ badge?: number; /** 副標只顯示一行，太長用「…」（公告預覽）。 */ subOneLine?: boolean }) {
+export function ElderBlockHeader({ title, sub, on, active, onPress, tone, badge, subOneLine, titleFit }: { title: string; sub?: string; on: boolean; active?: boolean; onPress: () => void; /** yellow＝公告（與超派公告同一組黃色，業主 2026-11-24）。 */ tone?: "yellow"; /** 未讀數：大於 0 時用紅色數字氣球暫時取代右邊的箭頭，看過就恢復箭頭。 */ badge?: number; /** 副標只顯示一行，太長用「…」（公告預覽）。 */ subOneLine?: boolean; /** 標題強制一行、太長自動縮小字體（公告標題帶中心／系列名稱）。 */ titleFit?: boolean }) {
   const { c, scheme } = useTheme();
   const hot = on || !!active;
   const yellow = tone === "yellow" ? YELLOW[scheme] : null;
@@ -51,7 +51,7 @@ export function ElderBlockHeader({ title, sub, on, active, onPress, tone, badge,
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${title}${n > 0 ? `，${n} 則未讀` : ""}${sub ? `，${sub}` : ""}，${on ? "點一下收起" : "點一下展開"}`} onPress={onPress} style={[styles.block, { backgroundColor: bg }]}>
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <AppText variant="headline" style={{ color: fg, fontWeight: "800" }}>
+        <AppText variant="headline" numberOfLines={titleFit ? 1 : undefined} adjustsFontSizeToFit={titleFit} minimumFontScale={titleFit ? 0.5 : undefined} style={{ color: fg, fontWeight: "800" }}>
           {title}
         </AppText>
         {sub ? (
