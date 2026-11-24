@@ -1,5 +1,5 @@
 import { Button } from "@/ui/button";
-import { useBorderW } from "@/lib/elder-mode";
+import { useBorderW, useElderOn } from "@/lib/elder-mode";
 import { trackFeature } from "@/lib/feature-track";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -30,6 +30,9 @@ type View_ = {
   fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", FieldView>;
   rankOptions: { value: string; label: string }[];
 };
+/** 填在「自訂系統」就該改選「寰宇」的字詞（業主 2026-11-24）：這些其實是寰宇系統下的中心。 */
+export const HGLOBAL_CENTER_WORDS = ["飛登", "蓁分享", "有賢社", "聚冠"];
+
 type Key = "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond";
 
 const FIELD_H = 40;
@@ -317,6 +320,8 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
 
   // 系統選「其他」時中心欄被隱藏，它的「變更需再重新審核」也不算（不然其他欄會多留一行空白）。
   const sysNone = vals.education_system.trim() === NONE_TERM;
+  // 自訂系統若寫了寰宇旗下的中心名稱（飛登、蓁分享、有賢社、聚冠），提醒改選寰宇再從中心切換（業主 2026-11-24；中央同步規則見 docs/central-request-custom-system-words.md）。
+  const sysWords = HGLOBAL_CENTER_WORDS.find((w) => vals.education_system.includes(w)) ?? null;
   const sysIsOther = !sysNone && (otherPick.education_system ?? (!!sysVal && !terms.education_system.includes(vals.education_system)));
   const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
   /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
@@ -478,6 +483,11 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                         cenCol.node
                       )}
                     </View>
+                    {sysCol.other && sysWords ? (
+                      <AppText variant="caption" style={{ color: c.warning, fontWeight: "800" }} accessibilityLiveRegion="polite">
+                        {`「${sysWords}」屬於寰宇系統：請把「系統」改選「寰宇」，再從「中心」切換選擇。`}
+                      </AppText>
+                    ) : null}
                     {!sysCol.other && cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}
                   </>
                 ) : null}
@@ -519,8 +529,8 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
 /** lift＝有下拉選單展開：網頁的每個 View 都是獨立堆疊層，外框也要提到最上層，選單才不會被後面的按鈕、卡片蓋住（業主 2026-11-24）。 */
 function Wrap({ inline, onClose, lift, children }: { inline: boolean; onClose: () => void; lift: boolean; children: ReactNode }) {
   const { c } = useTheme();
-  const bw = useBorderW(1);
-  return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw, zIndex: lift ? 500 : 1 }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
+  const elderOn = useElderOn();
+  return inline ? <View style={[styles.inlineCard, { backgroundColor: c.surface, borderColor: c.border, borderWidth: elderOn ? 0 : 1, zIndex: lift ? 500 : 1 }]}>{children}</View> : <BottomSheet onClose={onClose}>{children}</BottomSheet>;
 }
 
 /** 欄位區：上拉選單裡可捲動；放在頁面裡就跟著頁面捲。 */

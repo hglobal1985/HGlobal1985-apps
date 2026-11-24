@@ -134,7 +134,7 @@ function warmTabChunks(): () => void {
         /* 預載失敗不影響使用，點進去時照常載入 */
       }
     }
-  }, 2500);
+  }, 400);
   return () => clearTimeout(t);
 }
 
