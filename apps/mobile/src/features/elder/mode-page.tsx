@@ -35,7 +35,6 @@ export function ModePage() {
       {member ? (
         <>
           <PushSwitchRow banner />
-          {member.demo ? null : <AccountCenterLink />}
         </>
       ) : null}
       {/* 最上方並排：訂單紀錄｜超派模式（業主 2026-11-24） */}
@@ -47,6 +46,7 @@ export function ModePage() {
           <Button variant="cancel" label={`${MODE_PROFILES.super.name}模式`} onPress={() => runGuarded(() => void askSwitchToMaker())} fullWidth />
         </View>
       </View>
+      {member && !member.demo ? <AccountCenterLink /> : null}
       {!ready ? <LoadingView /> : null}
       {member ? (
         <>

@@ -46,7 +46,7 @@ export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { 
           </AppText>
           {rankTag ? <View style={styles.stackRank}>{rankTag}</View> : null}
         </View>
-        {hasBadge ? <RankBadge url={member.rankBadge!} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={av} /> : null}
+        {hasBadge ? <RankBadge url={member.rankBadge!} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={Math.round(av * 1.9)} /> : null}
       </Pressable>
     );
   }

@@ -22,7 +22,8 @@ for (const C of [Text, TextInput] as unknown as { defaultProps?: Record<string, 
     if (!f || (f.fontSize == null && f.lineHeight == null)) return style;
     const o = { ...f };
     // 至尊模式「文字加粗」：一般（400～500）的字一律加到 700，原本就粗的不動。
-    if (bold && (o.fontWeight == null || o.fontWeight === "normal" || o.fontWeight === "400" || o.fontWeight === "500" || o.fontWeight === 400 || o.fontWeight === 500)) o.fontWeight = "700";
+    // 加粗要明顯（業主 2026-11-24：效果不夠粗）：400～600 一律 900，原本 700 以上也提到 900。
+    if (bold) o.fontWeight = "900";
     if (typeof o.fontSize === "number") o.fontSize = Math.round(o.fontSize * k);
     if (typeof o.lineHeight === "number") o.lineHeight = Math.round(o.lineHeight * k);
     return o;

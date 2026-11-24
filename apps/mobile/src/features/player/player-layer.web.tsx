@@ -13,6 +13,8 @@ import { zoomHintOnce } from "./zoom-hint";
 const POS_KEY = "hglobal:learn:mini-pos";
 const MARGIN = 8;
 const CIRCLE = 84;
+/** 小視窗上方的視窗按鈕列高度（業主 2026-11-24：最小化／最大化／關閉放在播放外框上方，位置仿 Windows、顏色仿 Mac）。 */
+const BAR = 34;
 
 type Pos = { x: number; y: number };
 const floatWidth = () => Math.round(Math.min(240, Math.max(180, window.innerWidth * 0.55)));
@@ -42,6 +44,7 @@ export function PlayerLayer() {
   const s = usePlayer();
   const { ready, member } = useSession();
   const boxRef = useRef<HTMLDivElement>(null);
+  const barEl = useRef<HTMLDivElement>(null);
   // 手機、平板橫放且影片播放中＝自動全螢幕；轉回直式就還原（業主 2026-11-24）。fullRef 給 tick 用（鋪滿整個視窗），pFull 給畫面（縮小鈕）。
   const fullRef = useRef(false);
   const dismissed = useRef(false); // 使用者在橫放時自己按了縮小／退出全螢幕：這次橫放不再自動進入
@@ -362,9 +365,17 @@ export function PlayerLayer() {
           const isCircle = sn.collapsed;
           const w = isCircle ? CIRCLE : floatWidth();
           const h = isCircle ? CIRCLE : Math.round((w * 9) / 16);
-          const p = clamp(pos.current ?? { x: window.innerWidth - w - 12, y: Math.max(MARGIN, bottomEdge() - h - 12) }, w, h);
-          css = `${p.x}|${p.y}|${w}|${h}|${isCircle ? 2 : 1}`;
+          const hh = isCircle ? h : h + BAR; // 小視窗＝按鈕列＋影片；pos 記的是整組左上角
+          const p = clamp(pos.current ?? { x: window.innerWidth - w - 12, y: Math.max(MARGIN, bottomEdge() - hh - 12) }, w, hh);
+          css = `${p.x}|${p.y + (isCircle ? 0 : BAR)}|${w}|${h}|${isCircle ? 2 : 1}`;
         }
+      }
+      // 視窗按鈕列：只有「小視窗」（不是小圓圖、不是課程頁內嵌、不是全螢幕）才顯示，貼在播放外框正上方。
+      const bar = barEl.current;
+      if (bar) {
+        const [bl, bt, bw, , bf] = css.split("|");
+        if (css !== "none" && bf === "1") Object.assign(bar.style, { display: "flex", left: `${bl}px`, top: `${Number(bt) - BAR}px`, width: `${bw}px`, opacity: sn.switching ? "0" : "1" });
+        else bar.style.display = "none";
       }
       if (css === last) return;
       last = css;
@@ -394,12 +405,12 @@ export function PlayerLayer() {
 
   const size = () => {
     const w = s.collapsed ? CIRCLE : floatWidth();
-    return { w, h: s.collapsed ? CIRCLE : Math.round((w * 9) / 16) };
+    return { w, h: s.collapsed ? CIRCLE : Math.round((w * 9) / 16) + BAR };
   };
   const down = (e: PointerEvent<HTMLDivElement>) => {
     const r = boxRef.current?.getBoundingClientRect();
     if (!r) return;
-    drag.current = { px: e.clientX, py: e.clientY, x: r.left, y: r.top, moved: false, hidden: !ctl };
+    drag.current = { px: e.clientX, py: e.clientY, x: r.left, y: r.top - (s.collapsed ? 0 : BAR), moved: false, hidden: false };
     e.currentTarget.setPointerCapture(e.pointerId);
     wakeCtl();
   };
@@ -426,9 +437,17 @@ export function PlayerLayer() {
     if (!d) return;
     if (d.moved) return save();
     if (justSwitched()) return;
-    if (d.hidden && !s.collapsed) return; // 按鈕藏著時的第一下只是叫出按鈕，不要直接跳回課程頁
     if (s.collapsed) restore(); // 點一下小圓圖＝恢復原本的迷你播放器
-    else if (t) router.push(lessonHref(t.courseId, t.lessonId) as never); // 點一下小視窗＝回到課程頁
+    else engine.toggle(); // 點一下小視窗的影片＝暫停／播放（業主 2026-11-24；回課程頁改用上方的「最大化」鈕）
+  };
+  /** 最大化＝進入這支影片的課程頁。 */
+  const maximize = () => {
+    if (t) router.push(lessonHref(t.courseId, t.lessonId) as never);
+  };
+  const upBar = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (d?.moved) save();
   };
   /** 縮小／恢復時，讓小圓圖貼著小視窗的右上角（手指剛按的位置附近），恢復時再貼回來。 */
   const resizeAround = (toCircle: boolean) => {
@@ -477,6 +496,7 @@ export function PlayerLayer() {
   else if (!ytSrc.current) ytSrc.current = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt.videoId)}?controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&rel=0&modestbranding=1&autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${range}`;
   const art = s.artworkUrl ? (/^(https?:|blob:|data:)/.test(s.artworkUrl) ? s.artworkUrl : s.artworkUrl) : "/icon-512.png";
   return createPortal(
+    <>
     <div ref={boxRef} onPointerDownCapture={barDown} onPointerUpCapture={barUp} onPointerCancelCapture={() => { barHold.current = false; tap.current = null; endHold(); wakeBar(); }} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
       <style>{`@keyframes hg-spin{to{transform:rotate(360deg)}}${FRAME_KEYFRAMES}`}</style>
       {pFull ? (
@@ -520,20 +540,37 @@ export function PlayerLayer() {
         </div>
       ) : null}
       {windowed ? (
-        <div data-no-pull-refresh="" style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "grab" }} onPointerDown={down} onPointerMove={(e) => { move(e); wakeCtl(); }} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label="回到課程頁（可按住拖曳移動）">
-          <button type="button" aria-label="關閉播放" style={{ ...btn, ...ctlStyle, top: 4, right: 4, width: 40, height: 40 }} onPointerDown={stop} onPointerUp={stop} onClick={() => !justSwitched() && engine.close()}>
-            ✕
-          </button>
-          <button type="button" aria-label="縮小成小圓圖" style={{ ...btn, ...ctlStyle, top: 48, right: 4, width: 40, height: 40 }} onPointerDown={stop} onPointerUp={stop} onClick={() => !justSwitched() && minimize()}>
-            ─
-          </button>
-          <button type="button" aria-label={s.playing ? "暫停" : "播放"} style={{ ...btn, ...ctlStyle, left: "50%", top: "50%", width: 52, height: 52, transform: "translate(-50%,-50%)" }} onPointerDown={stop} onPointerUp={stop} onClick={() => !justSwitched() && engine.toggle()}>
-            {s.playing ? "❚❚" : "▶"}
-          </button>
+        <div data-no-pull-refresh="" style={{ position: "absolute", inset: 0, touchAction: "none", cursor: "pointer" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => (drag.current = null)} role="button" aria-label={s.playing ? "暫停（按住可拖曳移動）" : "播放（按住可拖曳移動）"}>
+          {!s.playing ? (
+            <div style={{ position: "absolute", left: "50%", top: "50%", width: 52, height: 52, transform: "translate(-50%,-50%)", borderRadius: 999, background: "rgba(0,0,0,0.6)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", font: "700 20px sans-serif", pointerEvents: "none" }}>▶</div>
+          ) : null}
         </div>
       ) : null}
       </div>
-    </div>,
+    </div>
+    <div
+      ref={barEl}
+      data-no-pull-refresh=""
+      onPointerDown={down}
+      onPointerMove={move}
+      onPointerUp={upBar}
+      onPointerCancel={() => (drag.current = null)}
+      style={{ position: "fixed", display: "none", zIndex: 1000, height: BAR, alignItems: "center", justifyContent: "flex-end", gap: 12, padding: "0 10px", boxSizing: "border-box", borderRadius: "12px 12px 0 0", background: "rgba(24,24,24,0.88)", touchAction: "none", cursor: "grab" }}
+    >
+      {/* 位置仿 Windows（右上角由左到右：最小化、最大化、關閉）、顏色仿 Mac（黃、綠、紅圓點）；按鈕 26px 圓、手指好按 */}
+      {(
+        [
+          { label: "最小化（縮成小圓圖）", glyph: "─", color: "#FEBC2E", act: minimize },
+          { label: "最大化（進入課程頁）", glyph: "□", color: "#28C840", act: maximize },
+          { label: "關閉播放", glyph: "✕", color: "#FF5F57", act: () => engine.close() },
+        ] as const
+      ).map((b) => (
+        <button key={b.label} type="button" aria-label={b.label} onPointerDown={stop} onPointerUp={stop} onClick={() => !justSwitched() && b.act()} style={{ width: 26, height: 26, borderRadius: 999, border: 0, background: b.color, color: "rgba(0,0,0,0.65)", font: "900 14px/1 sans-serif", display: "flex", alignItems: "center", justifyContent: "center", padding: 0, cursor: "pointer", touchAction: "manipulation" }}>
+          {b.glyph}
+        </button>
+      ))}
+    </div>
+    </>,
     document.body,
   );
 }
