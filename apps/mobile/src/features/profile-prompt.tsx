@@ -87,7 +87,7 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
 /**
  * 自訂下拉選單（不用系統原生選單）：依螢幕剩餘空間自動往下或往上展開；選項超過 12 個時上方有搜尋框。
  */
-function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth }: { pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
+function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth, flow }: { /** 一欄堆疊版面（至尊模式頁）：選項直接展開在欄位下方、把後面的內容往下推，不浮在畫面上被別的元件蓋住。 */ flow?: boolean; pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
   const box = useRef<HostInstance>(null);
@@ -109,7 +109,7 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
     });
   };
   return (
-    <View ref={box} collapsable={false} style={pop ? { alignSelf: "stretch", minWidth: 0, zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
+    <View ref={box} collapsable={false} style={flow ? { width: "100%" } : pop ? { alignSelf: "stretch", minWidth: 0, zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
       <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
         <AppText style={pop ? { flex: 1, minWidth: 0 } : { flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
           {label}
@@ -117,7 +117,7 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
         <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 14 : 20} color={c.textMuted} />
       </Pressable>
       {open ? (
-        <View style={[styles.dropdown, pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }]}>
+        <View style={[styles.dropdown, pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }, flow ? { position: "relative", top: undefined, bottom: undefined, left: undefined, right: undefined, width: "100%", marginTop: 4, maxHeight: 360, shadowOpacity: 0, elevation: 0 } : null]}>
           <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
             {options.map((o) => (
               <Pressable key={o.value} onPress={() => (onPick(o.value), onOpenChange(false))} accessibilityRole="button" style={[styles.opt, o.value === value && { backgroundColor: c.accentSoft }]}>
@@ -144,6 +144,8 @@ function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange,
  * inline＝直接放在頁面裡（至尊模式的模式頁，沒有「關閉」鈕、儲存後不關閉）；預設＝上拉選單。
  */
 export function ProfilePrompt({ onClose, initial: first, inline = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean }) {
+  /** 一欄由上往下排（至尊模式頁，字放大後三欄橫排會被擠爛）；上拉選單版維持原本的緊湊三欄。 */
+  const stack = inline;
   const { c } = useTheme();
   const { height: winH, width: winW } = useWindowDimensions();
   const { invalidate, refreshMember } = useSession();
@@ -284,7 +286,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
   const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
   /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
   const colBox = (key: string, children: ReactNode) => (
-    <View key={key} style={{ flex: 1, flexBasis: 0, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
+    <View key={key} style={stack ? { width: "100%" } : { flex: 1, flexBasis: 0, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
       {children}
     </View>
   );
@@ -316,6 +318,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
         <Row fixed z={openKey === key ? 100 : 1} bad={showBad && missing.includes(key)}>
           <Label text={label} tag={shortTag(tagFor(key, isCenter))} note={isCenter ? noteFor("education_center") : undefined} reserveNote={anyNote} />
           <Dropdown
+            flow={stack}
             pop={pop}
             keepWidth={blocked || none}
             options={options}
@@ -356,7 +359,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
       <Body inline={inline} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
           <Pressable onPress={openAccountCenter} accessibilityRole="link" style={styles.more}>
             <Icon name="open-outline" size={20} color={c.accentText} />
-            <Text numberOfLines={1} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
+            <Text numberOfLines={stack ? undefined : 1} style={{ color: c.accentText, fontSize: 17, fontWeight: "700", flexShrink: 1 }}>
               前往完整版會員中心
             </Text>
           </Pressable>
@@ -374,15 +377,15 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
           {data ? (
             <>
               {/* 本名（四個中文字寬）＋縮小的手機推播（業主 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
-              <View style={[styles.line, { alignItems: "flex-end" }]}>
-                <View style={{ width: 128 }}>
+              <View style={stack ? { gap: space.sm } : [styles.line, { alignItems: "flex-end" }]}>
+                <View style={stack ? { width: "100%" } : { width: 128 }}>
                   <Row bad={showBad && missing.includes("legal_name")}>
                     <Label text="本名" />
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
                 </View>
-                <View style={{ flex: 1, minWidth: 0, }}>
-                  <PushSwitchRow banner compact />
+                <View style={stack ? { width: "100%" } : { flex: 1, minWidth: 0, }}>
+                  <PushSwitchRow banner compact={!stack} />
                 </View>
               </View>
               {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
@@ -397,9 +400,9 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                 {amway ? (
                   <>
                     {/* 上手白金｜上手鑽石（必填）：兩欄並排，輸入時下方列出中央會員的關聯詞可點選。 */}
-                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start", zIndex: uplineFocus ? 100 : 1 }}>
+                    <View style={stack ? { gap: 8 } : { flexDirection: "row", gap: 8, alignItems: "flex-start", zIndex: uplineFocus ? 100 : 1 }}>
                       {(["upline_platinum", "upline_diamond"] as const).map((k) => (
-                        <View key={k} ref={k === "upline_platinum" ? platBox : diamBox} collapsable={false} style={{ flex: 1, minWidth: 0 }}>
+                        <View key={k} ref={k === "upline_platinum" ? platBox : diamBox} collapsable={false} style={stack ? { width: "100%" } : { flex: 1, minWidth: 0 }}>
                          <Row fixed bad={showBad && missing.includes(k)}>
                           <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
                           <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
@@ -408,12 +411,13 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                       ))}
                     </View>
                     {/* 順序：獎銜 > 系統 > 中心（業主 2026-11-22）。獎銜一律可選；中心只有系統是寰宇才能選。 */}
-                    <View style={{ flexDirection: "row", gap: 8, zIndex: 30, alignItems: "flex-start" }}>
+                    <View style={stack ? { gap: 8 } : { flexDirection: "row", gap: 8, zIndex: 30, alignItems: "flex-start" }}>
                       {colBox(
                         "rank",
                         <Row fixed z={openKey === "rank" ? 100 : 1} bad={showBad && missing.includes("rank")}>
                           <Label text="獎銜" tag={shortTag(tagFor("rank", true))} note={noteFor("rank")} reserveNote={anyNote} />
                           <Dropdown
+                            flow={stack}
                             pop="left"
                             keepWidth={rankNone}
                             options={data.rankOptions.filter((o) => o.value !== "none").map((o) => ({ value: o.value, label: o.label }))}
@@ -430,7 +434,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
                       {sysCol.node}
                       {sysCol.other ? (
                         // 系統選「其他」：隱藏中心欄，原位置改成自訂系統的輸入欄（業主 2026-11-23）。
-                        <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={stack ? { width: "100%" } : { flex: 1, minWidth: 0 }}>
                           <Row fixed bad={showBad && missing.includes("education_system")}>
                             <Label text="自訂系統" tag={shortTag(tagFor("education_system"))} reserveNote={anyNote} />
                             <Input value={vals.education_system} onChange={setSystem} placeholder="請輸入系統名稱" />
