@@ -542,6 +542,7 @@ type CourseRow = {
   location_none: number;
   is_online: number;
   chapter_covers: number;
+  block_photos: number;
   auto_cover: number;
   center_course: number;
   created_at: string;
@@ -569,7 +570,7 @@ const materialLike = (r: { invite_only: number; is_list: number; chapter_n: numb
 /** 同一個判斷的 SQL 版（FROM courses 的查詢用）。 */
 const MATERIAL_LIKE_SQL = `(invite_only = 0 AND (is_list = 1 OR (NOT EXISTS (SELECT 1 FROM lessons ch WHERE ch.course_id = courses.id AND ch.kind = 'chapter') AND price_twd = 0 AND price_tba <> 1 AND COALESCE(event_start, '') = '' AND COALESCE(event_end, '') = '')))`;
 
-const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.invite_only, c.invite_code, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.auto_cover, c.center_course, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
+const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher, c.teacher_rank, c.teacher_title, c.no_speaker, c.is_package, c.category, c.price_twd, c.min_rank_code, c.theme, c.status, c.description, c.guidance_unit, c.host_unit, c.host_center_key, c.is_shorts, c.is_list, (SELECT COUNT(*) FROM lessons ch WHERE ch.course_id = c.id AND ch.kind = 'chapter') AS chapter_n, c.url_name, c.mat_url, c.free_from, c.free_until, c.review_group_id, c.allow_president, c.invite_only, c.invite_code, c.event_start, c.event_end, c.is_public, c.price_tba, c.hide_home, c.brand_id, c.zone, c.diamond_free, c.series, c.series_order, c.series_hidden, (SELECT a.edm_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_edm_key, (SELECT a.art_version FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_art_version, (SELECT a.cover_key FROM series_art a WHERE a.series = c.series AND c.series <> '') AS series_cover_key, c.early_bird, c.early_price_twd, c.early_until, c.location, c.location_none, c.is_online, c.chapter_covers, c.block_photos, c.auto_cover, c.center_course, c.edm_key, c.cover_key, c.edm_view_y, c.cover_rect, c.art_version, c.created_by_sub, c.edited_by_name, c.edited_at, c.updated_at, c.created_at,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
@@ -700,6 +701,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     locationNone: row.location_none === 1,
     isOnline: row.is_online === 1,
     chapterCovers: row.chapter_covers === 1,
+    blockPhotos: row.block_photos === 1,
     lessonCount: row.lesson_count,
     hasMaterial: row.material_count > 0,
     // 教材數：自己的教材，加上連結區塊（品牌資訊卡的「新品特惠培訓直播」）來源清單裡的教材。
@@ -1027,11 +1029,13 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const linkCover = new Map<string, string>();
   const sourceCourses: string[] = [];
   const sourceCourseOf = new Map<string, string>();
+  const photoKeyOf = new Map<string, string>(); // 區塊 → 放照片的區塊編號（課程開放區塊照片時才有；業主 2026-11-24）
+  if (row.block_photos === 1) for (const l of lessons.results) if (l.kind === "section" && !l.link_block_id) photoKeyOf.set(l.id, l.id);
   // 連結區塊（只有品牌卡有）：每個連結區塊各自的來源一起查，再依原本順序接回去。
   const linked = await Promise.all(
     lessons.results.map(async (l) => {
       if (!l.link_block_id) return null;
-      const sec = await ctx.db.prepare("SELECT s.course_id, s.position, c.series, c.cover_key AS ckey, c.art_version AS cver FROM lessons s JOIN courses c ON c.id = s.course_id WHERE s.id = ? AND s.kind = 'section'").bind(l.link_block_id).first<{ course_id: string; position: number; series: string | null; ckey: string | null; cver: number }>();
+      const sec = await ctx.db.prepare("SELECT s.course_id, s.position, c.series, c.cover_key AS ckey, c.art_version AS cver, c.block_photos AS bp FROM lessons s JOIN courses c ON c.id = s.course_id WHERE s.id = ? AND s.kind = 'section'").bind(l.link_block_id).first<{ course_id: string; position: number; series: string | null; ckey: string | null; cver: number; bp: number }>();
       if (!sec) return null;
       const [{ results: items }, art] = await Promise.all([
         ctx.db
@@ -1050,6 +1054,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     const { sec, items, art } = hit;
     sourceCourses.push(sec.course_id);
     sourceCourseOf.set(l.id, sec.course_id);
+    if (sec.bp === 1) photoKeyOf.set(l.id, l.link_block_id!); // 區塊照片：連結區塊的照片存在來源區塊
     for (const it of items) lessonRows.push({ ...it, src: sec.course_id });
     // 封面＝來源清單的系列封面（上傳的封面優先，沒有再用首頁圖）；之後來源修改，這裡自動一致。
     const key = art?.cover_key || art?.edm_key;
@@ -1070,6 +1075,16 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   ctx.seriesSlugs = seriesSlugs;
   ctx.brands = brands;
   ctx.blocks = blocks;
+  // 區塊照片（業主 2026-11-24）：開放的課程，每個區塊帶出自己的照片（cover_media，owner_key＝區塊編號；連結區塊用來源區塊）。
+  const photosOf = new Map<string, CoverMediaItem[]>();
+  const photoKeys = [...new Set(photoKeyOf.values())];
+  if (photoKeys.length) {
+    const { results } = await ctx.db
+      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
+      .bind(...photoKeys)
+      .all<{ id: string; owner_key: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+    for (const r of results) photosOf.set(r.owner_key, [...(photosOf.get(r.owner_key) ?? []), coverItem(r)]);
+  }
   const [eligibility, canRoster, registrations] = await Promise.all([eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]), canSeeRoster(ctx, s, row, manages), manages ? registrationCount(ctx.db, id) : Promise.resolve(0)]);
   const summaryNow = summarize(row, ctx, rankMap, state, eligibility);
   const watchFree = summaryNow.watchFree;
@@ -1089,7 +1104,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       position: groupPos.get(l.id)!,
       material: l.kind === "material" || l.kind === "section",
       ...(l.kind === "section"
-        ? { section: true, ...(l.link_block_id ? { linkedBlockId: l.link_block_id, linkedCourseId: sourceCourseOf.get(l.id) } : {}), inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key) }
+        ? { section: true, ...(l.link_block_id ? { linkedBlockId: l.link_block_id, linkedCourseId: sourceCourseOf.get(l.id) } : {}), inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key), ...(photoKeyOf.has(l.id) ? { photoKey: photoKeyOf.get(l.id), photos: photosOf.get(photoKeyOf.get(l.id)!) ?? [] } : {}) }
         : {}),
       ...(l.is_full === 1 ? { full: true } : {}),
       title: l.title,
@@ -2545,7 +2560,7 @@ async function requireCoverOwner(ctx: Ctx, fromBody = false): Promise<{ s: Sessi
     return { s, kind, lookup: key, centerKey: null, ownerKey: key, scope };
   }
   const s = requireMember(ctx);
-  await requireCourseArt(ctx, s, key);
+  await requireCourseArt(ctx, s, await courseOfCoverKey(ctx.db, key));
   return { s, kind, lookup: key, centerKey: null, ownerKey: key, scope };
 }
 /** 刪除、換預覽圖時：依資料列所屬的封面檢查權限。 */
@@ -2556,8 +2571,19 @@ async function requireCoverRowOwner(ctx: Ctx, row: CoverRow): Promise<Session> {
     const mine = rights.center && row.center_key === centerKey(rights.center.label);
     if (!rights.admin && !(mine && (rights.staff || rights.editor?.editOthers))) fail(403, "forbidden", "只能修改自己中心的封面");
   } else if (row.owner_kind === "series") requireSuperAdmin(ctx);
-  else await requireCourseArt(ctx, s, row.owner_key);
+  else await requireCourseArt(ctx, s, await courseOfCoverKey(ctx.db, row.owner_key));
   return s;
+}
+/**
+ * 區塊照片（業主 2026-11-24）：cover_media 的 course 類，owner_key 除了課程編號，也可以是「區塊編號」（該區塊底下的照片，與中心 EDM 共用上傳模組）。
+ * 回傳要檢查權限的課程編號；區塊所屬課程沒有開放（courses.block_photos）就擋下。連結區塊要傳來源區塊編號（照片只存來源一份）。
+ */
+async function courseOfCoverKey(db: D1Database, key: string): Promise<string> {
+  if (await db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(key).first()) return key;
+  const blk = await db.prepare("SELECT l.course_id, c.block_photos FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ? AND l.kind = 'section'").bind(key).first<{ course_id: string; block_photos: number }>();
+  if (!blk) return key;
+  if (blk.block_photos !== 1) fail(403, "block_photos_off", "這門課程還沒有開放區塊新增照片");
+  return blk.course_id;
 }
 async function coverRoom(db: D1Database, o: { kind: CoverMediaKind; lookup: string; scope: CoverScope }): Promise<void> {
   if ((await coverItems(db, o.kind, o.lookup, o.scope)).filter((x) => !x.courseId).length >= COVER_MEDIA_MAX) fail(409, "album_full", `最多放 ${COVER_MEDIA_MAX} 張，請先刪除一些`);
@@ -2770,6 +2796,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   if (body.locationNone !== undefined) sets.push(["location_none", body.locationNone === true ? 1 : 0]);
   if (body.isOnline !== undefined) sets.push(["is_online", body.isOnline === true ? 1 : 0]);
   if (body.chapterCovers !== undefined) sets.push(["chapter_covers", body.chapterCovers === true ? 1 : 0]);
+  if (body.blockPhotos !== undefined) sets.push(["block_photos", body.blockPhotos === true ? 1 : 0]);
   // 短影音專輯：勾了的課程，其章節與影音教材在「單元」頁歸類為短影音。
   if (body.isShorts !== undefined) sets.push(["is_shorts", body.isShorts === true ? 1 : 0]);
   if (body.earlyBird !== undefined) {

@@ -17,6 +17,7 @@ export const NewMaterialSheet = lazyPart(bundle, "NewMaterialSheet");
 export const BlockEditList = lazyPart(bundle, "BlockEditList");
 export const EditLessonRows = lazyPart(bundle, "EditLessonRows");
 export const LessonSheet = lazyPart(bundle, "LessonSheet");
+export const BlockPhotosSheet = lazyPart(bundle, "BlockPhotosSheet");
 export const MoveToBlockSheet = lazyPart(bundle, "MoveToBlockSheet");
 export const PickMaterialsSheet = lazyPart(bundle, "PickMaterialsSheet");
 export const NewLessonSheet = lazyPart(bundle, "NewLessonSheet");

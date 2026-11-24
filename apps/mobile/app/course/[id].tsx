@@ -13,7 +13,7 @@ import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { engine } from "@/features/player/engine";
 import { useLessonSession } from "@/features/player/use-lesson-session";
 import { lessonHref } from "@/lib/lesson-href";
-import { BlockEditList, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
+import { BlockEditList, BlockPhotosSheet, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
 import type { SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { AddMaterialFab } from "@/features/course-edit/add-material-fab";
@@ -109,6 +109,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
     if (!editing) setSettingsOpen(false);
   }, [editing]);
   const [pickBlock, setPickBlock] = useState<string | null>(null); // 「移動教材」要移進哪個區塊
+  const [photoBlock, setPhotoBlock] = useState<Lesson | null>(null); // 「新增照片」的區塊（業主 2026-11-24）
   const [newCardOpen, setNewCardOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
@@ -497,7 +498,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
             <Section title="其他教材">
                 <>
                 {<Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
-                <BlockEditList extraMovable={lessons.length > 0 && pkgBlocks} items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} busy={lessonBusy} />
+                <BlockEditList extraMovable={lessons.length > 0 && pkgBlocks} items={materials} onEdit={setLessonSheet} onMoveItem={moveLesson} onMoveBlock={moveBlock} onCopy={duplicateLesson} onDelete={deleteLesson} onAddMaterial={(blockId) => (setMaterialBlock(blockId), setSheet("newMaterial"))} onAddBlock={() => setSheet("newSection")} onMoveTo={setMoveTarget} onPickMove={setPickBlock} onAddPhotos={setPhotoBlock} busy={lessonBusy} />
                 </>
             </Section>
           </>
@@ -538,6 +539,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
+      {photoBlock ? <BlockPhotosSheet head={photoBlock} onClose={() => setPhotoBlock(null)} onChanged={reload} /> : null}
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
       {/* 右下角「＋新增教材」（業主 2026-11-23：每張卡的頁面都要有新增鈕）：有修改權限就顯示（不必先進編輯模式，業主 2026-11-23 再次回報點進卡片沒有新增鈕）；播放中隱藏。 */}

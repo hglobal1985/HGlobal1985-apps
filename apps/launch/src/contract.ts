@@ -193,6 +193,8 @@ export type CourseSummary = {
   started: boolean;
   /** 課程勾選「章節各自設定封面」：章節編輯時才會出現封面設定。 */
   chapterCovers: boolean;
+  /** 課程開放「區塊新增照片」（業主 2026-11-24，先只有實戰百寶箱）：編輯模式每個區塊多一個「新增照片」，學員在區塊裡看照片格。 */
+  blockPhotos: boolean;
   /** 中心課程：只在「寰宇教育中心」頁出現，不在「全部課程」出現。 */
   centerCourse: boolean;
   /** 短影音專輯：這門課的章節與影音教材在「單元」頁歸類為短影音。 */
@@ -275,6 +277,10 @@ export type Lesson = {
   /** 連結區塊（品牌資訊卡的「新品特惠培訓直播」）：內容與封面都來自另一份清單的區塊（業主 2026-11-18）。 */
   linkedCourseId?: string;
   linkedBlockId?: string;
+  /** 區塊照片：放這個區塊照片的區塊編號（連結區塊＝來源區塊）；沒有這個欄位＝這門課沒開放區塊照片。 */
+  photoKey?: string;
+  /** 區塊照片清單（依排序）。 */
+  photos?: CoverMediaItem[];
   /** 這個項目實際屬於哪份清單（連結區塊裡的項目才有）；編輯、排序都在原清單。 */
   courseId?: string;
   categories?: string;
