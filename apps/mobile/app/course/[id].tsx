@@ -10,11 +10,7 @@ import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
 import { EdmStage } from "@/features/courses/edm-viewer";
 import { useCoverStats } from "@/features/courses/cover-stats";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
-import { InlineAudio } from "@/features/player/audio-bar";
 import { engine } from "@/features/player/engine";
-import { LessonPlayer } from "@/features/player/lesson-player";
-import { PlayerControls } from "@/features/player/player-controls";
-import { PlayerSlot } from "@/features/player/player-slot";
 import { useLessonSession } from "@/features/player/use-lesson-session";
 import { lessonHref } from "@/lib/lesson-href";
 import { BlockEditList, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
@@ -27,6 +23,9 @@ import { canCreateCourse, isSuperAdmin } from "@/lib/roles";
 import { Check } from "@/ui/check";
 import { CollapseToggle } from "@/ui/collapse-toggle";
 import { PageHeader } from "@/features/page-header";
+import { centerTitle } from "@/features/format";
+import { useSeriesSettings } from "@/features/courses/series-settings";
+import { LessonStage } from "@/features/player/lesson-stage";
 import { ElderCourse } from "@/features/elder/elder-course";
 import { ElderBroadcastBox } from "@/features/elder/elder-broadcast";
 import { useModeProfile } from "@/lib/app-mode";
@@ -35,7 +34,7 @@ import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { StageWidth } from "@/ui/stage-frame";
-import { AppText, Button, Card, LoadingLadybug, LoginPrompt, ErrorView, ListRow, LoadingView, LockMask, NoticeBox, Pill, Screen, Section, SegmentTabs, TopBarButton } from "@/ui";
+import { AppText, Button, Card, LoginPrompt, ErrorView, ListRow, LoadingView, LockMask, NoticeBox, Pill, Screen, Section, SegmentTabs, TopBarButton } from "@/ui";
 
 type Mode = "view" | "edit" | "preview";
 
@@ -64,6 +63,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   // 至尊模式（業主 2026-11-24）：沒有管理員編輯模式，版面改成 ElderCourse（上課／介紹兩頁）。
   const profile = useModeProfile();
   const elder = profile.coursePage === "twoTabs";
+  const seriesSettings = useSeriesSettings();
   const lay = useLayout();
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${id}`);
   // 剛儲存回來的最新資料（重新載入完成前先用它，避免下一次儲存誤判「別人剛改過」）。
@@ -353,20 +353,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
   const onSaved = (d: CourseDetail) => setSaved(d);
 
   if (elder) {
-    const player = stage ? (
-      <View>
-        {stage.audio ? (
-          <InlineAudio trackKey={stage.key} />
-        ) : (
-          <>
-            <PlayerSlot trackKey={stage.key} />
-            <PlayerControls />
-          </>
-        )}
-      </View>
-    ) : playLegacy && session.playback ? (
-      <LessonPlayer playback={session.playback} onSegmentEnd={session.onLegacyEnd} />
-    ) : null;
+    const player = stage || (playLegacy && session.playback) ? <LessonStage stage={stage} legacy={playLegacy ? session.playback : null} onLegacyEnd={session.onLegacyEnd} /> : null;
     return (
       <View style={{ flex: 1 }}>
         <PageHeader
@@ -374,14 +361,16 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
           path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
           course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
           list={course.isList ? { title: course.title } : undefined}
-          backTo="/courses"
+          // 返回＝回到「實際所屬的上一層」（業主 2026-11-24）：中心主辦的課程回該中心首頁、清單卡回卡片清單，不管是從哪裡點進來（例如首頁的繼續播放）。
+          backTo={course.isList ? `/courses?focus=${encodeURIComponent(course.series ? `s:${course.series}` : `c:${course.id}`)}` : course.hostCenter ? `/courses?center=${encodeURIComponent(course.hostCenter)}` : "/courses"}
+          backAlways
         />
         {/* 課程頁封面只留點閱數、不放訂閱鈕（業主 2026-11-24：報名＝自動訂閱）。 */}
         <ElderCourse
           course={course}
           player={player}
           cover={<EdmStage course={course} stats={{ ...stats, subscribe: undefined }} />}
-          announce={<ElderBroadcastBox center={course.hostCenter || undefined} series={course.series || undefined} />}
+          announce={<ElderBroadcastBox center={course.hostCenter || undefined} series={course.series || undefined} label={course.hostCenter ? centerTitle(course.hostCenter) : course.series ? seriesSettings.titleOf(course.series) : undefined} />}
           playingId={playLesson ? playLesson.id : null}
           onPlay={playLesson_}
           action={stickyAction}
@@ -439,36 +428,13 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block }: { id: s
       <View style={lay.split ? styles.split : styles.stack}>
       <StageWidth.Provider value={lay.split ? null : undefined}>
       <View style={lay.split ? [styles.splitLeft, { width: Math.round(lay.width * 0.56) }] : undefined}>
-        {stage ? (
-          <View>
-            {stage.audio ? (
-              <InlineAudio trackKey={stage.key} />
-            ) : (
-              <>
-                <PlayerSlot trackKey={stage.key} />
-                <PlayerControls />
-              </>
-            )}
-          </View>
-        ) : playLegacy && session.playback ? (
-          <LessonPlayer playback={session.playback} onSegmentEnd={session.onLegacyEnd} />
-        ) : (
-          <>
-            <View>
-              <EdmStage course={course} stats={course.isList ? stats : undefined} canManageAlbum={editing} />
-              {/* 影片中間不放任何按鈕（業主 2026-11-17）：播放一律從下面的控制列。 */}
-            </View>
-            {firstPlayable || playLesson ? (
-              <View style={[styles.idleBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
-                <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={() => firstPlayable && !playLesson && playLesson_(firstPlayable.id)} hitSlop={8} style={styles.idlePlay}>
-                  {playLesson ? <LoadingLadybug size={32} /> : <Ionicons name="play" size={26} color={c.text} />}
-                </Pressable>
-                <View style={[styles.idleTrack, { backgroundColor: c.border }]} />
-                <AppText variant="callout" tone="muted">{`-${Math.floor((playLesson ?? firstPlayable)!.minutes)}:00`}</AppText>
-              </View>
-            ) : null}
-          </>
-        )}
+        <LessonStage
+          stage={stage}
+          legacy={playLegacy ? session.playback : null}
+          onLegacyEnd={session.onLegacyEnd}
+          idle={<EdmStage course={course} stats={course.isList ? stats : undefined} canManageAlbum={editing} />}
+          idleBar={firstPlayable || playLesson ? { minutes: (playLesson ?? firstPlayable)!.minutes, loading: !!playLesson, onPlay: () => firstPlayable && !playLesson && playLesson_(firstPlayable.id) } : null}
+        />
         {editing && canEditContent ? (
           <Pressable accessibilityRole="button" accessibilityLabel="編輯 EDM 與封面" onPress={() => setSheet("art")} style={styles.edmEdit}>
             <Ionicons name="create-outline" size={20} color="#fff" />
@@ -598,9 +564,6 @@ const styles = StyleSheet.create({
   split: { flex: 1, flexDirection: "row" },
   splitLeft: { alignSelf: "flex-start" },
   splitRight: { flex: 1, minWidth: 0, borderLeftWidth: StyleSheet.hairlineWidth },
-  idleBar: { flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, paddingHorizontal: 16, borderBottomWidth: 1 },
-  idlePlay: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  idleTrack: { flex: 1, height: 6, borderRadius: 3 },
   banner: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, paddingVertical: space.xs, minHeight: minTouch },
   bannerText: { flex: 1, color: "#fff", fontWeight: "700", fontSize: 15 },
   bannerBtn: { minHeight: 36, minWidth: 64, paddingHorizontal: space.md, borderRadius: radius.pill, borderWidth: 1.5, borderColor: "#fff", alignItems: "center", justifyContent: "center" },

@@ -35,7 +35,7 @@ export function ElderSeriesHead({ series, title }: { series: string; title: stri
   return (
     <View style={{ gap: space.md, marginBottom: space.md }}>
       <CenterHero inline art={art} media={cm.items} stats={stats} title={title} />
-      <ElderBroadcastBox series={series} />
+      <ElderBroadcastBox series={series} label={title} />
     </View>
   );
 }
