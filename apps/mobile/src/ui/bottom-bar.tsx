@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, usePathname, type Href } from "expo-router";
-import { useEffect, useState, type ComponentProps } from "react";
-import { Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { Animated, Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requestCoursesReset } from "@/lib/courses-reset";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
@@ -44,6 +44,50 @@ const tabs: { key: TabKey; href: Href; title: string; icon: IconName; active: Ic
  * 只記在這次開啟期間（記憶體），不存裝置。
  */
 let lastCoursesHref: string | null = null;
+
+/**
+ * 超派模式的模式鍵「偷看」動畫（業主 2026-11-24）：平常顯示「超派＋火箭」，每隔 3 秒換成「至尊＋皇冠」閃爍幾下，再換回「超派＋火箭」，
+ * 提醒使用者這裡可以切換到至尊模式。只在超派模式執行（至尊模式固定顯示「至尊＋皇冠」）。
+ */
+function useModePeek(enabled: boolean) {
+  const [peek, setPeek] = useState(false);
+  const fade = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!enabled) {
+      setPeek(false);
+      fade.setValue(1);
+      return;
+    }
+    const native = Platform.OS !== "web";
+    const to = (v: number, d: number) => Animated.timing(fade, { toValue: v, duration: d, useNativeDriver: native });
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const cycle = () => {
+      timer = setTimeout(() => {
+        if (!alive) return;
+        // 淡出火箭 → 換成皇冠 → 閃爍兩下 → 淡出 → 換回火箭
+        to(0, 160).start(() => {
+          if (!alive) return;
+          setPeek(true);
+          Animated.sequence([to(1, 160), to(0.25, 220), to(1, 220), to(0.25, 220), to(1, 220), Animated.delay(250), to(0, 160)]).start(() => {
+            if (!alive) return;
+            setPeek(false);
+            to(1, 160).start(() => alive && cycle());
+          });
+        });
+      }, 3000);
+    };
+    cycle();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+      fade.stopAnimation();
+      fade.setValue(1);
+      setPeek(false);
+    };
+  }, [enabled, fade]);
+  return { peek, fade };
+}
 
 /**
  * 底部分頁列：放在根版面，所有頁面（課程、上課、報名、管理、設定…）都會顯示，不會被推入的頁面蓋掉。
@@ -91,6 +135,8 @@ export function BottomBar() {
       el.style.backgroundColor = old;
     };
   }, [barBg, hidden]);
+  const { peek, fade: peekFade } = useModePeek(!lib && !hidden && profile.key !== "elder");
+  const showElder = profile.key === "elder" || peek;
   if (hidden) return null;
   // 在模式頁（/mode）時，模式鍵跟其他分頁一樣亮起黃色膠囊。
   const modeOn = !lib && pathname === "/mode";
@@ -144,14 +190,14 @@ export function BottomBar() {
           accessibilityLabel={profile.key === "elder" ? `目前是${profile.name}模式。按這裡調整字體、看訂單紀錄、帳號，或換回${MODE_PROFILES.super.name}模式` : `目前是${profile.name}模式。按這裡切換到${MODE_PROFILES.elder.name}模式（大字簡易版）`}
           onPress={() => runGuarded(() => (profile.modeKey === "page" ? router.navigate("/mode") : switchToElder()))}
         >
-          <View style={[styles.cell, elder && styles.cellElder, modeOn && { backgroundColor: c.navPill }]}>
+          <Animated.View style={[styles.cell, elder && styles.cellElder, modeOn && { backgroundColor: c.navPill }, { opacity: peekFade }]}>
             <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
-              {profile.key === "elder" ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color={modeColor} /> : <Ionicons name={MAKER_ICON} size={iconSize} color={modeColor} {...({ uiOnly: true } as object)} />}
+              {showElder ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color={modeColor} /> : <Ionicons name={MAKER_ICON} size={iconSize} color={modeColor} {...({ uiOnly: true } as object)} />}
             </View>
             <AppText variant="caption" numberOfLines={1} style={{ color: modeColor, fontWeight: "800", fontSize: labelSize, lineHeight: Math.round(labelSize * 1.2) }} {...UI_ONLY}>
-              {profile.name}
+              {showElder ? MODE_PROFILES.elder.name : profile.name}
             </AppText>
-          </View>
+          </Animated.View>
         </Pressable>
       )}
       </View>
