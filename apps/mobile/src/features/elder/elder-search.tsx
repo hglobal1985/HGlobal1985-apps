@@ -14,7 +14,8 @@ import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
-import { ELDER_ZONES, ElderZoneBackdrop, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
+import { TileCover } from "@/features/courses/series-tile";
+import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -165,7 +166,6 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     <View style={[styles.fill, { backgroundColor: c.background }]}>
       {/* 課程分頁不再有搜尋框（業主 2026-11-24：移除置頂搜尋）；搜尋只在首頁。 */}
       {mode === "home" ? <View style={[styles.inner, pad, { paddingTop: insets.top + space.md, paddingBottom: space.sm }]}>{header}</View> : <View style={{ height: insets.top + space.md }} />}
-      {inZone ? <ElderZoneBackdrop zone={zoneDef!} /> : null}
       {inZone ? (
         <View style={[styles.inner, pad, { paddingBottom: space.sm }]}>
           <ElderZoneHeader zone={zoneDef!} sub={sub?.title} onBack={() => (sub ? setSub(null) : setZone(null))} />
@@ -188,7 +188,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
               </View>
             ) : undefined
           }
-          renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} />}
+          renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} />}
           initialNumToRender={8}
         />
       ) : (
@@ -242,23 +242,25 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
 const WAVE_ANIM = (Platform.OS === "web" ? { transitionProperty: "height", transitionDuration: "90ms", transitionTimingFunction: "ease-out" } : {}) as object;
 
 /** 至尊模式的課程列：大縮圖、大字標題、狀態（已報名／審核中／免費／付費）。整列都可以點。 */
-export type Row = { key: string; title: string; count?: number; rep: CourseSummary; children?: CourseSummary[] };
+export type Row = { key: string; title: string; count?: number; rep: CourseSummary; children?: CourseSummary[]; series?: boolean; coverUrl?: string | null };
 
-export function ElderCourseRow({ course, title, count, onPress }: { course: CourseSummary; title?: string; /** 有給＝標籤顯示「N 項教材」（分類清單，與超派模式一致）；沒給＝顯示報名狀態。 */ count?: number; onPress?: () => void }) {
+export function ElderCourseRow({ course, title, count, onPress, series, coverUrl }: { course: CourseSummary; title?: string; /** 有給＝標籤顯示「N 項教材」（分類清單，與超派模式一致）；沒給＝顯示報名狀態。 */ count?: number; onPress?: () => void; /** true＝這列是系列（封面用系列封面）。 */ series?: boolean; /** 中心列：中心封面圖（與超派模式的中心卡一致）。 */ coverUrl?: string | null }) {
   const { c } = useTheme();
-  const thumb = useThumb();
-  const img = course.coverUrl ?? course.edmUrl;
-  const size = Math.round(84 * UI_SCALE);
+  // 封面一律直式 4:3（寬 3：高 4），封面挑選與超派模式同一份程式（TileCover，業主 2026-11-24 永久指示）。
+  const w = Math.round(96 * UI_SCALE);
+  const h = Math.round((w * 4) / 3);
   const tag = count !== undefined ? `${count} 項教材` : course.isList ? "教材" : course.enrollment === "opened" ? "已報名" : course.enrollment === "pending" ? "審核中" : course.priceTba ? "費用未公布" : course.free || course.freeNow || course.watchFree ? "免費" : "付費";
   const strong = tag === "已報名";
+  const label = title ?? course.title;
+  const thumb = useThumb();
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${title ?? course.title}，${tag}`} onPress={onPress ?? (() => router.push(`/course/${course.id}`))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
-      <View style={[styles.thumb, { width: size, height: size, backgroundColor: c.accentSoft }]}>
-        {img ? <Image source={{ uri: thumb(resolveUrl(img), size * 2) }} style={{ width: size, height: size }} resizeMode="cover" /> : <ThumbFallback />}
+    <Pressable accessibilityRole="button" accessibilityLabel={`${label}，${tag}`} onPress={onPress ?? (() => router.push(`/course/${course.id}`))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
+      <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
+        {coverUrl ? <Image source={{ uri: thumb(resolveUrl(coverUrl), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <TileCover rep={course} width={w} height={h} flat={!series} inSeries={!!series} title={label} />}
       </View>
       <View style={{ flex: 1, gap: 6 }}>
         <AppText variant="headline" numberOfLines={3}>
-          {title ?? course.title}
+          {label}
         </AppText>
         <View style={[styles.tag, { backgroundColor: strong ? c.accent : c.accentSoft }]}>
           <AppText variant="callout" style={{ color: strong ? c.textOnAccent : c.accentText, fontWeight: "700" }}>
