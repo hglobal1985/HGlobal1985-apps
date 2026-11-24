@@ -39,6 +39,12 @@ export function PlayerLayer() {
   const s = usePlayer();
   const { ready, member } = useSession();
   const boxRef = useRef<HTMLDivElement>(null);
+  // 手機、平板橫放且影片播放中＝自動全螢幕；轉回直式就還原（業主 2026-11-24）。fullRef 給 tick 用（鋪滿整個視窗），pFull 給畫面（縮小鈕）。
+  const fullRef = useRef(false);
+  const dismissed = useRef(false); // 使用者在橫放時自己按了縮小／退出全螢幕：這次橫放不再自動進入
+  const realFs = useRef(false);
+  const [pFull, setPFull] = useState(false);
+  const exitRef = useRef<(() => void) | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const pos = useRef<Pos | null>(null);
   const drag = useRef<{ px: number; py: number; x: number; y: number; moved: boolean; hidden?: boolean } | null>(null);
@@ -182,11 +188,66 @@ export function PlayerLayer() {
   useEffect(() => {
     const el = engine.element();
     const sync = () => {
-      el.controls = !!document.fullscreenElement && document.fullscreenElement === boxRef.current;
+      el.controls = (!!document.fullscreenElement && document.fullscreenElement === boxRef.current) || fullRef.current;
     };
     sync();
     document.addEventListener("fullscreenchange", sync);
     return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  // 橫放自動全螢幕：影片（不含純音檔）播放中、觸控裝置（手機、平板）轉成橫放 → 進入全螢幕；轉回直式 → 退出。
+  // 瀏覽器常拒絕「沒有手指點擊」的全螢幕要求，拒絕時改用「鋪滿整個視窗」的假全螢幕，效果一樣（業主 2026-11-24）。
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const land = window.matchMedia("(orientation: landscape)");
+    const coarse = window.matchMedia("(pointer: coarse)");
+    const leave = () => {
+      fullRef.current = false;
+      setPFull(false);
+      if (realFs.current && document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      realFs.current = false;
+      engine.element().controls = false;
+    };
+    exitRef.current = () => {
+      dismissed.current = true;
+      leave();
+    };
+    const enter = () => {
+      fullRef.current = true;
+      setPFull(true);
+      engine.element().controls = true; // 鋪滿視窗時外面的控制列看不到，改用瀏覽器內建控制列
+      const box = boxRef.current;
+      if (document.fullscreenEnabled && box && !document.fullscreenElement) {
+        box.requestFullscreen().then(() => { realFs.current = true; setPFull(false); }).catch(() => undefined); // 被拒絕就維持鋪滿視窗
+      }
+    };
+    const check = () => {
+      const sn = engine.getSnapshot();
+      const isVideo = !!sn.track && sn.track.mode !== "audio" && !sn.collapsed;
+      if (!land.matches) {
+        dismissed.current = false;
+        if (fullRef.current) leave();
+        return;
+      }
+      if (!isVideo && fullRef.current) leave();
+      else if (isVideo && sn.playing && coarse.matches && !fullRef.current && !dismissed.current) enter();
+    };
+    const onFs = () => {
+      if (realFs.current && !document.fullscreenElement) {
+        realFs.current = false;
+        dismissed.current = true; // 使用者自己退出全螢幕
+        fullRef.current = false;
+        setPFull(false);
+      }
+    };
+    const id = window.setInterval(check, 400);
+    land.addEventListener("change", check);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => {
+      window.clearInterval(id);
+      land.removeEventListener("change", check);
+      document.removeEventListener("fullscreenchange", onFs);
+    };
   }, []);
 
   // 每個畫面更新時對齊位置：內嵌＝貼齊課程頁的播放區塊；浮動＝使用者拖曳過的位置；縮小＝小圓圖。
@@ -205,7 +266,9 @@ export function PlayerLayer() {
       let css = "none";
       if (tr) {
         const slot = sn.slotKey === tr.key ? engine.slotElement() : null;
-        if (tr.mode !== "audio" && slot && slot.isConnected) {
+        if (fullRef.current && tr.mode !== "audio") {
+          css = `0|0|${window.innerWidth}|${window.innerHeight}|0`; // 橫放全螢幕：鋪滿整個視窗
+        } else if (tr.mode !== "audio" && slot && slot.isConnected) {
           const r = slot.getBoundingClientRect();
           if (r.width > 0) css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
         } else if (sn.slotKey !== tr.key && (tr.mode !== "audio" || sn.collapsed) && !engine.isPip()) {
@@ -330,6 +393,11 @@ export function PlayerLayer() {
   return createPortal(
     <div ref={boxRef} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
       <style>{`@keyframes hg-spin{to{transform:rotate(360deg)}}${FRAME_KEYFRAMES}`}</style>
+      {pFull ? (
+        <button type="button" aria-label="縮小回原本大小" onClick={() => exitRef.current?.()} style={{ position: "absolute", top: 10, left: 10, zIndex: 5, minHeight: 44, padding: "0 16px", borderRadius: 22, border: 0, background: "rgba(0,0,0,0.55)", color: "#fff", font: "700 15px system-ui, sans-serif" }}>
+          縮小
+        </button>
+      ) : null}
       <div style={{ position: "absolute", inset: "var(--pad, 0px)", borderRadius: "inherit", overflow: "hidden", background: "#000" }}>
       <div ref={zoomLayer} style={{ position: "absolute", inset: 0, transformOrigin: "0 0" }}>
         <div ref={hostRef} style={{ position: "absolute", inset: 0, display: yt ? "none" : "block" }} />
