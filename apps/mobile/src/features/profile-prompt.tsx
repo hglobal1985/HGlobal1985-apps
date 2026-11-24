@@ -6,7 +6,7 @@ import { type HostInstance, Platform, Pressable, ScrollView, StyleSheet, Text, T
 import { api } from "@/api/client";
 import { openAccountCenter } from "@/features/account-link";
 import { PushSwitchRow } from "@/features/push-switch";
-import { setUnsavedGuard } from "@/lib/unsaved-guard";
+import { hasUnsaved, runGuarded, setUnsavedGuard } from "@/lib/unsaved-guard";
 import { useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
@@ -251,6 +251,26 @@ export function ProfilePrompt({ onClose, initial: first, inline = false }: { onC
       return false;
     });
     return () => setUnsavedGuard(null);
+  }, [dirty]);
+  // 瀏覽器／手機的返回鍵也要攔（業主 2026-11-24）：有未儲存的改動時先在歷史紀錄多塞一筆「同網址」的記號，
+  // 按返回只是退掉這筆記號（畫面不動）；這時再塞回去、顯示「尚未儲存」；按「放棄」才真的退兩步離開。改動儲存或放棄後把記號收掉。
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || !dirty) return;
+    window.history.pushState({ unsavedMark: true }, "", window.location.href);
+    let leaving = false;
+    const onPop = () => {
+      if (leaving || !hasUnsaved()) return;
+      window.history.pushState({ unsavedMark: true }, "", window.location.href);
+      runGuarded(() => {
+        leaving = true;
+        window.history.go(-2);
+      });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (!leaving && (window.history.state as { unsavedMark?: boolean } | null)?.unsavedMark) window.history.back();
+    };
   }, [dirty]);
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
