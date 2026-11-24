@@ -9,6 +9,8 @@ import { useProfileGate } from "@/features/profile-gate";
 import { HOME_INFO_SPACE, HomeRail } from "@/features/courses/home-rail";
 import { collapseSeries } from "@/features/courses/sort";
 import { useApi, useSession } from "@/state/session";
+import { useElderOn } from "@/lib/elder-mode";
+import { ElderSearch } from "@/features/elder/elder-search";
 import { useUiConfig } from "@/state/ui-config";
 import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
@@ -22,7 +24,12 @@ import { AppText, BrandTitle, ErrorView, InstallCard, LoginPrompt, LoadingView, 
  */
 // 每次登入只彈一次（登出後再登入會再提示）。
 
-export default function HomeScreen() {
+/** 首頁：至尊模式（業主 2026-11-24）改成大搜尋框＋大麥克風（features/elder/elder-search.tsx）；創客模式照舊。 */
+export default function HomeRoute() {
+  return useElderOn() ? <ElderSearch mode="home" /> : <HomeScreen />;
+}
+
+function HomeScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   // 大螢幕（業主 2026-11-18）：內容放寬到 960、左右留白加大；海報區在 HomeRail 依欄寬保留足夠高度（橫放時頁面可往下捲，不把海報裁成扁條）。

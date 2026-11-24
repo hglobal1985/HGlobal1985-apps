@@ -23,6 +23,7 @@ import { SessionProvider } from "@/state/session";
 import { UiConfigProvider } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { installBottomGap } from "@/lib/bottom-gap";
+import { useElderVersion } from "@/lib/elder-mode";
 import { useLayout } from "@/theme/layout";
 import { UpdateNotice } from "@/features/update-notice";
 import { BottomBar, InAppBrowserBanner, TopBar, TopBarShadow } from "@/ui";
@@ -144,6 +145,8 @@ export default function RootLayout() {
   useEffect(() => installStableScrollbar(), []);
   // 網頁版：開站後稍等，把其他分頁的程式檔先載入（每個分頁是獨立檔案，手機網路慢時第一次點進去會空白一陣子，業主 2026-11-22 回報）。
   useEffect(() => warmTabChunks(), []);
+  // 至尊模式切換或改字體大小（lib/elder-mode.ts）：重建頁面，已經畫好的字才會換成新大小（業主 2026-11-24）。
+  const elderV = useElderVersion();
   const base = scheme === "dark" ? DarkTheme : DefaultTheme;
   const navTheme = {
     ...base,
@@ -160,7 +163,7 @@ export default function RootLayout() {
           <View style={{ flex: 1, backgroundColor: c.background }}>
           {/* App 內建瀏覽器警示條：所有頁面最上方（業主 2026-11-17），只有這一處。 */}
           <InAppBrowserBanner />
-          <View style={{ flex: 1 }}>
+          <View style={{ flex: 1 }} key={`elder-${elderV}`}>
           <AppStack />
           <TopBarShadow />
           </View>
