@@ -136,3 +136,13 @@ export function useZoneItems(all: CourseSummary[]): (zone: ElderZone) => ZoneIte
     return (zone: ElderZone) => (zone === "centers" ? centerItems() : seriesItems(zone));
   }, [all, member, config.sortGroups, config.seriesOrder, settings, centers.data]);
 }
+
+/** 進入分類後的浮水印：該分類的大圖示淡淡鋪在背景右側（不擋操作）。 */
+export function ElderZoneBackdrop({ zone }: { zone: (typeof ELDER_ZONES)[number] }) {
+  const look = useZoneLook(zone.id);
+  return (
+    <View pointerEvents="none" style={{ position: "absolute", right: -30, top: 190, opacity: 0.08 }}>
+      <Ionicons name={zone.icon} size={300} color={look.fg} {...({ uiOnly: true } as object)} />
+    </View>
+  );
+}
