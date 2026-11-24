@@ -40,12 +40,12 @@ const formVals = (d: View_): Record<Key, string> => ({ legal_name: d.legalName, 
 const norm = (s: string) => s.trim().toLowerCase();
 
 /** 欄位標籤：必填欄位旁有橘色「必填」小標籤（中央視覺規範）；「變更需再重新審核」一律固定顯示在第二行（業主 2026-11-22）；reserveNote＝同一排其他欄位有第二行時，這欄也留一行空間，下拉框才會對齊。 */
-function Label({ text, tag, note, reserveNote }: { text: string; tag?: string; note?: string; reserveNote?: boolean }) {
+function Label({ text, tag, note, reserveNote, fit }: { /** 一行顯示、太長自動縮小字體。 */ fit?: boolean; text: string; tag?: string; note?: string; reserveNote?: boolean }) {
   const { c } = useTheme();
   return (
     <View>
       <View style={styles.labelRow}>
-        <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
+        <AppText variant="caption" tone="muted" numberOfLines={fit ? 1 : undefined} adjustsFontSizeToFit={fit} minimumFontScale={fit ? 0.6 : undefined} style={{ flexShrink: 1 }}>
           {text}
         </AppText>
         {tag ? (
@@ -405,9 +405,9 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
             <>
               {/* 本名（四個中文字寬）＋縮小的手機推播（業主 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
               <View style={stack ? { gap: space.sm } : [styles.line, { alignItems: "flex-end" }]}>
-                <View style={stack ? { width: "100%" } : { width: 128 }}>
+                <View style={stack ? { width: "100%" } : { width: 168 }}>
                   <Row anchor={"legal_name"} bad={showBad && missing.includes("legal_name")}>
-                    <Label text="本名" />
+                    <Label text="本名(審核用不對外顯示)" fit />
                     <Input value={vals.legal_name} onChange={set("legal_name")} />
                   </Row>
                 </View>

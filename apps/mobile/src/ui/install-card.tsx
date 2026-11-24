@@ -31,12 +31,11 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
   );
   if (!suggest || hidden) return null;
   const go = async () => {
-    if (native) {
-      const ok = await installNative();
-      if (ok) flashText("已加入主畫面");
-      return;
-    }
-    setSteps(true);
+    // 先試一鍵安裝（Android 會等安裝許可最多 3 秒）；真的不行（iPhone、或使用者剛取消）才顯示手動教學。
+    if (!native && !isIos()) flashText("準備安裝中…");
+    const ok = await installNative();
+    if (ok === null) setSteps(true);
+    else if (ok) flashText("已加入主畫面");
   };
   const dismiss = () => setHidden(true);
   const ios = isIos();

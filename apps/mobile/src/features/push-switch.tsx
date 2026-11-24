@@ -58,7 +58,7 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
           accessibilityLabel="訊息通知"
           disabled={!canToggle}
           onPress={() => !busy && void toggle(!on)}
-          style={{ flexDirection: "row", alignItems: "center", gap: compact ? 6 : space.sm, minHeight: compact ? 40 : 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: compact ? 8 : space.sm, opacity: 1 }}
+          style={{ flexDirection: "row", alignItems: "center", gap: compact ? 6 : space.sm, minHeight: compact ? 40 : 76, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: compact ? 8 : space.sm, opacity: 1 }}
         >
           {/* 鈴鐺與主選單「通知」分頁同款：沒開啟＝線條鈴鐺、開啟＝實心鈴鐺（業主 2026-11-24）。 */}
           {compact ? (
@@ -69,7 +69,15 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
             </View>
           )}
           <View style={{ flex: 1 }}>
-            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>{label}</AppText>
+            {compact ? (
+              <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: 15, lineHeight: 20, color: fg }}>{label}</AppText>
+            ) : (
+              // 兩行顯示（業主 2026-11-24）：第一行「訊息通知」、第二行目前狀態。
+              <>
+                <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: 22, lineHeight: 28, color: fg }}>訊息通知</AppText>
+                <AppText numberOfLines={1} style={{ fontWeight: "800", fontSize: 18, lineHeight: 24, color: fg }}>{label.replace("訊息通知：", "") || "尚未設定"}</AppText>
+              </>
+            )}
           </View>
           <Icon name={on ? "checkbox" : "square-outline"} size={compact ? 22 : 34} color={fg} />
         </Pressable>

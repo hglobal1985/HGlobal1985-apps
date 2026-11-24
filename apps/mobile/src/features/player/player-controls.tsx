@@ -33,7 +33,7 @@ export function PlayerControls({ overlay = false }: { /** 全螢幕疊在影片�
           {s.loading ? <LoadingLadybug size={32} /> : <Ionicons name={icon} size={22} color={c.text} />}
         </Pressable>
         <View style={styles.bar}>
-          <SeekBar dark={overlay} value={at} max={total || 1} onSeek={(v) => engine.seek(start + v)} onTouch={t.mode === "audio" ? undefined : () => engine.pokeHint()} />
+          <SeekBar dark={overlay} value={at} max={total || 1} onSeek={(v) => engine.seek(start + v)} />
         </View>
         {/* 倒數剩餘時間（-12:34）。寬度依「整堂長度」固定，播放中數字變動時時間軸不會跟著抖動。 */}
         <AppText variant="caption" tone="muted" numberOfLines={1} style={[styles.time, { minWidth: total >= 3600 ? 58 : 44 }]}>
