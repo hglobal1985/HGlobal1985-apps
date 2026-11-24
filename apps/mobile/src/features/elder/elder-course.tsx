@@ -11,6 +11,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { fadedStyle } from "@/ui/fade-style";
+import { BlockPhotos, hasBlockPhotos } from "@/features/courses/block-photos";
 import { AppText, NoticeBox, Screen } from "@/ui";
 
 /** 至尊模式課程頁要列的項目：有章節列章節；只有教材（清單卡）就列教材。分類標題、完整版不列。 */
@@ -91,10 +92,11 @@ function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blo
       {blocks.map((b) => {
         const on = open === b.head.id;
         const hasPlaying = b.items.some((l) => l.id === playingId);
-        const empty = b.items.length === 0;
+        const empty = b.items.length === 0 && !hasBlockPhotos(b.head);
         return (
           <View key={b.head.id} style={[{ gap: space.sm }, empty ? fadedStyle : null]} pointerEvents={empty ? "none" : "auto"}>
-            <ElderBlockHeader title={b.head.title} sub={`${b.items.length} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
+            <ElderBlockHeader title={b.head.title} sub={`${b.items.length + (b.head.photos?.length ?? 0)} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
+            {on ? <BlockPhotos head={b.head} /> : null}
             {on ? b.items.map(renderRow) : null}
           </View>
         );

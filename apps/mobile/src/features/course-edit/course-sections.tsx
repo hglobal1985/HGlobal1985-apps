@@ -441,18 +441,21 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
 function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
   const { member } = useSession();
   const isHq = member?.role === "admin";
-  const init = { hostUnit: course.hostUnit, chapterCovers: course.chapterCovers };
+  const init = { hostUnit: course.hostUnit, chapterCovers: course.chapterCovers, blockPhotos: course.blockPhotos };
   const [f, setF] = useState(init);
   const { save, busy, error } = useCourseSave(course, onSaved);
   const submit = async () => {
     const body: Record<string, unknown> = { ...f };
     if (!isHq) delete body.hostUnit; // 中心的人不能改主辦中心
+    if (!isHq) delete body.blockPhotos;
     if (await save(body)) onClose();
   };
   return (
     <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <HostField title="主辦單位" value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
+      {/* 區塊可新增照片（業主 2026-11-24 試行：先只有實戰百寶箱；只有超級管理員可以開關）。 */}
+      {member?.role === "admin" ? <Check label="區塊可新增照片（試行中）" value={f.blockPhotos} onChange={(v) => setF((x) => ({ ...x, blockPhotos: v }))} /> : null}
       <AppText variant="caption" tone="muted">
         {course.admin?.editedAt ? `最後修改：${course.admin.editedByName || "（未記錄）"}　${dateTime(course.admin.editedAt)}` : "最後修改：（還沒有紀錄）"}
       </AppText>

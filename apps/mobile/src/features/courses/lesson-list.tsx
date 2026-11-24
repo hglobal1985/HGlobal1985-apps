@@ -21,6 +21,7 @@ import { CompactRow, LIST_CARD, ListSection, MetaLine } from "./compact-row";
 import { NowPlayingIcon } from "@/ui/now-playing-icon";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { MaterialRow, RowActions, RowShare, SectionActions } from "./material-rows";
+import { BlockPhotos, hasBlockPhotos } from "./block-photos";
 export { RowShare } from "./material-rows";
 
 /**
@@ -97,7 +98,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
       else lead.push(l);
     }
     const full = all.filter((l) => l.full && shown(l));
-    const visibleBlocks = blocks.filter((b) => canEdit || b.items.some(shown));
+    const visibleBlocks = blocks.filter((b) => canEdit || b.items.some(shown) || hasBlockPhotos(b.head));
     const leadShown = lead.filter(shown);
     if (!visibleBlocks.length && !leadShown.length && !full.length) return null;
     // 欄數隨螢幕寬度自動變：手機 2 欄，越寬越多，最多 5 欄（業主 2026-11-18）。
@@ -108,8 +109,9 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           {leadShown.length ? <Card style={LIST_CARD}>{leadShown.map(itemRow)}</Card> : null}
           {visibleBlocks.map((b) => (
             <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
-              <ListSection title={b.head.title} count={b.items.filter(shown).length} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
-              {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
+              <ListSection title={b.head.title} count={b.items.filter(shown).length + (b.head.photos?.length ?? 0)} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
+              <BlockPhotos head={b.head} />
+              {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           ))}
           {full.length ? <Card style={LIST_CARD}>{full.map(itemRow)}</Card> : null}
@@ -126,7 +128,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           gap={GAP}
           defaultOpenId={openBlock}
           renderCell={(b, { on, dimmed, toggle, width: cell }) => (
-            <Pressable nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={toggle} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, dimmed || !b.items.some(shown) ? fadedStyle : null, pressed && { opacity: 0.75 }]}>
+            <Pressable nativeID={`blk-${b.head.id}`} accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${b.head.title}，${on ? "點一下收合" : "點一下展開"}`} onPress={toggle} style={({ pressed }) => [{ width: cell, scrollMarginTop: 72 } as ViewStyle, dimmed || (!b.items.some(shown) && !hasBlockPhotos(b.head)) ? fadedStyle : null, pressed && { opacity: 0.75 }]}>
               <View style={{ width: cell, aspectRatio: 16 / 9, borderRadius: radius.md, overflow: "hidden", backgroundColor: "#fff", borderWidth: on ? 3 : 1, borderColor: on ? c.accent : c.border }}>
                 {b.head.coverUrl ? (
                   <Image source={{ uri: thumb(resolveUrl(b.head.coverUrl), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
@@ -139,7 +141,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
                 {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
                 <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
                   <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
-                    {b.items.filter(shown).length}
+                    {b.items.filter(shown).length + (b.head.photos?.length ?? 0)}
                   </AppText>
                   <Ionicons name={on ? "chevron-up" : "chevron-down"} size={12} color={c.textOnAccent} />
                 </View>
@@ -151,7 +153,8 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           )}
           renderPanel={(b) => (
             <Card style={LIST_CARD}>
-              {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
+              <BlockPhotos head={b.head} />
+              {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           )}
         />

@@ -13,4 +13,5 @@ export { TimeRangePicker } from "@/features/uploads/time-range-picker";
 export { ThumbBadgeEditor } from "@/features/admin/thumb-badge-editor";
 export { SeriesEdm } from "@/features/admin/series-edm";
 export { SeriesCoverSheet } from "@/features/admin/series-cover-sheet";
+export { BlockPhotosSheet } from "@/features/course-edit/block-photos-sheet";
 export { SeriesApplySheet } from "@/features/courses/series-apply-sheet";
