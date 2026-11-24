@@ -4,7 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import { FlatList, Image, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
-import { buildSearchIndex, charsCourses, fuzzyCourses, matchCourses, type SearchLesson } from "@/features/courses/course-search";
+import { buildSearchIndex, charsCourses, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
+import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
 import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
@@ -60,20 +61,24 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const exact = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
   const noExact = !!exact && exact.size === 0;
   const semantic = useSemantic(key, noExact);
+  const phonetic = usePhonetic(key, noExact);
+  // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
   const results = useMemo(() => {
     if (!key) return mode === "browse" ? order(all) : [];
+    const byLesson = new Map((idx.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
+    const lessonCourses = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && index.haystack.has(x));
     let ids: Set<string> = exact ?? new Set();
+    let near: Parameters<typeof rankCourses>[3] = {};
     if (!ids.size) {
-      ids = new Set([...fuzzyCourses(index, key), ...charsCourses(index, key)]);
-      const byLesson = new Map((idx.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
-      for (const id of semantic.courses) if (index.haystack.has(id)) ids.add(id);
-      for (const lid of semantic.lessons) {
-        const cid = byLesson.get(lid);
-        if (cid && index.haystack.has(cid)) ids.add(cid);
-      }
+      const fuzzy = fuzzyCourses(index, key);
+      const chars = charsCourses(index, key);
+      const phon = [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
+      const sem = [...semantic.courses, ...lessonCourses(semantic.lessons)].filter((id) => index.haystack.has(id));
+      ids = new Set([...fuzzy, ...chars, ...phon, ...sem]);
+      near = { phonetic: phon, semantic: sem, fuzzy, chars };
     }
-    return order(all.filter((x) => ids.has(x.id)));
-  }, [key, index, all, mode, exact, semantic.courses, semantic.lessons, idx.data]);
+    return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
+  }, [key, index, all, mode, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data]);
   const cont = mode === "home" ? lastCourse(courses.data ?? []) : null;
   const searching = q.trim().length > 0;
   const mic = () => {
@@ -112,7 +117,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       </View>
       {member ? null : <LoginPrompt />}
       {searching ? (
-        <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading ? "正在找相近的課程…" : "找不到這個課程，換個字試試看"}</AppText>
+        <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : "找不到這個課程，換個字試試看"}</AppText>
       ) : null}
     </View>
   );
