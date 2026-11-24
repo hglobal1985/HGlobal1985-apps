@@ -14,7 +14,7 @@ import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
-import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, elderZoneOf, type ElderZone } from "./elder-zones";
+import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -48,6 +48,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const [heard, setHeard] = useState<string | null>(null);
   // 課程分頁的四大分類（業主 2026-11-24，D 款）：null＝顯示四張大卡；選了一區＝列出該區課程。
   const [zone, setZone] = useState<ElderZone | null>(null);
+  const [sub, setSub] = useState<Row | null>(null); // 系列／中心再往下一層
   const input = useRef<{ focus: () => void } | null>(null);
   // 搜尋索引（章節標題、分享者、日期…）：開始找的時候才下載。
   const wantIndex = q.trim().length > 0 || mode === "browse";
@@ -57,6 +58,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     if (final || text) setQ(text);
   });
   const all = useMemo(() => (courses.data ?? []).filter(listable), [courses.data]);
+  const itemsOf = useZoneItems(all);
   const index = useMemo(() => (idx.data ? buildSearchIndex(all, idx.data.lessons) : buildSearchIndex(all, [])), [all, idx.data]);
   // 與寰宇大學（超派模式）同一套找法（業主 2026-11-24 回報：語音說「線上白金」找不到課）：
   // 完全比對 → 模糊比對＋字元比對 → AI 語意搜尋（完全比對沒結果時才送出，合併顯示）。
@@ -68,7 +70,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const phonetic = usePhonetic(key, noExact);
   // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
   const results = useMemo(() => {
-    if (!key) return mode === "browse" ? (zone ? order(all.filter((x) => elderZoneOf(x) === zone)) : []) : [];
+    if (!key) return [];
     const byLesson = new Map((idx.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
     const lessonCourses = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && index.haystack.has(x));
     let ids: Set<string> = exact ?? new Set();
@@ -82,7 +84,14 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       near = { phonetic: phon, semantic: sem, fuzzy, chars };
     }
     return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
-  }, [key, index, all, mode, zone, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data]);
+  }, [key, index, all, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data]);
+  // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
+  const rows: Row[] = useMemo(() => {
+    if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x }));
+    if (mode !== "browse" || !zone) return [];
+    if (sub) return (sub.children ?? []).map((x) => ({ key: x.id, title: x.title, count: x.materialCount, rep: x }));
+    return itemsOf(zone);
+  }, [key, results, mode, zone, sub, itemsOf]);
   const cont = mode === "home" ? lastCourse(courses.data ?? []) : null;
   const searching = q.trim().length > 0;
   const mic = () => {
@@ -156,24 +165,24 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         <FlatList
           style={styles.fill}
           contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]}
-          data={results}
-          keyExtractor={(x) => x.id}
+          data={rows}
+          keyExtractor={(x) => x.key}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListHeaderComponent={
             mode === "browse" && !searching ? (
               zone ? (
-                <ElderZoneHeader zone={ELDER_ZONES.find((z) => z.id === zone)!} onBack={() => setZone(null)} />
+                <ElderZoneHeader zone={ELDER_ZONES.find((z) => z.id === zone)!} sub={sub?.title} onBack={() => (sub ? setSub(null) : setZone(null))} />
               ) : (
                 <View style={{ gap: space.md }}>
                   {ELDER_ZONES.map((z) => (
-                    <ElderZoneCard key={z.id} zone={z} count={all.filter((x) => elderZoneOf(x) === z.id).reduce((n, x) => n + x.materialCount, 0)} onPress={() => setZone(z.id)} />
+                    <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
                   ))}
                 </View>
               )
             ) : undefined
           }
-          renderItem={({ item }) => <ElderCourseRow course={item} />}
+          renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} />}
           initialNumToRender={8}
         />
       ) : (
@@ -227,21 +236,23 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
 const WAVE_ANIM = (Platform.OS === "web" ? { transitionProperty: "height", transitionDuration: "90ms", transitionTimingFunction: "ease-out" } : {}) as object;
 
 /** 至尊模式的課程列：大縮圖、大字標題、狀態（已報名／審核中／免費／付費）。整列都可以點。 */
-export function ElderCourseRow({ course }: { course: CourseSummary }) {
+export type Row = { key: string; title: string; count?: number; rep: CourseSummary; children?: CourseSummary[] };
+
+export function ElderCourseRow({ course, title, count, onPress }: { course: CourseSummary; title?: string; /** 有給＝標籤顯示「N 項教材」（分類清單，與超派模式一致）；沒給＝顯示報名狀態。 */ count?: number; onPress?: () => void }) {
   const { c } = useTheme();
   const thumb = useThumb();
   const img = course.coverUrl ?? course.edmUrl;
   const size = Math.round(84 * UI_SCALE);
-  const tag = course.isList ? "教材" : course.enrollment === "opened" ? "已報名" : course.enrollment === "pending" ? "審核中" : course.priceTba ? "費用未公布" : course.free || course.freeNow || course.watchFree ? "免費" : "付費";
+  const tag = count !== undefined ? `${count} 項教材` : course.isList ? "教材" : course.enrollment === "opened" ? "已報名" : course.enrollment === "pending" ? "審核中" : course.priceTba ? "費用未公布" : course.free || course.freeNow || course.watchFree ? "免費" : "付費";
   const strong = tag === "已報名";
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${course.title}，${tag}`} onPress={() => router.push(`/course/${course.id}`)} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${title ?? course.title}，${tag}`} onPress={onPress ?? (() => router.push(`/course/${course.id}`))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       <View style={[styles.thumb, { width: size, height: size, backgroundColor: c.accentSoft }]}>
         {img ? <Image source={{ uri: thumb(resolveUrl(img), size * 2) }} style={{ width: size, height: size }} resizeMode="cover" /> : <ThumbFallback />}
       </View>
       <View style={{ flex: 1, gap: 6 }}>
         <AppText variant="headline" numberOfLines={3}>
-          {course.title}
+          {title ?? course.title}
         </AppText>
         <View style={[styles.tag, { backgroundColor: strong ? c.accent : c.accentSoft }]}>
           <AppText variant="callout" style={{ color: strong ? c.textOnAccent : c.accentText, fontWeight: "700" }}>
