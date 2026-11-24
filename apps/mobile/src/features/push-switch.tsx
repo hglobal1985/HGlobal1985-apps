@@ -53,7 +53,7 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
         <Pressable
           accessibilityRole="checkbox"
           accessibilityState={{ checked: on, disabled: busy || !canToggle }}
-          accessibilityLabel="開啟手機推播"
+          accessibilityLabel="訊息通知"
           disabled={!canToggle}
           onPress={() => !busy && void toggle(!on)}
           style={{ flexDirection: "row", alignItems: "center", gap: compact ? 6 : space.sm, minHeight: compact ? 40 : 64, borderRadius: radius.md, backgroundColor: bg, paddingHorizontal: compact ? 8 : space.sm, opacity: 1 }}
@@ -67,7 +67,7 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
             </View>
           )}
           <View style={{ flex: 1 }}>
-            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>{on ? "手機通知已開啟" : "按此開啟手機通知"}</AppText>
+            <AppText numberOfLines={1} style={{ fontWeight: "900", fontSize: compact ? 15 : 22, lineHeight: compact ? 20 : 28, color: fg }}>訊息通知</AppText>
           </View>
           <Icon name={on ? "checkbox" : "square-outline"} size={compact ? 22 : 34} color={fg} />
         </Pressable>
@@ -86,7 +86,7 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
           <Icon name="notifications" size={20} color={c.accentText} />
         </View>
         <View style={{ flex: 1 }}>
-          <AppText style={{ fontWeight: "900", fontSize: 16, lineHeight: 22 }}>開啟手機推播</AppText>
+          <AppText style={{ fontWeight: "900", fontSize: 16, lineHeight: 22 }}>訊息通知</AppText>
         </View>
         <Switch value={on} disabled={busy || !canToggle} onValueChange={toggle} trackColor={{ false: c.border, true: c.accent }} thumbColor="#FFFFFF" ios_backgroundColor={c.border} accessibilityLabel="手機推播開關" />
       </View>

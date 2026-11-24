@@ -53,8 +53,8 @@ export function FontSizeCard() {
         </AppText>
       </View>
       <View style={styles.row}>
-        <StepButton label="字變小" icon="remove" disabled={draft.size <= ELDER_MIN} onPress={() => step(-0.1)} outline />
-        <StepButton label="字變大" icon="add" disabled={draft.size >= ELDER_MAX} onPress={() => step(0.1)} />
+        <StepButton label="字變小" icon="remove" disabled={draft.followSystem || draft.size <= ELDER_MIN} onPress={() => step(-0.1)} outline />
+        <StepButton label="字變大" icon="add" disabled={draft.followSystem || draft.size >= ELDER_MAX} onPress={() => step(0.1)} />
       </View>
       <Check label={sys !== 1 ? `跟著手機的字體大小（手機目前 ${Math.round(sys * 100)}%）` : "跟著手機的字體大小"} value={draft.followSystem} onChange={(v) => setDraft((p) => ({ ...p, followSystem: v }))} />
       {changed ? <Button label="套用這個字體大小" icon="checkmark" onPress={() => setElder({ size: draft.size, followSystem: draft.followSystem })} fullWidth /> : null}

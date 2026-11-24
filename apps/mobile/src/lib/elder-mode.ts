@@ -63,6 +63,24 @@ if (Platform.OS !== "web") {
     .catch(() => undefined);
 }
 
+/**
+ * 至尊模式的文字換行（業主 2026-11-24：換行後孤零零多出一兩個字很難看）：網頁在至尊模式時，所有多行文字用 text-wrap: balance
+ * 讓每行長度平均（不會剩一兩個字掉到下一行）。只在至尊模式生效（html[data-elder]），超派模式不變。
+ */
+function applyWrap() {
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  const el = document.documentElement;
+  if (prefs.on) el.setAttribute("data-elder", "1");
+  else el.removeAttribute("data-elder");
+  if (!document.getElementById("elder-wrap")) {
+    const st = document.createElement("style");
+    st.id = "elder-wrap";
+    st.textContent = 'html[data-elder="1"] div[dir="auto"],html[data-elder="1"] span[dir="auto"]{text-wrap:balance}';
+    document.head.appendChild(st);
+  }
+}
+applyWrap();
+
 let systemCache: number | null = null;
 /**
  * 手機系統的字體大小（1＝標準）。iOS／Android App 用系統提供的倍數；
@@ -108,6 +126,7 @@ export function setElder(patch: Partial<ElderPrefs>) {
   next.size = clamp(round1(next.size), ELDER_MIN, ELDER_MAX);
   const changed = elderTextScale(next) !== elderTextScale(prefs) || next.on !== prefs.on;
   prefs = next;
+  applyWrap();
   if (changed) version += 1;
   const raw = JSON.stringify(prefs);
   if (Platform.OS === "web") {
