@@ -258,6 +258,15 @@ function rankFieldOf(b: unknown): RankFieldDef | undefined {
   return list.find((f) => f && typeof f === "object" && (f as { key?: unknown }).key === "rank") as RankFieldDef | undefined;
 }
 
+/** 自訂系統含這些詞要提醒／被中央擋下（串接指令 2026-11-24.3 第 39 項）：一律讀 field-definitions 的 education_system，不寫死；讀不到就是沒有。 */
+export async function hglobalCenterWords(token: string): Promise<{ words: string[]; message: string } | undefined> {
+  const b = await fieldDefinitions(token);
+  const list: unknown[] = Array.isArray(b) ? b : b && typeof b === "object" ? Object.values((b as { fields?: unknown }).fields ?? b) : [];
+  const f = list.find((x) => x && typeof x === "object" && (x as { key?: unknown }).key === "education_system") as { hglobal_center_words?: unknown; hglobal_center_message?: unknown } | undefined;
+  const words = Array.isArray(f?.hglobal_center_words) ? f.hglobal_center_words.filter((w): w is string => typeof w === "string" && !!w.trim()) : [];
+  return words.length && typeof f?.hglobal_center_message === "string" ? { words, message: f.hglobal_center_message } : undefined;
+}
+
 /** 獎銜選項（代碼→名稱）：不寫死，向中央讀取 key=rank 的 options。讀不到回空 Map。 */
 export async function rankOptions(token: string): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -567,27 +576,27 @@ export async function rankBadges(token: string): Promise<Map<string, RankBadgeIn
 }
 
 export type AmwayFieldView = { value: string; pending: string | null; status: string };
-export type CentralProfileView = { legalName: string; nickname: string; email: string; /** 會員自己的 Google 登入信箱（中央 info.google_email）；聯絡信箱還空著時，面板用它預先帶入。只即時回給本人，不保存。 */ googleEmail: string; enabled: boolean; hglobal: boolean; hglobalSystems: string[]; fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", AmwayFieldView>; rankOptions: RankOption[] };
+export type CentralProfileView = { /** 中央提供的「自訂系統含這些詞」清單與提醒範本（{word} 換成命中的詞）；讀不到就沒有。 */ hglobalCenterWords?: string[]; hglobalCenterMessage?: string; legalName: string; nickname: string; email: string; /** 會員自己的 Google 登入信箱（中央 info.google_email）；聯絡信箱還空著時，面板用它預先帶入。只即時回給本人，不保存。 */ googleEmail: string; enabled: boolean; hglobal: boolean; hglobalSystems: string[]; fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", AmwayFieldView>; rankOptions: RankOption[] };
 const textOf = (v: unknown): string => (typeof v === "string" ? v : v && typeof v === "object" && typeof (v as { option?: unknown }).option === "string" ? (v as { option: string }).option : "");
 
 /** 資料補填視窗要顯示的欄位（即時讀取、不快取、不保存）：真實姓名、培訓系統、地區教育中心、獎銜。 */
 export async function centralProfileView(sub: string, token: string): Promise<CentralProfileView | null> {
-  const [p, a0, opts] = await Promise.all([profileDoc(sub, token), amwayMe(sub, token), rankOptionList(token)]);
+  const [p, a0, opts, hw] = await Promise.all([profileDoc(sub, token), amwayMe(sub, token), rankOptionList(token), hglobalCenterWords(token).catch(() => undefined)]);
   const a = a0 as { enabled?: boolean; hglobal?: boolean; hglobal_systems?: string[]; fields?: Record<string, { value?: unknown; pending_value?: unknown; status?: string }> } | undefined;
   if (!p || !a) return null;
   const f = (k: string): AmwayFieldView => ({ value: textOf(a.fields?.[k]?.value), pending: a.fields?.[k]?.pending_value != null ? textOf(a.fields[k].pending_value) : null, status: a.fields?.[k]?.status ?? "not_required" });
   const em = p.fields?.contact_email?.value;
   const nn = p.fields?.display_name?.value;
-  return { legalName: typeof p.fields?.legal_name?.value === "string" ? p.fields.legal_name.value : "", nickname: typeof nn === "string" ? nn : "", email: typeof em === "string" ? em.trim() : "", googleEmail: typeof p.info?.google_email === "string" ? p.info.google_email.trim() : "", enabled: a.enabled === true, hglobal: a.hglobal === true, hglobalSystems: Array.isArray(a.hglobal_systems) ? a.hglobal_systems.filter((x): x is string => typeof x === "string") : [], fields: { education_system: f("education_system"), education_center: f("education_center"), rank: f("rank"), upline_platinum: f("upline_platinum"), upline_diamond: f("upline_diamond") }, rankOptions: opts };
+  return { legalName: typeof p.fields?.legal_name?.value === "string" ? p.fields.legal_name.value : "", nickname: typeof nn === "string" ? nn : "", email: typeof em === "string" ? em.trim() : "", googleEmail: typeof p.info?.google_email === "string" ? p.info.google_email.trim() : "", enabled: a.enabled === true, hglobal: a.hglobal === true, hglobalSystems: Array.isArray(a.hglobal_systems) ? a.hglobal_systems.filter((x): x is string => typeof x === "string") : [], fields: { education_system: f("education_system"), education_center: f("education_center"), rank: f("rank"), upline_platinum: f("upline_platinum"), upline_diamond: f("upline_diamond") }, rankOptions: opts, ...(hw ? { hglobalCenterWords: hw.words, hglobalCenterMessage: hw.message } : {}) };
 }
 
 /** 把一個欄位寫回會員中心（用會員本人的 token）。失敗時回中央的錯誤訊息。 */
-export async function centralWriteField(token: string, key: "legal_name" | "display_name" | "education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", value: string | null): Promise<{ ok: true; status: string | null } | { ok: false; status: number; message: string }> {
+export async function centralWriteField(token: string, key: "legal_name" | "display_name" | "education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", value: string | null): Promise<{ ok: true; status: string | null } | { ok: false; status: number; message: string; /** 中央 error.details.reason（例如 use_hglobal_center）。 */ reason?: string }> {
   const path = key === "legal_name" || key === "display_name" ? `/v1/me/profile/fields/${key}` : `/v1/me/amway/fields/${key}`;
   const res = await callCentral(token, path, { method: "PUT", body: JSON.stringify({ value }) });
   if (!res) return { ok: false, status: 502, message: "會員中心暫時無法連線，請稍後再試" };
-  const b = (await res.json().catch(() => null)) as { status?: string; error?: { message?: string } } | null;
-  if (!res.ok) return { ok: false, status: res.status === 403 ? 403 : res.status === 422 ? 422 : 502, message: b?.error?.message ?? "會員中心拒絕了這次修改" };
+  const b = (await res.json().catch(() => null)) as { status?: string; error?: { message?: string; details?: { reason?: string } } } | null;
+  if (!res.ok) return { ok: false, status: res.status === 403 ? 403 : res.status === 422 ? 422 : 502, message: b?.error?.message ?? "會員中心拒絕了這次修改", reason: b?.error?.details?.reason };
   return { ok: true, status: b?.status ?? null };
 }
 
@@ -638,7 +647,7 @@ export async function centralAddJobTitle(secret: string | undefined, value: stri
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
 
 /** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由業主在中央後台勾選，不在程式內宣稱）。 */
-export const INTEGRATED_VERSION = "2026-11-24.2";
+export const INTEGRATED_VERSION = "2026-11-24.3";
 export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile", "in_app_delete"];
 export const SIGNATURE_TOLERANCE_SECONDS = 300;
 

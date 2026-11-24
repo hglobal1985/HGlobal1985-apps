@@ -30,9 +30,10 @@ type View_ = {
   hglobalSystems: string[];
   fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", FieldView>;
   rankOptions: { value: string; label: string }[];
+  /** 中央提供的自訂系統提醒詞與提醒範本（{word} 換成命中的詞）；沒有就不提醒。 */
+  hglobalCenterWords?: string[];
+  hglobalCenterMessage?: string;
 };
-/** 填在「自訂系統」就該改選「寰宇」的字詞（業主 2026-11-24）：這些其實是寰宇系統下的中心。 */
-export const HGLOBAL_CENTER_WORDS = ["飛登", "蓁分享", "有賢社", "聚冠"];
 
 type Key = "legal_name" | "display_name" | "contact_email" | "education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond";
 
@@ -144,6 +145,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
   const [error, setError] = useState<string | null>(null);
   const [vals, setVals] = useState<Record<Key, string>>({ legal_name: "", display_name: "", contact_email: "", education_system: "", education_center: "", rank: "", upline_platinum: "", upline_diamond: "" });
   const [terms, setTerms] = useState<{ education_system: string[]; education_center: string[] }>({ education_system: [], education_center: [] });
+  const [sysNotice, setSysNotice] = useState<string | null>(null); // 中央擋下自訂系統時的原文提醒（顯示在自訂系統輸入框下方）
   const [otherPick, setOtherPick] = useState<{ education_system?: boolean; education_center?: boolean }>({});
   const [openKey, setOpenKey] = useState<string | null>(null); // 目前展開的下拉選單：展開中的那一列要蓋在所有列的上面
   const [wantAmway, setWantAmway] = useState(false); // 剛勾選「我是 Amway 會員」、還沒儲存
@@ -244,13 +246,15 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
   const sysVal = vals.education_system.trim();
   const systemHg = !!data && !!sysVal && sysVal !== NONE_TERM && data.hglobalSystems.some((t) => norm(t) === norm(sysVal));
   /** 換系統時中心跟著連動：非寰宇的系統（含「無」）中心自動填「無」（中央規定三欄必填）；回到寰宇就清空讓會員自己選。 */
-  const setSystem = (v: string) =>
+  const setSystem = (v: string) => (
+    setSysNotice(null),
     setVals((st) => {
       const t = v.trim();
       const hg = !!data && !!t && t !== NONE_TERM && data.hglobalSystems.some((h) => norm(h) === norm(t));
       const center = hg ? (st.education_center.trim() === NONE_TERM ? "" : st.education_center) : t ? NONE_TERM : "";
       return { ...st, education_system: v, education_center: center };
-    });
+    })
+  );
   const missing: Key[] = data ? ([!vals.legal_name.trim() && "legal_name", amway && !vals.upline_platinum.trim() && "upline_platinum", amway && !vals.upline_diamond.trim() && "upline_diamond", amway && !vals.education_system.trim() && "education_system", amway && systemHg && !vals.education_center.trim() && "education_center", amway && !vals.rank.trim() && "rank"].filter(Boolean) as Key[]) : [];
 
   /** 三欄窄版用的短標籤：審核通過→通過、審核中...→審核中。 */
@@ -301,17 +305,18 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
     setMsg(null);
     try {
       // 所有改過的欄位一次送出（伺服器同時寫給會員中心），並把最新狀態一起帶回來。
-      const r = await api<{ ok: boolean; errors: string[]; pending: boolean; form: View_ | null }>("PUT", "/me/central-profile", { changes: changed.map((key) => ({ key, value: vals[key] })), ...(wantAmway && !data?.enabled ? { enableAmway: true } : {}) });
+      const r = await api<{ ok: boolean; errors: string[]; pending: boolean; form: View_ | null; systemNotice?: string | null }>("PUT", "/me/central-profile", { changes: changed.map((key) => ({ key, value: vals[key] })), ...(wantAmway && !data?.enabled ? { enableAmway: true } : {}) });
+      setSysNotice(r.systemNotice ?? null);
       if (r.form) apply(r.form);
       else load();
-      if (!r.errors.length) trackFeature("profile_edit");
+      if (!r.errors.length && !r.systemNotice) trackFeature("profile_edit");
       setShowBad(false);
-      setMsg(r.errors.length ? { ok: false, text: r.errors[0] } : { ok: true, text: r.pending ? "已儲存，部分欄位等待審核" : "已儲存到會員中心" });
+      setMsg(r.systemNotice && !r.errors.length ? { ok: false, text: "「系統」需要修改，請看下方紅字提醒" } : r.errors.length ? { ok: false, text: r.errors[0] } : { ok: true, text: r.pending ? "已儲存，部分欄位等待審核" : "已儲存到會員中心" });
       invalidate();
       // 儲存成功後立刻重新取一次會員資料（業主 2026-11-23 回報本名按儲存後再進來又變空白）：
       // 首頁／設定頁保存的是開啟 App 時帶來的舊資料（含 profileForm、profileMissing），不更新的話再開面板會看到舊值，還會再次誤判「資料不全」而彈出。
-      if (!r.errors.length) await refreshMember(0).catch(() => undefined);
-      if (!r.errors.length && !inline) onClose(); // 儲存成功就自動關閉視窗（業主 2026-11-19）；放在頁面裡的不關閉
+      if (!r.errors.length && !r.systemNotice) await refreshMember(0).catch(() => undefined);
+      if (!r.errors.length && !r.systemNotice && !inline) onClose(); // 儲存成功就自動關閉視窗（業主 2026-11-19）；放在頁面裡的不關閉
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -321,8 +326,10 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
 
   // 系統選「其他」時中心欄被隱藏，它的「變更需再重新審核」也不算（不然其他欄會多留一行空白）。
   const sysNone = vals.education_system.trim() === NONE_TERM;
-  // 自訂系統若寫了寰宇旗下的中心名稱（飛登、蓁分享、有賢社、聚冠），提醒改選寰宇再從中心切換（業主 2026-11-24；中央同步規則見 docs/central-request-custom-system-words.md）。
-  const sysWords = HGLOBAL_CENTER_WORDS.find((w) => vals.education_system.includes(w)) ?? null;
+  // 自訂系統含寰宇旗下中心名稱時提醒改選寰宇（串接指令 2026-11-24.3 第 39 項）：詞清單與提醒範本一律讀中央（field-definitions），讀不到就不提醒、不退回寫死的詞；儲存時以中央的 422 為準（sysNotice）。
+  const lowSys = vals.education_system.toLowerCase();
+  const sysWord = data?.hglobalCenterMessage ? (data.hglobalCenterWords ?? []).find((w) => w && lowSys.includes(w.toLowerCase())) : undefined;
+  const sysWords = sysNotice ?? (sysWord ? (data?.hglobalCenterMessage ?? "").replace("{word}", sysWord) : null);
   const sysIsOther = !sysNone && (otherPick.education_system ?? (!!sysVal && !terms.education_system.includes(vals.education_system)));
   const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
   /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
@@ -486,7 +493,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                     </View>
                     {sysCol.other && sysWords ? (
                       <AppText variant="caption" style={{ color: c.warning, fontWeight: "800" }} accessibilityLiveRegion="polite">
-                        {`「${sysWords}」屬於寰宇系統：請把「系統」改選「寰宇」，再從「中心」切換選擇。`}
+                        {sysWords}
                       </AppText>
                     ) : null}
                     {!sysCol.other && cenCol.other ? <Input value={vals.education_center} onChange={set("education_center")} placeholder="中心：請輸入自訂內容" /> : null}

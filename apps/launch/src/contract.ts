@@ -610,6 +610,9 @@ export type ProfileForm = {
   hglobalSystems: string[];
   fields: Record<"education_system" | "education_center" | "rank" | "upline_platinum" | "upline_diamond", { value: string; pending: string | null; status: string }>;
   rankOptions: { value: string; label: string }[];
+  /** 中央提供的自訂系統提醒詞與提醒範本（{word} 換成命中的詞）；讀不到就沒有，畫面不顯示提醒。 */
+  hglobalCenterWords?: string[];
+  hglobalCenterMessage?: string;
 };
 
 // ---------- 學習成就（徽章）----------
