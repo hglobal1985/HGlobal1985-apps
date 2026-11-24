@@ -55,14 +55,16 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const index = useMemo(() => (idx.data ? buildSearchIndex(all, idx.data.lessons) : buildSearchIndex(all, [])), [all, idx.data]);
   // 與寰宇大學（超派模式）同一套找法（業主 2026-11-24 回報：語音說「線上白金」找不到課）：
   // 完全比對 → 模糊比對＋字元比對 → AI 語意搜尋（完全比對沒結果時才送出，合併顯示）。
-  const exact = useMemo(() => (q.trim() ? matchCourses(index, q) : null), [index, q]);
+  // 語音辨識有時會在句中加標點（「線上，白金」）：比對前一律換成空白。
+  const key = useMemo(() => q.replace(/[。．.！!？?，,、；;：:「」“”"'（）()]+/g, " ").trim(), [q]);
+  const exact = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
   const noExact = !!exact && exact.size === 0;
-  const semantic = useSemantic(q, noExact);
+  const semantic = useSemantic(key, noExact);
   const results = useMemo(() => {
-    if (!q.trim()) return mode === "browse" ? order(all) : [];
+    if (!key) return mode === "browse" ? order(all) : [];
     let ids: Set<string> = exact ?? new Set();
     if (!ids.size) {
-      ids = new Set([...fuzzyCourses(index, q), ...charsCourses(index, q)]);
+      ids = new Set([...fuzzyCourses(index, key), ...charsCourses(index, key)]);
       const byLesson = new Map((idx.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
       for (const id of semantic.courses) if (index.haystack.has(id)) ids.add(id);
       for (const lid of semantic.lessons) {
@@ -71,7 +73,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       }
     }
     return order(all.filter((x) => ids.has(x.id)));
-  }, [q, index, all, mode, exact, semantic.courses, semantic.lessons, idx.data]);
+  }, [key, index, all, mode, exact, semantic.courses, semantic.lessons, idx.data]);
   const cont = mode === "home" ? lastCourse(courses.data ?? []) : null;
   const searching = q.trim().length > 0;
   const mic = () => {
