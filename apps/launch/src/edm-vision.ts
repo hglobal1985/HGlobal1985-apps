@@ -88,8 +88,8 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
     await release();
     throw e;
   }
-  const today = new Date().toISOString().slice(0, 10);
-  const prompt = `這是一張活動海報（EDM）。請讀出圖片上所有的文字（中文為主），並找出「活動舉辦日期」。今天是 ${today}；海報上沒寫年份時，請用最接近今天的合理年份。text 欄位請直接照抄圖片上的文字（依畫面由上到下、由左到右，換行用 \\n），不要分析、不要說明、不要使用 Markdown 符號（例如 ** ###）。只回傳 JSON，不要其他說明：{"text":"圖片上的全部文字","event_date":"YYYY-MM-DD 或 null"}`;
+  // 注意：不可把「今天日期」放進提示——模型會把它當成海報內容寫進辨識文字（業主 2026-11-24 回報）。日期由程式從文字推（inferDate）。
+  const prompt = `你是文字辨識（OCR）工具。請把這張活動海報（EDM）上「看得到的文字」逐字抄寫出來（中文為主），依畫面由上到下、由左到右，換行用 \\n。嚴格規定：只能寫圖片上實際出現的文字；不可以寫任何你自己的話、說明、開場白、判斷或猜測；不要使用 Markdown 符號（例如 ** ###）。event_date 只有在海報上明確寫出完整日期時才填（YYYY-MM-DD），沒寫就填 null，不可猜。只回傳 JSON，不要其他說明：{"text":"圖片上的全部文字","event_date":"YYYY-MM-DD 或 null"}`;
   let out = "";
   try {
     const dataUri = `data:${type};base64,${toBase64(bytes)}`;
