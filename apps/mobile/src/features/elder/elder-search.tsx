@@ -289,7 +289,10 @@ function FitTitle({ text }: { text: string }) {
   useEffect(() => {
     if (own !== null) report(own);
   }, [own, report]);
-  const fs = Math.min(own ?? 20, min);
+  // 字級往下對齊到「剛好一行排滿 n 個字」：全形字斷行處才會貼齊右邊（業主 2026-11-24：斷行要更靠近箭頭），不會留下不到一個字的空隙。
+  const raw = Math.min(own ?? 20, min);
+  const inner = box.w ? box.w / k - 1 : 0;
+  const fs = inner > 0 ? inner / Math.ceil(inner / raw) : raw;
   return (
     <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
       <AppText style={{ fontSize: fs, lineHeight: Math.round(fs * 1.2), fontWeight: "800" }}>{text}</AppText>
