@@ -22,6 +22,7 @@ import { NowPlayingIcon } from "@/ui/now-playing-icon";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { MaterialRow, RowActions, RowShare, SectionActions } from "./material-rows";
 import { BlockPhotos, hasBlockPhotos } from "./block-photos";
+import { BlockAlbum, BrowsePhotosRow } from "./block-album";
 export { RowShare } from "./material-rows";
 
 /**
@@ -72,7 +73,7 @@ export function ChapterList({ course, style, playingId, onPlay, onBlockedPress }
  * 「其他教材」區塊的清單：外部連結教材（業主 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
  */
-export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb" }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（業主 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" } & LessonPlayProps) {
+export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb", onBrowsePhotos, albumOpen, onPhotosChanged }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（業主 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" | "album"; /** 區塊照片（業主 2026-11-24）：「瀏覽本區照片」跳到相簿分頁（要展開的區塊編號）。 */ onBrowsePhotos?: (blockId: string) => void; /** 相簿分頁要自動展開的區塊。 */ albumOpen?: string | null; onPhotosChanged?: () => void } & LessonPlayProps) {
   const thumb = useThumb();
   const { c } = useTheme();
   const isBlocks = course.lessons.some((l) => l.section);
@@ -97,6 +98,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
       else if (blocks.length) blocks[blocks.length - 1]!.items.push(l);
       else lead.push(l);
     }
+    if (layout === "album") return <BlockAlbum course={course} openId={albumOpen} onChanged={onPhotosChanged} />;
     const full = all.filter((l) => l.full && shown(l));
     const visibleBlocks = blocks.filter((b) => canEdit || b.items.some(shown) || hasBlockPhotos(b.head));
     const leadShown = lead.filter(shown);
@@ -110,7 +112,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           {visibleBlocks.map((b) => (
             <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm }}>
               <ListSection title={b.head.title} count={b.items.filter(shown).length + (b.head.photos?.length ?? 0)} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
-              <BlockPhotos head={b.head} />
+              {onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           ))}
@@ -153,7 +155,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           )}
           renderPanel={(b) => (
             <Card style={LIST_CARD}>
-              <BlockPhotos head={b.head} />
+              {onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
             </Card>
           )}

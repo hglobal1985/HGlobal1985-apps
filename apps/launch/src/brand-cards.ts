@@ -43,7 +43,7 @@ export async function ensureBrandCards(env: Env, only?: string): Promise<number>
     const stmts = [
       db
         .prepare(
-          "INSERT INTO courses (id, sort_order, status, created_by_sub, edited_by_name, title, is_list, view_scope, is_public, allow_president, brand_id, zone, price_twd, min_rank_code, host_unit, series) VALUES (?, ?, 'published', 'system', '系統', ?, 1, 'all', 1, 1, ?, 'amway_brand', 0, 'none', '', '')",
+          "INSERT INTO courses (id, sort_order, status, created_by_sub, edited_by_name, title, is_list, view_scope, is_public, allow_president, brand_id, zone, price_twd, min_rank_code, host_unit, series, block_photos) VALUES (?, ?, 'published', 'system', '系統', ?, 1, 'all', 1, 1, ?, 'amway_brand', 0, 'none', '', '', 1)",
         )
         .bind(cardId, order, b.name, b.id),
     ];

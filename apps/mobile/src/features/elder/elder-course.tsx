@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useBorderW } from "@/lib/elder-mode";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { centerTitle } from "@/features/format";
@@ -82,10 +82,20 @@ const YELLOW = {
   dark: { bg: "#F5C518", fg: "#2A1D00", hotBg: "#C99A00", hotFg: "#1A1200" },
 } as const;
 
+const ALBUM = "__album";
+
 /** 區塊清單：每個區塊一張大列（標題＋教材數＋展開箭頭），預設全部收起、同一時間只展開一個（與超派模式 BLOCK_BEHAVIOR 一致）。 */
 function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
   const { c } = useTheme();
   const [open, setOpen] = useState<string | null>(null);
+  const [albumOpen, setAlbumOpen] = useState<string | null>(null); // 相簿裡展開的區塊（業主 2026-11-24）
+  const albumGroups = blocks.filter((b) => !!b.head.photoKey && !!b.head.photos?.length);
+  const albumTotal = albumGroups.reduce((n, b) => n + (b.head.photos?.length ?? 0), 0);
+  useEffect(() => {
+    if (open !== ALBUM || !albumOpen || typeof document === "undefined") return;
+    const t = setTimeout(() => document.getElementById(`alb-${albumOpen}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
+    return () => clearTimeout(t);
+  }, [open, albumOpen]);
   return (
     <>
       {lead.map(renderRow)}
@@ -96,11 +106,32 @@ function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blo
         return (
           <View key={b.head.id} style={[{ gap: space.sm }, empty ? fadedStyle : null]} pointerEvents={empty ? "none" : "auto"}>
             <ElderBlockHeader title={b.head.title} sub={`${b.items.length + (b.head.photos?.length ?? 0)} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
-            {on ? <BlockPhotos head={b.head} /> : null}
+            {on && hasBlockPhotos(b.head) ? (
+              <Pressable accessibilityRole="button" accessibilityLabel={`瀏覽本區照片，共 ${b.head.photos!.length} 張`} onPress={() => (setAlbumOpen(b.head.id), setOpen(ALBUM))} style={[styles.block, { backgroundColor: c.surfaceMuted, borderWidth: 2, borderColor: c.accent }]}>
+                <Ionicons name="images" size={26} color={c.accentText} />
+                <AppText variant="headline" style={{ flex: 1, color: c.accentText, fontWeight: "800" }}>
+                  瀏覽本區照片
+                </AppText>
+                <AppText variant="callout" style={{ color: c.accentText }}>{`${b.head.photos!.length} 張`}</AppText>
+              </Pressable>
+            ) : null}
             {on ? b.items.map(renderRow) : null}
           </View>
         );
       })}
+      {albumGroups.length ? (
+        <View style={{ gap: space.sm }}>
+          <ElderBlockHeader title="相簿" sub={`${albumTotal} 張照片`} on={open === ALBUM} onPress={() => (open === ALBUM ? setOpen(null) : setOpen(ALBUM))} />
+          {open === ALBUM
+            ? albumGroups.map((g) => (
+                <View key={g.head.id} nativeID={`alb-${g.head.id}`} style={{ gap: space.sm }}>
+                  <ElderBlockHeader title={g.head.title} sub={`${g.head.photos!.length} 張`} on={albumOpen === g.head.id} onPress={() => setAlbumOpen(albumOpen === g.head.id ? null : g.head.id)} />
+                  {albumOpen === g.head.id ? <BlockPhotos head={g.head} /> : null}
+                </View>
+              ))
+            : null}
+        </View>
+      ) : null}
     </>
   );
 }
