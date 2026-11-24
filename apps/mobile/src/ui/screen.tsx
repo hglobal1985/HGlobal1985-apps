@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { reportPlayerScroll } from "@/features/player/shrink";
 import { Animated, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useModeProfile } from "@/lib/app-mode";
@@ -151,14 +152,17 @@ function Scroller({ scrollY, children, ...props }: { scrollY?: Animated.Value } 
     const ts = [0, 120, 600].map((ms) => setTimeout(resync, ms));
     return () => ts.forEach(clearTimeout);
   }, [scrollY]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!scrollY) return <ScrollView {...rest}>{children}</ScrollView>;
+  // App：把捲動位置回報給播放器（往下滑影片縮成迷你播放器；網頁版另有自己的監聽）。
+  const report = (e: { nativeEvent: { contentOffset: { y: number } } }) => reportPlayerScroll(e.nativeEvent.contentOffset.y, () => (ref.current as unknown as { scrollTo?: (o: object) => void } | null)?.scrollTo?.({ y: 0, animated: true }));
+  const nativeReport = Platform.OS !== "web" ? { onScroll: report, scrollEventThrottle: 16 } : {};
+  if (!scrollY) return <ScrollView {...rest} {...(nativeReport as object)} ref={ref as never}>{children}</ScrollView>;
   const { onContentSizeChange, onLayout } = props;
   return (
     <Animated.ScrollView
       {...(rest as object)}
       ref={ref as never}
       scrollEventThrottle={16}
-      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false })}
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: false, listener: Platform.OS !== "web" ? (report as never) : undefined })}
       onContentSizeChange={(w: number, h: number) => {
         onContentSizeChange?.(w, h);
         resync();

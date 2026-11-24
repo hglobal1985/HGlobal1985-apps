@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl } from "@/api/client";
 import { useSession } from "@/state/session";
 import { engine } from "./engine";
+import { scrollPlayerPageTop, useShrink } from "./shrink";
 import { usePlayer } from "./use-player";
 
 const MARGIN = 8;
@@ -33,7 +34,8 @@ export function PlayerLayer() {
   const cur = useRef(home);
   const spin = useRef(new Animated.Value(0)).current;
   const t = s.track;
-  const away = !!t && s.slotKey !== t.key;
+  const shrunk = useShrink() >= 0.99 && !!t && s.slotKey === t.key && t.mode === "video"; // 頁面往下滑到底＝在原頁縮成迷你
+  const away = !!t && (s.slotKey !== t.key || shrunk);
   const circle = away && s.collapsed;
   const windowed = away && !s.collapsed && t.mode === "video";
   const size = useRef({ w, h });
@@ -76,6 +78,7 @@ export function PlayerLayer() {
         if (Math.hypot(g.dx, g.dy) < 6) {
           const sn = engine.getSnapshot();
           if (sn.collapsed) resizeRef.current(false);
+          else if (shrunkRef.current) scrollPlayerPageTop(); // 在課程頁被滑動縮小：點一下回到頁面最上方就還原
           else if (sn.track) router.push(lessonHref(sn.track.courseId, sn.track.lessonId) as never);
           return;
         }
@@ -83,6 +86,8 @@ export function PlayerLayer() {
       },
     }),
   ).current;
+  const shrunkRef = useRef(shrunk);
+  shrunkRef.current = shrunk;
   const resizeRef = useRef(resize);
   resizeRef.current = resize;
   const placeRef = useRef(place);
