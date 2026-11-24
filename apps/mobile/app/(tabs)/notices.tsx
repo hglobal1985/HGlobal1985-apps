@@ -99,8 +99,8 @@ export default function NoticesScreen() {
     );
   return (
     <Screen
-      title="通知"
-      subtitle={data ? (unread ? `${unread} 則未讀` : "全部已讀") : undefined}
+      title={elder ? undefined : "通知"}
+      subtitle={elder ? undefined : data ? (unread ? `${unread} 則未讀` : "全部已讀") : undefined}
       right={elder ? undefined : (
         <View style={{ flexDirection: "row", alignItems: "center" }}>
           {unread ? <Button variant="ghost" label="全部標為已讀" onPress={markAll} /> : null}
