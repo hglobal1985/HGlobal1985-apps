@@ -71,6 +71,11 @@ export function PlayerLayer() {
   const combo = useRef<{ side: "l" | "r"; total: number; at: number } | null>(null);
   const press = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holding = useRef(false);
+  const hideBar = () => {
+    if (barTimer.current) clearTimeout(barTimer.current);
+    barOnRef.current = false;
+    setBarOn(false);
+  };
   const barDown = (e: PointerEvent<HTMLDivElement>) => {
     barHold.current = true;
     if (barTimer.current) clearTimeout(barTimer.current);
@@ -98,12 +103,15 @@ export function PlayerLayer() {
     tap.current = null;
     const wasHolding = holding.current;
     endHold();
-    wakeBar();
     const inFull = fullRef.current || document.fullscreenElement === boxRef.current;
     const isTap = !!d && !wasHolding && !d.onBar && Date.now() - d.t < 400 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 12;
-    if (!isTap || !inFull) return;
+    if (!isTap || !inFull) return void wakeBar();
+    // 畫面分三塊各 33%：左＝倒退、中間＝顯示／隱藏控制列、右＝快轉（業主 2026-11-24）
     const r = boxRef.current?.getBoundingClientRect();
-    const side: "l" | "r" = e.clientX < (r ? r.left + r.width / 2 : window.innerWidth / 2) ? "l" : "r";
+    const frac = (e.clientX - (r?.left ?? 0)) / (r?.width || window.innerWidth);
+    if (frac >= 1 / 3 && frac < 2 / 3) return void (d.wasOn ? hideBar() : wakeBar());
+    wakeBar();
+    const side: "l" | "r" = frac < 1 / 3 ? "l" : "r";
     const now = Date.now();
     const c = combo.current;
     const chain = !!c && c.side === side && now - c.at < 700;
@@ -477,7 +485,7 @@ export function PlayerLayer() {
         </button>
       ) : null}
       {gHint && (pFull || fsOn) ? (
-        <div key={gHint.n} style={{ position: "absolute", top: "42%", zIndex: 7, pointerEvents: "none", ...(gHint.side === "l" ? { left: "10%" } : gHint.side === "r" ? { right: "10%" } : { left: "50%", transform: "translateX(-50%)" }), padding: "10px 18px", borderRadius: 24, background: "rgba(0,0,0,0.6)", color: "#fff", font: "800 20px system-ui, sans-serif" }}>
+        <div key={gHint.n} style={{ position: "absolute", top: "42%", zIndex: 7, pointerEvents: "none", ...(gHint.side === "l" ? { left: "4%" } : gHint.side === "r" ? { right: "4%" } : { left: "50%", transform: "translateX(-50%)" }), padding: "14px 30px", borderRadius: 48, background: "rgba(0,0,0,0.6)", color: "#fff", font: "800 50px/1.25 system-ui, sans-serif", whiteSpace: "nowrap" }}>
           {gHint.text}
         </div>
       ) : null}
