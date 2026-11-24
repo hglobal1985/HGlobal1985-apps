@@ -14,6 +14,7 @@ import { elderTextScale } from "@/lib/elder-mode";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
+import { Dropdown } from "@/ui/dropdown";
 import { SuggestField, useSuggestions } from "@/features/admin/suggest-input";
 
 type FieldView = { value: string; pending: string | null; status: string };
@@ -111,53 +112,6 @@ export function AccountCenterLink() {
 /** 一欄堆疊版面（至尊模式頁）：下拉選單與右邊的「無」勾選框並排同一列（業主 2026-11-24）；三欄版面維持原樣（無在選單下方）。 */
 function FieldLine({ stack, children }: { stack: boolean; children: ReactNode }) {
   return stack ? <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>{children}</View> : <>{children}</>;
-}
-
-/**
- * 自訂下拉選單（不用系統原生選單）：依螢幕剩餘空間自動往下或往上展開；選項超過 12 個時上方有搜尋框。
- */
-function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth, flow }: { /** 一欄堆疊版面（至尊模式頁）：選項直接展開在欄位下方、把後面的內容往下推，不浮在畫面上被別的元件蓋住。 */ flow?: boolean; pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
-  const { c } = useTheme();
-  const { height: winH, width: winW } = useWindowDimensions();
-  const box = useRef<HostInstance>(null);
-  const lastW = useRef(0); // 最近一次「正常顯示」時的欄位寬度
-    const [pos, setPos] = useState({ up: false, max: 240, left: 0, w: 220 });
-  const toggle = () => {
-    if (open) return onOpenChange(false);
-    box.current?.measureInWindow((x, y, w, h) => {
-      const below = winH - (y + h) - 24;
-      const above = y - 24;
-      const up = below < 240 && above > below;
-      // 窄欄（三欄表單）的選項面板：寬度放寬，並以欄位為中心、夾在螢幕左右各 16 之內（不再超出畫面）。
-      // 選項面板寬度＝剛好放得下最長的選項（不小於欄位本身），並夾在螢幕左右各 16 之內。
-      const est = Math.max(0, ...options.map((o) => [...o.label].reduce((n, ch) => n + (/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 16 : 9), 0))) + 36;
-      const popW = Math.min(winW - 32, Math.max(w, est));
-      const left = Math.min(Math.max(x, 16), winW - 16 - popW) - x;
-      setPos({ up, max: Math.max(140, Math.min(300, up ? above : below)), left, w: popW });
-      onOpenChange(true);
-    });
-  };
-  return (
-    <View ref={box} collapsable={false} style={flow ? { width: "100%" } : pop ? { alignSelf: "stretch", minWidth: 0, zIndex: open ? 50 : 1 } : { flex: 1, zIndex: open ? 50 : 1 }}>
-      <Pressable onLayout={(e) => { if (!keepWidth) lastW.current = Math.round(e.nativeEvent.layout.width); }} onPress={() => !disabled && toggle()} accessibilityRole="button" accessibilityState={{ disabled: !!disabled, expanded: open }} style={[styles.input, { borderColor: c.border, backgroundColor: disabled ? c.surfaceMuted : c.surface, flexDirection: "row", alignItems: "center", gap: pop ? 2 : space.sm, opacity: disabled ? 0.7 : 1 }, pop ? { paddingHorizontal: 8 } : null]}>
-        <AppText style={pop ? { flex: 1, minWidth: 0 } : { flex: 1 }} numberOfLines={1} tone={disabled || !value ? "muted" : undefined}>
-          {label}
-        </AppText>
-        <Icon name={open ? "chevron-up" : "chevron-down"} size={pop ? 14 : 20} color={c.textMuted} />
-      </Pressable>
-      {open ? (
-        <View style={[styles.dropdown, pop ? { width: pos.w, left: pos.left, right: "auto" as never } : null, pos.up ? { bottom: FIELD_H + 4 } : { top: FIELD_H + 4 }, { maxHeight: pos.max, borderWidth: 2, borderColor: c.accentText, backgroundColor: c.surface, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }, flow ? { position: "relative", top: undefined, bottom: undefined, left: undefined, right: undefined, width: "100%", marginTop: 4, maxHeight: 360, shadowOpacity: 0, elevation: 0 } : null]}>
-          <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-            {options.map((o) => (
-              <Pressable key={o.value} onPress={() => (onPick(o.value), onOpenChange(false))} accessibilityRole="button" style={[styles.opt, o.value === value && { backgroundColor: c.accentSoft }]}>
-                <AppText numberOfLines={1}>{o.label}</AppText>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
-    </View>
-  );
 }
 
 /** 視窗頂端的按鈕：文字一律單行。儲存＝金黃色（中央視覺規範），儲存中顯示轉圈圈與「儲存中」。 */

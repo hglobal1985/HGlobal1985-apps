@@ -44,6 +44,7 @@
 - 上方工具列：`TopBar`／`PageHeader`；右側按鈕 `TopBarButton`（綠色）；可分享頁面要給 `backTo`。
 - 一句話回饋：`flashText()`／`showFlash()`（不用 toast）；背景暗化 `DimBackdrop`；流光邊框 `GradientFrame`。
 - 編輯面板：`EditSheet`（取消在左、儲存在右同一列）；按鈕取消 `variant="cancel"`（左、紅框）、儲存在右（深綠）；欄位群組 `FormBlock`、`BrandField`／`CategoryField`／`HostField`。
+- **下拉選單（業主 2026-11-24 永久指示，不可另做）**：原地展開的下拉一律用 `Dropdown`（`ui/dropdown.tsx`，即會員資料獎銜／中心／系統的樣式：深綠 2px 框、選中淡綠底、再按一次收起）；`Select` 在至尊模式自動改用它（不顯示欄位標籤），超派模式仍是上拉面板。
 - 日期：`DateSelect`；切換鈕：`SegmentTabs`；勾選：`Check`；數量膠囊：`CountPill`／`CardCount`。
 - 讀取中：整頁 `LoadingView`（灌溉小樹苗）、小塊 `LoadingLadybug`；沒有圖的縮圖／封面：`ThumbFallback`（綠色學士帽）。
 - 封面：`ArtUploader`、`EdmManager`、`LessonArt`＋封面庫；圖片存 R2 前一律 `shrinkImage`；顯示縮圖用 `useThumb()`。
