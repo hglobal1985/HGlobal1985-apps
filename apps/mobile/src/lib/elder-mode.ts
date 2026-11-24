@@ -74,10 +74,10 @@ function applyWrap() {
   const el = document.documentElement;
   if (prefs.on) el.setAttribute("data-elder", "1");
   else el.removeAttribute("data-elder");
-  if (!document.getElementById("elder-wrap")) {
+  if (!document.getElementById("elder-wrap-2")) {
     const st = document.createElement("style");
-    st.id = "elder-wrap";
-    st.textContent = 'html[data-elder="1"] div[dir="auto"],html[data-elder="1"] span[dir="auto"]{text-wrap:balance}';
+    st.id = "elder-wrap-2";
+    st.textContent = 'html[data-elder="1"] div[dir="auto"]:not([data-plainwrap]),html[data-elder="1"] span[dir="auto"]:not([data-plainwrap]){text-wrap:balance}';
     document.head.appendChild(st);
   }
 }

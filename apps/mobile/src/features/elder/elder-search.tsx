@@ -12,6 +12,8 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { maxContentWidth, radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
+import { elderTextScale } from "@/lib/elder-mode";
+import { fitFontSize } from "@/ui/course-cover";
 import { ELDER_FIELD } from "@/ui/elder-controls";
 import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
 import { TileCover } from "@/features/courses/series-tile";
@@ -272,14 +274,19 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
 }
 
 /**
- * 列上的課程標題：所有列同一個固定字級，依剩餘寬度自然換行（業主 2026-11-24 撤銷「自動算字級／對齊斷行」：
- * 那會讓斷行落在奇怪的地方，例如「中山中／心 288」）。字級已乘上全站放大倍數，不要再自己算。
+ * 列上的課程標題（業主 2026-11-24）：標準字級 `TITLE_SIZE`，依剩餘寬度自然換行（不提早斷行）；
+ * 資訊卡高度固定（＝封面高度），標題字數太多放不下時才**縮小字級**，一定完整顯示全部文字。
+ * 斷行處由瀏覽器依寬度決定，不做任何字數對齊；網頁版用 data-plainwrap 排除至尊模式的 text-wrap: balance（會讓斷行提早）。
+ * 畫字時會再乘「平板倍數 × 至尊倍數」，所以估算要在放大前的尺寸上算。
  */
 const TITLE_SIZE = 22;
 function FitTitle({ text }: { text: string }) {
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const k = UI_SCALE * elderTextScale();
+  const fs = box.w && box.h ? Math.min(TITLE_SIZE, fitFontSize(text, box.w / k, (box.h / k) * 0.92, TITLE_SIZE, 10)) : TITLE_SIZE;
   return (
-    <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }}>
-      <AppText numberOfLines={4} style={{ fontSize: TITLE_SIZE, lineHeight: Math.round(TITLE_SIZE * 1.3), fontWeight: "800" }}>
+    <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
+      <AppText {...({ dataSet: { plainwrap: "" } } as object)} style={{ fontSize: fs, lineHeight: Math.round(fs * 1.25), fontWeight: "800" }}>
         {text}
       </AppText>
     </View>
