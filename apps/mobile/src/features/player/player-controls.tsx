@@ -15,8 +15,9 @@ import { usePlayer } from "./use-player";
  * 位置在影片的外面下方（不在影片裡面）。播放／暫停、可拖曳的時間軸、時間、（影片才有）全螢幕。
  * 以後要改時間軸的外觀或位置，只改這個檔案（與 seek-bar.tsx），三種模式會自動一起變。
  */
-export function PlayerControls() {
-  const { c } = useTheme();
+export function PlayerControls({ overlay = false }: { /** 全螢幕疊在影片上：黑色半透明底、白色圖示（業主 2026-11-24）。 */ overlay?: boolean } = {}) {
+  const theme = useTheme();
+  const c = overlay ? { ...theme.c, text: "#fff", textMuted: "rgba(255,255,255,0.85)", accentText: "#fff", surface: "rgba(0,0,0,0.55)", border: "transparent" } : theme.c;
   const s = usePlayer();
   const maxWidth = useStageMax(); // 與上方舞台同寬（大螢幕兩欄時填滿左欄）
   const t = s.track;
@@ -32,7 +33,7 @@ export function PlayerControls() {
           {s.loading ? <LoadingLadybug size={32} /> : <Ionicons name={icon} size={22} color={c.text} />}
         </Pressable>
         <View style={styles.bar}>
-          <SeekBar value={at} max={total || 1} onSeek={(v) => engine.seek(start + v)} onTouch={t.mode === "audio" ? undefined : () => engine.pokeHint()} />
+          <SeekBar dark={overlay} value={at} max={total || 1} onSeek={(v) => engine.seek(start + v)} onTouch={t.mode === "audio" ? undefined : () => engine.pokeHint()} />
         </View>
         {/* 倒數剩餘時間（-12:34）。寬度依「整堂長度」固定，播放中數字變動時時間軸不會跟著抖動。 */}
         <AppText variant="caption" tone="muted" numberOfLines={1} style={[styles.time, { minWidth: total >= 3600 ? 58 : 44 }]}>

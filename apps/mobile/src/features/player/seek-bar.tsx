@@ -6,7 +6,7 @@ import { useTheme } from "@/theme/theme";
  * 時間軸細條：點一下跳到該位置，手指按住左右拖曳可連續調整（觸控區高 48px、圓點直徑 26，手指好抓）。
  * value、max 單位相同（秒）；放開手指才真正跳轉。
  */
-export function SeekBar({ value, max, onSeek, onTouch }: { value: number; max: number; onSeek: (v: number) => void; onTouch?: () => void }) {
+export function SeekBar({ value, max, onSeek, onTouch, dark }: { value: number; max: number; onSeek: (v: number) => void; onTouch?: () => void; /** 黑色半透明底（全螢幕疊在影片上）用：軌道與圓點改白色系。 */ dark?: boolean }) {
   const { c } = useTheme();
   const [width, setWidth] = useState(1);
   const [drag, setDrag] = useState<number | null>(null);
@@ -40,10 +40,10 @@ export function SeekBar({ value, max, onSeek, onTouch }: { value: number; max: n
   const pct = max > 0 ? Math.min(1, Math.max(0, shown / max)) : 0;
   return (
     <View style={styles.touch} onLayout={(e) => setWidth(Math.max(1, e.nativeEvent.layout.width))} accessibilityRole="adjustable" accessibilityLabel="播放進度" {...responder.panHandlers}>
-      <View style={[styles.track, { backgroundColor: c.border }]}>
-        <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: c.accent }]} />
+      <View style={[styles.track, { backgroundColor: dark ? "rgba(255,255,255,0.35)" : c.border }]}>
+        <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: dark ? "#fff" : c.accent }]} />
       </View>
-      <View style={[styles.thumb, { left: `${pct * 100}%`, backgroundColor: c.accent, borderColor: c.surface }]} />
+      <View style={[styles.thumb, { left: `${pct * 100}%`, backgroundColor: dark ? "#fff" : c.accent, borderColor: dark ? "rgba(0,0,0,0.6)" : c.surface }]} />
     </View>
   );
 }

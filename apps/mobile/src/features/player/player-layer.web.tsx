@@ -45,7 +45,21 @@ export function PlayerLayer() {
   const dismissed = useRef(false); // 使用者在橫放時自己按了縮小／退出全螢幕：這次橫放不再自動進入
   const realFs = useRef(false);
   const [pFull, setPFull] = useState(false);
+  const [barOn, setBarOn] = useState(true); // 全螢幕控制列：2 秒沒動作自動隱藏，點畫面任意處再顯示
+  const barTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const barHold = useRef(false);
+  const wakeBar = useCallback(() => {
+    setBarOn(true);
+    if (barTimer.current) clearTimeout(barTimer.current);
+    if (!barHold.current) barTimer.current = setTimeout(() => setBarOn(false), 2000);
+  }, []);
   const [fsOn, setFsOn] = useState(false); // 這個播放框正處於瀏覽器全螢幕
+  useEffect(() => {
+    if (pFull || fsOn) wakeBar();
+    return () => {
+      if (barTimer.current) clearTimeout(barTimer.current);
+    };
+  }, [pFull, fsOn, wakeBar]);
   const exitRef = useRef<(() => void) | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
   const pos = useRef<Pos | null>(null);
@@ -395,17 +409,17 @@ export function PlayerLayer() {
   else if (!ytSrc.current) ytSrc.current = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(yt.videoId)}?controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&rel=0&modestbranding=1&autoplay=1&playsinline=1&enablejsapi=1&origin=${encodeURIComponent(location.origin)}${range}`;
   const art = s.artworkUrl ? (/^(https?:|blob:|data:)/.test(s.artworkUrl) ? s.artworkUrl : s.artworkUrl) : "/icon-512.png";
   return createPortal(
-    <div ref={boxRef} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
+    <div ref={boxRef} onPointerDownCapture={() => { barHold.current = true; wakeBar(); }} onPointerMoveCapture={() => barHold.current && wakeBar()} onPointerUpCapture={() => { barHold.current = false; wakeBar(); }} onPointerCancelCapture={() => { barHold.current = false; wakeBar(); }} style={{ position: "fixed", left: 0, top: 0, display: "none", zIndex: 1000, overflow: "hidden", background: "#000" }}>
       <style>{`@keyframes hg-spin{to{transform:rotate(360deg)}}${FRAME_KEYFRAMES}`}</style>
       {pFull ? (
-        <button type="button" aria-label="縮小回原本大小" onClick={() => exitRef.current?.()} style={{ position: "absolute", top: 10, left: 10, zIndex: 5, minHeight: 44, padding: "0 16px", borderRadius: 22, border: 0, background: "rgba(0,0,0,0.55)", color: "#fff", font: "700 15px system-ui, sans-serif" }}>
+        <button type="button" aria-label="縮小回原本大小" onClick={() => exitRef.current?.()} style={{ position: "absolute", top: 10, left: 10, zIndex: 5, opacity: barOn ? 1 : 0, pointerEvents: barOn ? "auto" : "none", transition: "opacity 0.25s", minHeight: 44, padding: "0 16px", borderRadius: 22, border: 0, background: "rgba(0,0,0,0.55)", color: "#fff", font: "700 15px system-ui, sans-serif" }}>
           縮小
         </button>
       ) : null}
       {pFull || fsOn ? (
         // 全螢幕裡看不到頁面下方的播放控制列，所以在播放框內放同一個控制列（時間軸、播放／暫停、倍速…；業主 2026-11-24 回報時間軸不見了）
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 6, paddingBottom: "env(safe-area-inset-bottom, 0px)", background: "rgba(0,0,0,0.0)" }}>
-          <PlayerControls />
+        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 6, paddingBottom: "env(safe-area-inset-bottom, 0px)", opacity: barOn ? 1 : 0, pointerEvents: barOn ? "auto" : "none", transition: "opacity 0.25s" }}>
+          <PlayerControls overlay />
         </div>
       ) : null}
       <div style={{ position: "absolute", inset: "var(--pad, 0px)", borderRadius: "inherit", overflow: "hidden", background: "#000" }}>
