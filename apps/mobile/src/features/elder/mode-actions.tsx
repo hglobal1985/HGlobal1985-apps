@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { confirmSheet } from "@/features/confirm";
 import { MODE_PROFILES } from "@/lib/app-mode";
-import { ELDER_MAX, ELDER_MIN, elderTextScale, setElder, systemFontScale, useElder } from "@/lib/elder-mode";
+import { ELDER_DEFAULT, ELDER_MAX, ELDER_MIN, elderTextScale, setElder, systemFontScale, useElder } from "@/lib/elder-mode";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
@@ -31,6 +31,9 @@ export async function askSwitchToMaker() {
  * 「跟著手機字體大小」（粗體字，勾選＝以手機的設定為準，下面的範例、＋／－、快速大小都刷淡不能用）→
  * 小的「－／＋」＋「字體大小 150%」同一列 → 範例字 → 快速大小（標準／大／特大）→「文字加粗」。
  */
+/** 勾「跟著手機」之前的自訂大小。 */
+let savedSize: number | null = null;
+
 export function FontSizeCard() {
   const { c } = useTheme();
   const prefs = useElder();
@@ -54,7 +57,13 @@ export function FontSizeCard() {
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
       {toggle("文字加粗", prefs.bold, (v) => setElder({ bold: v }))}
-      {toggle("跟著手機字體大小", follow, (v) => setElder({ followSystem: v }), sys !== 1 ? `手機目前 ${Math.round(sys * 100)}%` : undefined)}
+      {toggle("跟著手機字體大小", follow, (v) => {
+        // 勾選＝字體設定立刻復原成預設（舊的自訂大小先記起來）；取消勾選＝還原剛才的自訂大小（業主 2026-11-24）。
+        if (v) {
+          savedSize = prefs.size;
+          setElder({ followSystem: true, size: ELDER_DEFAULT });
+        } else setElder({ followSystem: false, size: savedSize ?? prefs.size });
+      }, sys !== 1 ? `手機目前 ${Math.round(sys * 100)}%` : undefined)}
       <View style={[styles.row, { alignItems: "center" }, dim]} pointerEvents={follow ? "none" : "auto"}>
         <StepButton label="字變小" icon="remove" disabled={follow || prefs.size <= ELDER_MIN} onPress={() => step(-0.1)} outline />
         <StepButton label="字變大" icon="add" disabled={follow || prefs.size >= ELDER_MAX} onPress={() => step(0.1)} />
