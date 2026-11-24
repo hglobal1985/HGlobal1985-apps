@@ -24,7 +24,7 @@ import { AppText, BrandTitle, ErrorView, InstallCard, LoginPrompt, LoadingView, 
  */
 // 每次登入只彈一次（登出後再登入會再提示）。
 
-/** 首頁：至尊模式（業主 2026-11-24）改成大搜尋框＋大麥克風（features/elder/elder-search.tsx）；創客模式照舊。 */
+/** 首頁：至尊模式（業主 2026-11-24）改成大搜尋框＋大麥克風（features/elder/elder-search.tsx）；超派模式照舊。 */
 export default function HomeRoute() {
   return useElderOn() ? <ElderSearch mode="home" /> : <HomeScreen />;
 }

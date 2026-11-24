@@ -18,8 +18,8 @@ import { UI_SCALE } from "@/theme/ui-scale";
 const navHeight = Math.round((UI_SCALE > 1 ? 58 : 50) * UI_SCALE);
 /** 至尊模式（業主 2026-11-24）：底部選單加高、字與圖示加大（固定大小，不跟著至尊字體倍數再放大，否則四個分頁會擠不下）。 */
 const elderNavHeight = Math.round((UI_SCALE > 1 ? 80 : 72) * UI_SCALE);
-/** 創客模式的模式鍵圖示（業主 2026-11-24 從五個方案挑選）。 */
-const MAKER_ICON: IconName = "construct-outline";
+/** 超派模式的模式鍵圖示（業主 2026-11-24 從五個方案挑選：方案 3 火箭）。 */
+const MAKER_ICON: IconName = "rocket-outline";
 /** 只吃平板／電腦倍數、不吃至尊模式倍數（lib/global-scale.ts）。 */
 const UI_ONLY = { dataSet: { uiOnly: "" } } as object;
 import { AppText } from "./text";
@@ -54,7 +54,7 @@ export function BottomBar() {
   const pathname = usePathname();
   const unread = useUnreadCount();
   const lib = useLibraryMode();
-  // 至尊模式：不顯示「設定」分頁；最右邊的模式鍵（創客模式顯示「至尊」、至尊模式顯示「創客」）。
+  // 至尊模式：不顯示「設定」分頁；最右邊的模式鍵（超派模式顯示「至尊」、至尊模式顯示「超派」）。
   const elder = useElderOn();
   const [modeOpen, setModeOpen] = useState(false);
   const shown = elder ? tabs.filter((t) => t.title !== "設定") : tabs;
@@ -131,12 +131,12 @@ export function BottomBar() {
         );
       })}
       {/* 模式鍵（業主 2026-11-24）：放在「設定」右邊，樣式跟其他分頁一樣（不加黃色底框）；文字與圖示顯示「目前的模式」：
-          創客模式＝「創客」＋MAKER_ICON，按下直接切到至尊模式；至尊模式＝「至尊」＋皇冠，按下打開面板（字體大小、訂單紀錄、帳號、換回創客模式）。書櫃頁面不顯示。 */}
+          超派模式＝「超派」＋MAKER_ICON，按下直接切到至尊模式；至尊模式＝「至尊」＋皇冠，按下打開面板（字體大小、訂單紀錄、帳號、換回超派模式）。書櫃頁面不顯示。 */}
       {lib ? null : (
         <Pressable
           style={tabStyle}
           accessibilityRole="button"
-          accessibilityLabel={elder ? "目前是至尊模式。按這裡調整字體、看訂單紀錄、帳號，或換回創客模式" : "目前是創客模式。按這裡切換到至尊模式（大字簡易版）"}
+          accessibilityLabel={elder ? "目前是至尊模式。按這裡調整字體、看訂單紀錄、帳號，或換回超派模式" : "目前是超派模式。按這裡切換到至尊模式（大字簡易版）"}
           onPress={() => (elder ? setModeOpen(true) : switchToElder())}
         >
           <View style={[styles.cell, elder && styles.cellElder]}>
@@ -144,7 +144,7 @@ export function BottomBar() {
               {elder ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color="#FFFFFF" /> : <Ionicons name={MAKER_ICON} size={iconSize} color="#FFFFFF" {...({ uiOnly: true } as object)} />}
             </View>
             <AppText variant="caption" numberOfLines={1} style={{ color: "#FFFFFF", fontWeight: "800", fontSize: labelSize, lineHeight: Math.round(labelSize * 1.2) }} {...UI_ONLY}>
-              {elder ? "至尊" : "創客"}
+              {elder ? "至尊" : "超派"}
             </AppText>
           </View>
         </Pressable>

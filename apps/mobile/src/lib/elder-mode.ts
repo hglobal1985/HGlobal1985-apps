@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { PixelRatio, Platform } from "react-native";
 
 /**
- * 使用模式（業主 2026-11-24）：「至尊模式」＝給長輩用的簡易大字版；「創客模式」＝原本的完整版。
+ * 使用模式（業主 2026-11-24）：「至尊模式」＝給長輩用的簡易大字版；「超派模式」＝原本的完整版。
  * 只存在這支手機／這個瀏覽器（不上傳伺服器）。字體放大倍數可自訂，也可選擇跟著手機系統的字體大小。
  * 全站文字、圖示的放大由 lib/global-scale.ts 讀 elderTextScale() 統一處理。
  */
@@ -93,7 +93,7 @@ export function systemFontScale(): number {
   return systemCache;
 }
 
-/** 目前全站文字要乘的「至尊模式」倍數（創客模式＝1）。 */
+/** 目前全站文字要乘的「至尊模式」倍數（超派模式＝1）。 */
 export function elderTextScale(p: ElderPrefs = prefs): number {
   if (!p.on) return 1;
   return round1(clamp(p.size * (p.followSystem ? systemFontScale() : 1), 1, 3));
