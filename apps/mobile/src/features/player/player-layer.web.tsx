@@ -159,8 +159,8 @@ export function PlayerLayer() {
   // 影片／YouTube：在課程頁內嵌，其餘時間是浮動小視窗；純音檔只有「縮小」時才有畫面（小圓圖）。
   const inline = !!t && !isAudio && inlineSlot;
   const floating = !!t && !inlineSlot && (!isAudio || s.collapsed);
-  const circle = floating && s.collapsed;
-  const windowed = (floating && !s.collapsed) || (inline && shrunk);
+  const circle = (floating || (inline && shrunk)) && s.collapsed; // 課程頁往下滑縮成的迷你播放器也能最小化成小圓圖（業主 2026-11-24）
+  const windowed = (floating && !s.collapsed) || (inline && shrunk && !s.collapsed);
 
   // 影片區的點擊擋板（只擋 YouTube 自己的按鈕與連結；播放暫停只用下方控制列）。已移除雙指放大與拖曳（業主 2026-11-24）。
   const canBlock = inline && !shrunk && (t?.mode === "video" || t?.mode === "youtube");
@@ -309,7 +309,11 @@ export function PlayerLayer() {
           }
           const atMini = pr >= 0.99;
           setShrunk((v) => (v === atMini ? v : atMini));
-          if (r.width > 0 && pr <= 0) css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
+          if (pr <= 0 && sn.collapsed) engine.setCollapsed(false); // 回到頁面最上方：小圓圖還原，不留著下次直接變圓
+          if (r.width > 0 && atMini && sn.collapsed) {
+            const p = clamp(pos.current ?? { x: window.innerWidth - CIRCLE - 12, y: Math.max(MARGIN, bottomEdge() - CIRCLE - 12) }, CIRCLE, CIRCLE);
+            css = `${p.x}|${p.y}|${CIRCLE}|${CIRCLE}|2`;
+          } else if (r.width > 0 && pr <= 0) css = `${r.left}|${r.top}|${r.width}|${r.height}|0`;
           else if (r.width > 0) {
             const mw = floatWidth();
             const mh = Math.round((mw * 9) / 16);
@@ -416,7 +420,7 @@ export function PlayerLayer() {
     const to = toCircle ? CIRCLE : floatWidth();
     const right = (pos.current?.x ?? r.left) + from;
     const toH = toCircle ? CIRCLE : Math.round((to * 9) / 16);
-    pos.current = clamp({ x: right - to, y: pos.current?.y ?? r.top }, to, toH);
+    pos.current = clamp({ x: right - to, y: pos.current?.y ?? (toCircle ? r.top - BAR : r.top) }, to, toH + (toCircle ? 0 : BAR));
     save();
   };
   const minimize = () => {
