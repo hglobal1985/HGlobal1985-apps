@@ -229,3 +229,48 @@ test("命名規則：{標題}＝影片原標題；移除文字從最後的名稱
   const names = syncNamesFor([{ title: "A 影片", date: "2026-03-14" }, { title: "A 影片", date: "2026-03-20" }], "{標題}", [], new Set());
   assert.deepEqual(names, ["A 影片（3/14）", "A 影片（3/20）"]);
 });
+
+test("同步清單：沒勾「使用行動大學播放器」＝存成外部連結、再同步不重複（業主 2026-11-24）", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
+  await db.prepare("INSERT INTO courses (id, title, status) VALUES ('c1', '外連', 'published')").run();
+  await db.prepare("INSERT INTO youtube_syncs (id, url, playlist_id, course_id, title_prefix, use_app_player) VALUES ('s1', 'u', 'PLX', 'c1', '外連', 0)").run();
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (u: string | URL | Request) => {
+    if (String(u).includes("playlistItems"))
+      return new Response(JSON.stringify({ items: [{ snippet: { title: "a" }, contentDetails: { videoId: "AAAAAAAAAAA", videoPublishedAt: "2026-10-05T01:00:00Z" } }] }), { status: 200 });
+    return new Response("x", { status: 404 });
+  }) as typeof fetch;
+  try {
+    assert.equal((await runYoutubeSync(env, "s1")).imported, 1);
+    assert.equal((await runYoutubeSync(env, "s1")).imported, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const l = await db.prepare("SELECT media_type, media_ref FROM lessons WHERE course_id = 'c1'").first<{ media_type: string; media_ref: string | null }>();
+  assert.equal(l?.media_type, "demo");
+  assert.equal(l?.media_ref, null);
+  const a = await db.prepare("SELECT link_url, att_type FROM lesson_attachments WHERE course_id = 'c1'").first<{ link_url: string; att_type: string }>();
+  assert.equal(a?.link_url, "https://www.youtube.com/watch?v=AAAAAAAAAAA");
+  assert.equal(a?.att_type, "youtube");
+});
+
+test("migration 0130：U40創業學院的 YouTube 外部連結教材改存成影片來源並刪掉連結", async () => {
+  const { readFileSync } = await import("node:fs");
+  const db = createTestDb();
+  const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+  await run("INSERT INTO courses (id, title, status, series) VALUES ('u1', '系統複製', 'published', 'U40創業學院'), ('o1', '別的', 'published', '其他')");
+  const mk = async (id: string, course: string, url: string) => {
+    await run("INSERT INTO lessons (id, course_id, position, title, media_type, kind) VALUES (?, ?, ?, 'x', 'demo', 'material')", id, course, Math.floor(Math.random() * 1e6));
+    await run("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, 'x', 'link', ?, 'youtube', 'system')", `a-${id}`, id, course, url);
+  };
+  await mk("m1", "u1", "https://www.youtube.com/watch?v=AAAAAAAAAAA");
+  await mk("m2", "u1", "https://www.youtube.com/live/BBBBBBBBBBB?si=zzz");
+  await mk("m3", "o1", "https://www.youtube.com/watch?v=CCCCCCCCCCC");
+  const sql = readFileSync(new URL("../migrations/0130_app_player.sql", import.meta.url), "utf8").split(/;\s*\n/).map((x) => x.replace(/--.*$/gm, "").trim()).filter((x) => x && !x.startsWith("ALTER"));
+  for (const st of sql) await db.prepare(st).run();
+  const rows = (await db.prepare("SELECT id, media_type, media_ref FROM lessons WHERE id IN ('m1', 'm2', 'm3') ORDER BY id").all<{ id: string; media_type: string; media_ref: string | null }>()).results.map((r) => ({ ...r }));
+  assert.deepEqual(rows, [{ id: "m1", media_type: "youtube", media_ref: "AAAAAAAAAAA" }, { id: "m2", media_type: "youtube", media_ref: "BBBBBBBBBBB" }, { id: "m3", media_type: "demo", media_ref: null }]);
+  const left = (await db.prepare("SELECT lesson_id FROM lesson_attachments WHERE lesson_id IN ('m1', 'm2', 'm3')").all<{ lesson_id: string }>()).results.map((r) => r.lesson_id);
+  assert.deepEqual(left, ["m3"]);
+});

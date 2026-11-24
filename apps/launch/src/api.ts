@@ -4760,8 +4760,8 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       requireSuperAdmin(ctx);
       const { results } = await ctx.db
-        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.strip_text AS stripText, y.sort_mode AS sortMode, y.sort_locked AS sortLocked, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id ORDER BY y.created_at")
-        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; stripText: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
+        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.strip_text AS stripText, y.sort_mode AS sortMode, y.sort_locked AS sortLocked, y.use_app_player AS appPlayer, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id ORDER BY y.created_at")
+        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; stripText: string; sortMode: string; appPlayer: number; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
       const { defaultSyncFormat, SYNC_FORMAT_HELP, SYNC_SORT_LABEL } = await import("./imports.ts");
       return { syncs: results.map((r) => ({ ...r, titleFormat: r.titleFormat || defaultSyncFormat(r.titlePrefix) })), keyReady: !!ctx.env.YOUTUBE_API_KEY, formatHelp: SYNC_FORMAT_HELP, sortLabels: SYNC_SORT_LABEL };
     },
@@ -4779,7 +4779,10 @@ const routes: [string, RegExp, Handler][] = [
       if (!playlistId) return fail(400, "invalid_playlist", "請貼上 YouTube 播放清單的網址（網址裡要有 list=…）");
       if (!ctx.env.YOUTUBE_API_KEY) return fail(503, "youtube_key_missing", "尚未設定 YouTube 金鑰，無法預覽");
       const have = new Set<string>();
-      if (typeof body.courseId === "string" && body.courseId) for (const r of (await ctx.db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_ref IS NOT NULL").bind(body.courseId).all<{ media_ref: string }>()).results) have.add(r.media_ref);
+      if (typeof body.courseId === "string" && body.courseId) {
+        const { existingVideoIds } = await import("./imports.ts");
+        for (const id of await existingVideoIds(ctx.db, body.courseId)) have.add(id);
+      }
       const read = await readPlaylist(ctx.env.YOUTUBE_API_KEY, playlistId, have);
       if ("error" in read) return fail(502, "playlist_unreadable", read.error);
       const fmt = (typeof body.titleFormat === "string" ? body.titleFormat.trim() : "").slice(0, 120) || defaultSyncFormat(typeof body.titlePrefix === "string" ? body.titlePrefix.trim().slice(0, 80) : "");
@@ -4797,9 +4800,9 @@ const routes: [string, RegExp, Handler][] = [
       // 這張教材卡自己的同步清單（課程設定「YouTube 播放清單」用）。
       await requireCourseManager(ctx, courseId!);
       const { results } = await ctx.db
-        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.strip_text AS stripText, y.sort_mode AS sortMode, y.sort_locked AS sortLocked, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id WHERE y.course_id = ? ORDER BY y.rowid DESC")
+        .prepare("SELECT y.id, y.label, y.url, y.course_id AS courseId, c.title AS courseTitle, y.title_prefix AS titlePrefix, y.title_format AS titleFormat, y.strip_text AS stripText, y.sort_mode AS sortMode, y.sort_locked AS sortLocked, y.use_app_player AS appPlayer, y.last_synced_at AS lastSyncedAt, y.last_imported AS lastImported, y.last_note AS lastNote FROM youtube_syncs y JOIN courses c ON c.id = y.course_id WHERE y.course_id = ? ORDER BY y.rowid DESC")
         .bind(courseId)
-        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; stripText: string; sortMode: string; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
+        .all<{ id: string; label: string; url: string; courseId: string; courseTitle: string; titlePrefix: string; titleFormat: string; stripText: string; sortMode: string; appPlayer: number; sortLocked: number; lastSyncedAt: string | null; lastImported: number; lastNote: string }>();
       const { defaultSyncFormat, SYNC_FORMAT_HELP, SYNC_SORT_LABEL } = await import("./imports.ts");
       return { syncs: results.map((r) => ({ ...r, titleFormat: r.titleFormat || defaultSyncFormat(r.titlePrefix) })), keyReady: !!ctx.env.YOUTUBE_API_KEY, formatHelp: SYNC_FORMAT_HELP, sortLabels: SYNC_SORT_LABEL };
     },
@@ -4810,7 +4813,7 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       // 新增一份同步設定（業主 2026-11-20，超級管理員）：貼播放清單網址，選「放進哪一張教材卡」（或直接新建一張）與教材名稱前綴。
       // 課程頁的「匯入 YouTube 播放清單」（業主 2026-11-23）：有該課程修改權限的人也能為「這張卡」新增並立刻匯入（syncNow）；新建教材卡仍只有超級管理員。
-      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; stripText?: unknown; sortMode?: unknown; label?: unknown; syncNow?: unknown }>(ctx.req);
+      const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; stripText?: unknown; sortMode?: unknown; label?: unknown; syncNow?: unknown; appPlayer?: unknown }>(ctx.req);
       const s = typeof body.courseId === "string" && body.courseId ? await requireCourseManager(ctx, body.courseId) : requireSuperAdmin(ctx);
       const { playlistIdOf, defaultSyncFormat, asSortMode } = await import("./imports.ts");
       const playlistId = typeof body.url === "string" ? playlistIdOf(body.url) : null;
@@ -4831,7 +4834,7 @@ const routes: [string, RegExp, Handler][] = [
       const prefix = (typeof body.titlePrefix === "string" ? body.titlePrefix.trim() : "").slice(0, 80) || newTitle;
       const id = `ys${randomId(8)}`;
       const format = (typeof body.titleFormat === "string" ? body.titleFormat.trim() : "").slice(0, 120) || defaultSyncFormat(prefix);
-      await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix, title_format, sort_mode, strip_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix, format, asSortMode(body.sortMode), typeof body.stripText === "string" ? body.stripText.slice(0, 300) : "").run();
+      await ctx.db.prepare("INSERT INTO youtube_syncs (id, label, url, playlist_id, course_id, title_prefix, title_format, sort_mode, strip_text, use_app_player) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), playlistId, courseId, prefix, format, asSortMode(body.sortMode), typeof body.stripText === "string" ? body.stripText.slice(0, 300) : "", body.appPlayer === false ? 0 : 1).run();
       await audit(ctx.db, s.sub, "youtube_sync.create", "youtube_sync", id, playlistId).run();
       if (body.syncNow === true) {
         const { runYoutubeSync } = await import("./imports.ts");
@@ -4857,7 +4860,8 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [id]) => {
       // 修改這份同步的規則：命名規則、排序規則、解除手動排序鎖定（業主 2026-11-20）。命名只影響之後匯入的；已匯入的要按「依規則重新命名」。
       const s = await requireSyncManager(ctx, id!);
-      const body = await readJson<{ titleFormat?: unknown; stripText?: unknown; sortMode?: unknown; unlock?: unknown }>(ctx.req);
+      const body = await readJson<{ titleFormat?: unknown; stripText?: unknown; sortMode?: unknown; unlock?: unknown; appPlayer?: unknown }>(ctx.req);
+      if (typeof body.appPlayer === "boolean") await ctx.db.prepare("UPDATE youtube_syncs SET use_app_player = ? WHERE id = ?").bind(body.appPlayer ? 1 : 0, id).run();
       if (typeof body.stripText === "string") await ctx.db.prepare("UPDATE youtube_syncs SET strip_text = ? WHERE id = ?").bind(body.stripText.slice(0, 300), id).run();
       const { asSortMode } = await import("./imports.ts");
       const format = typeof body.titleFormat === "string" ? body.titleFormat.trim().slice(0, 120) : "";
@@ -5743,7 +5747,7 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [courseId]) => {
       // 新增「其他教材」：只有外部連結與名稱（名稱空白＝自動抓取，抓不到用類型的預設名稱）。教材與連結一次建立。
       const admin = await requireCourseManager(ctx, courseId);
-      const body = await readJson<{ url?: unknown; title?: unknown; eventDate?: unknown }>(ctx.req);
+      const body = await readJson<{ url?: unknown; title?: unknown; eventDate?: unknown; appPlayer?: unknown }>(ctx.req);
       const u = parseHttpsUrl(body.url);
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
@@ -5752,7 +5756,8 @@ const routes: [string, RegExp, Handler][] = [
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;
       // 清單卡貼 YouTube 影片：存成影片來源，在 App 內原地播放（計入學習進度）；其他連結照常開外部網頁。
-      const yt = youtubeId(u.toString());
+      // 「使用行動大學播放器」（業主 2026-11-24，預設勾選）：沒勾＝存成外部連結，點了開新網頁到 YouTube。
+      const yt = body.appPlayer === false ? null : youtubeId(u.toString());
       // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
       const slot = await materialSlot(ctx.db, courseId);
       const attId = crypto.randomUUID();
@@ -5775,12 +5780,12 @@ const routes: [string, RegExp, Handler][] = [
       const lesson = await ctx.db.prepare("SELECT l.course_id, l.kind, l.is_full, l.media_type, l.media_ref, c.is_list FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ?").bind(id).first<{ course_id: string; kind: string; is_full: number; media_type: string; media_ref: string | null; is_list: number }>();
       if (!lesson) return fail(404, "not_found", "找不到這個教材");
       if (lesson.kind !== "material" || lesson.is_full === 1) return fail(400, "not_link_material", "這一列不是外部連結教材");
-      const body = await readJson<{ url?: unknown; title?: unknown; eventDate?: unknown }>(ctx.req);
+      const body = await readJson<{ url?: unknown; title?: unknown; eventDate?: unknown; appPlayer?: unknown }>(ctx.req);
       const u = parseHttpsUrl(body.url);
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
       // 清單卡：YouTube 影片存成影片來源（App 內播放；同一支影片保留原本的分鐘數與區間），其他連結存成外部連結。
-      const yt = youtubeId(u.toString());
+      const yt = body.appPlayer === false ? null : youtubeId(u.toString()); // 沒勾「使用行動大學播放器」＝存成外部連結（業主 2026-11-24）
       const sameVideo = !!yt && lesson.media_type === "youtube" && lesson.media_ref === yt;
       await ctx.db.batch([
         ctx.db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(title, id),
