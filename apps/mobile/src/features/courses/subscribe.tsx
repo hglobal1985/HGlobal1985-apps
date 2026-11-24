@@ -73,5 +73,5 @@ export function useSubscribe(kind: SubKind, name: string | null, loginNext: stri
 
 const styles = StyleSheet.create({
   icon: { alignItems: "center", justifyContent: "center" },
-  sub: { flexDirection: "row", alignItems: "center", gap: 6, height: 44, paddingHorizontal: 12, borderRadius: 22, marginRight: 2, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  sub: { flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingVertical: 3, paddingHorizontal: 12, borderRadius: 22, marginRight: 2, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
 });

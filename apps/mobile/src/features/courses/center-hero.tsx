@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Animated, Image, Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useThumb } from "@/lib/thumb";
@@ -36,19 +36,24 @@ export const centerHeroFull = (winW: number, winH = 10000) => centerHeroSize(win
  * 它是蓋在捲動區上面的浮動層（Screen 的 hero），不會改變捲動區大小，所以課程很少時也不會閃動（修正於 2026-11-16）。
  * scrollY 是頁面捲動位移（Screen 的 scrollY）；縮放範圍剛好讓「照片下緣＝展開高度 − 捲動量」，內容第一列永遠接在照片下方。
  */
-export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover }: { /** 封面輪播的照片與短影音（相簿）；沒有時用 art 單張首頁圖。 */ media?: CoverMediaItem[]; onEditCover?: () => void; stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; scrollY: Animated.Value; title: string }) {
+export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover, inline = false }: { /** 封面輪播的照片與短影音（相簿）；沒有時用 art 單張首頁圖。 */ media?: CoverMediaItem[]; onEditCover?: () => void; stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; /** 浮動封面才需要（往上捲時縮小）；inline 不用。 */ scrollY?: Animated.Value; title: string; /** 放在一般內容裡（至尊模式中心卡，業主 2026-11-24）：寬度＝所在欄寬、16:10、圓角、不隨捲動縮小。 */ inline?: boolean }) {
   const { width: winW, height: winH } = useWindowDimensions();
   const thumb = useThumb();
   const [open, setOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [boxW, setBoxW] = useState(0);
+  const still = useRef(new Animated.Value(0)).current;
   const images = media.filter((x) => x.kind === "image");
-  const { w: heroW, h: full } = centerHeroSize(winW, winH);
+  const { w: heroW, h: full } = inline ? { w: boxW, h: Math.round((boxW * 10) / 16) } : centerHeroSize(winW, winH);
   const range = Math.max(1, full - (COMPACT_H + COMPACT_GAP));
-  const at = (a: number, b: number) => scrollY.interpolate({ inputRange: [0, range], outputRange: [a, b], extrapolate: "clamp" });
+  const at = (a: number, b: number) => (scrollY ?? still).interpolate({ inputRange: [0, range], outputRange: [a, b], extrapolate: "clamp" });
   const url = art ? art.coverUrl ?? art.edmUrl : null;
+  const frame = inline
+    ? { height: boxW ? full : 200, borderRadius: 18 }
+    : [heroW < winW ? { alignSelf: "center" as const, width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }];
   return (
-    <Animated.View style={[styles.box, url ? { backgroundColor: "#fff" } : null, heroW < winW ? { alignSelf: "center", width: heroW } : null, { height: at(full, COMPACT_H), marginHorizontal: at(0, SIDE), marginTop: at(0, space.sm), marginBottom: at(0, space.xs), borderRadius: at(0, 16) }]}>
-      {media.length ? (
+    <Animated.View onLayout={inline ? (e) => setBoxW(Math.round(e.nativeEvent.layout.width)) : undefined} style={[styles.box, url ? { backgroundColor: "#fff" } : null, frame]}>
+      {media.length && heroW ? (
         // 封面輪播：高度固定為展開高度，往上捲縮成窄橫幅時整組跟著往上移一半，維持置中（業主 2026-11-21）。
         <Animated.View style={{ position: "absolute", left: 0, top: 0, width: heroW, height: full, transform: [{ translateY: at(0, -(full - COMPACT_H) / 2) }] }}>
           <CoverCarousel items={media} width={heroW} height={full} paused={openId !== null} onOpen={setOpenId} />
