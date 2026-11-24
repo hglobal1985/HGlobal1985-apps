@@ -10,6 +10,7 @@ import { flashText } from "@/ui/flash-notice";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
+import { fadedStyle } from "@/ui/fade-style";
 import { AppText, NoticeBox, Screen } from "@/ui";
 
 /** 至尊模式課程頁要列的項目：有章節列章節；只有教材（清單卡）就列教材。分類標題、完整版不列。 */
@@ -28,7 +29,7 @@ export function elderExtras(course: CourseDetail): Lesson[] {
 }
 
 type BlockGroup = { head: Lesson; items: Lesson[] };
-/** 切成：區塊前面沒歸區塊的教材＋各區塊（標題＋底下的教材）；沒有可看教材的區塊不列。 */
+/** 切成：區塊前面沒歸區塊的教材＋各區塊（標題＋底下的教材）；沒有可看教材的區塊也列出來、顯示淡化（業主 2026-11-24，與超派模式空區塊一致）。 */
 function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lead: Lesson[]; blocks: BlockGroup[] } {
   const lead: Lesson[] = [];
   const blocks: BlockGroup[] = [];
@@ -38,7 +39,7 @@ function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lea
     else if (blocks.length) blocks[blocks.length - 1]!.items.push(l);
     else lead.push(l);
   }
-  return { lead: lead.filter(shown), blocks: blocks.map((b) => ({ ...b, items: b.items.filter(shown) })).filter((b) => b.items.length) };
+  return { lead: lead.filter(shown), blocks: blocks.map((b) => ({ ...b, items: b.items.filter(shown) })) };
 }
 
 /** 區塊標題大列（標題＋副標＋展開箭頭）：課程頁的區塊、中心頁的四個分類共用（業主 2026-11-24）。active＝綠底。 */
@@ -90,8 +91,9 @@ function BlockList({ lead, blocks, playingId, renderRow }: { lead: Lesson[]; blo
       {blocks.map((b) => {
         const on = open === b.head.id;
         const hasPlaying = b.items.some((l) => l.id === playingId);
+        const empty = b.items.length === 0;
         return (
-          <View key={b.head.id} style={{ gap: space.sm }}>
+          <View key={b.head.id} style={[{ gap: space.sm }, empty ? fadedStyle : null]} pointerEvents={empty ? "none" : "auto"}>
             <ElderBlockHeader title={b.head.title} sub={`${b.items.length} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
             {on ? b.items.map(renderRow) : null}
           </View>
