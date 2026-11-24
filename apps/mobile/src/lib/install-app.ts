@@ -19,6 +19,15 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
     deferred = e as unknown as Deferred;
     emit();
   });
+  // 這支手機已經把本站安裝成 App（例如從超派模式裝過）：Chrome 不會再送安裝許可事件，所以先問瀏覽器，已安裝就不再顯示安裝邀請（業主 2026-11-24 回報按了沒反應）。
+  (navigator as unknown as { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps?.()
+    .then((apps) => {
+      if (apps.length) {
+        installed = true;
+        emit();
+      }
+    })
+    .catch(() => undefined);
   window.addEventListener("appinstalled", () => {
     installed = true;
     deferred = null;
@@ -73,3 +82,6 @@ export function useInstallState(): { suggest: boolean; native: boolean } {
   }, []);
   return { suggest: canSuggestInstall(), native: !!deferred };
 }
+
+/** 這次沒等到系統安裝視窗：Android 多半是「已經裝過了」，呼叫端要提醒從桌面開啟。 */
+export const likelyInstalledAndroid = () => !isIos() && isMobile();
