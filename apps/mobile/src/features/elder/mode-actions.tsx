@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { MODE_PROFILES } from "@/lib/app-mode";
+import { ANCHOR_ID, rememberAnchor } from "@/lib/keep-scroll";
 import { ELDER_DEFAULT, ELDER_MAX, ELDER_MIN, elderTextScale, setElder, systemFontScale, useElder } from "@/lib/elder-mode";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -32,13 +33,15 @@ export async function askSwitchToMaker() {
 let savedSize: number | null = null;
 
 export function FontSizeCard() {
+  // 改字體會重建畫面；改之前記住這張卡在螢幕上的位置，重建後捲回來讓它留在原處（業主 2026-11-24）。
+  const setKeep = (patch: Parameters<typeof setElder>[0]) => (rememberAnchor(), setElder(patch));
   const { c } = useTheme();
   const prefs = useElder();
   const eff = elderTextScale({ ...prefs, on: true });
   const sys = systemFontScale();
   const sampleSize = Math.round(17 * UI_SCALE * eff);
   const follow = prefs.followSystem;
-  const step = (d: number) => setElder({ size: Math.min(ELDER_MAX, Math.max(ELDER_MIN, Math.round((prefs.size + d) * 10) / 10)) });
+  const step = (d: number) => setKeep({ size: Math.min(ELDER_MAX, Math.max(ELDER_MIN, Math.round((prefs.size + d) * 10) / 10)) });
   const dim = follow ? { opacity: 0.35 } : null;
   const toggle = (label: string, value: boolean, onChange: (v: boolean) => void, note?: string) => (
     <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} onPress={() => onChange(!value)} style={styles.toggle}>
@@ -52,14 +55,14 @@ export function FontSizeCard() {
     </Pressable>
   );
   return (
-    <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-      {toggle("文字加粗", prefs.bold, (v) => setElder({ bold: v }))}
+    <View nativeID={ANCHOR_ID} style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+      {toggle("文字加粗", prefs.bold, (v) => setKeep({ bold: v }))}
       {toggle("跟著手機字體大小", follow, (v) => {
         // 勾選＝字體設定立刻復原成預設（舊的自訂大小先記起來）；取消勾選＝還原剛才的自訂大小（業主 2026-11-24）。
         if (v) {
           savedSize = prefs.size;
-          setElder({ followSystem: true, size: ELDER_DEFAULT });
-        } else setElder({ followSystem: false, size: savedSize ?? prefs.size });
+          setKeep({ followSystem: true, size: ELDER_DEFAULT });
+        } else setKeep({ followSystem: false, size: savedSize ?? prefs.size });
       }, sys !== 1 ? `手機目前 ${Math.round(sys * 100)}%` : undefined)}
       <View style={[styles.row, { alignItems: "center" }, dim]} pointerEvents={follow ? "none" : "auto"}>
         <StepButton label="字變小" icon="remove" disabled={follow || prefs.size <= ELDER_MIN} onPress={() => step(-0.1)} outline />
@@ -77,7 +80,7 @@ export function FontSizeCard() {
         {PRESETS.map((p) => {
           const on = !follow && Math.abs(prefs.size - p.size) < 0.05;
           return (
-            <Pressable key={p.label} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setElder({ size: p.size })} style={[styles.chip, { borderColor: c.accent, backgroundColor: on ? c.accent : c.surface }]}>
+            <Pressable key={p.label} accessibilityRole="button" accessibilityState={{ selected: on }} onPress={() => setKeep({ size: p.size })} style={[styles.chip, { borderColor: c.accent, backgroundColor: on ? c.accent : c.surface }]}>
               <AppText variant="callout" style={{ fontWeight: "800", color: on ? c.textOnAccent : c.accentText }} numberOfLines={1}>
                 {p.label}
               </AppText>
