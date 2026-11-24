@@ -22,7 +22,7 @@ import { TileCover } from "@/features/courses/series-tile";
 import { ElderCenterPage } from "./elder-center";
 import { ElderInvite, ElderSeriesHead } from "./elder-heads";
 import { centerTitle } from "@/features/format";
-import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
+import { ELDER_ZONES, ElderZoneCard, TREASURE_CARD, TREASURE_ID, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -226,6 +226,10 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
                 {ELDER_ZONES.map((z) => (
                   <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
                 ))}
+                {(() => {
+                  const tb = all.find((x) => x.id === TREASURE_ID);
+                  return tb ? <ElderZoneCard zone={TREASURE_CARD} count={tb.materialCount} onPress={() => router.push(`/course/${tb.id}`)} /> : null;
+                })()}
               </View>
             ) : undefined
           }
