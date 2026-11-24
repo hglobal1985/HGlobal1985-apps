@@ -12,10 +12,7 @@ import { CoverBadges, type CoverStats } from "./cover-stats";
 import { CoverCarousel } from "./cover-carousel";
 
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
-const COMPACT_H = 112;
-const SIDE = 16;
-/** 縮成窄橫幅時，照片上下留白合計（上 8＋下 4）。 */
-const COMPACT_GAP = space.sm + space.xs;
+import { COMPACT_GAP, COMPACT_H, COMPACT_SIDE as SIDE } from "@/ui/collapse-band";
 
 /**
  * 照片完全展開時的寬與高。手機：左右滿版、16:10。頁面用高度在捲動內容最上方墊出同樣高的空間（Screen 的 heroHeight）。

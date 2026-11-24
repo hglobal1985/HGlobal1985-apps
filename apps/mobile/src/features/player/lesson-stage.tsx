@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import type { Playback } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { AppText, LoadingLadybug } from "@/ui";
+import { CollapseBand } from "@/ui/collapse-band";
 import { InlineAudio } from "./audio-bar";
 import { LessonPlayer } from "./lesson-player";
 import { PlayerControls } from "./player-controls";
@@ -23,7 +24,10 @@ export function LessonStage({
   onLegacyEnd,
   idle,
   idleBar,
+  collapseIdle = true,
 }: {
+  /** 還沒播放時，封面隨頁面下滑縮成窄橫幅（業主 2026-11-24，共用 ui/collapse-band；大螢幕左右分欄傳 false）。 */
+  collapseIdle?: boolean;
   /** 目前釘住的播放軌（沒有＝還沒播放）。 */
   stage: { key: string; audio: boolean } | null;
   /** 舊版 YouTube 播放來源。 */
@@ -52,7 +56,7 @@ export function LessonStage({
   if (legacy) return <LessonPlayer playback={legacy} onSegmentEnd={onLegacyEnd} />;
   return (
     <>
-      {idle ? <View>{idle}</View> : null}
+      {idle ? <CollapseBand enabled={collapseIdle}>{idle}</CollapseBand> : null}
       {idleBar ? (
         <View style={[styles.idleBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
           <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={idleBar.onPlay} hitSlop={8} style={styles.idlePlay}>
