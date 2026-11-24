@@ -1,7 +1,7 @@
 import { trackUsage } from "@/lib/usage";
 import { useEffect, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { resolveUrl, UNCATEGORIZED } from "@/api/client";
+import { resolveUrl, UNCATEGORIZED, type CourseSummary } from "@/api/client";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useThumb } from "@/lib/thumb";
@@ -49,6 +49,26 @@ export function TopFill({ uri, w, h, viewY = 0, fillBlur = false }: { uri: strin
  * flat（中心模式選了某中心時）：所有課程平鋪，同系列也不合併。
  * 緞帶仍然顯示，文字以日期最近的那一梯為準。不顯示任何課程資訊欄位。
  */
+/**
+ * 卡片封面的挑選與繪製（唯一來源，業主 2026-11-24 永久指示：至尊模式的封面一律與超派模式一致）。
+ * flat＝中心頁／單門課（用課程自己的 EDM）；inSeries＝系列卡（用系列封面）。
+ */
+export function tileCoverOf(rep: CourseSummary, flat: boolean, inSeries: boolean) {
+  const ownCover = !flat && !inSeries ? rep.coverUrl || rep.seriesCoverUrl : null;
+  const cropped = (flat && !rep.edmUrl && !!rep.coverUrl) || (!flat && inSeries && !!rep.seriesCoverUrl) || !!ownCover;
+  const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesCoverUrl || rep.seriesEdmUrl : ownCover || rep.edmUrl;
+  return { edm, cropped };
+}
+
+export function TileCover({ rep, width, height, flat, inSeries, title }: { rep: CourseSummary; width: number; height: number; flat: boolean; inSeries: boolean; title: string }) {
+  const thumb = useThumb();
+  const { edm, cropped } = tileCoverOf(rep, flat, inSeries);
+  if (rep.brand && !inSeries) return <BrandCover brand={rep.brand} fill />;
+  if (edm && cropped) return <Image source={{ uri: thumb(resolveUrl(edm), width) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors />;
+  if (edm) return <TopFill uri={thumb(resolveUrl(edm), width)} w={width} h={height} viewY={flat || !inSeries ? rep.edmViewY : 0} fillBlur={flat} />;
+  return <CourseCover theme={rep.theme} label={rep.category} title={title} fill />;
+}
+
 export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup; width: number; flat?: boolean }) {
   const { c } = useTheme();
   const { member } = useSession();
@@ -71,10 +91,9 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   // 平鋪（flat，中心頁）：統一用直式 4:3 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始；圖太小／太矮就完整顯示，用同一張圖模糊填滿背景）；沒有 EDM 才退回封面。
   // 第一層的卡（業主 2026-11-19 更正：指定的封面裁切位置沒生效）：
   // 系列卡＝系列的封面（橫式裁切）；單張卡／獨立清單卡＝這張卡自己裁好的封面 > 系列封面 > EDM（照「預設顯示位置」從該處開始顯示）。中心頁（flat）照舊。
-  const ownCover = !flat && !inSeries ? rep.coverUrl || rep.seriesCoverUrl : null;
-  const cropped = (flat && !rep.edmUrl && !!rep.coverUrl) || (!flat && inSeries && !!rep.seriesCoverUrl) || !!ownCover;
+  // （封面挑選與繪製集中在上面的 tileCoverOf／TileCover，與至尊模式共用。）
   // 系列小卡：有管理員裁切好的系列封面就用封面（16:9），沒有才用系列 EDM（業主 2026-11-17：新上傳的高 EDM 沒用裁切後的封面，字被切掉）。
-  const edm = flat ? rep.edmUrl || rep.coverUrl : inSeries ? rep.seriesCoverUrl || rep.seriesEdmUrl : ownCover || rep.edmUrl;
+  const { edm } = tileCoverOf(rep, flat, inSeries);
   const ribbons = ribbonsFor(rep, member, config);
   const count = sessions.reduce((n, x) => n + x.materialCount, 0);
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
@@ -88,7 +107,7 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
   return (
     <View style={{ width }} nativeID={`tile-${group.key}`}>
       <Pressable accessibilityRole="button" accessibilityLabel={`${inSeries ? settings.titleOf(rep.series) : rep.title}，${flat ? "看章節" : "瀏覽細節"}`} onPress={open} style={[styles.art, { width, height, backgroundColor: edm ? "#fff" : c.surfaceMuted }, unlisted && { opacity: 0.55 }]}>
-        {rep.brand && !inSeries ? <BrandCover brand={rep.brand} fill /> : edm && cropped ? <Image source={{ uri: thumb(resolveUrl(edm), width) }} resizeMode="cover" style={{ position: "absolute", top: 0, left: 0, width, height }} accessibilityIgnoresInvertColors /> : edm ? <TopFill uri={thumb(resolveUrl(edm), width)} w={width} h={height} viewY={flat || !inSeries ? rep.edmViewY : 0} fillBlur={flat} /> : <CourseCover theme={rep.theme} label={rep.category} title={inSeries ? settings.titleOf(rep.series) : rep.title} fill />}
+        <TileCover rep={rep} width={width} height={height} flat={flat} inSeries={inSeries} title={inSeries ? settings.titleOf(rep.series) : rep.title} />
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
         {/* 所有卡片右下角統一顯示教材數量（業主 2026-11-20，共用 CardCount；原本只有安麗品牌專區有）。中心頁（flat）是章節選單，不放。 */}
