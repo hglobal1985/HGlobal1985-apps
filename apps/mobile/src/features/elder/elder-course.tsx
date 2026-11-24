@@ -122,7 +122,7 @@ function BlockList({ lead, blocks, playingId, renderRow, albumFocus }: { albumFo
           <View key={b.head.id} style={{ gap: space.sm }}>
             <ElderBlockHeader title={b.head.title} sub={`${b.items.length + blockPhotoCount(b.head)} 項教材`} on={on} active={on || hasPlaying} onPress={() => setOpen(on ? null : b.head.id)} />
             {on && b.head.blockLocked ? <ElderLock lines={b.head.lockLines} /> : null}
-            {on && !b.head.blockLocked && hasBlockPhotos(b.head) ? (
+            {on && hasBlockPhotos(b.head) ? (
               <Pressable accessibilityRole="button" accessibilityLabel={`瀏覽本區照片，共 ${blockPhotoCount(b.head)} 張`} onPress={() => (setAlbumOpen(b.head.id), setOpen(ALBUM))} style={[styles.block, { backgroundColor: c.surfaceMuted, borderWidth: 2, borderColor: c.accent }]}>
                 <Ionicons name="images" size={26} color={c.accentText} />
                 <AppText variant="headline" style={{ flex: 1, color: c.accentText, fontWeight: "800" }}>
@@ -142,7 +142,19 @@ function BlockList({ lead, blocks, playingId, renderRow, albumFocus }: { albumFo
             ? albumGroups.map((g) => (
                 <View key={g.head.id} nativeID={`alb-${g.head.id}`} style={{ gap: space.sm }}>
                   <ElderBlockHeader title={g.head.title} sub={`${blockPhotoCount(g.head)} 張`} on={albumOpen === g.head.id} onPress={() => setAlbumOpen(albumOpen === g.head.id ? null : g.head.id)} />
-                  {albumOpen === g.head.id ? (g.head.blockLocked ? <ElderLock lines={g.head.lockLines} /> : <BlockPhotos head={g.head} />) : null}
+                  {albumOpen === g.head.id ? (
+                    g.head.blockLocked ? (
+                      // 沒有權限：預覽縮圖淡化顯示，上面一張大鎖頭＋原因（至尊版）。
+                      <View style={{ gap: space.sm }}>
+                        <ElderLock lines={g.head.lockLines} />
+                        <View pointerEvents="none" style={{ opacity: 0.45 }}>
+                          <BlockPhotos head={g.head} />
+                        </View>
+                      </View>
+                    ) : (
+                      <BlockPhotos head={g.head} />
+                    )
+                  ) : null}
                 </View>
               ))
             : null}

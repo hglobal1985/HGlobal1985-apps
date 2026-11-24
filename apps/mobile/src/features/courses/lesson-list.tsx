@@ -111,10 +111,10 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           {leadShown.length ? <Card style={LIST_CARD}>{leadShown.map(itemRow)}</Card> : null}
           {visibleBlocks.map((b) => (
             <Card key={b.head.id} style={{ paddingVertical: 0, paddingHorizontal: space.sm, ...(b.head.blockLocked ? { position: "relative", minHeight: 230, overflow: "hidden" } : {}) }}>
-              {b.head.blockLocked ? <LockMask lines={b.head.lockLines ?? ["目前無法使用"]} /> : null}
               <ListSection title={b.head.title} count={b.items.filter(shown).length + blockPhotoCount(b.head)} actions={<SectionActions courseId={course.id} blockId={b.head.id} title={b.head.title} path={course.shortPath} />} />
-              {b.head.blockLocked ? null : onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
+              {onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
+              {b.head.blockLocked ? <LockMask lines={b.head.lockLines ?? ["目前無法使用"]} /> : null}
             </Card>
           ))}
           {full.length ? <Card style={LIST_CARD}>{full.map(itemRow)}</Card> : null}
@@ -156,9 +156,9 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
           )}
           renderPanel={(b) => (
             <Card style={[LIST_CARD, b.head.blockLocked ? { position: "relative", minHeight: 230, overflow: "hidden" } : null]}>
-              {b.head.blockLocked ? <LockMask lines={b.head.lockLines ?? ["目前無法使用"]} /> : null}
-              {b.head.blockLocked ? null : onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
+              {onBrowsePhotos ? <BrowsePhotosRow head={b.head} onPress={() => onBrowsePhotos(b.head.id)} /> : <BlockPhotos head={b.head} />}
               {b.items.filter(shown).length ? b.items.filter(shown).map(itemRow) : hasBlockPhotos(b.head) ? null : <AppText tone="muted" style={{ padding: space.md }}>這個區塊還沒有教材</AppText>}
+              {b.head.blockLocked ? <LockMask lines={b.head.lockLines ?? ["目前無法使用"]} /> : null}
             </Card>
           )}
         />

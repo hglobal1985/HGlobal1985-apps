@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
-import type { ApiError } from "../../../launch/src/contract";
+import { UPGRADING_MSG, type ApiError } from "../../../launch/src/contract";
 export { classifyLink, parseHttpsUrl } from "../../../launch/src/links";
 export { THUMB_BADGE_COLORS, THUMB_BADGE_KINDS, LIST_COVER_COLORS, COVER_MEDIA_MAX, SERIES_APPLY_GROUPS, THUMB_WIDTH_CHOICES, ZONES, VIEW_SCOPES, VIEW_SCOPE_LABEL, PAYMENT_METHODS, KEYWORD_INFO, ACHIEVEMENT_TYPES, ACHIEVEMENT_CATEGORIES, ACH_VERBS, ACH_TIMES, ACH_UNITS, ACH_ICON_POOL, achTypeOf, achRecipeOf, achDefaultIcon, isImageIcon, textCoverLines, UNCATEGORIZED, FEATURES, NOTICE_KINDS, applicantLabel, reviewerInviteMessage, REVIEW_ROLES, REVIEW_ROLE_LABEL, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, shareMessage, DUTY_LABELS, HQ_UNIT, REVIEW_REASONS, RIBBON_INFO, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUP_INFO, SORT_GROUPS, STATS_ROLE_OPTIONS } from "../../../launch/src/contract";
 import { centralToken, refresh as refreshCentral } from "./central";
@@ -122,8 +122,8 @@ export class RequestError extends Error {
 }
 
 /** 上傳檔案並回報進度 0～100（網頁版用 XMLHttpRequest，fetch 拿不到上傳進度）。 */
-/** 伺服器暫時回不出正常結果（部署更新、系統忙碌…）時，全站統一顯示的白話提示（業主 2026-11-18）。 */
-export const UPGRADING_MSG = "系統功能正在升級中，請稍後幾分鐘後再試";
+/** 伺服器暫時回不出正常結果（部署更新、系統忙碌…）時，全站統一顯示的白話提示（業主 2026-11-18；文字 2026-11-24 改，定義在 contract.ts 與後端共用）。 */
+export { UPGRADING_MSG };
 
 export async function apiUpload<T>(method: "POST" | "PUT", path: string, body: Blob, onProgress: (pct: number) => void, retried = false): Promise<T> {
   await (tokenInit ??= loadToken());

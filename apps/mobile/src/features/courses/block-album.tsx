@@ -58,14 +58,13 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
                 <AppText variant="callout" tone="muted">{`${blockPhotoCount(g)} 張`}</AppText>
                 <Ionicons name={on ? "chevron-up" : "chevron-down"} size={18} color={c.textMuted} />
               </Pressable>
-              {on && g.blockLocked ? (
-                <View style={{ position: "relative", minHeight: 200, marginBottom: space.sm }}>
-                  <LockMask lines={g.lockLines ?? ["目前無法使用"]} />
-                </View>
-              ) : on ? (
-                <View style={{ paddingBottom: space.sm, gap: space.sm }}>
+              {on ? (
+                <View style={{ paddingBottom: space.sm, gap: space.sm, ...(g.blockLocked ? { position: "relative", minHeight: 200, overflow: "hidden", borderRadius: radius.md } : {}) }}>
+                  {/* 沒有權限：照樣顯示全部預覽縮圖，上面蓋鎖頭遮罩＋原因（LockMask，與課程沒報名同一個模組；業主 2026-11-24）。 */}
                   {sceneTags(g.photos!).length ? <AppText variant="caption" tone="muted">{`場景：${sceneTags(g.photos!).join("、")}`}</AppText> : null}
                   <CoverAlbum kind="course" ownerKey={g.photoKey!} title={g.title} items={g.photos!} canEdit={!!course.can?.edit && !key} onChanged={onChanged ?? (() => undefined)} />
+                  {/* 遮罩一定要放在最後一個子元素才蓋得住上面的縮圖（LockMask 的用法）。 */}
+                  {g.blockLocked ? <LockMask lines={g.lockLines ?? ["目前無法使用"]} /> : null}
                 </View>
               ) : null}
             </View>

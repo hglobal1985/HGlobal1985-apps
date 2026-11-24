@@ -135,10 +135,10 @@ test("成交百寶箱的報名資格（12% 以上、會長也可、不用報名�
   assert.equal(head.title, "成交百寶箱");
   assert.equal(head.blockLocked, true);
   assert.deepEqual(head.lockLines, ["登入並符合獎銜才能使用", "限12%獎銜以上使用（會長也可）"]);
-  assert.equal(head.photos?.length, 0);
+  assert.equal(head.photos?.length, 1, "沒有權限的人也看得到預覽縮圖（畫面蓋鎖頭遮罩）");
   assert.equal(head.photoCount, 1);
   assert.equal(guest.lessons.find((l) => l.id === "t1")?.locked, true);
-  assert.equal((await get(`/cover-media?kind=course&key=${blk}`)).data.length, 0, "鎖住的人拿不到區塊照片清單");
+  assert.equal((await get(`/cover-media?kind=course&key=${blk}`)).data.length, 1);
   // 管理員：不受限
   const login = async (sub: string) => ((await (await handleApi(new Request("https://learn.test/api/v2/auth/demo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub }) }), env)).json()) as { token: string }).token;
   const adm = await login("demo-admin");

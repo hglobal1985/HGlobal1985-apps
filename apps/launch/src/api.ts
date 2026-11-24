@@ -85,6 +85,7 @@ import {
   type CoverScope,
   type CoverMediaItem,
   LIST_COVER_COLORS,
+  UPGRADING_MSG,
 } from "./contract.ts";
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
@@ -1149,7 +1150,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       position: groupPos.get(l.id)!,
       material: l.kind === "material" || l.kind === "section",
       ...(l.kind === "section"
-        ? { section: true, ...(l.link_block_id ? { linkedBlockId: l.link_block_id, linkedCourseId: sourceCourseOf.get(l.id) } : {}), inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key), ...(l.link_block_id && lockOf(l)?.locked ? { blockLocked: true, lockLines: lockOf(l)!.lines } : {}), ...(photoKeyOf.has(l.id) ? (() => { const all = photosOf.get(photoKeyOf.get(l.id)!) ?? []; const hide = l.link_block_id ? !!lockOf(l)?.locked : lockedAll && !admin; return { photoKey: photoKeyOf.get(l.id), photoCount: all.length, photos: hide ? [] : all }; })() : {}) }
+        ? { section: true, ...(l.link_block_id ? { linkedBlockId: l.link_block_id, linkedCourseId: sourceCourseOf.get(l.id) } : {}), inSheet: l.in_sheet === 1, categories: l.categories, brandId: l.brand_id, brandName: ctx.brands?.find((b) => b.id === l.brand_id)?.name ?? null, brand: brandForBlock(ctx, l.brand_id, l.cover_key), ...(l.link_block_id && lockOf(l)?.locked ? { blockLocked: true, lockLines: lockOf(l)!.lines } : {}), ...(photoKeyOf.has(l.id) ? (() => { const all = photosOf.get(photoKeyOf.get(l.id)!) ?? []; return { photoKey: photoKeyOf.get(l.id), photoCount: all.length, photos: all }; })() : {}) }
         : {}),
       ...(l.is_full === 1 ? { full: true } : {}),
       title: l.title,
@@ -3037,7 +3038,7 @@ async function assertCentralCenters(ctx: Ctx, labels: string[]): Promise<void> {
   const s = ctx.session;
   if (!s || s.kind !== "central" || !labels.length) return;
   const list = await centerList(s.token);
-  if (!list.length) fail(503, "central_unavailable", "暫時無法取得會員中心的中心清單，請稍後再試");
+  if (!list.length) fail(503, "central_unavailable", UPGRADING_MSG);
   const known = new Set(list.map(centerKey));
   const bad = labels.find((l) => !known.has(centerKey(l)));
   if (bad) fail(400, "unknown_center", `「${bad}」不在會員中心的中心清單裡；中心名稱以會員中心為準，行動大學不能自行新增`);
@@ -3742,7 +3743,7 @@ const routes: [string, RegExp, Handler][] = [
       await syncContact(ctx, s).catch(() => undefined);
       if (email !== undefined) {
         // 正本在會員中心：先寫回中央，成功才更新這裡的副本。
-        if (s.kind === "central" && !(await saveContactEmail(s.sub, s.token, email))) return fail(502, "central_unavailable", "會員中心暫時無法儲存，請稍後再試");
+        if (s.kind === "central" && !(await saveContactEmail(s.sub, s.token, email))) return fail(502, "central_unavailable", UPGRADING_MSG);
         // 中央會員不在本地留副本；只有模擬會員（測試）寫本地欄位。
         if (s.kind !== "central")
           await ctx.db
@@ -4090,14 +4091,7 @@ const routes: [string, RegExp, Handler][] = [
       const kind = coverKindOf(ctx.url.searchParams.get("kind"));
       const key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
       if (!key) return [];
-      // 區塊照片（業主 2026-11-24）：照片屬於區塊時，依該區塊所屬課程最新的報名資格設定判斷，鎖住的人拿不到照片清單。
-      if (kind === "course") {
-        const blk = await ctx.db.prepare("SELECT course_id FROM lessons WHERE id = ? AND kind = 'section'").bind(key).first<{ course_id: string }>();
-        if (blk) {
-          const lk = await lockStateOfKey(ctx, blk.course_id);
-          if (lk.locked && !lk.manages) return [];
-        }
-      }
+      // 區塊照片（業主 2026-11-24）：沒有權限的人也看得到全部預覽縮圖，畫面蓋鎖頭遮罩（LockMask）與原因，所以這裡不再擋清單。
       const lookup = kind === "center" ? centerKey(key) : key;
       if (kind === "center") await reconcileCenterEdm(ctx.db, lookup).catch(() => undefined); // 課程 EDM 自動併入中心 EDM 空間
       await fillImageDims(ctx.env, ctx.db, kind, lookup);
@@ -5269,7 +5263,7 @@ const routes: [string, RegExp, Handler][] = [
         if (err.code === "field_not_allowed") return fail(503, "central_field_not_allowed", "會員中心尚未開放「顯示名稱」給行動大學：請超級管理員到會員中心後台「平台設定」勾選 display_name");
         if (err.status === 403) return fail(403, "central_forbidden", "會員中心不允許查詢這個中心的名單");
         if (err.status === 404) return fail(404, "unknown_center", "會員中心找不到這個中心");
-        return fail(503, "central_unavailable", "暫時無法取得會員中心的名單，請稍後再試");
+        return fail(503, "central_unavailable", UPGRADING_MSG);
       }
     },
   ],
@@ -5301,7 +5295,7 @@ const routes: [string, RegExp, Handler][] = [
       if (r.status === 403) return fail(403, "forbidden", "你沒有權限指派這個職務或這位會員");
       if (r.status === 404) return fail(404, "not_found", "找不到這位會員");
       if (r.status === 422) return fail(422, "invalid_roles", "中央不接受這個職務組合");
-      return fail(r.status === 429 ? 429 : 503, "central_unavailable", "會員中心暫時無法回應，請稍後再試");
+      return fail(r.status === 429 ? 429 : 503, "central_unavailable", UPGRADING_MSG);
     },
   ],
   [
@@ -5391,7 +5385,7 @@ const routes: [string, RegExp, Handler][] = [
       if (code === 422) return fail(422, "invalid_value", "修改後的內容不符合規則，請重新選擇");
       if (code === 403) return fail(403, "forbidden", "這個申請不屬於您負責的中心，或不能改成其他中心");
       if (code === 404) return fail(404, "not_pending", "這筆申請已被處理過，請重新整理");
-      return fail(502, "central_unavailable", "會員中心暫時無法連線，請稍後再試");
+      return fail(502, "central_unavailable", UPGRADING_MSG);
     },
   ],
   [
@@ -5435,7 +5429,7 @@ const routes: [string, RegExp, Handler][] = [
         }
       })();
       if (!s) {
-        if (!saved.length) fail(503, "central_unavailable", "暫時無法取得中心清單，請稍後再試");
+        if (!saved.length) fail(503, "central_unavailable", UPGRADING_MSG);
         await ensureCentersReconciled(ctx.db, saved);
         return saved;
       }
@@ -5443,7 +5437,7 @@ const routes: [string, RegExp, Handler][] = [
         const list = await centerList(s.token);
         if (!list.length) {
           if (saved.length) return saved;
-          fail(503, "central_unavailable", "暫時無法取得會員中心的中心清單，請稍後再試");
+          fail(503, "central_unavailable", UPGRADING_MSG);
         }
         await ensureCentersReconciled(ctx.db, list);
         if (JSON.stringify(list) !== JSON.stringify(saved)) await ctx.db.prepare("INSERT INTO central_snapshots (key, value) VALUES ('centers', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list)).run();
@@ -5807,7 +5801,7 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(400, "central_only", "只有中央會員可以使用");
-      return (await centralProfileView(s.sub, s.token)) ?? fail(502, "central_unavailable", "會員中心暫時無法連線，請稍後再試");
+      return (await centralProfileView(s.sub, s.token)) ?? fail(502, "central_unavailable", UPGRADING_MSG);
     },
   ],
   [
@@ -6591,7 +6585,7 @@ const routes: [string, RegExp, Handler][] = [
         if (err.status === 403) fail(403, "central_forbidden", "會員中心不允許查詢這個中心的名單（需要該中心已審核的音控或會長職務）");
         if (err.status === 404) fail(404, "unknown_center", "會員中心找不到這個中心");
         if (err.status === 422) fail(400, "center_required", "請先選擇中心");
-        return fail(503, "central_unavailable", "暫時無法取得會員中心的名單，請稍後再試");
+        return fail(503, "central_unavailable", UPGRADING_MSG);
       }
     },
   ],
@@ -7804,7 +7798,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
     if (e instanceof HttpError) res = json({ error: { code: e.code, message: e.message } }, e.status);
     else {
       console.error("api error", e);
-      res = json({ error: { code: "internal", message: "系統功能正在升級中，請稍後幾分鐘後再試" } }, 500);
+      res = json({ error: { code: "internal", message: UPGRADING_MSG } }, 500);
     }
   }
   for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);

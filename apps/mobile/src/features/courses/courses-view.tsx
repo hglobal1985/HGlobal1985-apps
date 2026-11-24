@@ -6,7 +6,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { overlayPopRecent } from "@/lib/back-close";
 import { Animated, BackHandler, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { api, ZONES, type CenterArt, type CourseSummary, type Zone } from "@/api/client";
+import { api, UPGRADING_MSG, ZONES, type CenterArt, type CourseSummary, type Zone } from "@/api/client";
 import { AddMaterialFab, type AddKind } from "@/features/course-edit/add-material-fab";
 import { CenterEditSheet, CenterScheduleSheet, NewCourseSheet } from "@/features/admin-parts";
 import { centerKeyOf, centerTitle } from "@/features/format";
@@ -677,7 +677,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             )
           ) : null}
           {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (
-            <EmptyState icon="business-outline" title="暫時看不到中心清單" body="請稍後再試，或先到「寰宇大學」瀏覽。" />
+            <EmptyState icon="business-outline" title="暫時看不到中心清單" body={UPGRADING_MSG} />
           ) : null}
           {canSort ? (
             <Pressable accessibilityRole="button" accessibilityState={{ selected: sortMode }} onPress={() => setSortMode((v) => !v)} style={[styles.sortBar, { backgroundColor: sortMode ? c.accent : c.surface, borderColor: sortMode ? c.accent : c.border }]}>
