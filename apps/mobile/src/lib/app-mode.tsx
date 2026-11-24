@@ -53,6 +53,8 @@ export type ModeProfile = {
   bigNav: boolean;
   /** 頁面大標題（標題、未讀數、右側按鈕）上下堆疊，不橫擠（字放大後標題才不會被擠成一字一行）。 */
   stackHeaders: boolean;
+  /** 往下滑時上方標題列平順縮小、往上滑再展開（業主 2026-11-24：超派模式所有頁面；至尊模式標題大、操作單純，不縮）。 */
+  collapseHeader: boolean;
   /** 大字版面（至尊）：清單一欄由上往下、內文直接展開、不顯示頁面大標題，篩選改用大標籤／大下拉（通知、學習中…）。 */
   bigLayout: boolean;
   /** 字體可以自訂、可以跟著手機字體。 */
@@ -77,6 +79,7 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     coursePage: "twoTabs",
     bigNav: true,
     stackHeaders: true,
+    collapseHeader: false,
     bigLayout: true,
     fontAdjustable: true,
     confirmLeave: true,
@@ -94,6 +97,7 @@ export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
     coursePage: "classic",
     bigNav: false,
     stackHeaders: false,
+    collapseHeader: true,
     bigLayout: false,
     fontAdjustable: false,
     confirmLeave: false,

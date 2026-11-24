@@ -1,10 +1,13 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, usePathname } from "expo-router";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { runGuarded } from "@/lib/unsaved-guard";
+import { useModeProfile } from "@/lib/app-mode";
 import { useTheme } from "@/theme/theme";
+import { resetBandScroll, useBandScroll } from "./band-scroll";
+import { BAR_COLLAPSE_PX, BAR_COMPACT_H, BAR_COMPACT_TITLE } from "./collapse-band";
 import { barHeight, minTouch } from "@/theme/tokens";
 
 /**
@@ -24,13 +27,19 @@ export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTo
   const fallback = path.startsWith("/course") || path.startsWith("/learn") ? "/courses" : path.startsWith("/orders") || path.startsWith("/admin") || path.startsWith("/settings") || path.startsWith("/achievements") ? "/me" : "/";
   const back = onBack ?? (() => (!backAlways && router.canGoBack() ? router.back() : router.replace((backTo ?? fallback) as never)));
   const top = safeTop ? insets.top : 0;
+  // 下滑縮小（業主 2026-11-24，超派模式所有頁面）：標題列高度與標題字跟著捲動平順縮小，往上滑再展開（模組 ui/collapse-band.tsx）。
+  const collapse = useModeProfile().collapseHeader;
+  const scrolled = useBandScroll();
+  useEffect(() => resetBandScroll(), [path]); // 換頁：捲動位置歸零，標題列回到展開
+  const p = collapse ? Math.min(1, scrolled / BAR_COLLAPSE_PX) : 0;
+  const h = Math.round(barHeight - p * (barHeight - Math.min(barHeight, BAR_COMPACT_H)));
   return (
     <View style={styles.wrap}>
-      <View style={[styles.bar, { height: barHeight + top, paddingTop: top, backgroundColor: c.surface }]}>
+      <View style={[styles.bar, { height: h + top, paddingTop: top, backgroundColor: c.surface }]}>
         <Pressable accessibilityRole="button" accessibilityLabel="返回上一頁" hitSlop={8} onPress={() => runGuarded(back)} style={styles.back}>
           <Ionicons name="arrow-back" size={26} color={c.text} />
         </Pressable>
-        <Text numberOfLines={1} accessibilityRole="header" style={[styles.title, { color: c.text }]}>
+        <Text numberOfLines={1} accessibilityRole="header" style={[styles.title, { color: c.text }, p > 0 ? { fontSize: Math.round(18 * (1 - p * (1 - BAR_COMPACT_TITLE)) * 10) / 10 } : null]}>
           {title}
         </Text>
         {right ? <View style={styles.right}>{right}</View> : null}
@@ -62,9 +71,14 @@ const TAB_ROOTS = new Set(["/", "/courses", "/learning", "/notices", "/me"]);
 export function TopBarShadow() {
   const insets = useSafeAreaInsets();
   const path = usePathname();
+  const collapse = useModeProfile().collapseHeader;
+  const scrolled = useBandScroll();
   if (TAB_ROOTS.has(path) || path.startsWith("/auth")) return null;
+  // 標題列下滑縮小時，下緣陰影跟著往上（與 TopBar 同一組數字）。
+  const p = collapse ? Math.min(1, scrolled / BAR_COLLAPSE_PX) : 0;
+  const h = Math.round(barHeight - p * (barHeight - Math.min(barHeight, BAR_COMPACT_H)));
   return (
-    <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: insets.top + barHeight, zIndex: 20 }}>
+    <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: insets.top + h, zIndex: 20 }}>
       <ShadowStrips />
     </View>
   );

@@ -17,6 +17,11 @@ export const COMPACT_SIDE = 16;
 /** 縮成窄橫幅時，封面上下留白合計（上 8＋下 4）。 */
 export const COMPACT_GAP = space.sm + space.xs;
 
+/** 上方標題列（TopBar）下滑縮小：捲動多少像素縮到最小、縮到多高（維持 44px 的觸控高度，業主：觸控目標要夠大）、標題字縮到幾倍。 */
+export const BAR_COLLAPSE_PX = 64;
+export const BAR_COMPACT_H = 44;
+export const BAR_COMPACT_TITLE = 0.88;
+
 /** 縮小的進度範圍：封面下緣＝展開高度 − 捲動量，直到窄橫幅高度（跟著手指 1:1，不是固定門檻）。 */
 export const collapseRange = (full: number) => Math.max(1, full - (COMPACT_H + COMPACT_GAP));
 

@@ -184,12 +184,17 @@ async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
     } else if (r.has && any) counts.set(any, (counts.get(any) ?? 0) + 1);
     if (r.kind !== "section" && cur && r.has) cur.count++;
   }
+  // 區塊照片也算內容（業主 2026-11-24：沒內容的區塊不對外展示，有照片就不是空的）。
+  const photoCounts = new Map<string, number>(
+    (await db.prepare("SELECT owner_key, COUNT(*) AS n FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' GROUP BY owner_key").all<{ owner_key: string; n: number }>()).results.map((r) => [r.owner_key, r.n]),
+  );
+  for (const list of map.values()) for (const b of list) if (!links.some((l) => l.block === b)) b.count += photoCounts.get(b.id) ?? 0;
   if (links.length) {
     // 連結區塊（品牌資訊卡）：數量用來源區塊的；封面＝來源清單的系列封面。
     const arts = (await db.prepare("SELECT c.id, COALESCE(a.cover_key, a.edm_key, c.cover_key) AS cover_key, NULL AS edm_key, COALESCE(a.art_version, c.art_version) AS art_version FROM courses c LEFT JOIN series_art a ON a.series = c.series AND c.series <> ''").all<{ id: string; cover_key: string | null; edm_key: string | null; art_version: number }>()).results;
     const srcCourse = new Map(results.filter((r) => r.kind === "section").map((r) => [r.id, r.course_id]));
     for (const { block, src } of links) {
-      block.count = counts.get(src) ?? 0;
+      block.count = (counts.get(src) ?? 0) + (photoCounts.get(src) ?? 0);
       const a = arts.find((x) => x.id === srcCourse.get(src));
       const key = a?.cover_key || a?.edm_key;
       if (a && key) block.coverUrl = pubUrl(key, a.art_version);
@@ -577,7 +582,7 @@ const COURSE_SELECT = `SELECT c.view_scope, c.id, c.title, c.subtitle, c.teacher
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS lesson_count,
   (SELECT COALESCE(SUM(duration_minutes), 0) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1)))) AS total_minutes,
   (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND (l.kind = 'chapter' OR (l.kind = 'material' AND l.is_full = 0 AND l.media_ref IS NOT NULL AND l.media_type <> 'demo' AND l.course_id IN (SELECT id FROM courses WHERE is_list = 1))) AND l.duration_minutes = 0) AS zero_minute_lessons,
-  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND ((l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id))) AS material_count
+  (SELECT COUNT(*) FROM lessons l WHERE l.course_id = c.id AND ((l.media_type <> 'demo' AND l.media_ref IS NOT NULL) OR EXISTS (SELECT 1 FROM lesson_attachments a WHERE a.lesson_id = l.id))) + (SELECT COUNT(*) FROM cover_media pm WHERE pm.owner_kind = 'course' AND pm.scope = 'cover' AND pm.owner_key IN (SELECT id FROM lessons WHERE course_id = c.id AND kind = 'section')) AS material_count
   FROM courses c`;
 
 async function memberCourseState(db: D1Database, sub: string | undefined) {

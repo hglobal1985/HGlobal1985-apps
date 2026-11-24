@@ -65,6 +65,13 @@ test("區塊新增照片：只有開放的課程可以、照片屬於區塊、�
   assert.equal(head.photoKey, blk);
   assert.equal(head.photos?.length, 1);
   assert.equal(course.blockPhotos, true);
+  // 照片也算教材數（業主 2026-11-24）：上拉選單的區塊數字、卡片的教材數量都含照片
+  const list = (await call<{ id: string; materialCount: number; hasMaterial: boolean; blocks: { id: string; count: number }[] }[]>("GET", "/courses", { token: adm })).data;
+  const box = list.find((c) => c.id === "cqqxw4z2")!;
+  assert.equal(box.blocks.find((b) => b.id === blk)!.count, 1, "區塊數字含照片");
+  assert.equal(box.materialCount, 1, "卡片教材數含照片");
+  assert.equal(box.hasMaterial, true);
+  assert.equal(list.find((c) => c.id === "cbba")!.materialCount, 1, "品牌卡的教材數含連結區塊裡的照片");
   // 品牌卡的「成交百寶箱」連結區塊：看到同一批照片（照片只存來源一份）
   const card = (await call<CourseDetail>("GET", "/courses/cbba", { token: adm })).data;
   const link = card.lessons[0]!;
