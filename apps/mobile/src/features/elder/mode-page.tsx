@@ -1,4 +1,4 @@
-import { router, useNavigation } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { useEffect } from "react";
 import { hasUnsaved, runGuarded } from "@/lib/unsaved-guard";
 import { View } from "react-native";
@@ -8,7 +8,7 @@ import { AccountCenterLink, ProfilePrompt } from "@/features/profile-prompt";
 import { MODE_PROFILES } from "@/lib/app-mode";
 import { useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { Button, GuestGate, LoadingView, Screen } from "@/ui";
+import { Button, GuestGate, InstallCard, LoadingView, Screen } from "@/ui";
 import { askSwitchToMaker, FontSizeCard } from "./mode-actions";
 
 /**
@@ -18,6 +18,7 @@ import { askSwitchToMaker, FontSizeCard } from "./mode-actions";
  */
 export function ModePage() {
   const { member, ready } = useSession();
+  const { fill } = useLocalSearchParams<{ fill?: string }>(); // 登入後自動帶過來（會員資料沒填完）：捲到沒填的欄位
   // 返回（含瀏覽器／手機返回鍵）離開前：表單有未儲存的改動就攔下，交給表單顯示「尚未儲存」與「放棄」。
   const nav = useNavigation();
   useEffect(
@@ -31,6 +32,8 @@ export function ModePage() {
   );
   return (
     <Screen>
+      {/* 最上方：「加到主畫面」邀請卡（業主 2026-11-24）；與超派首頁同一個元件，安裝後自動不再顯示。 */}
+      <InstallCard dismissible />
       {/* 最上方：訊息通知（勾選）→ 前往完整版會員中心 → 並排「訂單紀錄｜超派模式」（業主 2026-11-24） */}
       {member ? (
         <>
@@ -51,7 +54,7 @@ export function ModePage() {
       {member ? (
         <>
           <MemberHeader member={member} scale={1.15} stacked />
-          {member.demo ? null : <ProfilePrompt inline initial={member.profileForm ?? null} onClose={() => undefined} />}
+          {member.demo ? null : <ProfilePrompt inline focusMissing={fill === "1"} initial={member.profileForm ?? null} onClose={() => undefined} />}
         </>
       ) : ready ? (
         <GuestGate body="登入後即可報名課程、記錄學習進度。" />

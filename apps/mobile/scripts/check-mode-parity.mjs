@@ -13,7 +13,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
-const root = new URL("../src/", import.meta.url).pathname;
+// 掃 src/ 與 app/（畫面路由在 app/，2026-11-24 補上：原本只掃 src/ 漏掉學習中、通知等頁面）。
+const base = new URL("../", import.meta.url).pathname;
 const files = [];
 const walk = (d) => {
   for (const n of readdirSync(d)) {
@@ -22,7 +23,8 @@ const walk = (d) => {
     else if (/\.(tsx?|jsx?)$/.test(n)) files.push(p);
   }
 };
-walk(root);
+walk(join(base, "src"));
+walk(join(base, "app"));
 
 // 規則 2 的白名單：模式本身的設定與切換。
 const MODE_ALLOW = [/^lib\/app-mode\.tsx$/, /^lib\/elder-mode\.ts$/, /^lib\/global-scale\.ts$/, /^ui\/bottom-bar\.tsx$/, /^features\/elder\//];
@@ -31,7 +33,7 @@ const MODE_CHECK = /\bkey\s*[!=]==\s*"(elder|super)"|\buseElderOn\s*\(|\bgetElde
 
 const errors = [];
 for (const f of files) {
-  const rel = relative(root, f).replaceAll("\\", "/");
+  const rel = relative(base, f).replaceAll("\\", "/").replace(/^src\//, "");
   const lines = readFileSync(f, "utf8").split("\n");
   lines.forEach((line, i) => {
     if (line.includes("mode-parity-ok")) return; // 真的有必要時，在該行加註解「mode-parity-ok：原因」

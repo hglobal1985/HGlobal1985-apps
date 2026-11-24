@@ -20,6 +20,11 @@
   - **「權限」和「模式」分開**：呼叫共用元件時，兩種模式一律傳**同一份權限**（看的人能做什麼）；模式要藏的東西由**共用元件自己**用 `useFeature()` 讀 `MODE_PROFILES` 決定。例：`CoverAlbum` 的排序／刪除小鈕看 `canEdit && useFeature("adminEdit")`（至尊模式藏起來），驚嘆號只看 `canEdit`（兩種模式都有）。
   - **自動檢查 `apps/mobile/scripts/check-mode-parity.mjs`**：`npm run typecheck -w @learn/mobile` 與部署腳本都會跑，沒過就不能部署。規則 1：`features/elder/**` 傳給共用元件的權限類參數（`can…`、`show…`、`allow…`、`hide…`、`editable`、`readOnly`）不可寫死 true／false；規則 2：除了白名單（`lib/app-mode.tsx`、`lib/elder-mode.ts`、`lib/global-scale.ts`、`ui/bottom-bar.tsx`、`features/elder/`），畫面不可自己判斷「是不是至尊模式」。真的必要時在該行加註解 `mode-parity-ok：原因`。
   - **新增或修改超派模式的功能時**：做在共用元件裡（至尊模式自動拿到）；兩種模式真的要不一樣，就在 `MODE_PROFILES.features` 加一個開關，不要在至尊模式另做一份。
+- **至尊模式：登入後自動帶去填會員資料＋模式頁安裝提示（業主 2026-11-24）**：
+  - 會員資料有沒填的欄位（`member.profileMissing`，與超派同一個來源）時，**每次登入／每次開啟 App** 進到至尊首頁或課程分頁，自動跳到模式頁 `/mode?fill=1`（`profile-gate.tsx` 的 `useProfileRedirect`，同一次開啟只帶一次）；模式頁的 `ProfilePrompt` 收到 `focusMissing` 後標出沒填的欄位（橘框）、上方顯示「請先把標示的欄位填好，再按儲存」，並捲到第一個沒填的欄位（欄位 `nativeID＝pf-欄位代號`）。超派模式照舊用上拉面板 `useProfileGate`。
+  - 模式頁最上方放「加到主畫面」邀請卡（`InstallCard dismissible`，與超派首頁同一個元件），安裝後自動不再顯示。
+  - 同步檢查改成也掃 `app/`（原本漏掉）；學習中、通知原本直接判斷至尊模式，改讀模式設定檔：新增 `bigLayout`（大字版面：一欄直排、內文展開、不顯示頁面大標題）與功能開關 `seriesFilter`（學習中的系列篩選，至尊＝false）。
+  - 其他對照清單（業主 2026-11-24 逐項決定）：清單卡訂閱鈕不補（報名＝自動訂閱）；中心卡的封面輪播、中心公告、訂閱＋點閱、分享四項先出模擬圖待業主決定；其餘照現狀。
 - **模式設定檔＝兩種模式差異的唯一來源（業主 2026-11-24 要求長期維護穩定）**：`src/lib/app-mode.tsx` 的 `MODE_PROFILES` 寫死兩種模式各自的：主選單分頁（`tabs`）、首頁版面（`home`）、課程分頁版面（`courses`）、課程頁版面（`coursePage`）、選單放大（`bigNav`）、字體可調（`fontAdjustable`）、離開前確認（`confirmLeave`）、功能開關（`features`：addToList、comments、achievements、myLists、library、manageSection、adminEdit、addButton）。**畫面不可自己判斷「是不是至尊模式」**，一律用 `useFeature("功能名")`、`useModeProfile()` 或 `<ModeGate feature="…">`。要改某個模式顯示／隱藏什麼，只改 `MODE_PROFILES` 的 true／false；新增功能先在 `FeatureKey` 加名字、兩個模式各填值。模式名稱（至尊／超派）也只寫在這裡（`name`），畫面文字用 `MODE_PROFILES.xxx.name` 組字。`lib/elder-mode.ts` 只負責「目前是哪個模式＋字體倍數」的儲存。
 - **說話時的音波（業主 2026-11-24）**：`use-voice.ts` 回傳 `levels`（9 條、0～1），「正在聽…」畫面的音波高度跟著麥克風音量即時跳動（每 50 毫秒更新，網頁加 90 毫秒高度過渡）。真實音量用 `getUserMedia`＋`AnalyserNode` 頻譜（人聲頻段、中間高兩邊低）；**Android 不另開麥克風**（可能和瀏覽器語音辨識搶麥克風），改用語音辨識的 `onsoundstart／onsoundend`：有聲音時隨機跳動、沒聲音時趴平；量音量失敗（沒權限等）也自動改用這種擬真音波。結束聆聽時一定關掉麥克風與 AudioContext。
 - **至尊模式一律不用上拉選單＋模式頁整頁顯示（業主 2026-11-24 第四次）**：
