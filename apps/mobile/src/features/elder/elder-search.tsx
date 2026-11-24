@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Image, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -174,6 +174,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         </View>
       ) : null}
       {listMode ? (
+        <TitleSizeScope key={`${key}|${zone}|${sub?.key}`}>
         <FlatList
           style={styles.fill}
           contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]}
@@ -193,6 +194,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} />}
           initialNumToRender={8}
         />
+        </TitleSizeScope>
       ) : (
         <View style={[styles.inner, pad, { flex: 1, gap: space.md, paddingBottom: space.md }]}>
           {body}
@@ -280,13 +282,29 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
  */
 function FitTitle({ text }: { text: string }) {
   const [box, setBox] = useState({ w: 0, h: 0 });
+  const { min, report } = useContext(TitleSize);
   const k = UI_SCALE * elderTextScale();
-  const fs = box.w && box.h ? fitFontSize(text, box.w / k, (box.h / k) * 0.95, 44, 14) : 20;
+  const own = box.w && box.h ? fitFontSize(text, box.w / k, (box.h / k) * 0.95, 44, 14) : null;
+  useEffect(() => {
+    if (own !== null) report(own);
+  }, [own, report]);
+  const fs = Math.min(own ?? 20, min);
   return (
     <View style={{ flex: 1, minHeight: 0, justifyContent: "center" }} onLayout={(e) => setBox({ w: Math.round(e.nativeEvent.layout.width), h: Math.round(e.nativeEvent.layout.height) })}>
       <AppText style={{ fontSize: fs, lineHeight: Math.round(fs * 1.2), fontWeight: "800" }}>{text}</AppText>
     </View>
   );
+}
+
+/**
+ * 同一份清單的所有標題統一字級（業主 2026-11-24）：每一列算出自己塞得進去的最大字級，整份清單取其中最小的，大家一樣大。
+ * 換清單（換分類／搜尋）時用 key 重建，重新算。
+ */
+const TitleSize = createContext<{ min: number; report: (s: number) => void }>({ min: 44, report: () => undefined });
+function TitleSizeScope({ children }: { children: ReactNode }) {
+  const [min, setMin] = useState(44);
+  const value = useMemo(() => ({ min, report: (s: number) => setMin((m) => Math.min(m, s)) }), [min]);
+  return <TitleSize.Provider value={value}>{children}</TitleSize.Provider>;
 }
 
 const styles = StyleSheet.create({
