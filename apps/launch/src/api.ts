@@ -4555,12 +4555,23 @@ const routes: [string, RegExp, Handler][] = [
       const tokens = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase().split(/\s+/).filter((t) => t.length >= 1).slice(0, 3);
       if (!tokens.length || tokens.join("").length < 2) return { hits: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
-      const { results } = await ctx.db
-        .prepare(
-          `SELECT cm.owner_key AS block_id, cm.scene_text, l.title AS block_title, l.course_id, c.title AS course_title FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.scene_status = 'done' AND c.status = 'published' AND ${tokens.map(() => "lower(cm.scene_text) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 300`,
-        )
+      type SceneRow = { block_id: string; scene_text: string; block_title: string; course_id: string; course_title: string };
+      const base = `SELECT cm.owner_key AS block_id, cm.scene_text, l.title AS block_title, l.course_id, c.title AS course_title FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.scene_status = 'done' AND c.status = 'published'`;
+      let { results } = await ctx.db
+        .prepare(`${base} AND ${tokens.map(() => "lower(cm.scene_text) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 300`)
         .bind(...tokens.map(like))
-        .all<{ block_id: string; scene_text: string; block_title: string; course_id: string; course_title: string }>();
+        .all<SceneRow>();
+      // 反向比對（業主 2026-11-25：說了一長句「洗蔬菜水果清潔劑…」卻找不到蔬菜水果的照片）：整句塞不進標籤時，
+      // 改成「照片的某個標籤（至少 2 字、不是『室內』這類泛稱）出現在查詢句子裡」就算符合，命中標籤越多的照片越前面。
+      let tagsOf: ((r: SceneRow) => string[]) | null = null;
+      if (!results.length) {
+        const full = tokens.join("");
+        const GENERIC = new Set(["室內", "室外", "圖片", "桌子", "椅子", "天花板", "窗戶", "燈光", "手指", "手腕", "手臂", "桌上物品"]);
+        const hitTags = (r: SceneRow) => r.scene_text.split("，").map((t) => t.trim()).filter((t) => t.length >= 2 && !GENERIC.has(t) && full.includes(t.toLowerCase()));
+        const all = await ctx.db.prepare(`${base} ORDER BY cm.created_at DESC LIMIT 3000`).all<SceneRow>();
+        results = all.results.map((r) => [r, hitTags(r).length] as const).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([r]) => r);
+        tagsOf = hitTags;
+      }
       const locks = new Map<string, LockState>();
       const groups = new Map<string, { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; tags: Set<string> }>();
       for (const r of results) {
@@ -4569,7 +4580,7 @@ const routes: [string, RegExp, Handler][] = [
         if (lk.locked && !lk.manages) continue;
         const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>() };
         g.count++;
-        for (const t of r.scene_text.split("，")) if (tokens.some((k) => t.toLowerCase().includes(k))) g.tags.add(t);
+        for (const t of tagsOf ? tagsOf(r) : r.scene_text.split("，")) if (tagsOf || tokens.some((k) => t.toLowerCase().includes(k))) g.tags.add(t);
         groups.set(r.block_id, g);
       }
       return { hits: [...groups.values()].slice(0, 20).map((g) => ({ blockId: g.blockId, courseId: g.courseId, courseTitle: g.courseTitle, blockTitle: g.blockTitle, count: g.count, scene: [...g.tags].slice(0, 6).join("，") })) };
