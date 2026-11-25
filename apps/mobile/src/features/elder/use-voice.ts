@@ -118,47 +118,104 @@ export function useVoice(onText: (text: string, final: boolean) => void) {
 
   useEffect(() => () => (rec.current?.abort(), meter.current?.stop()), []);
 
+  /** 說完停多久才自動結束（業主 2026-11-25：不要太快偵測結束就送出）：開始說話後停 4 秒；一直沒開口則等 12 秒。 */
+  const SILENCE_MS = 4000;
+  const NO_SPEECH_MS = 12000;
+  const idle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const running = useRef(false);
+  const lastText = useRef(""); // 這一輪辨識到的字（重連時併入 heard）
+  const heard = useRef(""); // 瀏覽器中途自己斷線重連時，前面聽到的字要保留
+
   const start = useCallback(() => {
     const R = recognizer();
     if (!R) return false;
     rec.current?.abort();
-    const r = new R();
-    r.lang = "zh-TW";
-    r.interimResults = true;
-    r.continuous = false;
-    r.onresult = (e) => {
-      let text = "";
-      let final = false;
-      for (let i = 0; i < e.results.length; i++) {
-        const res = e.results[i]!;
-        text += res[0]?.transcript ?? "";
-        if (res.isFinal) final = true;
-      }
-      // 去掉句尾標點（辨識常加「。」），搜尋時不需要。
-      cb.current(text.replace(/[。．.！!？?，,]+$/g, "").trim(), final);
+    if (idle.current) clearTimeout(idle.current);
+    heard.current = "";
+    running.current = true;
+    let spoke = false;
+    const finish = () => {
+      running.current = false;
+      if (idle.current) clearTimeout(idle.current);
+      rec.current?.stop();
     };
-    r.onsoundstart = () => (sound.current = true);
-    r.onsoundend = () => (sound.current = false);
-    r.onerror = (e) => setError(e.error === "not-allowed" || e.error === "service-not-allowed" ? "請允許使用麥克風，才能用說的找課程。" : e.error === "no-speech" ? "沒有聽到聲音，請再按一次麥克風。" : null);
-    r.onend = () => {
-      setListening(false);
-      sound.current = false;
-      stopMeter();
+    const arm = () => {
+      if (idle.current) clearTimeout(idle.current);
+      idle.current = setTimeout(finish, spoke ? SILENCE_MS : NO_SPEECH_MS);
+    };
+    const launch = (): boolean => {
+      const r = new R();
+      r.lang = "zh-TW";
+      r.interimResults = true;
+      r.continuous = true; // 連續聽，不因為短暫停頓就結束
+      r.onresult = (e) => {
+        let text = "";
+        let final = false;
+        for (let i = 0; i < e.results.length; i++) {
+          const res = e.results[i]!;
+          text += res[0]?.transcript ?? "";
+          if (res.isFinal) final = true;
+        }
+        lastText.current = text;
+        const all = (heard.current + text).replace(/[。．.！!？?，,]+$/g, "").trim();
+        if (all) spoke = true;
+        arm(); // 每聽到新的字就重新計時
+        cb.current(all, final && !running.current);
+      };
+      r.onsoundstart = () => {
+        sound.current = true;
+        spoke = true;
+        arm();
+      };
+      r.onsoundend = () => (sound.current = false);
+      r.onerror = (e) => {
+        if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+          running.current = false;
+          setError("請允許使用麥克風，才能用說的找課程。");
+        } else if (e.error === "no-speech" && !running.current) setError("沒有聽到聲音，請再按一次麥克風。");
+      };
+      r.onend = () => {
+        // 還沒到自己設的結束時間、瀏覽器卻先斷了：接著重新聽（Android 常這樣），把已聽到的字留著。
+        if (running.current && rec.current === r) {
+          heard.current = (heard.current + lastText.current).trim();
+          lastText.current = "";
+          try {
+            if (launch()) return;
+          } catch {
+            /* 重連失敗就結束 */
+          }
+        }
+        if (rec.current === r || !rec.current) {
+          running.current = false;
+          if (idle.current) clearTimeout(idle.current);
+          setListening(false);
+          sound.current = false;
+          stopMeter();
+        }
+      };
+      try {
+        r.start();
+        rec.current = r;
+        return true;
+      } catch {
+        return false;
+      }
     };
     setError(null);
     setListening(true);
-    try {
-      r.start();
-      rec.current = r;
-    } catch {
+    if (!launch()) {
+      running.current = false;
       setListening(false);
       return false;
     }
+    arm();
     if (canMeter()) void startRealMeter();
     else startFakeMeter();
     return true;
   }, [startRealMeter, startFakeMeter, stopMeter]);
   const stop = useCallback(() => {
+    running.current = false;
+    if (idle.current) clearTimeout(idle.current);
     rec.current?.stop();
     setListening(false);
     stopMeter();
