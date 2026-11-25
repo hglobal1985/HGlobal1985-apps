@@ -147,8 +147,6 @@ export default function NoticesScreen() {
         })}
       </View>
       )}
-      {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
-      {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
       {/* 審核相關而且還沒處理的一律置頂（業主 2026-11-23）：在「全部」與「審核」都放在最上面，處理完（或已讀）才回到下面依日期排列。 */}
       {pinned.length ? (
         <View style={{ gap: 6, marginTop: space.xs }}>
@@ -159,6 +157,8 @@ export default function NoticesScreen() {
           <Card style={{ paddingVertical: 4, borderWidth: pinBw, borderColor: c.danger }}>{pinned.map((n, i) => renderRow(n, i))}</Card>
         </View>
       ) : null}
+      {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
+      {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
       {groupByDay(rest, (n) => n.createdAt).map((g) => (
         <View key={g.day} style={{ gap: 6, marginTop: space.xs }}>
           <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
