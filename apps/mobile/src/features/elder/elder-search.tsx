@@ -124,11 +124,11 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           </Pressable>
         ) : null}
       </View>
-      {member ? null : <LoginPrompt />}
-      {searching ? (
+      {member || voice.listening ? null : <LoginPrompt />}
+      {searching && !voice.listening ? (
         <AppText variant="headline">{chapters.length ? `找到 ${chapters.length} 個單元` : eng.loading ? "正在找相近的單元…" : eng.extras.length ? `找到 ${eng.extras.length} 個相近的項目` : "找不到這個單元"}</AppText>
       ) : null}
-      {searching ? <SceneHits q={q} big /> : null}
+      {searching && !voice.listening ? <SceneHits q={q} big /> : null}
     </View>
   );
 
@@ -293,43 +293,64 @@ export function FitLine({ text, max = 30, min = 10, weight = "700", muted, tight
   );
 }
 export function SearchHint() {
-  return <FitLine text={SEARCH_HINT} max={22} weight="400" muted />;
+  return <FitLine text={SEARCH_HINT} max={16} weight="400" muted />;
 }
 /** 中央黑色標題下方的黑字提示（業主 2026-11-25：強制一行、自動縮放到最大寬度）。 */
 export function TypoHint() {
-  return <FitLine text={TYPO_HINT} max={30} tight />;
+  return <FitLine text={TYPO_HINT} max={22} tight />;
 }
 
 /** 「正在聽…」：跟著聲音大小即時高低跳動的音波＋聽到的字＋停止鈕（業主 2026-11-24）。 */
 function Listening({ heard, levels, onStop }: { heard: string | null; levels: number[]; onStop: () => void }) {
   const { c } = useTheme();
-  const max = Math.round(120 * UI_SCALE);
-  const min = Math.round(14 * UI_SCALE);
+  // 一切縮小、行距收緊（業主 2026-11-25）：音波、字體都再縮小；聽到的字太多時自動縮字，永遠塞得進畫面、不重疊。
+  const max = Math.round(64 * UI_SCALE);
+  const min = Math.round(8 * UI_SCALE);
   return (
-    <View style={styles.center} accessibilityLiveRegion="polite">
-      {heard ? (
-        <AppText numberOfLines={3} style={{ color: c.danger, textAlign: "center", fontWeight: "800", fontSize: 24, lineHeight: 30 }}>
-          {`聽到：「${heard}」`}
-        </AppText>
-      ) : null}
-      <View style={[styles.wave, { height: max }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+    <View style={styles.listen} accessibilityLiveRegion="polite">
+      {heard ? <HeardText text={`聽到：「${heard}」`} /> : null}
+      <View style={[styles.wave, { height: max, gap: 5 }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {levels.map((v, i) => (
-          <View key={i} style={[{ width: Math.round(14 * UI_SCALE), height: Math.round(min + v * (max - min)), borderRadius: 8, backgroundColor: c.accent }, WAVE_ANIM]} />
+          <View key={i} style={[{ width: Math.round(8 * UI_SCALE), height: Math.round(min + v * (max - min)), borderRadius: 5, backgroundColor: c.accent }, WAVE_ANIM]} />
         ))}
       </View>
-      <AppText variant="title" style={{ lineHeight: 26 }}>正在聽…</AppText>
+      <AppText style={{ fontSize: 20, lineHeight: 22, fontWeight: "800" }}>正在聽…</AppText>
       <TypoHint />
       {heard ? null : (
-        <AppText tone="muted" style={{ textAlign: "center" }}>
+        <AppText tone="muted" style={{ textAlign: "center", fontSize: 14, lineHeight: 16 }}>
           請說出想找的課程
         </AppText>
       )}
       <SearchHint />
-      <Pressable accessibilityRole="button" accessibilityLabel="送出" onPress={onStop} style={[styles.stop, { borderColor: c.danger, borderWidth: ELDER_FIELD.borderWidth }]}>
-        <AppText variant="headline" style={{ color: c.danger }}>
+      <Pressable accessibilityRole="button" accessibilityLabel="送出" onPress={onStop} style={[styles.stop, { borderColor: c.danger, borderWidth: ELDER_FIELD.borderWidth, minHeight: 52, marginTop: 6 }]}>
+        <AppText variant="headline" style={{ color: c.danger, lineHeight: 22 }}>
           送出
         </AppText>
       </Pressable>
+    </View>
+  );
+}
+
+/** 聽到的字（紅色）：依字數與可用寬度自動縮小字級，最多佔約 5 行高，絕不超出、不與其他文字重疊。 */
+function HeardText({ text }: { text: string }) {
+  const { c } = useTheme();
+  const [w, setW] = useState(0);
+  const k = UI_SCALE * elderTextScale();
+  const budget = 110; // 可用高度（未乘縮放）
+  let size = 12;
+  if (w) {
+    const units = lineUnits(text) * 1.05;
+    for (let s = 22; s >= 12; s--) {
+      const lines = Math.ceil((units * s) / (w / k));
+      if (lines * s * 1.15 <= budget) {
+        size = s;
+        break;
+      }
+    }
+  } else size = 18;
+  return (
+    <View style={{ alignSelf: "stretch" }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+      <AppText style={{ color: c.danger, textAlign: "center", fontWeight: "800", fontSize: size, lineHeight: Math.round(size * 1.15) }}>{text}</AppText>
     </View>
   );
 }
@@ -425,6 +446,7 @@ const styles = StyleSheet.create({
   box: { flexDirection: "row", alignItems: "center", gap: space.sm, borderWidth: ELDER_FIELD.borderWidth, borderRadius: ELDER_FIELD.radius, paddingLeft: space.lg, paddingRight: space.sm, paddingVertical: space.sm, minHeight: Math.round(80 * UI_SCALE) },
   input: { flex: 1, fontSize: 20, lineHeight: 28, paddingVertical: space.sm, minWidth: 0, outlineStyle: "none" } as object,
   boxBtn: { width: Math.round(56 * UI_SCALE), height: Math.round(56 * UI_SCALE), borderRadius: radius.lg, alignItems: "center", justifyContent: "center" },
+  listen: { flex: 1, alignItems: "center", justifyContent: "flex-start", gap: 4, paddingTop: 6 },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingVertical: space.md },
   micWrap: { padding: 18, borderRadius: 999 },
   mic: { width: Math.round(120 * UI_SCALE), height: Math.round(120 * UI_SCALE), borderRadius: 999, alignItems: "center", justifyContent: "center" },
