@@ -41,7 +41,7 @@ export function approxSyl(s: string[], q: string[], k: number): boolean {
 const allow = (m: number, from = 4) => (m >= from ? 1 : 0);
 
 type Seg = { syl: string[]; w: number };
-type Entry = { kind: "course" | "lesson"; id: string; courseId: string; segs: Seg[] };
+type Entry = { kind: "course" | "lesson"; id: string; courseId: string; segs: Seg[]; /** 所有欄位的相鄰音節對（快速預篩：片段的前兩個音節不在裡面就不可能符合）。 */ bg?: Set<string> };
 let cache: { at: number; rows: Entry[] } | null = null;
 /** 測試用：清掉快取。 */
 export const resetPhoneticCache = () => { cache = null; };
@@ -71,12 +71,13 @@ export const stripFiller = (q: string) => {
 export async function phoneticSearch(db: D1Database, q: string, limit = 24): Promise<{ courses: string[]; lessons: string[] }> {
   const st = await loadSearchSettings(db);
   if (!st.phoneticEnabled) return { courses: [], lessons: [] };
-  const qs = syllables(stripFiller(q.trim().slice(0, 100)));
+  const qs = syllables(stripFiller(q.trim().slice(0, 100))).slice(0, 40);
   if (qs.length < (st.phoneticMinSyllables as number)) return { courses: [], lessons: [] };
   const k = allow(qs.length, st.phoneticTypoFrom as number);
   // 整串連續符合（最高分）；否則「拆片段」：查詢裡每一段連續的音節只要在這筆資料的任何欄位出現就算覆蓋到，
   // 覆蓋率夠高就列出，覆蓋越多排越前面（業主 2026-11-25：「一支援安裝」＝「益之源」同音錯字＋「安裝」，中間隔著別的字）。
-  const n = qs.length;
+  const n = Math.min(qs.length, 40); // 口語長句最多看前 40 個音節
+  const bigrams = (e: Entry) => (e.bg ??= new Set(e.segs.flatMap((s) => s.syl.slice(0, -1).map((a, i) => `${a}|${s.syl[i + 1]}`))));
   const score = (e: Entry) => {
     let best = 0;
     for (const s of e.segs) {
@@ -85,25 +86,32 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
       else if (k && approxSyl(s.syl, qs, k)) best = Math.max(best, s.w - 1.5);
     }
     if (best > 0 || n < 4) return best;
+    const bg = bigrams(e);
+    if (!qs.slice(0, n - 1).some((a, i) => bg.has(`${a}|${qs[i + 1]}`))) return 0; // 連一對相鄰音節都沒有就不可能
     const covered = new Array<boolean>(n).fill(false);
     let w = 0;
-    for (let len = n - 1; len >= 2; len--) {
+    let longest = 0; // 最長的一段連續符合（越長越代表是同一個詞）
+    for (let len = Math.min(n - 1, 8); len >= 2; len--) {
       for (let st0 = 0; st0 + len <= n; st0++) {
         if (covered.slice(st0, st0 + len).every(Boolean)) continue;
+        if (!bg.has(`${qs[st0]}|${qs[st0 + 1]}`)) continue;
         const win = qs.slice(st0, st0 + len);
         for (const s of e.segs) {
           if (s.syl.length && approxSyl(s.syl, win, 0)) {
             for (let i = st0; i < st0 + len; i++) covered[i] = true;
             w = Math.max(w, s.w);
+            longest = Math.max(longest, len);
             break;
           }
         }
       }
     }
-    const cov = covered.filter(Boolean).length / n;
-    // 門檻：短查詢（≤5 音節）要覆蓋 75%；長查詢（口語長句）只要覆蓋至少 4 個音節、且達 35%（例如「逸新」＋「濾網」兩個關鍵詞各出現就列出）。
-    const need = n <= 5 ? 0.75 * n : Math.max(4, 0.35 * n);
-    return covered.filter(Boolean).length >= need ? w * cov : 0;
+    const got = covered.filter(Boolean).length;
+    // 門檻：短查詢（≤5 音節）覆蓋 75%；口語長句（多個關鍵詞串在一起）不看比例——
+    // 至少覆蓋 4 個音節，而且有一個 ≥3 音節的詞或覆蓋 ≥6 個音節（避免隨便兩個常見雙字詞就配上）。
+    if (n <= 5 ? got < 0.75 * n : got < 4 || (longest < 3 && got < 6)) return 0;
+    // 分數：覆蓋的音節越多越前面；最長詞加一點分。
+    return w * (got / n) + got * 0.05 + longest * 0.05;
   };
   const hit = (await load(db)).map((e) => ({ e, s: score(e) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
   return { courses: hit.filter((x) => x.e.kind === "course").slice(0, limit).map((x) => x.e.id), lessons: hit.filter((x) => x.e.kind === "lesson").slice(0, limit).map((x) => x.e.id) };

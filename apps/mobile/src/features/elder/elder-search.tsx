@@ -139,7 +139,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         ) : null}
       </View>
       {member || voice.listening ? null : <LoginPrompt />}
-      {searching && !voice.listening ? (
+      {searching && !voice.listening && !(key && !chapters.length && !eng.extras.length && !eng.loading) ? (
         <AppText variant="headline">{chapters.length ? `找到 ${chapters.length} 個單元` : eng.loading ? "正在找相近的單元…" : eng.extras.length ? `找到 ${eng.extras.length} 個相近的項目` : "找不到這個單元"}</AppText>
       ) : null}
       {searching && !voice.listening ? <SceneHits q={q} big /> : null}
@@ -171,8 +171,9 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       </View>
     ) : key && !chapters.length && !eng.extras.length && !eng.loading ? (
       // 找不到課程：畫面中央放錄音鈕，按一下再說一次（業主 2026-11-25）。
-      <View style={styles.center}>
-        <AppText variant="headline" style={{ textAlign: "center" }}>{`找不到「${q.trim()}」，再說一次試試看`}</AppText>
+      // 訊息依字數自動縮字（長句不再爆框、不與上方文字重疊）；內容由上往下排，不置中擠壓（業主 2026-11-25）。
+      <View style={[styles.center, { justifyContent: "flex-start" }]}>
+        <HeardText plain budgetPx={150} text={`找不到「${q.trim()}」，再說一次試試看`} />
         <Pressable accessibilityRole="button" accessibilityLabel="再說一次" onPress={mic} style={({ pressed }) => [styles.micWrap, { backgroundColor: c.accentSoft, opacity: pressed ? 0.85 : 1 }]}>
           <View style={[styles.mic, { backgroundColor: c.accent }]}>
             <Ionicons name="mic" size={60} color={c.textOnAccent} {...({ uiOnly: true } as object)} />
@@ -347,11 +348,11 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
 }
 
 /** 聽到的字（紅色）：依字數與可用寬度自動縮小字級，最多佔約 5 行高，絕不超出、不與其他文字重疊。 */
-function HeardText({ text }: { text: string }) {
+function HeardText({ text, plain = false, budgetPx = 110 }: { text: string; plain?: boolean; budgetPx?: number }) {
   const { c } = useTheme();
   const [w, setW] = useState(0);
   const k = UI_SCALE * elderTextScale();
-  const budget = 110 / elderTextScale(); // 外框固定 120×UI_SCALE，字被放大時可用的行數相對變少
+  const budget = budgetPx / elderTextScale(); // 外框固定 120×UI_SCALE，字被放大時可用的行數相對變少
   let size = 12;
   if (w) {
     const units = lineUnits(text) * 1.05;
@@ -365,7 +366,7 @@ function HeardText({ text }: { text: string }) {
   } else size = 18;
   return (
     <View style={{ alignSelf: "stretch" }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
-      <AppText style={{ color: c.danger, textAlign: "center", fontWeight: "800", fontSize: size, lineHeight: Math.round(size * 1.15) }}>{text}</AppText>
+      <AppText style={{ ...(plain ? null : { color: c.danger }), textAlign: "center", fontWeight: "800", fontSize: size, lineHeight: Math.round(size * 1.15) }}>{text}</AppText>
     </View>
   );
 }
