@@ -14,7 +14,6 @@ import { ConfirmSheetHost } from "@/features/confirm";
 import { FlashHost } from "@/ui/flash-notice";
 import { MiniAudioBar } from "@/features/player/audio-bar";
 import { PlayerLayer } from "@/features/player/player-layer";
-import { SwitchSheet } from "@/features/player/switch-sheet";
 import { installNoPageZoom } from "@/lib/no-page-zoom";
 import { installStableScrollbar } from "@/lib/stable-scrollbar";
 import { installWebPullRefresh } from "@/lib/web-pull-refresh";
@@ -178,7 +177,6 @@ export default function RootLayout() {
           <UpdateNotice />
           <BottomBar />
           <PlayerLayer />
-          <SwitchSheet />
           <ConfirmSheetHost />
           <FlashHost />
           <StatusBarCover />

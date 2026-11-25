@@ -154,7 +154,6 @@ export function normalizeApp(raw: unknown): AppSettings {
       max: num(rr.max, d.rec.max, 0, 50),
     },
     freshDays: num(r.freshDays, d.freshDays, 1, 90),
-    switchCountdownSec: num(r.switchCountdownSec, d.switchCountdownSec, 5, 60),
     blurStrength: num(r.blurStrength, d.blurStrength, 4, 40),
     ...learnPct(r, d),
     watchReportSec: num(r.watchReportSec, d.watchReportSec, 5, 120),

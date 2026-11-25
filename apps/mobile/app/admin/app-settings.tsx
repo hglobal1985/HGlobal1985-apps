@@ -130,7 +130,6 @@ export default function AppSettingsScreen() {
       <Section title="③ 其他全站數值">
         <Card>
           {stepper("課程「新」標籤", "課程建立幾天內，分類下拉顯示「新」", app.freshDays, 1, 90, (v) => set("freshDays", v), " 天")}
-          {stepper("改播另一堂的倒數", "正在播放時又點另一堂：幾秒沒操作就自動同意改播", app.switchCountdownSec, 5, 60, (v) => set("switchCountdownSec", v))}
           {stepper("圖片「完整顯示」背景模糊", "合成封面時背景的模糊強度，數字越大越模糊（建議 12～24）", app.blurStrength, 4, 40, (v) => set("blurStrength", v), "")}
         </Card>
       </Section>

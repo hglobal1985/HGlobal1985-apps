@@ -184,6 +184,7 @@ function openMaterial(l: Lesson): boolean {
 export function ElderCourse({
   course,
   player,
+  hideCover,
   cover,
   announce,
   playingId,
@@ -203,6 +204,8 @@ export function ElderCourse({
   course: CourseDetail;
   /** 播放器（還沒播放為 null）。 */
   player: ReactNode;
+  /** 迷你播放器／小圓圖播放中：不顯示封面與封面圓球（業主 2026-11-25）。 */
+  hideCover?: boolean;
   /** 介紹頁的封面（EDM）。 */
   cover: ReactNode;
   /** 主辦中心與所屬系列的公告（介紹頁最上面；和超派模式課程頁同一條）。 */
@@ -240,7 +243,7 @@ export function ElderCourse({
     <View style={{ flex: 1 }}>
       {player}
       {/* 封面釘在上方、往下滑縮小（業主 2026-11-25：與超派模式同一個元件 CollapseBand＋CoverMiniFloat，靜態封面縮到最後是圓球）。 */}
-      {player ? null : <CollapseBand>{cover}</CollapseBand>}
+      {player || hideCover ? null : <CollapseBand>{cover}</CollapseBand>}
       <Screen header={false} footer={tab === "intro" ? action : null}>
         {/* 課程卡首頁（業主 2026-11-24：與中心卡統一）：最上面封面（含訂閱鈕、點閱數；正在播放時上方已是播放器，不再放封面）→ 公告黃色區塊 → 上課／介紹。 */}
         {announce}
@@ -327,7 +330,7 @@ export function ElderCourse({
           </>
         )}
       </Screen>
-      {miniCover && !player ? <CoverMiniFloat cover={miniCover} label={course.title} /> : null}
+      {miniCover && !player && !hideCover ? <CoverMiniFloat cover={miniCover} label={course.title} /> : null}
     </View>
   );
 }

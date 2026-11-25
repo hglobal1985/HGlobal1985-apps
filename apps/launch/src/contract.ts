@@ -1039,8 +1039,6 @@ export type AppSettings = {
   rec: RecommendRules;
   /** 課程「新」標籤：建立幾天內算新。 */
   freshDays: number;
-  /** 已有課程播放中又要播另一堂時，自動同意改播前的倒數秒數。 */
-  switchCountdownSec: number;
   /** 圖片「完整顯示」合成封面時的背景模糊強度（數字越大越模糊）。 */
   blurStrength: number;
   /** 學習紀錄：播放超過這個比例（%）就算「開始學習」（課程列入「學習中」）。 */
@@ -1084,7 +1082,6 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   tickerPauseSec: 8,
   rec: { scope: "myCenter", includeHq: true, onlyEligible: true, hideEnded: false, collapseSeries: true, order: "list", max: 0 },
   freshDays: 7,
-  switchCountdownSec: 15,
   blurStrength: 18,
   learnStartPct: 1,
   learnDonePct: 95,
