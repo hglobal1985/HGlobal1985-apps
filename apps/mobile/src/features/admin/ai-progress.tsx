@@ -5,7 +5,7 @@ import { space } from "@/theme/tokens";
 import { AppText, Card } from "@/ui";
 
 type Pack = { total: number; done: number; failed: number; pending: number; groups: { label: string; total: number; done: number; failed: number }[] };
-type Progress = { ocr: Pack; scene: Pack; ai: { capEnabled: boolean; dailyCap: number; used: number; remaining: number } };
+type Progress = { ocr: Pack; scene: Pack; photoOcr?: Pack; ai: { capEnabled: boolean; dailyCap: number; used: number; remaining: number } };
 
 function Bar({ done, total }: { done: number; total: number }) {
   const { c } = useTheme();
@@ -57,6 +57,7 @@ export function AiProgressPanel() {
       </Card>
       <PackCard title="中心 EDM 文字辨識" rule="只辨識中心 EDM；套用「欄位格式範本」，可被文字搜尋。" pack={data.ocr} />
       <PackCard title="相簿場景辨識" rule="只辨識其他相簿（例如成交百寶箱）；認出行為、場景、物品，搜尋時分類標籤＝「場景」。" pack={data.scene} />
+      <PackCard title="相簿照片文字辨識（OCR）" rule="只辨識相簿（區塊）照片；讀出照片裡的文字（招牌、白板、包裝…），相簿搜尋與場景搜尋都能用文字找到。可在「搜尋與 AI 設定」開關。" pack={data.photoOcr ?? { total: 0, done: 0, failed: 0, pending: 0, groups: [] }} />
     </View>
   );
 }
