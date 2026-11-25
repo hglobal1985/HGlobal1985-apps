@@ -192,7 +192,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         path={sharePath}
         extra={admin ? <TopBarButton label={editing ? "完成" : "編輯"} accessibilityLabel={editing ? "完成編輯系列" : "編輯系列"} iconName={editing ? "checkmark-circle-outline" : "create-outline"} onPress={() => setEditing((v) => !v)} /> : undefined}
       />
-      <Screen wide header={false} hero={<CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroFooter={<BroadcastZone series={series} title={`${shownTitle}公告`} reloadKey={bcTick} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
+      <Screen wide header={false} hero={<CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroFooter={<BroadcastZone flush series={series} title={`${shownTitle}公告`} reloadKey={bcTick} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
         {/* 系列公告緊貼封面下方（業主 2026-11-21）；課程頁、各中心頁各有自己的公告橫條。 */}
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
