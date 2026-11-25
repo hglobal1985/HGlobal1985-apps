@@ -166,6 +166,7 @@ export default function MeScreen() {
             {member.titles.includes("超級管理員") ? <ListRow icon="images-outline" title="品牌 Logo" subtitle="上傳品牌 logo、選底圖或底色，並對應分類，課程與清單卡可用它當封面" onPress={() => router.push("/admin/brand-logos")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="happy-outline" title="縮圖符號" subtitle="總覽並設定中心卡、系列卡、課程卡的小縮圖符號（emoji 或文字）與顏色" onPress={() => router.push("/admin/thumb-badges")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="albums-outline" title="清單封面底圖" subtitle="上傳「我的清單」文字封面可選的底圖，清單名稱會自動放大並加光暈" onPress={() => router.push("/admin/list-cover-bgs")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="git-compare-outline" title="搜尋關聯詞" subtitle="自訂意思相同的詞（例如：王老師 = 王儷凱），搜尋時一起找" onPress={() => router.push("/admin/synonyms")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="logo-youtube" title="同步 YouTube 清單" subtitle="貼上播放清單網址，手動按同步就把新影片匯成教材" onPress={() => router.push("/admin/youtube-syncs")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="image-outline" title="Cloudflare即時縮圖" subtitle="手機小螢幕的卡片縮圖即時縮小，設定所有縮圖選項與試算" onPress={() => router.push("/admin/thumbnails")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="cloud-outline" title="儲存空間管理" subtitle="各中心已使用的檔案容量，以及圖片、文件、音檔的佔用比例" onPress={() => router.push("/admin/storage")} /> : null}

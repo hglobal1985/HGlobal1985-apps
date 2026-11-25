@@ -6,6 +6,29 @@ export type SearchLesson = { id: string; courseId: string; position: number; tit
 export type SearchTerm = { kind: "系列" | "課程" | "主講人" | "獎銜" | "職稱" | "章節" | "日期"; text: string };
 export type SearchIndex = { haystack: Map<string, string>; /** 章節模式用：每一堂自己的搜尋文字（含所屬課程的主講人、系列、日期）。 */ lessonHay: Map<string, string>; terms: SearchTerm[] };
 
+/**
+ * 自訂關聯詞（業主 2026-11-25）：課程文字裡只要有某一組的任何一個詞，這組的其他詞也加進這門課的搜尋文字（各自獨立一段，
+ * 所以「王儷凱」打錯字也能用模糊比對找到「王老師」的課）。回傳一個把文字補上關聯詞的函式。
+ */
+export function withSynonyms(groups: string[][]): (hay: string) => string {
+  const gs = groups.map((g) => g.map((t) => t.toLowerCase()).filter(Boolean)).filter((g) => g.length >= 2);
+  if (!gs.length) return (hay) => hay;
+  return (hay) => {
+    let out = hay;
+    for (const g of gs) if (g.some((t) => hay.includes(t))) for (const t of g) if (!out.includes(t)) out += `\u0001${t}`;
+    return out;
+  };
+}
+
+/** 查詢的詞若屬於某組關聯詞，語意搜尋（AI）一起送出同組的其他詞，找得更廣。 */
+export function expandQuery(groups: string[][], q: string): string {
+  const k = q.trim().toLowerCase();
+  if (!k) return q;
+  const extra = new Set<string>();
+  for (const g of groups) if (g.some((t) => t.toLowerCase() === k)) for (const t of g) if (t.toLowerCase() !== k) extra.add(t);
+  return extra.size ? `${q.trim()} ${[...extra].join(" ")}` : q;
+}
+
 /** 2026-11-03 → 各種常見寫法，使用者打「11/3」「2026/11」「11月3日」都找得到。 */
 export function dateForms(d: string | null | undefined): string[] {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d ?? "");
@@ -19,7 +42,8 @@ export function dateForms(d: string | null | undefined): string[] {
  * 搜尋範圍：主講人（姓名、獎銜、職稱）、系列、課程名稱、章節標題、分享者、日期（課程日期與每一堂的日期）。
  * 每門課產生一串小寫文字，之後輸入的字只要被包含就算符合。
  */
-export function buildSearchIndex(courses: CourseSummary[], lessons: SearchLesson[]): SearchIndex {
+export function buildSearchIndex(courses: CourseSummary[], lessons: SearchLesson[], synonyms: string[][] = []): SearchIndex {
+  const syn = withSynonyms(synonyms);
   const byCourse = new Map<string, SearchLesson[]>();
   for (const l of lessons) byCourse.set(l.courseId, [...(byCourse.get(l.courseId) ?? []), l]);
   const terms = new Map<string, SearchTerm>();
@@ -45,14 +69,14 @@ export function buildSearchIndex(courses: CourseSummary[], lessons: SearchLesson
     }
     for (const l of byCourse.get(c.id) ?? []) {
       parts.push(l.title, l.sharer, l.sharerRankName, l.sharerTitle, ...dateForms(l.eventDate));
-      lessonHay.set(l.id, [...courseParts, l.title, l.sharer, l.sharerRankName, l.sharerTitle, ...dateForms(l.eventDate)].filter(Boolean).join("\u0001").toLowerCase());
+      lessonHay.set(l.id, syn([...courseParts, l.title, l.sharer, l.sharerRankName, l.sharerTitle, ...dateForms(l.eventDate)].filter(Boolean).join("\u0001").toLowerCase()));
       add("章節", l.title);
       add("主講人", l.sharer);
       add("獎銜", l.sharerRankName);
       add("職稱", l.sharerTitle);
       if (l.eventDate) add("日期", dateForms(l.eventDate)[0]);
     }
-    haystack.set(c.id, parts.filter(Boolean).join("\u0001").toLowerCase());
+    haystack.set(c.id, syn(parts.filter(Boolean).join("\u0001").toLowerCase()));
   }
   return { haystack, lessonHay, terms: [...terms.values()] };
 }

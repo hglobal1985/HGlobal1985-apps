@@ -7233,6 +7233,41 @@ const routes: [string, RegExp, Handler][] = [
       return { ranks: [...(await ranks(ctx.db)).values()].filter((r) => r.code !== "none").map((r) => ({ value: r.code, label: r.name })) };
     },
   ],
+  [
+    "GET",
+    /^\/search-synonyms$/,
+    async (ctx) => {
+      // 自訂關聯詞（公開，給搜尋用；業主 2026-11-25）。
+      const { results } = await ctx.db.prepare("SELECT terms FROM search_synonyms ORDER BY id").all<{ terms: string }>();
+      return { groups: results.map((r) => JSON.parse(r.terms) as string[]) };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/search-synonyms$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      const { synonymsToText } = await import("./synonyms.ts");
+      const { results } = await ctx.db.prepare("SELECT terms FROM search_synonyms ORDER BY id").all<{ terms: string }>();
+      return { text: synonymsToText(results.map((r) => JSON.parse(r.terms) as string[])) };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/search-synonyms$/,
+    async (ctx) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ text?: unknown }>(ctx.req);
+      const { parseSynonymText } = await import("./synonyms.ts");
+      const groups = parseSynonymText(typeof body.text === "string" ? body.text.slice(0, 20000) : "");
+      await ctx.db.batch([
+        ctx.db.prepare("DELETE FROM search_synonyms"),
+        ...groups.map((g) => ctx.db.prepare("INSERT INTO search_synonyms (terms) VALUES (?)").bind(JSON.stringify(g))),
+        audit(ctx.db, s.sub, "search_synonyms.save", "setting", "search_synonyms", String(groups.length)),
+      ]);
+      return { ok: true, groups: groups.length };
+    },
+  ],
   ["GET", /^\/admin\/keywords$/, async (ctx) => (requireSuperAdmin(ctx), listKeywords(ctx))],
   [
     "POST",

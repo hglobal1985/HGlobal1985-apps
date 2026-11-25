@@ -36,7 +36,8 @@ import { flashMode } from "./mode-flash";
 import { ZoneMoveSheet, zoneLabel } from "./zone-move-sheet";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
-import { buildSearchIndex, charsCourses, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
+import { useSynonyms } from "./use-synonyms";
+import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
 import { usePhonetic } from "./use-phonetic";
 import { useSemantic } from "./use-semantic";
 import { SceneHits } from "./scene-hits";
@@ -299,11 +300,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter)));
   const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
   const needIndex = wantIndex || chapterMode;
-  const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? []) : null), [needIndex, courses, searchData.data]);
+  const synonyms = useSynonyms();
+  const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? [], synonyms) : null), [needIndex, courses, searchData.data, synonyms]);
   // 打錯字也找得到（業主 2026-11-23）：完全比對沒有結果時，先用模糊比對（差 1～2 個字），再用 AI 語意搜尋找意思相近的；兩者合併顯示並標示「相近結果」。
   const exact = searchIndex ? (chapterMode ? matchLessons(searchIndex, q) : matchCourses(searchIndex, q)) : null;
   const noExact = !!exact && exact.size === 0;
-  const semantic = useSemantic(q, noExact);
+  const semantic = useSemantic(expandQuery(synonyms, q), noExact);
   const phonetic = usePhonetic(q, noExact);
   // 搜尋結果的關聯性順序（至尊模式共用 rankCourses）：同音、模糊、字元比對、AI 語意各自的順序傳給排序。
   const nearInfo = useMemo(() => {
