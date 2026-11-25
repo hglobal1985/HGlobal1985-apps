@@ -230,7 +230,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
             ) : undefined
           }
           renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} />}
-          initialNumToRender={8}
+          initialNumToRender={60} maxToRenderPerBatch={60} windowSize={21}
         />
       ) : (
         <View style={[styles.inner, pad, { flex: 1, gap: space.md, paddingBottom: space.md }]}>
