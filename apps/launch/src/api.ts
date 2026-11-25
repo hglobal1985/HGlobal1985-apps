@@ -2620,6 +2620,29 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
     .sort((a, b) => pos(a.id) - pos(b.id));
   return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out };
 }
+/** 全站 AI 辨識（文字 OCR、場景）還沒處理的張數與預估完成時間（圖片資訊「藍字」區給所有人看；業主 2026-11-26）。速度取最近 3 小時實際完成的張數。 */
+async function aiQueueInfo(db: D1Database): Promise<{ pending: number; perHour: number; etaMin: number | null; quotaOut: boolean }> {
+  const since = new Date(Date.now() - 3 * 3600_000).toISOString();
+  const [q, st, used] = await Promise.all([
+    db
+      .prepare(
+        `SELECT
+          SUM(CASE WHEN kind = 'image' AND ocr_status = '' AND ((owner_kind = 'center' AND scope = 'edm') OR owner_kind = 'course') THEN 1 ELSE 0 END) AS po,
+          SUM(CASE WHEN kind = 'image' AND owner_kind = 'course' AND scene_status = '' THEN 1 ELSE 0 END) AS ps,
+          SUM(CASE WHEN ocr_status = 'done' AND ocr_at >= ?1 THEN 1 ELSE 0 END) AS dof,
+          SUM(CASE WHEN scene_status = 'done' AND scene_at >= ?1 THEN 1 ELSE 0 END) AS dsc
+        FROM cover_media`,
+      )
+      .bind(since)
+      .first<{ po: number | null; ps: number | null; dof: number | null; dsc: number | null }>(),
+    loadAiSettings(db),
+    aiTodayUsed(db),
+  ]);
+  const pending = (q?.po ?? 0) + (q?.ps ?? 0);
+  const perHour = Math.round((((q?.dof ?? 0) + (q?.dsc ?? 0)) / 3) * 10) / 10;
+  return { pending, perHour, etaMin: pending && perHour > 0 ? Math.ceil((pending / perHour) * 60) : null, quotaOut: !!st.capEnabled && used >= st.dailyCap };
+}
+
 function coverItem(r: { id: string; scope: CoverScope; folder_id?: string | null; created_at?: string | null; uploader_name?: string | null; uploader_avatar?: string | null; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
@@ -2862,7 +2885,7 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
   // 圖片資訊面板（業主 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
   // 其他人看到同樣的面板，但 EXIF 的 GPS 位置（緯度、經度、海拔）與上傳者帳號編號會拿掉，沒權限看的課程照片也不給。
   const r = await ctx.db
-    .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.r2_key, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name, (SELECT name FROM member_profiles WHERE sub = cm.created_by) AS profile_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
+    .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.r2_key, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.scene_status, cm.scene_text, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name, (SELECT name FROM member_profiles WHERE sub = cm.created_by) AS profile_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
     .bind(id)
     .first<Record<string, string | number | null>>();
   if (!r) return fail(404, "not_found", "找不到這張照片");
@@ -2905,6 +2928,9 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
     courseId: r.course_id,
     courseTitle: r.course_title,
     ocrStatus: r.ocr_status,
+    sceneStatus: String(r.scene_status ?? ""),
+    sceneText: String(r.scene_text ?? ""),
+    queue: await aiQueueInfo(ctx.db),
     ocrModel: r.ocr_model,
     ocrAt: r.ocr_at,
     eventDate: r.event_date,
@@ -4721,33 +4747,6 @@ const routes: [string, RegExp, Handler][] = [
       } else await saveJob(ctx.db, { running: false, startedAt: cur.startedAt, stoppedAt: new Date().toISOString() });
       await audit(ctx.db, s.sub, `recompress.${action}`, "cover_media", "all").run();
       return recompressStatus(ctx.db);
-    },
-  ],
-  [
-    "POST",
-    /^\/admin\/cover-media\/([\w-]{1,40})\/recompress$/,
-    async (ctx, [id]) => {
-      // 依「相簿」目前的存檔格式與畫質，重新壓縮這一張照片（業主 2026-11-25，超級管理員；調整設定後用來測試畫質）。
-      // 來源是 R2 裡目前存的這一份（站內不保留原圖），所以是「再壓一次」：畫質會比直接拿原圖壓差一點；要最準確的比較請重新上傳原圖。
-      const s = requireSuperAdmin(ctx);
-      const row = await ctx.db.prepare("SELECT id, kind, r2_key, bytes FROM cover_media WHERE id = ?").bind(id).first<{ id: string; kind: string; r2_key: string; bytes: number }>();
-      if (!row || row.kind !== "image") return fail(404, "not_found", "找不到這張照片");
-      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
-      const obj = await bucket.get(row.r2_key);
-      if (!obj) return fail(404, "not_found", "找不到這張照片的檔案");
-      const type = obj.httpMetadata?.contentType ?? "image/jpeg";
-      const before = await bucket.head(row.r2_key);
-      const app = (await loadConfig(ctx.db)).app;
-      const shrunk = await shrinkImage(ctx.env, await new Response(obj.body).arrayBuffer(), type, "center", false, { format: app.albumFormat, quality: app.albumQuality });
-      if (shrunk.type === type && shrunk.size >= (before?.size ?? row.bytes)) return { changed: false, before: before?.size ?? row.bytes, after: before?.size ?? row.bytes, format: type, message: "再壓一次沒有變得更小，維持原樣" };
-      const key = `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${renameForType("x.jpg", shrunk.type).split(".").pop()}`;
-      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
-      await ctx.db.prepare("UPDATE cover_media SET r2_key = ?, bytes = ? WHERE id = ?").bind(key, shrunk.size, id).run();
-      // 舊檔沒有別的資料列在用才刪（同一個檔可能被其他資料列共用）。
-      const shared = await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? LIMIT 1").bind(row.r2_key).first();
-      if (!shared) await bucket.delete(row.r2_key).catch(() => undefined);
-      await audit(ctx.db, s.sub, "album.recompress", "cover_media", id, `${before?.size ?? row.bytes}->${shrunk.size} ${shrunk.type}`).run();
-      return { changed: true, before: before?.size ?? row.bytes, after: shrunk.size, format: shrunk.type };
     },
   ],
   [
