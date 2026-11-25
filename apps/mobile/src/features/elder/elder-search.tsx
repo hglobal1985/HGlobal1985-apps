@@ -28,6 +28,7 @@ import type { ChapterItem } from "@/features/courses/chapter-list";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
+import { onHomeReset } from "@/lib/home-reset";
 import { markFromSearch, useRememberedQuery } from "@/lib/search-memory";
 import { listable, useSearchEngine } from "@/features/search/use-search-engine";
 import { useVoice } from "./use-voice";
@@ -74,6 +75,19 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const eng = useSearchEngine(q, courses.data ?? []);
   const { key, all, chapters, semantic, phonetic } = eng;
   const itemsOf = useZoneItems(all);
+  // 已經在首頁再按一次底部「首頁」＝清掉搜尋字與語音、回到預設畫面（業主 2026-11-25）。
+  useEffect(
+    () =>
+      onHomeReset(() => {
+        if (mode !== "home") return;
+        voice.stop();
+        setQ("");
+        setHeard(null);
+        setZone(null);
+        setSub(null);
+      }),
+    [mode], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   // 從搜尋結果點「中心卡」會帶 ?center=中心名稱 來到課程分頁：直接打開該中心頁（業主 2026-11-25）。
   const { center: centerParam } = useLocalSearchParams<{ center?: string }>();
   const openedCenter = useRef("");

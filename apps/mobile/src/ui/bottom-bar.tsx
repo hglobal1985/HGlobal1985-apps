@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { Animated, Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { requestCoursesReset } from "@/lib/courses-reset";
+import { requestHomeReset } from "@/lib/home-reset";
 import { LIB, useLibraryMode } from "@/lib/library-mode";
 import { runGuarded } from "@/lib/unsaved-guard";
 import { getBottomGap, onBottomGap } from "@/lib/bottom-gap";
@@ -167,6 +168,8 @@ export function BottomBar() {
               } else router.navigate((lastCoursesHref ?? t.href) as Href);
               return;
             }
+            // 已經在首頁再按一次首頁＝清掉首頁狀態、回到預設值（業主 2026-11-25）。
+            if (t.title === "首頁" && t.match(pathname)) requestHomeReset();
             router.navigate(t.href);
           })}>
             <View style={[styles.cell, elder && styles.cellElder, on && { backgroundColor: c.navPill }]}>
