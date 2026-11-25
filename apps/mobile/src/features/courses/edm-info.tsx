@@ -1,7 +1,10 @@
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { useApi } from "@/state/session";
+import { api } from "@/api/client";
+import { confirmAsk } from "@/features/confirm";
+import { isSuperAdmin } from "@/lib/roles";
+import { useApi, useSession } from "@/state/session";
 import { flashText } from "@/ui/flash-notice";
 import { space } from "@/theme/tokens";
 
@@ -81,6 +84,23 @@ const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "bo
 export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string; /** 沒有相簿照片編號時，用圖片網址裡的儲存檔名查（課程封面、品牌 logo、課表…）。 */ imageKey?: string; top?: number; onClose: () => void }) {
   const r = useApi<MediaInfo>(id ? `/cover-media/${id}/info` : `/image-info?k=${encodeURIComponent(imageKey ?? "")}`);
   const info = r.data;
+  const { member } = useSession();
+  const [busy, setBusy] = useState(false);
+  // 超級管理員：依「相簿」目前的存檔格式與畫質重新壓縮這一張（測試畫質用；業主 2026-11-25）。
+  const recompress = async () => {
+    if (!id || busy) return;
+    if (!(await confirmAsk("重新壓縮這張照片", "會依「設定 › 儲存空間管理 › 相簿照片」目前的格式與畫質，把這張照片再壓一次並取代原檔。站內不保留原圖，所以是從現在這一份再壓縮，畫質會比直接用原圖壓差一點。要精準比較請重新上傳原圖。", "重新壓縮"))) return;
+    setBusy(true);
+    try {
+      const x = await api<{ changed: boolean; before: number; after: number; format: string; message?: string }>("POST", `/admin/cover-media/${id}/recompress`);
+      flashText(x.changed ? `已壓縮：${size(x.before)} → ${size(x.after)}（${x.format.replace("image/", "").toUpperCase()}）` : (x.message ?? "沒有變更"));
+      r.reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const [showRaw, setShowRaw] = useState(false);
   // 每個區塊預設收起，點標題才展開（業主 2026-11-25）。
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -129,7 +149,13 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
       {info?.stored ? (
         <View style={styles.fmt}>
           <Ionicons name="server-outline" size={18} color="#9fd8ff" />
-          <Text style={styles.fmtText}>{`R2 儲存格式：${storedFormat(info.stored)}　${size(info.stored.bytes)}`}</Text>
+          <Text style={[styles.fmtText, { flex: 1 }]}>{`R2 儲存格式：${storedFormat(info.stored)}　${size(info.stored.bytes)}`}</Text>
+          {id && info.kind === "image" && isSuperAdmin(member) ? (
+            <Pressable accessibilityRole="button" accessibilityLabel="依相簿設定重新壓縮這張照片" disabled={busy} onPress={() => void recompress()} style={[styles.btn, { minHeight: 36, paddingHorizontal: 12, opacity: busy ? 0.5 : 1 }]}>
+              <Ionicons name="contract-outline" size={16} color="#fff" />
+              <Text style={styles.btnText}>{busy ? "壓縮中…" : "重新壓縮"}</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: space.md, gap: space.md }} showsVerticalScrollIndicator>
