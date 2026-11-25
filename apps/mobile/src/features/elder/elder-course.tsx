@@ -3,7 +3,7 @@ import { useBorderW } from "@/lib/elder-mode";
 import { useEffect, useState, type ReactNode } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
-import { centerTitle, eventDays } from "@/features/format";
+import { centerTitle, eventDays, minutesText } from "@/features/format";
 import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
 import { trackFeature } from "@/lib/feature-track";
 import { flashText } from "@/ui/flash-notice";
@@ -311,7 +311,7 @@ export function ElderCourse({
             <AppText variant="title" accessibilityRole="header">{course.title}</AppText>
             <View style={[styles.info, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw }]}>
               {teacher ? <InfoLine icon="person" text={`主講：${teacher}`} /> : null}
-              {items.length ? <InfoLine icon="list" text={`${items.length} ${word}${course.totalMinutes ? `・約 ${Math.round(course.totalMinutes)} 分鐘` : ""}`} /> : null}
+              {items.length ? <InfoLine icon="list" text={`${items.length} ${word}${course.totalMinutes ? `・約 ${minutesText(Math.round(course.totalMinutes))}` : ""}`} /> : null}
               {date ? <InfoLine icon="calendar" text={date} /> : null}
               {!course.isList && !course.locationNone && (course.isOnline || course.location) ? <InfoLine icon="location" text={course.isOnline ? "線上課程" : course.location} /> : null}
               {course.hostCenter ? <InfoLine icon="business" text={centerTitle(course.hostCenter)} /> : null}

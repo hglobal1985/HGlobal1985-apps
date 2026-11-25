@@ -89,7 +89,14 @@ export function centerShort(label: string): string {
 }
 
 /** 章節長度：「12分鐘」（超過 60 分鐘也一樣用分鐘，不顯示「小時」、不加「約」；沒有長度回空字串。業主 2026-11-16）。 */
-export const minutesText = (m: number | null | undefined): string => (m && m > 0 ? `${m}分鐘` : "");
+/** 影片長度文字：60 分鐘以內「N分鐘」，超過 60 分鐘「X小時Y分鐘」（整點只寫「X小時」；業主 2026-11-25）。 */
+export const minutesText = (m: number | null | undefined): string => {
+  if (!m || m <= 0) return "";
+  if (m <= 60) return `${m}分鐘`;
+  const h = Math.floor(m / 60);
+  const r = Math.round(m % 60);
+  return r ? `${h}小時${r}分鐘` : `${h}小時`;
+};
 
 /** 章節的分享者顯示：「李講師﹒白金﹒經理」（姓名、獎銜、職稱用「﹒」連接，不加「分享者：」標題；沒填的略過；三者都沒填回空字串。業主 2026-11-16 全站統一）。 */
 export function sharerLine(l: { sharer: string; sharerRankName: string; sharerTitle: string }): string {

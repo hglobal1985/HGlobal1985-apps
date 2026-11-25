@@ -492,7 +492,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       </View>
       {chapterMode ? <UnitFilter value={unitFilter} onChange={pickUnitFilter} /> : null}
       {termsBox}
-      {sceneBox}
     </View>
   ) : (
     <View>
@@ -515,7 +514,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     </View>
     {chapterMode ? <UnitFilter value={unitFilter} onChange={pickUnitFilter} /> : null}
     {termsBox}
-    {sceneBox}
     </View>
   );
   // 中心專屬頁：網頁進入時多記一筆瀏覽紀錄，瀏覽器／手機的「返回」＝回到中心清單；Android 實體返回鍵同理。
@@ -642,8 +640,10 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         // 有搜尋字＝一律顯示引擎的「單元」清單（業主 2026-11-25：以超派原本的搜尋結果為準，至尊與它一致）。
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
-          {data && (eng.searching ? !eng.chapters.length : searchData.data && !chapterItems.length) ? <EmptyState icon="library-outline" title={eng.loading ? "正在找相近的結果…" : q.trim() ? (eng.extras.length ? "沒有符合的章節，請看上方其他項目" : "找不到符合的章節") : "沒有符合條件的章節"} /> : null}
+          {data && (eng.searching ? !eng.chapters.length : searchData.data && !chapterItems.length) ? <EmptyState icon="library-outline" title={eng.loading ? "正在找相近的結果…" : q.trim() ? (eng.extras.length ? "沒有符合的章節，請看下方其他項目" : "找不到符合的章節") : "沒有符合條件的章節"} /> : null}
           <ChapterList items={eng.searching ? eng.chapters : chapterItems} />
+          {/* 其他項目（場景相片、EDM…）接在單元結果的最後面，同一個捲動區（業主 2026-11-25：放在上方會變成兩個區塊、無法下拉）。 */}
+          {sceneBox}
         </>
       ) : (
         <>
@@ -652,7 +652,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               // 中心頁完全沒有課程：固定提示文字（地址由中心的編輯面板設定；沒設定就不顯示地址那一行）
               <EmptyState icon="library-outline" title="線上課程準備中" body={["線下課程週週精彩", centerInfo.data?.[normCenter(center)] ? `地址：${centerInfo.data[normCenter(center)]}` : "", "請洽中心負責人"].filter(Boolean).join("\n")} />
             ) : (
-              <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : matched ? (semantic.extras.length ? "沒有相近的教材卡，請看上方其他項目" : "找不到符合的課程") : "沒有符合條件的課程"} />
+              <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : matched ? (semantic.extras.length ? "沒有相近的教材卡，請看下方其他項目" : "找不到符合的課程") : "沒有符合條件的課程"} />
             )
           ) : null}
           {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (
