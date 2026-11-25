@@ -161,17 +161,17 @@ export default function StorageScreen() {
             ① 中心封面照片（中心首頁圖）
           </AppText>
           <Stepper label="長邊像素" hint="中心封面要特別清楚，建議比一般高（預設 2048）" value={lim.centerMaxSide} min={800} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, centerMaxSide: v }))} />
-          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 95）" value={lim.centerQuality} min={70} max={100} step={1} unit="%" onChange={(v) => setLim((x) => ({ ...x, centerQuality: v }))} />
+          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 95）" value={lim.centerQuality} min={30} max={100} step={1} unit="%" onChange={(v) => setLim((x) => ({ ...x, centerQuality: v }))} />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             ② 一般（課程、系列、區塊封面與上傳的圖片）
           </AppText>
           <Stepper label="長邊像素" hint="上傳的圖片長邊縮到這個像素以內（預設 1024）" value={lim.imageMaxSide} min={400} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, imageMaxSide: v }))} />
-          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 88）" value={lim.imageQuality} min={50} max={100} step={2} unit="%" onChange={(v) => setLim((x) => ({ ...x, imageQuality: v }))} />
+          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 88）" value={lim.imageQuality} min={30} max={100} step={2} unit="%" onChange={(v) => setLim((x) => ({ ...x, imageQuality: v }))} />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             ③ EDM 海報（課程、系列的直式海報原圖）
           </AppText>
           <Stepper label="長邊像素" hint="海報上有小字與 QR code，建議維持高一點（預設 2048）" value={lim.edmMaxSide} min={800} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, edmMaxSide: v }))} />
-          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 90）" value={lim.edmQuality} min={70} max={100} step={1} unit="%" onChange={(v) => setLim((x) => ({ ...x, edmQuality: v }))} />
+          <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 90）" value={lim.edmQuality} min={30} max={100} step={1} unit="%" onChange={(v) => setLim((x) => ({ ...x, edmQuality: v }))} />
           {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
           <Button label="儲存上傳設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={saveLim} fullWidth />
         </Card>

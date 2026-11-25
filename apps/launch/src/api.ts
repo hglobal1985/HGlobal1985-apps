@@ -269,6 +269,20 @@ function requireAdmin(ctx: Ctx): Session {
 
 const demoEnabled = (env: Env) => env.DEMO_LOGIN === "on";
 
+/** 會員最新暱稱與頭像（migration 0135 member_profiles）：登入使用時只有「變動」才寫入，相簿上傳者標記永遠顯示最新版本（業主 2026-11-25）。 */
+const profMemo = new Map<string, string>();
+async function touchProfile(db: D1Database, sub: string, name: string, avatar: string | null): Promise<void> {
+  if (!name || name === "會員") return;
+  const sig = `${name}|${avatar ?? ""}`;
+  if (profMemo.get(sub) === sig) return;
+  profMemo.set(sub, sig);
+  await db
+    .prepare("INSERT INTO member_profiles (sub, name, avatar, updated_at) VALUES (?1, ?2, ?3, datetime('now')) ON CONFLICT(sub) DO UPDATE SET name = ?2, avatar = ?3, updated_at = datetime('now') WHERE name <> ?2 OR avatar <> ?3")
+    .bind(sub, name.slice(0, 60), (avatar ?? "").slice(0, 500))
+    .run()
+    .catch(() => void profMemo.delete(sub));
+}
+
 async function loadSession(env: Env, req: Request, warmAmway = false, light = false): Promise<Session | null> {
   const db = env.DB;
   const auth = req.headers.get("authorization") ?? "";
@@ -283,6 +297,7 @@ async function loadSession(env: Env, req: Request, warmAmway = false, light = fa
     const [prof, superAdmin, mc] = await Promise.all([profileSummary(sub, jwt).catch(() => ({ name: "會員", avatarUrl: null })), isAdmin(sub, jwt, env.LEARN_ADMIN_SUBS), memberContext(sub, jwt), warmAmway ? amwayMe(sub, jwt).catch(() => undefined) : undefined]);
     // 管理員（可管理課程、審核全部報名）＝超級管理員、總部秘書，或 LEARN_ADMIN_SUBS 指定的會員。
     const admin = superAdmin || mc.roles.includes("super_admin") || mc.roles.includes("secretary");
+    await touchProfile(db, sub, prof.name, prof.avatarUrl);
     return { kind: "central", sub, name: prof.name, avatarUrl: prof.avatarUrl, role: admin ? "admin" : "student", token: jwt, roles: mc.roles, hglobal: mc.hglobal, center: mc.center };
   }
   if (!demoEnabled(env)) return null;
@@ -1138,7 +1153,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const photoKeys = [...new Set(photoKeyOf.values())];
   if (photoKeys.length) {
     const { results } = await ctx.db
-      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec, scene_text, ocr_text, uploader_name, uploader_avatar FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
+      .prepare(`SELECT cm.id, cm.owner_key, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, COALESCE(NULLIF(mp.name, ''), cm.uploader_name) AS uploader_name, COALESCE(NULLIF(mp.avatar, ''), cm.uploader_avatar) AS uploader_avatar FROM cover_media cm LEFT JOIN member_profiles mp ON mp.sub = cm.created_by WHERE cm.owner_kind = 'course' AND cm.scope = 'cover' AND cm.owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY cm.owner_key, cm.position`)
       .bind(...photoKeys)
       .all<{ id: string; owner_key: string; scene_text: string; ocr_text: string; uploader_name: string | null; uploader_avatar: string | null; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
     for (const r of results) photosOf.set(r.owner_key, [...(photosOf.get(r.owner_key) ?? []), coverItem(r)]);
@@ -2626,7 +2641,7 @@ const coverScopeOf = (kind: CoverMediaKind, v: unknown): CoverScope => (kind !==
 async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, scope?: CoverScope): Promise<CoverMediaItem[]> {
   const where = (kind === "center" ? "cm.owner_kind = 'center' AND cm.center_key = ?" : "cm.owner_kind = ? AND cm.owner_key = ?") + (scope ? " AND cm.scope = ?" : "");
   // 課程 EDM（綁定課程的照片）不受 100 張上限限制，所以讀取上限放寬。
-  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, cm.ocr_text, cm.event_date, cm.created_at, cm.uploader_name, cm.uploader_avatar, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, cm.position, CASE WHEN cm.scope = 'edm' THEN cm.event_date IS NULL ELSE 0 END, CASE WHEN cm.scope = 'edm' THEN cm.event_date END DESC, cm.created_at, cm.rowid LIMIT 2000`);
+  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, cm.ocr_text, cm.event_date, cm.created_at, COALESCE(NULLIF(mp.name, ''), cm.uploader_name) AS uploader_name, COALESCE(NULLIF(mp.avatar, ''), cm.uploader_avatar) AS uploader_avatar, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id LEFT JOIN member_profiles mp ON mp.sub = cm.created_by WHERE ${where} ORDER BY cm.scope, cm.position, CASE WHEN cm.scope = 'edm' THEN cm.event_date IS NULL ELSE 0 END, CASE WHEN cm.scope = 'edm' THEN cm.event_date END DESC, cm.created_at, cm.rowid LIMIT 2000`);
   const args = [...(kind === "center" ? [lookup] : [kind, lookup]), ...(scope ? [scope] : [])];
   const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; created_at: string | null; uploader_name: string | null; uploader_avatar: string | null; ocr_text: string | null; event_date: string | null; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
   return results.map(coverItem);
@@ -2788,7 +2803,7 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
   // 圖片資訊面板（業主 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
   // 其他人看到同樣的面板，但 EXIF 的 GPS 位置（緯度、經度、海拔）與上傳者帳號編號會拿掉，沒權限看的課程照片也不給。
   const r = await ctx.db
-    .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.r2_key, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
+    .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.r2_key, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name, (SELECT name FROM member_profiles WHERE sub = cm.created_by) AS profile_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
     .bind(id)
     .first<Record<string, string | number | null>>();
   if (!r) return fail(404, "not_found", "找不到這張照片");
@@ -2825,7 +2840,7 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
     position: r.position,
     ownerKind: r.owner_kind,
     ownerKey: r.owner_kind === "center" ? r.center_key : r.owner_key,
-    uploader: system ? (byRaw === "course-edm" ? "系統（由課程 EDM 自動併入）" : "系統（舊資料搬移）") : String(r.uploader_name || r.session_name || ""),
+    uploader: system ? (byRaw === "course-edm" ? "系統（由課程 EDM 自動併入）" : "系統（舊資料搬移）") : String(r.profile_name || r.uploader_name || r.session_name || ""),
     uploaderSub: system || !manager ? "" : byRaw,
     uploadedAt: r.created_at,
     courseId: r.course_id,
@@ -4435,7 +4450,7 @@ const routes: [string, RegExp, Handler][] = [
       const args = f.kind === "center" ? [id.split(":").slice(1, -1).join(":"), f.scope ?? "edm"] : [f.key];
       const [tot, up, big, hot, perms] = await Promise.all([
         ctx.db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS bytes, MAX(created_at) AS last FROM cover_media WHERE ${where}`).bind(...args).first<{ n: number; bytes: number; last: string | null }>(),
-        ctx.db.prepare(`SELECT COALESCE(NULLIF(uploader_name, ''), '（不明）') AS name, COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS bytes FROM cover_media WHERE ${where} GROUP BY created_by, uploader_name ORDER BY n DESC, bytes DESC LIMIT 30`).bind(...args).all<{ name: string; n: number; bytes: number }>(),
+        ctx.db.prepare(`SELECT COALESCE(NULLIF((SELECT name FROM member_profiles WHERE sub = cm.created_by), ''), NULLIF(MAX(cm.uploader_name), ''), '（不明）') AS name, COUNT(*) AS n, COALESCE(SUM(cm.bytes), 0) AS bytes FROM cover_media cm WHERE ${where} GROUP BY cm.created_by ORDER BY n DESC, bytes DESC LIMIT 30`).bind(...args).all<{ name: string; n: number; bytes: number }>(),
         ctx.db.prepare(`SELECT id, r2_key, bytes FROM cover_media WHERE ${where} AND kind = 'image' ORDER BY bytes DESC LIMIT 10`).bind(...args).all<{ id: string; r2_key: string; bytes: number }>(),
         ctx.db.prepare(`SELECT id, r2_key, views FROM cover_media WHERE ${where} AND kind = 'image' ORDER BY views DESC, created_at DESC LIMIT 10`).bind(...args).all<{ id: string; r2_key: string; views: number }>(),
         albumPermMap(ctx.db),
@@ -4490,7 +4505,7 @@ const routes: [string, RegExp, Handler][] = [
       if (!tokens.length || tokens.join("").length < 2) return { items: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
       const { results } = await ctx.db
-        .prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, cm.event_date, cm.uploader_name, cm.uploader_avatar, cm.owner_kind, cm.center_key, cm.owner_key FROM cover_media cm WHERE cm.kind = 'image' AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text || ' ' || COALESCE(cm.event_date, '')) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 400`)
+        .prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, cm.event_date, COALESCE(NULLIF(mp.name, ''), cm.uploader_name) AS uploader_name, COALESCE(NULLIF(mp.avatar, ''), cm.uploader_avatar) AS uploader_avatar, cm.owner_kind, cm.center_key, cm.owner_key FROM cover_media cm LEFT JOIN member_profiles mp ON mp.sub = cm.created_by WHERE cm.kind = 'image' AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text || ' ' || COALESCE(cm.event_date, '')) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 400`)
         .bind(...tokens.map(like))
         .all<{ id: string; scope: CoverScope; kind: "image"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number; scene_text: string; ocr_text: string; event_date: string | null; uploader_name: string | null; uploader_avatar: string | null; owner_kind: string; center_key: string | null; owner_key: string }>();
       const folders = new Map((await albumsIndex(ctx)).groups.flatMap((g) => g.folders).map((f) => [f.id, f]));
