@@ -18,7 +18,7 @@ const NO_SELECT = Platform.OS === "web" ? ({ userSelect: "none", WebkitUserSelec
  * 全螢幕看圖的「檢視全部」（業主 2026-11-25）：一格一張縮圖。
  * 點一下＝回到單張看那一張；長按一張＝進入複選（之後點一下就是勾選／取消），可全選、下載、分享給其他 App。
  */
-export function LightboxGrid({ list, current, onPick, onClose, heading, extra, embedded = false, onPrev, onNext }: { /** 嵌在相簿資料夾檢視裡（不蓋滿畫面、不自帶黑底）：左邊是返回鈕、右邊是上一個／下一個資料夾（業主 2026-11-25）。 */ embedded?: boolean; onPrev?: () => void; onNext?: () => void; list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
+export function LightboxGrid({ list, current, onPick, onClose, heading, extra, embedded = false }: { /** 嵌在相簿資料夾檢視裡（不蓋滿畫面、不自帶黑底）：左邊是返回鈕（業主 2026-11-25）。 */ embedded?: boolean; list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
   const thumb = useThumb();
   const win = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -73,12 +73,7 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, e
             {btn("分享", () => void run(() => shareImages(name, urls()), "分享失敗，請稍後再試"), <ShareIcon size={24} color="#fff" uiOnly />, !picked.length || busy)}
             {btn("取消複選", () => setSel(null), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
           </>
-        ) : embedded ? (
-          <>
-            {onPrev ? btn("上一個資料夾", onPrev, <Ionicons name="arrow-back" size={22} color="#fff" {...UI_ONLY} />) : null}
-            {onNext ? btn("下一個資料夾", onNext, <Ionicons name="arrow-forward" size={22} color="#fff" {...UI_ONLY} />) : null}
-          </>
-        ) : (
+        ) : embedded ? null : (
           btn("回到單張檢視", onClose, <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)
         )}
       </View>

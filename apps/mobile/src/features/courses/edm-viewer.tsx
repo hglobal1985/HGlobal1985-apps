@@ -163,11 +163,35 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
     setHideHelp(hide);
   };
   useDimLayer();
-  useBackToClose(onClose); // 瀏覽器／手機「上一頁」＝直接關閉這個全螢幕視窗（業主 2026-11-24）
+  // 「關閉」的行為（業主 2026-11-25）：從相簿資料夾打開某張照片時，按 ✕／返回＝退回相簿資料夾畫面，不是退出全螢幕；
+  // 從課程教材中心等一般入口打開的照片，按 ✕ 才是退出全螢幕。
+  const closeNow = useRef<() => void>(onClose);
+  useBackToClose(() => closeNow.current()); // 瀏覽器／手機「上一頁」同 ✕（業主 2026-11-24）
   const [infoOpen, setInfoOpen] = useState(false);
   const [grid, setGrid] = useState(false); // 「檢視全部」格狀畫面（業主 2026-11-25）
   const [libOpen, setLibOpen] = useState(library); // 「相簿」資料夾檢視（業主 2026-11-25）
   const [over, setOver] = useState<{ title: string; items: LightboxItem[]; folder: LibraryPick["folder"] } | null>(null); // 從相簿選了資料夾：整個看圖換成這個資料夾的照片
+  closeNow.current = () => (over && !libOpen ? setLibOpen(true) : onClose());
+  // 全螢幕被系統收起（例如管理員按「上傳照片」開檔案選擇視窗）：下一次點一下畫面就自動再進全螢幕，停留在相簿裡操作（業主 2026-11-25）。
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    let lost = false;
+    const onFs = () => {
+      if (!document.fullscreenElement) lost = true;
+    };
+    const onTap = () => {
+      if (lost) {
+        lost = false;
+        enterFullscreen();
+      }
+    };
+    document.addEventListener("fullscreenchange", onFs);
+    window.addEventListener("pointerdown", onTap, true);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFs);
+      window.removeEventListener("pointerdown", onTap, true);
+    };
+  }, []);
   const gridRef = useRef(false);
   gridRef.current = grid;
   const insets = useSafeAreaInsets();
@@ -275,11 +299,11 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") goRef.current(-1);
       else if (e.key === "ArrowRight") goRef.current(1);
-      else if (e.key === "Escape") (gridRef.current ? setGrid(false) : onClose());
+      else if (e.key === "Escape") (gridRef.current ? setGrid(false) : closeNow.current());
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
   const share = async () => {
     const r = await shareImage(cur.title, cur.uri, `${cur.title}.jpg`);
@@ -318,9 +342,9 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   })();
   const canInfo = !!cur.id || !!imageKey;
   return (
-    <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal transparent animationType="fade" onRequestClose={() => closeNow.current()} statusBarTranslucent>
       <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="關閉" />
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => closeNow.current()} accessibilityLabel="關閉" />
         {/* 整個螢幕都是手勢範圍：放大後可拖曳到螢幕的任何位置，不會被圖片原本的外框切掉。 */}
         <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", overflow: "hidden" }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab" } as object) : null]} {...pan.panHandlers} {...wheel} {...NO_PULL}>
           {list.length ? <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, backgroundColor: imgBg ?? "#fff", transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors /> : null}
@@ -346,7 +370,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
                 {list.length && canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
                 {list.length ? tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
                 {list.length ? tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />) : null}
-                {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
+                {tool("關閉", () => closeNow.current(), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
               </View>
               {/* 第幾張、共幾張：獨立標籤，放在「關閉」鈕正下方（業主 2026-11-21）。 */}
               {many ? (
@@ -368,7 +392,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
             ) : null}
           </View>
           {grid && list.length ? <LightboxGrid list={list} current={idx} heading={over?.title} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
-          {libOpen ? <LightboxLibrary initial={over?.folder ? { folder: over.folder, items: [] } : null} onClose={() => (list.length ? setLibOpen(false) : onClose())} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => ({ uri: x.url, title: p.title, id: x.id })) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
+          {libOpen ? <LightboxLibrary initial={over?.folder ? { folder: over.folder, items: [] } : null} onClose={() => (over || library || !list.length ? onClose() : setLibOpen(false))} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => ({ uri: x.url, title: p.title, id: x.id })) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
           {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>
