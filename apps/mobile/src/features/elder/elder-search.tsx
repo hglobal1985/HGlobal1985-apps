@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Image, ScrollView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -77,11 +77,15 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   // 完全比對 → 模糊比對＋字元比對 → AI 語意搜尋（完全比對沒結果時才送出，合併顯示）。
   // 語音辨識有時會在句中加標點（「線上，白金」）：比對前一律換成空白。
   const key = useMemo(() => q.replace(/[。．.！!？?，,、；;：:「」“”"'（）()]+/g, " ").trim(), [q]);
-  const exact = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
-  const noExact = !!exact && exact.size === 0;
+  const exactRaw = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
   const searchSt = useSearchSettings();
-  const semantic = useSemantic(expandQuery(synonyms, key), noExact && searchSt.semanticEnabled);
-  const phonetic = usePhonetic(key, noExact && searchSt.phoneticEnabled);
+  // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：語意搜尋每次都跑（查詢字原樣送出，不加關聯詞）；開著而且有結果（或還在找）就**只顯示它的結果**，
+  // 字面、同音、模糊、字元比對都不混進來；語意沒結果才退回它們（語音辨識錯字仍找得到）。
+  const semantic = useSemantic(key, searchSt.semanticEnabled);
+  const semOnly = searchSt.semanticEnabled && !!key && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
+  const exact = semOnly && exactRaw ? new Set<string>() : exactRaw;
+  const noExact = !!exact && exact.size === 0;
+  const phonetic = usePhonetic(key, noExact && !semOnly && searchSt.phoneticEnabled);
   // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
   const results = useMemo(() => {
     if (!key) return [];
@@ -90,9 +94,6 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     let ids: Set<string> = exact ?? new Set();
     let near: Parameters<typeof rankCourses>[3] = {};
     if (!ids.size) {
-      // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：AI 語意搜尋開著而且有結果（或還在找）時，只顯示語意搜尋的結果；
-      // 沒結果才退回同音、模糊、字元比對（語音辨識錯字仍找得到）。
-      const semOnly = searchSt.semanticEnabled && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
       const fuzzy = semOnly ? new Set<string>() : fuzzyCourses(index, key);
       const chars = semOnly ? new Set<string>() : charsCourses(index, key);
       const phon = semOnly ? [] : [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
@@ -101,7 +102,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       near = { phonetic: phon, semantic: sem, fuzzy, chars };
     }
     return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
-  }, [key, index, all, exact, semantic.courses, semantic.lessons, semantic.extras, semantic.loading, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
+  }, [key, index, all, exact, semantic.courses, semantic.lessons, semOnly, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
   // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
     if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x, tag: "教材卡" }));
@@ -198,6 +199,18 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   // 進入「系列」之後（業主 2026-11-24：與中心卡統一）：上方封面＋訂閱＋點閱、公告，標題區右上角邀請。
   const seriesName = inZone && !centerPage && sub?.series ? sub.rep.series || null : null;
   const listMode = !body && !(!searching && mode === "home");
+  const listHeader: ReactNode = seriesName ? (
+              <ElderSeriesHead key={seriesName} series={seriesName} title={sub!.title} />
+            ) : mode === "browse" && !searching && !zone ? (
+              <View style={{ gap: space.md }}>
+                {ELDER_ZONES.map((z) => (
+                  <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
+                ))}
+              </View>
+            ) : undefined;
+  const listFooter: ReactNode = key ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).below} big /> : undefined;
+  const renderRow = (item: Row) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />;
+
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
       {/* 課程分頁不再有搜尋框（業主 2026-11-24：移除置頂搜尋）；搜尋只在首頁。 */}
@@ -234,6 +247,14 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           />
         </ScrollView>
       ) : listMode ? (
+        // 網頁：不用會即時增減畫面項目的 FlatList，改成一般捲動清單（業主 2026-11-25：手機系統的長截圖拼接要整頁內容穩定；結果最多幾十筆，不需要虛擬化）。
+        Platform.OS === "web" ? (
+          <ScrollView style={styles.fill} contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+            {listHeader}
+            {rows.map((item) => renderRow(item))}
+            {listFooter}
+          </ScrollView>
+        ) : (
         <FlatList
           style={styles.fill}
           contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]}
@@ -241,21 +262,12 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           keyExtractor={(x) => x.key}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          ListHeaderComponent={
-            seriesName ? (
-              <ElderSeriesHead key={seriesName} series={seriesName} title={sub!.title} />
-            ) : mode === "browse" && !searching && !zone ? (
-              <View style={{ gap: space.md }}>
-                {ELDER_ZONES.map((z) => (
-                  <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
-                ))}
-              </View>
-            ) : undefined
-          }
-          ListFooterComponent={key ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).below} big /> : undefined}
-          renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={listFooter}
+          renderItem={({ item }) => renderRow(item)}
           initialNumToRender={60} maxToRenderPerBatch={60} windowSize={21}
         />
+        )
       ) : (
         <View style={[styles.inner, pad, { flex: 1, gap: space.md, paddingBottom: space.md }]}>
           {body}

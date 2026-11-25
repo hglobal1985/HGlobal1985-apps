@@ -27,5 +27,5 @@ export function useSemantic(q: string, enabled: boolean): { courses: Set<string>
     return () => clearTimeout(t);
   }, [text, enabled]);
   const ok = enabled && res?.q === text;
-  return { courses: new Set(ok ? res!.courses : []), lessons: new Set(ok ? res!.lessons : []), extras: ok ? res!.extras : [], coursePrio: ok ? res!.coursePrio : 9, loading: enabled && loading };
+  return { courses: new Set(ok ? res!.courses : []), lessons: new Set(ok ? res!.lessons : []), extras: ok ? res!.extras : [], coursePrio: ok ? res!.coursePrio : 9, loading: enabled && (loading || (text.length >= 2 && res?.q !== text)) };
 }

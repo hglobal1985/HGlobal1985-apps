@@ -15,7 +15,8 @@ export function withSynonyms(groups: string[][]): (hay: string) => string {
   if (!gs.length) return (hay) => hay;
   return (hay) => {
     let out = hay;
-    for (const g of gs) if (g.some((t) => hay.includes(t))) for (const t of g) if (!out.includes(t)) out += `\u0001${t}`;
+    // 單字的詞（例如「水」）不當觸發條件：幾乎每門課都有，會讓所有課都被補上同組的詞（業主 2026-11-25 回報搜「水機」跑出美護髮、口腔保健）。
+    for (const g of gs) if (g.some((t) => [...t].length >= 2 && hay.includes(t))) for (const t of g) if (!out.includes(t)) out += `\u0001${t}`;
     return out;
   };
 }
