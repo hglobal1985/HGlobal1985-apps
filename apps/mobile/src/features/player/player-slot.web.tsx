@@ -1,7 +1,9 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, type ElementRef } from "react";
+import { useCallback, useEffect, useRef, type ElementRef } from "react";
 import type { View } from "react-native";
+import { setBandExtra } from "@/ui/band-extra";
 import { StageFrame } from "@/ui/stage-frame";
+import { SHRINK_PX } from "./shrink";
 import { engine } from "./engine.web";
 
 /**
@@ -17,5 +19,22 @@ export function PlayerSlot({ trackKey }: { trackKey: string }) {
       return () => engine.clearSlot(trackKey);
     }, [trackKey]),
   );
+  // 頁面太短捲不到「縮完」時，縮矮舞台會讓可捲範圍變小、捲動位置被夾回去 → 又展開 → 又縮（影片一直抖動，業主 2026-11-25 錄影回報）。
+  // 登記額外的捲動空間（同 CollapseBand），保證一定捲得夠、縮完之後穩定停住。
+  useEffect(() => {
+    const measure = () => {
+      const el = ref.current as unknown as HTMLElement | null;
+      const band = el?.parentElement;
+      // 縮矮時 band 高度被改小，舞台本身高度不變（舞台＝16:9 寬度算出來的）
+      const h = el ? el.offsetHeight : 0;
+      if (h > 0 && band) setBandExtra(SHRINK_PX + h + 24);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      setBandExtra(0);
+    };
+  }, []);
   return <StageFrame ref={ref} />;
 }

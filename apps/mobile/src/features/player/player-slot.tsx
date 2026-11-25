@@ -1,11 +1,12 @@
 import { notePipStarted } from "./pip-help-store";
 import { VideoView } from "expo-video";
 import { useFocusEffect } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { StageFrame } from "@/ui/stage-frame";
 import { engine } from "./engine";
-import { resetPlayerShrink, useShrink } from "./shrink";
+import { setBandExtra } from "@/ui/band-extra";
+import { SHRINK_PX, resetPlayerShrink, useShrink } from "./shrink";
 import { usePlayer } from "./use-player";
 
 /**
@@ -25,6 +26,13 @@ export function PlayerSlot({ trackKey }: { trackKey: string }) {
       return () => (engine.clearSlot(trackKey), engine.setFullscreenTarget(null));
     }, [trackKey]),
   );
+  // 頁面太短捲不到「縮完」時，縮矮舞台會讓可捲範圍變小、捲動位置被瀏覽器夾回去 → 又展開 → 又縮（影片一直抖動，業主 2026-11-25 錄影回報）。
+  // 登記額外的捲動空間（同 CollapseBand），保證一定捲得夠、縮完之後仍可穩定停住。
+  useEffect(() => {
+    if (!h0) return;
+    setBandExtra(SHRINK_PX + h0 + 24);
+    return () => setBandExtra(0);
+  }, [h0]);
   const p = s.track?.key === trackKey ? engine.player() : null;
   const atMini = shrink >= 0.99;
   // 往下滑：舞台跟著縮矮（頁面露出更多文字），縮到底就交給浮動小視窗（player-layer.tsx）。
