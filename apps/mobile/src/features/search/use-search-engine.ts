@@ -1,7 +1,8 @@
-import { useMemo } from "react";
-import { useApi } from "@/state/session";
+import { useMemo, useState } from "react";
+import { useApi, useSession } from "@/state/session";
 import type { CourseSummary } from "@/api/client";
-import { buildSearchIndex, charsCourses, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
+import type { ChapterItem } from "@/features/courses/chapter-list";
+import { buildSearchIndex, charsCourses, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, type SearchLesson } from "@/features/courses/course-search";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
@@ -49,5 +50,36 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
     }
     return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
   }, [key, index, all, exact, semantic.courses, semantic.lessons, semOnly, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
-  return { key, searching: !!key, all, index, results, semantic, phonetic, extras: semantic.extras, coursePrio: semantic.coursePrio, loading: semantic.loading || phonetic.loading };
+  // 主結果＝「單元」（章節）清單（業主 2026-11-25：以超派原本的搜尋結果為正確，至尊要跟它一樣；超派原本搜尋一律是單元模式）：
+  // 有字面符合的章節就只列它們；沒有才合併 模糊＋語意（AI）＋同音 找到的章節。順序＝每次打開頁面洗牌一次（同一次瀏覽相對順序不變）。
+  const { member } = useSession();
+  const [seed] = useState(() => Math.floor(Math.random() * 2 ** 31));
+  const chapters = useMemo<ChapterItem[]>(() => {
+    if (!key) return [];
+    const exactL = matchLessons(index, key);
+    let hit: Set<string>;
+    if (exactL && exactL.size) hit = exactL;
+    else {
+      hit = new Set<string>();
+      if (!semOnly) for (const id of fuzzyLessons(index, key)) hit.add(id);
+      for (const id of semantic.lessons) if (index.lessonHay.has(id)) hit.add(id);
+      for (const id of phonetic.lessons) if (index.lessonHay.has(id)) hit.add(id);
+    }
+    const byId = new Map(all.map((x) => [x.id, x]));
+    const canWatch = (x: CourseSummary) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
+    const rand = (id: string) => {
+      let h = seed | 0;
+      for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 2654435761);
+      return (h ^ (h >>> 15)) >>> 0;
+    };
+    const out: ChapterItem[] = [];
+    for (const l of idx.data?.lessons ?? []) {
+      const co = byId.get(l.courseId);
+      if (co && hit.has(l.id)) out.push({ lesson: l, course: co, locked: !canWatch(co) });
+    }
+    return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
+  }, [key, index, all, idx.data, semOnly, semantic.lessons, phonetic.lessons, member, seed]);
+  // 其他類別命中裡的「單一教材」已經在單元清單裡，不重複列。
+  const extras = useMemo(() => semantic.extras.filter((h) => h.kind !== "lesson"), [semantic.extras]);
+  return { key, searching: !!key, all, index, results, semantic, phonetic, chapters, extras, coursePrio: semantic.coursePrio, loading: semantic.loading || phonetic.loading };
 }
