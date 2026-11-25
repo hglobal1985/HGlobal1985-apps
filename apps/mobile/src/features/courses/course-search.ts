@@ -185,6 +185,7 @@ export function rankCourses(index: SearchIndex, list: CourseSummary[], q: string
   const enrolled = (c: CourseSummary) => (c.enrollment === "opened" ? 2 : c.enrollment === "pending" ? 1 : 0);
   return list
     .map((c) => ({ c, r: rel(c) }))
-    .sort((a, b) => b.r - a.r || (date(b.c) > date(a.c) ? 1 : date(b.c) < date(a.c) ? -1 : 0) || enrolled(b.c) - enrolled(a.c))
+    // 只是「相近」（同音、模糊、AI 語意）的品牌／清單卡排在課程後面（業主 2026-11-25）；字面完全符合的不受影響。
+    .sort((a, b) => Number(a.c.isList && a.r < 3) - Number(b.c.isList && b.r < 3) || b.r - a.r || (date(b.c) > date(a.c) ? 1 : date(b.c) < date(a.c) ? -1 : 0) || enrolled(b.c) - enrolled(a.c))
     .map((x) => x.c);
 }

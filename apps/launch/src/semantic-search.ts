@@ -7,7 +7,7 @@ import type { D1Database, Env } from "./d1.ts";
 import { AiStopped, loadSelection, markExhausted, refundAi, reserveAi } from "./ai-models.ts";
 
 /** 相似度門檻：低於這個不算相近（BGE-M3 的餘弦相似度；偏保守，寧可少一點也不要不相干）。 */
-export const SEMANTIC_MIN = 0.55;
+export const SEMANTIC_MIN = 0.62; // 2026-11-25 由 0.55 小幅提高（搜「水機」連雅姿、紐崔萊都被撈進來）
 const BATCH = 100;
 
 /** 向量正規化後量化成 int8，轉成 base64。 */
