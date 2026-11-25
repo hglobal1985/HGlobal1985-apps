@@ -142,11 +142,11 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
                   <CourseCover theme="" label="" title={b.head.title} fill />
                 )}
                 {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
-                <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
-                  <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
+                <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(0,0,0,0.55)", borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
+                  <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
                     {b.items.filter(shown).length + blockPhotoCount(b.head)}
                   </AppText>
-                  <Ionicons name={on ? "chevron-up" : "chevron-down"} size={12} color={c.textOnAccent} />
+                  <Ionicons name={on ? "chevron-up" : "chevron-down"} size={12} color="#fff" />
                 </View>
               </View>
               <AppText variant="headline" numberOfLines={2} style={{ marginTop: 6, fontWeight: "800", color: on ? c.accentText : c.text }}>
