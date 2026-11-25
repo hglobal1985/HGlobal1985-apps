@@ -31,6 +31,8 @@ import { CourseMiniCover } from "@/features/courses/edm-viewer";
 import { CoverMiniFloat } from "@/ui/collapse-band";
 import { LessonStage } from "@/features/player/lesson-stage";
 import { setStayMini, useStayMini } from "@/features/player/stay-mini";
+import { SHRINK_PX } from "@/features/player/shrink";
+import { useBandScroll } from "@/ui/band-scroll";
 import { ElderCourse } from "@/features/elder/elder-course";
 import { ElderBroadcastBox } from "@/features/elder/elder-broadcast";
 import { useModeProfile } from "@/lib/app-mode";
@@ -149,10 +151,12 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   const playNext = playLesson && !playLesson.material ? playChapters[playChapters.findIndex((l) => l.id === playLesson.id) + 1] : undefined;
   // 進入課程頁就是「播放器版面」（業主 2026-11-17）：還沒按播放時，舞台是 EDM 加大播放鈕、下方是待機的控制列；按下去才開始載入並播放第一堂。
   const firstPlayable = course && !editing ? course.lessons.find((l) => !l.locked && !l.full && !l.section && (course.isList ? l.material : !l.material)) : undefined;
+  const bandY = useBandScroll();
   const playLesson_ = (lid: string) => {
     const sn = engine.getSnapshot();
     if (sn.track && sn.collapsed) engine.keepMiniOnce();
-    setStayMini(!!sn.track && sn.slotKey !== sn.track.key);
+    // 迷你狀態＝影片浮在畫面上（沒有佔用這一頁）、或這一頁往下滑已縮成迷你播放器、或是小圓圖。
+    setStayMini(!!sn.track && (sn.slotKey !== sn.track.key || sn.collapsed || bandY >= SHRINK_PX - 2));
     engine.expectSwitch();
     setPlayingId(lid);
   };
