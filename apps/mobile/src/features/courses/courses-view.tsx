@@ -314,7 +314,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const semOnly = searchSt.semanticEnabled && !chapterMode && !!q.trim() && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
   const exact = semOnly && exactRaw ? new Set<string>() : exactRaw;
   const noExact = !!exact && exact.size === 0;
-  const phonetic = usePhonetic(q, noExact && !semOnly && searchSt.phoneticEnabled);
+  const phonetic = usePhonetic(q, (noExact || semOnly) && searchSt.phoneticEnabled);
   // 搜尋結果的關聯性順序（至尊模式共用 rankCourses）：同音、模糊、字元比對、AI 語意各自的順序傳給排序。
   const nearInfo = useMemo(() => {
     if (!noExact || !searchIndex || chapterMode) return null;
@@ -324,7 +324,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     return {
       fuzzy: semOnly ? new Set<string>() : fuzzyCourses(searchIndex, q),
       chars: semOnly ? new Set<string>() : charsCourses(searchIndex, q),
-      phonetic: semOnly ? [] : [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
+      phonetic: [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
       semantic: [...semantic.courses].filter((id) => searchIndex.haystack.has(id)),
     };
   }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, semantic.extras, semantic.loading, phonetic.courses, phonetic.lessons, searchData.data, searchSt, semOnly]);

@@ -97,7 +97,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const semOnly = searchSt.semanticEnabled && !!key && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
   const exact = semOnly && exactRaw ? new Set<string>() : exactRaw;
   const noExact = !!exact && exact.size === 0;
-  const phonetic = usePhonetic(key, noExact && !semOnly && searchSt.phoneticEnabled);
+  const phonetic = usePhonetic(key, (noExact || semOnly) && searchSt.phoneticEnabled);
   // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
   const results = useMemo(() => {
     if (!key) return [];
@@ -108,7 +108,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     if (!ids.size) {
       const fuzzy = semOnly ? new Set<string>() : fuzzyCourses(index, key);
       const chars = semOnly ? new Set<string>() : charsCourses(index, key);
-      const phon = semOnly ? [] : [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
+      const phon = [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
       const sem = [...semantic.courses].filter((id) => index.haystack.has(id));
       ids = new Set([...fuzzy, ...chars, ...phon, ...sem]);
       near = { phonetic: phon, semantic: sem, fuzzy, chars };
