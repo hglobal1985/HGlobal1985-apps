@@ -156,7 +156,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
             <Ionicons name="mic" size={84} color={c.textOnAccent} {...({ uiOnly: true } as object)} />
           </View>
         </Pressable>
-        <AppText variant="headline" style={{ textAlign: "center" }}>
+        <AppText variant="headline" style={{ textAlign: "center", lineHeight: 20 }}>
           按一下，用說的
         </AppText>
         {voice.supported ? <TypoHint /> : null}
@@ -275,8 +275,8 @@ export function TypoHint() {
   const k = UI_SCALE * elderTextScale();
   const size = w ? Math.max(10, Math.min(22, Math.floor(w / k / ([...TYPO_HINT].length * 1.05)))) : 18;
   return (
-    <View style={{ alignSelf: "stretch" }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
-      <AppText numberOfLines={1} style={{ textAlign: "center", fontSize: size, lineHeight: Math.round(size * 1.15), fontWeight: "700" }}>
+    <View style={{ alignSelf: "stretch", marginTop: -space.sm }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+      <AppText numberOfLines={1} style={{ textAlign: "center", fontSize: size, lineHeight: size, fontWeight: "700" }}>
         {TYPO_HINT}
       </AppText>
     </View>
@@ -295,7 +295,7 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
           <View key={i} style={[{ width: Math.round(14 * UI_SCALE), height: Math.round(min + v * (max - min)), borderRadius: 8, backgroundColor: c.accent }, WAVE_ANIM]} />
         ))}
       </View>
-      <AppText variant="title">正在聽…</AppText>
+      <AppText variant="title" style={{ lineHeight: 26 }}>正在聽…</AppText>
       <TypoHint />
       <AppText tone="muted" style={{ textAlign: "center" }}>
         {heard ? `聽到：「${heard}」` : "請說出想找的課程"}
