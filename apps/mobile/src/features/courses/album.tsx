@@ -4,6 +4,7 @@ import { Image, Modal, Platform, Pressable, StyleSheet, View } from "react-nativ
 import { api, resolveUrl, type CoverMediaItem, type CoverMediaKind, type CoverScope } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { replaceAlbumPhoto } from "@/features/uploads/album-replace";
+import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useFeature } from "@/lib/app-mode";
 import { useThumb } from "@/lib/thumb";
@@ -30,6 +31,8 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
   const adminEdit = useFeature("adminEdit");
   const editUi = canEdit && adminEdit;
   const { config } = useUiConfig();
+  const { member } = useSession();
+  const infoOk = !!member?.courseRights?.all; // 超級管理者：任何相簿照片（含區塊照片、場景搜尋）都有「圖片資訊」驚嘆號
   const [w, setW] = useState(0);
   const [view, setView] = useState<string | null>(null); // 看哪張圖（照片編號）
   const [play, setPlay] = useState<CoverMediaItem | null>(null);
@@ -111,7 +114,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
           </View>
         ))}
       </View>
-      {view !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} showInfo={canEdit && scope === "edm"} items={images.map((x) => ({ uri: x.url, title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === view))} onClose={() => setView(null)} /> : null}
+      {view !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} showInfo={(canEdit && scope === "edm") || infoOk} items={images.map((x) => ({ uri: x.url, title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === view))} onClose={() => setView(null)} /> : null}
       {play ? <VideoModal item={play} onClose={() => setPlay(null)} /> : null}
     </View>
   );

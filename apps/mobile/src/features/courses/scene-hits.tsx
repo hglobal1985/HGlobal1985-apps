@@ -5,6 +5,7 @@ import { Pressable, View } from "react-native";
 import { api, resolveUrl } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
+import { useSession } from "@/state/session";
 import { AppText } from "@/ui";
 import { EdmLightbox } from "./edm-viewer";
 import { flashText } from "@/ui/flash-notice";
@@ -49,9 +50,10 @@ export function SceneHits({ q, big }: { q: string; big?: boolean }) {
   const { c } = useTheme();
   const { hits } = useSceneSearch(q);
   const [view, setView] = useState<Hit | null>(null);
+  const { member } = useSession();
   if (!hits.length) return null;
   const open = (h: Hit) => (h.locked ? flashText((h.lockLines ?? ["目前無法使用"]).join("，")) : h.photos?.length ? setView(h) : gotoAlbum(h));
-  const lightbox = view?.photos?.length ? <EdmLightbox uri={resolveUrl(view.photos[0]!.url)} title={`${view.courseTitle} ${view.blockTitle}`} items={view.photos.map((x) => ({ uri: x.url, title: `${view.courseTitle} ${view.blockTitle}`, id: x.id }))} onClose={() => setView(null)} /> : null;
+  const lightbox = view?.photos?.length ? <EdmLightbox showInfo={!!member?.courseRights?.all} uri={resolveUrl(view.photos[0]!.url)} title={`${view.courseTitle} ${view.blockTitle}`} items={view.photos.map((x) => ({ uri: x.url, title: `${view.courseTitle} ${view.blockTitle}`, id: x.id }))} onClose={() => setView(null)} /> : null;
   if (big) {
     return (
       <View style={{ gap: space.sm }}>
