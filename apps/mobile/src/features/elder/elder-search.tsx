@@ -8,7 +8,7 @@ import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, matchCourses
 import { useSynonyms } from "@/features/courses/use-synonyms";
 import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
-import { SceneHits } from "@/features/courses/scene-hits";
+import { SceneHits, useSceneSearch } from "@/features/courses/scene-hits";
 import { useThumb } from "@/lib/thumb";
 import { useProfileRedirect } from "@/features/profile-gate";
 import { useApi, useSession } from "@/state/session";
@@ -76,6 +76,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   // 搜尋引擎：與超派模式是同一個模組（features/search/use-search-engine.ts），業主 2026-11-25。
   const eng = useSearchEngine(q, courses.data ?? []);
   const { key, all, chapters, semantic, phonetic } = eng;
+  const scenes = useSceneSearch(q);
   const itemsOf = useZoneItems(all);
   // 已經在首頁再按一次底部「首頁」＝清掉搜尋字與語音、回到預設畫面（業主 2026-11-25）。
   useEffect(
@@ -141,10 +142,6 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         ) : null}
       </View>
       {member || voice.listening ? null : <LoginPrompt />}
-      {searching && !voice.listening && (chapters.length || eng.loading || eng.extras.length) ? (
-        <AppText variant="headline">{chapters.length ? `找到 ${chapters.length} 個單元` : eng.loading ? "正在找相近的單元…" : eng.extras.length ? `找到 ${eng.extras.length} 個相近的項目` : ""}</AppText>
-      ) : null}
-      {searching && !voice.listening ? <SceneHits q={q} big /> : null}
     </View>
   );
 
@@ -171,7 +168,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         )}
         {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
       </View>
-    ) : key && !chapters.length && !eng.extras.length && !eng.loading ? (
+    ) : key && !chapters.length && !eng.extras.length && !eng.loading && !scenes.hits.length && !scenes.loading ? (
       // 找不到課程：畫面中央放錄音鈕，按一下再說一次（業主 2026-11-25）。
       // 訊息依字數自動縮字（長句不再爆框、不與上方文字重疊）；內容由上往下排，不置中擠壓（業主 2026-11-25）。
       <View style={[styles.center, { justifyContent: "flex-start" }]}>
@@ -207,7 +204,13 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
               </View>
             ) : key ? (
               // 其他項目放進「可捲動」的清單裡（業主 2026-11-25：放在固定的上半部，項目一多就佔滿畫面、清單捲不動）。
-              <SemanticExtras items={eng.extras} big />
+              <View style={{ gap: space.md }}>
+                {!voice.listening && (chapters.length || eng.loading || eng.extras.length) ? (
+                  <AppText variant="headline">{chapters.length ? `找到 ${chapters.length} 個單元` : eng.loading ? "正在找相近的單元…" : eng.extras.length ? `找到 ${eng.extras.length} 個相近的項目` : ""}</AppText>
+                ) : null}
+                {!voice.listening ? <SceneHits q={q} big /> : null}
+                <SemanticExtras items={eng.extras} big />
+              </View>
             ) : undefined;
   const listFooter: ReactNode = undefined;
   const renderRow = (item: Row) => item.chapter ? <ElderChapterRow key={item.key} item={item.chapter} /> : <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />;
