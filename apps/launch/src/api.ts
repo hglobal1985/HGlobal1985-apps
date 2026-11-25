@@ -4568,6 +4568,33 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "POST",
+    /^\/admin\/cover-media\/([\w-]{1,40})\/recompress$/,
+    async (ctx, [id]) => {
+      // 依「相簿」目前的存檔格式與畫質，重新壓縮這一張照片（業主 2026-11-25，超級管理員；調整設定後用來測試畫質）。
+      // 來源是 R2 裡目前存的這一份（站內不保留原圖），所以是「再壓一次」：畫質會比直接拿原圖壓差一點；要最準確的比較請重新上傳原圖。
+      const s = requireSuperAdmin(ctx);
+      const row = await ctx.db.prepare("SELECT id, kind, r2_key, bytes FROM cover_media WHERE id = ?").bind(id).first<{ id: string; kind: string; r2_key: string; bytes: number }>();
+      if (!row || row.kind !== "image") return fail(404, "not_found", "找不到這張照片");
+      const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
+      const obj = await bucket.get(row.r2_key);
+      if (!obj) return fail(404, "not_found", "找不到這張照片的檔案");
+      const type = obj.httpMetadata?.contentType ?? "image/jpeg";
+      const before = await bucket.head(row.r2_key);
+      const app = (await loadConfig(ctx.db)).app;
+      const shrunk = await shrinkImage(ctx.env, await new Response(obj.body).arrayBuffer(), type, "center", false, { format: app.albumFormat, quality: app.albumQuality });
+      if (shrunk.type === type && shrunk.size >= (before?.size ?? row.bytes)) return { changed: false, before: before?.size ?? row.bytes, after: before?.size ?? row.bytes, format: type, message: "再壓一次沒有變得更小，維持原樣" };
+      const key = `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${renameForType("x.jpg", shrunk.type).split(".").pop()}`;
+      await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
+      await ctx.db.prepare("UPDATE cover_media SET r2_key = ?, bytes = ? WHERE id = ?").bind(key, shrunk.size, id).run();
+      // 舊檔沒有別的資料列在用才刪（同一個檔可能被其他資料列共用）。
+      const shared = await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? LIMIT 1").bind(row.r2_key).first();
+      if (!shared) await bucket.delete(row.r2_key).catch(() => undefined);
+      await audit(ctx.db, s.sub, "album.recompress", "cover_media", id, `${before?.size ?? row.bytes}->${shrunk.size} ${shrunk.type}`).run();
+      return { changed: true, before: before?.size ?? row.bytes, after: shrunk.size, format: shrunk.type };
+    },
+  ],
+  [
     "PUT",
     /^\/admin\/cover-media\/([\w-]{1,40})\/poster$/,
     async (ctx, [id]) => {
