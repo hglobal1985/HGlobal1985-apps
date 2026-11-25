@@ -415,6 +415,12 @@ let switchTimer: ReturnType<typeof setTimeout> | null = null;
 /** request() 的序號：只有最新的請求有資格真正載入。 */
 let requestSeq = 0;
 
+let keepMini = false; // 下一次換播放軌時，沿用「小圓圖」狀態
+const consumeKeepMini = () => {
+  const v = keepMini;
+  keepMini = false;
+  return v;
+};
 export const engine = {
   subscribe(l: () => void) {
     listeners.add(l);
@@ -490,6 +496,10 @@ export const engine = {
    * 另一堂正在播放：詢問是否中斷；選擇「關閉」回傳 false（呼叫端應回到原本那堂）。
    */
   /** 使用者在上課頁點了同一門課的另一堂：換好之前（最多 6 秒）不跳迷你播放器，也不再詢問。 */
+  /** 正在迷你播放器／小圓圖時，使用者點了別的影片：新的這支沿用目前的小視窗或小圓圖，不跳回整頁（業主 2026-11-25）。 */
+  keepMiniOnce() {
+    keepMini = snap.collapsed;
+  },
   expectSwitch() {
     if (switchTimer) clearTimeout(switchTimer);
     switchTimer = setTimeout(() => {
@@ -512,7 +522,7 @@ export const engine = {
     teardownMedia();
     endedFlag = false;
     intent = false; // 等真的開始播放（play 事件）才算「想播放」
-    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork, loadId: snap.loadId + 1 });
+    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: consumeKeepMini(), artworkUrl: t.artwork, loadId: snap.loadId + 1 });
     if (t.mode !== "youtube") {
       attach(element(), t, resumeOf(t), true, (h) => (hlsVideo = h));
       applyRate();

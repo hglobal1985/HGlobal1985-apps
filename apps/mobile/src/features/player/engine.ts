@@ -68,6 +68,12 @@ let switchTimer: ReturnType<typeof setTimeout> | null = null;
 /** request() 的序號：只有最新的請求有資格真正載入。 */
 let requestSeq = 0;
 
+let keepMini = false; // 下一次換播放軌時，沿用「小圓圖」狀態
+const consumeKeepMini = () => {
+  const v = keepMini;
+  keepMini = false;
+  return v;
+};
 export const engine = {
   subscribe(l: () => void) {
     listeners.add(l);
@@ -100,6 +106,10 @@ export const engine = {
     if (snap.slotKey === key) emit({ slotKey: null });
   },
   /** 使用者在上課頁點了同一門課的另一堂：換好之前（最多 6 秒）不跳迷你播放器，也不再詢問。 */
+  /** 正在迷你播放器／小圓圖時，使用者點了別的影片：新的這支沿用目前的小視窗或小圓圖，不跳回整頁（業主 2026-11-25）。 */
+  keepMiniOnce() {
+    keepMini = snap.collapsed;
+  },
   expectSwitch() {
     if (switchTimer) clearTimeout(switchTimer);
     switchTimer = setTimeout(() => {
@@ -126,7 +136,7 @@ export const engine = {
       bind(player);
     } else player.replace(src);
     player.playbackRate = userRate;
-    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: false, artworkUrl: t.artwork, loadId: snap.loadId + 1 });
+    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: consumeKeepMini(), artworkUrl: t.artwork, loadId: snap.loadId + 1 });
     const begin = resumeOf(t); // 續播記憶：有上次的位置就從那裡接著播
     if (begin) player.currentTime = begin;
     player.play();
