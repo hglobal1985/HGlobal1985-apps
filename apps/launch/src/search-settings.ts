@@ -4,6 +4,7 @@
  * 伺服器（語意搜尋、同音搜尋、EDM 辨識）與前端（模糊、字元、排序）都讀這一份；讀不到或亂填一律退回預設。
  */
 import type { D1Database } from "./d1.ts";
+import { SOURCES } from "./search-sources.ts";
 
 const KEY = "search_settings";
 
@@ -57,6 +58,15 @@ export const PARAMS: ParamDef[] = [
   { key: "edmTextMaxTokens", group: "edm", label: "EDM 文字整理：最多輸出長度", desc: "AI 一次最多寫多少（token，約 1 個中文字 1～2 個）。太小會被截斷、欄位缺字；太大浪費額度。", advice: "建議 1200；海報文字很多才調到 2000。", type: "number", default: 1200, min: 400, max: 3000, step: 100, unit: "token" },
   { key: "edmVisionMaxTokens", group: "edm", label: "EDM 圖片辨識：最多輸出長度", desc: "讀海報文字時最多輸出多少。字很多的海報太小會讀不完。", advice: "建議 1024。", type: "number", default: 1024, min: 512, max: 2048, step: 128, unit: "token" },
 ];
+
+
+/** 每一類資料的「加分」與「顯示順序」（業主 2026-11-25：測試「水機」時單一教材 0.53 全被門檻擋掉，要能自己調各類的優先順序）。 */
+const DEFAULT_PRIO: Record<string, number> = { series: 1, center: 2, lesson: 3, section: 4, intro: 5, edm: 6, photo: 7, course: 0 };
+for (const x of SOURCES) {
+  const cap = x.kind.charAt(0).toUpperCase() + x.kind.slice(1);
+  PARAMS.push({ key: `semBoost${cap}`, group: "sources", label: `${x.label}：加分`, desc: "把這一類的相似度分數加上這個數字，再去跟門檻比、再排序。例如門檻 0.65、某類分數只有 0.53：加 0.12 就變 0.65、會顯示。想讓這一類更容易出現、排更前面就加；0＝不加。", advice: "建議 0。看到該找到的資料卡在門檻下面，就用「試搜尋」看差多少，加這個差距。", type: "number", default: 0, min: 0, max: 0.4, step: 0.01 });
+  if (x.kind !== "course") PARAMS.push({ key: `semPrio${cap}`, group: "sources", label: `${x.label}：顯示順序`, desc: "「意思相近的其他項目」裡，數字小的類別排前面（1＝最前）；同一個順序再比分數高低。課程卡固定顯示在下方的課程清單，不受影響。", advice: `建議 ${DEFAULT_PRIO[x.kind] ?? 5}。`, type: "number", default: DEFAULT_PRIO[x.kind] ?? 5, min: 1, max: 9, step: 1 });
+}
 
 export type SearchSettings = Record<string, boolean | number | string>;
 export const defaultSearchSettings = (): SearchSettings => Object.fromEntries(PARAMS.map((p) => [p.key, p.default]));
