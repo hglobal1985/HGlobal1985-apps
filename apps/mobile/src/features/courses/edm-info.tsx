@@ -91,6 +91,7 @@ const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "bo
 export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string; /** 沒有相簿照片編號時，用圖片網址裡的儲存檔名查（課程封面、品牌 logo、課表…）。 */ imageKey?: string; top?: number; onClose: () => void }) {
   const r = useApi<MediaInfo>(id ? `/cover-media/${id}/info` : `/image-info?k=${encodeURIComponent(imageKey ?? "")}`);
   const info = r.data;
+  const [statusOpen, setStatusOpen] = useState(false); // 藍字區（儲存格式與辨識狀態）預設收起
   const [showRaw, setShowRaw] = useState(false);
   // 每個區塊預設收起，點標題才展開（業主 2026-11-25）。
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -138,6 +139,13 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
       </View>
       {info?.stored ? (
         <View style={styles.fmt}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: statusOpen }} accessibilityLabel={`儲存格式與辨識狀態，${statusOpen ? "點一下收起" : "點一下展開"}`} onPress={() => setStatusOpen((v) => !v)} style={styles.fmtHead}>
+            <Ionicons name="server-outline" size={18} color="#9fd8ff" />
+            <Text style={[styles.fmtText, { flex: 1 }]}>儲存格式與辨識狀態</Text>
+            <Ionicons name={statusOpen ? "chevron-up" : "chevron-down"} size={20} color="#9fd8ff" />
+          </Pressable>
+          {statusOpen ? (
+            <View style={{ gap: 4, paddingTop: 6 }}>
           <View style={styles.fmtRow}>
             <Ionicons name="server-outline" size={18} color="#9fd8ff" />
             <Text style={styles.fmtText}>{`R2 儲存格式：${storedFormat(info.stored)}　${size(info.stored.bytes)}`}</Text>
@@ -154,6 +162,8 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
               </View>
               {info.ocrStatus === "done" && info.sceneStatus === "done" ? null : <Text style={styles.fmtSub}>{queueLine(info.queue)}</Text>}
             </>
+          ) : null}
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -248,6 +258,7 @@ const styles = StyleSheet.create({
   sec: { gap: 8, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12 },
   secHead: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 36 },
   fmt: { gap: 4, paddingHorizontal: 16, paddingBottom: 8 },
+  fmtHead: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 40 },
   fmtRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   fmtSub: { color: "#9fd8ff", fontSize: 13, lineHeight: 18 },
   fmtText: { flex: 1, color: "#9fd8ff", fontSize: 15, fontWeight: "800", lineHeight: 21 },
