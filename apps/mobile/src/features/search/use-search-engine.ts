@@ -77,6 +77,13 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
       const co = byId.get(l.courseId);
       if (co && hit.has(l.id)) out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
+    // 字面符合＝洗牌（跟超派原本的單元模式一樣）；「相近」找到的依相關度排：同音（覆蓋越多越前面）> AI 語意。
+    if (!(exactL && exactL.size)) {
+      const rank = new Map<string, number>();
+      [...phonetic.lessons].forEach((id, i) => rank.set(id, i));
+      [...semantic.lessons].forEach((id, i) => !rank.has(id) && rank.set(id, 1000 + i));
+      return out.sort((a, b) => (rank.get(a.lesson.id) ?? 5000) - (rank.get(b.lesson.id) ?? 5000) || rand(a.lesson.id) - rand(b.lesson.id));
+    }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
   }, [key, index, all, idx.data, semOnly, semantic.lessons, phonetic.lessons, member, seed]);
   // 其他類別命中裡的「單一教材」已經在單元清單裡，不重複列。
