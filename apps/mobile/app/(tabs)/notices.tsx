@@ -25,7 +25,7 @@ export default function NoticesScreen() {
   const { data, error, loading, reload } = useApi<Notice[]>(member ? "/notifications" : null);
   const unread = (data ?? []).filter((n) => !n.read).length;
   // 檢視模式（業主 2026-11-17）：全部、審核、訂閱、留言。審核裡另外會顯示中央的獎銜、中心新申請（沒有權限就不顯示）。
-  // 標籤順序與內容（業主 2026-11-24）：留言 > 訂閱 > 審核 > 成就，沒有「全部」；伺服器分類 other 歸到訂閱。預設停在第一個有未讀的標籤。
+  // 標籤順序與內容（業主 2026-11-25）：留言 > 審核 > 訂閱 > 成就，沒有「全部」；伺服器分類 other 歸到訂閱。預設停在第一個有未讀的標籤。
   type Tab = "comment" | "subscribe" | "review" | "achievement";
   const tabOf = (n: Notice): Tab => (n.category === "other" ? "subscribe" : n.category);
   const [picked, setPicked] = useState<Tab | null>(null);
@@ -34,17 +34,21 @@ export default function NoticesScreen() {
   const count = (cat: Tab) => (data ?? []).filter((n) => tabOf(n) === cat && !n.read).length + (cat === "review" ? centralCount : 0);
   const MODES: { key: Tab; label: string }[] = [
     { key: "comment", label: "留言" },
-    { key: "subscribe", label: "訂閱" },
     { key: "review", label: "審核" },
+    { key: "subscribe", label: "訂閱" },
     { key: "achievement", label: "成就" },
   ];
-  const mode: Tab = picked ?? MODES.find((m) => count(m.key) > 0)?.key ?? "comment";
+  // 預設分頁只在第一次有資料時決定一次並固定（之後資料重抓、已讀變動都不再自動換分頁；業主 2026-11-25 回報置頂審核只停留一秒就消失）。
+  // 有等待處理的審核就優先停在「審核」，讓紅框置頂看得到。
+  const autoTab = useRef<Tab | null>(null);
+  if (data && !autoTab.current) autoTab.current = (data ?? []).some((n) => n.pending) ? "review" : MODES.find((m) => count(m.key) > 0)?.key ?? "comment";
+  const mode: Tab = picked ?? autoTab.current ?? "comment";
   const setMode = setPicked;
   const list = (data ?? []).filter((n) => tabOf(n) === mode);
   // 審核相關而且還沒處理的置頂（伺服器標 pending）；其他分頁不需要。
   const pinned = mode === "review" ? list.filter((n) => n.pending) : [];
   const rest = pinned.length ? list.filter((n) => !n.pending) : list;
-  // 成就分頁：畫面上看得到的成就通知自動標為已讀，不必逐則點開（業主 2026-11-24）。
+  // 成就、訂閱分頁：畫面上看得到的通知自動標為已讀，不必逐則點開（業主 2026-11-24 成就；2026-11-25 訂閱同）。
   const seen = useRef(new Set<string>());
   const flush = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markSeen = (n: Notice) => {
@@ -65,7 +69,7 @@ export default function NoticesScreen() {
     await api("POST", "/notifications/read-all").catch(() => undefined);
     invalidate();
   };
-  const wrapSeen = (n: Notice, row: ReactNode) => (mode === "achievement" ? <SeenRow key={n.id} onSeen={() => markSeen(n)}>{row}</SeenRow> : row);
+  const wrapSeen = (n: Notice, row: ReactNode) => (mode === "achievement" || mode === "subscribe" ? <SeenRow key={n.id} onSeen={() => markSeen(n)}>{row}</SeenRow> : row);
   const renderRow = (n: Notice, i: number) => (
       <Pressable key={n.id} accessibilityRole="button" accessibilityLabel={`${n.title}${n.read ? "" : "，未讀"}`} onPress={() => open(n)} style={({ pressed }) => [{ flexDirection: elder ? "column" : "row", alignItems: elder ? "stretch" : "center", gap: elder ? 8 : 10, paddingVertical: 12, minHeight: 64 }, i > 0 && { borderTopWidth: 1, borderColor: c.border }, pressed && { opacity: 0.7 }]}>
         <View style={elder ? { flexDirection: "row", alignItems: "center", gap: 10 } : { flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
