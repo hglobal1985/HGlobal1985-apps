@@ -40,7 +40,7 @@ export const GROUPS: { key: ParamDef["group"]; title: string; intro: string }[] 
 export const PARAMS: ParamDef[] = [
   { key: "semanticEnabled", group: "semantic", label: "啟用意思相近搜尋", desc: "關閉後完全不呼叫 AI，只用字面、同音、模糊比對。完全比對有結果時本來就不會呼叫 AI，只有「找不到」才補找。", advice: "建議開。想省 AI 額度或結果太雜時才關。", type: "bool", default: true },
   { key: "semanticMin", group: "semantic", label: "相似度門檻", desc: "AI 判斷兩段文字意思有多接近（0～1，越高越像）。低於這個數字的不顯示。調高＝更準但可能漏掉；調低＝找得多但會混進不相干的課（例如搜「水機」出現保養品）。", advice: "建議 0.62。看到不相干的結果就每次調高 0.03；漏掉該找到的就調低 0.03。", type: "number", default: 0.62, min: 0.4, max: 0.9, step: 0.01 },
-  { key: "semanticLimit", group: "semantic", label: "最多顯示幾筆（Top-K）", desc: "AI 最多回傳幾門課（章節另外算）。越大結果越多、越雜。", advice: "建議 24；課程不多可降到 10～15。", type: "number", default: 24, min: 5, max: 50, step: 1, unit: "筆" },
+  { key: "semanticLimit", group: "semantic", label: "最多顯示幾筆（Top-K）", desc: "AI 最多回傳幾門課（章節另外算）。越大結果越多、越雜。", advice: "建議 100（業主指定）；課程不多可降到 10～15。", type: "number", default: 100, min: 5, max: 200, step: 1, unit: "筆" },
   { key: "semSrcCourse", group: "sources", label: "教材卡　［標籤：教材卡］", desc: "搜尋欄位：courses.title（教材卡名稱）。", advice: "建議開（核心）。", type: "bool", default: true },
   { key: "semSrcLesson", group: "sources", label: "單一教材　［標籤：單一教材］", desc: "搜尋欄位：lessons.title（教材標題，不含區塊）。點結果直接到所屬課程。", advice: "建議開。", type: "bool", default: true },
   { key: "semSrcSection", group: "sources", label: "區塊　［標籤：區塊］", desc: "搜尋欄位：lessons.title（課程裡的區塊／分組名稱）。", advice: "建議開。", type: "bool", default: true },
