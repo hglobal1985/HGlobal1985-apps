@@ -8,6 +8,7 @@ import { centerTitle } from "@/features/format";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { LightboxGrid } from "./lightbox-grid";
 import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
+import { SubfolderHome, SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
 import { AlbumSearchBar, matchAlbumItem } from "./album-search";
 import { saveAlbumPos } from "@/lib/album-memory";
 import { isSuperAdmin } from "@/lib/roles";
@@ -52,6 +53,15 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const [busy, setBusy] = useState(false);
   const [panel, setPanel] = useState<"perms" | "info" | null>(null); // 超級管理員的相簿管理面板
   const [sortBy, setSortBy] = useState<{ key: "date" | "upload"; dir: "asc" | "desc" } | null>(null); // 資料夾照片排序
+  // 區塊相簿的子資料夾（業主 2026-11-26）：sub＝null 是區塊總覽（資料夾卡）；""＝未分類；其他＝資料夾編號。
+  const [sub, setSub] = useState<string | null>(null);
+  const [fsheet, setFsheet] = useState<FolderSheetState>(null);
+  const [moveIds, setMoveIds] = useState<string[]>([]);
+  const isBlock = view?.folder.kind === "block";
+  const sf = useSubfolders(isBlock ? view!.folder.key : null);
+  const hasSubs = isBlock && (sf.subs?.folders.length ?? 0) > 0;
+  const subName = sub === null ? "" : sub === "" ? "未分類" : (sf.subs?.folders.find((x) => x.id === sub)?.name ?? "");
+  useEffect(() => setSub(null), [view?.folder.id]);
   const groups = data?.groups ?? [];
   const viewGroup = view ? groups.find((g) => g.folders.some((f) => f.id === view.folder.id)) : undefined;
   const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)); // 沒有＝相簿首頁（類別資料夾）
@@ -178,7 +188,8 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 * 2 - 36 - 8 * 3 - (large && side ? 280 : 0)) / 8.6)));
 
   // 資料夾裡的照片（此頁搜尋會過濾）
-  const filtered = view ? (scope === "page" && key ? view.items.filter((p) => matchAlbumItem(p, key)) : view.items) : [];
+  const inSub = hasSubs && sub !== null ? view!.items.filter((p) => (p.folderId ?? "") === sub) : view?.items ?? [];
+  const filtered = view ? (scope === "page" && key ? inSub.filter((p) => matchAlbumItem(p, key)) : inSub) : [];
   // 排序（業主 2026-11-25）：活動日期、上傳時間；點一下遞減，再點遞增。沒有排序＝相簿原本的順序。沒有日期的照片永遠排最後。
   const shown = sortBy
     ? [...filtered].sort((a, b) => {
@@ -208,6 +219,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       const r = await api<{ items: CoverMediaItem[] }>("GET", `/albums/folder?id=${encodeURIComponent(view.folder.id)}`);
       setView({ folder: view.folder, items: r.items.filter((x) => x.kind === "image") });
       reload();
+      sf.reload();
     } catch (e) {
       flashText((e as Error).message);
     }
@@ -307,17 +319,29 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
             <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`${cur.folders.length} 個資料夾`}</AppText>
           </View>
         ) : null}
-        {view && !(scope === "all" && key) ? (
+        {view && hasSubs && sub === null && !key && sf.subs ? (
+          <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6, gap: 8 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {btn("回上一頁（類別）", () => (setGroup(cur?.id ?? null), setView(null), setSortBy(null)), "chevron-back")}
+              <AppText numberOfLines={2} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 18 }}>{folderName(view.folder)}</AppText>
+              {sf.subs.canManage ? btn("管理資料夾", () => setFsheet({ t: "manage" }), "folder-open-outline") : null}
+              {admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}
+            </View>
+            <SubfolderHome subs={sf.subs} bottomPad={insets.bottom + 32} onOpen={(id) => setSub(id)} onNew={() => setFsheet({ t: "new", move: false })} onMenu={(id) => setFsheet({ t: "menu", id })} />
+          </View>
+        ) : view && !(scope === "all" && key) ? (
           <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6 }}>
             <LightboxGrid
               embedded
               list={shown.map((x) => lightboxItem(x, folderName(view.folder)))}
               current={focusId ? shown.findIndex((x) => x.id === focusId) : -1}
-              heading={folderName(view.folder)}
-              extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}</View>) : undefined}
+              heading={hasSubs && sub !== null ? subName : folderName(view.folder)}
+              parent={hasSubs && sub !== null ? folderName(view.folder) : undefined}
+              onMove={isBlock && sf.subs?.canManage ? (ids) => (setMoveIds(ids), setFsheet({ t: "move" })) : undefined}
+              extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} folder={sub || undefined} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{isBlock && !hasSubs && sf.subs?.canManage ? btn("新增資料夾", () => setFsheet({ t: "new", move: false }), "folder-open-outline") : null}{admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}</View>) : undefined}
               onPick={(i) => onPick({ folder: view.folder, title: folderName(view.folder), items: shown, index: i })}
               actions={<View style={{ flexDirection: "row", gap: 8 }}>{sortBtn("date", "calendar-outline", "活動日期排序")}{sortBtn("upload", "time-outline", "上傳時間排序")}</View>}
-              onClose={() => (setGroup(cur?.id ?? null), setView(null), setSortBy(null))}
+              onClose={() => (hasSubs && sub !== null ? setSub(null) : (setGroup(cur?.id ?? null), setView(null), setSortBy(null)))}
             />
           </View>
         ) : (
@@ -359,6 +383,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       ) : null}
       </View>
       {panel === "perms" ? <AlbumPermissionsPanel onClose={() => setPanel(null)} onChanged={() => (reload(), void reloadView())} /> : null}
+      {isBlock && view ? <SubfolderSheet dark sheet={fsheet} setSheet={setFsheet} blockKey={view.folder.key} subs={sf.subs} selIds={moveIds} onChanged={() => (sf.reload(), void reloadView())} onMoved={() => setMoveIds([])} /> : null}
       {panel === "info" && view ? <AlbumInfoPanel folderId={view.folder.id} title={folderName(view.folder)} onClose={() => setPanel(null)} onChanged={() => (reload(), void reloadView())} /> : null}
     </View>
   );

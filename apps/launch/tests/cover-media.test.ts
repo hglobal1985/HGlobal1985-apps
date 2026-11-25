@@ -299,3 +299,57 @@ test("舊照片重新壓縮：只有超級管理員能開始／暫停／看進�
   assert.equal((await call("POST", "/admin/recompress/start", { token: admin })).status, 503, "沒有 IMAGES 轉檔服務就不開始");
   assert.equal((await call("POST", "/admin/recompress/stop", { token: admin })).status, 200);
 });
+
+test("區塊相簿子資料夾：建立／重新命名／移動／刪除、名稱規則、權限、上傳進資料夾（業主 2026-11-26）", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: memR2() };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.json ? { "content-type": "application/json" } : {}), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.json ? JSON.stringify(opts.json) : opts.bytes) as unknown as BodyInit | undefined }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  const login = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", { json: { sub } })).data.token;
+  const [admin, stu] = await Promise.all([login("demo-admin"), login("demo-student")]);
+  await db.prepare("INSERT INTO courses (id, title, is_list, status, view_scope, is_public, zone, block_photos) VALUES ('cs', '某課程', 0, 'published', 'all', 1, 'hglobal', 1)").run();
+  await db.prepare("INSERT INTO lessons (id, course_id, position, title, kind, media_type) VALUES ('bs', 'cs', 1, '某區塊', 'section', 'demo')").run();
+  await db.prepare("DELETE FROM album_permissions").run();
+  type Sub = { folders: { id: string; name: string; count: number }[]; uncat: { count: number }; canManage: boolean };
+  const up = async (q = "") => (await call<{ id: string }>("PUT", `/admin/cover-media?kind=course&key=bs&w=10&h=10${q}`, { token: admin, bytes: jpeg })).data.id;
+  const p1 = await up(), p2 = await up(), p3 = await up();
+  const sub0 = (await call<Sub>("GET", "/albums/subfolders?key=bs")).data;
+  assert.equal(sub0.folders.length, 0);
+  assert.equal(sub0.uncat.count, 3);
+  assert.equal(sub0.canManage, false, "訪客不能管理");
+  assert.equal((await call("POST", "/admin/album-folders", { token: stu, json: { key: "bs", name: "A" } })).status, 403, "一般會員不能建立");
+  assert.equal((await call("POST", "/admin/album-folders", { token: admin, json: { key: "bs", name: "" } })).status, 400);
+  assert.equal((await call("POST", "/admin/album-folders", { token: admin, json: { key: "bs", name: "未分類" } })).status, 400);
+  assert.equal((await call("POST", "/admin/album-folders", { token: admin, json: { key: "bs", name: "超過二十個字".repeat(4) } })).status, 400);
+  assert.equal((await call("POST", "/admin/album-folders", { token: admin, json: { key: "cs", name: "A" } })).status, 400, "只有區塊相簿才有資料夾");
+  const f1 = (await call<{ id: string }>("POST", "/admin/album-folders", { token: admin, json: { key: "bs", name: "產品介紹" } })).data.id;
+  const f2 = (await call<{ id: string }>("POST", "/admin/album-folders", { token: admin, json: { key: "bs", name: "活動照片" } })).data.id;
+  assert.equal((await call("POST", "/admin/album-folders", { token: admin, json: { key: "bs", name: "產品介紹" } })).status, 409, "同名不行");
+  // 移動、計數與排序（張數多到少）
+  const m = await call<Sub>("POST", "/admin/album-folders/move", { token: admin, json: { key: "bs", ids: [p1, p2], folderId: f2 } });
+  assert.deepEqual(m.data.folders.map((f) => [f.name, f.count]), [["活動照片", 2], ["產品介紹", 0]]);
+  assert.equal(m.data.uncat.count, 1);
+  assert.equal((await call("POST", "/admin/album-folders/move", { token: stu, json: { key: "bs", ids: [p3], folderId: f1 } })).status, 403);
+  assert.equal((await call("POST", "/admin/album-folders/move", { token: admin, json: { key: "bs", ids: [p3], folderId: "nope" } })).status, 404);
+  // 上傳進目前資料夾；照片項目帶 folderId
+  const p4 = await up(`&folder=${f1}`);
+  const items = (await call<{ id: string; folderId?: string }[]>("GET", "/cover-media?kind=course&key=bs")).data;
+  assert.equal(items.find((x) => x.id === p4)!.folderId, f1);
+  assert.equal(items.find((x) => x.id === p3)!.folderId, undefined, "未分類沒有 folderId");
+  // 重新命名
+  assert.equal((await call("PUT", `/admin/album-folders/${f1}`, { token: admin, json: { name: "活動照片" } })).status, 409);
+  const rn = await call<Sub>("PUT", `/admin/album-folders/${f1}`, { token: admin, json: { name: "產品" } });
+  assert.ok(rn.data.folders.some((f) => f.name === "產品"));
+  // 刪除：照片回到未分類，不刪照片
+  const del = await call<Sub>("DELETE", `/admin/album-folders/${f2}`, { token: admin });
+  assert.equal(del.data.folders.length, 1);
+  assert.equal(del.data.uncat.count, 3, "2 張回到未分類＋原本 1 張");
+  assert.equal((await call<unknown[]>("GET", "/cover-media?kind=course&key=bs")).data.length, 4, "照片都還在");
+  // 獎銜達標者可管理（上傳權限設定）
+  await call("PUT", "/admin/albums/permission", { token: admin, json: { key: "block:bs", uploadMinRank: "none" } });
+  assert.equal((await call("POST", "/admin/album-folders", { token: stu, json: { key: "bs", name: "會員的" } })).status, 200);
+  assert.equal((await call<Sub>("GET", "/albums/subfolders?key=bs", { token: stu })).data.canManage, true);
+});

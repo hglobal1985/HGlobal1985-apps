@@ -23,7 +23,7 @@ const COLS = 3;
  * 與封面輪播是同一份資料（cover_media）：這裡新增的照片與短影音，會直接出現在封面輪播；管理者可上傳、整理順序、刪除。
  * 點照片開全螢幕看圖（可左右翻整本相簿）；點影片開播放視窗。
  */
-export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, scope, emptyHint }: { kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void; /** 中心的儲存區（cover＝封面編輯、edm＝EDM 分頁）；系列、課程不用給。 */ scope?: CoverScope; emptyHint?: string }) {
+export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, scope, emptyHint, onMovePhoto }: { /** 區塊相簿：有資料夾管理權限的人，每張照片右上角多一顆「移到資料夾」鈕（業主 2026-11-26）。 */ onMovePhoto?: (id: string) => void; kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void; /** 中心的儲存區（cover＝封面編輯、edm＝EDM 分頁）；系列、課程不用給。 */ scope?: CoverScope; emptyHint?: string }) {
   const { c } = useTheme();
   const thumb = useThumb();
   // canEdit＝看的人的權限（兩種模式一樣傳）；要不要顯示排序／刪除等編輯小鈕由模式設定檔決定（至尊模式 adminEdit＝false）。
@@ -77,6 +77,11 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
                 </View>
               ) : null}
             </Pressable>
+            {onMovePhoto && x.kind === "image" ? (
+              <Pressable accessibilityRole="button" hitSlop={8} accessibilityLabel="移到資料夾" onPress={() => onMovePhoto(x.id)} style={[styles.tbtn, { position: "absolute", right: 4, top: 4 }]}>
+                <Ionicons name="folder-open-outline" size={15} color="#fff" {...NO_SCALE} />
+              </Pressable>
+            ) : null}
             {scope === "edm" && x.eventDate ? (
               <View style={{ position: "absolute", left: 4, top: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8, backgroundColor: "rgba(0,0,0,0.6)" }} pointerEvents="none">
                 <AppText variant="caption" style={{ color: "#fff", fontSize: 11, lineHeight: 14, fontWeight: "700" }} {...NO_SCALE}>

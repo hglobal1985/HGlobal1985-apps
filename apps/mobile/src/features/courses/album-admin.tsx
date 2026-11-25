@@ -25,7 +25,7 @@ const when = (iso: string | null) => {
  * ①`AlbumPermissionsPanel`：資料夾清單右上角的齒輪——檢視並調整所有相簿（大類別與資料夾）的「誰可以上傳」最低獎銜。
  * ②`AlbumInfoPanel`：每個資料夾上傳鈕右邊的齒輪——這個相簿的資訊總覽（R2 佔用、上傳者排名、最近上傳、檔案大小與瀏覽數排序）與上傳權限。
  */
-function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   const insets = useSafeAreaInsets();
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 20 }]} pointerEvents="box-none">
