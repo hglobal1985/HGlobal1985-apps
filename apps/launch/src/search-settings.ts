@@ -10,7 +10,7 @@ const KEY = "search_settings";
 
 export type ParamDef = {
   key: string;
-  group: "semantic" | "sources" | "phonetic" | "fuzzy" | "rank" | "edm";
+  group: "semantic" | "sources" | "phonetic" | "fuzzy" | "rank" | "memory" | "edm";
   label: string;
   /** 這個參數做什麼（白話）。 */
   desc: string;
@@ -31,6 +31,7 @@ export const GROUPS: { key: ParamDef["group"]; title: string; intro: string }[] 
   { key: "phonetic", title: "同音搜尋（語音辨識錯字）", intro: "不用 AI、不花額度。把文字轉成拼音比對，語音把「益之源」聽成「一支援」也找得到。" },
   { key: "fuzzy", title: "模糊比對（打錯字）", intro: "不用 AI、不花額度。容許漏字、多字、錯字（例如「益支源」找得到「益之源」）；字元比對＝查詢的每個字都出現在同一門課就算符合。" },
   { key: "rank", title: "結果排序", intro: "決定找到很多結果時誰排前面。" },
+  { key: "memory", title: "搜尋記憶", intro: "點了搜尋結果、按返回時，要不要回到剛剛的搜尋畫面。" },
   { key: "edm", title: "EDM 海報辨識的 AI 參數", intro: "這兩項 AI 工作（辨識海報文字、把文字整理成欄位）共用的生成參數；其他 AI 工作用模型預設值。" },
 ];
 
@@ -54,6 +55,7 @@ export const PARAMS: ParamDef[] = [
   { key: "charsEnabled", group: "fuzzy", label: "啟用字元比對", desc: "查詢的每個字（不分順序）都出現在同一門課的文字裡就算符合，例如「線上白金」找得到「安麗與白金線上溝通會」。", advice: "建議開。", type: "bool", default: true },
   { key: "charsMinLen", group: "fuzzy", label: "字元比對至少幾個不同字", desc: "太短（例如 2 個字）幾乎每門課都符合，所以設下限。", advice: "建議 3。", type: "number", default: 3, min: 2, max: 6, step: 1, unit: "字" },
   { key: "listCardsLast", group: "rank", label: "品牌／清單卡排在課程後面", desc: "只是「相近」才找到的品牌卡（標「教材」的，如雅姿、紐崔萊）排在課程後面；名稱字面完全符合的不受影響。", advice: "建議開。", type: "bool", default: true },
+  { key: "searchMemoryMinutes", group: "memory", label: "記住搜尋框與搜尋結果多久", desc: "點進某個搜尋結果後按返回，在這段時間內會直接回到剛剛的搜尋字與結果（不用重新輸入、不用重新等）；超過就清空。重新整理頁面一律清空。填 1 約等於幾乎不記。", advice: "建議 15 分鐘。", type: "number", default: 15, min: 1, max: 720, step: 1, unit: "分鐘" },
   { key: "edmTextTemperature", group: "edm", label: "EDM 文字整理：隨機度（Temperature）", desc: "AI 回答的隨機程度（0～1）。越低越照原文、穩定；越高越有變化、越容易自己發揮。整理海報欄位要求照抄。", advice: "建議 0.1（接近 0 最保守）。", type: "number", default: 0.1, min: 0, max: 1, step: 0.05 },
   { key: "edmTextMaxTokens", group: "edm", label: "EDM 文字整理：最多輸出長度", desc: "AI 一次最多寫多少（token，約 1 個中文字 1～2 個）。太小會被截斷、欄位缺字；太大浪費額度。", advice: "建議 1200；海報文字很多才調到 2000。", type: "number", default: 1200, min: 400, max: 3000, step: 100, unit: "token" },
   { key: "edmVisionMaxTokens", group: "edm", label: "EDM 圖片辨識：最多輸出長度", desc: "讀海報文字時最多輸出多少。字很多的海報太小會讀不完。", advice: "建議 1024。", type: "number", default: 1024, min: 512, max: 2048, step: 128, unit: "token" },

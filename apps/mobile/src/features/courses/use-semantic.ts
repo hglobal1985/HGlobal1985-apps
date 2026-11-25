@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/api/client";
+import { memoryTtl } from "@/lib/search-memory";
 
 /**
  * 語意搜尋（業主 2026-11-23）：完全比對與模糊比對都找不到時，才請伺服器用 AI（BGE-M3 向量）找意思相近的課程與章節編號。
  * 停止打字 0.5 秒才送出；沒登入、額度用完或失敗時回空集合（不影響其他搜尋）。結果只有編號，畫面再依自己有權限的索引過濾。
  */
 export type SemanticHit = { kind: string; tag: string; id: string; title: string; sub: string; link: string; score: number; prio?: number; /** 左邊縮圖網址（沒有＝預設圖）。 */ thumb?: string | null; /** 有＝點了直接放大看這張圖（EDM、相片）。 */ image?: string };
-/** 同一個查詢的結果記在記憶體（2 小時）：從搜尋結果點進去再按返回時，不必重新等一次（業主 2026-11-25：返回會空白停頓一秒）。 */
-const TWO_HOURS = 2 * 3600_000;
+/** 同一個查詢的結果記在記憶體（設定的時間（預設 15 分鐘））：從搜尋結果點進去再按返回時，不必重新等一次（業主 2026-11-25：返回會空白停頓一秒）。 */
 const memo = new Map<string, { at: number; v: { q: string; courses: string[]; lessons: string[]; extras: SemanticHit[]; coursePrio: number } }>();
 const recall = (q: string) => {
   const m = memo.get(q);
-  return m && Date.now() - m.at < TWO_HOURS ? m.v : null;
+  return m && Date.now() - m.at < memoryTtl() ? m.v : null;
 };
 export function useSemantic(q: string, enabled: boolean): { courses: Set<string>; lessons: Set<string>; extras: SemanticHit[]; coursePrio: number; loading: boolean } {
   const [res, setRes] = useState<{ q: string; courses: string[]; lessons: string[]; extras: SemanticHit[]; coursePrio: number } | null>(() => (q.trim() ? recall(q.trim()) : null));
