@@ -4555,8 +4555,8 @@ const routes: [string, RegExp, Handler][] = [
       const tokens = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase().split(/\s+/).filter((t) => t.length >= 1).slice(0, 3);
       if (!tokens.length || tokens.join("").length < 2) return { hits: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
-      type SceneRow = { block_id: string; scene_text: string; block_title: string; course_id: string; course_title: string };
-      const base = `SELECT cm.owner_key AS block_id, cm.scene_text, l.title AS block_title, l.course_id, c.title AS course_title FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.scene_status = 'done' AND c.status = 'published'`;
+      type SceneRow = { id: string; r2_key: string; block_id: string; scene_text: string; block_title: string; course_id: string; course_title: string };
+      const base = `SELECT cm.id, cm.r2_key, cm.owner_key AS block_id, cm.scene_text, l.title AS block_title, l.course_id, c.title AS course_title FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.scene_status = 'done' AND c.status = 'published'`;
       let { results } = await ctx.db
         .prepare(`${base} AND ${tokens.map(() => "lower(cm.scene_text) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 300`)
         .bind(...tokens.map(like))
@@ -4573,16 +4573,17 @@ const routes: [string, RegExp, Handler][] = [
         tagsOf = hitTags;
       }
       const locks = new Map<string, LockState>();
-      const groups = new Map<string, { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; tags: Set<string>; locked: boolean; lockLines: string[] }>();
+      const groups = new Map<string, { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; tags: Set<string>; locked: boolean; lockLines: string[]; photos: { id: string; url: string }[] }>();
       for (const r of results) {
         if (!locks.has(r.course_id)) locks.set(r.course_id, await lockStateOfKey(ctx, r.course_id));
         const lk = locks.get(r.course_id)!;
-        const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>(), locked: lk.locked && !lk.manages, lockLines: lk.lines };
+        const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>(), locked: lk.locked && !lk.manages, lockLines: lk.lines, photos: [] };
         g.count++;
+        if (!g.locked && g.photos.length < 40) g.photos.push({ id: r.id, url: pubUrl(r.r2_key, 0) });
         for (const t of tagsOf ? tagsOf(r) : r.scene_text.split("，")) if (tagsOf || tokens.some((k) => t.toLowerCase().includes(k))) g.tags.add(t);
         groups.set(r.block_id, g);
       }
-      return { hits: [...groups.values()].slice(0, 20).map((g) => ({ blockId: g.blockId, courseId: g.courseId, courseTitle: g.courseTitle, blockTitle: g.blockTitle, count: g.count, scene: [...g.tags].slice(0, 6).join("，"), ...(g.locked ? { locked: true, lockLines: g.lockLines } : {}) })) };
+      return { hits: [...groups.values()].slice(0, 20).map((g) => ({ blockId: g.blockId, courseId: g.courseId, courseTitle: g.courseTitle, blockTitle: g.blockTitle, count: g.count, scene: [...g.tags].slice(0, 6).join("，"), ...(g.locked ? { locked: true, lockLines: g.lockLines } : { photos: g.photos }) })) };
     },
   ],
   [
