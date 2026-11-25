@@ -18,7 +18,7 @@ const NO_SELECT = Platform.OS === "web" ? ({ userSelect: "none", WebkitUserSelec
  * 全螢幕看圖的「檢視全部」（業主 2026-11-25）：一格一張縮圖。
  * 點一下＝回到單張看那一張；長按一張＝進入複選（之後點一下就是勾選／取消），可全選、下載、分享給其他 App。
  */
-export function LightboxGrid({ list, current, onPick, onClose, heading, extra, actions, embedded = false }: { /** 標題列右邊的圖示按鈕（例如排序）。 */ actions?: ReactNode; /** 嵌在相簿資料夾檢視裡（不蓋滿畫面、不自帶黑底）：左邊是返回鈕（業主 2026-11-25）。 */ embedded?: boolean; list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
+export function LightboxGrid({ list, current, onPick, onClose, heading, extra, actions, embedded = false, parent, onMove }: { /** 標題上方的小字（區塊相簿的子資料夾：上層區塊名稱）。 */ parent?: string; /** 複選時多一顆「移到資料夾」鈕（有管理權限的區塊相簿用）；回傳選取的照片編號。 */ onMove?: (ids: string[]) => void; /** 標題列右邊的圖示按鈕（例如排序）。 */ actions?: ReactNode; /** 嵌在相簿資料夾檢視裡（不蓋滿畫面、不自帶黑底）：左邊是返回鈕（業主 2026-11-25）。 */ embedded?: boolean; list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
   const thumb = useThumb();
   const win = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -72,6 +72,7 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
         {embedded && !sel ? btn("回上一頁（資料夾總覽）", onClose, <Ionicons name="chevron-back" size={26} color="#fff" {...UI_ONLY} />) : null}
         {/* 資料夾名稱（業主 2026-11-25）：沒有張數統計、太長自動變兩行；右邊的排序按鈕固定顯示，不會被名稱擠掉。 */}
         <View style={[styles.label, embedded && heading && !sel ? { flex: 1, minWidth: 0, maxWidth: undefined } : null]}>
+          {parent && !sel ? <AppText {...UI_ONLY_TEXT} numberOfLines={1} style={{ color: "#9a9aa0", fontSize: 12 }}>{parent}</AppText> : null}
           <AppText variant="callout" {...UI_ONLY_TEXT} numberOfLines={embedded && heading && !sel ? 2 : 1} style={{ color: "#fff", fontWeight: "800" }}>
             {sel ? `已選 ${picked.length} 張` : heading ? heading : `全部 ${list.length} 張・長按可複選`}
           </AppText>
@@ -80,6 +81,7 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
         {sel ? (
           <>
             {btn(picked.length === list.length ? "取消全選" : "全選", () => setSel(picked.length === list.length ? new Set() : new Set(list.map((_, i) => i))), <Ionicons name={picked.length === list.length ? "checkmark-done-circle" : "checkmark-done-outline"} size={26} color="#fff" {...UI_ONLY} />)}
+            {onMove ? btn("移到資料夾", () => onMove(picked.map((i) => list[i]!.id ?? "").filter(Boolean)), <Ionicons name="folder-open-outline" size={24} color="#fff" {...UI_ONLY} />, !picked.length) : null}
             {btn("下載", () => void run(() => downloadImages(urls(), name), "下載失敗，請稍後再試"), <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />, !picked.length || busy)}
             {btn("分享", () => void run(() => shareImages(name, urls()), "分享失敗，請稍後再試"), <ShareIcon size={24} color="#fff" uiOnly />, !picked.length || busy)}
             {btn("取消複選", () => setSel(null), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}

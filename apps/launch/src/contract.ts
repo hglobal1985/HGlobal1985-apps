@@ -486,10 +486,13 @@ export type AlbumInfo = {
   groupRank: string;
 };
 export type AlbumPermissions = { ranks: { code: string; name: string }[]; groups: { id: string; label: string; uploadMinRank: string }[]; folders: { id: string; title: string; groupId: string; count: number; uploadMinRank: string | null }[] };
+/** 區塊相簿的子資料夾（業主 2026-11-26）：folders 依張數多到少；uncat＝還沒分資料夾的照片（固定排最後）。 */
+export type AlbumSubfolder = { id: string; name: string; count: number; thumbs: string[] };
+export type AlbumSubfolders = { folders: AlbumSubfolder[]; uncat: { count: number; thumbs: string[] }; canManage: boolean };
 export type AlbumGroup = { id: string; label: string; folders: AlbumFolder[] };
 export type AlbumsResponse = { total: number; groups: AlbumGroup[] };
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
-export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（業主 2026-11-24）。 */ scene?: string; /** 上傳時間（相簿資料夾排序用）。 */ createdAt?: string; /** 上傳者暱稱與頭像（單張看圖顯示；舊照片沒有）。 */ uploader?: string; uploaderAvatar?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
+export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（業主 2026-11-24）。 */ scene?: string; /** 上傳時間（相簿資料夾排序用）。 */ createdAt?: string; /** 上傳者暱稱與頭像（單張看圖顯示；舊照片沒有）。 */ uploader?: string; uploaderAvatar?: string; /** 區塊相簿的子資料夾編號（沒有＝未分類）。 */ folderId?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
 /** 縮圖符號（業主 2026-11-23）：系列卡、課程卡、中心卡的小縮圖。symbol＝emoji 或短文字（最多 4 個字）；fg 文字色、bg 底色（#RRGGBB）。 */
 export type ThumbBadgeKind = "course" | "series" | "center";
 export type ThumbBadge = { kind: ThumbBadgeKind; key: string; symbol: string; fg: string; bg: string };

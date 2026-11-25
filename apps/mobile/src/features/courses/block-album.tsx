@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { Platform, Pressable, ScrollView, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -8,6 +8,7 @@ import { AppText, Card } from "@/ui";
 import { LockMask } from "@/ui";
 import { blockPhotoCount } from "./block-photos";
 import { CoverAlbum } from "./album";
+import { SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
 import { AlbumSearchBar, albumSearchable, matchAlbumItem, useAlbumSearch } from "./album-search";
 
 /** 有照片的區塊（相簿分頁、「瀏覽本區照片」都以這份為準）。 */
@@ -58,7 +59,7 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
                 <View style={{ paddingBottom: space.sm, gap: space.sm, ...(g.blockLocked ? { position: "relative", minHeight: 200, overflow: "hidden", borderRadius: radius.md } : {}) }}>
                   {/* 沒有權限：照樣顯示全部預覽縮圖，上面蓋鎖頭遮罩＋原因（LockMask，與課程沒報名同一個模組；業主 2026-11-24）。 */}
                   {sceneTags(g.photos!).length ? <AppText variant="caption" tone="muted">{`場景：${sceneTags(g.photos!).join("、")}`}</AppText> : null}
-                  <CoverAlbum kind="course" ownerKey={g.photoKey!} title={g.title} items={g.photos!} canEdit={!!course.can?.edit && !key} onChanged={onChanged ?? (() => undefined)} />
+                  <BlockBody group={g} canEdit={!!course.can?.edit && !key} searching={!!key} onChanged={onChanged ?? (() => undefined)} />
                   {/* 遮罩一定要放在最後一個子元素才蓋得住上面的縮圖（LockMask 的用法）。 */}
                   {g.blockLocked ? <LockMask lines={g.lockLines ?? ["目前無法使用"]} /> : null}
                 </View>
@@ -67,6 +68,47 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
           </Card>
         );
       })}
+    </View>
+  );
+}
+
+/**
+ * 區塊相簿的內容（業主 2026-11-26，與相簿瀏覽器共用子資料夾資料與面板 `album-subfolders.tsx`）：
+ * 有子資料夾時，照片上方多一排標籤「全部／各資料夾（按張數多到少）／未分類」；有權限者多「＋新增」「管理」，每張照片可「移到資料夾」。
+ * 只有「全部」標籤可排序／刪除（排序是整本的順序）。
+ */
+function BlockBody({ group: g, canEdit, searching, onChanged }: { group: Lesson; canEdit: boolean; searching: boolean; onChanged: () => void }) {
+  const { c } = useTheme();
+  const { subs, reload } = useSubfolders(g.photoKey);
+  const [chip, setChip] = useState<string>("all"); // all／""（未分類）／資料夾編號
+  const [sheet, setSheet] = useState<FolderSheetState>(null);
+  const [moveIds, setMoveIds] = useState<string[]>([]);
+  const folders = subs?.folders ?? [];
+  const manage = !!subs?.canManage && !searching;
+  const shownChip = chip === "all" || (chip !== "" && !folders.some((f) => f.id === chip)) ? "all" : chip === "" && !subs?.uncat.count ? "all" : chip;
+  const items = shownChip === "all" ? g.photos! : g.photos!.filter((p) => (p.folderId ?? "") === shownChip);
+  const done = () => (reload(), onChanged());
+  const pill = (id: string, label: string, n: number | null, on: boolean, onPress: () => void, icon?: string) => (
+    <Pressable key={id} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={n === null ? label : `${label}，${n} 張`} onPress={onPress} style={{ flexDirection: "row", alignItems: "center", gap: 6, minHeight: 44, paddingHorizontal: 14, borderRadius: 22, backgroundColor: on ? c.accent : c.surfaceMuted }}>
+      {icon ? <Ionicons name={icon as never} size={16} color={on ? "#fff" : c.accentText} /> : null}
+      <AppText variant="callout" style={{ color: on ? "#fff" : c.text, fontWeight: "800" }}>{label}</AppText>
+      {n !== null ? <AppText variant="caption" style={{ color: on ? "#fff" : c.textMuted }}>{n}</AppText> : null}
+    </Pressable>
+  );
+  const hasChips = folders.length > 0 && !searching;
+  return (
+    <View style={{ gap: space.sm }}>
+      {hasChips || manage ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
+          {hasChips ? pill("all", "全部", g.photos!.length, shownChip === "all", () => setChip("all")) : null}
+          {hasChips ? folders.map((f) => pill(f.id, f.name, f.count, shownChip === f.id, () => setChip(f.id))) : null}
+          {hasChips && subs!.uncat.count ? pill("uncat", "未分類", subs!.uncat.count, shownChip === "", () => setChip("")) : null}
+          {manage ? pill("new", "新增", null, false, () => setSheet({ t: "new", move: false }), "add") : null}
+          {manage && folders.length ? pill("manage", "管理", null, false, () => setSheet({ t: "manage" }), "settings-outline") : null}
+        </ScrollView>
+      ) : null}
+      <CoverAlbum kind="course" ownerKey={g.photoKey!} title={g.title} items={items} canEdit={canEdit && shownChip === "all"} onChanged={onChanged} onMovePhoto={manage ? (id) => (setMoveIds([id]), setSheet({ t: "move" })) : undefined} />
+      <SubfolderSheet dark={false} sheet={sheet} setSheet={setSheet} blockKey={g.photoKey!} subs={subs} selIds={moveIds} onChanged={done} onMoved={() => setMoveIds([])} />
     </View>
   );
 }
