@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState, type ReactNode } from "react";
-import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl } from "@/api/client";
 import { downloadImages, shareImages } from "@/lib/share";
@@ -29,6 +29,16 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
   const areaW = embedded && boxW ? boxW : win.width - insets.left - insets.right;
   const cols = Math.max(3, Math.floor(areaW / 140));
   const cell = Math.floor((areaW - gap * (cols + 1)) / cols);
+  // 從單張看圖按 ✕ 回到縮圖清單：自動捲到剛剛那張照片的位置，不跳回最上面（業主 2026-11-25）。
+  const scroller = useRef<ScrollViewInstance | null>(null);
+  const focused = useRef(false);
+  useEffect(() => {
+    if (focused.current || current < 0 || !list.length || cell <= 0 || (embedded && !boxW)) return;
+    focused.current = true;
+    const y = Math.max(0, Math.floor(current / cols) * (cell + gap) - Math.round(cell * 0.6));
+    const t = setTimeout(() => scroller.current?.scrollTo({ y, animated: false }), 30);
+    return () => clearTimeout(t);
+  }, [current, list.length, cols, cell, boxW]); // eslint-disable-line react-hooks/exhaustive-deps
   const picked = sel ? [...sel].sort((a, b) => a - b) : [];
   const toggle = (i: number) =>
     setSel((s) => {
@@ -81,7 +91,7 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
         )}
       </View>
       {extra && !sel ? <View style={{ paddingHorizontal: embedded ? 0 : 16, paddingBottom: 8 }}>{extra}</View> : null}
-      <ScrollView contentContainerStyle={{ padding: gap, paddingLeft: embedded ? gap : gap + insets.left, paddingBottom: insets.bottom + 24, flexDirection: "row", flexWrap: "wrap", gap }}>
+      <ScrollView ref={scroller} contentContainerStyle={{ padding: gap, paddingLeft: embedded ? gap : gap + insets.left, paddingBottom: insets.bottom + 24, flexDirection: "row", flexWrap: "wrap", gap }}>
         {list.map((it, i) => {
           const on = !!sel?.has(i);
           return (
