@@ -10,6 +10,8 @@ import { useSession } from "@/state/session";
 import { engine } from "./engine";
 import { scrollPlayerPageTop, useShrink } from "./shrink";
 import { usePlayer } from "./use-player";
+import { notePipStarted } from "./pip-help-store";
+import { PipHelp, useNativePipHelp } from "./pip-help";
 
 const MARGIN = 8;
 const BAR = 64; // 底部分頁列大約高度
@@ -22,7 +24,7 @@ const GREEN = "#0c603c";
  * 點一下回到課程頁；有播放／暫停、縮小與關閉。按「縮小」變成小圓圖（課程 EDM，播放中 360 度旋轉），點一下恢復。
  * 純音檔平常由底部迷你列控制，按「縮小」後也會變成同樣的小圓圖。
  */
-export function PlayerLayer() {
+function MiniLayer() {
   const s = usePlayer();
   const { ready, member } = useSession();
   const { width: W, height: H } = useWindowDimensions();
@@ -110,7 +112,7 @@ export function PlayerLayer() {
     );
   return (
     <Animated.View style={[styles.win, { width: w, height: h, transform: pan.getTranslateTransform() }]} {...responder.panHandlers}>
-      <VideoView player={p!} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="contain" allowsPictureInPicture startsPictureInPictureAutomatically />
+      <VideoView player={p!} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="contain" allowsPictureInPicture startsPictureInPictureAutomatically onPictureInPictureStart={notePipStarted} />
       <Pressable accessibilityLabel="關閉播放" onPress={() => !engine.recentlySwitched() && engine.close()} style={[styles.btn, { top: 4, right: 4 }]} hitSlop={8}>
         <Ionicons name="close" size={20} color="#fff" />
       </Pressable>
@@ -123,6 +125,17 @@ export function PlayerLayer() {
         </Pressable>
       </View>
     </Animated.View>
+  );
+}
+
+/** 全站播放畫面層（App 版）：迷你小視窗＋「縮小後留在浮動視窗」的授權教學。 */
+export function PlayerLayer() {
+  useNativePipHelp();
+  return (
+    <>
+      <MiniLayer />
+      <PipHelp />
+    </>
   );
 }
 

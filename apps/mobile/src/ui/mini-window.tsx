@@ -6,6 +6,12 @@ import type { Rect } from "./band-rect";
 import { MINI_BAR, MINI_BAR_BG, MINI_BTN, MINI_BTN_COLORS, MINI_BTN_GLYPH_COLOR, MINI_CIRCLE, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, MINI_RADIUS, miniFloatWidth } from "./mini-spec";
 
 type Pos = { x: number; y: number };
+/** 預設位置的底邊：網頁版＝底部分頁列的上緣（小視窗放在分頁列上方），其他＝這一層的底部。 */
+function defaultBottomEdge(h: number): number {
+  if (Platform.OS !== "web" || typeof document === "undefined") return h;
+  const bar = document.querySelector('[role="tablist"]');
+  return bar ? bar.getBoundingClientRect().top : h;
+}
 
 /**
  * 封面迷你小視窗（業主 2026-11-24 永久指示：與影片迷你小視窗一模一樣的參數與功能）：
@@ -61,7 +67,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
   const W = collapsed ? MINI_CIRCLE : mw;
   const H = collapsed ? MINI_CIRCLE : mh + MINI_BAR; // 小視窗＝按鈕列＋畫面；位置記的是整組左上角
   const clampPos = (p: Pos): Pos => ({ x: Math.min(area.w - W - MINI_MARGIN, Math.max(MINI_MARGIN, p.x)), y: Math.min(area.h - H - MINI_MARGIN, Math.max(MINI_MARGIN, p.y)) });
-  const cur = clampPos(saved ?? { x: area.w - W - 12, y: (getBottomEdge?.() ?? area.h) - H - 12 });
+  const cur = clampPos(saved ?? { x: area.w - W - 12, y: (getBottomEdge?.() ?? defaultBottomEdge(area.h)) - H - 12 });
   const live = useRef<{ cur: Pos; clampPos: (p: Pos) => Pos; onTap?: () => void; collapsed: boolean; restore: () => void }>({ cur, clampPos, onTap, collapsed, restore: () => undefined });
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
   const savedRef = useRef<Pos | null>(null);
@@ -125,7 +131,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
     { key: "max", label: maximizeLabel, glyph: MINI_GLYPHS.max, color: MINI_BTN_COLORS.max, act: onMaximize },
     { key: "close", label: "關閉小視窗", glyph: MINI_GLYPHS.close, color: MINI_BTN_COLORS.close, act: onClose },
   ];
-  return (
+  const tree = (
     <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: 30 }]} ref={root} onLayout={(e) => (setArea({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }), root.current?.measureInWindow((x: number, y: number) => setOrigin({ x, y })))}>
       {visible && area.w && morphing ? (
         <View pointerEvents="none" style={{ position: "absolute", left: mx, top: my, width: mwid, height: mhei }}>
@@ -135,7 +141,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
         </View>
       ) : null}
       {visible && area.w && !morphing ? (
-        <View {...responder.panHandlers} accessibilityLabel={label} style={[{ position: "absolute", left: cur.x, top: cur.y, width: W, opacity }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab", userSelect: "none", WebkitUserSelect: "none" } as object) : null]}>
+        <View {...responder.panHandlers} {...({ dataSet: { noPullRefresh: "" } } as object)} accessibilityLabel={label} style={[{ position: "absolute", left: cur.x, top: cur.y, width: W, opacity }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab", userSelect: "none", WebkitUserSelect: "none" } as object) : null]}>
           {collapsed ? (
             <View accessibilityRole="button" accessibilityLabel="恢復小視窗（可按住拖曳移動）" style={{ width: MINI_CIRCLE, height: MINI_CIRCLE }}>
               <GradientFrame width={MINI_CIRCLE} height={MINI_CIRCLE} radius={MINI_CIRCLE / 2} running={running} flush>
@@ -164,4 +170,9 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
       ) : null}
     </View>
   );
+  // 網頁版：放在整個視窗最上層的固定層（業主 2026-11-25：小視窗／圓球可以拖到上方標題列的位置，不被頁面內容區裁住）。
+  if (Platform.OS !== "web" || typeof document === "undefined") return tree;
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { createPortal } = require("react-dom") as typeof import("react-dom");
+  return createPortal(<div style={{ position: "fixed", inset: 0, zIndex: 900, pointerEvents: "none" }}>{tree}</div>, document.body);
 }

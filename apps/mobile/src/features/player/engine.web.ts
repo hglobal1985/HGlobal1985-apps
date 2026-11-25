@@ -1,3 +1,4 @@
+import { maybeShowPipHelp, pipBlocked } from "./pip-help-store";
 import { inAppBrowser } from "@/lib/in-app-browser";
 import { flashText } from "@/ui/flash-notice";
 import { resolveUrl } from "@/api/client";
@@ -234,6 +235,13 @@ function iosPipOk() {
 function iosPresentation() {
   return (video as unknown as IosVideo | null)?.webkitPresentationMode;
 }
+/** 縮小瀏覽器時，影片播放中就嘗試進入手機的浮動小視窗（業主 2026-11-25）；被拒絕（多半是手機沒開授權）就記下來，回來時教使用者開。 */
+function tryAutoPip() {
+  const t = snap.track;
+  if (!t || t.mode !== "video" || !video || bg || !intent || video.paused || !document.pictureInPictureEnabled) return;
+  if (document.pictureInPictureElement === video) return;
+  video.requestPictureInPicture().catch(() => pipBlocked());
+}
 function onHidden() {
   if (bgTimer) clearTimeout(bgTimer);
   bgTimer = setTimeout(() => {
@@ -263,7 +271,15 @@ function toForeground() {
   if (want) void video.play().catch(() => undefined);
 }
 if (typeof document !== "undefined") {
-  document.addEventListener("visibilitychange", () => (document.hidden ? onHidden() : toForeground()));
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      tryAutoPip();
+      onHidden();
+    } else {
+      toForeground();
+      void maybeShowPipHelp();
+    }
+  });
   // iOS Safari 切換 App 時比較常觸發 pagehide／pageshow
   window.addEventListener("pagehide", onHidden);
   window.addEventListener("pageshow", () => !document.hidden && toForeground());
