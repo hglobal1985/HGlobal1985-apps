@@ -2,6 +2,31 @@ import { trackFeature } from "@/lib/feature-track";
 import { Platform, Share } from "react-native";
 import { DEFAULT_SHARE_SETTINGS, resolveUrl, reviewerInviteMessage, shareMessage, type UiConfig } from "@/api/client";
 
+/**
+ * 分享、下載到手機的圖片一律是 JPEG（業主 2026-11-25）：相簿照片可能存成 AVIF／WebP（省空間），
+ * 但存到手機相簿、傳給其他 App 時要最通用的 JPEG。網頁在瀏覽器內解碼再用畫布輸出 JPEG（不花伺服器額度；透明背景墊白色）。
+ * 轉不成（舊瀏覽器）就維持原檔。
+ */
+async function asJpeg(blob: Blob): Promise<Blob> {
+  if (blob.type === "image/jpeg" || typeof createImageBitmap !== "function") return blob;
+  try {
+    const bmp = await createImageBitmap(blob);
+    const c = document.createElement("canvas");
+    c.width = bmp.width;
+    c.height = bmp.height;
+    const g = c.getContext("2d");
+    if (!g) return blob;
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, c.width, c.height);
+    g.drawImage(bmp, 0, 0);
+    const out = await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.92));
+    return out ?? blob;
+  } catch {
+    return blob;
+  }
+}
+const jpgName = (n: string) => n.replace(/\.(avif|webp|png|jpe?g)$/i, "") + ".jpg";
+
 /** 絕對網址（分享與下載用）。 */
 /** 頁面路徑 → 完整網址（邀請的 QR Code 與分享共用）。 */
 export const absoluteUrl = (url: string) => absolute(url);
@@ -78,8 +103,8 @@ export async function shareImage(title: string, url: string, fileName = "poster.
     }
   }
   try {
-    const blob = await (await fetch(link)).blob();
-    const file = new window.File([blob], fileName, { type: blob.type || "image/jpeg" });
+    const blob = await asJpeg(await (await fetch(link)).blob());
+    const file = new window.File([blob], blob.type === "image/jpeg" ? jpgName(fileName) : fileName, { type: blob.type || "image/jpeg" });
     if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
       await navigator.share({ files: [file], title });
       return "shared";
@@ -97,10 +122,10 @@ export async function downloadImage(url: string, fileName: string): Promise<void
     return;
   }
   trackFeature("download_image");
-  const blob = await (await fetch(absolute(url))).blob();
+  const blob = await asJpeg(await (await fetch(absolute(url))).blob());
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = fileName;
+  a.download = blob.type === "image/jpeg" ? jpgName(fileName) : fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -117,7 +142,7 @@ export async function shareImages(title: string, urls: string[]): Promise<"share
   if (Platform.OS === "web") {
     try {
       const files = await Promise.all(urls.map(async (u, i) => {
-        const blob = await (await fetch(absolute(u))).blob();
+        const blob = await asJpeg(await (await fetch(absolute(u))).blob());
         return new window.File([blob], `${title}-${i + 1}.jpg`, { type: blob.type || "image/jpeg" });
       }));
       if (typeof navigator.canShare === "function" && navigator.canShare({ files })) {

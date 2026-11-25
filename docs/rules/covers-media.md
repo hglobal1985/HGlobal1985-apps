@@ -68,3 +68,5 @@
 - **相片／影片上傳不限張數（業主 2026-11-25，取代所有「最多 100 張」的舊規則）**：中心 EDM、封面輪播、各類相簿（系列、課程、區塊照片）一律不設張數上限；已移除 `COVER_MEDIA_MAX`，後端 `coverRoom` 不再檢查，上傳按鈕只顯示目前張數「上傳EDM（n）」。
 
 - **全螢幕看圖「檢視全部」（業主 2026-11-25）**：`EdmLightbox` 有一組圖（`items` 超過一張）時，上方工具列多一顆格狀圖示「檢視全部」（`features/courses/lightbox-grid.tsx` 的 `LightboxGrid`）：手機 3 欄縮圖格；點一下＝回單張看那一張；**長按一張進入複選**（之後點一下＝勾選／取消，右上角圓形勾），複選時工具列變成「全選／下載／分享／取消複選」，沒選任何張時下載與分享停用；沒在複選時只有「回到單張檢視」鈕。分享用 `lib/share.ts` 的 `shareImages`（網頁一次傳多個圖片檔給系統分享選單；不支援就分享連結；App 因系統一次只能傳一個檔案，改傳所有圖片連結文字）；下載用 `downloadImages`（網頁依序下載，App 走分享選單）。Esc 先關格狀畫面。
+
+- **相簿獨立存檔格式與畫質（AVIF 試行，業主 2026-11-25）**：`AppSettings.albumFormat`（預設 AVIF）、`albumQuality`（預設 60）、`albumScope`（`off`／`treasure`＝只有成交百寶箱（預設）／`all`＝全部相簿），在設定 › 儲存空間管理的「相簿照片」區塊調整。`PUT /admin/cover-media` 上傳時，依 `albumRefOf` 判斷資料夾所屬類別，範圍符合就用 `shrinkImage(..., override)` 轉成相簿格式與畫質（其他照片仍用全站 `storeFormat`）。**業主實機確認沒問題才把範圍改成「全部相簿」**；舊照片不回頭轉檔；Android 舊手機可能不顯示 AVIF，改全站前必須實機驗證。**分享、下載一律轉 JPEG**：`lib/share.ts` 的 `asJpeg`（網頁在瀏覽器內用畫布輸出 JPEG，透明墊白，檔名 `.jpg`），單張、複選分享、下載都走它；**App（原生）版沒有圖片轉檔套件，目前不轉**，要支援需另外加 `expo-image-manipulator`。縮圖仍是 WebP（Cloudflare 即時縮圖）。
