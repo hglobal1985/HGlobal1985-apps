@@ -5,6 +5,7 @@
  * 只回課程與章節編號（依相似程度排序）；前端只顯示自己有權限的索引裡有的，所以不洩漏內容。
  */
 import { pinyin } from "pinyin-pro";
+import { loadSearchSettings } from "./search-settings.ts";
 import type { D1Database } from "./d1.ts";
 
 /** 近音正規化：翹舌＝平舌、前後鼻音相同、ü＝u。 */
@@ -37,7 +38,7 @@ export function approxSyl(s: string[], q: string[], k: number): boolean {
   return false;
 }
 /** 容許差幾個音節：2～3 音節必須完全相同，4 個以上可差 1。 */
-const allow = (m: number) => (m >= 4 ? 1 : 0);
+const allow = (m: number, from = 4) => (m >= from ? 1 : 0);
 
 type Seg = { syl: string[]; w: number };
 type Entry = { kind: "course" | "lesson"; id: string; courseId: string; segs: Seg[] };
@@ -59,9 +60,11 @@ async function load(db: D1Database): Promise<Entry[]> {
 
 /** 查詢 → 同音／近音的課程與章節編號（相似度高的在前）。查詢少於 2 個音節不比對（太短會亂配）。 */
 export async function phoneticSearch(db: D1Database, q: string, limit = 24): Promise<{ courses: string[]; lessons: string[] }> {
+  const st = await loadSearchSettings(db);
+  if (!st.phoneticEnabled) return { courses: [], lessons: [] };
   const qs = syllables(q.trim().slice(0, 100));
-  if (qs.length < 2) return { courses: [], lessons: [] };
-  const k = allow(qs.length);
+  if (qs.length < (st.phoneticMinSyllables as number)) return { courses: [], lessons: [] };
+  const k = allow(qs.length, st.phoneticTypoFrom as number);
   const score = (e: Entry) => {
     let best = 0;
     for (const s of e.segs) {

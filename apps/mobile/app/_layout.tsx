@@ -91,6 +91,7 @@ function AppStack() {
             <Stack.Screen name="admin/brand-logos" options={{ title: "品牌 Logo" }} />
             <Stack.Screen name="admin/list-cover-bgs" options={{ title: "清單封面底圖" }} />
             <Stack.Screen name="admin/synonyms" options={{ title: "搜尋關聯詞" }} />
+            <Stack.Screen name="admin/search-settings" options={{ title: "搜尋與 AI 設定" }} />
             <Stack.Screen name="admin/youtube-syncs" options={{ title: "同步 YouTube 清單" }} />
             <Stack.Screen name="admin/thumbnails" options={{ title: "Cloudflare即時縮圖" }} />
             <Stack.Screen name="admin/storage" options={{ title: "儲存空間管理" }} />

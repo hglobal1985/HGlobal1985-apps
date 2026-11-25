@@ -127,8 +127,12 @@ export function approxIncludes(text: string, pat: string, k: number): boolean {
   }
   return false;
 }
+/** 搜尋參數（由「搜尋與 AI 設定」決定；use-search-settings.ts 每次繪製前更新）。 */
+export type SearchTune = { fuzzyEnabled: boolean; fuzzyMaxDiff: number; charsEnabled: boolean; charsMinLen: number; listCardsLast: boolean };
+let TUNE: SearchTune = { fuzzyEnabled: true, fuzzyMaxDiff: 2, charsEnabled: true, charsMinLen: 3, listCardsLast: true };
+export const setSearchTune = (t: SearchTune) => { TUNE = t; };
 /** 容許的差異字數：1～2 個字必須完全一樣（太短會亂配）、3～4 個字差 1、5 個字以上差 2。 */
-const allowance = (len: number) => (len <= 2 ? 0 : len <= 4 ? 1 : 2);
+const allowance = (len: number) => Math.min(TUNE.fuzzyEnabled ? TUNE.fuzzyMaxDiff : 0, len <= 2 ? 0 : len <= 4 ? 1 : 2);
 const fuzzyHit = (hay: string, w: string) => {
   if (hay.includes(w)) return true;
   const k = allowance([...w].length);
@@ -157,7 +161,7 @@ export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
 export function charsCourses(index: SearchIndex, q: string): Set<string> {
   const chars = [...new Set([...q.toLowerCase().replace(/\s+/g, "")])];
   const out = new Set<string>();
-  if (chars.length < 3) return out;
+  if (!TUNE.charsEnabled || chars.length < TUNE.charsMinLen) return out;
   for (const [id, hay] of index.haystack) if (chars.every((ch) => hay.includes(ch))) out.add(id);
   return out;
 }
@@ -186,6 +190,6 @@ export function rankCourses(index: SearchIndex, list: CourseSummary[], q: string
   return list
     .map((c) => ({ c, r: rel(c) }))
     // 只是「相近」（同音、模糊、AI 語意）的品牌／清單卡排在課程後面（業主 2026-11-25）；字面完全符合的不受影響。
-    .sort((a, b) => Number(a.c.isList && a.r < 3) - Number(b.c.isList && b.r < 3) || b.r - a.r || (date(b.c) > date(a.c) ? 1 : date(b.c) < date(a.c) ? -1 : 0) || enrolled(b.c) - enrolled(a.c))
+    .sort((a, b) => (TUNE.listCardsLast ? Number(a.c.isList && a.r < 3) - Number(b.c.isList && b.r < 3) : 0) || b.r - a.r || (date(b.c) > date(a.c) ? 1 : date(b.c) < date(a.c) ? -1 : 0) || enrolled(b.c) - enrolled(a.c))
     .map((x) => x.c);
 }
