@@ -10,6 +10,8 @@ import { PaymentForm } from "@/features/orders/payment-form";
 import { OrderTimeline } from "@/features/orders/timeline";
 import { WebOnly } from "@/features/web-only";
 import { useApi, useSession } from "@/state/session";
+import { elderTextScale } from "@/lib/elder-mode";
+import { UI_SCALE } from "@/theme/ui-scale";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Button, Card, ErrorView, LoadingView, NoticeBox, Screen } from "@/ui";
@@ -50,9 +52,7 @@ function OrderDetail() {
             </AppText>
           );
         })}
-        <AppText style={[styles.amount, { color: c.text }]} accessibilityLabel={`金額 ${total} 元`} adjustsFontSizeToFit numberOfLines={1}>
-          {total ? ntd(total) : "免費"}
-        </AppText>
+        <FitAmount text={total ? ntd(total) : "免費"} label={`金額 ${total} 元`} color={c.text} />
       </Card>
       {data.status === "pending" ? (
         <Card>
@@ -94,6 +94,20 @@ export default function OrderScreen() {
     <WebOnly>
       <OrderDetail />
     </WebOnly>
+  );
+}
+
+/** 金額一定要完整顯示（業主 2026-11-25 回報至尊模式只顯示「NT$…」）：依卡片寬度與字數自動縮字級，一行放得下為止（畫字時會再乘平板倍數×至尊倍數，所以在放大前的尺寸上算）。 */
+function FitAmount({ text, label, color }: { text: string; label: string; color: string }) {
+  const [w, setW] = useState(0);
+  const k = UI_SCALE * elderTextScale();
+  const size = w ? Math.max(20, Math.min(60, Math.floor(w / k / ([...text].length * 0.62)))) : 40;
+  return (
+    <View style={{ alignSelf: "stretch" }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+      <AppText style={[styles.amount, { color, fontSize: size, lineHeight: Math.round(size * 1.15), textAlign: "center" }]} accessibilityLabel={label} numberOfLines={1}>
+        {text}
+      </AppText>
+    </View>
   );
 }
 

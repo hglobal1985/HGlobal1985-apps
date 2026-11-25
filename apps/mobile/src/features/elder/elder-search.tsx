@@ -246,7 +246,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
                 <AppText variant="headline" style={{ color: c.navPillText }}>
                   繼續上課
                 </AppText>
-                <AppText numberOfLines={2} style={{ color: c.navPillText, lineHeight: 18 }}>
+                <AppText numberOfLines={1} style={{ color: c.navPillText, lineHeight: 18 }}>
                   {cont.title}
                 </AppText>
               </View>
