@@ -239,8 +239,10 @@ function iosPresentation() {
  * YouTube 內嵌影片縮小瀏覽器（業主 2026-11-25：要繼續在通知欄播放）：記下縮小前正在播放；縮小後若 YouTube 自己把影片暫停了，
  * 在 0.6、1.5、3 秒各補送一次「播放」指令，並維持通知欄的播放狀態。YouTube 對手機瀏覽器的背景播放有自己的限制，補送不一定會成功。
  */
+let ytWasPlayingOnHide = false;
 function ytKeepPlaying() {
   const t = snap.track;
+  ytWasPlayingOnHide = !!t && t.mode === "youtube" && snap.playing;
   if (!t || t.mode !== "youtube" || !snap.playing || !intent) return;
   const id = snap.loadId;
   for (const ms of [600, 1500, 3000]) {
@@ -299,6 +301,8 @@ if (typeof document !== "undefined") {
     } else {
       toForeground();
       void maybeShowPipHelp();
+      if (ytWasPlayingOnHide && snap.track?.mode === "youtube" && !snap.playing) flashText("YouTube 影片縮小瀏覽器會被 YouTube 暫停，請按播放繼續");
+      ytWasPlayingOnHide = false;
     }
   });
   // iOS Safari 切換 App 時比較常觸發 pagehide／pageshow
