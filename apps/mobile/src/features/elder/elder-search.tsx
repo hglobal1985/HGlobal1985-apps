@@ -8,6 +8,7 @@ import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, matchCourses
 import { useSynonyms } from "@/features/courses/use-synonyms";
 import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
+import { AlbumViewer } from "@/features/courses/edm-viewer";
 import { SceneHits, useSceneSearch } from "@/features/courses/scene-hits";
 import { useThumb } from "@/lib/thumb";
 import { useProfileRedirect } from "@/features/profile-gate";
@@ -499,5 +500,11 @@ const styles = StyleSheet.create({
 /** 第五大分類「相簿」卡（業主 2026-11-25）：與四個分類同款，點開前往相簿專區（/albums）。 */
 function ElderAlbumCard() {
   const { data } = useApi<AlbumsResponse>("/albums");
-  return <ElderZoneCard zone={ELDER_ALBUM_ZONE} count={data?.total ?? 0} onPress={() => router.push("/albums" as never)} />;
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ElderZoneCard zone={ELDER_ALBUM_ZONE} count={data?.total ?? 0} onPress={() => setOpen(true)} />
+      {open ? <AlbumViewer onClose={() => setOpen(false)} /> : null}
+    </>
+  );
 }
