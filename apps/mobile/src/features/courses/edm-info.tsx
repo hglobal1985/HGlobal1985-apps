@@ -29,6 +29,8 @@ export type MediaInfo = {
   ocrText: string;
   /** 套入「AI 文字辨識」欄位格式後的內容；fields 為 null＝還沒整理好（顯示清理過的原文）。 */
   structured: { fields: [string, string][] | null; other: string; stale: boolean };
+  /** 不是相簿照片（沒有辨識文字、上傳者）。 */
+  basic?: boolean;
   file: { name?: string; type?: string; bytes?: number; width?: number; height?: number; lastModified?: string };
   exif: Record<string, unknown>;
 };
@@ -67,8 +69,8 @@ const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "bo
  * 圖片資訊面板（業主 2026-11-24）：半透明黑底視窗，三大類——EXIF 詳細資訊、行動大學站內資訊、辨識後的圖片文字（可選取、可複製）。
  * 在全螢幕看圖（EdmLightbox）右上角的驚嘆號按鈕開關；視窗右上角也有 X。
  */
-export function EdmInfoPanel({ id, top = 140, onClose }: { id: string; top?: number; onClose: () => void }) {
-  const r = useApi<MediaInfo>(`/cover-media/${id}/info`);
+export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string; /** 沒有相簿照片編號時，用圖片網址裡的儲存檔名查（課程封面、品牌 logo、課表…）。 */ imageKey?: string; top?: number; onClose: () => void }) {
+  const r = useApi<MediaInfo>(id ? `/cover-media/${id}/info` : `/image-info?k=${encodeURIComponent(imageKey ?? "")}`);
   const info = r.data;
   const [showRaw, setShowRaw] = useState(false);
   const copy = async (t: string) => {
@@ -105,7 +107,7 @@ export function EdmInfoPanel({ id, top = 140, onClose }: { id: string; top?: num
         {!info ? <Text style={styles.v}>{r.error ? `讀取失敗：${r.error}` : "讀取中…"}</Text> : null}
         {info ? (
           <>
-            <View style={styles.sec}>
+            {info.basic ? null : <View style={styles.sec}>
               <Text style={styles.h}>① 辨識後的圖片文字</Text>
               {info.kind === "video" ? <Text style={styles.v}>影片沒有文字辨識。</Text> : (
                 <>
@@ -150,19 +152,19 @@ export function EdmInfoPanel({ id, top = 140, onClose }: { id: string; top?: num
                   ) : <Text style={styles.v}>{info.ocrStatus === "done" ? "沒有辨識出文字。" : "目前還沒有辨識出的文字。"}</Text>}
                 </>
               )}
-            </View>
+            </View>}
             <View style={styles.sec}>
-              <Text style={styles.h}>② 行動大學站內資訊</Text>
-              {row("上傳者", info.uploader || "（未記錄）")}
+              <Text style={styles.h}>{info.basic ? "行動大學站內資訊" : "② 行動大學站內資訊"}</Text>
+              {info.basic ? null : row("上傳者", info.uploader || "（未記錄）")}
               {row("上傳時間", when(info.uploadedAt))}
               {row("所屬", `${OWNER[info.ownerKind] ?? info.ownerKind}：${info.ownerKey || "—"}`)}
-              {row("放在", info.scope === "edm" ? "中心 EDM 分頁" : "封面輪播照片")}
+              {info.basic ? null : row("放在", info.scope === "edm" ? "中心 EDM 分頁" : "封面輪播照片")}
               {row("連結課程", info.courseId ? `${info.courseTitle || "課程"}（${info.courseId}）` : "沒有連結課程")}
-              {row("排序位置", `第 ${info.position + 1} 位`)}
-              {row("類型", info.kind === "video" ? `影片（${info.durationSec} 秒）` : "圖片")}
+              {info.basic ? null : row("排序位置", `第 ${info.position + 1} 位`)}
+              {info.basic ? null : row("類型", info.kind === "video" ? `影片（${info.durationSec} 秒）` : "圖片")}
               {row("站內尺寸", info.width && info.height ? `${info.width} × ${info.height} px` : "—")}
               {row("站內檔案大小", size(info.bytes))}
-              {row("上傳的原始檔", f.name ? f.name : "（舊資料，沒有記錄）")}
+              {info.basic ? row("檔案類型", f.type || "—") : row("上傳的原始檔", f.name ? f.name : "（舊資料，沒有記錄）")}
               {f.name ? row("原始檔大小", `${size(f.bytes)}　${f.width && f.height ? `${f.width} × ${f.height} px` : ""}　${f.type ?? ""}`) : null}
               {f.lastModified ? row("原始檔修改時間", when(f.lastModified)) : null}
               {info.ocrModel ? row("辨識模型", info.ocrModel) : null}
@@ -170,7 +172,7 @@ export function EdmInfoPanel({ id, top = 140, onClose }: { id: string; top?: num
               {row("圖片編號", info.id)}
             </View>
             <View style={styles.sec}>
-              <Text style={styles.h}>③ EXIF 詳細資訊</Text>
+              <Text style={styles.h}>{info.basic ? "拍攝資訊（EXIF）" : "③ EXIF 詳細資訊"}</Text>
               {exifRows.length ? exifRows : <Text style={styles.v}>沒有 EXIF（舊照片、截圖、LINE／社群軟體傳來的圖通常沒有；站內存放的圖已壓縮，EXIF 只在上傳時讀取）。</Text>}
               {gps ? (
                 <Pressable accessibilityRole="link" onPress={() => (typeof window !== "undefined" ? window.open(gps, "_blank") : undefined)} style={styles.btn}>

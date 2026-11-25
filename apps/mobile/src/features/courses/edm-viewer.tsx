@@ -298,7 +298,15 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   // 電腦（有滑鼠）才顯示左右切換按鈕；手機、平板橫放用手指滑動（業主 2026-11-21）。
   const desktop = Platform.OS === "web" && typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
   const imgBg = cur.bg ?? bg;
-  const canInfo = !!cur.id; // 圖片資訊開放給所有人（業主 2026-11-25）；showInfo 保留相容、不再限制
+  // 圖片資訊開放給所有人、所有照片都有（業主 2026-11-25）：相簿照片用編號查；其他（課程封面、品牌 logo、課表…）用網址裡的儲存檔名查。showInfo 保留相容、不再限制。
+  const imageKey = (() => {
+    try {
+      return /[?&]k=([^&]+)/.exec(cur.uri)?.[1] ? decodeURIComponent(/[?&]k=([^&]+)/.exec(cur.uri)![1]!) : undefined;
+    } catch {
+      return undefined;
+    }
+  })();
+  const canInfo = !!cur.id || !!imageKey;
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
@@ -347,7 +355,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
               </View>
             ) : null}
           </View>
-          {infoOpen && canInfo ? <EdmInfoPanel id={cur.id!} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
+          {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>
     </Modal>
