@@ -4,7 +4,6 @@ import { flashText } from "@/ui/flash-notice";
 import { resolveUrl } from "@/api/client";
 import { embeddedCover } from "./audio-cover";
 import { EMPTY, nextRate, segmentOf, type Snapshot, type Track, resumeOf } from "./engine.types";
-import { askSwitch } from "./switch-prompt";
 
 /**
  * Web 全站單一播放器：媒體元素只建立一次、永遠不會被搬動或銷毀，
@@ -415,7 +414,6 @@ let switchTimer: ReturnType<typeof setTimeout> | null = null;
 /** request() 的序號：只有最新的請求有資格真正載入。 */
 let requestSeq = 0;
 
-let stayLoad = false;
 let keepMini = false; // 下一次換播放軌時，沿用「小圓圖」狀態
 const consumeKeepMini = () => {
   const v = keepMini;
@@ -502,7 +500,7 @@ export const engine = {
     keepMini = snap.collapsed;
   },
   expectSwitch(stayMini = false) {
-    stayLoad = stayMini; // 迷你播放器原地換片：新影片載入後立刻恢復顯示（沒有播放區塊會把 switching 清掉）
+    if (stayMini) return; // 迷你播放器原地換片：不隱藏小視窗，換片才絲滑（業主 2026-11-25）
     if (switchTimer) clearTimeout(switchTimer);
     switchTimer = setTimeout(() => {
       switchTimer = null;
@@ -513,10 +511,7 @@ export const engine = {
   async request(t: Track): Promise<boolean> {
     // 同一堂而且內容也沒變才算「已經是這一堂」；key 相同但內容不同（章節改過起訖秒數、換了影片來源）要重新載入。
     if (snap.track?.key === t.key && snap.track.fp === t.fp) return true;
-    const mine = ++requestSeq;
-    const intended = snap.switching && snap.track?.courseId === t.courseId; // 自己點的章節：直接換
-    if (snap.track && snap.playing && !intended && !(await askSwitch(snap.track, t))) return false;
-    if (mine !== requestSeq) return false; // 詢問的期間又有更新的請求：這個已經過期，不能蓋掉新的
+    ++requestSeq; // 切換影片不再詢問（業主 2026-11-25），直接換
     engine.load(t);
     return true;
   },
@@ -524,7 +519,7 @@ export const engine = {
     teardownMedia();
     endedFlag = false;
     intent = false; // 等真的開始播放（play 事件）才算「想播放」
-    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: consumeKeepMini(), ...(stayLoad ? { switching: false } : {}), artworkUrl: t.artwork, loadId: snap.loadId + 1 });
+    emit({ rate: userRate, track: t, playing: false, position: segmentOf(t).start, duration: 0, loading: true, error: null, segmentEnded: false, collapsed: consumeKeepMini(), artworkUrl: t.artwork, loadId: snap.loadId + 1 });
     if (t.mode !== "youtube") {
       attach(element(), t, resumeOf(t), true, (h) => (hlsVideo = h));
       applyRate();

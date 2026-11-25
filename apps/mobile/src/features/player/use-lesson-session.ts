@@ -17,7 +17,7 @@ import { usePlayer } from "./use-player";
  * - 學習進度：記住最後學習的章節、播放 1% 回報「開始學習」、每前進 1% 且超過 10 秒回報進度、離開時補送、播到 95%／結尾自動標記完成。
  * lessonId 為 null＝沒有在播放，全部閒置。onSwitch＝被別堂佔用、使用者選「繼續原本的」時，要切到正在播的那一堂。
  */
-export function useLessonSession(c: CourseDetail | null | undefined, lessonId: string | null, reload: () => void, onSwitch: (courseId: string, lessonId: string) => void) {
+export function useLessonSession(c: CourseDetail | null | undefined, lessonId: string | null, reload: () => void) {
   const { invalidate, ready, member } = useSession();
   // 學習紀錄的三個數字由超級管理員在「設定 > APP 數值設定」調整。
   const { learnStartPct, learnDonePct, watchReportSec } = useUiConfig().config.app;
@@ -78,8 +78,6 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
         if (r != null && !already) flashText(`接續上次進度，從 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
         return;
       }
-      const cur = engine.getSnapshot().track;
-      if (cur) onSwitch(cur.courseId, cur.lessonId);
     });
     return () => {
       alive = false;

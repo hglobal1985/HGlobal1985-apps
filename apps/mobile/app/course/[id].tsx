@@ -138,7 +138,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   useEffect(() => {
     if (chapterLesson) setPlayingId(chapterLesson);
   }, [chapterLesson]);
-  const session = useLessonSession(course, editing ? null : playingId, reload, (cid, lid) => (cid === course?.id ? setPlayingId(lid) : router.replace(lessonHref(cid, lid) as never)));
+  const session = useLessonSession(course, editing ? null : playingId, reload);
   // 換章節的空檔（新的播放授權還沒回來）繼續顯示上一個播放器，避免畫面閃回 EDM。
   const lastStage = useRef<{ key: string; audio: boolean } | null>(null);
   if (session.pinned && session.track) lastStage.current = { key: session.track.key, audio: session.track.mode === "audio" };
@@ -419,6 +419,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           lockedLines={[lockedText, ...(needRank ? [needRank] : [])]}
           albumFocus={album}
           miniCover={<CourseMiniCover course={course} />}
+          hideCover={stayMini}
         />
       </View>
     );
@@ -462,6 +463,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
       <View style={lay.split ? styles.split : styles.stack}>
       <StageWidth.Provider value={lay.split ? null : undefined}>
       <View style={lay.split ? [styles.splitLeft, { width: Math.round(lay.width * 0.56) }] : undefined}>
+        {/* 迷你播放器／小圓圖播放中：上方不放封面與時間軸（業主 2026-11-25）。 */}
+        {stayMini ? null : (
         <LessonStage
           stage={stage}
           legacy={playLegacy ? session.playback : null}
@@ -470,6 +473,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           idle={<EdmStage course={course} stats={course.isList ? stats : undefined} canManageAlbum={editing} />}
           idleBar={firstPlayable || playLesson ? { minutes: (playLesson ?? firstPlayable)!.minutes, loading: !!playLesson, onPlay: () => firstPlayable && !playLesson && playLesson_(firstPlayable.id) } : null}
         />
+        )}
         {editing && canEditContent ? (
           <Pressable accessibilityRole="button" accessibilityLabel="編輯 EDM 與封面" onPress={() => setSheet("art")} style={styles.edmEdit}>
             <Ionicons name="create-outline" size={20} color="#fff" />
@@ -574,7 +578,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
       {/* 沒在播放時，封面往下滑縮成右下角的迷你小視窗（業主 2026-11-24；成對的 CollapseBand 在 LessonStage 的 idle）。 */}
-      <CoverMiniFloat enabled={!stage && !(playLegacy && session.playback) && !lay.split} cover={<CourseMiniCover course={course} />} label={course.title} />
+      <CoverMiniFloat enabled={!stayMini && !stage && !(playLegacy && session.playback) && !lay.split} cover={<CourseMiniCover course={course} />} label={course.title} />
       {photoBlock ? <BlockPhotosSheet head={photoBlock} onClose={() => setPhotoBlock(null)} onChanged={reload} /> : null}
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
