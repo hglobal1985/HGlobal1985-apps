@@ -42,6 +42,7 @@ import { usePhonetic } from "./use-phonetic";
 import { useSemantic } from "./use-semantic";
 import { useSearchSettings } from "./use-search-settings";
 import { SceneHits } from "./scene-hits";
+import { SemanticExtras } from "@/features/search/semantic-extras";
 import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses, type SeriesGroup } from "./sort";
 import { useApi, useSession } from "@/state/session";
@@ -318,7 +319,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       fuzzy: fuzzyCourses(searchIndex, q),
       chars: charsCourses(searchIndex, q),
       phonetic: [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
-      semantic: [...semantic.courses, ...lc(semantic.lessons)].filter((id) => searchIndex.haystack.has(id)),
+      semantic: [...semantic.courses].filter((id) => searchIndex.haystack.has(id)),
     };
   }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, searchData.data, searchSt]);
   const near = useMemo(() => {
@@ -475,7 +476,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     return () => clearTimeout(t);
   }, [focusKey, tileW, groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
   // 相簿照片的場景搜尋結果（業主 2026-11-24）：有打字時才找。
-  const sceneBox = q.trim() ? <SceneHits q={q} /> : null;
+  const sceneBox = q.trim() ? (
+    <>
+      <SceneHits q={q} />
+      <SemanticExtras items={semantic.extras} />
+    </>
+  ) : null;
   const termsBox = terms.length ? (
       <View style={[styles.terms, { backgroundColor: c.surface, borderColor: c.border }]}>
         {terms.map((t) => (
@@ -708,7 +714,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
                     {items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
                       <>
                         <ZoneBand zone={zone} count={items.reduce((n, g) => n + g.sessions.reduce((m, x) => m + x.materialCount, 0), 0)} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!zoneOpen(zone)} onFold={() => toggleFold(zone)} />
-                        {!zoneOpen(zone) ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} />))}
+                        {!zoneOpen(zone) ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} typeTag={!!q.trim()} />))}
                       </>
                     ) : null}
                     {/* 教育中心固定排在第二個區塊（業主 2026-11-21，原本在最下面）；排序＝各中心教材總數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}

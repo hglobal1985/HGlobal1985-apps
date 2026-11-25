@@ -1,3 +1,4 @@
+import { TagPill } from "@/features/search/semantic-extras";
 import { trackUsage } from "@/lib/usage";
 import { useEffect, useState } from "react";
 import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
@@ -69,7 +70,7 @@ export function TileCover({ rep, width, height, flat, inSeries, title }: { rep: 
   return <CourseCover theme={rep.theme} label={rep.category} title={title} fill />;
 }
 
-export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup; width: number; flat?: boolean }) {
+export function SeriesTile({ group, width, flat = false, typeTag = false }: { group: SeriesGroup; width: number; flat?: boolean; /** 搜尋結果：卡片上方中間顯示資料類別膠囊標籤（系列卡／教材卡／課程卡）。 */ typeTag?: boolean }) {
   const { c } = useTheme();
   const { member } = useSession();
   const isAdmin = member?.role === "admin";
@@ -111,6 +112,11 @@ export function SeriesTile({ group, width, flat = false }: { group: SeriesGroup;
         <TileCover rep={rep} width={width} height={height} flat={flat} inSeries={inSeries} title={inSeries ? settings.titleOf(rep.series) : rep.title} />
         {ribbons.left ? <CornerRibbon label={ribbons.left.label} bg={ribbons.left.bg} fg={ribbons.left.fg} side="left" scale={0.8} /> : null}
         {ribbons.right ? <CornerRibbon label={ribbons.right.label} bg={ribbons.right.bg} fg={ribbons.right.fg} side="right" scale={0.8} /> : null}
+        {typeTag ? (
+          <View style={{ position: "absolute", top: 6, left: 0, right: 0, alignItems: "center" }} pointerEvents="none">
+            <TagPill label={inSeries || hasSeries ? "系列卡" : rep.isList ? "教材卡" : "課程卡"} />
+          </View>
+        ) : null}
         {/* 所有卡片右下角統一顯示教材數量（業主 2026-11-20，共用 CardCount；原本只有安麗品牌專區有）。中心頁（flat）是章節選單，不放。 */}
         {!flat ? <CardCount count={count} /> : null}
         {unlisted ? (
