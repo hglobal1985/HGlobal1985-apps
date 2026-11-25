@@ -6,6 +6,7 @@ import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMedia
 import { centerTitle } from "@/features/format";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { LightboxGrid } from "./lightbox-grid";
+import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
 import { AlbumSearchBar, matchAlbumItem } from "./album-search";
 import { isSuperAdmin } from "@/lib/roles";
 import { useThumb } from "@/lib/thumb";
@@ -47,6 +48,8 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
   const [scope, setScope] = useState<"page" | "all">("page");
   const [found, setFound] = useState<Found[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [panel, setPanel] = useState<"perms" | "info" | null>(null); // 超級管理員的相簿管理面板
+  const [sortBy, setSortBy] = useState<{ key: "date" | "upload"; dir: "asc" | "desc" } | null>(null); // 資料夾照片排序
   const groups = data?.groups ?? [];
   const viewGroup = view ? groups.find((g) => g.folders.some((f) => f.id === view.folder.id)) : undefined;
   const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)); // 沒有＝相簿首頁（類別資料夾）
@@ -172,7 +175,25 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
   const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 * 2 - 36 - 8 * 3 - (large && side ? 280 : 0)) / 8.6)));
 
   // 資料夾裡的照片（此頁搜尋會過濾）
-  const shown = view ? (scope === "page" && key ? view.items.filter((p) => matchAlbumItem(p, key)) : view.items) : [];
+  const filtered = view ? (scope === "page" && key ? view.items.filter((p) => matchAlbumItem(p, key)) : view.items) : [];
+  // 排序（業主 2026-11-25）：活動日期、上傳時間；點一下遞減，再點遞增。沒有排序＝相簿原本的順序。沒有日期的照片永遠排最後。
+  const shown = sortBy
+    ? [...filtered].sort((a, b) => {
+        const va = sortBy.key === "date" ? (a.eventDate ?? "") : (a.createdAt ?? "");
+        const vb = sortBy.key === "date" ? (b.eventDate ?? "") : (b.createdAt ?? "");
+        if (!va || !vb) return va ? -1 : vb ? 1 : 0;
+        return sortBy.dir === "asc" ? va.localeCompare(vb) : vb.localeCompare(va);
+      })
+    : filtered;
+  const sortBtn = (k: "date" | "upload", icon: string, label: string) => {
+    const on = sortBy?.key === k;
+    return (
+      <Pressable key={k} accessibilityRole="button" accessibilityLabel={`${label}${on ? (sortBy!.dir === "desc" ? "，目前新到舊" : "，目前舊到新") : ""}`} onPress={() => setSortBy(on ? { key: k, dir: sortBy!.dir === "desc" ? "asc" : "desc" } : { key: k, dir: "desc" })} style={[styles.tool, on && { backgroundColor: "#2e7d32" }]}>
+        <Ionicons name={icon as never} size={22} color="#fff" {...UI_ONLY} />
+        {on ? <Ionicons name={sortBy!.dir === "desc" ? "arrow-down" : "arrow-up"} size={12} color="#fff" style={{ position: "absolute", right: 7, bottom: 7 }} {...UI_ONLY} /> : null}
+      </Pressable>
+    );
+  };
   const reloadView = async () => {
     if (!view) return;
     try {
@@ -190,7 +211,14 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
 
   const sidebar = (
     <View style={large ? { width: 300, backgroundColor: "#1c1c1f", paddingTop: 6, borderRightWidth: 1, borderRightColor: "#2f2f33" } : { alignSelf: "flex-start", minWidth: 220, maxWidth: win.width * 0.9, maxHeight: "100%", backgroundColor: "#1c1c1f", paddingTop: 6, borderRadius: 14, overflow: "hidden" }}>
-      <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", paddingHorizontal: 16, paddingBottom: 8 }}>{admin ? "相簿類別（可上下移動順序）" : "相簿類別"}</AppText>
+      <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingRight: 8, paddingBottom: 4 }}>
+        <AppText variant="caption" {...UI_ONLY_TEXT} style={{ flex: 1, color: "#9a9aa0" }}>{admin ? "相簿類別（可上下移動順序）" : "相簿類別"}</AppText>
+        {admin ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="相簿權限設定" onPress={() => setPanel("perms")} style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }}>
+            <Ionicons name="settings-outline" size={22} color="#fff" {...UI_ONLY} />
+          </Pressable>
+        ) : null}
+      </View>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
         <Pressable accessibilityRole="button" accessibilityLabel="相簿首頁" onPress={() => (setView(null), setGroup(null), setQ(""), !large && setSide(false))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingHorizontal: 12, backgroundColor: !cur ? "#2e7d32" : "transparent" }}>
           <Ionicons name="home-outline" size={18} color="#fff" {...UI_ONLY} />
@@ -237,7 +265,6 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
     <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto">
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
           {btn("資料夾清單", () => setSide((v) => !v), "folder-open", side)}
-          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><Image source={require("../../../assets/logo.png")} style={{ width: 34, height: 34 }} resizeMode="contain" accessibilityLabel="寰宇" /></View>
           <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, minWidth: 0, color: "#fff", fontWeight: "900", fontSize: titleSize, lineHeight: titleSize + 6 }}>寰宇行動大學相簿</AppText>
           {btn("關閉相簿", onClose, "close")}
         </View>
@@ -263,9 +290,10 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
               list={shown.map((x) => ({ uri: x.url, title: folderName(view.folder), id: x.id }))}
               current={-1}
               heading={folderName(view.folder)}
-              extra={view.folder.canEdit && !key ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : undefined}
+              extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}</View>) : undefined}
               onPick={(i) => onPick({ folder: view.folder, title: folderName(view.folder), items: shown, index: i })}
-              onClose={() => (setGroup(cur?.id ?? null), setView(null))}
+              actions={<View style={{ flexDirection: "row", gap: 8 }}>{sortBtn("date", "calendar-outline", "活動日期排序")}{sortBtn("upload", "time-outline", "上傳時間排序")}</View>}
+              onClose={() => (setGroup(cur?.id ?? null), setView(null), setSortBy(null))}
             />
           </View>
         ) : (
@@ -306,6 +334,8 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
         </View>
       ) : null}
       </View>
+      {panel === "perms" ? <AlbumPermissionsPanel onClose={() => setPanel(null)} onChanged={() => (reload(), void reloadView())} /> : null}
+      {panel === "info" && view ? <AlbumInfoPanel folderId={view.folder.id} title={folderName(view.folder)} onClose={() => setPanel(null)} onChanged={() => (reload(), void reloadView())} /> : null}
     </View>
   );
 }

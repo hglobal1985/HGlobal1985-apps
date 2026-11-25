@@ -53,7 +53,8 @@ test("區塊新增照片：只有開放的課程可以、照片屬於區塊、�
   const blk = (await db.prepare("SELECT id FROM lessons WHERE course_id = 'cqqxw4z2' AND brand_id = 'ba'").first<{ id: string }>())!.id;
   // 沒開放的課程：擋下
   assert.equal((await call("PUT", `/admin/cover-media?kind=course&key=osec&w=100&h=100`, { token: adm, bytes: jpeg })).status, 403);
-  // 一般會員：擋下
+  // 一般會員：擋下（成交百寶箱預設「白金以上可上傳」，這裡先清掉這個預設，只測原本的管理權限）
+  await run("DELETE FROM album_permissions");
   assert.equal((await call("PUT", `/admin/cover-media?kind=course&key=${blk}&w=100&h=100`, { token: stu, bytes: jpeg })).status, 403);
   // 開放的課程：上傳成功
   const up = await call<{ items: { id: string }[] }>("PUT", `/admin/cover-media?kind=course&key=${blk}&w=1200&h=800`, { token: adm, bytes: jpeg });

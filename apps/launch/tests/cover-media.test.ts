@@ -231,3 +231,50 @@ test("相簿專區：資料夾依張數多到少、大類別順序可調、單�
   assert.equal((await call("GET", `/albums/folder?id=${encodeURIComponent("series:none")}`)).status, 404);
   assert.deepEqual((await call<{ items: unknown[] }>("GET", "/albums/search?q=a")).data.items, [], "太短不搜");
 });
+
+test("相簿權限：獎銜達標可上傳、資料夾設定優先於類別、資訊總覽與瀏覽數（業主 2026-11-25）", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: memR2() };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.json ? { "content-type": "application/json" } : {}), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.json ? JSON.stringify(opts.json) : opts.bytes) as unknown as BodyInit | undefined }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  const login = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", { json: { sub } })).data.token;
+  const [admin, stu] = await Promise.all([login("demo-admin"), login("demo-student")]);
+  await db.prepare("INSERT INTO courses (id, title, is_list, status, view_scope, is_public, zone, block_photos) VALUES ('cx', '某課程', 0, 'published', 'all', 1, 'hglobal', 1)").run();
+  await db.prepare("INSERT INTO lessons (id, course_id, position, title, kind, media_type) VALUES ('bx', 'cx', 1, '某區塊', 'section', 'demo')").run();
+  const up = (token: string) => call("PUT", "/admin/cover-media?kind=course&key=bx&w=10&h=10", { token, bytes: jpeg });
+  await db.prepare("DELETE FROM album_permissions").run();
+  assert.equal((await up(stu)).status, 403, "沒設定：一般會員不能上傳");
+  // 只有超級管理員能改權限
+  assert.equal((await call("PUT", "/admin/albums/permission", { token: stu, json: { key: "block:bx", uploadMinRank: "none" } })).status, 403);
+  assert.equal((await call("PUT", "/admin/albums/permission", { token: admin, json: { key: "bad", uploadMinRank: "" } })).status, 400);
+  assert.equal((await call("PUT", "/admin/albums/permission", { token: admin, json: { key: "block:bx", uploadMinRank: "no-such" } })).status, 400);
+  // 資料夾設定「不限獎銜」：會員可以上傳，也看得到上傳鈕
+  assert.equal((await call("PUT", "/admin/albums/permission", { token: admin, json: { key: "block:bx", uploadMinRank: "none" } })).status, 200);
+  assert.equal((await up(stu)).status, 200, "獎銜達標可以上傳");
+  const idx = (await call<{ groups: { id: string; folders: { id: string; canEdit: boolean; groupId: string }[] }[] }>("GET", "/albums", { token: stu })).data;
+  assert.equal(idx.groups.find((g) => g.id === "block")!.folders[0]!.canEdit, true);
+  // 資料夾設成很高的獎銜：優先於類別，會員不能上傳
+  await call("PUT", "/admin/albums/permission", { token: admin, json: { key: "group:block", uploadMinRank: "none" } });
+  await call("PUT", "/admin/albums/permission", { token: admin, json: { key: "block:bx", uploadMinRank: "diamond" } });
+  assert.equal((await up(stu)).status, 403, "資料夾自己的設定優先於類別");
+  await call("PUT", "/admin/albums/permission", { token: admin, json: { key: "block:bx", uploadMinRank: null } });
+  assert.equal((await up(stu)).status, 200, "清掉資料夾設定＝沿用類別");
+  // 資訊總覽與瀏覽數
+  const info = await call<{ count: number; bytes: number; uploaders: { name: string; count: number }[]; byViews: { id: string; views: number }[]; effectiveRank: string }>("GET", `/admin/albums/info?id=${encodeURIComponent("block:bx")}`, { token: admin });
+  assert.equal(info.status, 200);
+  assert.equal(info.data.count, 2);
+  assert.equal(info.data.effectiveRank, "none");
+  assert.ok(info.data.uploaders.length >= 1);
+  assert.equal((await call("GET", `/admin/albums/info?id=${encodeURIComponent("block:bx")}`, { token: stu })).status, 403, "資訊總覽只有超級管理員");
+  const first = info.data.byViews[0]!.id;
+  await call("POST", `/cover-media/${first}/view`);
+  await call("POST", `/cover-media/${first}/view`);
+  const after = await call<{ byViews: { id: string; views: number }[] }>("GET", `/admin/albums/info?id=${encodeURIComponent("block:bx")}`, { token: admin });
+  assert.equal(after.data.byViews.find((x) => x.id === first)!.views, 2);
+  const perms = await call<{ ranks: unknown[]; groups: { id: string }[]; folders: { id: string; uploadMinRank: string | null }[] }>("GET", "/admin/albums/permissions", { token: admin });
+  assert.equal(perms.status, 200);
+  assert.ok(perms.data.ranks.length > 3 && perms.data.groups.some((g) => g.id === "block"));
+});

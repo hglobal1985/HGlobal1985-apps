@@ -468,11 +468,28 @@ export type CoverMediaKind = "center" | "series" | "course";
 /** 儲存區（業主 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，張數不設上限（業主 2026-11-25）；系列、課程只有 cover。 */
 export type CoverScope = "cover" | "edm";
 /** 「相簿」專區（業主 2026-11-25）：自動彙整全站所有用到相簿上傳功能的照片，依來源分成「資料夾」。 */
-export type AlbumFolder = { /** 唯一識別：來源類型＋鍵值（＋儲存區）。 */ id: string; /** center＝中心；series＝系列；course＝課程封面；block＝課程區塊相簿（點開前往該課程的相簿分頁）。 */ kind: "center" | "series" | "course" | "block"; /** center／series／course 用 /cover-media 讀；block 用課程編號＋區塊編號前往課程頁。 */ key: string; scope?: CoverScope; title: string; subtitle?: string; count: number; thumb: string | null; /** 資料夾預覽用的前 4 張縮圖。 */ thumbs: string[]; courseId?: string; /** 沒有權限進入（鎖定的課程、區塊相簿）：禁止進入，點了只顯示原因。 */ locked: boolean; lockReason?: string; /** 看的人可不可以在這個資料夾上傳照片（伺服器上傳時仍會再檢查）。 */ canEdit: boolean };
+export type AlbumFolder = { /** 唯一識別：來源類型＋鍵值（＋儲存區）。 */ id: string; /** center＝中心；series＝系列；course＝課程封面；block＝課程區塊相簿（點開前往該課程的相簿分頁）。 */ kind: "center" | "series" | "course" | "block"; /** center／series／course 用 /cover-media 讀；block 用課程編號＋區塊編號前往課程頁。 */ key: string; scope?: CoverScope; title: string; subtitle?: string; count: number; thumb: string | null; /** 資料夾預覽用的前 4 張縮圖。 */ thumbs: string[]; courseId?: string; /** 沒有權限進入（鎖定的課程、區塊相簿）：禁止進入，點了只顯示原因。 */ locked: boolean; lockReason?: string; /** 所屬大類別代碼（edm／cover／series／course／block／treasure）。 */ groupId: string; /** 看的人可不可以在這個資料夾上傳照片（伺服器上傳時仍會再檢查）。 */ canEdit: boolean };
+/** 相簿資訊總覽（超級管理員，業主 2026-11-25）：R2 佔用、上傳者排名、最近上傳、檔案大小與瀏覽數排序，以及這個相簿的上傳權限。 */
+export type AlbumInfo = {
+  id: string;
+  title: string;
+  count: number;
+  bytes: number;
+  lastUploadAt: string | null;
+  uploaders: { name: string; count: number; bytes: number }[];
+  bySize: { id: string; url: string; bytes: number }[];
+  byViews: { id: string; url: string; views: number }[];
+  /** 這個資料夾自己設定的上傳最低獎銜（null＝沒設定，沿用類別）；inherited＝實際生效的（含類別）。 */
+  uploadMinRank: string | null;
+  effectiveRank: string;
+  groupId: string;
+  groupRank: string;
+};
+export type AlbumPermissions = { ranks: { code: string; name: string }[]; groups: { id: string; label: string; uploadMinRank: string }[]; folders: { id: string; title: string; groupId: string; count: number; uploadMinRank: string | null }[] };
 export type AlbumGroup = { id: string; label: string; folders: AlbumFolder[] };
 export type AlbumsResponse = { total: number; groups: AlbumGroup[] };
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
-export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（業主 2026-11-24）。 */ scene?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
+export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（業主 2026-11-24）。 */ scene?: string; /** 上傳時間（相簿資料夾排序用）。 */ createdAt?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
 /** 縮圖符號（業主 2026-11-23）：系列卡、課程卡、中心卡的小縮圖。symbol＝emoji 或短文字（最多 4 個字）；fg 文字色、bg 底色（#RRGGBB）。 */
 export type ThumbBadgeKind = "course" | "series" | "center";
 export type ThumbBadge = { kind: ThumbBadgeKind; key: string; symbol: string; fg: string; bg: string };
