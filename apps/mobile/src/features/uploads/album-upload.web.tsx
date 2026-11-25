@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { api, apiUpload, type CoverMediaKind, type CoverScope } from "@/api/client";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
@@ -6,6 +6,7 @@ import { useUiConfig } from "@/state/ui-config";
 import { space } from "@/theme/tokens";
 import { Button, NoticeBox } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
+import { holdFullscreenClose, releaseFullscreenClose } from "@/lib/back-close";
 import { readPhotoMeta } from "./exif-meta";
 import { compressVideo, probeVideo, videoCompressSupported } from "./video-compress";
 import { UploadProgress } from "./upload-progress";
@@ -21,6 +22,11 @@ export function AlbumUploadButton({ kind, ownerKey, count, onDone, scope, label 
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState<{ label: string; pct: number | null; detail?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    const el = input.current;
+    el?.addEventListener("cancel", releaseFullscreenClose); // 檔案選擇視窗按取消
+    return () => el?.removeEventListener("cancel", releaseFullscreenClose);
+  }, []);
   const q = `kind=${kind}&key=${encodeURIComponent(ownerKey)}${scope ? `&scope=${scope}` : ""}`;
   const spec = { maxHeight: config.app.videoMaxHeight, kbps: config.app.videoKbps, fps: config.app.videoFps, maxMb: config.app.videoMaxMb, maxSec: config.app.videoMaxSec };
 
@@ -65,7 +71,7 @@ export function AlbumUploadButton({ kind, ownerKey, count, onDone, scope, label 
   };
   return (
     <View style={{ gap: space.sm }}>
-      <Button label={`${label}（${count}）`} icon="images-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} fullWidth />
+      <Button label={`${label}（${count}）`} icon="images-outline" loading={busy} disabled={busy} onPress={() => (holdFullscreenClose(), input.current?.click())} fullWidth />
       <input
         ref={input}
         type="file"
@@ -73,6 +79,7 @@ export function AlbumUploadButton({ kind, ownerKey, count, onDone, scope, label 
         accept="image/png,image/jpeg,image/webp,image/heic,video/*"
         style={{ display: "none" }}
         onChange={(e) => {
+          releaseFullscreenClose();
           const fs = Array.from(e.target.files ?? []);
           e.target.value = "";
           if (fs.length) void run(fs);
