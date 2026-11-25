@@ -2721,6 +2721,13 @@ async function albumRankAllows(ctx: Ctx, ref: { folderId: string; groupId: strin
   const elig = await eligibilityFor(ctx.session, await ranks(ctx.db), [eff]);
   return elig.get(eff) === true;
 }
+/** 教材圖片（上傳檔案當教材、雲端硬碟匯入）的壓縮：格式與畫質直接套用「相簿存檔格式」（業主 2026-11-25）；套用範圍跟著相簿的範圍設定（試行期只有成交百寶箱的課程）。 */
+async function materialImageOverride(ctx: Ctx, courseId: string | null | undefined): Promise<{ format: "jpeg" | "webp" | "avif"; quality: number } | undefined> {
+  const app = (await loadConfig(ctx.db)).app;
+  if (app.albumScope === "off") return undefined;
+  if (app.albumScope === "treasure" && courseId !== (await treasureCourseId(ctx.db).catch(() => null))) return undefined;
+  return { format: app.albumFormat, quality: app.albumQuality };
+}
 /** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
 async function requireCoverOwner(ctx: Ctx, fromBody = false) {
   const base = ctx;
@@ -6393,7 +6400,7 @@ const routes: [string, RegExp, Handler][] = [
       if (!data.byteLength) return fail(400, "empty_file", "檔案是空的");
       if (data.byteLength > maxBytes) return fail(413, "file_too_large", fileTooBig(maxMb));
       if (!(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(404, "not_found", "找不到這門課程");
-      const shrunk = kind.type === "image" ? await shrinkImage(ctx.env, data, kind.ct, "general") : { data, type: kind.ct, size: data.byteLength };
+      const shrunk = kind.type === "image" ? await shrinkImage(ctx.env, data, kind.ct, "general", false, await materialImageOverride(ctx, courseId)) : { data, type: kind.ct, size: data.byteLength };
       const finalName = kind.type === "image" ? renameForType(name, shrunk.type) : name; // 轉成 JPEG 等格式後，檔名的副檔名跟著換
       const key = `file/${courseId}/${crypto.randomUUID()}/${safeFileName(finalName)}`;
       await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
@@ -6477,7 +6484,7 @@ const routes: [string, RegExp, Handler][] = [
         let finalType = kind.ct;
         let finalName = src.name;
         if (kind.type === "image") {
-          const done = await shrinkStored(ctx.env, key, kind.ct);
+          const done = await shrinkStored(ctx.env, key, kind.ct, "general", await materialImageOverride(ctx, courseId));
           if (done) {
             size = done.size;
             finalType = done.type;

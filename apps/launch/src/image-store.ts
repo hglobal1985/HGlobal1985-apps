@@ -18,7 +18,7 @@ export const renameForType = (name: string, type: string): string => {
 
 /**
  * @param keepFormat true＝不轉格式（品牌 logo：透明背景的 PNG 轉成 JPEG 會破壞深色模式底色），只縮尺寸。
- * 其他圖片一律轉成設定的存檔格式（`app.storeFormat`，預設 JPEG；業主 2026-11-20）。
+ * 其他圖片固定轉成 JPEG（2026-11-25 起不再有「存檔格式」設定）；相簿照片與教材圖片由呼叫端傳 override（相簿存檔格式與畫質）。
  */
 export async function shrinkImage(env: Env, data: ArrayBuffer, type: string, cls: ImageClass, keepFormat = false, override?: { format: "jpeg" | "webp" | "avif"; quality: number }): Promise<{ data: ArrayBuffer; type: string; size: number }> {
   const same = { data, type, size: data.byteLength };
@@ -28,7 +28,8 @@ export async function shrinkImage(env: Env, data: ArrayBuffer, type: string, cls
     const app = (await loadConfig(env.DB)).app;
     const side = cls === "center" ? app.centerMaxSide : cls === "edm" ? app.edmMaxSide : app.imageMaxSide;
     const quality = override?.quality ?? (cls === "center" ? app.centerQuality : cls === "edm" ? app.edmQuality : app.imageQuality);
-    const target = override?.format ?? (keepFormat ? fmt : app.storeFormat);
+    // 全站圖片的存檔格式不再有獨立設定（業主 2026-11-25）：一般圖片固定 JPEG；相簿照片與教材圖片用「相簿存檔格式」（override）；品牌 logo 保留原格式。
+    const target = override?.format ?? (keepFormat ? fmt : "jpeg");
     const info = await env.IMAGES.info(new Response(data).body!);
     const longSide = Math.max(info.width ?? 0, info.height ?? 0);
     // 要保留的 PNG（品牌 logo）沒有畫質參數，長邊在上限內且小於 1MB 就不動。
@@ -46,14 +47,14 @@ export async function shrinkImage(env: Env, data: ArrayBuffer, type: string, cls
 }
 
 /** 已經存進 R2 的圖片（例如從雲端硬碟串流存入）：讀回來壓縮再覆蓋；太大（>40MB）或失敗就維持原樣。回傳最後大小。 */
-export async function shrinkStored(env: Env, key: string, type: string, cls: ImageClass = "general"): Promise<{ size: number; type: string } | null> {
+export async function shrinkStored(env: Env, key: string, type: string, cls: ImageClass = "general", override?: { format: "jpeg" | "webp" | "avif"; quality: number }): Promise<{ size: number; type: string } | null> {
   const bucket = env.MEDIA;
   if (!bucket || !TYPES[type]) return null;
   const head = await bucket.head(key);
   if (!head || head.size > 40 * 1024 * 1024) return null;
   const obj = await bucket.get(key);
   if (!obj) return null;
-  const r = await shrinkImage(env, await new Response(obj.body).arrayBuffer(), type, cls);
+  const r = await shrinkImage(env, await new Response(obj.body).arrayBuffer(), type, cls, false, override);
   if (r.size >= head.size && r.type === type) return null;
   await bucket.put(key, r.data, { httpMetadata: { contentType: r.type } });
   return { size: r.size, type: r.type };
