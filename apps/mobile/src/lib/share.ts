@@ -11,6 +11,11 @@ async function asJpeg(blob: Blob): Promise<Blob> {
   if (blob.type === "image/jpeg" || typeof createImageBitmap !== "function") return blob;
   try {
     const bmp = await createImageBitmap(blob);
+    // 解析度維持原樣、絕不縮小（業主 2026-11-25）：畫布尺寸＝圖片原尺寸。超大圖（>6400 萬像素，部分手機畫布放不下會被系統偷偷縮小）不轉，原檔直接用。
+    if (bmp.width * bmp.height > 64_000_000) {
+      bmp.close?.();
+      return blob;
+    }
     const c = document.createElement("canvas");
     c.width = bmp.width;
     c.height = bmp.height;
@@ -19,13 +24,21 @@ async function asJpeg(blob: Blob): Promise<Blob> {
     g.fillStyle = "#fff";
     g.fillRect(0, 0, c.width, c.height);
     g.drawImage(bmp, 0, 0);
-    const out = await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.92));
+    const out = await new Promise<Blob | null>((res) => c.toBlob(res, "image/jpeg", 0.95));
     return out ?? blob;
   } catch {
     return blob;
   }
 }
 const jpgName = (n: string) => n.replace(/\.(avif|webp|png|jpe?g)$/i, "") + ".jpg";
+
+/** 分享、下載一律用「原圖」網址：把即時縮圖的參數（w＝寬度、r＝版本）拿掉，絕不下載縮小版（業主 2026-11-25）。 */
+const originalUrl = (url: string): string => {
+  if (!url.includes("/media/pub")) return url;
+  const [path = "", q = ""] = url.split("?");
+  const keep = q.split("&").filter((p) => p && !/^(w|r)=\d+$/.test(p));
+  return keep.length ? `${path}?${keep.join("&")}` : path;
+};
 
 /** 絕對網址（分享與下載用）。 */
 /** 頁面路徑 → 完整網址（邀請的 QR Code 與分享共用）。 */
@@ -90,7 +103,7 @@ async function shareTextCore(title: string, message: string): Promise<"shared" |
  * App：先下載到暫存，再交給系統分享選單。
  */
 export async function shareImage(title: string, url: string, fileName = "poster.jpg"): Promise<"shared" | "copied" | "cancelled"> {
-  const link = absolute(url);
+  const link = absolute(originalUrl(url));
   if (Platform.OS !== "web") {
     try {
       // App 才用到的檔案工具，用到才載入（網頁版不必下載，2026-11-21）。
@@ -122,7 +135,7 @@ export async function downloadImage(url: string, fileName: string): Promise<void
     return;
   }
   trackFeature("download_image");
-  const blob = await asJpeg(await (await fetch(absolute(url))).blob());
+  const blob = await asJpeg(await (await fetch(absolute(originalUrl(url)))).blob());
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = blob.type === "image/jpeg" ? jpgName(fileName) : fileName;
@@ -142,7 +155,7 @@ export async function shareImages(title: string, urls: string[]): Promise<"share
   if (Platform.OS === "web") {
     try {
       const files = await Promise.all(urls.map(async (u, i) => {
-        const blob = await asJpeg(await (await fetch(absolute(u))).blob());
+        const blob = await asJpeg(await (await fetch(absolute(originalUrl(u)))).blob());
         return new window.File([blob], `${title}-${i + 1}.jpg`, { type: blob.type || "image/jpeg" });
       }));
       if (typeof navigator.canShare === "function" && navigator.canShare({ files })) {
