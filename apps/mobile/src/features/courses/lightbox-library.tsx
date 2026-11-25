@@ -4,6 +4,9 @@ import { Image, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimension
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMediaItem } from "@/api/client";
 import { centerTitle } from "@/features/format";
+import { AlbumUploadButton } from "@/features/uploads/album-upload";
+import { LightboxGrid } from "./lightbox-grid";
+import { matchAlbumItem } from "./album-search";
 import { isSuperAdmin } from "@/lib/roles";
 import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
@@ -28,7 +31,7 @@ const folderName = (f: AlbumFolder) => (f.kind === "center" ? centerTitle(f.titl
  * ④沒有權限的資料夾（鎖定的課程、區塊相簿）禁止進入，點了只顯示原因（伺服器也會擋）。
  * 點資料夾 → onPick（交給全螢幕看圖換成這個資料夾的照片並進入「檢視全部」格狀畫面）。
  */
-export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) => void; onClose: () => void }) {
+export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[] } | null }) {
   const thumb = useThumb();
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
@@ -36,13 +39,17 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
   const admin = isSuperAdmin(member);
   const { data, loading, error, reload } = useApi<AlbumsResponse>("/albums");
   const [group, setGroup] = useState<string | null>(null);
-  const [side, setSide] = useState(false);
+  const large = win.width >= 900;
+  const [side, setSide] = useState(large); // 大螢幕資料夾清單預設一直顯示
+  // 目前打開的資料夾（null＝資料夾總覽）：搜尋列、類別標籤、側邊欄在資料夾裡一樣永遠顯示（業主 2026-11-25）。
+  const [view, setView] = useState<{ folder: AlbumFolder; items: CoverMediaItem[] } | null>(initial ?? null);
   const [q, setQ] = useState("");
   const [scope, setScope] = useState<"page" | "all">("page");
   const [found, setFound] = useState<Found[] | null>(null);
   const [busy, setBusy] = useState(false);
   const groups = data?.groups ?? [];
-  const cur = groups.find((g) => g.id === group) ?? groups[0];
+  const viewGroup = view ? groups.find((g) => g.folders.some((f) => f.id === view.folder.id)) : undefined;
+  const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)) ?? groups[0];
   const key = q.trim().toLowerCase();
 
   // 搜尋「全部」：停手 0.4 秒後才問伺服器。
@@ -68,7 +75,8 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
       const r = await api<{ items: CoverMediaItem[] }>("GET", `/albums/folder?id=${encodeURIComponent(f.id)}`);
       const items = r.items.filter((x) => x.kind === "image");
       if (!items.length) return void flashText("這個相簿還沒有照片");
-      onPick({ folder: f, title: folderName(f), items });
+      setView({ folder: f, items });
+      setQ("");
     } catch (e) {
       flashText((e as Error).message);
     } finally {
@@ -130,7 +138,6 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
   );
 
   // 大螢幕（≥900）：側邊欄是左邊固定的一欄，相簿自動往右推、不重疊；小裝置：側邊欄蓋在相簿上，寬度只要剛好符合文字。
-  const large = win.width >= 900;
   const [expanded, setExpanded] = useState<Set<string>>(new Set()); // 側邊欄裡展開哪些大類別的資料夾清單（預設全部收起）
   const toggleExpanded = (id: string) =>
     setExpanded((s) => {
@@ -140,6 +147,27 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
       return n;
     });
   const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 * 2 - 36 - 8 * 3 - (large && side ? 280 : 0)) / 8.6)));
+
+  // 資料夾裡的照片（此頁搜尋會過濾）、上一個／下一個資料夾（同類別、沒被鎖的）
+  const shown = view ? (scope === "page" && key ? view.items.filter((p) => matchAlbumItem(p, key)) : view.items) : [];
+  const sib = (cur?.folders ?? []).filter((f) => !f.locked);
+  const vi = view ? sib.findIndex((f) => f.id === view.folder.id) : -1;
+  const prevF = vi > 0 ? sib[vi - 1] : undefined;
+  const nextF = vi >= 0 && vi < sib.length - 1 ? sib[vi + 1] : undefined;
+  const reloadView = async () => {
+    if (!view) return;
+    try {
+      const r = await api<{ items: CoverMediaItem[] }>("GET", `/albums/folder?id=${encodeURIComponent(view.folder.id)}`);
+      setView({ folder: view.folder, items: r.items.filter((x) => x.kind === "image") });
+      reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    }
+  };
+
+  useEffect(() => {
+    if (view && !view.items.length) void reloadView(); // 從單張看圖回到資料夾：重新讀這個資料夾的照片
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sidebar = (
     <View style={large ? { width: 280, backgroundColor: "#1c1c1f", paddingTop: insets.top + 16, borderRightWidth: 1, borderRightColor: "#2f2f33" } : { alignSelf: "flex-start", minWidth: 170, maxWidth: win.width * 0.82, flexShrink: 1, maxHeight: "100%", backgroundColor: "#1c1c1f", paddingTop: insets.top + 16, paddingRight: 8 }}>
@@ -151,7 +179,7 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
             <View key={g.id}>
               <View style={{ flexDirection: "row", alignItems: "center", minHeight: 48, paddingLeft: 12, backgroundColor: g.id === cur?.id ? "#2e7d32" : "transparent" }}>
                 {/* 點標題＝進入這個類別的總覽縮圖 */}
-                <Pressable accessibilityRole="button" accessibilityLabel={`${g.label}，進入總覽`} onPress={() => (setGroup(g.id), setQ(""), !large && setSide(false))} style={{ flexShrink: 1, flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingRight: 8 }}>
+                <Pressable accessibilityRole="button" accessibilityLabel={`${g.label}，進入總覽`} onPress={() => (setView(null), setGroup(g.id), setQ(""), !large && setSide(false))} style={{ flexShrink: 1, flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingRight: 8 }}>
                   <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{g.label}</AppText>
                   <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#cfcfd4" }}>{g.folders.length}</AppText>
                 </Pressable>
@@ -195,7 +223,7 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
         <View style={{ paddingHorizontal: 16, gap: 8 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#262629", borderRadius: 24, paddingLeft: 14, paddingRight: 6, minHeight: 48 }}>
             <Ionicons name="search" size={20} color="#9a9aa0" {...UI_ONLY} />
-            <TextInput value={q} onChangeText={setQ} placeholder={scope === "page" ? "搜尋此類別的相簿" : "搜尋全部相簿的場景、照片文字"} placeholderTextColor="#7c7c82" accessibilityLabel="搜尋相簿" returnKeyType="search" style={{ flex: 1, minWidth: 0, color: "#fff", fontSize: 16, paddingVertical: 8 }} />
+            <TextInput value={q} onChangeText={setQ} placeholder={scope === "page" ? (view ? "搜尋這個資料夾的照片" : "搜尋此類別的相簿") : "搜尋全部相簿的場景、照片文字"} placeholderTextColor="#7c7c82" accessibilityLabel="搜尋相簿" returnKeyType="search" style={{ flex: 1, minWidth: 0, color: "#fff", fontSize: 16, paddingVertical: 8 }} />
             {q ? <Pressable accessibilityLabel="清除搜尋" onPress={() => setQ("")} hitSlop={8}><Ionicons name="close-circle" size={20} color="#9a9aa0" {...UI_ONLY} /></Pressable> : null}
             {(["page", "all"] as const).map((s) => (
               <Pressable key={s} accessibilityRole="button" accessibilityState={{ selected: scope === s }} onPress={() => setScope(s)} style={{ paddingHorizontal: 12, minHeight: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: scope === s ? "#2e7d32" : "transparent" }}>
@@ -207,13 +235,55 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
             {groups.map((g) => {
               const on = g.id === cur?.id;
               return (
-                <Pressable key={g.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => setGroup(g.id)} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: "center", backgroundColor: on ? "#2e7d32" : "#262629" }}>
+                <Pressable key={g.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => (setView(null), setGroup(g.id))} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: "center", backgroundColor: on ? "#2e7d32" : "#262629" }}>
                   <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{g.label.replace("照片", "").replace("課程", "")}</AppText>
                 </Pressable>
               );
             })}
           </ScrollView>
         </View>
+        {/* 資料夾橫條：在資料夾裡也永遠看得到同類別的所有資料夾，一點就切換（業主 2026-11-25） */}
+        {view ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingTop: 8 }} style={{ flexGrow: 0 }}>
+            {(cur?.folders ?? []).map((f) => {
+              const on = f.id === view.folder.id;
+              return (
+                <Pressable key={f.id} accessibilityRole="button" accessibilityState={{ selected: on }} accessibilityLabel={`${folderName(f)}，${f.count} 張${f.locked ? "，沒有權限" : ""}`} onPress={() => void openFolder(f)} style={{ alignItems: "center", gap: 3, width: 64 }}>
+                  <View style={{ width: 56, height: 56, borderRadius: 10, overflow: "hidden", backgroundColor: "#262629", borderWidth: on ? 2.5 : 0, borderColor: "#fff" }}>
+                    {f.thumbs[0] ? <Image source={{ uri: thumb(resolveUrl(f.thumbs[0]), 120) }} style={{ width: "100%", height: "100%", opacity: f.locked ? 0.35 : 1 }} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
+                    {f.locked ? <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center" }]}><Ionicons name="lock-closed" size={20} color="#fff" {...UI_ONLY} /></View> : null}
+                  </View>
+                  <AppText variant="caption" numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: on ? "#fff" : "#9a9aa0", fontSize: 10, lineHeight: 13 }}>{folderName(f).slice(0, 6)}</AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+        {/* 麵包屑：相簿 > 類別 > 資料夾（每一段都能點回去） */}
+        {view ? (
+          <View style={{ paddingHorizontal: 16, paddingTop: 6, flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+            <Pressable accessibilityRole="button" accessibilityLabel="回到資料夾總覽" onPress={() => setView(null)}><AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>相簿</AppText></Pressable>
+            <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#6a6a70" }}>{">"}</AppText>
+            <Pressable accessibilityRole="button" accessibilityLabel={`回到${cur?.label}總覽`} onPress={() => setView(null)}><AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>{cur?.label}</AppText></Pressable>
+            <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#6a6a70" }}>{">"}</AppText>
+            <AppText variant="caption" numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", flexShrink: 1 }}>{folderName(view.folder)}</AppText>
+          </View>
+        ) : null}
+        {view && !(scope === "all" && key) ? (
+          <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6 }}>
+            <LightboxGrid
+              embedded
+              list={shown.map((x) => ({ uri: x.url, title: folderName(view.folder), id: x.id }))}
+              current={-1}
+              heading={folderName(view.folder)}
+              extra={view.folder.canEdit && !key ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : undefined}
+              onPick={(i) => onPick({ folder: view.folder, title: folderName(view.folder), items: shown, index: i })}
+              onClose={() => setView(null)}
+              onPrev={prevF ? () => void openFolder(prevF) : undefined}
+              onNext={nextF ? () => void openFolder(nextF) : undefined}
+            />
+          </View>
+        ) : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 14 }}>
           {error && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#fff" }}>讀取失敗，請稍後再試</AppText> : null}
           {loading && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>讀取中…</AppText> : null}
@@ -239,6 +309,7 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
             </>
           )}
         </ScrollView>
+        )}
       </View>
       {side && !large ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
