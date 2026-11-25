@@ -1236,3 +1236,79 @@ export const LIST_COVER_COLORS: { hex: string; to: string; name: string }[] = [
 
 /** 網站暫時無法服務（部署更新、系統錯誤、會員中心連不上、維護中…）時，全站統一顯示的白話提示（業主 2026-11-24 改文字）。後端、App 都用這一句。 */
 export const UPGRADING_MSG = "網站功能正在升級中、請稍候再試";
+
+// ---------- 作業（業主 2026-11-25；第一個用在美力之星）：學員繳交、老師批改評分、學員分組 ----------
+/** 學員可以交的種類：照片、短影片（3 分鐘內，上傳前自動壓縮）、檔案（PDF、Word、簡報…）、連結、文字心得。 */
+export type HwKind = "image" | "video" | "file" | "link" | "text";
+export const HW_KINDS: { key: HwKind; label: string }[] = [
+  { key: "image", label: "照片" },
+  { key: "video", label: "短影片" },
+  { key: "file", label: "檔案" },
+  { key: "link", label: "連結" },
+  { key: "text", label: "文字" },
+];
+/** 評分方式：分數、5 顆星、通過／重交。 */
+export type HwGrading = "score" | "stars" | "pass";
+export const HW_GRADINGS: { key: HwGrading; label: string }[] = [
+  { key: "score", label: "分數" },
+  { key: "stars", label: "5 顆星" },
+  { key: "pass", label: "通過／重交" },
+];
+/** 短影片的上限與壓縮規格（在學員自己的瀏覽器裡壓縮）。 */
+export const HW_VIDEO = { maxSec: 180, maxHeight: 720, kbps: 1200, fps: 30, maxMb: 80 } as const;
+export const HW_LIMITS = { files: 10, imageMb: 15, fileMb: 30, noteChars: 2000, commentChars: 1000 } as const;
+/** none＝還沒交；draft＝放了檔案還沒送出；submitted＝等待批改；graded＝已評分；returned＝退回重交。 */
+export type HwStatus = "none" | "draft" | "submitted" | "graded" | "returned";
+export type HwResult = { score: number | null; stars: number | null; passed: boolean | null; comment: string; gradedBy: string; gradedAt: string | null };
+export type HwAssignment = {
+  id: string;
+  courseId: string;
+  title: string;
+  body: string;
+  kinds: HwKind[];
+  grading: HwGrading;
+  maxScore: number;
+  opensAt: string | null;
+  dueAt: string | null;
+  createdAt: string;
+  /** 已經開放繳交（沒設開放時間＝立刻開放）。 */
+  open: boolean;
+  /** 已經過了截止時間（仍可補交，會標「逾期」）。 */
+  overdue: boolean;
+  /** 我（學員）這份的狀態與成績。 */
+  myStatus: HwStatus;
+  myResult: HwResult | null;
+  /** 老師、組長才有：交了幾份、待批改、已批改。 */
+  counts: { members: number; submitted: number; toGrade: number; graded: number; returned: number } | null;
+};
+/** 我在這門課的身份：teacher＝可以出作業、評分；leaderOf＝我當組長的組；groupId＝我所在的組。 */
+export type HwRole = { teacher: boolean; enrolled: boolean; groupId: string | null; leaderOf: string | null };
+export type HwCourseView = { course: { id: string; title: string }; role: HwRole; assignments: HwAssignment[] };
+export type HwFile = { id: string; kind: "image" | "video" | "file" | "link"; name: string; url: string; posterUrl: string | null; size: number; width: number; height: number; durationSec: number; contentType: string };
+export type HwComment = { id: string; authorName: string; role: "teacher" | "leader" | "student"; body: string; createdAt: string; mine: boolean };
+export type HwSubmission = {
+  id: string;
+  assignmentId: string;
+  memberName: string;
+  avatar: string | null;
+  groupName: string | null;
+  status: HwStatus;
+  note: string;
+  submittedAt: string | null;
+  late: boolean;
+  result: HwResult | null;
+  files: HwFile[];
+  comments: HwComment[];
+  mine: boolean;
+  canEdit: boolean;
+  canGrade: boolean;
+  canComment: boolean;
+  /** 老師批改時「儲存並下一份」要跳去的下一份待批改。 */
+  nextToGrade: string | null;
+};
+export type HwRosterRow = { sub: string; name: string; avatar: string | null; groupId: string | null; groupName: string | null; leader: boolean; status: HwStatus; submissionId: string | null; submittedAt: string | null; late: boolean; result: HwResult | null };
+export type HwAssignmentView = { assignment: HwAssignment; course: { id: string; title: string }; role: HwRole; mine: HwSubmission | null; roster: HwRosterRow[]; groups: { id: string; name: string }[] };
+export type HwGroupMember = { sub: string; name: string; avatar: string | null; leader: boolean };
+export type HwGroupsView = { groups: { id: string; name: string; members: HwGroupMember[] }[]; ungrouped: HwGroupMember[]; canEdit: boolean; teacher: boolean; leaderOf: string | null; myGroupId: string | null };
+export type MyHomeworkItem = { assignmentId: string; courseId: string; courseTitle: string; title: string; dueAt: string | null; overdue: boolean; status: HwStatus; result: HwResult | null; grading: HwGrading; maxScore: number };
+export type MyHomework = { items: MyHomeworkItem[]; todo: number; toGrade: { courseId: string; courseTitle: string; assignmentId: string; title: string; count: number }[] };
