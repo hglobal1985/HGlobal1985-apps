@@ -352,7 +352,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
               <View style={styles.row} pointerEvents="box-none">
                 {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />) : null}
-                {tool("相簿", () => setLibOpen(true), <Ionicons name="folder-open-outline" size={24} color="#fff" {...UI_ONLY} />)}
+                {tool("相簿", () => setLibOpen(true), <View style={{ width: toolSize - 8, height: toolSize - 8, borderRadius: (toolSize - 8) / 2, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><Image source={require("../../../assets/logo.png")} style={{ width: toolSize - 16, height: toolSize - 16 }} resizeMode="contain" accessibilityIgnoresInvertColors /></View>)}
                 {many ? tool("檢視全部", () => setGrid(true), <Ionicons name="grid-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
                 {list.length && canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
                 {list.length ? tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
