@@ -6,10 +6,11 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, resolveUrl, type CourseSummary } from "@/api/client";
+import { api, resolveUrl, type CourseSummary, type CoverMediaItem } from "@/api/client";
 import { downloadImage, shareImage } from "@/lib/share";
 import { LightboxGrid } from "./lightbox-grid";
 import { LightboxLibrary, type LibraryPick } from "./lightbox-library";
+import { loadAlbumPos, saveAlbumPos } from "@/lib/album-memory";
 import { displayName } from "./sort";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -172,8 +173,30 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   useBackToClose(() => closeNow.current()); // 瀏覽器／手機「上一頁」同 ✕（業主 2026-11-24）
   const [infoOpen, setInfoOpen] = useState(false);
   const [grid, setGrid] = useState(false); // 「檢視全部」格狀畫面（業主 2026-11-25）
-  const [libOpen, setLibOpen] = useState(library); // 「相簿」資料夾檢視（業主 2026-11-25）
+  // 相簿專區入口：記住上次位置（業主 2026-11-25）。上次停在單張看圖＝直接開回那張照片；停在資料夾檢視＝開到那個資料夾。
+  const [restore] = useState(() => (library ? loadAlbumPos() : null));
+  const photoRestore = !!restore && restore.mode === "photo" && !!restore.folder && !!restore.photo;
+  const [libOpen, setLibOpen] = useState(library && !photoRestore); // 「相簿」資料夾檢視（業主 2026-11-25）
   const [over, setOver] = useState<{ title: string; items: LightboxItem[]; folder: LibraryPick["folder"] } | null>(null); // 從相簿選了資料夾：整個看圖換成這個資料夾的照片
+  const photoSaved = useRef(!photoRestore); // 單張位置還原完成前不記，免得蓋掉上次的位置
+  useEffect(() => {
+    if (!photoRestore || !restore?.folder) return;
+    let alive = true;
+    api<{ folder: NonNullable<LibraryPick["folder"]>; items: CoverMediaItem[] }>("GET", `/albums/folder?id=${encodeURIComponent(restore.folder)}`)
+      .then((r) => {
+        if (!alive) return;
+        const imgs = r.items.filter((x) => x.kind === "image");
+        const at = imgs.findIndex((x) => x.id === restore.photo);
+        if (!imgs.length) throw new Error("empty");
+        setOver({ title: r.folder.title, folder: r.folder, items: imgs.map((x) => lightboxItem(x, r.folder.title)) });
+        setIdx(Math.max(0, at));
+      })
+      .catch(() => alive && setLibOpen(true)) // 這張／這個資料夾不在了或沒有權限：回到資料夾檢視
+      .finally(() => void (photoSaved.current = true));
+    return () => {
+      alive = false;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   closeNow.current = () => (over && !libOpen ? setLibOpen(true) : onClose());
   // 全螢幕被系統收起（例如管理員按「上傳照片」開檔案選擇視窗）：下一次點一下畫面就自動再進全螢幕，停留在相簿裡操作（業主 2026-11-25）。
   useEffect(() => {
@@ -214,6 +237,9 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
     viewedIds.add(id);
     api("POST", `/cover-media/${id}/view`).catch(() => undefined);
   }, [list, idx]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (library && over?.folder && !libOpen && photoSaved.current && list[idx]?.id) saveAlbumPos({ folder: over.folder.id, photo: list[idx]!.id!, mode: "photo" });
+  }, [library, over?.folder?.id, libOpen, idx, list]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (cur.uri) Image.getSize(full, (w, h) => h && setRatio(w / h), () => undefined);
   }, [full]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -428,7 +454,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
           </View>
           {!hideHelp && smallLand ? <View style={{ position: "absolute", left: toolSize + 28, right: toolSize + 28, top: topY }} pointerEvents="box-none">{helpBar}</View> : null}
           {grid && list.length ? <LightboxGrid list={list} current={idx} heading={over?.title} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
-          {libOpen ? <LightboxLibrary initial={over?.folder ? { folder: over.folder, items: [] } : null} onClose={() => (over || library || !list.length ? onClose() : setLibOpen(false))} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => lightboxItem(x, p.title)) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
+          {libOpen ? <LightboxLibrary restore={restore ? { group: restore.group, folder: restore.folder } : null} initial={over?.folder ? { folder: over.folder, items: [] } : null} onClose={() => (over || library || !list.length ? onClose() : setLibOpen(false))} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => lightboxItem(x, p.title)) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
           {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>

@@ -9,6 +9,7 @@ import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { LightboxGrid } from "./lightbox-grid";
 import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
 import { AlbumSearchBar, matchAlbumItem } from "./album-search";
+import { saveAlbumPos } from "@/lib/album-memory";
 import { isSuperAdmin } from "@/lib/roles";
 import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
@@ -33,7 +34,7 @@ const folderName = (f: AlbumFolder) => (f.kind === "center" ? centerTitle(f.titl
  * ④沒有權限的資料夾（鎖定的課程、區塊相簿）禁止進入，點了只顯示原因（伺服器也會擋）。
  * 點資料夾 → onPick（交給全螢幕看圖換成這個資料夾的照片並進入「檢視全部」格狀畫面）。
  */
-export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[] } | null }) {
+export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到上次位置（相簿專區入口）：類別與資料夾；沒有 initial 才套用。 */ restore?: { group: string | null; folder: string | null } | null; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[] } | null }) {
   const thumb = useThumb();
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
@@ -214,6 +215,21 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
   useEffect(() => {
     if (view && !view.items.length) void reloadView(); // 從單張看圖回到資料夾：重新讀這個資料夾的照片
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // 回到上次位置（業主 2026-11-25）：資料讀回來後，開到上次的類別／資料夾；沒權限或不存在了就停在相簿首頁／該類別。
+  const [ready, setReady] = useState(!restore || !!initial);
+  useEffect(() => {
+    if (ready || !data) return;
+    setReady(true);
+    if (!restore) return;
+    const g = data.groups.find((x) => x.id === restore.group);
+    if (g) setGroup(g.id);
+    const f = restore.folder ? data.groups.flatMap((x) => x.folders).find((x) => x.id === restore.folder) : undefined;
+    if (f && !f.locked) void openFolder(f);
+  }, [ready, data]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 位置有變就記下來（還原完成前不記，免得把上次的位置蓋掉）。
+  useEffect(() => {
+    if (ready && data && !busy) saveAlbumPos({ group: cur?.id ?? null, folder: view?.folder.id ?? null, photo: null, mode: "library" });
+  }, [ready, busy, cur?.id, view?.folder.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sidebar = (
     <View style={large ? { width: 300, backgroundColor: "#1c1c1f", paddingTop: 6, borderRightWidth: 1, borderRightColor: "#2f2f33" } : { alignSelf: "flex-start", minWidth: 220, maxWidth: win.width * 0.9, maxHeight: "100%", backgroundColor: "#1c1c1f", paddingTop: 6, borderRadius: 14, overflow: "hidden" }}>

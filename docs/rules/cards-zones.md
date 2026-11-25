@@ -70,3 +70,5 @@
 - **相簿資料夾標題列（業主 2026-11-25）**：資料夾名稱**不顯示張數統計**，太長自動變兩行，不可擠到右邊兩顆排序按鈕（`LightboxGrid` embedded 的 `heading` 用 `flex:1`、`actions` 用 `flexShrink:0`，按鈕固定顯示）。點排序按鈕會跳出該功能的文字提示——用 `showFlash`（與課程頁切換檢視模式同款的全螢幕提醒視窗，`FlashHost`），標題＝「活動日期排序」／「上傳時間排序」，說明＝「新到舊」／「舊到新」。
 
 - **全螢幕相簿按「上傳照片」選好檔案後視窗整個消失、沒有上傳（業主 2026-11-25 回報，已修）**：原因＝`lib/back-close.ts` 的 `useBackToClose` 規定「瀏覽器全螢幕被退出就關閉視窗」，而電腦瀏覽器開檔案選擇視窗時會自己收起全螢幕，視窗被當成使用者要關閉而卸載，上傳元件跟著消失。修法：`holdFullscreenClose()`／`releaseFullscreenClose()`——`AlbumUploadButton`（網頁版）在開檔案選擇視窗前呼叫 hold，選好檔案或按取消後 release（再緩衝 1.5 秒），這段期間全螢幕被收起不關閉視窗；收起後下一次點一下畫面會自動再進全螢幕（`EdmLightbox` 的 `fullscreenchange` 監聽）。**瀏覽器會在檔案選擇視窗開啟時收起全螢幕，網頁無法阻止**，只能保證視窗不消失、上傳照常進行。之後任何全螢幕視窗裡要開檔案選擇的按鈕，都要照這個做法。
+
+- **相簿記住上次位置（業主 2026-11-25）**：退出相簿時記住最後看的類別、資料夾、單張照片，下次進入顯示同一條路徑。`lib/album-memory.ts`（`loadAlbumPos`／`saveAlbumPos`，存在這支裝置的 localStorage，只是個人便利、不上傳伺服器；沒有 localStorage 就只記這次開啟期間）。`mode`＝`library`：`LightboxLibrary` 的 `restore` 在資料讀回來後開到上次的類別／資料夾（`group`、`folder`；沒權限或不存在就停在首頁／該類別），位置變動時記下（還原完成前、讀取資料夾中不記，免得蓋掉）；`mode`＝`photo`：`EdmLightbox library` 一開場就讀 `/albums/folder` 直接開回上次那張照片，讀不到（被刪、被鎖）回到資料夾檢視。只有相簿專區入口（`library`）會記，一般看圖不記。
