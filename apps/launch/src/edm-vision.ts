@@ -118,6 +118,12 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
   await structureEdm(env, db, rowId).catch(() => undefined);
 }
 
+/** 還沒辨識的中心 EDM 圖編號（批次排程 ai-batch.ts 用）。 */
+export async function edmOcrIds(db: D1Database, limit: number): Promise<string[]> {
+  const { results } = await db.prepare("SELECT id FROM cover_media WHERE owner_kind = 'center' AND scope = 'edm' AND kind = 'image' AND (ocr_status = '' OR (ocr_status = 'working' AND ocr_at < ?)) ORDER BY created_at DESC LIMIT ?").bind(new Date(Date.now() - 600_000).toISOString(), limit).all<{ id: string }>();
+  return results.map((r) => r.id);
+}
+
 /** 背景處理還沒辨識的中心 EDM 圖（每次最多 limit 張；額度用完或沒綁定 AI 就停）。 */
 export async function ocrPending(env: Env, db: D1Database, limit = 3): Promise<void> {
   // 已辨識但沒有日期的，用已存的文字重新推日期（不用 AI）。
