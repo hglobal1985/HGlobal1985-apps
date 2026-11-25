@@ -153,7 +153,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       <View style={styles.center}>
         <Pressable accessibilityRole="button" accessibilityLabel="按一下，用說的找課程" onPress={mic} style={({ pressed }) => [styles.micWrap, { backgroundColor: c.accentSoft, opacity: pressed ? 0.85 : 1 }]}>
           <View style={[styles.mic, { backgroundColor: c.accent }]}>
-            <Ionicons name="mic" size={84} color={c.textOnAccent} {...({ uiOnly: true } as object)} />
+            <Ionicons name="mic" size={60} color={c.textOnAccent} {...({ uiOnly: true } as object)} />
           </View>
         </Pressable>
         <AppText variant="headline" style={{ textAlign: "center", lineHeight: 20 }}>
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   boxBtn: { width: Math.round(56 * UI_SCALE), height: Math.round(56 * UI_SCALE), borderRadius: radius.lg, alignItems: "center", justifyContent: "center" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", gap: space.md, paddingVertical: space.md },
   micWrap: { padding: 18, borderRadius: 999 },
-  mic: { width: Math.round(170 * UI_SCALE), height: Math.round(170 * UI_SCALE), borderRadius: 999, alignItems: "center", justifyContent: "center" },
+  mic: { width: Math.round(120 * UI_SCALE), height: Math.round(120 * UI_SCALE), borderRadius: 999, alignItems: "center", justifyContent: "center" },
   wave: { flexDirection: "row", alignItems: "center", gap: 8 },
   stop: { minHeight: 64, minWidth: 200, borderWidth: 3, borderRadius: radius.lg, alignItems: "center", justifyContent: "center", marginTop: space.md },
   cont: { flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 76, borderRadius: radius.lg + 4, paddingHorizontal: space.lg, paddingVertical: space.md },
