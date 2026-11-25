@@ -7235,6 +7235,45 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/search-settings$/,
+    async (ctx) => {
+      // 搜尋參數（公開，前端的模糊、字元、排序、語意開關用；業主 2026-11-25）。
+      const { loadSearchSettings } = await import("./search-settings.ts");
+      return loadSearchSettings(ctx.db);
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/search-settings$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      const { loadSearchSettings, PARAMS, GROUPS } = await import("./search-settings.ts");
+      return { values: await loadSearchSettings(ctx.db), params: PARAMS, groups: GROUPS };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/search-settings$/,
+    async (ctx) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ values?: unknown; reset?: unknown }>(ctx.req);
+      const { saveSearchSettings, defaultSearchSettings } = await import("./search-settings.ts");
+      const values = await saveSearchSettings(ctx.db, body.reset === true ? defaultSearchSettings() : body.values);
+      await audit(ctx.db, s.sub, "search_settings.save", "setting", "search_settings", body.reset === true ? "reset" : Object.keys((body.values ?? {}) as object).join(",")).run();
+      return { values };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/search-settings\/test$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      const { semanticDebug } = await import("./semantic-search.ts");
+      return semanticDebug(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "");
+    },
+  ],
+  [
+    "GET",
     /^\/search-synonyms$/,
     async (ctx) => {
       // 自訂關聯詞（公開，給搜尋用；業主 2026-11-25）。

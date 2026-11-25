@@ -40,6 +40,7 @@ import { useSynonyms } from "./use-synonyms";
 import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
 import { usePhonetic } from "./use-phonetic";
 import { useSemantic } from "./use-semantic";
+import { useSearchSettings } from "./use-search-settings";
 import { SceneHits } from "./scene-hits";
 import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses, type SeriesGroup } from "./sort";
@@ -305,8 +306,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 打錯字也找得到（業主 2026-11-23）：完全比對沒有結果時，先用模糊比對（差 1～2 個字），再用 AI 語意搜尋找意思相近的；兩者合併顯示並標示「相近結果」。
   const exact = searchIndex ? (chapterMode ? matchLessons(searchIndex, q) : matchCourses(searchIndex, q)) : null;
   const noExact = !!exact && exact.size === 0;
-  const semantic = useSemantic(expandQuery(synonyms, q), noExact);
-  const phonetic = usePhonetic(q, noExact);
+  const searchSt = useSearchSettings();
+  const semantic = useSemantic(expandQuery(synonyms, q), noExact && searchSt.semanticEnabled);
+  const phonetic = usePhonetic(q, noExact && searchSt.phoneticEnabled);
   // 搜尋結果的關聯性順序（至尊模式共用 rankCourses）：同音、模糊、字元比對、AI 語意各自的順序傳給排序。
   const nearInfo = useMemo(() => {
     if (!noExact || !searchIndex || chapterMode) return null;
@@ -318,7 +320,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       phonetic: [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
       semantic: [...semantic.courses, ...lc(semantic.lessons)].filter((id) => searchIndex.haystack.has(id)),
     };
-  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, searchData.data]);
+  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, searchData.data, searchSt]);
   const near = useMemo(() => {
     if (!noExact || !searchIndex) return null;
     const out = new Set<string>();
@@ -337,7 +339,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 搜尋時不受兩頁分流限制（搜得到所有課程）；其餘只看目前這一頁的課程。
   const filtered = (matched ? courses : pool).filter((x) => (matched ? matched.has(x.id) : inCategory(x) && inCenter(x) ));
   // 搜尋結果排序（業主 2026-11-24，至尊模式共用）：關聯性高 > 日期最新 > 已報名；有搜尋時不再套系列手動排序。
-  const list = useMemo(() => (matched && searchIndex && !chapterMode ? rankCourses(searchIndex, filtered, q, nearInfo ?? {}) : filtered), [matched, searchIndex, chapterMode, filtered, q, nearInfo]);
+  const list = useMemo(() => (matched && searchIndex && !chapterMode ? rankCourses(searchIndex, filtered, q, nearInfo ?? {}) : filtered), [matched, searchIndex, chapterMode, filtered, q, nearInfo, searchSt]);
   const pickTerm = (text: string) => {
     const head = q.trim().split(/\s+/).slice(0, -1).join(" ");
     const next = head ? `${head} ${text}` : text;

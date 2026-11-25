@@ -4,6 +4,7 @@
  * 日期、時間、主題…各欄；歸不進任何欄位的放「其他內容」。格式改了，舊的 EDM 會在背景自動重新整理（只重跑文字模型，不用再看圖）。
  */
 import type { D1Database, Env } from "./d1.ts";
+import { loadSearchSettings } from "./search-settings.ts";
 import { AiStopped, callClaude, estimateTokens, loadSelection, markExhausted, refundAi, reserveAi } from "./ai-models.ts";
 
 export type FieldDef = { name: string; hint: string };
@@ -104,11 +105,13 @@ export function parseStructured(raw: string, fields: FieldDef[]): Structured | n
 }
 
 async function runText(env: Env, db: D1Database, model: string, system: string, user: string): Promise<string> {
-  if (model.startsWith("claude-")) return (await callClaude(env, db, model, { system, prompt: user, maxTokens: 1200 })).text;
+  const st = await loadSearchSettings(db); // 隨機度與輸出長度由「搜尋與 AI 設定」決定
+  const maxTokens = st.edmTextMaxTokens as number;
+  if (model.startsWith("claude-")) return (await callClaude(env, db, model, { system, prompt: user, maxTokens })).text;
   if (!env.AI) throw new Error("沒有綁定 Workers AI");
   const est = await reserveAi(db, model, { inputTokens: estimateTokens(system + user) + 100, outputTokens: 800 });
   try {
-    const res = (await env.AI.run(model as never, { messages: [{ role: "system", content: system }, { role: "user", content: user }], max_tokens: 1200, temperature: 0.1 } as never)) as { response?: string; choices?: { message?: { content?: string } }[] };
+    const res = (await env.AI.run(model as never, { messages: [{ role: "system", content: system }, { role: "user", content: user }], max_tokens: maxTokens, temperature: st.edmTextTemperature as number } as never)) as { response?: string; choices?: { message?: { content?: string } }[] };
     return res?.response ?? res?.choices?.[0]?.message?.content ?? "";
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);

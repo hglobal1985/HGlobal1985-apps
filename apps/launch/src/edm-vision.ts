@@ -2,6 +2,7 @@
  * EDM 圖片辨識（業主 2026-11-23）：用 Workers AI 的視覺模型（設定 → AI 模型 →「EDM 圖片辨識」選用）讀出海報上的文字與活動日期，
  * 存在 cover_media 的 ocr_text／event_date，用於搜尋與 EDM 依活動日期排序。額度走 reserveAi（和其他 AI 工作共用每日免費額度）。
  */
+import { loadSearchSettings } from "./search-settings.ts";
 import type { D1Database, Env } from "./d1.ts";
 import { AiStopped, loadSelection, markExhausted, refundAi, reserveAi } from "./ai-models.ts";
 import { cleanOcrText, structureEdm, structurePending } from "./edm-structure.ts";
@@ -93,7 +94,7 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
   let out = "";
   try {
     const dataUri = `data:${type};base64,${toBase64(bytes)}`;
-    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: 1024 } as never)) as { response?: string; choices?: { message?: { content?: string } }[] };
+    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: (await loadSearchSettings(db)).edmVisionMaxTokens as number } as never)) as { response?: string; choices?: { message?: { content?: string } }[] };
     out = res?.response ?? res?.choices?.[0]?.message?.content ?? "";
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);

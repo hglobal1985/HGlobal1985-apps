@@ -24,6 +24,7 @@ import { ElderCenterPage } from "./elder-center";
 import { ElderInvite, ElderSeriesHead } from "./elder-heads";
 import { centerTitle } from "@/features/format";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
+import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -77,8 +78,9 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const key = useMemo(() => q.replace(/[。．.！!？?，,、；;：:「」“”"'（）()]+/g, " ").trim(), [q]);
   const exact = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
   const noExact = !!exact && exact.size === 0;
-  const semantic = useSemantic(expandQuery(synonyms, key), noExact);
-  const phonetic = usePhonetic(key, noExact);
+  const searchSt = useSearchSettings();
+  const semantic = useSemantic(expandQuery(synonyms, key), noExact && searchSt.semanticEnabled);
+  const phonetic = usePhonetic(key, noExact && searchSt.phoneticEnabled);
   // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
   const results = useMemo(() => {
     if (!key) return [];
@@ -95,7 +97,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       near = { phonetic: phon, semantic: sem, fuzzy, chars };
     }
     return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
-  }, [key, index, all, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data]);
+  }, [key, index, all, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
   // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
     if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x }));

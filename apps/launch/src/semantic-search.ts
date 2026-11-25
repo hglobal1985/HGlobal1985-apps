@@ -4,6 +4,7 @@
  * 向量存在 D1 `search_vectors`（int8 量化＋base64），排程每 10 分鐘補一批；額度走 AI 點數預扣（用完就停，不影響其他搜尋）。
  */
 import type { D1Database, Env } from "./d1.ts";
+import { loadSearchSettings } from "./search-settings.ts";
 import { AiStopped, loadSelection, markExhausted, refundAi, reserveAi } from "./ai-models.ts";
 
 /** 相似度門檻：低於這個不算相近（BGE-M3 的餘弦相似度；偏保守，寧可少一點也不要不相干）。 */
@@ -93,9 +94,13 @@ async function allVectors(db: D1Database): Promise<Row[]> {
 }
 
 /** 查詢文字 → 意思最接近的課程與章節編號（依相似度由高到低，各最多 limit 個）。額度用完或沒有向量回空清單。 */
-export async function semanticSearch(env: Env, db: D1Database, q: string, limit = 24): Promise<{ courses: string[]; lessons: string[] }> {
+export async function semanticSearch(env: Env, db: D1Database, q: string, limitArg?: number): Promise<{ courses: string[]; lessons: string[] }> {
   const text = q.trim().slice(0, 100);
   if (text.length < 2) return { courses: [], lessons: [] };
+  const st = await loadSearchSettings(db); // 門檻、筆數由「搜尋與 AI 設定」決定
+  if (!st.semanticEnabled) return { courses: [], lessons: [] };
+  const limit = limitArg ?? (st.semanticLimit as number);
+  const min = st.semanticMin as number;
   const rows = await allVectors(db);
   if (!rows.length) return { courses: [], lessons: [] };
   let qv: Int8Array;
@@ -104,6 +109,32 @@ export async function semanticSearch(env: Env, db: D1Database, q: string, limit 
   } catch {
     return { courses: [], lessons: [] };
   }
-  const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) })).filter((x) => x.s >= SEMANTIC_MIN).sort((a, b) => b.s - a.s);
+  const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) })).filter((x) => x.s >= min).sort((a, b) => b.s - a.s);
   return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id) };
+}
+
+/** 試搜尋（設定頁用，超級管理員）：列出最接近的前 N 筆與相似度分數，方便依實際數字調「相似度門檻」。不套用門檻與開關。 */
+export async function semanticDebug(env: Env, db: D1Database, q: string, n = 20): Promise<{ min: number; rows: { kind: string; title: string; score: number }[]; note?: string }> {
+  const st = await loadSearchSettings(db);
+  const min = st.semanticMin as number;
+  const text = q.trim().slice(0, 100);
+  if (text.length < 2) return { min, rows: [], note: "請輸入至少 2 個字" };
+  const rows = await allVectors(db);
+  if (!rows.length) return { min, rows: [], note: "還沒有建立向量索引（排程每 10 分鐘補一批）" };
+  let qv: Int8Array;
+  try {
+    qv = unpackVec(packVec((await embed(env, db, [text]))[0]!));
+  } catch {
+    return { min, rows: [], note: "AI 沒有回應（額度用完或模型未啟用）" };
+  }
+  const top = rows.map((r) => ({ r, s: cosine(qv, r.v) })).sort((a, b) => b.s - a.s).slice(0, n);
+  const courseIds = top.filter((x) => x.r.kind === "course").map((x) => x.r.id);
+  const lessonIds = top.filter((x) => x.r.kind === "lesson").map((x) => x.r.id);
+  const titles = new Map<string, string>();
+  for (const [table, ids] of [["courses", courseIds], ["lessons", lessonIds]] as const) {
+    if (!ids.length) continue;
+    const { results } = await db.prepare(`SELECT id, title FROM ${table} WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids).all<{ id: string; title: string }>();
+    for (const r of results) titles.set(r.id, r.title);
+  }
+  return { min, rows: top.map((x) => ({ kind: x.r.kind === "course" ? "課程" : "章節", title: titles.get(x.r.id) ?? x.r.id, score: Math.round(x.s * 1000) / 1000 })) };
 }
