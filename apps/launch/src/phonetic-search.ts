@@ -73,12 +73,13 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
   if (!st.phoneticEnabled) return { courses: [], lessons: [] };
   const qs = syllables(stripFiller(q.trim().slice(0, 100))).slice(0, 40);
   if (qs.length < (st.phoneticMinSyllables as number)) return { courses: [], lessons: [] };
-  const k = allow(qs.length, st.phoneticTypoFrom as number);
   // 整串連續符合（最高分）；否則「拆片段」：查詢裡每一段連續的音節只要在這筆資料的任何欄位出現就算覆蓋到，
   // 覆蓋率夠高就列出，覆蓋越多排越前面（業主 2026-11-25：「一支援安裝」＝「益之源」同音錯字＋「安裝」，中間隔著別的字）。
-  const n = Math.min(qs.length, 40); // 口語長句最多看前 40 個音節
   const bigrams = (e: Entry) => (e.bg ??= new Set(e.segs.flatMap((s) => s.syl.slice(0, -1).map((a, i) => `${a}|${s.syl[i + 1]}`))));
-  const score = (e: Entry) => {
+  const scoreOf = (qs: string[]) => {
+    const k = allow(qs.length, st.phoneticTypoFrom as number);
+    const n = Math.min(qs.length, 40); // 口語長句最多看前 40 個音節
+    return (e: Entry) => {
     let best = 0;
     for (const s of e.segs) {
       if (!s.syl.length) continue;
@@ -112,7 +113,39 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
     if (n <= 5 ? got < 0.75 * n : got < 4 || (longest < 3 && got < 6)) return 0;
     // 分數：覆蓋的音節越多越前面；最長詞加一點分。
     return w * (got / n) + got * 0.05 + longest * 0.05;
+    };
   };
-  const hit = (await load(db)).map((e) => ({ e, s: score(e) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
+  const entries = await load(db);
+  const best = new Map<string, { e: Entry; s: number }>();
+  const run = (qsx: string[], bonus: number) => {
+    const sc = scoreOf(qsx);
+    for (const e of entries) {
+      const s = sc(e);
+      if (s > 0) {
+        const cur = best.get(`${e.kind}:${e.id}`);
+        if (!cur || cur.s < s + bonus) best.set(`${e.kind}:${e.id}`, { e, s: s + bonus });
+      }
+    }
+  };
+  run(qs, 0);
+  // 自訂關聯詞（業主 2026-11-25：故意打錯字「和本翠」要找得到「漢本萃＝智慧草本＝中藥」）：
+  // 查詢的音節與某個關聯詞「相同，或 3 個音節以上差 1 個音節」，就把同組的所有詞也當查詢找一遍（分數略低一點）。
+  for (const g of await synonymGroups(db)) {
+    const sylOf = g.map((t) => syllables(t));
+    const hitTerm = sylOf.some((ts) => ts.length >= 2 && qs.length >= 2 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 0) || (ts.length >= 3 && qs.length >= 3 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 1)));
+    if (hitTerm) for (const ts of sylOf) if (ts.length >= 2) run(ts.slice(0, 40), -0.3);
+  }
+  const hit = [...best.values()].sort((a, b) => b.s - a.s);
   return { courses: hit.filter((x) => x.e.kind === "course").slice(0, limit).map((x) => x.e.id), lessons: hit.filter((x) => x.e.kind === "lesson").slice(0, limit).map((x) => x.e.id) };
 }
+
+/** 自訂關聯詞各組（每次最多快取 1 分鐘）。 */
+let synCache: { at: number; groups: string[][] } | null = null;
+async function synonymGroups(db: D1Database): Promise<string[][]> {
+  if (synCache && Date.now() - synCache.at < 60_000) return synCache.groups;
+  const { results } = await db.prepare("SELECT terms FROM search_synonyms ORDER BY id").all<{ terms: string }>();
+  const groups = results.map((r) => { try { return JSON.parse(r.terms) as string[]; } catch { return []; } }).filter((g) => g.length >= 2);
+  synCache = { at: Date.now(), groups };
+  return groups;
+}
+export const resetSynonymCache = () => { synCache = null; };
