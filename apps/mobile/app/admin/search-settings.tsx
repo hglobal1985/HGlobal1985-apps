@@ -103,7 +103,7 @@ export default function SearchSettingsScreen() {
           {g.key === "semantic" ? (
             <Card style={{ gap: space.sm }}>
               <AppText variant="headline">試搜尋（看相似度分數）</AppText>
-              <AppText variant="callout">輸入一個詞（例如「水機」），列出 AI 認為最接近的前 20 筆與分數（已含各類的「加分」）。沒顯示但你想要的，把門檻調低到它的分數，或替那一類加分。目前門檻 {fmt(Number(cur.semanticMin), 0.01)}。</AppText>
+              <AppText variant="callout">輸入一個詞（例如「水機」），列出 AI 認為最接近的前 20 筆。這裡的結果就是 App 實際搜尋的結果：只列已開啟的資料類別、分數含加分、依「顯示順序」排列，標「會顯示」的才會出現在搜尋結果。目前門檻 {fmt(Number(cur.semanticMin), 0.01)}。</AppText>
               <TextInput value={q} onChangeText={setQ} placeholder="輸入要測試的搜尋詞" placeholderTextColor={c.textMuted} onSubmitEditing={runTest} returnKeyType="search" style={[styles.input, { borderColor: c.border, backgroundColor: c.surface, color: c.text }]} />
               <Button label={testing ? "搜尋中…" : "試搜尋"} onPress={runTest} disabled={testing || q.trim().length < 2} />
               {test?.note ? <AppText variant="callout" tone="muted">{test.note}</AppText> : null}

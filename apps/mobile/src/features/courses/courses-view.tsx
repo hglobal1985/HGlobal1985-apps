@@ -315,13 +315,15 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     if (!noExact || !searchIndex || chapterMode) return null;
     const byLesson = new Map((searchData.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
     const lc = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && searchIndex.haystack.has(x));
+    // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：語意搜尋開著而且有結果（或還在找）時只顯示它的結果，沒結果才退回同音／模糊／字元比對。
+    const semOnly = searchSt.semanticEnabled && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
     return {
-      fuzzy: fuzzyCourses(searchIndex, q),
-      chars: charsCourses(searchIndex, q),
-      phonetic: [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
+      fuzzy: semOnly ? new Set<string>() : fuzzyCourses(searchIndex, q),
+      chars: semOnly ? new Set<string>() : charsCourses(searchIndex, q),
+      phonetic: semOnly ? [] : [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
       semantic: [...semantic.courses].filter((id) => searchIndex.haystack.has(id)),
     };
-  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, searchData.data, searchSt]);
+  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, semantic.extras, semantic.loading, phonetic.courses, phonetic.lessons, searchData.data, searchSt]);
   const near = useMemo(() => {
     if (!noExact || !searchIndex) return null;
     const out = new Set<string>();
