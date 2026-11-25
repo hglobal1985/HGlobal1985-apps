@@ -615,7 +615,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               <HeaderAddToList target={{ kind: "center", ref: activeCenter }} title={centerTitle(activeCenter)} />
               <HeaderInvite title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
-          } /> : undefined} hero={centerHero} heroFooter={centerHero ? <BroadcastZone center={activeCenter} title={`${centerTitle(activeCenter)}公告`} reloadKey={bcTick} /> : undefined} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+          } /> : undefined} hero={centerHero} heroFooter={centerHero ? <BroadcastZone flush center={activeCenter} title={`${centerTitle(activeCenter)}公告`} reloadKey={bcTick} /> : undefined} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       {/* 廣播公告緊貼封面正下方、左右滿版（業主 2026-11-21），所以放在第一個。 */}
       <LoginPrompt />
       {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}

@@ -9,7 +9,7 @@ import { useBroadcasts } from "./use-broadcasts";
  * 中心頁：傳 center；該中心的課程頁、系列頁：傳 center 與／或 series（兩邊的公告一起輪播）。沒有公告就什麼都不顯示。
  * 業主 2026-11-21：公告模組化，之後新增任何頁面要放公告，只放這一個元件。
  */
-export function BroadcastZone({ center, series, title, gutter, reloadKey }: { center?: string; series?: string; title: string; gutter?: number; /** 頁面別處新增、修改公告後把這個數字加一，這裡就重新讀取。 */ reloadKey?: number }) {
+export function BroadcastZone({ center, series, title, gutter, reloadKey, flush }: { /** 釘在封面下方（heroFooter）時傳 true。 */ flush?: boolean; center?: string; series?: string; title: string; gutter?: number; /** 頁面別處新增、修改公告後把這個數字加一，這裡就重新讀取。 */ reloadKey?: number }) {
   const bc = useBroadcasts({ center, series });
   const seriesSettings = useSeriesSettings();
   const [open, setOpen] = useState(false);
@@ -21,7 +21,7 @@ export function BroadcastZone({ center, series, title, gutter, reloadKey }: { ce
   if (!bc.data?.items.length) return null;
   return (
     <>
-      <BroadcastBand items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setOpen(true)} gutter={gutter} labelOf={(s) => (s === "center" && center ? centerShort(center) : s === "series" && series ? seriesSettings.titleOf(series) : "")} />
+      <BroadcastBand flush={flush} items={bc.data.items} seconds={bc.data.seconds} onOpen={() => setOpen(true)} gutter={gutter} labelOf={(s) => (s === "center" && center ? centerShort(center) : s === "series" && series ? seriesSettings.titleOf(series) : "")} />
       {open ? <BroadcastSheet title={title} items={bc.data.items} onClose={() => setOpen(false)} onChanged={bc.reload} /> : null}
     </>
   );

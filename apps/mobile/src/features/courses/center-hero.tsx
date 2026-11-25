@@ -36,6 +36,7 @@ export const centerHeroFull = (winW: number, winH = 10000) => centerHeroSize(win
 export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover, inline = false }: { /** 封面輪播的照片與短影音（相簿）；沒有時用 art 單張首頁圖。 */ media?: CoverMediaItem[]; onEditCover?: () => void; stats: CoverStats; art?: { edmUrl: string; coverUrl?: string | null }; /** 浮動封面才需要（往上捲時縮小）；inline 不用。 */ scrollY?: Animated.Value; title: string; /** 放在一般內容裡（至尊模式中心卡，業主 2026-11-24）：寬度＝所在欄寬、16:10、圓角、不隨捲動縮小。 */ inline?: boolean }) {
   const { width: winW, height: winH } = useWindowDimensions();
   const thumb = useThumb();
+  const { scheme } = useTheme();
   const [open, setOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const [boxW, setBoxW] = useState(0);
@@ -106,7 +107,13 @@ export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover
     </Animated.View>
   );
   // 往下滑縮成迷你小視窗的「大到小封面動畫」直接串接共用模組 CollapseBand（量封面位置、縮小途中隱藏本體；shrink＝false：高度仍由這裡隨捲動縮放）。
-  return inline ? hero : <CollapseBand shrink={false} range={Math.max(1, full)}>{hero}</CollapseBand>;
+  // 方案 E（業主 2026-11-25）：封面縮小時，封面區的顏色漸漸變成公告列的黃色、與下方黃色公告列融為一體（黃色蓋層的透明度隨捲動 0→1）。
+  return inline ? hero : (
+    <View>
+      <CollapseBand shrink={false} range={Math.max(1, full)}>{hero}</CollapseBand>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: scheme === "dark" ? "#F5C518" : "#FFD43B", opacity: at(0, 1) }]} />
+    </View>
+  );
 }
 
 /**
