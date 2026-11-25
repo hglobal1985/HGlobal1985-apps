@@ -4,7 +4,7 @@ import { handleApi } from "../src/api.ts";
 import type { CourseDetail } from "../src/contract.ts";
 import type { Env, R2Bucket } from "../src/d1.ts";
 import { classifyFile } from "../src/files.ts";
-const FILE_MAX_BYTES = 30 * 1024 * 1024;
+const FILE_MAX_BYTES = 95 * 1024 * 1024;
 import { createTestDb } from "./sqlite-d1.ts";
 
 const memR2 = (): R2Bucket & { store: Map<string, { data: Uint8Array; type?: string }> } => {
@@ -29,7 +29,7 @@ test("檔案類型判斷：影片不行、圖片與文件可以", () => {
   assert.equal(classifyFile("x.exe"), null);
 });
 
-test("教材上傳檔案：建立教材、下載、超過 30MB 與影片被擋；儲存空間統計", async () => {
+test("教材上傳檔案：建立教材、下載、超過 95MB 與影片被擋；儲存空間統計", async () => {
   const db = createTestDb();
   const r2 = memR2();
   const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: r2 };

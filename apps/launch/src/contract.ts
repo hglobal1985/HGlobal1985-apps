@@ -1116,7 +1116,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   libraryKeyBadges: 100,
   listBaseQuota: 2,
   listUnlocks: [],
-  fileMaxMb: 30,
+  fileMaxMb: 95,
   imageMaxSide: 1024,
   imageQuality: 88,
   centerMaxSide: 2048,

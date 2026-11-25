@@ -80,3 +80,5 @@
 - **移除儲存空間管理的「單檔上限」設定（業主 2026-11-25，取代上一條的「標籤釐清」）**：設定頁不再有這個調整項（`app/admin/storage.tsx`）。教材檔案從裝置上傳的上限仍然存在但**固定、不可調**：沿用 `AppSettings.fileMaxMb` 目前存的值（預設 30MB，最多受網路請求大小限制 95MB），`file-upload-module.web.tsx` 與 `api.ts` 教材檔案上傳照舊讀它；沒有拿掉這個上限本身，否則超大檔會拖垮上傳。相簿照片、影片從來不用它。
 
 - **移除「圖片存檔格式」設定，格式與畫質統一用「相簿存檔格式」（業主 2026-11-25，取代前面「所有上傳圖片一律轉成指定的存檔格式（預設 JPEG）」的可調設定）**：儲存空間管理不再有「圖片存檔格式」單選（只留各類型存檔格式比較表 `FormatTable`，標為參考）；`image-store.ts` 的 `shrinkImage` 目標格式＝`override`（相簿存檔格式與畫質）或固定 JPEG（品牌 logo `keepFormat` 保留原格式）；`AppSettings.storeFormat` 欄位保留相容但**不再使用**。**相簿照片與「上傳當教材的圖片」（教材檔案上傳、雲端硬碟匯入）一律套用「相簿存檔格式」**：`api.ts` 的 `materialImageOverride`（`albumScope`＝`treasure` 時只有成交百寶箱課程、`all`＝全部、`off`＝不套用），`shrinkStored` 也接 override；設定頁範圍選項改名「全部（相簿與教材圖片）」。課程「相簿」分頁本來就只有該課程有相簿照片（`albumTotal(course) > 0`，例如上傳單張或少量圖片當教材、被自動搬進區塊相簿）才出現，沒改。
+
+- **教材檔案單檔上限固定 95MB（業主 2026-11-25，取代前面「沿用存的值、預設 30MB」）**：`ui-config.ts` 的 `normalizeApp` 把 `fileMaxMb` 強制為 95（舊設定存的 40 等值一律忽略），`contract.ts` 預設也是 95；`file-upload-module.web.tsx` 與教材檔案上傳 API 照舊讀 `app.fileMaxMb`。95MB 是 Cloudflare Workers 單次請求大小的實際上限（再大要改成分段上傳），要調高需先做分段上傳。
