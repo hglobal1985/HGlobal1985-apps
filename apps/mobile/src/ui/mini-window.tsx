@@ -2,14 +2,14 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { GradientFrame } from "./gradient-frame";
-import { MINI_BAR, MINI_BAR_BG, MINI_BTN, MINI_BTN_COLORS, MINI_BTN_GLYPH_COLOR, MINI_CIRCLE, MINI_CTL_HIDE_MS, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, MINI_RADIUS, miniFloatWidth } from "./mini-spec";
+import { MINI_BAR, MINI_BAR_BG, MINI_BTN, MINI_BTN_COLORS, MINI_BTN_GLYPH_COLOR, MINI_CIRCLE, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, MINI_RADIUS, miniFloatWidth } from "./mini-spec";
 
 type Pos = { x: number; y: number };
 
 /**
  * 封面迷你小視窗（業主 2026-11-24 永久指示：與影片迷你小視窗一模一樣的參數與功能）：
  * 右下角浮動小視窗（16:9、同樣寬度、流光漸層邊框），上方一條按鈕列——黃＝最小化（縮成小圓圖）、綠＝最大化（onMaximize）、紅＝關閉（onClose）；
- * 三顆按鈕 1 秒沒有觸摸就自動隱藏；手指按住可任意拖曳位置，位置記在本機（與影片迷你播放器共用同一個位置）；小圓圖也能拖曳、點一下恢復小視窗。
+ * 三顆按鈕永遠顯示；手指按住可任意拖曳位置，位置記在本機（與影片迷你播放器共用同一個位置）；小圓圖也能拖曳、點一下恢復小視窗。
  * 尺寸、顏色、時間都來自 ui/mini-spec.ts（影片迷你播放器用同一份）。放在頁面最外層（滿版透明層，只有小視窗本身會接觸摸）。
  */
 export function MiniWindow({ visible, opacity = 1, windowContent, circleContent, label, maximizeLabel, onMaximize, onClose, onTap, collapsed: collapsedProp, onCollapsedChange, slotRef, running = true, getBottomEdge }: {
@@ -44,24 +44,12 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
     onCollapsedChange?.(v);
   };
   const [saved, setSaved] = useState<Pos | null>(null);
-  const [ctl, setCtl] = useState(true);
-  const ctlTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const wake = () => {
-    setCtl(true);
-    if (ctlTimer.current) clearTimeout(ctlTimer.current);
-    ctlTimer.current = setTimeout(() => setCtl(false), MINI_CTL_HIDE_MS);
-  };
+  const wake = () => undefined; // 三顆按鈕永遠顯示（業主 2026-11-25，不再自動隱藏）
   useEffect(() => {
     AsyncStorage.getItem(MINI_POS_KEY)
       .then((raw) => raw && setSaved(JSON.parse(raw) as Pos))
       .catch(() => undefined);
-    return () => {
-      if (ctlTimer.current) clearTimeout(ctlTimer.current);
-    };
   }, []);
-  useEffect(() => {
-    if (visible) wake();
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mw = miniFloatWidth(area.w || 390);
   const mh = Math.round((mw * 9) / 16);
@@ -138,7 +126,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
             </View>
           ) : (
             <>
-              <View pointerEvents={ctl ? "auto" : "none"} style={{ height: MINI_BAR, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 12, paddingHorizontal: 10, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: MINI_BAR_BG, opacity: ctl ? 1 : 0 }}>
+              <View style={{ height: MINI_BAR, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 12, paddingHorizontal: 10, borderTopLeftRadius: 12, borderTopRightRadius: 12, backgroundColor: MINI_BAR_BG }}>
                 {buttons.map((b) => (
                   <Pressable key={b.key} accessibilityRole="button" accessibilityLabel={b.label} onPress={b.act} style={{ width: MINI_BTN, height: MINI_BTN, borderRadius: 999, backgroundColor: b.color, alignItems: "center", justifyContent: "center" }}>
                     <Text style={{ color: MINI_BTN_GLYPH_COLOR, fontSize: 14, fontWeight: "900", lineHeight: 16 }}>{b.glyph}</Text>

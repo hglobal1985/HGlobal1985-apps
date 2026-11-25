@@ -20,7 +20,6 @@ export const MINI_BTN = 26;
 export const MINI_BTN_COLORS = { min: "#FEBC2E", max: "#28C840", close: "#FF5F57" } as const;
 export const MINI_BTN_GLYPH_COLOR = "rgba(0,0,0,0.65)";
 export const MINI_GLYPHS = { min: "─", max: "□", close: "✕" } as const;
-/** 三顆按鈕在沒有觸摸 1 秒後自動隱藏，再摸到小視窗才會顯示。 */
-export const MINI_CTL_HIDE_MS = 1000;
+/** 三顆按鈕永遠顯示（業主 2026-11-25，取消原本 1 秒自動隱藏）。 */
 /** 小視窗邊框圓角（流光邊框 GradientFrame 的 radius）。 */
 export const MINI_RADIUS = 14;
