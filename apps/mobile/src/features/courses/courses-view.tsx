@@ -35,6 +35,7 @@ import { parseUnitFilter, UnitFilter, unitFilterPass, type UnitFilterValue } fro
 import { flashMode } from "./mode-flash";
 import { ZoneMoveSheet, zoneLabel } from "./zone-move-sheet";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
+import { AlbumViewer } from "./edm-viewer";
 import { ChapterList, type ChapterItem } from "./chapter-list";
 import { useSynonyms } from "./use-synonyms";
 import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
@@ -754,7 +755,13 @@ function SortableTile({ group, width, index, count, onSwap }: { group: SeriesGro
 /** 第五大分類「相簿」色帶：數量＝全站相簿照片總數。 */
 function AlbumZoneBand() {
   const { data } = useApi<AlbumsResponse>("/albums");
-  return <ZoneBand album text="相簿" count={data?.total ?? 0} folded onFold={() => router.push("/albums" as never)} />;
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ZoneBand album text="相簿" count={data?.total ?? 0} folded onFold={() => setOpen(true)} />
+      {open ? <AlbumViewer onClose={() => setOpen(false)} /> : null}
+    </>
+  );
 }
 
 /** 專區色帶的顏色：寰宇專區沿用站內主色（c.accentSoft／c.accentText，本來就有深色），其他專區各有淺色與深色兩組。 */

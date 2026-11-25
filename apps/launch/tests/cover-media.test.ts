@@ -200,3 +200,34 @@ test("相簿專區 GET /albums：全站相簿照片依來源分資料夾（業�
   assert.equal(r.groups[1]!.folders[0]!.count, 2);
   assert.ok(r.groups[1]!.folders[0]!.thumb, "有縮圖");
 });
+
+test("相簿專區：資料夾依張數多到少、大類別順序可調、單一資料夾與全部搜尋（業主 2026-11-25）", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.json ? { "content-type": "application/json" } : {}), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.json ? JSON.stringify(opts.json) : opts.bytes) as unknown as BodyInit | undefined }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  type Folder = { id: string; count: number; title: string; locked: boolean; canEdit: boolean; thumbs: string[] };
+  type Albums = { groups: { id: string; folders: Folder[] }[] };
+  const admin = (await call<{ token: string }>("POST", "/auth/demo", { json: { sub: "demo-admin" } })).data.token;
+  await call("PUT", "/admin/cover-media?kind=series&key=A&w=10&h=10", { token: admin, bytes: jpeg });
+  for (let i = 0; i < 3; i++) await call("PUT", "/admin/cover-media?kind=series&key=B&w=10&h=10", { token: admin, bytes: jpeg });
+  await call("PUT", `/admin/cover-media?kind=center&key=${encodeURIComponent("台北中心")}&scope=edm&w=10&h=10`, { token: admin, bytes: jpeg });
+  const r = (await call<Albums>("GET", "/albums")).data;
+  assert.deepEqual(r.groups.map((g) => g.id), ["edm", "series"], "預設順序");
+  assert.deepEqual(r.groups[1]!.folders.map((f) => f.title), ["B", "A"], "子項目按張數多到少");
+  assert.equal(r.groups[1]!.folders[0]!.thumbs.length, 3);
+  assert.equal(r.groups[1]!.folders[0]!.canEdit, false, "訪客不能上傳");
+  const adm = (await call<Albums>("GET", "/albums", { token: admin })).data;
+  assert.equal(adm.groups[1]!.folders[0]!.canEdit, true, "超級管理員可上傳");
+  // 大類別順序：只有超級管理員能改
+  assert.equal((await call("PUT", "/admin/ui-config", { json: { albumOrder: ["series", "edm"] } })).status, 401);
+  assert.equal((await call("PUT", "/admin/ui-config", { token: admin, json: { albumOrder: ["series", "edm", "bogus"] } })).status, 200);
+  assert.deepEqual((await call<Albums>("GET", "/albums")).data.groups.map((g) => g.id), ["series", "edm"], "依設定的大類別順序");
+  const f = await call<{ items: unknown[] }>("GET", `/albums/folder?id=${encodeURIComponent("series:B")}`);
+  assert.equal(f.status, 200);
+  assert.equal(f.data.items.length, 3);
+  assert.equal((await call("GET", `/albums/folder?id=${encodeURIComponent("series:none")}`)).status, 404);
+  assert.deepEqual((await call<{ items: unknown[] }>("GET", "/albums/search?q=a")).data.items, [], "太短不搜");
+});

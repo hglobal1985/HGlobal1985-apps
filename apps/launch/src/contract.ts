@@ -468,7 +468,7 @@ export type CoverMediaKind = "center" | "series" | "course";
 /** 儲存區（業主 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，張數不設上限（業主 2026-11-25）；系列、課程只有 cover。 */
 export type CoverScope = "cover" | "edm";
 /** 「相簿」專區（業主 2026-11-25）：自動彙整全站所有用到相簿上傳功能的照片，依來源分成「資料夾」。 */
-export type AlbumFolder = { /** 唯一識別：來源類型＋鍵值（＋儲存區）。 */ id: string; /** center＝中心；series＝系列；course＝課程封面；block＝課程區塊相簿（點開前往該課程的相簿分頁）。 */ kind: "center" | "series" | "course" | "block"; /** center／series／course 用 /cover-media 讀；block 用課程編號＋區塊編號前往課程頁。 */ key: string; scope?: CoverScope; title: string; subtitle?: string; count: number; thumb: string | null; courseId?: string };
+export type AlbumFolder = { /** 唯一識別：來源類型＋鍵值（＋儲存區）。 */ id: string; /** center＝中心；series＝系列；course＝課程封面；block＝課程區塊相簿（點開前往該課程的相簿分頁）。 */ kind: "center" | "series" | "course" | "block"; /** center／series／course 用 /cover-media 讀；block 用課程編號＋區塊編號前往課程頁。 */ key: string; scope?: CoverScope; title: string; subtitle?: string; count: number; thumb: string | null; /** 資料夾預覽用的前 4 張縮圖。 */ thumbs: string[]; courseId?: string; /** 沒有權限進入（鎖定的課程、區塊相簿）：禁止進入，點了只顯示原因。 */ locked: boolean; lockReason?: string; /** 看的人可不可以在這個資料夾上傳照片（伺服器上傳時仍會再檢查）。 */ canEdit: boolean };
 export type AlbumGroup = { id: string; label: string; folders: AlbumFolder[] };
 export type AlbumsResponse = { total: number; groups: AlbumGroup[] };
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
@@ -869,6 +869,8 @@ export type UiConfig = {
   sortGroups: SortGroup[];
   /** 「全部課程 > 系列」小卡的手動排序：由上到下的小卡代碼（系列＝s:系列名稱、單一課程＝c:課程編號）；沒列到的排在後面。 */
   seriesOrder: string[];
+  /** 「相簿」專區大類別的由上到下順序（超級管理員在相簿側邊欄調整；代碼 edm／cover／series／course／block；沒列到的接在後面）。子項目一律按張數多到少，不能移動。 */
+  albumOrder: string[];
   ribbons: Record<RibbonKey, { label: string; color: RibbonColor; enabled: boolean }>;
   /** 除了超級管理員、總部秘書之外，哪些職務可以看「統計分析」（職務代碼：president、sound、course、reviewer）。 */
   statsRoles: string[];
@@ -1118,6 +1120,7 @@ export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [
 export const DEFAULT_UI_CONFIG: UiConfig = {
   sortGroups: [...SORT_GROUPS],
   seriesOrder: [],
+  albumOrder: [],
   ribbons: {
     public_free: { label: "免費公開", color: "ok", enabled: true },
     learning: { label: "學習中", color: "green", enabled: true },

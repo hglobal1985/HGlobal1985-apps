@@ -6,9 +6,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { resolveUrl, type CourseSummary } from "@/api/client";
+import { api, resolveUrl, type CourseSummary, type CoverMediaItem } from "@/api/client";
 import { downloadImage, shareImage } from "@/lib/share";
 import { LightboxGrid } from "./lightbox-grid";
+import { LightboxLibrary, type LibraryPick } from "./lightbox-library";
 import { displayName } from "./sort";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -149,7 +150,7 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
 let helpHiddenMemory = true; // 預設縮成十字圖示，點圖示才展開（業主 2026-11-24）
 /** id＝相簿照片編號（有給、而且看的人有管理權限時，右上角多一顆「圖片資訊」驚嘆號鈕；業主 2026-11-24）。 */
 export type LightboxItem = { uri: string; title: string; bg?: string; id?: string };
-export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, index = 0 }: { uri: string; title: string; onClose: () => void; /** 看的人有管理權限時才傳 true：顯示「圖片資訊」鈕（內容含上傳者與 EXIF）。 */ showInfo?: boolean; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
+export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, index = 0, library = false }: { /** 直接以「相簿」資料夾檢視開場（相簿專區入口：沒有照片、先選資料夾；業主 2026-11-25）。 */ library?: boolean; uri: string; title: string; onClose: () => void; /** 看的人有管理權限時才傳 true：顯示「圖片資訊」鈕（內容含上傳者與 EXIF）。 */ showInfo?: boolean; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
   useEffect(() => trackFeature("edm_zoom"), []);
   // 真正的全螢幕：進來時收起瀏覽器的網址列與按鈕，關閉時還原（lib/fullscreen.ts；不支援的瀏覽器略過）。
   useEffect(() => {
@@ -165,20 +166,23 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   useBackToClose(onClose); // 瀏覽器／手機「上一頁」＝直接關閉這個全螢幕視窗（業主 2026-11-24）
   const [infoOpen, setInfoOpen] = useState(false);
   const [grid, setGrid] = useState(false); // 「檢視全部」格狀畫面（業主 2026-11-25）
+  const [libOpen, setLibOpen] = useState(library); // 「相簿」資料夾檢視（業主 2026-11-25）
+  const [over, setOver] = useState<{ title: string; items: LightboxItem[]; folder: LibraryPick["folder"] } | null>(null); // 從相簿選了資料夾：整個看圖換成這個資料夾的照片
   const gridRef = useRef(false);
   gridRef.current = grid;
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
-  const list = items && items.length ? items : [{ uri, title, bg }];
+  const base: LightboxItem[] = items && items.length ? items : uri ? [{ uri, title, bg }] : [];
+  const list = over ? over.items : base;
   const [idx, setIdx] = useState(Math.min(Math.max(0, index), list.length - 1));
-  const cur = list[idx] ?? list[0]!;
+  const cur = list[idx] ?? list[0] ?? { uri: "", title: "" };
   const [scale, setScale] = useState(1);
   const [ratio, setRatio] = useState(0.7); // 寬 / 高
   const [touching, setTouching] = useState(false); // 手指或滑鼠按著圖片時，按鈕暫時消失
   const full = resolveUrl(cur.uri);
   useEffect(() => {
-    Image.getSize(full, (w, h) => h && setRatio(w / h), () => undefined);
-  }, [full]);
+    if (cur.uri) Image.getSize(full, (w, h) => h && setRatio(w / h), () => undefined);
+  }, [full]); // eslint-disable-line react-hooks/exhaustive-deps
   // 全螢幕（業主 2026-11-21）：圖片依整個螢幕等比貼合；放大後「整個螢幕」都是可看、可拖曳的範圍（不再被圖片原本的外框切掉）。
   const frameW = Math.min(win.width, win.height * ratio);
   const frameH = frameW / ratio;
@@ -288,11 +292,24 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
       flashText("下載失敗，請稍後再試");
     }
   };
+  // 工具列最多 7 顆圓鈕（說明、相簿、檢視全部、資訊、下載、分享、關閉）：窄螢幕自動縮小直徑，一定排得下（業主 2026-11-25）。
+  const toolSize = Math.min(50, Math.floor((win.width - 32 - 4 * 6) / 7));
   const tool = (label: string, onPress: () => void, child: React.ReactNode, disabled?: boolean) => (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} disabled={disabled} style={[styles.tool, { opacity: disabled ? 0.45 : 1 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} disabled={disabled} style={[styles.tool, { width: toolSize, height: toolSize, borderRadius: toolSize / 2, opacity: disabled ? 0.45 : 1 }]}>
       {child}
     </Pressable>
   );
+  // 資料夾裡上傳完：重新讀這個資料夾的照片（有權限者的「上傳照片」鈕，業主 2026-11-25）。
+  const reloadFolder = async () => {
+    const f = over?.folder;
+    if (!f) return;
+    try {
+      const r = await api<{ items: CoverMediaItem[] }>("GET", `/albums/folder?id=${encodeURIComponent(f.id)}`);
+      setOver({ title: over.title, folder: f, items: r.items.filter((x) => x.kind === "image").map((x) => ({ uri: x.url, title: over.title, id: x.id })) });
+    } catch (e) {
+      flashText((e as Error).message);
+    }
+  };
   const many = list.length > 1;
   const land = win.width > win.height; // 橫放：說明與按鈕合併在同一列
   const hint = many ? "左右滑動換張、兩指放大縮小" : "可拖曳移動、兩指放大縮小";
@@ -317,7 +334,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="關閉" />
         {/* 整個螢幕都是手勢範圍：放大後可拖曳到螢幕的任何位置，不會被圖片原本的外框切掉。 */}
         <View style={[StyleSheet.absoluteFill, { alignItems: "center", justifyContent: "center", overflow: "hidden" }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab" } as object) : null]} {...pan.panHandlers} {...wheel} {...NO_PULL}>
-          <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, backgroundColor: imgBg ?? "#fff", transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors />
+          {list.length ? <Animated.Image source={{ uri: full }} resizeMode="stretch" style={{ width: frameW * scale, height: frameH * scale, backgroundColor: imgBg ?? "#fff", transform: [{ translateX: tx }, { translateY: ty }] }} accessibilityIgnoresInvertColors /> : null}
         </View>
         <View style={[StyleSheet.absoluteFill, { opacity: touching ? 0 : 1, paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }]} pointerEvents={touching ? "none" : "box-none"}>
           {many && desktop ? (
@@ -335,10 +352,11 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
               <View style={styles.row} pointerEvents="box-none">
                 {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />) : null}
+                {tool("相簿", () => setLibOpen(true), <Ionicons name="folder-open-outline" size={24} color="#fff" {...UI_ONLY} />)}
                 {many ? tool("檢視全部", () => setGrid(true), <Ionicons name="grid-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
-                {canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
-                {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />)}
-                {tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />)}
+                {list.length && canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
+                {list.length ? tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
+                {list.length ? tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />) : null}
                 {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
               </View>
               {/* 第幾張、共幾張：獨立標籤，放在「關閉」鈕正下方（業主 2026-11-21）。 */}
@@ -360,7 +378,8 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
               </View>
             ) : null}
           </View>
-          {grid ? <LightboxGrid list={list} current={idx} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
+          {grid && list.length ? <LightboxGrid list={list} current={idx} heading={over?.title} extra={over?.folder?.canEdit ? <FolderUpload folder={over.folder} count={list.length} onDone={reloadFolder} /> : undefined} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
+          {libOpen ? <LightboxLibrary onClose={() => (list.length ? setLibOpen(false) : onClose())} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => ({ uri: x.url, title: p.title, id: x.id })) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
           {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>
@@ -378,3 +397,13 @@ const styles = StyleSheet.create({
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
   help: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, borderRadius: 30, backgroundColor: "rgba(0,0,0,0.5)" },
 });
+
+/** 相簿資料夾裡的「上傳照片」（有該相簿權限的人；伺服器上傳時還會再檢查）：與各頁面相簿同一個上傳元件。 */
+function FolderUpload({ folder, count, onDone }: { folder: NonNullable<LibraryPick["folder"]>; count: number; onDone: () => void }) {
+  return <AlbumUploadButton kind={folder.kind === "block" ? "course" : folder.kind} ownerKey={folder.key} count={count} onDone={onDone} scope={folder.scope} label={folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} />;
+}
+
+/** 相簿專區入口開的看圖畫面（第五大分類，業主 2026-11-25）：全黑的全螢幕看圖，直接以「相簿」資料夾檢視開場。超派、至尊共用。 */
+export function AlbumViewer({ onClose }: { onClose: () => void }) {
+  return <EdmLightbox library uri="" title="相簿" onClose={onClose} />;
+}

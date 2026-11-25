@@ -1,0 +1,227 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { useEffect, useState } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMediaItem } from "@/api/client";
+import { centerTitle } from "@/features/format";
+import { isSuperAdmin } from "@/lib/roles";
+import { useThumb } from "@/lib/thumb";
+import { useApi, useSession } from "@/state/session";
+import { space } from "@/theme/tokens";
+import { AppText } from "@/ui";
+import { flashText } from "@/ui/flash-notice";
+
+const UI_ONLY = { uiOnly: true } as object;
+const UI_ONLY_TEXT = { dataSet: { uiOnly: "" } } as object;
+
+/** 在資料夾裡選了什麼：folder＝null 代表「搜尋結果」；index＝從哪一張開始看。 */
+export type LibraryPick = { folder: AlbumFolder | null; title: string; items: CoverMediaItem[]; index?: number };
+type Found = CoverMediaItem & { folderId: string; folderTitle: string };
+
+const folderName = (f: AlbumFolder) => (f.kind === "center" ? centerTitle(f.title) : f.title);
+
+/**
+ * 全螢幕看圖裡的「相簿」資料夾檢視（業主 2026-11-25，款式 C 為主架構＋B 的搜尋＋A 的側邊欄；與全螢幕看圖 `EdmLightbox`／「檢視全部」`LightboxGrid` 是同一套模組，不另做）：
+ * ①上方一排「大類別」標籤（中心 EDM、中心封面、系列、課程封面、區塊相簿），下面一律兩欄資料夾卡（4 格預覽、名稱、張數），資料夾自動按張數多到少排；
+ * ②搜尋框可選「此頁」（預設，只搜目前類別的資料夾）或「全部」（搜全部相簿照片的場景標籤、照片文字 OCR）；
+ * ③左上角選單鈕開側邊欄：列出大類別與目前類別的資料夾，超級管理員可在這裡用 ▲▼ 移動大類別的順序（存在 UiConfig.albumOrder；子項目不能移動）；
+ * ④沒有權限的資料夾（鎖定的課程、區塊相簿）禁止進入，點了只顯示原因（伺服器也會擋）。
+ * 點資料夾 → onPick（交給全螢幕看圖換成這個資料夾的照片並進入「檢視全部」格狀畫面）。
+ */
+export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) => void; onClose: () => void }) {
+  const thumb = useThumb();
+  const insets = useSafeAreaInsets();
+  const win = useWindowDimensions();
+  const { member } = useSession();
+  const admin = isSuperAdmin(member);
+  const { data, loading, error, reload } = useApi<AlbumsResponse>("/albums");
+  const [group, setGroup] = useState<string | null>(null);
+  const [side, setSide] = useState(false);
+  const [q, setQ] = useState("");
+  const [scope, setScope] = useState<"page" | "all">("page");
+  const [found, setFound] = useState<Found[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  const groups = data?.groups ?? [];
+  const cur = groups.find((g) => g.id === group) ?? groups[0];
+  const key = q.trim().toLowerCase();
+
+  // 搜尋「全部」：停手 0.4 秒後才問伺服器。
+  useEffect(() => {
+    if (scope !== "all" || key.length < 2) return void setFound(null);
+    let alive = true;
+    const t = setTimeout(() => {
+      api<{ items: Found[] }>("GET", `/albums/search?q=${encodeURIComponent(key)}`)
+        .then((r) => alive && setFound(r.items))
+        .catch(() => alive && setFound([]));
+    }, 400);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [scope, key]);
+
+  const openFolder = async (f: AlbumFolder) => {
+    if (f.locked) return void flashText(f.lockReason || "沒有權限進入這個相簿");
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await api<{ items: CoverMediaItem[] }>("GET", `/albums/folder?id=${encodeURIComponent(f.id)}`);
+      const items = r.items.filter((x) => x.kind === "image");
+      if (!items.length) return void flashText("這個相簿還沒有照片");
+      onPick({ folder: f, title: folderName(f), items });
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const move = async (id: string, d: number) => {
+    const ids = groups.map((g) => g.id);
+    const i = ids.indexOf(id);
+    const j = i + d;
+    if (i < 0 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
+    try {
+      await api("PUT", "/admin/ui-config", { albumOrder: ids });
+      reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    }
+  };
+
+  const gap = 10;
+  const cardW = Math.floor((win.width - insets.left - insets.right - 16 * 2 - gap) / 2);
+  const folders = (cur?.folders ?? []).filter((f) => !key || scope === "all" || `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key));
+  const allFolderHits = scope === "all" && key ? groups.flatMap((g) => g.folders).filter((f) => `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key)) : [];
+
+  const card = (f: AlbumFolder) => {
+    const half = Math.floor((cardW - 6) / 2);
+    return (
+      <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={`${folderName(f)}，${f.count} 張${f.locked ? "，沒有權限" : ""}`} onPress={() => void openFolder(f)} style={({ pressed }) => [{ width: cardW, borderRadius: 12, backgroundColor: "#262629", padding: 3, opacity: pressed ? 0.75 : 1 }]}>
+        <View style={{ width: cardW - 6, height: cardW - 6, borderRadius: 9, overflow: "hidden", flexDirection: "row", flexWrap: "wrap", gap: 2, backgroundColor: "#1a1a1c" }}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={{ width: half - 1, height: half - 1, backgroundColor: "#2e2e31" }}>
+              {f.thumbs[i] ? <Image source={{ uri: thumb(resolveUrl(f.thumbs[i]!), 200) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
+            </View>
+          ))}
+          {f.locked ? (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.62)", alignItems: "center", justifyContent: "center", gap: 4, padding: 8 }]}>
+              <Ionicons name="lock-closed" size={30} color="#fff" {...UI_ONLY} />
+              <AppText variant="caption" numberOfLines={2} {...UI_ONLY_TEXT} style={{ color: "#fff", textAlign: "center", fontWeight: "700" }}>{f.lockReason || "沒有權限"}</AppText>
+            </View>
+          ) : null}
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 6, paddingVertical: 6 }}>
+          <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800" }}>{folderName(f)}</AppText>
+          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{f.count}</AppText>
+        </View>
+        {f.subtitle ? <AppText variant="caption" numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", paddingHorizontal: 6, paddingBottom: 6 }}>{f.subtitle}</AppText> : null}
+      </Pressable>
+    );
+  };
+  const btn = (label: string, onPress: () => void, icon: string, on = false) => (
+    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.tool, on && { backgroundColor: "#2e7d32" }]}>
+      <Ionicons name={icon as never} size={24} color="#fff" {...UI_ONLY} />
+    </Pressable>
+  );
+
+  return (
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto">
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: space.xs }}>
+        {btn("側邊欄", () => setSide((v) => !v), "menu", side)}
+        <AppText variant="headline" {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 22 }}>相簿</AppText>
+        {btn("關閉相簿", onClose, "close")}
+      </View>
+      {/* 搜尋框（款式 B）：預設只搜尋目前類別（此頁），可切換成全部相簿 */}
+      <View style={{ paddingHorizontal: 16, gap: 8 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#262629", borderRadius: 24, paddingLeft: 14, paddingRight: 6, minHeight: 48 }}>
+          <Ionicons name="search" size={20} color="#9a9aa0" {...UI_ONLY} />
+          <TextInput value={q} onChangeText={setQ} placeholder={scope === "page" ? "搜尋此類別的相簿" : "搜尋全部相簿的場景、照片文字"} placeholderTextColor="#7c7c82" accessibilityLabel="搜尋相簿" returnKeyType="search" style={{ flex: 1, minWidth: 0, color: "#fff", fontSize: 16, paddingVertical: 8 }} />
+          {q ? <Pressable accessibilityLabel="清除搜尋" onPress={() => setQ("")} hitSlop={8}><Ionicons name="close-circle" size={20} color="#9a9aa0" {...UI_ONLY} /></Pressable> : null}
+          {(["page", "all"] as const).map((s) => (
+            <Pressable key={s} accessibilityRole="button" accessibilityState={{ selected: scope === s }} onPress={() => setScope(s)} style={{ paddingHorizontal: 12, minHeight: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: scope === s ? "#2e7d32" : "transparent" }}>
+              <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{s === "page" ? "此頁" : "全部"}</AppText>
+            </Pressable>
+          ))}
+        </View>
+        {/* 大類別標籤（款式 C） */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+          {groups.map((g) => {
+            const on = g.id === cur?.id;
+            return (
+              <Pressable key={g.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => setGroup(g.id)} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: "center", backgroundColor: on ? "#2e7d32" : "#262629" }}>
+                <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{g.label.replace("照片", "").replace("課程", "")}</AppText>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 14 }}>
+        {error && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#fff" }}>讀取失敗，請稍後再試</AppText> : null}
+        {loading && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>讀取中…</AppText> : null}
+        {scope === "all" && key ? (
+          <>
+            {allFolderHits.length ? <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>資料夾</AppText> : null}
+            {allFolderHits.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{allFolderHits.map(card)}</View> : null}
+            <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>{found === null ? (key.length < 2 ? "請輸入至少 2 個字" : "搜尋中…") : `照片 ${found.length} 張`}</AppText>
+            {found?.length ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                {found.map((p, i) => (
+                  <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`${p.folderTitle} 的照片`} onPress={() => onPick({ folder: null, title: `搜尋「${q.trim()}」`, items: found, index: i })} style={{ width: Math.floor((win.width - 32 - 8) / 3), height: Math.floor((win.width - 32 - 8) / 3), backgroundColor: "#262629" }}>
+                    <Image source={{ uri: thumb(resolveUrl(p.url), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View>
+            {data && !folders.length ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? "沒有符合的資料夾" : "還沒有相簿照片"}</AppText> : null}
+          </>
+        )}
+      </ScrollView>
+      {/* 側邊欄（款式 A）：大類別（超級管理員可上下移動）與目前類別的資料夾 */}
+      {side ? (
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <Pressable accessibilityLabel="收起側邊欄" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.5)" }]} onPress={() => setSide(false)} />
+          <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: Math.min(300, win.width * 0.82), backgroundColor: "#1c1c1f", paddingTop: insets.top + 16 }}>
+            <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", paddingHorizontal: 16, paddingBottom: 8 }}>{admin ? "相簿類別（可上下移動順序）" : "相簿類別"}</AppText>
+            <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+              {groups.map((g, gi) => (
+                <View key={g.id}>
+                  <View style={{ flexDirection: "row", alignItems: "center", minHeight: 52, paddingHorizontal: 12, backgroundColor: g.id === cur?.id ? "#2e7d32" : "transparent" }}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={g.label} onPress={() => (setGroup(g.id), setSide(false))} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52 }}>
+                      <Ionicons name="folder-open-outline" size={20} color="#fff" {...UI_ONLY} />
+                      <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800" }}>{g.label}</AppText>
+                      <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#cfcfd4" }}>{g.folders.length}</AppText>
+                    </Pressable>
+                    {admin ? (
+                      <>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往上移`} disabled={gi === 0} onPress={() => void move(g.id, -1)} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: gi === 0 ? 0.3 : 1 }}><Ionicons name="chevron-up" size={22} color="#fff" {...UI_ONLY} /></Pressable>
+                        <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往下移`} disabled={gi === groups.length - 1} onPress={() => void move(g.id, 1)} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: gi === groups.length - 1 ? 0.3 : 1 }}><Ionicons name="chevron-down" size={22} color="#fff" {...UI_ONLY} /></Pressable>
+                      </>
+                    ) : null}
+                  </View>
+                  {g.id === cur?.id
+                    ? g.folders.map((f) => (
+                        <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={folderName(f)} onPress={() => (setSide(false), void openFolder(f))} style={{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44, paddingLeft: 36, paddingRight: 16 }}>
+                          <Ionicons name={f.locked ? "lock-closed-outline" : "folder-outline"} size={18} color="#cfcfd4" {...UI_ONLY} />
+                          <AppText variant="caption" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff" }}>{folderName(f)}</AppText>
+                          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{f.count}</AppText>
+                        </Pressable>
+                      ))
+                    : null}
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
+});

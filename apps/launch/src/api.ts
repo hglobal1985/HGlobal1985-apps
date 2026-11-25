@@ -2537,6 +2537,54 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; kind?: string; poster_key?: string | null };
 const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
 const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
+/** 相簿專區的資料夾彙整（業主 2026-11-25）：大類別順序＝設定的 albumOrder，資料夾一律按張數多到少；每個資料夾帶鎖定狀態與可否上傳。 */
+async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
+  type G = { ok: string; scope: CoverScope; ck: string | null; k: string; n: number; thumbs: string | null };
+  const [rows, arts, courses, blocks, cfg] = await Promise.all([
+    ctx.db
+      .prepare("SELECT cm.owner_kind AS ok, cm.scope AS scope, cm.center_key AS ck, cm.owner_key AS k, COUNT(*) AS n, (SELECT GROUP_CONCAT(r2_key, '|') FROM (SELECT x.r2_key FROM cover_media x WHERE x.kind = 'image' AND x.owner_kind = cm.owner_kind AND x.scope = cm.scope AND COALESCE(x.center_key, '') = COALESCE(cm.center_key, '') AND x.owner_key = cm.owner_key ORDER BY x.position LIMIT 4)) AS thumbs FROM cover_media cm GROUP BY cm.owner_kind, cm.scope, cm.center_key, cm.owner_key")
+      .all<G>(),
+    ctx.db.prepare("SELECT center_key, center_label FROM center_art").all<{ center_key: string; center_label: string }>(),
+    ctx.db.prepare("SELECT id, title FROM courses WHERE status = 'published'").all<{ id: string; title: string }>(),
+    ctx.db.prepare("SELECT l.id, l.title, l.course_id, c.title AS course_title FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.kind = 'section' AND c.status = 'published'").all<{ id: string; title: string; course_id: string; course_title: string }>(),
+    loadConfig(ctx.db),
+  ]);
+  const rights = ctx.session ? await rightsOf(ctx) : null;
+  const label = new Map(arts.results.map((a) => [a.center_key, a.center_label]));
+  const courseTitle = new Map(courses.results.map((c) => [c.id, c.title]));
+  const block = new Map(blocks.results.map((b) => [b.id, b]));
+  const locks = await lockStatesOf(ctx, [...new Set([...rows.results.filter((r) => r.ok === "course" && courseTitle.has(r.k)).map((r) => r.k), ...rows.results.filter((r) => r.ok === "course" && block.has(r.k)).map((r) => block.get(r.k)!.course_id)])]);
+  const lockOf = (courseId: string) => {
+    const l = locks.get(courseId);
+    return l && l.locked ? { locked: true, lockReason: l.lines.join("、") || "沒有權限進入這個相簿" } : { locked: false };
+  };
+  const groups: Record<string, AlbumFolder[]> = { edm: [], cover: [], series: [], course: [], block: [] };
+  for (const r of rows.results) {
+    const thumbs = r.thumbs ? r.thumbs.split("|").map((k) => pubUrl(k, 0)) : [];
+    const base = { count: r.n, thumb: thumbs[0] ?? null, thumbs };
+    if (r.ok === "center" && r.ck) {
+      const title = label.get(r.ck) ?? r.ck;
+      const scope: CoverScope = r.scope === "edm" ? "edm" : "cover";
+      const canEdit = !!rights && (rights.admin || (!!rights.center && centerKey(rights.center.label) === r.ck && (rights.staff || !!rights.editor?.editOthers)));
+      groups[scope]!.push({ id: `center:${r.ck}:${scope}`, kind: "center", key: title, scope, title, ...base, locked: false, canEdit });
+    } else if (r.ok === "series" && r.k) groups.series!.push({ id: `series:${r.k}`, kind: "series", key: r.k, title: r.k, ...base, locked: false, canEdit: !!rights?.admin });
+    else if (r.ok === "course") {
+      const ct = courseTitle.get(r.k);
+      const b = block.get(r.k);
+      if (ct) groups.course!.push({ id: `course:${r.k}`, kind: "course", key: r.k, title: ct, ...base, courseId: r.k, ...lockOf(r.k), canEdit: !!rights?.admin });
+      else if (b) groups.block!.push({ id: `block:${r.k}`, kind: "block", key: r.k, title: b.title, subtitle: b.course_title, ...base, courseId: b.course_id, ...lockOf(b.course_id), canEdit: !!rights?.admin });
+    }
+  }
+  const sort = (a: AlbumFolder, b: AlbumFolder) => b.count - a.count || a.title.localeCompare(b.title, "zh-Hant");
+  const defs: [string, string][] = [["edm", "中心 EDM"], ["cover", "中心封面照片"], ["series", "系列封面照片"], ["course", "課程封面照片"], ["block", "課程區塊相簿"]];
+  const order = cfg.albumOrder ?? [];
+  const pos = (id: string) => (order.includes(id) ? order.indexOf(id) : 100 + defs.findIndex((d) => d[0] === id));
+  const out = defs
+    .map(([id, l]) => ({ id, label: l, folders: groups[id]!.sort(sort) }))
+    .filter((g) => g.folders.length)
+    .sort((a, b) => pos(a.id) - pos(b.id));
+  return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out };
+}
 function coverItem(r: { id: string; scope: CoverScope; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
@@ -4252,39 +4300,43 @@ const routes: [string, RegExp, Handler][] = [
   [
     "GET",
     /^\/albums$/,
+    async (ctx) => albumsIndex(ctx),
+  ],
+  [
+    "GET",
+    /^\/albums\/folder$/,
     async (ctx) => {
-      // 「相簿」專區（業主 2026-11-25）：全站所有用到相簿上傳功能的照片，依來源分成資料夾（中心 EDM、中心封面、系列封面、課程封面、課程區塊相簿）。
-      type G = { ok: string; scope: CoverScope; ck: string | null; k: string; n: number; thumb: string | null };
-      const [rows, arts, courses, blocks] = await Promise.all([
-        ctx.db
-          .prepare("SELECT cm.owner_kind AS ok, cm.scope AS scope, cm.center_key AS ck, cm.owner_key AS k, COUNT(*) AS n, (SELECT x.r2_key FROM cover_media x WHERE x.kind = 'image' AND x.owner_kind = cm.owner_kind AND x.scope = cm.scope AND COALESCE(x.center_key, '') = COALESCE(cm.center_key, '') AND x.owner_key = cm.owner_key ORDER BY x.position LIMIT 1) AS thumb FROM cover_media cm GROUP BY cm.owner_kind, cm.scope, cm.center_key, cm.owner_key")
-          .all<G>(),
-        ctx.db.prepare("SELECT center_key, center_label FROM center_art").all<{ center_key: string; center_label: string }>(),
-        ctx.db.prepare("SELECT id, title FROM courses WHERE status = 'published'").all<{ id: string; title: string }>(),
-        ctx.db.prepare("SELECT l.id, l.title, l.course_id, c.title AS course_title FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.kind = 'section' AND c.status = 'published'").all<{ id: string; title: string; course_id: string; course_title: string }>(),
-      ]);
-      const label = new Map(arts.results.map((a) => [a.center_key, a.center_label]));
-      const courseTitle = new Map(courses.results.map((c) => [c.id, c.title]));
-      const block = new Map(blocks.results.map((b) => [b.id, b]));
-      const groups: Record<string, AlbumFolder[]> = { edm: [], cover: [], series: [], course: [], block: [] };
-      for (const r of rows.results) {
-        const thumb = r.thumb ? pubUrl(r.thumb, 0) : null;
-        if (r.ok === "center" && r.ck) {
-          const title = label.get(r.ck) ?? r.ck;
-          const scope: CoverScope = r.scope === "edm" ? "edm" : "cover";
-          groups[scope === "edm" ? "edm" : "cover"]!.push({ id: `center:${r.ck}:${scope}`, kind: "center", key: title, scope, title, count: r.n, thumb });
-        } else if (r.ok === "series" && r.k) groups.series!.push({ id: `series:${r.k}`, kind: "series", key: r.k, title: r.k, count: r.n, thumb });
-        else if (r.ok === "course") {
-          const ct = courseTitle.get(r.k);
-          const b = block.get(r.k);
-          if (ct) groups.course!.push({ id: `course:${r.k}`, kind: "course", key: r.k, title: ct, count: r.n, thumb, courseId: r.k });
-          else if (b) groups.block!.push({ id: `block:${r.k}`, kind: "block", key: r.k, title: b.title, subtitle: b.course_title, count: r.n, thumb, courseId: b.course_id });
-        }
+      // 相簿專區的一個資料夾（業主 2026-11-25）：沒有權限的人禁止進入（鎖定的課程、區塊相簿回 403 與原因）。
+      const id = (ctx.url.searchParams.get("id") ?? "").slice(0, 200);
+      const f = (await albumsIndex(ctx)).groups.flatMap((g) => g.folders).find((x) => x.id === id);
+      if (!f) return fail(404, "not_found", "找不到這個相簿");
+      if (f.locked) return fail(403, "locked", f.lockReason || "沒有權限進入這個相簿");
+      const kind: CoverMediaKind = f.kind === "block" ? "course" : f.kind;
+      const lookup = f.kind === "center" ? centerKey(f.key) : f.key;
+      return { folder: f, items: await coverItems(ctx.db, kind, lookup, f.scope) };
+    },
+  ],
+  [
+    "GET",
+    /^\/albums\/search$/,
+    async (ctx) => {
+      // 搜尋「全部相簿」（業主 2026-11-25）：比對照片的場景標籤、照片文字（OCR）、EDM 活動日期；沒有權限（鎖定）的相簿不列。
+      const tokens = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 4);
+      if (!tokens.length || tokens.join("").length < 2) return { items: [] };
+      const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+      const { results } = await ctx.db
+        .prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, cm.event_date, cm.owner_kind, cm.center_key, cm.owner_key FROM cover_media cm WHERE cm.kind = 'image' AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text || ' ' || COALESCE(cm.event_date, '')) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 400`)
+        .bind(...tokens.map(like))
+        .all<{ id: string; scope: CoverScope; kind: "image"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number; scene_text: string; ocr_text: string; event_date: string | null; owner_kind: string; center_key: string | null; owner_key: string }>();
+      const folders = new Map((await albumsIndex(ctx)).groups.flatMap((g) => g.folders).map((f) => [f.id, f]));
+      const items = [];
+      for (const r of results) {
+        const fid = r.owner_kind === "center" ? `center:${r.center_key}:${r.scope === "edm" ? "edm" : "cover"}` : r.owner_kind === "series" ? `series:${r.owner_key}` : folders.has(`course:${r.owner_key}`) ? `course:${r.owner_key}` : `block:${r.owner_key}`;
+        const f = folders.get(fid);
+        if (!f || f.locked) continue;
+        items.push({ ...coverItem(r), folderId: f.id, folderTitle: f.title });
       }
-      const sort = (a: AlbumFolder, b: AlbumFolder) => a.title.localeCompare(b.title, "zh-Hant");
-      const defs: [string, string, string][] = [["edm", "edm", "中心 EDM"], ["cover", "cover", "中心封面照片"], ["series", "series", "系列封面照片"], ["course", "course", "課程封面照片"], ["block", "block", "課程區塊相簿"]];
-      const out = defs.map(([id, k, l]) => ({ id, label: l, folders: groups[k]!.sort(sort) })).filter((g) => g.folders.length);
-      return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out } satisfies AlbumsResponse;
+      return { items: items.slice(0, 300) };
     },
   ],
   [

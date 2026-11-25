@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl } from "@/api/client";
@@ -18,7 +18,7 @@ const NO_SELECT = Platform.OS === "web" ? ({ userSelect: "none", WebkitUserSelec
  * 全螢幕看圖的「檢視全部」（業主 2026-11-25）：一格一張縮圖。
  * 點一下＝回到單張看那一張；長按一張＝進入複選（之後點一下就是勾選／取消），可全選、下載、分享給其他 App。
  */
-export function LightboxGrid({ list, current, onPick, onClose }: { list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void }) {
+export function LightboxGrid({ list, current, onPick, onClose, heading, extra }: { list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
   const thumb = useThumb();
   const win = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -59,7 +59,7 @@ export function LightboxGrid({ list, current, onPick, onClose }: { list: Lightbo
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: space.xs }}>
         <View style={styles.label}>
           <AppText variant="callout" {...UI_ONLY_TEXT} numberOfLines={1} style={{ color: "#fff", fontWeight: "800" }}>
-            {sel ? `已選 ${picked.length} 張` : `全部 ${list.length} 張・長按可複選`}
+            {sel ? `已選 ${picked.length} 張` : heading ? `${heading}・${list.length} 張` : `全部 ${list.length} 張・長按可複選`}
           </AppText>
         </View>
         <View style={{ flex: 1 }} />
@@ -74,6 +74,7 @@ export function LightboxGrid({ list, current, onPick, onClose }: { list: Lightbo
           btn("回到單張檢視", onClose, <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)
         )}
       </View>
+      {extra && !sel ? <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>{extra}</View> : null}
       <ScrollView contentContainerStyle={{ padding: gap, paddingLeft: gap + insets.left, paddingBottom: insets.bottom + 24, flexDirection: "row", flexWrap: "wrap", gap }}>
         {list.map((it, i) => {
           const on = !!sel?.has(i);
@@ -105,6 +106,6 @@ export function LightboxGrid({ list, current, onPick, onClose }: { list: Lightbo
 
 const styles = StyleSheet.create({
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
-  label: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.18)", maxWidth: 200 },
+  label: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.18)", maxWidth: 240 },
   mark: { position: "absolute", right: 6, top: 6, width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: "#fff", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.3)" },
 });

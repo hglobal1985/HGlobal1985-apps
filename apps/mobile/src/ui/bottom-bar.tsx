@@ -29,11 +29,11 @@ import { UniversityIcon } from "./university-icon";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];
 /** 短網址（/縮寫）：單層路徑且不是網站固定頁面。 */
-const FIXED = new Set(["/me", "/mode", "/learning", "/notices", "/achievements", "/orders", "/courses", "/albums", "/admin", "/settings", "/auth"]);
+const FIXED = new Set(["/me", "/mode", "/learning", "/notices", "/achievements", "/orders", "/courses", "/admin", "/settings", "/auth"]);
 const isShortLink = (p: string) => /^\/[a-z0-9-]{2,30}$/i.test(p) && !FIXED.has(p);
 const tabs: { key: TabKey; href: Href; title: string; icon: IconName; active: IconName; building?: boolean; match: (p: string) => boolean }[] = [
   { key: "home", href: "/", title: "首頁", icon: "home-outline", active: "home", match: (p) => p === "/" },
-  { key: "courses", href: "/courses", title: "課程", icon: "library-outline", active: "library", building: true, match: (p) => p === "/courses" || p === "/albums" || p.startsWith("/course/") || p.startsWith("/series/") || isShortLink(p) },
+  { key: "courses", href: "/courses", title: "課程", icon: "library-outline", active: "library", building: true, match: (p) => p === "/courses" || p.startsWith("/course/") || p.startsWith("/series/") || isShortLink(p) },
   { key: "learning", href: "/learning", title: "學習中", icon: "play-circle-outline", active: "play-circle", match: (p) => p === "/learning" || p.startsWith("/learn/") },
   { key: "notices", href: "/notices", title: "通知", icon: "notifications-outline", active: "notifications", match: (p) => p === "/notices" },
   { key: "settings", href: "/me", title: "設定", icon: "person-circle-outline", active: "person-circle", match: (p) => p === "/me" || p.startsWith("/orders") || p.startsWith("/admin") || p.startsWith("/settings") },
