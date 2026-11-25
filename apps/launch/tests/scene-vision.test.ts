@@ -87,3 +87,16 @@ test("圖片資訊：訪客也能看，GPS 與上傳者帳號拿掉；鎖住課�
   assert.equal(j.uploaderSub, "");
   assert.equal((await get("m2")).status, 403, "鎖住課程的照片不給");
 });
+
+test("圖片資訊：課程封面等非相簿圖片也有基本資訊", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  await db.prepare("INSERT INTO courses (id, title, is_list, status, series, view_scope, is_public, min_rank_code, cover_key) VALUES ('c9', '封面課', 0, 'published', '', 'all', 1, 'none', 'art/c9.jpg')").run();
+  const r = await handleApi(new Request("https://learn.test/api/v2/image-info?k=art%2Fc9.jpg"), env);
+  assert.equal(r.status, 200);
+  const j = (await r.json()) as { basic: boolean; courseTitle: string };
+  assert.equal(j.basic, true);
+  assert.equal(j.courseTitle, "封面課");
+  assert.equal((await handleApi(new Request("https://learn.test/api/v2/image-info?k=nope"), env)).status, 404);
+});
+

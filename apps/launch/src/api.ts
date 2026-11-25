@@ -2633,6 +2633,125 @@ async function requireCoverRowOwner(ctx: Ctx, row: CoverRow): Promise<Session> {
   else await requireCourseArt(ctx, s, await courseOfCoverKey(ctx.db, row.owner_key));
   return s;
 }
+/** 圖片資訊（相簿照片）：管理者看完整內容；其他人拿掉 GPS 與帳號編號，鎖住課程的照片不給。 */
+async function coverMediaInfo(ctx: Ctx, id: string) {
+  // 圖片資訊面板（業主 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
+  // 其他人看到同樣的面板，但 EXIF 的 GPS 位置（緯度、經度、海拔）與上傳者帳號編號會拿掉，沒權限看的課程照片也不給。
+  const r = await ctx.db
+    .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
+    .bind(id)
+    .first<Record<string, string | number | null>>();
+  if (!r) return fail(404, "not_found", "找不到這張照片");
+  let manager = true;
+  try {
+    await requireCoverRowOwner(ctx, r as unknown as CoverRow);
+  } catch {
+    manager = false;
+    if (r.owner_kind === "course") {
+      const blk = await ctx.db.prepare("SELECT course_id FROM lessons WHERE id = ? AND kind = 'section'").bind(String(r.owner_key)).first<{ course_id: string }>();
+      const lk = await lockStateOfKey(ctx, blk?.course_id ?? String(r.owner_key));
+      if (lk.locked && !lk.manages) return fail(403, "locked", lk.lines[0] ?? "沒有權限");
+    }
+  }
+  const fieldsNow = await loadFields(ctx.db);
+  let meta: { exif?: Record<string, unknown>; file?: Record<string, unknown> } = {};
+  try {
+    meta = r.meta ? (JSON.parse(String(r.meta)) as typeof meta) : {};
+  } catch {
+    meta = {};
+  }
+  // 還沒用目前格式整理過：背景補整理（額度用完或沒綁定 AI 就略過）
+  if (r.kind === "image" && r.ocr_text && r.ocr_fmt !== fmtOf(fieldsNow) && ctx.defer) ctx.defer(structureEdm(ctx.env, ctx.db, String(r.id)).catch(() => undefined));
+  const byRaw = String(r.created_by ?? "");
+  const system = byRaw === "migration" || byRaw === "course-edm";
+  return {
+    id: r.id,
+    kind: r.kind,
+    scope: r.scope,
+    width: r.width,
+    height: r.height,
+    durationSec: r.duration_sec,
+    bytes: r.bytes,
+    position: r.position,
+    ownerKind: r.owner_kind,
+    ownerKey: r.owner_kind === "center" ? r.center_key : r.owner_key,
+    uploader: system ? (byRaw === "course-edm" ? "系統（由課程 EDM 自動併入）" : "系統（舊資料搬移）") : String(r.uploader_name || r.session_name || ""),
+    uploaderSub: system || !manager ? "" : byRaw,
+    uploadedAt: r.created_at,
+    courseId: r.course_id,
+    courseTitle: r.course_title,
+    ocrStatus: r.ocr_status,
+    ocrModel: r.ocr_model,
+    ocrAt: r.ocr_at,
+    eventDate: r.event_date,
+    ocrText: cleanOcrText(String(r.ocr_text ?? "")),
+    structured: (() => {
+      // 套入「AI 文字辨識」欄位格式後的內容（業主 2026-11-24）：沒整理好時 fields 是 null，畫面改顯示清理過的原文。
+      try {
+        const st = r.ocr_fields ? (JSON.parse(String(r.ocr_fields)) as Structured) : null;
+        return { fields: st?.f ?? null, other: st?.o ?? "", stale: r.ocr_fmt !== fmtOf(fieldsNow) };
+      } catch {
+        return { fields: null, other: "", stale: true };
+      }
+    })(),
+    file: meta.file ?? {},
+    exif: manager ? meta.exif ?? {} : Object.fromEntries(Object.entries(meta.exif ?? {}).filter(([k]) => !/^(latitude|longitude|GPS)/i.test(k))),
+  };
+}
+
+/**
+ * 任何圖片都有「圖片資訊」（業主 2026-11-25：所有的照片都要有驚嘆號）：用儲存檔名（網址的 k）查。
+ * 是相簿照片 → 走 coverMediaInfo；否則（課程封面、EDM、系列／中心封面、品牌 logo、課表…）回基本資訊：儲存空間裡的檔案大小、類型、上傳時間與所屬項目。
+ */
+async function imageInfoByKey(ctx: Ctx) {
+  const k = (ctx.url.searchParams.get("k") ?? "").slice(0, 300);
+  if (!k) return fail(400, "invalid_key", "缺少圖片");
+  const cm = await ctx.db.prepare("SELECT id FROM cover_media WHERE r2_key = ? OR poster_key = ? LIMIT 1").bind(k, k).first<{ id: string }>();
+  if (cm) return coverMediaInfo(ctx, cm.id);
+  const one = async (sql: string) => (await ctx.db.prepare(sql).bind(k).first<{ a: string | null; b: string | null }>()) ?? null;
+  let owner: { kind: "center" | "series" | "course"; key: string; label: string; courseId?: string } | null = null;
+  const c = await one("SELECT id AS a, title AS b FROM courses WHERE (cover_key = ?1 OR edm_key = ?1) AND status = 'published' LIMIT 1");
+  const ln = !c ? await one("SELECT c.id AS a, c.title || ' › ' || l.title AS b FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.cover_key = ?1 AND c.status = 'published' LIMIT 1") : null;
+  const sr = !c && !ln ? await one("SELECT series AS a, series AS b FROM series_art WHERE cover_key = ?1 OR edm_key = ?1 LIMIT 1") : null;
+  const ct = !c && !ln && !sr ? await one("SELECT center_key AS a, center_key AS b FROM center_art WHERE cover_key = ?1 OR edm_key = ?1 LIMIT 1") : null;
+  const br = !c && !ln && !sr && !ct ? await one("SELECT id AS a, name AS b FROM brand_logos WHERE logo_key = ?1 OR bg_key = ?1 LIMIT 1") : null;
+  const sc = !c && !ln && !sr && !ct && !br ? await one("SELECT center_key AS a, ym AS b FROM center_schedules WHERE image_key = ?1 LIMIT 1") : null;
+  if (c) owner = { kind: "course", key: c.b ?? "", label: c.b ?? "", courseId: c.a ?? undefined };
+  else if (ln) owner = { kind: "course", key: ln.b ?? "", label: ln.b ?? "", courseId: ln.a ?? undefined };
+  else if (sr) owner = { kind: "series", key: sr.a ?? "", label: sr.a ?? "" };
+  else if (ct) owner = { kind: "center", key: ct.a ?? "", label: ct.a ?? "" };
+  else if (br) owner = { kind: "course", key: `品牌：${br.b ?? ""}`, label: br.b ?? "" };
+  else if (sc) owner = { kind: "center", key: `${sc.a ?? ""} ${sc.b ?? ""} 課表`, label: sc.a ?? "" };
+  const head = await ctx.env.MEDIA?.head(k).catch(() => null);
+  if (!head && !owner) return fail(404, "not_found", "找不到這張圖片的資料");
+  return {
+    id: k,
+    kind: "image",
+    scope: "cover",
+    width: 0,
+    height: 0,
+    durationSec: 0,
+    bytes: head?.size ?? 0,
+    position: 0,
+    ownerKind: owner?.kind ?? "course",
+    ownerKey: owner?.key ?? "",
+    uploader: "",
+    uploaderSub: "",
+    uploadedAt: (head as { uploaded?: Date } | null | undefined)?.uploaded?.toISOString() ?? "",
+    courseId: owner?.courseId ?? null,
+    courseTitle: owner?.kind === "course" ? owner.label : null,
+    ocrStatus: "none",
+    ocrModel: "",
+    ocrAt: null,
+    eventDate: null,
+    ocrText: "",
+    structured: { fields: null, other: "", stale: false },
+    file: { type: head?.httpMetadata?.contentType ?? "", bytes: head?.size ?? 0 },
+    exif: {},
+    basic: true,
+  };
+}
+
 /**
  * 區塊照片（業主 2026-11-24）：cover_media 的 course 類，owner_key 除了課程編號，也可以是「區塊編號」（該區塊底下的照片，與中心 EDM 共用上傳模組）。
  * 回傳要檢查權限的課程編號；區塊所屬課程沒有開放（courses.block_photos）就擋下。連結區塊要傳來源區塊編號（照片只存來源一份）。
@@ -4194,70 +4313,12 @@ const routes: [string, RegExp, Handler][] = [
   [
     "GET",
     /^\/(?:admin\/)?cover-media\/([\w-]{1,40})\/info$/,
-    async (ctx, [id]) => {
-      // 圖片資訊面板（業主 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
-      // 其他人看到同樣的面板，但 EXIF 的 GPS 位置（緯度、經度、海拔）與上傳者帳號編號會拿掉，沒權限看的課程照片也不給。
-      const r = await ctx.db
-        .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
-        .bind(id)
-        .first<Record<string, string | number | null>>();
-      if (!r) return fail(404, "not_found", "找不到這張照片");
-      let manager = true;
-      try {
-        await requireCoverRowOwner(ctx, r as unknown as CoverRow);
-      } catch {
-        manager = false;
-        if (r.owner_kind === "course") {
-          const blk = await ctx.db.prepare("SELECT course_id FROM lessons WHERE id = ? AND kind = 'section'").bind(String(r.owner_key)).first<{ course_id: string }>();
-          const lk = await lockStateOfKey(ctx, blk?.course_id ?? String(r.owner_key));
-          if (lk.locked && !lk.manages) return fail(403, "locked", lk.lines[0] ?? "沒有權限");
-        }
-      }
-      const fieldsNow = await loadFields(ctx.db);
-      let meta: { exif?: Record<string, unknown>; file?: Record<string, unknown> } = {};
-      try {
-        meta = r.meta ? (JSON.parse(String(r.meta)) as typeof meta) : {};
-      } catch {
-        meta = {};
-      }
-      // 還沒用目前格式整理過：背景補整理（額度用完或沒綁定 AI 就略過）
-      if (r.kind === "image" && r.ocr_text && r.ocr_fmt !== fmtOf(fieldsNow) && ctx.defer) ctx.defer(structureEdm(ctx.env, ctx.db, String(r.id)).catch(() => undefined));
-      const byRaw = String(r.created_by ?? "");
-      const system = byRaw === "migration" || byRaw === "course-edm";
-      return {
-        id: r.id,
-        kind: r.kind,
-        scope: r.scope,
-        width: r.width,
-        height: r.height,
-        durationSec: r.duration_sec,
-        bytes: r.bytes,
-        position: r.position,
-        ownerKind: r.owner_kind,
-        ownerKey: r.owner_kind === "center" ? r.center_key : r.owner_key,
-        uploader: system ? (byRaw === "course-edm" ? "系統（由課程 EDM 自動併入）" : "系統（舊資料搬移）") : String(r.uploader_name || r.session_name || ""),
-        uploaderSub: system || !manager ? "" : byRaw,
-        uploadedAt: r.created_at,
-        courseId: r.course_id,
-        courseTitle: r.course_title,
-        ocrStatus: r.ocr_status,
-        ocrModel: r.ocr_model,
-        ocrAt: r.ocr_at,
-        eventDate: r.event_date,
-        ocrText: cleanOcrText(String(r.ocr_text ?? "")),
-        structured: (() => {
-          // 套入「AI 文字辨識」欄位格式後的內容（業主 2026-11-24）：沒整理好時 fields 是 null，畫面改顯示清理過的原文。
-          try {
-            const st = r.ocr_fields ? (JSON.parse(String(r.ocr_fields)) as Structured) : null;
-            return { fields: st?.f ?? null, other: st?.o ?? "", stale: r.ocr_fmt !== fmtOf(fieldsNow) };
-          } catch {
-            return { fields: null, other: "", stale: true };
-          }
-        })(),
-        file: meta.file ?? {},
-        exif: manager ? meta.exif ?? {} : Object.fromEntries(Object.entries(meta.exif ?? {}).filter(([k]) => !/^(latitude|longitude|GPS)/i.test(k))),
-      };
-    },
+    async (ctx, [id]) => coverMediaInfo(ctx, id),
+  ],
+  [
+    "GET",
+    /^\/image-info$/,
+    async (ctx) => imageInfoByKey(ctx),
   ],
   [
     "POST",
