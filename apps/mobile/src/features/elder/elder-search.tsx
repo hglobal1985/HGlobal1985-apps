@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Image, ScrollView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { resolveUrl, type CourseSummary } from "@/api/client";
+import { resolveUrl, type AlbumsResponse, type CourseSummary } from "@/api/client";
 import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
 import { useSynonyms } from "@/features/courses/use-synonyms";
 import { usePhonetic } from "@/features/courses/use-phonetic";
@@ -27,7 +27,7 @@ import { ElderInvite, ElderSeriesHead } from "./elder-heads";
 import { centerKeyOf, centerTitle, eventDays } from "@/features/format";
 import { lessonHref } from "@/lib/lesson-href";
 import type { ChapterItem } from "@/features/courses/chapter-list";
-import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
+import { ELDER_ALBUM_ZONE, ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
 import { onHomeReset } from "@/lib/home-reset";
@@ -201,6 +201,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
                 {ELDER_ZONES.map((z) => (
                   <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
                 ))}
+                <ElderAlbumCard />
               </View>
             ) : key ? (
               // 其他項目放進「可捲動」的清單裡（業主 2026-11-25：放在固定的上半部，項目一多就佔滿畫面、清單捲不動）。
@@ -494,3 +495,9 @@ const styles = StyleSheet.create({
   thumb: { borderRadius: radius.md, overflow: "hidden" },
   tag: { alignSelf: "flex-start", borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 2 },
 });
+
+/** 第五大分類「相簿」卡（業主 2026-11-25）：與四個分類同款，點開前往相簿專區（/albums）。 */
+function ElderAlbumCard() {
+  const { data } = useApi<AlbumsResponse>("/albums");
+  return <ElderZoneCard zone={ELDER_ALBUM_ZONE} count={data?.total ?? 0} onPress={() => router.push("/albums" as never)} />;
+}

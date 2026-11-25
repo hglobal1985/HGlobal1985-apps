@@ -180,3 +180,23 @@ test("課程 EDM 併入中心 EDM 空間：已上傳與未來上傳的自動綁�
   assert.equal((await list(encodeURIComponent("台中中心"))).filter((x) => x.courseId).length, 0);
   assert.ok(await bucket.head("edm/start/other.jpg"), "課程自己的檔案沒被刪");
 });
+
+test("相簿專區 GET /albums：全站相簿照片依來源分資料夾（業主 2026-11-25）", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.bytes as unknown as BodyInit | undefined }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  type Albums = { total: number; groups: { id: string; label: string; folders: { id: string; kind: string; key: string; title: string; count: number; thumb: string | null }[] }[] };
+  assert.deepEqual((await call<Albums>("GET", "/albums")).data, { total: 0, groups: [] }, "沒有照片＝空");
+  const admin = ((await (await handleApi(new Request("https://learn.test/api/v2/auth/demo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: "demo-admin" }) }), env)).json()) as { token: string }).token;
+  await call("PUT", `/admin/cover-media?kind=center&key=${encodeURIComponent("台北中心")}&scope=edm&w=10&h=10`, { token: admin, bytes: jpeg });
+  await call("PUT", "/admin/cover-media?kind=series&key=U40&w=10&h=10", { token: admin, bytes: jpeg });
+  await call("PUT", "/admin/cover-media?kind=series&key=U40&w=10&h=10", { token: admin, bytes: jpeg });
+  const r = (await call<Albums>("GET", "/albums")).data;
+  assert.equal(r.total, 3);
+  assert.deepEqual(r.groups.map((g) => g.id), ["edm", "series"], "依來源分組、沒有的組不列");
+  assert.equal(r.groups[1]!.folders[0]!.count, 2);
+  assert.ok(r.groups[1]!.folders[0]!.thumb, "有縮圖");
+});

@@ -84,6 +84,8 @@ import {
   type CoverMediaKind,
   type CoverScope,
   type CoverMediaItem,
+  type AlbumFolder,
+  type AlbumsResponse,
   LIST_COVER_COLORS,
   UPGRADING_MSG,
 } from "./contract.ts";
@@ -4245,6 +4247,44 @@ const routes: [string, RegExp, Handler][] = [
       // 還沒辨識的中心 EDM 圖（舊的、課程併入的）每次讀取在背景補辨識幾張，慢慢補齊。
       if (kind === "center" && ctx.defer) ctx.defer(ocrPending(ctx.env, ctx.db, 2).catch(() => undefined));
       return coverItems(ctx.db, kind, lookup);
+    },
+  ],
+  [
+    "GET",
+    /^\/albums$/,
+    async (ctx) => {
+      // 「相簿」專區（業主 2026-11-25）：全站所有用到相簿上傳功能的照片，依來源分成資料夾（中心 EDM、中心封面、系列封面、課程封面、課程區塊相簿）。
+      type G = { ok: string; scope: CoverScope; ck: string | null; k: string; n: number; thumb: string | null };
+      const [rows, arts, courses, blocks] = await Promise.all([
+        ctx.db
+          .prepare("SELECT cm.owner_kind AS ok, cm.scope AS scope, cm.center_key AS ck, cm.owner_key AS k, COUNT(*) AS n, (SELECT x.r2_key FROM cover_media x WHERE x.kind = 'image' AND x.owner_kind = cm.owner_kind AND x.scope = cm.scope AND COALESCE(x.center_key, '') = COALESCE(cm.center_key, '') AND x.owner_key = cm.owner_key ORDER BY x.position LIMIT 1) AS thumb FROM cover_media cm GROUP BY cm.owner_kind, cm.scope, cm.center_key, cm.owner_key")
+          .all<G>(),
+        ctx.db.prepare("SELECT center_key, center_label FROM center_art").all<{ center_key: string; center_label: string }>(),
+        ctx.db.prepare("SELECT id, title FROM courses WHERE status = 'published'").all<{ id: string; title: string }>(),
+        ctx.db.prepare("SELECT l.id, l.title, l.course_id, c.title AS course_title FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.kind = 'section' AND c.status = 'published'").all<{ id: string; title: string; course_id: string; course_title: string }>(),
+      ]);
+      const label = new Map(arts.results.map((a) => [a.center_key, a.center_label]));
+      const courseTitle = new Map(courses.results.map((c) => [c.id, c.title]));
+      const block = new Map(blocks.results.map((b) => [b.id, b]));
+      const groups: Record<string, AlbumFolder[]> = { edm: [], cover: [], series: [], course: [], block: [] };
+      for (const r of rows.results) {
+        const thumb = r.thumb ? pubUrl(r.thumb, 0) : null;
+        if (r.ok === "center" && r.ck) {
+          const title = label.get(r.ck) ?? r.ck;
+          const scope: CoverScope = r.scope === "edm" ? "edm" : "cover";
+          groups[scope === "edm" ? "edm" : "cover"]!.push({ id: `center:${r.ck}:${scope}`, kind: "center", key: title, scope, title, count: r.n, thumb });
+        } else if (r.ok === "series" && r.k) groups.series!.push({ id: `series:${r.k}`, kind: "series", key: r.k, title: r.k, count: r.n, thumb });
+        else if (r.ok === "course") {
+          const ct = courseTitle.get(r.k);
+          const b = block.get(r.k);
+          if (ct) groups.course!.push({ id: `course:${r.k}`, kind: "course", key: r.k, title: ct, count: r.n, thumb, courseId: r.k });
+          else if (b) groups.block!.push({ id: `block:${r.k}`, kind: "block", key: r.k, title: b.title, subtitle: b.course_title, count: r.n, thumb, courseId: b.course_id });
+        }
+      }
+      const sort = (a: AlbumFolder, b: AlbumFolder) => a.title.localeCompare(b.title, "zh-Hant");
+      const defs: [string, string, string][] = [["edm", "edm", "中心 EDM"], ["cover", "cover", "中心封面照片"], ["series", "series", "系列封面照片"], ["course", "course", "課程封面照片"], ["block", "block", "課程區塊相簿"]];
+      const out = defs.map(([id, k, l]) => ({ id, label: l, folders: groups[k]!.sort(sort) })).filter((g) => g.folders.length);
+      return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out } satisfies AlbumsResponse;
     },
   ],
   [
