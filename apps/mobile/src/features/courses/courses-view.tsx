@@ -39,6 +39,7 @@ import { ChapterList, type ChapterItem } from "./chapter-list";
 import { useSynonyms } from "./use-synonyms";
 import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
 import { usePhonetic } from "./use-phonetic";
+import { recallQuery, useRememberedQuery } from "@/lib/search-memory";
 import { useSemantic } from "./use-semantic";
 import { useSearchSettings } from "./use-search-settings";
 import { SceneHits } from "./scene-hits";
@@ -169,9 +170,9 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [showArchived, setShowArchived] = useState(false);
   const [boxW, setBoxW] = useState(0);
   // 搜尋：放大鏡展開後，每打一個字就即時過濾下方清單並列出關聯詞；搜尋時不受分類限制。
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(() => !!recallQuery("maker")); // 返回時有記住的搜尋字就保持展開
   const [slotW, setSlotW] = useState(0);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useRememberedQuery("maker"); // 點了搜尋結果再按返回，回到剛剛的搜尋結果
   const [picked, setPicked] = useState("");
   // 顯示模式：系列（封面牆）／章節（一堂一列）；記住上次的選擇。
   const [mode, setMode] = useState<CourseViewMode>("series");
