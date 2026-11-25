@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { View } from "react-native";
-import { api, apiUpload, COVER_MEDIA_MAX, type CoverMediaKind, type CoverScope } from "@/api/client";
+import { api, apiUpload, type CoverMediaKind, type CoverScope } from "@/api/client";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
 import { useUiConfig } from "@/state/ui-config";
 import { space } from "@/theme/tokens";
@@ -29,7 +29,6 @@ export function AlbumUploadButton({ kind, ownerKey, count, onDone, scope, label 
     setError(null);
     let ok = 0;
     try {
-      if (count + files.length > COVER_MEDIA_MAX) throw Error(`最多放 ${COVER_MEDIA_MAX} 張，目前已有 ${count} 張，這次最多還能放 ${Math.max(0, COVER_MEDIA_MAX - count)} 張`);
       for (let i = 0; i < files.length; i++) {
         const f = files[i]!;
         const tag = files.length > 1 ? `（${i + 1}/${files.length}）` : "";
@@ -66,7 +65,7 @@ export function AlbumUploadButton({ kind, ownerKey, count, onDone, scope, label 
   };
   return (
     <View style={{ gap: space.sm }}>
-      <Button label={`${label}（${count}/${COVER_MEDIA_MAX}）`} icon="images-outline" loading={busy} disabled={busy || count >= COVER_MEDIA_MAX} onPress={() => input.current?.click()} fullWidth />
+      <Button label={`${label}（${count}）`} icon="images-outline" loading={busy} disabled={busy} onPress={() => input.current?.click()} fullWidth />
       <input
         ref={input}
         type="file"

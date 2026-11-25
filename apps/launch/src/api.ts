@@ -80,7 +80,6 @@ import {
   zoneOf,
   type ThumbSettings,
   THUMB_WIDE_WIDTHS,
-  COVER_MEDIA_MAX,
   type CoverMediaKind,
   type CoverScope,
   type CoverMediaItem,
@@ -2780,9 +2779,8 @@ async function courseOfCoverKey(db: D1Database, key: string): Promise<string> {
   if (blk.block_photos !== 1) fail(403, "block_photos_off", "這門課程還沒有開放區塊新增照片");
   return blk.course_id;
 }
-async function coverRoom(db: D1Database, o: { kind: CoverMediaKind; lookup: string; scope: CoverScope }): Promise<void> {
-  if ((await coverItems(db, o.kind, o.lookup, o.scope)).filter((x) => !x.courseId).length >= COVER_MEDIA_MAX) fail(409, "album_full", `最多放 ${COVER_MEDIA_MAX} 張，請先刪除一些`);
-}
+// 照片張數不設上限（業主 2026-11-25）。
+async function coverRoom(_db: D1Database, _o: { kind: CoverMediaKind; lookup: string; scope: CoverScope }): Promise<void> {}
 async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind; centerKey: string | null; ownerKey: string; scope: CoverScope }, x: { kind: "image" | "video"; r2Key: string; posterKey: string | null; width: number; height: number; durationSec: number; bytes: number; by: string }): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
   const where = o.kind === "center" ? "owner_kind = 'center' AND center_key = ?" : "owner_kind = ? AND owner_key = ?";
@@ -4344,7 +4342,7 @@ const routes: [string, RegExp, Handler][] = [
       // 排序：ids＝新的完整順序（只重排這個封面自己的項目；不在清單裡的排最後）。
       const o = await requireCoverOwner(ctx, true);
       const body = await readJson<{ ids?: unknown }>(ctx.req);
-      const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string").slice(0, COVER_MEDIA_MAX) : [];
+      const ids = Array.isArray(body.ids) ? body.ids.filter((x): x is string => typeof x === "string") : [];
       const cur = (await coverItems(ctx.db, o.kind, o.lookup, o.scope)).map((x) => x.id);
       const next = [...ids.filter((x) => cur.includes(x)), ...cur.filter((x) => !ids.includes(x))];
       await ctx.db.batch(next.map((id, i) => ctx.db.prepare("UPDATE cover_media SET position = ? WHERE id = ?").bind(i, id)));

@@ -27,7 +27,7 @@ export function CenterCoverPhotos({ center, onChanged }: { center: string; onCha
     }
   };
   return (
-    <FormBlock title="中心封面" hint="中心清單的封面會每次從這裡的照片隨機挑一張。和「EDM」分頁的照片分開存放；照片與短影音最多各 100 張。">
+    <FormBlock title="中心封面" hint="中心清單的封面會每次從這裡的照片隨機挑一張。和「EDM」分頁的照片分開存放；照片與短影音張數不設上限。">
       <View style={{ gap: 12 }}>
         <AppText variant="callout">封面輪播照片</AppText>
         <Check label="封面輪播顯示 EDM" value={cm.showEdm} onChange={toggle} />
