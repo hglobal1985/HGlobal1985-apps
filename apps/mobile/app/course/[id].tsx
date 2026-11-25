@@ -171,6 +171,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
     setStayMini(true);
   }, [lesson]);
   const playerTrack = usePlayer().track;
+  // 只有「正在播放的這一門課」的頁面隱藏封面與時間軸；切到別的課程頁，那一頁自己的封面照常顯示（業主 2026-11-25）。
+  const hideTop = stayMini && (!!playLesson || playerTrack?.courseId === course?.id);
   useEffect(() => {
     if (!playerTrack) setStayMini(false); // 迷你播放器被關掉：下次回到整頁播放
   }, [playerTrack]);
@@ -419,7 +421,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           lockedLines={[lockedText, ...(needRank ? [needRank] : [])]}
           albumFocus={album}
           miniCover={<CourseMiniCover course={course} />}
-          hideCover={stayMini}
+          hideCover={hideTop}
         />
       </View>
     );
@@ -464,7 +466,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
       <StageWidth.Provider value={lay.split ? null : undefined}>
       <View style={lay.split ? [styles.splitLeft, { width: Math.round(lay.width * 0.56) }] : undefined}>
         {/* 迷你播放器／小圓圖播放中：上方不放封面與時間軸（業主 2026-11-25）。 */}
-        {stayMini ? null : (
+        {hideTop ? null : (
         <LessonStage
           stage={stage}
           legacy={playLegacy ? session.playback : null}
@@ -578,7 +580,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
       {/* 沒在播放時，封面往下滑縮成右下角的迷你小視窗（業主 2026-11-24；成對的 CollapseBand 在 LessonStage 的 idle）。 */}
-      <CoverMiniFloat enabled={!stayMini && !stage && !(playLegacy && session.playback) && !lay.split} cover={<CourseMiniCover course={course} />} label={course.title} />
+      <CoverMiniFloat enabled={!hideTop && !stage && !(playLegacy && session.playback) && !lay.split} cover={<CourseMiniCover course={course} />} label={course.title} />
       {photoBlock ? <BlockPhotosSheet head={photoBlock} onClose={() => setPhotoBlock(null)} onChanged={reload} /> : null}
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}

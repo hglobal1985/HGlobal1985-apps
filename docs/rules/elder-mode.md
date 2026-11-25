@@ -172,3 +172,5 @@
 - **迷你播放器原地換片後畫面消失只剩聲音（業主 2026-11-25 回報，已修）**：原因＝`engine.expectSwitch()` 把 `switching` 設為 true（換章節空檔隱藏小視窗），只有播放區塊登記時才會清掉；原地換片沒有播放區塊，小視窗被一直藏著。現在 `expectSwitch(true)`（迷你狀態點別堂）會讓 `engine.load` 載入新影片時同時把 `switching` 清掉。
 
 - **切換影片三項（業主 2026-11-25，超派、至尊同步）**：①**移除「改播另一堂？」確認提示整個功能**：刪除 `switch-prompt.ts`、`switch-sheet.tsx`、`_layout.tsx` 的 `SwitchSheet`、設定頁「改播另一堂的倒數」與 `AppSettings.switchCountdownSec`；`engine.request` 不再詢問，直接換播（任何頁面都一樣，不可再加回）；`useLessonSession` 也沒有 `onSwitch`。②**迷你播放器原地換片要絲滑**：`engine.expectSwitch(true)` 在迷你狀態不設 `switching`，小視窗不再藏起來一秒。③**迷你播放器／小圓圖狀態（`useStayMini`）下，課程頁上方不放封面、不放封面下的時間軸（`idleBar`）也不出現封面圓球**：`app/course/[id].tsx` 不畫 `LessonStage`、`CoverMiniFloat enabled` 關閉；至尊版 `ElderCourse` 傳 `hideCover`。
+
+- **迷你播放器狀態下，只有「正在播放的那一門課」的頁面隱藏封面與時間軸（業主 2026-11-25，修正前面「課程頁最上方是空的」）**：`app/course/[id].tsx` 的 `hideTop`＝`useStayMini()` 且（這一頁要播的是這門課 或 播放器正在播的是這門課）；切換到別的課程頁（封面不同），那一頁照常顯示自己的封面與時間軸，迷你播放器繼續浮著；在別頁點播放才換成這一門課，這時這一頁也隱藏。
