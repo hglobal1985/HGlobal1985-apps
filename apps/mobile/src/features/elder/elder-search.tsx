@@ -419,6 +419,8 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
  * 畫字時會再乘「平板倍數 × 至尊倍數」，所以估算要在放大前的尺寸上算。
  */
 const TITLE_SIZE = 22;
+/** 16:9 縮圖裡直式（9:16）影片佔的寬度比例＝(9/16)/(16/9)。 */
+const SHORTS_CONTENT = 81 / 256;
 /** 搜尋結果的「單元」列（跟超派 ChapterList 同內容同順序，業主 2026-11-25）：大縮圖、標題、日期與所屬教材卡、狀態；點下去能看就直接播放，不能看進課程頁。 */
 function ElderChapterRow({ item }: { item: ChapterItem }) {
   const { c } = useTheme();
@@ -434,7 +436,14 @@ function ElderChapterRow({ item }: { item: ChapterItem }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${lesson.title}，${course.title}`} onPress={() => (locked && flashText(lockReason(course, !!member)), markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
-        {cover ? <Image source={{ uri: thumb(resolveUrl(cover), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <TileCover rep={course} width={w} height={h} flat inSeries={false} title={course.title} />}
+        {cover ? (
+          // YouTube 短影音的縮圖是 16:9、直式影片兩側是黑邊：自動放大到「直式影片剛好填滿 3:4 的寬度」（業主 2026-11-25），上下多的部分裁掉。
+          lesson.isShorts && !lesson.coverUrl?.includes("/media/pub") && /ytimg\.com/.test(cover) ? (
+            <Image source={{ uri: resolveUrl(cover) }} style={{ position: "absolute", width: w / SHORTS_CONTENT, height: ((w / SHORTS_CONTENT) * 9) / 16, left: (w - w / SHORTS_CONTENT) / 2, top: (h - ((w / SHORTS_CONTENT) * 9) / 16) / 2 }} resizeMode="cover" />
+          ) : (
+            <Image source={{ uri: thumb(resolveUrl(cover), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" />
+          )
+        ) : <TileCover rep={course} width={w} height={h} flat inSeries={false} title={course.title} />}
         {locked ? <ThumbLock size={Math.round(w * 0.4)} /> : null}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
