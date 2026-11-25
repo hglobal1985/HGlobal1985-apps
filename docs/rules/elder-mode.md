@@ -174,3 +174,5 @@
 - **切換影片三項（業主 2026-11-25，超派、至尊同步）**：①**移除「改播另一堂？」確認提示整個功能**：刪除 `switch-prompt.ts`、`switch-sheet.tsx`、`_layout.tsx` 的 `SwitchSheet`、設定頁「改播另一堂的倒數」與 `AppSettings.switchCountdownSec`；`engine.request` 不再詢問，直接換播（任何頁面都一樣，不可再加回）；`useLessonSession` 也沒有 `onSwitch`。②**迷你播放器原地換片要絲滑**：`engine.expectSwitch(true)` 在迷你狀態不設 `switching`，小視窗不再藏起來一秒。③**迷你播放器／小圓圖狀態（`useStayMini`）下，課程頁上方不放封面、不放封面下的時間軸（`idleBar`）也不出現封面圓球**：`app/course/[id].tsx` 不畫 `LessonStage`、`CoverMiniFloat enabled` 關閉；至尊版 `ElderCourse` 傳 `hideCover`。
 
 - **迷你播放器狀態下，只有「正在播放的那一門課」的頁面隱藏封面與時間軸（業主 2026-11-25，修正前面「課程頁最上方是空的」）**：`app/course/[id].tsx` 的 `hideTop`＝`useStayMini()` 且（這一頁要播的是這門課 或 播放器正在播的是這門課）；切換到別的課程頁（封面不同），那一頁照常顯示自己的封面與時間軸，迷你播放器繼續浮著；在別頁點播放才換成這一門課，這時這一頁也隱藏。
+
+- **右下角模式鍵有時整個消失（業主 2026-11-25 回報，`ui/bottom-bar.tsx`）**：懷疑是模式鍵「偷看」動畫的透明度（`peekFade`）卡在 0。修法：①至尊模式根本不套用動畫透明度（永遠完全顯示）；②超派模式的偷看動畫加「保險」：動畫超過 3 秒沒走完（例如分頁被丟到背景、動畫被暫停）就強制還原成完全顯示並重新排程。若之後還會消失，請業主提供當下的模式與操作，不要只加保險。
