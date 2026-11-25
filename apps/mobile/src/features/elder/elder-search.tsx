@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Image, ScrollView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
@@ -22,7 +22,7 @@ import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/u
 import { TileCover } from "@/features/courses/series-tile";
 import { ElderCenterPage } from "./elder-center";
 import { ElderInvite, ElderSeriesHead } from "./elder-heads";
-import { centerTitle } from "@/features/format";
+import { centerKeyOf, centerTitle } from "@/features/format";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
@@ -72,6 +72,17 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   });
   const all = useMemo(() => (courses.data ?? []).filter(listable), [courses.data]);
   const itemsOf = useZoneItems(all);
+  // 從搜尋結果點「中心卡」會帶 ?center=中心名稱 來到課程分頁：直接打開該中心頁（業主 2026-11-25）。
+  const { center: centerParam } = useLocalSearchParams<{ center?: string }>();
+  const openedCenter = useRef("");
+  useEffect(() => {
+    if (mode !== "browse" || typeof centerParam !== "string" || !centerParam || openedCenter.current === centerParam) return;
+    const row = itemsOf("centers").find((x) => centerKeyOf(x.title) === centerKeyOf(centerParam));
+    if (!row) return;
+    openedCenter.current = centerParam;
+    setZone("centers");
+    setSub(row);
+  }, [mode, centerParam, itemsOf]); // eslint-disable-line react-hooks/exhaustive-deps
   const synonyms = useSynonyms();
   const index = useMemo(() => buildSearchIndex(all, idx.data?.lessons ?? [], synonyms), [all, idx.data, synonyms]);
   // 與寰宇大學（超派模式）同一套找法（業主 2026-11-24 回報：語音說「線上白金」找不到課）：
