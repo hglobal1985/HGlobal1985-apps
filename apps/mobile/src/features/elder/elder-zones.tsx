@@ -19,14 +19,18 @@ import { AppText } from "@/ui";
  * 歸類：教育中心＝centerCourse；其餘看課程的 zone（hglobal／amway_material／amway_brand）。
  * 顏色與 courses-view.tsx 的 ZONE_PALETTE 相同（綠、紅、黃、藍）；改那邊的顏色這裡要一起改。
  */
-export type ElderZone = "hglobal" | "centers" | "amway_material" | "amway_brand";
+export type ElderZone = "hglobal" | "centers" | "amway_material" | "amway_brand" | "album";
 
-export const ELDER_ZONES: { id: ElderZone; label: string; icon: "library" | "business" | "folder-open" | "pricetag"; unit: string }[] = [
+export type ElderZoneDef = { id: ElderZone; label: string; icon: "library" | "business" | "folder-open" | "pricetag" | "images"; unit: string };
+export const ELDER_ZONES: ElderZoneDef[] = [
   { id: "hglobal", label: "寰宇課程活動", icon: "library", unit: "項教材" },
   { id: "centers", label: "寰宇教育中心", icon: "business", unit: "項教材" },
   { id: "amway_material", label: "安麗官方資源", icon: "folder-open", unit: "項教材" },
   { id: "amway_brand", label: "安麗品牌館", icon: "pricetag", unit: "項教材" },
 ];
+
+/** 第五大分類「相簿」（業主 2026-11-25）：不是課程分類，點開前往 /albums；數量＝全站相簿照片數。 */
+export const ELDER_ALBUM_ZONE: ElderZoneDef = { id: "album", label: "相簿", icon: "images", unit: "張照片" };
 
 export const elderZoneOf = (x: CourseSummary): ElderZone => (x.centerCourse ? "centers" : x.zone);
 
@@ -35,6 +39,7 @@ const PALETTE: Record<ElderZone, Record<"light" | "dark", { bg: string; fg: stri
   centers: { light: { bg: "#FCE1DE", fg: "#8F1D18" }, dark: { bg: "#3B1B19", fg: "#F0A8A2" } },
   amway_material: { light: { bg: "#FFF3C4", fg: "#5A4300" }, dark: { bg: "#3A3112", fg: "#F2D675" } },
   amway_brand: { light: { bg: "#DCEBFA", fg: "#0F3D6E" }, dark: { bg: "#15283D", fg: "#8EC1F0" } },
+  album: { light: { bg: "#EBDDF7", fg: "#4B2C7A" }, dark: { bg: "#2E2040", fg: "#CDB4EE" } },
 };
 
 export function useZoneLook(zone: ElderZone) {
@@ -58,7 +63,7 @@ function FitTitle({ text, color }: { text: string; color: string }) {
 }
 
 /** 一欄四張大卡之一：圖示、名稱、數量、箭頭；整張可點。 */
-export function ElderZoneCard({ zone, count, onPress }: { zone: (typeof ELDER_ZONES)[number]; count: number; onPress: () => void }) {
+export function ElderZoneCard({ zone, count, onPress }: { zone: ElderZoneDef; count: number; onPress: () => void }) {
   const look = useZoneLook(zone.id);
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${zone.label}，${count} ${zone.unit}`} onPress={onPress} style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: space.md, borderRadius: 20, padding: space.lg, backgroundColor: look.bg, opacity: pressed ? 0.85 : 1 }]}>
@@ -75,7 +80,7 @@ export function ElderZoneCard({ zone, count, onPress }: { zone: (typeof ELDER_ZO
 }
 
 /** 進入某一區之後的標題列：返回鍵＋分類名稱（同色帶）。 */
-export function ElderZoneHeader({ zone, sub, onBack, right }: { zone: (typeof ELDER_ZONES)[number]; /** 再往下一層（系列／中心）的名稱。 */ sub?: string; onBack: () => void; /** 標題區右上角（中心卡、系列頁的「邀請」鈕，業主 2026-11-24）。 */ right?: ReactNode }) {
+export function ElderZoneHeader({ zone, sub, onBack, right }: { zone: ElderZoneDef; /** 再往下一層（系列／中心）的名稱。 */ sub?: string; onBack: () => void; /** 標題區右上角（中心卡、系列頁的「邀請」鈕，業主 2026-11-24）。 */ right?: ReactNode }) {
   const look = useZoneLook(zone.id);
   const bar = (
     <Pressable accessibilityRole="button" accessibilityLabel={`返回，${zone.label}`} onPress={onBack} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space.sm, borderRadius: 20, padding: space.md, backgroundColor: right ? undefined : look.bg }}>
