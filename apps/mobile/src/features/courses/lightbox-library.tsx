@@ -6,7 +6,7 @@ import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMedia
 import { centerTitle } from "@/features/format";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { LightboxGrid } from "./lightbox-grid";
-import { matchAlbumItem } from "./album-search";
+import { AlbumSearchBar, matchAlbumItem } from "./album-search";
 import { isSuperAdmin } from "@/lib/roles";
 import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
@@ -49,7 +49,7 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
   const [busy, setBusy] = useState(false);
   const groups = data?.groups ?? [];
   const viewGroup = view ? groups.find((g) => g.folders.some((f) => f.id === view.folder.id)) : undefined;
-  const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)) ?? groups[0];
+  const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)); // 沒有＝相簿首頁（類別資料夾）
   const key = q.trim().toLowerCase();
 
   // 搜尋「全部」：停手 0.4 秒後才問伺服器。
@@ -103,7 +103,7 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
   const cols = mainW >= 900 ? 5 : mainW >= 640 ? 4 : mainW >= 420 ? 3 : 2;
   const cardW = Math.floor((mainW - gap * (cols - 1)) / cols);
   const thirdW = Math.floor((mainW - 4 * (cols * 2 - 1)) / (cols * 2));
-  const folders = (cur?.folders ?? []).filter((f) => !key || scope === "all" || `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key));
+  const folders = (cur?.folders ?? []).filter((f) => !key || `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key));
   const allFolderHits = scope === "all" && key ? groups.flatMap((g) => g.folders).filter((f) => `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key)) : [];
 
   const card = (f: AlbumFolder) => {
@@ -128,6 +128,29 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
           <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{f.count}</AppText>
         </View>
         {f.subtitle ? <AppText variant="caption" numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", paddingHorizontal: 6, paddingBottom: 6 }}>{f.subtitle}</AppText> : null}
+      </Pressable>
+    );
+  };
+  // 相簿首頁的「類別資料夾」（款式 C 的大類別標籤改成這個）：4 格預覽取自該類別資料夾的封面；此頁搜尋會過濾類別名稱。
+  const homeCats = groups.filter((g) => !key || g.label.toLowerCase().includes(key));
+  const homeFolderHits = key ? groups.flatMap((g) => g.folders).filter((f) => `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key)) : [];
+  const catCard = (g: (typeof groups)[number]) => {
+    const half = Math.floor((cardW - 6) / 2);
+    const photos = g.folders.reduce((n, f) => n + f.count, 0);
+    return (
+      <Pressable key={g.id} accessibilityRole="button" accessibilityLabel={`${g.label}，${g.folders.length} 個資料夾，${photos} 張`} onPress={() => (setGroup(g.id), setQ(""))} style={({ pressed }) => [{ width: cardW, borderRadius: 12, backgroundColor: "#262629", padding: 3, opacity: pressed ? 0.75 : 1 }]}>
+        <View style={{ width: cardW - 6, height: cardW - 6, borderRadius: 9, overflow: "hidden", flexDirection: "row", flexWrap: "wrap", gap: 2, backgroundColor: "#1a1a1c" }}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={{ width: half - 1, height: half - 1, backgroundColor: "#2e2e31" }}>
+              {g.folders[i]?.thumbs[0] ? <Image source={{ uri: thumb(resolveUrl(g.folders[i]!.thumbs[0]!), 200) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : null}
+            </View>
+          ))}
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 6, paddingVertical: 6 }}>
+          <Ionicons name="folder" size={16} color="#cfcfd4" {...UI_ONLY} />
+          <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800" }}>{g.label}</AppText>
+          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{g.folders.length}</AppText>
+        </View>
       </Pressable>
     );
   };
@@ -169,6 +192,10 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
     <View style={large ? { width: 300, backgroundColor: "#1c1c1f", paddingTop: 6, borderRightWidth: 1, borderRightColor: "#2f2f33" } : { alignSelf: "flex-start", minWidth: 220, maxWidth: win.width * 0.9, maxHeight: "100%", backgroundColor: "#1c1c1f", paddingTop: 6, borderRadius: 14, overflow: "hidden" }}>
       <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", paddingHorizontal: 16, paddingBottom: 8 }}>{admin ? "相簿類別（可上下移動順序）" : "相簿類別"}</AppText>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="相簿首頁" onPress={() => (setView(null), setGroup(null), setQ(""), !large && setSide(false))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingHorizontal: 12, backgroundColor: !cur ? "#2e7d32" : "transparent" }}>
+          <Ionicons name="home-outline" size={18} color="#fff" {...UI_ONLY} />
+          <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>相簿首頁</AppText>
+        </Pressable>
         {groups.map((g, gi) => {
           const isOpen = expanded.has(g.id);
           return (
@@ -217,28 +244,18 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
       {side && large ? sidebar : null}
       <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ paddingHorizontal: 16, gap: 8 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#262629", borderRadius: 24, paddingLeft: 14, paddingRight: 6, minHeight: 48 }}>
-            <Ionicons name="search" size={20} color="#9a9aa0" {...UI_ONLY} />
-            <TextInput value={q} onChangeText={setQ} placeholder={scope === "page" ? (view ? "搜尋這個資料夾的照片" : "搜尋此類別的相簿") : "搜尋全部相簿的場景、照片文字"} placeholderTextColor="#7c7c82" accessibilityLabel="搜尋相簿" returnKeyType="search" style={{ flex: 1, minWidth: 0, color: "#fff", fontSize: 16, paddingVertical: 8 }} />
-            {q ? <Pressable accessibilityLabel="清除搜尋" onPress={() => setQ("")} hitSlop={8}><Ionicons name="close-circle" size={20} color="#9a9aa0" {...UI_ONLY} /></Pressable> : null}
-            {(["page", "all"] as const).map((s) => (
-              <Pressable key={s} accessibilityRole="button" accessibilityState={{ selected: scope === s }} onPress={() => setScope(s)} style={{ paddingHorizontal: 12, minHeight: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: scope === s ? "#2e7d32" : "transparent" }}>
-                <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{s === "page" ? "此頁" : "全部"}</AppText>
-              </Pressable>
-            ))}
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-            {groups.map((g) => {
-              const on = g.id === cur?.id;
-              return (
-                <Pressable key={g.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => (setView(null), setGroup(g.id))} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: "center", backgroundColor: on ? "#2e7d32" : "#262629" }}>
-                  <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{g.label.replace("照片", "").replace("課程", "")}</AppText>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+        {/* 搜尋列：與頁面相簿共用 AlbumSearchBar（深色款＋「此頁／全部」切換），永遠顯示 */}
+        <View style={{ paddingHorizontal: 16 }}>
+          <AlbumSearchBar dark q={q} setQ={setQ} scope={scope} onScope={setScope} placeholder={scope === "page" ? (view ? "搜尋這個資料夾的照片" : cur ? `搜尋「${cur.label}」裡的資料夾` : "搜尋相簿類別與資料夾") : "搜尋全部相簿的場景、照片文字"} />
         </View>
+        {/* 類別返回列：在某個類別裡時，回到相簿首頁（類別資料夾） */}
+        {cur && !view ? (
+          <View style={{ paddingHorizontal: 16, paddingTop: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {btn("回相簿首頁", () => (setGroup(null), setQ("")), "chevron-back")}
+            <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 18 }}>{cur.label}</AppText>
+            <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`${cur.folders.length} 個資料夾`}</AppText>
+          </View>
+        ) : null}
         {view && !(scope === "all" && key) ? (
           <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6 }}>
             <LightboxGrid
@@ -248,7 +265,7 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
               heading={folderName(view.folder)}
               extra={view.folder.canEdit && !key ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : undefined}
               onPick={(i) => onPick({ folder: view.folder, title: folderName(view.folder), items: shown, index: i })}
-              onClose={() => setView(null)}
+              onClose={() => (setGroup(cur?.id ?? null), setView(null))}
             />
           </View>
         ) : (
@@ -272,8 +289,11 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
             </>
           ) : (
             <>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View>
-              {data && !folders.length ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? "沒有符合的資料夾" : "還沒有相簿照片"}</AppText> : null}
+              {/* 相簿首頁：每個「類別」就是一個資料夾（有新類別會自動出現）；進去才是該類別的資料夾 */}
+              {!cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeCats.map(catCard)}</View> : null}
+              {!cur && key ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeFolderHits.map(card)}</View> : null}
+              {cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View> : null}
+              {data && ((cur && !folders.length) || (!cur && !homeCats.length && !homeFolderHits.length)) ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? "沒有符合的資料夾" : "還沒有相簿照片"}</AppText> : null}
             </>
           )}
         </ScrollView>

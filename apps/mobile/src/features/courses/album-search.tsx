@@ -1,5 +1,6 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { TextInput, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
 import type { CoverMediaItem } from "@/api/client";
 import { useModeProfile } from "@/lib/app-mode";
 import { useTheme } from "@/theme/theme";
@@ -27,23 +28,41 @@ export function useAlbumSearch() {
   return { q, setQ, key: q.trim().toLowerCase() };
 }
 
-export function AlbumSearchBar({ q, setQ }: { q: string; setQ: (v: string) => void }) {
+export function AlbumSearchBar({ q, setQ, dark = false, scope, onScope, placeholder }: { q: string; setQ: (v: string) => void; /** 全黑看圖畫面（相簿資料夾檢視）用深色款式。 */ dark?: boolean; /** 有給 onScope 才顯示「此頁／全部」切換（相簿資料夾檢視：預設只搜此頁，可切成全部相簿）。 */ scope?: "page" | "all"; onScope?: (s: "page" | "all") => void; placeholder?: string }) {
   const { c } = useTheme();
   const elder = useModeProfile().coursePage === "twoTabs";
+  const text = dark ? "#fff" : c.text;
+  const muted = dark ? "#9a9aa0" : c.textMuted;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-      <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: c.accent }}>
-        <AppText variant={elder ? "callout" : "caption"} style={{ color: c.textOnAccent, fontWeight: "800" }}>照片</AppText>
+      {dark ? null : (
+        <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: c.accent }}>
+          <AppText variant={elder ? "callout" : "caption"} style={{ color: c.textOnAccent, fontWeight: "800" }}>照片</AppText>
+        </View>
+      )}
+      <View style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8, minHeight: dark ? 48 : elder ? ELDER_FIELD.height() : 44, borderWidth: dark ? 0 : elder ? ELDER_FIELD.borderWidth : 1, borderColor: elder ? c.accent : c.border, borderRadius: dark ? 24 : elder ? ELDER_FIELD.radius : radius.md, paddingLeft: space.md, paddingRight: dark ? 6 : space.md, backgroundColor: dark ? "#262629" : c.surface }}>
+        <TextInput
+          value={q}
+          onChangeText={setQ}
+          placeholder={placeholder ?? "搜尋照片裡的場景、文字、物品"}
+          placeholderTextColor={muted}
+          accessibilityLabel="搜尋相簿照片"
+          returnKeyType="search"
+          style={{ flex: 1, minWidth: 0, color: text, ...type.body }}
+        />
+        {dark && q ? (
+          <Pressable accessibilityLabel="清除搜尋" onPress={() => setQ("")} hitSlop={8}>
+            <Ionicons name="close-circle" size={20} color={muted} />
+          </Pressable>
+        ) : null}
+        {onScope
+          ? (["page", "all"] as const).map((x) => (
+              <Pressable key={x} accessibilityRole="button" accessibilityState={{ selected: scope === x }} onPress={() => onScope(x)} style={{ paddingHorizontal: 12, minHeight: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: scope === x ? "#2e7d32" : "transparent" }}>
+                <AppText variant="caption" style={{ color: "#fff", fontWeight: "800" }}>{x === "page" ? "此頁" : "全部"}</AppText>
+              </Pressable>
+            ))
+          : null}
       </View>
-      <TextInput
-        value={q}
-        onChangeText={setQ}
-        placeholder="搜尋照片裡的場景、文字、物品"
-        placeholderTextColor={c.textMuted}
-        accessibilityLabel="搜尋相簿照片"
-        returnKeyType="search"
-        style={{ flex: 1, minWidth: 0, minHeight: elder ? ELDER_FIELD.height() : 44, borderWidth: elder ? ELDER_FIELD.borderWidth : 1, borderColor: elder ? c.accent : c.border, borderRadius: elder ? ELDER_FIELD.radius : radius.md, paddingHorizontal: space.md, color: c.text, backgroundColor: c.surface, ...type.body }}
-      />
     </View>
   );
 }
