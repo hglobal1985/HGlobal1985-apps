@@ -136,7 +136,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       </View>
       {member ? null : <LoginPrompt />}
       {searching ? (
-        <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : "找不到這個課程，換個字試試看"}</AppText>
+        <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : "找不到這個課程"}</AppText>
       ) : null}
       {searching ? <SceneHits q={q} big /> : null}
     </View>
@@ -163,6 +163,18 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
             會打開鍵盤，請按鍵盤上的麥克風說話
           </AppText>
         )}
+        {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
+      </View>
+    ) : key && !results.length && !semantic.loading && !phonetic.loading ? (
+      // 找不到課程：畫面中央放錄音鈕，按一下再說一次（業主 2026-11-25）。
+      <View style={styles.center}>
+        <AppText variant="headline" style={{ textAlign: "center" }}>{`找不到「${q.trim()}」，再說一次試試看`}</AppText>
+        <Pressable accessibilityRole="button" accessibilityLabel="再說一次" onPress={mic} style={({ pressed }) => [styles.micWrap, { backgroundColor: c.accentSoft, opacity: pressed ? 0.85 : 1 }]}>
+          <View style={[styles.mic, { backgroundColor: c.accent }]}>
+            <Ionicons name="mic" size={60} color={c.textOnAccent} {...({ uiOnly: true } as object)} />
+          </View>
+        </Pressable>
+        <FitLine text="按一下，再說一次" max={36} />
         {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
       </View>
     ) : null;
@@ -291,7 +303,7 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
   return (
     <View style={styles.center} accessibilityLiveRegion="polite">
       {heard ? (
-        <AppText numberOfLines={3} style={{ color: c.danger, textAlign: "center", fontWeight: "800", fontSize: 34, lineHeight: 42 }}>
+        <AppText numberOfLines={3} style={{ color: c.danger, textAlign: "center", fontWeight: "800", fontSize: 24, lineHeight: 30 }}>
           {`聽到：「${heard}」`}
         </AppText>
       ) : null}
