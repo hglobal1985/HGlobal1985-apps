@@ -262,11 +262,7 @@ export function ElderCourse({
         {message}
         {tab === "learn" ? (
           <>
-            {items.length ? (
-              <AppText tone="muted">{done ? `已上完 ${done} ${word}，共 ${items.length} ${word}` : `共 ${items.length} ${word}`}</AppText>
-            ) : (
-              <NoticeBox text="課程內容準備中，敬請期待。" />
-            )}
+            {!items.length ? <NoticeBox text="課程內容準備中，敬請期待。" /> : null}
             {locked ? (
               <Pressable accessibilityRole="button" onPress={() => setTab("intro")} style={[styles.lockBox, { backgroundColor: c.warningSoft, borderColor: c.warning, borderWidth: bw }]}>
                 <Ionicons name="lock-closed" size={28} color={c.warning} />
