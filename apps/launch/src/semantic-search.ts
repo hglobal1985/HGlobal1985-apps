@@ -96,7 +96,7 @@ async function allVectors(db: D1Database): Promise<Row[]> {
 
 /**
  * 字面相關度（業主 2026-11-25：搜「晚安修護面膜」，出來一堆完全不相干的 EDM）：AI 相似度之外，再看查詢字的「相鄰兩字」有幾成出現在這筆文字裡。
- * 加分＝0.3 × 命中比例；EDM、相片、課程介紹這類長文字最容易被 AI 誤判，完全沒有任何相鄰兩字命中的再扣 0.08。後台「試搜尋」與實際搜尋共用。
+ * 加分＝0.3 × 命中比例；EDM、相片、課程介紹這類長文字最容易被 AI 誤判，完全沒有任何相鄰兩字命中的直接扣 0.5（等於不列）。後台「試搜尋」與實際搜尋共用。
  */
 export function lexAdjust(query: string, txt: string, kind: string): number {
   const q = query.toLowerCase().replace(/[\s\u3000]+/g, "");
@@ -108,7 +108,7 @@ export function lexAdjust(query: string, txt: string, kind: string): number {
   for (const g of grams) if (t.includes(g)) hit++;
   const cov = hit / grams.size;
   const noisy = kind === "edm" || kind === "photo" || kind === "intro";
-  return 0.3 * cov - (noisy && hit === 0 ? 0.08 : 0);
+  return 0.3 * cov - (noisy && hit === 0 ? 0.5 : 0);
 }
 
 /** 查詢文字 → 意思最接近的課程、教材編號（前端依自己的索引過濾）＋其他類別的命中（系列、中心、區塊、課程介紹、EDM、相片；已附標題、連結與膠囊標籤）。依相似度由高到低，各最多 limit 個。額度用完或沒有向量回空。 */
