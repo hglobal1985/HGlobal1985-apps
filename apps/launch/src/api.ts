@@ -4193,15 +4193,26 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
-    /^\/admin\/cover-media\/([\w-]{1,40})\/info$/,
+    /^\/(?:admin\/)?cover-media\/([\w-]{1,40})\/info$/,
     async (ctx, [id]) => {
-      // 圖片資訊面板（業主 2026-11-24）：只有能管理這個相簿的人看得到（含上傳者姓名與 EXIF，EXIF 可能有拍攝地點）。
+      // 圖片資訊面板（業主 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
+      // 其他人看到同樣的面板，但 EXIF 的 GPS 位置（緯度、經度、海拔）與上傳者帳號編號會拿掉，沒權限看的課程照片也不給。
       const r = await ctx.db
         .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
         .bind(id)
         .first<Record<string, string | number | null>>();
       if (!r) return fail(404, "not_found", "找不到這張照片");
-      await requireCoverRowOwner(ctx, r as unknown as CoverRow);
+      let manager = true;
+      try {
+        await requireCoverRowOwner(ctx, r as unknown as CoverRow);
+      } catch {
+        manager = false;
+        if (r.owner_kind === "course") {
+          const blk = await ctx.db.prepare("SELECT course_id FROM lessons WHERE id = ? AND kind = 'section'").bind(String(r.owner_key)).first<{ course_id: string }>();
+          const lk = await lockStateOfKey(ctx, blk?.course_id ?? String(r.owner_key));
+          if (lk.locked && !lk.manages) return fail(403, "locked", lk.lines[0] ?? "沒有權限");
+        }
+      }
       const fieldsNow = await loadFields(ctx.db);
       let meta: { exif?: Record<string, unknown>; file?: Record<string, unknown> } = {};
       try {
@@ -4225,7 +4236,7 @@ const routes: [string, RegExp, Handler][] = [
         ownerKind: r.owner_kind,
         ownerKey: r.owner_kind === "center" ? r.center_key : r.owner_key,
         uploader: system ? (byRaw === "course-edm" ? "系統（由課程 EDM 自動併入）" : "系統（舊資料搬移）") : String(r.uploader_name || r.session_name || ""),
-        uploaderSub: system ? "" : byRaw,
+        uploaderSub: system || !manager ? "" : byRaw,
         uploadedAt: r.created_at,
         courseId: r.course_id,
         courseTitle: r.course_title,
@@ -4244,7 +4255,7 @@ const routes: [string, RegExp, Handler][] = [
           }
         })(),
         file: meta.file ?? {},
-        exif: meta.exif ?? {},
+        exif: manager ? meta.exif ?? {} : Object.fromEntries(Object.entries(meta.exif ?? {}).filter(([k]) => !/^(latitude|longitude|GPS)/i.test(k))),
       };
     },
   ],

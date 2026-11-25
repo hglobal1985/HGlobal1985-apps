@@ -298,7 +298,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   // 電腦（有滑鼠）才顯示左右切換按鈕；手機、平板橫放用手指滑動（業主 2026-11-21）。
   const desktop = Platform.OS === "web" && typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
   const imgBg = cur.bg ?? bg;
-  const canInfo = !!cur.id && showInfo;
+  const canInfo = !!cur.id; // 圖片資訊開放給所有人（業主 2026-11-25）；showInfo 保留相容、不再限制
   return (
     <Modal transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.backdrop}>
