@@ -2,6 +2,7 @@ import { ensureBrandCards } from "./brand-cards.ts";
 import { reserveThumb, thumbUsage } from "./thumb-quota.ts";
 import { scenePending } from "./scene-vision.ts";
 import { photoOcrPending } from "./photo-ocr.ts";
+import { loadJob, recompressStatus, runRecompress, saveJob } from "./recompress.ts";
 import { kickFilePhotos } from "./block-photos.ts";
 import { ensureTreasureLinks, syncSeriesOrderFromTreasure, syncTreasureFromSeriesOrder, treasureCourseId } from "./treasure-box.ts";
 import { renameForType, shrinkImage, shrinkStored } from "./image-store.ts";
@@ -4572,6 +4573,31 @@ const routes: [string, RegExp, Handler][] = [
       await bucket.put(key, data.buffer as ArrayBuffer, { httpMetadata: { contentType: isMp4 ? "video/mp4" : "video/webm" } });
       const id = await addCoverRow(ctx.db, o, { kind: "video", r2Key: key, posterKey: null, width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")), durationSec: Math.min(dur, 600), bytes: data.byteLength, by: o.s.sub });
       return { id, items: await coverItems(ctx.db, o.kind, o.lookup) };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/recompress\/status$/,
+    async (ctx) => {
+      // 舊照片重新壓縮的進度（業主 2026-11-25，只有超級管理員）。
+      requireSuperAdmin(ctx);
+      return recompressStatus(ctx.db);
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/recompress\/(start|stop)$/,
+    async (ctx, [action]) => {
+      // 開始／暫停全站舊照片重新壓縮。⚠ 覆蓋原檔、不可復原；排程每 10 分鐘分批處理，按「開始」後也會先在背景跑一批。
+      const s = requireSuperAdmin(ctx);
+      const cur = await loadJob(ctx.db);
+      if (action === "start") {
+        if (!ctx.env.IMAGES) return fail(503, "images_not_ready", "圖片轉檔服務尚未啟用");
+        await saveJob(ctx.db, { running: true, startedAt: cur.running ? cur.startedAt : new Date().toISOString(), stoppedAt: null });
+        if (ctx.defer) ctx.defer(runRecompress(ctx.env, ctx.db, 25).catch(() => undefined));
+      } else await saveJob(ctx.db, { running: false, startedAt: cur.startedAt, stoppedAt: new Date().toISOString() });
+      await audit(ctx.db, s.sub, `recompress.${action}`, "cover_media", "all").run();
+      return recompressStatus(ctx.db);
     },
   ],
   [

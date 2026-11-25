@@ -278,3 +278,24 @@ test("相簿權限：獎銜達標可上傳、資料夾設定優先於類別、�
   assert.equal(perms.status, 200);
   assert.ok(perms.data.ranks.length > 3 && perms.data.groups.some((g) => g.id === "block"));
 });
+
+test("舊照片重新壓縮：只有超級管理員能開始／暫停／看進度，沒有圖片轉檔服務時不開始（業主 2026-11-25）", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.json ? { "content-type": "application/json" } : {}), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.json ? JSON.stringify(opts.json) : opts.bytes) as unknown as BodyInit | undefined }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  const login = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", { json: { sub } })).data.token;
+  const [admin, stu] = await Promise.all([login("demo-admin"), login("demo-student")]);
+  await call("PUT", "/admin/cover-media?kind=series&key=R&w=10&h=10", { token: admin, bytes: jpeg });
+  assert.equal((await call("GET", "/admin/recompress/status", { token: stu })).status, 403);
+  const st = await call<{ total: number; pending: number; job: { running: boolean } }>("GET", "/admin/recompress/status", { token: admin });
+  assert.equal(st.status, 200);
+  assert.equal(st.data.total, 1);
+  assert.equal(st.data.pending, 1);
+  assert.equal(st.data.job.running, false);
+  assert.equal((await call("POST", "/admin/recompress/start", { token: stu })).status, 403);
+  assert.equal((await call("POST", "/admin/recompress/start", { token: admin })).status, 503, "沒有 IMAGES 轉檔服務就不開始");
+  assert.equal((await call("POST", "/admin/recompress/stop", { token: admin })).status, 200);
+});
