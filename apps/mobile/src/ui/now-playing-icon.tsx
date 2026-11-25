@@ -11,7 +11,7 @@ import { useTheme } from "@/theme/theme";
  * - 沒在播（暫停、載入中、手機瀏覽器擋掉自動播放、播放器還在換上一堂）：靜止的播放三角形，點一下＝播放。
  * lessonId＝這一列的章節編號；播放器的目前章節不是它時，一律當作「還沒開始」。
  */
-export function NowPlayingIcon({ size = 36, lessonId }: { size?: number; lessonId?: string }) {
+export function NowPlayingIcon({ size = 36, lessonId, color }: { size?: number; lessonId?: string; /** 預設主題強調色；放在深色底（正在播放整列變色）時給白色。 */ color?: string }) {
   const { c } = useTheme();
   const s = usePlayer();
   const mine = !lessonId || s.track?.lessonId === lessonId;
@@ -32,7 +32,7 @@ export function NowPlayingIcon({ size = 36, lessonId }: { size?: number; lessonI
   const opacity = t.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.6, 1] });
   return (
     <Animated.View style={{ transform: [{ scale }], opacity }} accessibilityLabel={live ? "正在播放" : "已暫停"}>
-      <Ionicons name={live ? "pause-circle" : "play-circle"} size={size} color={c.accent} />
+      <Ionicons name={live ? "pause-circle" : "play-circle"} size={size} color={color ?? c.accent} />
     </Animated.View>
   );
 }

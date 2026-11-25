@@ -1,6 +1,7 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { setBandExtra } from "./band-extra";
+import { getBandRect, setBandRect } from "./band-rect";
 import { resetBandScroll, scrollBandTop, useBandScroll } from "./band-scroll";
 import { MiniWindow } from "./mini-window";
 
@@ -20,7 +21,9 @@ export const miniProgress = (y: number) => Math.min(1, Math.max(0, y / MINI_PX))
 export function CollapseBand({ children, enabled = true }: { children: ReactNode; /** false＝不縮（例如大螢幕左右分欄，封面在左欄、內容在右欄）。 */ enabled?: boolean }) {
   const y = useBandScroll();
   const [full, setFull] = useState(0); // 展開時的高度（只在沒縮時量）
+  const box = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any;
   useEffect(() => resetBandScroll(), []);
+  useEffect(() => () => setBandRect(null), []);
   // 登記需要的額外捲動空間：封面縮完＝捲動區多出 full，可捲範圍會跟著少 full（內容短的頁面也要捲得到縮完；見 band-extra.ts）。
   useEffect(() => {
     if (!enabled || !full) return;
@@ -32,7 +35,18 @@ export function CollapseBand({ children, enabled = true }: { children: ReactNode
   const shown = full ? Math.round(full * (1 - p)) : undefined;
   return (
     <View style={shown !== undefined && p > 0 ? { height: shown, overflow: "hidden" } : undefined}>
-      <View onLayout={(e) => p === 0 && setFull(Math.round(e.nativeEvent.layout.height))}>{children}</View>
+      {/* 縮小途中封面本體隱藏，由小視窗那邊畫「大邊框由大到小」的變形框（與影片縮小一致，MiniWindow 的 morph） */}
+      <View
+        ref={box}
+        style={p > 0.02 && getBandRect() ? { opacity: 0 } : undefined}
+        onLayout={(e) => {
+          if (p !== 0) return;
+          setFull(Math.round(e.nativeEvent.layout.height));
+          box.current?.measureInWindow((x: number, y: number, w: number, h: number) => w > 0 && h > 0 && setBandRect({ x, y, w, h }));
+        }}
+      >
+        {children}
+      </View>
     </View>
   );
 }
@@ -59,7 +73,7 @@ export function CoverMiniFloat({ cover, enabled = true, label }: { cover: ReactN
   return (
     <MiniWindow
       visible={p > 0.02 && !closed}
-      opacity={Math.min(1, p * 2)}
+      morph={{ p, from: getBandRect() }}
       windowContent={cover}
       circleContent={cover}
       label={label}
