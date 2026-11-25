@@ -159,9 +159,11 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         <AppText variant="headline" style={{ textAlign: "center" }}>
           按一下，用說的
         </AppText>
-        <AppText tone="muted" style={{ textAlign: "center" }}>
-          {voice.supported ? "例如：「王老師　表揚大會　淨水器　營養」，說錯字也找得到" : "會打開鍵盤，請按鍵盤上的麥克風說話"}
-        </AppText>
+        {voice.supported ? <SearchHint /> : (
+          <AppText tone="muted" style={{ textAlign: "center" }}>
+            會打開鍵盤，請按鍵盤上的麥克風說話
+          </AppText>
+        )}
         {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
       </View>
     ) : null;
@@ -244,7 +246,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
                 <AppText variant="headline" style={{ color: c.navPillText }}>
                   繼續上課
                 </AppText>
-                <AppText numberOfLines={1} style={{ color: c.navPillText }}>
+                <AppText numberOfLines={2} style={{ color: c.navPillText, lineHeight: 18 }}>
                   {cont.title}
                 </AppText>
               </View>
@@ -253,6 +255,16 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         </View>
       )}
     </View>
+  );
+}
+
+/** 搜尋提示文字（業主 2026-11-25）：首頁麥克風下方與「正在聽」畫面共用這一個，改這裡兩邊一起變；行距縮到最小。 */
+export const SEARCH_HINT = "例如：「王老師　表揚大會　淨水器　營養」，說錯字也找得到";
+export function SearchHint() {
+  return (
+    <AppText tone="muted" style={{ textAlign: "center", lineHeight: 17 }}>
+      {SEARCH_HINT}
+    </AppText>
   );
 }
 
@@ -272,6 +284,7 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
       <AppText tone="muted" style={{ textAlign: "center" }}>
         {heard ? `聽到：「${heard}」` : "請說出想找的課程"}
       </AppText>
+      <SearchHint />
       <Pressable accessibilityRole="button" onPress={onStop} style={[styles.stop, { borderColor: c.danger, borderWidth: ELDER_FIELD.borderWidth }]}>
         <AppText variant="headline" style={{ color: c.danger }}>
           停止
