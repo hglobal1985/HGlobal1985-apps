@@ -90,7 +90,11 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
   };
 
   const gap = 10;
-  const cardW = Math.floor((win.width - insets.left - insets.right - 16 * 2 - gap) / 2);
+  // 大螢幕開側邊欄時，主畫面變窄（相簿往右推）：資料夾卡片的欄數與寬度隨主畫面寬度算（業主 2026-11-25）。
+  const mainW = win.width - (win.width >= 900 && side ? 280 : 0) - insets.left - insets.right - 16 * 2;
+  const cols = mainW >= 900 ? 5 : mainW >= 640 ? 4 : mainW >= 420 ? 3 : 2;
+  const cardW = Math.floor((mainW - gap * (cols - 1)) / cols);
+  const thirdW = Math.floor((mainW - 4 * (cols * 2 - 1)) / (cols * 2));
   const folders = (cur?.folders ?? []).filter((f) => !key || scope === "all" || `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key));
   const allFolderHits = scope === "all" && key ? groups.flatMap((g) => g.folders).filter((f) => `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key)) : [];
 
@@ -125,97 +129,121 @@ export function LightboxLibrary({ onPick, onClose }: { onPick: (p: LibraryPick) 
     </Pressable>
   );
 
+  // 大螢幕（≥900）：側邊欄是左邊固定的一欄，相簿自動往右推、不重疊；小裝置：側邊欄蓋在相簿上，寬度只要剛好符合文字。
+  const large = win.width >= 900;
+  const [expanded, setExpanded] = useState<Set<string>>(new Set()); // 側邊欄裡展開哪些大類別的資料夾清單（預設全部收起）
+  const toggleExpanded = (id: string) =>
+    setExpanded((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 * 2 - 36 - 8 * 3 - (large && side ? 280 : 0)) / 8.6)));
+
+  const sidebar = (
+    <View style={large ? { width: 280, backgroundColor: "#1c1c1f", paddingTop: insets.top + 16, borderRightWidth: 1, borderRightColor: "#2f2f33" } : { alignSelf: "flex-start", minWidth: 170, maxWidth: win.width * 0.82, flexShrink: 1, maxHeight: "100%", backgroundColor: "#1c1c1f", paddingTop: insets.top + 16, paddingRight: 8 }}>
+      <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", paddingHorizontal: 16, paddingBottom: 8 }}>{admin ? "相簿類別（可上下移動順序）" : "相簿類別"}</AppText>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+        {groups.map((g, gi) => {
+          const isOpen = expanded.has(g.id);
+          return (
+            <View key={g.id}>
+              <View style={{ flexDirection: "row", alignItems: "center", minHeight: 48, paddingLeft: 12, backgroundColor: g.id === cur?.id ? "#2e7d32" : "transparent" }}>
+                {/* 點標題＝進入這個類別的總覽縮圖 */}
+                <Pressable accessibilityRole="button" accessibilityLabel={`${g.label}，進入總覽`} onPress={() => (setGroup(g.id), setQ(""), !large && setSide(false))} style={{ flexShrink: 1, flexDirection: "row", alignItems: "center", gap: 8, minHeight: 48, paddingRight: 8 }}>
+                  <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{g.label}</AppText>
+                  <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#cfcfd4" }}>{g.folders.length}</AppText>
+                </Pressable>
+                {admin ? (
+                  <>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往上移`} disabled={gi === 0} onPress={() => void move(g.id, -1)} style={{ width: 34, height: 40, alignItems: "center", justifyContent: "center", opacity: gi === 0 ? 0.3 : 1 }}><Ionicons name="arrow-up" size={18} color="#fff" {...UI_ONLY} /></Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往下移`} disabled={gi === groups.length - 1} onPress={() => void move(g.id, 1)} style={{ width: 34, height: 40, alignItems: "center", justifyContent: "center", opacity: gi === groups.length - 1 ? 0.3 : 1 }}><Ionicons name="arrow-down" size={18} color="#fff" {...UI_ONLY} /></Pressable>
+                  </>
+                ) : null}
+                {/* 標題右側的小按鈕：展開／收起這個類別的資料夾清單 */}
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${isOpen ? "收起" : "展開"}${g.label}的資料夾`} onPress={() => toggleExpanded(g.id)} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}>
+                  <Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#fff" {...UI_ONLY} />
+                </Pressable>
+              </View>
+              {isOpen
+                ? g.folders.map((f) => (
+                    <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={folderName(f)} onPress={() => (!large && setSide(false), void openFolder(f))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingLeft: 28, paddingRight: 12 }}>
+                      <Ionicons name={f.locked ? "lock-closed-outline" : "folder-outline"} size={16} color="#cfcfd4" {...UI_ONLY} />
+                      <AppText variant="caption" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flexShrink: 1, color: "#fff" }}>{folderName(f)}</AppText>
+                      <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{f.count}</AppText>
+                    </Pressable>
+                  ))
+                : null}
+            </View>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto">
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: space.xs }}>
-        {btn("側邊欄", () => setSide((v) => !v), "menu", side)}
-        <AppText variant="headline" {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 22 }}>相簿</AppText>
-        {btn("關閉相簿", onClose, "close")}
-      </View>
-      {/* 搜尋框（款式 B）：預設只搜尋目前類別（此頁），可切換成全部相簿 */}
-      <View style={{ paddingHorizontal: 16, gap: 8 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#262629", borderRadius: 24, paddingLeft: 14, paddingRight: 6, minHeight: 48 }}>
-          <Ionicons name="search" size={20} color="#9a9aa0" {...UI_ONLY} />
-          <TextInput value={q} onChangeText={setQ} placeholder={scope === "page" ? "搜尋此類別的相簿" : "搜尋全部相簿的場景、照片文字"} placeholderTextColor="#7c7c82" accessibilityLabel="搜尋相簿" returnKeyType="search" style={{ flex: 1, minWidth: 0, color: "#fff", fontSize: 16, paddingVertical: 8 }} />
-          {q ? <Pressable accessibilityLabel="清除搜尋" onPress={() => setQ("")} hitSlop={8}><Ionicons name="close-circle" size={20} color="#9a9aa0" {...UI_ONLY} /></Pressable> : null}
-          {(["page", "all"] as const).map((s) => (
-            <Pressable key={s} accessibilityRole="button" accessibilityState={{ selected: scope === s }} onPress={() => setScope(s)} style={{ paddingHorizontal: 12, minHeight: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: scope === s ? "#2e7d32" : "transparent" }}>
-              <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{s === "page" ? "此頁" : "全部"}</AppText>
-            </Pressable>
-          ))}
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000", flexDirection: "row" }]} pointerEvents="auto">
+      {side && large ? sidebar : null}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {btn("側邊欄", () => setSide((v) => !v), "menu", side)}
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><Image source={require("../../../assets/logo.png")} style={{ width: 34, height: 34 }} resizeMode="contain" accessibilityLabel="寰宇" /></View>
+          <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, minWidth: 0, color: "#fff", fontWeight: "900", fontSize: titleSize, lineHeight: titleSize + 6 }}>寰宇行動大學相簿</AppText>
+          {btn("關閉相簿", onClose, "close")}
         </View>
-        {/* 大類別標籤（款式 C） */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-          {groups.map((g) => {
-            const on = g.id === cur?.id;
-            return (
-              <Pressable key={g.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => setGroup(g.id)} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: "center", backgroundColor: on ? "#2e7d32" : "#262629" }}>
-                <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{g.label.replace("照片", "").replace("課程", "")}</AppText>
+        <View style={{ paddingHorizontal: 16, gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#262629", borderRadius: 24, paddingLeft: 14, paddingRight: 6, minHeight: 48 }}>
+            <Ionicons name="search" size={20} color="#9a9aa0" {...UI_ONLY} />
+            <TextInput value={q} onChangeText={setQ} placeholder={scope === "page" ? "搜尋此類別的相簿" : "搜尋全部相簿的場景、照片文字"} placeholderTextColor="#7c7c82" accessibilityLabel="搜尋相簿" returnKeyType="search" style={{ flex: 1, minWidth: 0, color: "#fff", fontSize: 16, paddingVertical: 8 }} />
+            {q ? <Pressable accessibilityLabel="清除搜尋" onPress={() => setQ("")} hitSlop={8}><Ionicons name="close-circle" size={20} color="#9a9aa0" {...UI_ONLY} /></Pressable> : null}
+            {(["page", "all"] as const).map((s) => (
+              <Pressable key={s} accessibilityRole="button" accessibilityState={{ selected: scope === s }} onPress={() => setScope(s)} style={{ paddingHorizontal: 12, minHeight: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: scope === s ? "#2e7d32" : "transparent" }}>
+                <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{s === "page" ? "此頁" : "全部"}</AppText>
               </Pressable>
-            );
-          })}
+            ))}
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+            {groups.map((g) => {
+              const on = g.id === cur?.id;
+              return (
+                <Pressable key={g.id} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => setGroup(g.id)} style={{ minHeight: 40, paddingHorizontal: 16, borderRadius: 20, justifyContent: "center", backgroundColor: on ? "#2e7d32" : "#262629" }}>
+                  <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{g.label.replace("照片", "").replace("課程", "")}</AppText>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 14 }}>
+          {error && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#fff" }}>讀取失敗，請稍後再試</AppText> : null}
+          {loading && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>讀取中…</AppText> : null}
+          {scope === "all" && key ? (
+            <>
+              {allFolderHits.length ? <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>資料夾</AppText> : null}
+              {allFolderHits.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{allFolderHits.map(card)}</View> : null}
+              <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>{found === null ? (key.length < 2 ? "請輸入至少 2 個字" : "搜尋中…") : `照片 ${found.length} 張`}</AppText>
+              {found?.length ? (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                  {found.map((p, i) => (
+                    <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`${p.folderTitle} 的照片`} onPress={() => onPick({ folder: null, title: `搜尋「${q.trim()}」`, items: found, index: i })} style={{ width: thirdW, height: thirdW, backgroundColor: "#262629" }}>
+                      <Image source={{ uri: thumb(resolveUrl(p.url), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View>
+              {data && !folders.length ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? "沒有符合的資料夾" : "還沒有相簿照片"}</AppText> : null}
+            </>
+          )}
         </ScrollView>
       </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 32, gap: 14 }}>
-        {error && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#fff" }}>讀取失敗，請稍後再試</AppText> : null}
-        {loading && !data ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>讀取中…</AppText> : null}
-        {scope === "all" && key ? (
-          <>
-            {allFolderHits.length ? <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>資料夾</AppText> : null}
-            {allFolderHits.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{allFolderHits.map(card)}</View> : null}
-            <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>{found === null ? (key.length < 2 ? "請輸入至少 2 個字" : "搜尋中…") : `照片 ${found.length} 張`}</AppText>
-            {found?.length ? (
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-                {found.map((p, i) => (
-                  <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`${p.folderTitle} 的照片`} onPress={() => onPick({ folder: null, title: `搜尋「${q.trim()}」`, items: found, index: i })} style={{ width: Math.floor((win.width - 32 - 8) / 3), height: Math.floor((win.width - 32 - 8) / 3), backgroundColor: "#262629" }}>
-                    <Image source={{ uri: thumb(resolveUrl(p.url), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View>
-            {data && !folders.length ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? "沒有符合的資料夾" : "還沒有相簿照片"}</AppText> : null}
-          </>
-        )}
-      </ScrollView>
-      {/* 側邊欄（款式 A）：大類別（超級管理員可上下移動）與目前類別的資料夾 */}
-      {side ? (
+      {side && !large ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <Pressable accessibilityLabel="收起側邊欄" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.5)" }]} onPress={() => setSide(false)} />
-          <View style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: Math.min(300, win.width * 0.82), backgroundColor: "#1c1c1f", paddingTop: insets.top + 16 }}>
-            <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", paddingHorizontal: 16, paddingBottom: 8 }}>{admin ? "相簿類別（可上下移動順序）" : "相簿類別"}</AppText>
-            <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-              {groups.map((g, gi) => (
-                <View key={g.id}>
-                  <View style={{ flexDirection: "row", alignItems: "center", minHeight: 52, paddingHorizontal: 12, backgroundColor: g.id === cur?.id ? "#2e7d32" : "transparent" }}>
-                    <Pressable accessibilityRole="button" accessibilityLabel={g.label} onPress={() => (setGroup(g.id), setSide(false))} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52 }}>
-                      <Ionicons name="folder-open-outline" size={20} color="#fff" {...UI_ONLY} />
-                      <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800" }}>{g.label}</AppText>
-                      <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#cfcfd4" }}>{g.folders.length}</AppText>
-                    </Pressable>
-                    {admin ? (
-                      <>
-                        <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往上移`} disabled={gi === 0} onPress={() => void move(g.id, -1)} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: gi === 0 ? 0.3 : 1 }}><Ionicons name="chevron-up" size={22} color="#fff" {...UI_ONLY} /></Pressable>
-                        <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往下移`} disabled={gi === groups.length - 1} onPress={() => void move(g.id, 1)} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: gi === groups.length - 1 ? 0.3 : 1 }}><Ionicons name="chevron-down" size={22} color="#fff" {...UI_ONLY} /></Pressable>
-                      </>
-                    ) : null}
-                  </View>
-                  {g.id === cur?.id
-                    ? g.folders.map((f) => (
-                        <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={folderName(f)} onPress={() => (setSide(false), void openFolder(f))} style={{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 44, paddingLeft: 36, paddingRight: 16 }}>
-                          <Ionicons name={f.locked ? "lock-closed-outline" : "folder-outline"} size={18} color="#cfcfd4" {...UI_ONLY} />
-                          <AppText variant="caption" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff" }}>{folderName(f)}</AppText>
-                          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{f.count}</AppText>
-                        </Pressable>
-                      ))
-                    : null}
-                </View>
-              ))}
-            </ScrollView>
-          </View>
+          <View style={{ position: "absolute", left: 0, top: 0, bottom: 0 }}>{sidebar}</View>
         </View>
       ) : null}
     </View>
