@@ -6,11 +6,12 @@ import { api } from "@/api/client";
  * 停止打字 0.5 秒才送出；沒登入、額度用完或失敗時回空集合（不影響其他搜尋）。結果只有編號，畫面再依自己有權限的索引過濾。
  */
 export type SemanticHit = { kind: string; tag: string; id: string; title: string; sub: string; link: string; score: number; prio?: number; /** 左邊縮圖網址（沒有＝預設圖）。 */ thumb?: string | null; /** 有＝點了直接放大看這張圖（EDM、相片）。 */ image?: string };
-/** 同一個查詢的結果記在記憶體（5 分鐘）：從搜尋結果點進去再按返回時，不必重新等一次（業主 2026-11-25：返回會空白停頓一秒）。 */
+/** 同一個查詢的結果記在記憶體（2 小時）：從搜尋結果點進去再按返回時，不必重新等一次（業主 2026-11-25：返回會空白停頓一秒）。 */
+const TWO_HOURS = 2 * 3600_000;
 const memo = new Map<string, { at: number; v: { q: string; courses: string[]; lessons: string[]; extras: SemanticHit[]; coursePrio: number } }>();
 const recall = (q: string) => {
   const m = memo.get(q);
-  return m && Date.now() - m.at < 300_000 ? m.v : null;
+  return m && Date.now() - m.at < TWO_HOURS ? m.v : null;
 };
 export function useSemantic(q: string, enabled: boolean): { courses: Set<string>; lessons: Set<string>; extras: SemanticHit[]; coursePrio: number; loading: boolean } {
   const [res, setRes] = useState<{ q: string; courses: string[]; lessons: string[]; extras: SemanticHit[]; coursePrio: number } | null>(() => (q.trim() ? recall(q.trim()) : null));
@@ -45,3 +46,6 @@ export function useSemantic(q: string, enabled: boolean): { courses: Set<string>
   const ok = enabled && res?.q === text;
   return { courses: new Set(ok ? res!.courses : []), lessons: new Set(ok ? res!.lessons : []), extras: ok ? res!.extras : [], coursePrio: ok ? res!.coursePrio : 9, loading: enabled && (loading || (text.length >= 2 && res?.q !== text)) };
 }
+
+/** 後台改了搜尋設定後，清掉記住的結果，立刻用新設定（業主 2026-11-25）。 */
+export const clearSemanticMemo = () => memo.clear();
