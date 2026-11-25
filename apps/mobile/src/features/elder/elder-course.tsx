@@ -304,6 +304,8 @@ export function ElderCourse({
           </>
         ) : (
           <>
+            {/* 完整的教材卡名稱（業主 2026-11-25：上方標題列會被截成「逸新 atmosp…」，介紹頁要顯示完整名稱；不限行數、不縮略） */}
+            <AppText variant="title" accessibilityRole="header">{course.title}</AppText>
             <View style={[styles.info, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw }]}>
               {teacher ? <InfoLine icon="person" text={`主講：${teacher}`} /> : null}
               {items.length ? <InfoLine icon="list" text={`${items.length} ${word}${course.totalMinutes ? `・約 ${Math.round(course.totalMinutes)} 分鐘` : ""}`} /> : null}
@@ -371,7 +373,7 @@ function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson;
         {l.completed ? <Ionicons name="checkmark" size={24} color={c.accent} /> : <AppText variant="headline" style={{ color: c.accent }}>{String(l.position)}</AppText>}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
-        <AppText variant="headline" numberOfLines={3} style={{ color: fg }}>
+        <AppText variant="headline" style={{ color: fg }}>
           {l.title}
         </AppText>
         {status || date ? (
