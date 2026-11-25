@@ -39,15 +39,21 @@ export function CollapseBand({ children, enabled = true }: { children: ReactNode
 
 /**
  * 封面縮成的迷你小視窗（成對的 CollapseBand 把封面縮掉之後，右下角浮出它）：放在頁面最外層。cover＝小視窗與小圓圖裡顯示的封面（填滿）。
+ * 一浮出就是最小的圓球（點一下才展開成小視窗；影片播放時則是有紅綠燈按鈕的迷你播放器，見 features/player）。
  * 與影片迷你小視窗一模一樣的規格與功能（ui/mini-spec.ts、ui/mini-window.tsx）：黃＝最小化（小圓圖）、綠＝最大化（回到頂端、封面展開）、紅＝關閉（這次先不再浮出，回到頂端再往下滑才會再出現），可任意拖曳、位置記在本機。
  * enabled＝false（例如影片在播放、大螢幕分欄）不顯示。
  */
 export function CoverMiniFloat({ cover, enabled = true, label }: { cover: ReactNode; enabled?: boolean; label: string }) {
   const y = useBandScroll();
   const [closed, setClosed] = useState(false);
+  // 靜態封面往下滑：一浮出就直接縮到最小的圓球（業主 2026-11-25）；點圓球才展開成小視窗，回到頂端再往下滑又從圓球開始。
+  const [collapsed, setCollapsed] = useState(true);
   const p = miniProgress(y);
   useEffect(() => {
-    if (p <= 0.02) setClosed(false); // 回到頂端就恢復，下次往下滑再浮出
+    if (p <= 0.02) {
+      setClosed(false); // 回到頂端就恢復，下次往下滑再浮出
+      setCollapsed(true);
+    }
   }, [p]);
   if (!enabled) return null;
   return (
@@ -60,6 +66,8 @@ export function CoverMiniFloat({ cover, enabled = true, label }: { cover: ReactN
       maximizeLabel="最大化（回到頂端、封面展開）"
       onMaximize={scrollBandTop}
       onClose={() => setClosed(true)}
+      collapsed={collapsed}
+      onCollapsedChange={setCollapsed}
     />
   );
 }
