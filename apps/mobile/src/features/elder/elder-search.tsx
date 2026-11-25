@@ -159,6 +159,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         <AppText variant="headline" style={{ textAlign: "center" }}>
           按一下，用說的
         </AppText>
+        {voice.supported ? <TypoHint /> : null}
         {voice.supported ? <SearchHint /> : (
           <AppText tone="muted" style={{ textAlign: "center" }}>
             會打開鍵盤，請按鍵盤上的麥克風說話
@@ -259,12 +260,26 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
 }
 
 /** 搜尋提示文字（業主 2026-11-25）：首頁麥克風下方與「正在聽」畫面共用這一個，改這裡兩邊一起變；行距縮到最小。 */
-export const SEARCH_HINT = "例如：「王老師　表揚大會　淨水器　營養」，說錯字也找得到";
+export const SEARCH_HINT = "例如：「王老師　表揚大會　淨水器　營養」";
+export const TYPO_HINT = "說錯字不用改 都能找得到";
 export function SearchHint() {
   return (
     <AppText tone="muted" style={{ textAlign: "center", lineHeight: 17 }}>
       {SEARCH_HINT}
     </AppText>
+  );
+}
+/** 中央黑色標題下方的黑字提示：寬度強制一行，太長自動縮小字體（業主 2026-11-25）。首頁與「正在聽」共用。 */
+export function TypoHint() {
+  const [w, setW] = useState(0);
+  const k = UI_SCALE * elderTextScale();
+  const size = w ? Math.max(10, Math.min(22, Math.floor(w / k / ([...TYPO_HINT].length * 1.05)))) : 18;
+  return (
+    <View style={{ alignSelf: "stretch" }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+      <AppText numberOfLines={1} style={{ textAlign: "center", fontSize: size, lineHeight: Math.round(size * 1.15), fontWeight: "700" }}>
+        {TYPO_HINT}
+      </AppText>
+    </View>
   );
 }
 
@@ -281,6 +296,7 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
         ))}
       </View>
       <AppText variant="title">正在聽…</AppText>
+      <TypoHint />
       <AppText tone="muted" style={{ textAlign: "center" }}>
         {heard ? `聽到：「${heard}」` : "請說出想找的課程"}
       </AppText>
