@@ -106,3 +106,40 @@ export async function downloadImage(url: string, fileName: string): Promise<void
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 }
+
+/**
+ * 一次分享多張圖片（業主 2026-11-25，照片全螢幕「檢視全部」複選後分享）：
+ * 網頁：Web Share 一次傳多個圖片檔；瀏覽器不能傳檔案就改分享所有連結，連分享選單都沒有（電腦）就複製連結。
+ * App：系統分享選單一次只能傳一個檔案，所以改傳所有圖片連結（文字）。
+ */
+export async function shareImages(title: string, urls: string[]): Promise<"shared" | "copied" | "cancelled"> {
+  if (urls.length === 1) return shareImage(title, urls[0]!, `${title}.jpg`);
+  if (Platform.OS === "web") {
+    try {
+      const files = await Promise.all(urls.map(async (u, i) => {
+        const blob = await (await fetch(absolute(u))).blob();
+        return new window.File([blob], `${title}-${i + 1}.jpg`, { type: blob.type || "image/jpeg" });
+      }));
+      if (typeof navigator.canShare === "function" && navigator.canShare({ files })) {
+        await navigator.share({ files, title });
+        trackFeature("share");
+        return "shared";
+      }
+    } catch (e) {
+      if ((e as { name?: string }).name === "AbortError") return "cancelled";
+    }
+  }
+  return shareText(title, urls.map(absolute).join("\n"));
+}
+
+/** 一次下載多張圖片：網頁依序觸發瀏覽器下載（每張間隔一下，避免被瀏覽器擋下）；App 交給系統分享選單。 */
+export async function downloadImages(urls: string[], baseName: string): Promise<void> {
+  if (Platform.OS !== "web") {
+    await shareImages(baseName, urls);
+    return;
+  }
+  for (let i = 0; i < urls.length; i++) {
+    await downloadImage(urls[i]!, `${baseName}-${i + 1}.jpg`);
+    await new Promise((r) => setTimeout(r, 350));
+  }
+}

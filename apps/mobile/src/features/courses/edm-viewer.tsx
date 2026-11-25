@@ -8,6 +8,7 @@ import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
 import { downloadImage, shareImage } from "@/lib/share";
+import { LightboxGrid } from "./lightbox-grid";
 import { displayName } from "./sort";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -163,6 +164,9 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   useDimLayer();
   useBackToClose(onClose); // 瀏覽器／手機「上一頁」＝直接關閉這個全螢幕視窗（業主 2026-11-24）
   const [infoOpen, setInfoOpen] = useState(false);
+  const [grid, setGrid] = useState(false); // 「檢視全部」格狀畫面（業主 2026-11-25）
+  const gridRef = useRef(false);
+  gridRef.current = grid;
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const list = items && items.length ? items : [{ uri, title, bg }];
@@ -267,7 +271,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") goRef.current(-1);
       else if (e.key === "ArrowRight") goRef.current(1);
-      else if (e.key === "Escape") onClose();
+      else if (e.key === "Escape") (gridRef.current ? setGrid(false) : onClose());
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -331,6 +335,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
               <View style={styles.row} pointerEvents="box-none">
                 {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />) : null}
+                {many ? tool("檢視全部", () => setGrid(true), <Ionicons name="grid-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
                 {canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
                 {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />)}
                 {tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />)}
@@ -355,6 +360,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
               </View>
             ) : null}
           </View>
+          {grid ? <LightboxGrid list={list} current={idx} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
           {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>
