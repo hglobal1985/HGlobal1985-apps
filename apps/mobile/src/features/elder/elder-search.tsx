@@ -308,9 +308,9 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
         </AppText>
       )}
       <SearchHint />
-      <Pressable accessibilityRole="button" onPress={onStop} style={[styles.stop, { borderColor: c.danger, borderWidth: ELDER_FIELD.borderWidth }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="送出" onPress={onStop} style={[styles.stop, { borderColor: c.danger, borderWidth: ELDER_FIELD.borderWidth }]}>
         <AppText variant="headline" style={{ color: c.danger }}>
-          停止
+          送出
         </AppText>
       </Pressable>
     </View>
