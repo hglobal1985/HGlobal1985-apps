@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { phoneticSearch } from "../src/phonetic-search.ts";
+import { phoneticSearch, resetPhoneticCache } from "../src/phonetic-search.ts";
 
 // 最小的假資料庫：課程「益之源 eSpring」，章節「eSpring益之源淨水器Pro | 分流器安裝方式」「連接APP與註冊教學」。
 const db = {
@@ -19,5 +19,24 @@ const db = {
 
 test("同音搜尋拆片段：「一支援安裝」＝益之源（同音錯字）＋安裝，中間隔著別的字也找得到，沒有的字不亂配", async () => {
   const r = await phoneticSearch(db, "一支援安裝");
+  assert.deepEqual(r.lessons, ["l1"]);
+});
+
+test("口語長句：去掉「如何」等虛詞，「一心空氣清淨機濾網如何安裝」找得到逸新的濾網單元", async () => {
+  const db2 = {
+    prepare(sql: string) {
+      const q = {
+        bind: () => q,
+        first: async () => null,
+        all: async () =>
+          /FROM courses/.test(sql) && !/lessons/.test(sql)
+            ? { results: [{ id: "c1", title: "逸新 atmosphere", series: "", teacher: "" }] }
+            : { results: [{ id: "l1", course_id: "c1", title: "安麗抗過敏保健室｜為什濾網要定期清潔、更換及使用原廠耗材的重要性", ct: "逸新 atmosphere", cs: "" }, { id: "l2", course_id: "c2", title: "美護髮的重點", ct: "美護髮", cs: "" }] },
+      };
+      return q;
+    },
+  } as never;
+  resetPhoneticCache();
+  const r = await phoneticSearch(db2, "一心空氣清淨機濾網如何安裝");
   assert.deepEqual(r.lessons, ["l1"]);
 });

@@ -43,6 +43,8 @@ const allow = (m: number, from = 4) => (m >= from ? 1 : 0);
 type Seg = { syl: string[]; w: number };
 type Entry = { kind: "course" | "lesson"; id: string; courseId: string; segs: Seg[] };
 let cache: { at: number; rows: Entry[] } | null = null;
+/** 測試用：清掉快取。 */
+export const resetPhoneticCache = () => { cache = null; };
 
 async function load(db: D1Database): Promise<Entry[]> {
   if (cache && Date.now() - cache.at < 600_000) return cache.rows;
@@ -59,10 +61,17 @@ async function load(db: D1Database): Promise<Entry[]> {
 }
 
 /** 查詢 → 同音／近音的課程與章節編號（相似度高的在前）。查詢少於 2 個音節不比對（太短會亂配）。 */
+/** 口語問句的虛詞（「如何安裝」「怎麼辦」「請問」…）不拿來比對（業主 2026-11-25）：先去掉再轉拼音。 */
+const FILLER = /有沒有|怎麼樣|怎麼辦|怎麼|怎樣|如何|請問|想知道|想要|我要|我想|可以|哪裡|什麼|為什麼|為何|嗎|呢|吧|啊|呀|的|了/g;
+export const stripFiller = (q: string) => {
+  const t = q.replace(FILLER, " ").replace(/\s+/g, " ").trim();
+  return t.length >= 2 ? t : q; // 去完幾乎不剩就維持原樣
+};
+
 export async function phoneticSearch(db: D1Database, q: string, limit = 24): Promise<{ courses: string[]; lessons: string[] }> {
   const st = await loadSearchSettings(db);
   if (!st.phoneticEnabled) return { courses: [], lessons: [] };
-  const qs = syllables(q.trim().slice(0, 100));
+  const qs = syllables(stripFiller(q.trim().slice(0, 100)));
   if (qs.length < (st.phoneticMinSyllables as number)) return { courses: [], lessons: [] };
   const k = allow(qs.length, st.phoneticTypoFrom as number);
   // 整串連續符合（最高分）；否則「拆片段」：查詢裡每一段連續的音節只要在這筆資料的任何欄位出現就算覆蓋到，
@@ -92,7 +101,9 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
       }
     }
     const cov = covered.filter(Boolean).length / n;
-    return cov >= 0.75 ? w * cov : 0;
+    // 門檻：短查詢（≤5 音節）要覆蓋 75%；長查詢（口語長句）只要覆蓋至少 4 個音節、且達 35%（例如「逸新」＋「濾網」兩個關鍵詞各出現就列出）。
+    const need = n <= 5 ? 0.75 * n : Math.max(4, 0.35 * n);
+    return covered.filter(Boolean).length >= need ? w * cov : 0;
   };
   const hit = (await load(db)).map((e) => ({ e, s: score(e) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
   return { courses: hit.filter((x) => x.e.kind === "course").slice(0, limit).map((x) => x.e.id), lessons: hit.filter((x) => x.e.kind === "lesson").slice(0, limit).map((x) => x.e.id) };
