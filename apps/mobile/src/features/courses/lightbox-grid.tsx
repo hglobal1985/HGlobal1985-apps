@@ -18,15 +18,17 @@ const NO_SELECT = Platform.OS === "web" ? ({ userSelect: "none", WebkitUserSelec
  * 全螢幕看圖的「檢視全部」（業主 2026-11-25）：一格一張縮圖。
  * 點一下＝回到單張看那一張；長按一張＝進入複選（之後點一下就是勾選／取消），可全選、下載、分享給其他 App。
  */
-export function LightboxGrid({ list, current, onPick, onClose, heading, extra }: { list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
+export function LightboxGrid({ list, current, onPick, onClose, heading, extra, embedded = false, onPrev, onNext }: { /** 嵌在相簿資料夾檢視裡（不蓋滿畫面、不自帶黑底）：左邊是返回鈕、右邊是上一個／下一個資料夾（業主 2026-11-25）。 */ embedded?: boolean; onPrev?: () => void; onNext?: () => void; list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
   const thumb = useThumb();
   const win = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [sel, setSel] = useState<Set<number> | null>(null); // null＝一般模式；Set＝複選模式
   const [busy, setBusy] = useState(false);
   const gap = 4;
-  const cols = Math.max(3, Math.floor(win.width / 140));
-  const cell = Math.floor((win.width - insets.left - insets.right - gap * (cols + 1)) / cols);
+  const [boxW, setBoxW] = useState(0); // 嵌在相簿裡時，格子寬度看容器寬度（側邊欄會讓它變窄）
+  const areaW = embedded && boxW ? boxW : win.width - insets.left - insets.right;
+  const cols = Math.max(3, Math.floor(areaW / 140));
+  const cell = Math.floor((areaW - gap * (cols + 1)) / cols);
   const picked = sel ? [...sel].sort((a, b) => a - b) : [];
   const toggle = (i: number) =>
     setSel((s) => {
@@ -55,8 +57,9 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra }:
     </Pressable>
   );
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto">
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: space.xs }}>
+    <View style={embedded ? { flex: 1, minHeight: 0 } : [StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto" onLayout={embedded ? (e) => setBoxW(Math.floor(e.nativeEvent.layout.width)) : undefined}>
+      <View style={{ paddingTop: embedded ? 8 : insets.top + 16, paddingHorizontal: embedded ? 0 : 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: space.xs }}>
+        {embedded && !sel ? btn("回上一頁（資料夾總覽）", onClose, <Ionicons name="chevron-back" size={26} color="#fff" {...UI_ONLY} />) : null}
         <View style={styles.label}>
           <AppText variant="callout" {...UI_ONLY_TEXT} numberOfLines={1} style={{ color: "#fff", fontWeight: "800" }}>
             {sel ? `已選 ${picked.length} 張` : heading ? `${heading}・${list.length} 張` : `全部 ${list.length} 張・長按可複選`}
@@ -70,12 +73,17 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra }:
             {btn("分享", () => void run(() => shareImages(name, urls()), "分享失敗，請稍後再試"), <ShareIcon size={24} color="#fff" uiOnly />, !picked.length || busy)}
             {btn("取消複選", () => setSel(null), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
           </>
+        ) : embedded ? (
+          <>
+            {onPrev ? btn("上一個資料夾", onPrev, <Ionicons name="arrow-back" size={22} color="#fff" {...UI_ONLY} />) : null}
+            {onNext ? btn("下一個資料夾", onNext, <Ionicons name="arrow-forward" size={22} color="#fff" {...UI_ONLY} />) : null}
+          </>
         ) : (
           btn("回到單張檢視", onClose, <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)
         )}
       </View>
-      {extra && !sel ? <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>{extra}</View> : null}
-      <ScrollView contentContainerStyle={{ padding: gap, paddingLeft: gap + insets.left, paddingBottom: insets.bottom + 24, flexDirection: "row", flexWrap: "wrap", gap }}>
+      {extra && !sel ? <View style={{ paddingHorizontal: embedded ? 0 : 16, paddingBottom: 8 }}>{extra}</View> : null}
+      <ScrollView contentContainerStyle={{ padding: gap, paddingLeft: embedded ? gap : gap + insets.left, paddingBottom: insets.bottom + 24, flexDirection: "row", flexWrap: "wrap", gap }}>
         {list.map((it, i) => {
           const on = !!sel?.has(i);
           return (
