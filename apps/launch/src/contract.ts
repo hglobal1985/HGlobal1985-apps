@@ -1094,6 +1094,10 @@ export type AppSettings = {
   videoMaxSec: number;
   /** 所有上傳圖片存進雲端時統一轉成的格式（業主 2026-11-20；預設 JPEG，相容性最好）。 */
   storeFormat: "jpeg" | "webp" | "avif";
+  /** 相簿照片的獨立存檔格式與畫質（業主 2026-11-25，先在「成交百寶箱」試行；通過後才全站）。albumScope：off＝不啟用、treasure＝只有成交百寶箱、all＝全部相簿。 */
+  albumFormat: "jpeg" | "webp" | "avif";
+  albumQuality: number;
+  albumScope: "off" | "treasure" | "all";
   /** Cloudflare 即時縮圖（業主 2026-11-20 小範圍試用）：封面縮圖的所有選項，在「設定 › Cloudflare即時縮圖」調整。 */
   thumb: ThumbSettings;
 };
@@ -1126,6 +1130,9 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   videoMaxMb: 25,
   videoMaxSec: 60,
   storeFormat: "jpeg",
+  albumFormat: "avif",
+  albumQuality: 60,
+  albumScope: "treasure",
   thumb: { enabled: false, widths: [320, 480, 640], height: 0, fit: "scale-down", gravity: "auto", format: "auto", quality: 70, qualityLevel: "", anim: true, metadata: "none", rotate: 0, flip: "", blur: 0, sharpen: 0, brightness: 1, contrast: 1, gamma: 1, saturation: 1, background: "", trim: 0, borderWidth: 0, borderColor: "#ffffff", quota: { monthly: 5000, edmPct: 90, albumPct: 70 } },
 };
 export const STATS_ROLE_OPTIONS: { key: string; title: string }[] = [

@@ -20,15 +20,15 @@ export const renameForType = (name: string, type: string): string => {
  * @param keepFormat true＝不轉格式（品牌 logo：透明背景的 PNG 轉成 JPEG 會破壞深色模式底色），只縮尺寸。
  * 其他圖片一律轉成設定的存檔格式（`app.storeFormat`，預設 JPEG；業主 2026-11-20）。
  */
-export async function shrinkImage(env: Env, data: ArrayBuffer, type: string, cls: ImageClass, keepFormat = false): Promise<{ data: ArrayBuffer; type: string; size: number }> {
+export async function shrinkImage(env: Env, data: ArrayBuffer, type: string, cls: ImageClass, keepFormat = false, override?: { format: "jpeg" | "webp" | "avif"; quality: number }): Promise<{ data: ArrayBuffer; type: string; size: number }> {
   const same = { data, type, size: data.byteLength };
   const fmt = TYPES[type];
   if (!fmt || !env.IMAGES?.info) return same;
   try {
     const app = (await loadConfig(env.DB)).app;
     const side = cls === "center" ? app.centerMaxSide : cls === "edm" ? app.edmMaxSide : app.imageMaxSide;
-    const quality = cls === "center" ? app.centerQuality : cls === "edm" ? app.edmQuality : app.imageQuality;
-    const target = keepFormat ? fmt : app.storeFormat;
+    const quality = override?.quality ?? (cls === "center" ? app.centerQuality : cls === "edm" ? app.edmQuality : app.imageQuality);
+    const target = override?.format ?? (keepFormat ? fmt : app.storeFormat);
     const info = await env.IMAGES.info(new Response(data).body!);
     const longSide = Math.max(info.width ?? 0, info.height ?? 0);
     // 要保留的 PNG（品牌 logo）沒有畫質參數，長邊在上限內且小於 1MB 就不動。

@@ -175,6 +175,9 @@ export function normalizeApp(raw: unknown): AppSettings {
     videoMaxMb: num(r.videoMaxMb, d.videoMaxMb, 2, 60),
     videoMaxSec: num(r.videoMaxSec, d.videoMaxSec, 5, 60),
     storeFormat: pick(r.storeFormat, ["jpeg", "webp", "avif"] as const, d.storeFormat),
+    albumFormat: pick(r.albumFormat, ["jpeg", "webp", "avif"] as const, d.albumFormat),
+    albumQuality: num(r.albumQuality, d.albumQuality, 30, 100),
+    albumScope: pick(r.albumScope, ["off", "treasure", "all"] as const, d.albumScope),
     thumb: normalizeThumb(r.thumb),
   };
 }

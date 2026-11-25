@@ -76,11 +76,11 @@ function FormatTable() {
 export default function StorageScreen() {
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
-  const [lim, setLim] = useState({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, storeFormat: config.app.storeFormat });
-  useEffect(() => setLim({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, storeFormat: config.app.storeFormat }), [config.app.fileMaxMb, config.app.imageMaxSide, config.app.imageQuality, config.app.centerMaxSide, config.app.centerQuality, config.app.edmMaxSide, config.app.edmQuality, config.app.storeFormat]);
+  const [lim, setLim] = useState({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, storeFormat: config.app.storeFormat, albumFormat: config.app.albumFormat, albumQuality: config.app.albumQuality, albumScope: config.app.albumScope });
+  useEffect(() => setLim({ fileMaxMb: config.app.fileMaxMb, imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, storeFormat: config.app.storeFormat, albumFormat: config.app.albumFormat, albumQuality: config.app.albumQuality, albumScope: config.app.albumScope }), [config.app.fileMaxMb, config.app.imageMaxSide, config.app.imageQuality, config.app.centerMaxSide, config.app.centerQuality, config.app.edmMaxSide, config.app.edmQuality, config.app.storeFormat]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
-  const dirty = lim.fileMaxMb !== config.app.fileMaxMb || lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality || lim.centerMaxSide !== config.app.centerMaxSide || lim.centerQuality !== config.app.centerQuality || lim.edmMaxSide !== config.app.edmMaxSide || lim.edmQuality !== config.app.edmQuality || lim.storeFormat !== config.app.storeFormat;
+  const dirty = lim.fileMaxMb !== config.app.fileMaxMb || lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality || lim.centerMaxSide !== config.app.centerMaxSide || lim.centerQuality !== config.app.centerQuality || lim.edmMaxSide !== config.app.edmMaxSide || lim.edmQuality !== config.app.edmQuality || lim.storeFormat !== config.app.storeFormat || lim.albumFormat !== config.app.albumFormat || lim.albumQuality !== config.app.albumQuality || lim.albumScope !== config.app.albumScope;
   const saveLim = async () => {
     setSaving(true);
     setMsg(null);
@@ -150,6 +150,13 @@ export default function StorageScreen() {
           </AppText>
           <Chips title="圖片存檔格式" value={lim.storeFormat} onChange={(v) => setLim((x) => ({ ...x, storeFormat: v }))} options={[{ key: "jpeg", label: "JPEG（預設）" }, { key: "webp", label: "WebP" }, { key: "avif", label: "AVIF" }]} />
           <FormatTable />
+          <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
+            相簿照片（獨立設定，先在「成交百寶箱」試行）
+          </AppText>
+          <NoticeBox tone="info" text="相簿照片可以用和全站不同的存檔格式與畫質。先選「只有成交百寶箱」試用：之後上傳到成交百寶箱的照片會照這裡的格式壓縮，其他照片不受影響；下載、分享到手機時，會自動轉回 JPEG。實機確認沒問題，再改成「全部相簿」。舊照片不會回頭轉檔。" />
+          <Chips title="套用範圍" value={lim.albumScope} onChange={(v) => setLim((x) => ({ ...x, albumScope: v }))} options={[{ key: "off", label: "不啟用" }, { key: "treasure", label: "只有成交百寶箱" }, { key: "all", label: "全部相簿" }]} />
+          <Chips title="相簿存檔格式" value={lim.albumFormat} onChange={(v) => setLim((x) => ({ ...x, albumFormat: v }))} options={[{ key: "avif", label: "AVIF（預設）" }, { key: "webp", label: "WebP" }, { key: "jpeg", label: "JPEG" }]} />
+          <Stepper label="相簿畫質" hint="AVIF 建議 55～65（約省 6～7 成）；數字越大畫質越好、檔案越大（預設 60）" value={lim.albumQuality} min={30} max={100} step={5} unit="%" onChange={(v) => setLim((x) => ({ ...x, albumQuality: v }))} />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             ① 中心封面照片（中心首頁圖）
           </AppText>

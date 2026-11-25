@@ -66,3 +66,5 @@
   ③**超級管理員的齒輪（`features/courses/album-admin.tsx`，疊在全黑相簿畫面上的共用面板）**：資料夾清單標題右上角的齒輪＝`AlbumPermissionsPanel`（所有類別與資料夾的上傳最低獎銜，`GET /admin/albums/permissions`、`PUT /admin/albums/permission`，資料夾可選「沿用類別」）；每個資料夾上傳鈕同一列右邊的齒輪＝`AlbumInfoPanel`（`GET /admin/albums/info`：照片數、R2 佔用容量、最近上傳、上傳者人數與排名、檔案大小排序、瀏覽數排序，另可調這個資料夾的上傳權限）。瀏覽數：migration 0133 在 `cover_media` 加 `views`，`EdmLightbox` 看一張就 `POST /cover-media/:id/view`（同一次開啟網站同一張只送一次，`viewedIds`）。
   ④**資料夾排序**：資料夾標題＋張數右側兩顆只有圖示的按鈕（日曆＝活動日期、時鐘＝上傳時間），點一下新到舊、再點舊到新（亮綠＋小箭頭），沒有日期的永遠排最後；`CoverMediaItem.createdAt` 由 `coverItem` 提供。
   ⑤**看圖工具列（`EdmLightbox`，所有看圖畫面通用，不只相簿）**：寰宇 logo 在最左邊、純標誌、點了沒反應；工具列位置往下移（top 30）；**小螢幕手機橫放（寬>高且高<520）按鈕改靠右由上到下一欄**（`smallLand`）；已拿掉「相簿」鈕（從相簿開的照片按 ✕ 回相簿）。
+
+- **相簿資料夾標題列（業主 2026-11-25）**：資料夾名稱**不顯示張數統計**，太長自動變兩行，不可擠到右邊兩顆排序按鈕（`LightboxGrid` embedded 的 `heading` 用 `flex:1`、`actions` 用 `flexShrink:0`，按鈕固定顯示）。點排序按鈕會跳出該功能的文字提示——用 `showFlash`（與課程頁切換檢視模式同款的全螢幕提醒視窗，`FlashHost`），標題＝「活動日期排序」／「上傳時間排序」，說明＝「新到舊」／「舊到新」。

@@ -60,12 +60,13 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
     <View style={embedded ? { flex: 1, minHeight: 0 } : [StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto" onLayout={embedded ? (e) => setBoxW(Math.floor(e.nativeEvent.layout.width)) : undefined}>
       <View style={{ paddingTop: embedded ? 8 : insets.top + 16, paddingHorizontal: embedded ? 0 : 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: space.xs }}>
         {embedded && !sel ? btn("回上一頁（資料夾總覽）", onClose, <Ionicons name="chevron-back" size={26} color="#fff" {...UI_ONLY} />) : null}
-        <View style={styles.label}>
-          <AppText variant="callout" {...UI_ONLY_TEXT} numberOfLines={1} style={{ color: "#fff", fontWeight: "800" }}>
-            {sel ? `已選 ${picked.length} 張` : heading ? `${heading}・${list.length} 張` : `全部 ${list.length} 張・長按可複選`}
+        {/* 資料夾名稱（業主 2026-11-25）：沒有張數統計、太長自動變兩行；右邊的排序按鈕固定顯示，不會被名稱擠掉。 */}
+        <View style={[styles.label, embedded && heading && !sel ? { flex: 1, minWidth: 0, maxWidth: undefined } : null]}>
+          <AppText variant="callout" {...UI_ONLY_TEXT} numberOfLines={embedded && heading && !sel ? 2 : 1} style={{ color: "#fff", fontWeight: "800" }}>
+            {sel ? `已選 ${picked.length} 張` : heading ? heading : `全部 ${list.length} 張・長按可複選`}
           </AppText>
         </View>
-        <View style={{ flex: 1 }} />
+        {embedded && heading && !sel ? null : <View style={{ flex: 1 }} />}
         {sel ? (
           <>
             {btn(picked.length === list.length ? "取消全選" : "全選", () => setSel(picked.length === list.length ? new Set() : new Set(list.map((_, i) => i))), <Ionicons name={picked.length === list.length ? "checkmark-done-circle" : "checkmark-done-outline"} size={26} color="#fff" {...UI_ONLY} />)}
@@ -74,7 +75,7 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
             {btn("取消複選", () => setSel(null), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
           </>
         ) : embedded ? (
-          actions ?? null
+          actions ? <View style={{ flexShrink: 0 }}>{actions}</View> : null
         ) : (
           btn("回到單張檢視", onClose, <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)
         )}

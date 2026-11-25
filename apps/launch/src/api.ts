@@ -4506,7 +4506,11 @@ const routes: [string, RegExp, Handler][] = [
       if (!data.byteLength || data.byteLength > 8 * 1024 * 1024) fail(413, "invalid_size", "圖片大小需在 8MB 以內（上傳時會自動壓縮）");
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       await coverRoom(ctx.db, o);
-      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "center");
+      // 相簿照片獨立的存檔格式與畫質（業主 2026-11-25；先只套用成交百寶箱，確認沒問題才全站）。
+      const app = (await loadConfig(ctx.db)).app;
+      const ref = await albumRefOf(ctx.db, o.kind, o.lookup, o.scope);
+      const albumOn = app.albumScope === "all" || (app.albumScope === "treasure" && ref.groupId === "treasure");
+      const shrunk = await shrinkImage(ctx.env, data.buffer as ArrayBuffer, img.type, "center", false, albumOn ? { format: app.albumFormat, quality: app.albumQuality } : undefined);
       const key = `album/${crypto.randomUUID().slice(0, 8)}/${crypto.randomUUID()}.${renameForType("x.jpg", shrunk.type).split(".").pop()}`;
       await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       const id = await addCoverRow(ctx.db, o, { kind: "image", r2Key: key, posterKey: null, width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")), durationSec: 0, bytes: shrunk.data.byteLength, by: o.s.sub });

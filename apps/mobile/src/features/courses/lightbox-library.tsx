@@ -13,7 +13,7 @@ import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText } from "@/ui";
-import { flashText } from "@/ui/flash-notice";
+import { FLASH_ICON, flashText, showFlash } from "@/ui/flash-notice";
 
 const UI_ONLY = { uiOnly: true } as object;
 const UI_ONLY_TEXT = { dataSet: { uiOnly: "" } } as object;
@@ -188,7 +188,12 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
   const sortBtn = (k: "date" | "upload", icon: string, label: string) => {
     const on = sortBy?.key === k;
     return (
-      <Pressable key={k} accessibilityRole="button" accessibilityLabel={`${label}${on ? (sortBy!.dir === "desc" ? "，目前新到舊" : "，目前舊到新") : ""}`} onPress={() => setSortBy(on ? { key: k, dir: sortBy!.dir === "desc" ? "asc" : "desc" } : { key: k, dir: "desc" })} style={[styles.tool, on && { backgroundColor: "#2e7d32" }]}>
+      <Pressable key={k} accessibilityRole="button" accessibilityLabel={`${label}${on ? (sortBy!.dir === "desc" ? "，目前新到舊" : "，目前舊到新") : ""}`} onPress={() => {
+        const dir = on ? (sortBy!.dir === "desc" ? "asc" : "desc") : "desc";
+        setSortBy({ key: k, dir });
+        // 點了跳出該功能的文字提示（與課程頁切換檢視模式同款的全螢幕提醒視窗 showFlash）
+        showFlash({ icon: <Ionicons name={icon as never} size={FLASH_ICON - 3} color="#2E7D32" />, title: label, body: dir === "desc" ? "新到舊" : "舊到新" });
+      }} style={[styles.tool, on && { backgroundColor: "#2e7d32" }]}>
         <Ionicons name={icon as never} size={22} color="#fff" {...UI_ONLY} />
         {on ? <Ionicons name={sortBy!.dir === "desc" ? "arrow-down" : "arrow-up"} size={12} color="#fff" style={{ position: "absolute", right: 7, bottom: 7 }} {...UI_ONLY} /> : null}
       </Pressable>
