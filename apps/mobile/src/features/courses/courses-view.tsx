@@ -678,13 +678,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       ) : chapterMode ? (
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
-          {nearMode ? <AppText variant="caption" tone="muted">找不到完全符合的，以下是相近的結果</AppText> : null}
           {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}
           <ChapterList items={chapterItems} />
         </>
       ) : (
         <>
-          {nearMode ? <AppText variant="caption" tone="muted">找不到完全符合的，以下是相近的結果</AppText> : null}
           {data && !groups.length && !(mode === "center" && center === ALL) ? (
             mode === "center" && !matched && !selCats.length ? (
               // 中心頁完全沒有課程：固定提示文字（地址由中心的編輯面板設定；沒設定就不顯示地址那一行）
