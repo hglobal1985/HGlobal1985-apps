@@ -71,6 +71,8 @@ export type {
   AlbumFolder,
   AlbumGroup,
   AlbumsResponse,
+  AlbumInfo,
+  AlbumPermissions,
   CoverMediaKind,
   CoverScope,
   StaffRole,

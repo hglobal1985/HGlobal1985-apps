@@ -6,7 +6,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Image, Modal, PanResponder, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { resolveUrl, type CourseSummary } from "@/api/client";
+import { api, resolveUrl, type CourseSummary } from "@/api/client";
 import { downloadImage, shareImage } from "@/lib/share";
 import { LightboxGrid } from "./lightbox-grid";
 import { LightboxLibrary, type LibraryPick } from "./lightbox-library";
@@ -147,6 +147,7 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
  * 分享會呼叫系統分享選單，直接把「圖片」傳出去（圖示用系統預設的 ShareIcon）。
  */
 /** 操作說明縮成十字圖示後，這次開啟網站期間都記住（不用每張圖再按一次）。 */
+const viewedIds = new Set<string>(); // 這次開啟網站已回報過瀏覽的照片編號
 let helpHiddenMemory = true; // 預設縮成十字圖示，點圖示才展開（業主 2026-11-24）
 /** id＝相簿照片編號（有給、而且看的人有管理權限時，右上角多一顆「圖片資訊」驚嘆號鈕；業主 2026-11-24）。 */
 export type LightboxItem = { uri: string; title: string; bg?: string; id?: string };
@@ -204,6 +205,13 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   const [ratio, setRatio] = useState(0.7); // 寬 / 高
   const [touching, setTouching] = useState(false); // 手指或滑鼠按著圖片時，按鈕暫時消失
   const full = resolveUrl(cur.uri);
+  // 照片瀏覽數（相簿資訊總覽的「瀏覽數排序」用）：看過一張就算一次，同一次開啟網站同一張只送一次。
+  useEffect(() => {
+    const id = list[idx]?.id;
+    if (!id || viewedIds.has(id)) return;
+    viewedIds.add(id);
+    api("POST", `/cover-media/${id}/view`).catch(() => undefined);
+  }, [list, idx]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (cur.uri) Image.getSize(full, (w, h) => h && setRatio(w / h), () => undefined);
   }, [full]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -326,9 +334,21 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   const many = list.length > 1;
   const land = win.width > win.height; // 橫放：說明與按鈕合併在同一列
   const hint = many ? "左右滑動換張、兩指放大縮小" : "可拖曳移動、兩指放大縮小";
+  const smallLand = win.width > win.height && win.height < 520; // 小螢幕手機橫放（業主 2026-11-25）
+  const topY = smallLand ? 10 : 30;
   const [helpW, setHelpW] = useState(0);
   // 單行自動縮小：中文每字約一個字寬；可用寬度＝長條寬度扣掉圖示與左右留白。
   const helpSize = helpW ? Math.max(11, Math.min(26, Math.floor((helpW - 32 - 24 - 10 - 60) / (hint.length * 1.05)))) : 18;
+  const helpBar = (
+    <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} onLayout={(e) => setHelpW(e.nativeEvent.layout.width)} pointerEvents="box-none">
+      <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />
+      <AppText variant="caption" numberOfLines={1} {...NO_SCALE} style={{ color: "#fff", fontWeight: "800", fontSize: helpSize, lineHeight: helpSize + 8, flexShrink: 1, flexGrow: 1 }}>
+        {hint}
+      </AppText>
+      {/* 縮小：按了變成十字圖示，排在下載鈕左邊（業主 2026-11-21）。 */}
+      {tool("縮小操作說明", () => setHelp(true), <Ionicons name="contract" size={24} color="#fff" {...UI_ONLY} />)}
+    </View>
+  );
   // 電腦（有滑鼠）才顯示左右切換按鈕；手機、平板橫放用手指滑動（業主 2026-11-21）。
   const desktop = Platform.OS === "web" && typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
   const imgBg = cur.bg ?? bg;
@@ -360,12 +380,15 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
               </View>
             </>
           ) : null}
-          {/* 說明文字與下載、分享、關閉全部在最上面同一列（業主 2026-11-21）。 */}
-          <View style={[styles.top, land && { flexDirection: "row-reverse", alignItems: "flex-start" }]} pointerEvents="box-none">
+          {/* 工具列（業主 2026-11-21；2026-11-25 調整）：寰宇 logo 在最左邊（純標誌，點了沒有任何反應）；按鈕在右邊。
+              位置往下移一點；小螢幕手機橫放時，按鈕改成靠右由上到下一欄，不蓋住照片。所有看圖畫面（含不是從相簿進來的）都用這個。 */}
+          <View style={{ position: "absolute", left: 16, top: topY, width: toolSize, height: toolSize, borderRadius: toolSize / 2, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no">
+            <Image source={require("../../../assets/logo.png")} style={{ width: toolSize - 10, height: toolSize - 10 }} resizeMode="contain" accessibilityIgnoresInvertColors />
+          </View>
+          <View style={[styles.top, { top: topY }, smallLand ? { left: undefined, right: 12 } : null, !smallLand && land && { flexDirection: "row-reverse", alignItems: "flex-start" }]} pointerEvents="box-none">
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
-              <View style={styles.row} pointerEvents="box-none">
+              <View style={[styles.row, smallLand && { flexDirection: "column", alignItems: "flex-end" }]} pointerEvents="box-none">
                 {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />) : null}
-                {tool("相簿", () => setLibOpen(true), <View style={{ width: toolSize - 8, height: toolSize - 8, borderRadius: (toolSize - 8) / 2, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }}><Image source={require("../../../assets/logo.png")} style={{ width: toolSize - 16, height: toolSize - 16 }} resizeMode="contain" accessibilityIgnoresInvertColors /></View>)}
                 {many ? tool("檢視全部", () => (over?.folder ? setLibOpen(true) : setGrid(true)), <Ionicons name="grid-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
                 {list.length && canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
                 {list.length ? tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
@@ -380,17 +403,9 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
               ) : null}
             </View>
             {/* 操作說明：強制單行，字太多時自動縮小（業主 2026-11-21）。 */}
-            {!hideHelp ? (
-              <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} onLayout={(e) => setHelpW(e.nativeEvent.layout.width)} pointerEvents="box-none">
-                <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />
-                <AppText variant="caption" numberOfLines={1} {...NO_SCALE} style={{ color: "#fff", fontWeight: "800", fontSize: helpSize, lineHeight: helpSize + 8, flexShrink: 1, flexGrow: 1 }}>
-                  {hint}
-                </AppText>
-                {/* 縮小：按了變成十字圖示，排在下載鈕左邊（業主 2026-11-21）。 */}
-                {tool("縮小操作說明", () => setHelp(true), <Ionicons name="contract" size={24} color="#fff" {...UI_ONLY} />)}
-              </View>
-            ) : null}
+            {!hideHelp && !smallLand ? helpBar : null}
           </View>
+          {!hideHelp && smallLand ? <View style={{ position: "absolute", left: toolSize + 28, right: toolSize + 28, top: topY }} pointerEvents="box-none">{helpBar}</View> : null}
           {grid && list.length ? <LightboxGrid list={list} current={idx} heading={over?.title} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
           {libOpen ? <LightboxLibrary initial={over?.folder ? { folder: over.folder, items: [] } : null} onClose={() => (over || library || !list.length ? onClose() : setLibOpen(false))} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => ({ uri: x.url, title: p.title, id: x.id })) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
           {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
@@ -405,7 +420,7 @@ const styles = StyleSheet.create({
   frame: { overflow: "hidden", backgroundColor: "#fff" },
   side: { position: "absolute", top: 0, bottom: 0, justifyContent: "center" },
   counter: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.5)" },
-  top: { position: "absolute", left: 16, right: 16, top: 16, gap: space.xs },
+  top: { position: "absolute", left: 16, right: 16, top: 30, gap: space.xs },
   row: { flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: space.xs },
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
   help: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, borderRadius: 30, backgroundColor: "rgba(0,0,0,0.5)" },

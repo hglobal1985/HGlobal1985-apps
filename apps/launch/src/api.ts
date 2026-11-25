@@ -85,6 +85,8 @@ import {
   type CoverScope,
   type CoverMediaItem,
   type AlbumFolder,
+  type AlbumInfo,
+  type AlbumPermissions,
   type AlbumsResponse,
   LIST_COVER_COLORS,
   UPGRADING_MSG,
@@ -2534,13 +2536,13 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 
 /** 中心 EDM：總部任何中心（名稱必須在會員中心清單內）；會長、音控、有「修改別人」權限的小編只能改自己中心。 */
 // ---------- 封面輪播與相簿的共用函式 ----------
-type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; kind?: string; poster_key?: string | null };
+type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; scope?: string; kind?: string; poster_key?: string | null };
 const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
 const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
 /** 相簿專區的資料夾彙整（業主 2026-11-25）：大類別順序＝設定的 albumOrder，資料夾一律按張數多到少；每個資料夾帶鎖定狀態與可否上傳。 */
 async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
   type G = { ok: string; scope: CoverScope; ck: string | null; k: string; n: number; thumbs: string | null };
-  const [rows, arts, courses, blocks, cfg] = await Promise.all([
+  const [rows, arts, courses, blocks, cfg, treasure, perms] = await Promise.all([
     ctx.db
       .prepare("SELECT cm.owner_kind AS ok, cm.scope AS scope, cm.center_key AS ck, cm.owner_key AS k, COUNT(*) AS n, (SELECT GROUP_CONCAT(r2_key, '|') FROM (SELECT x.r2_key FROM cover_media x WHERE x.kind = 'image' AND x.owner_kind = cm.owner_kind AND x.scope = cm.scope AND COALESCE(x.center_key, '') = COALESCE(cm.center_key, '') AND x.owner_key = cm.owner_key ORDER BY x.position LIMIT 4)) AS thumbs FROM cover_media cm GROUP BY cm.owner_kind, cm.scope, cm.center_key, cm.owner_key")
       .all<G>(),
@@ -2548,6 +2550,8 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
     ctx.db.prepare("SELECT id, title FROM courses WHERE status = 'published'").all<{ id: string; title: string }>(),
     ctx.db.prepare("SELECT l.id, l.title, l.course_id, c.title AS course_title FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.kind = 'section' AND c.status = 'published'").all<{ id: string; title: string; course_id: string; course_title: string }>(),
     loadConfig(ctx.db),
+    treasureCourseId(ctx.db).catch(() => null),
+    albumPermMap(ctx.db),
   ]);
   const rights = ctx.session ? await rightsOf(ctx) : null;
   const label = new Map(arts.results.map((a) => [a.center_key, a.center_label]));
@@ -2558,7 +2562,7 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
     const l = locks.get(courseId);
     return l && l.locked ? { locked: true, lockReason: l.lines.join("、") || "沒有權限進入這個相簿" } : { locked: false };
   };
-  const groups: Record<string, AlbumFolder[]> = { edm: [], cover: [], series: [], course: [], block: [] };
+  const groups: Record<string, AlbumFolder[]> = { edm: [], cover: [], series: [], course: [], block: [], treasure: [] };
   for (const r of rows.results) {
     const thumbs = r.thumbs ? r.thumbs.split("|").map((k) => pubUrl(k, 0)) : [];
     const base = { count: r.n, thumb: thumbs[0] ?? null, thumbs };
@@ -2566,17 +2570,31 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
       const title = label.get(r.ck) ?? r.ck;
       const scope: CoverScope = r.scope === "edm" ? "edm" : "cover";
       const canEdit = !!rights && (rights.admin || (!!rights.center && centerKey(rights.center.label) === r.ck && (rights.staff || !!rights.editor?.editOthers)));
-      groups[scope]!.push({ id: `center:${r.ck}:${scope}`, kind: "center", key: title, scope, title, ...base, locked: false, canEdit });
-    } else if (r.ok === "series" && r.k) groups.series!.push({ id: `series:${r.k}`, kind: "series", key: r.k, title: r.k, ...base, locked: false, canEdit: !!rights?.admin });
+      groups[scope]!.push({ id: `center:${r.ck}:${scope}`, kind: "center", key: title, scope, title, groupId: scope, ...base, locked: false, canEdit });
+    } else if (r.ok === "series" && r.k) groups.series!.push({ id: `series:${r.k}`, kind: "series", key: r.k, title: r.k, groupId: "series", ...base, locked: false, canEdit: !!rights?.admin });
     else if (r.ok === "course") {
       const ct = courseTitle.get(r.k);
       const b = block.get(r.k);
-      if (ct) groups.course!.push({ id: `course:${r.k}`, kind: "course", key: r.k, title: ct, ...base, courseId: r.k, ...lockOf(r.k), canEdit: !!rights?.admin });
-      else if (b) groups.block!.push({ id: `block:${r.k}`, kind: "block", key: r.k, title: b.title, subtitle: b.course_title, ...base, courseId: b.course_id, ...lockOf(b.course_id), canEdit: !!rights?.admin });
+      if (ct) groups.course!.push({ id: `course:${r.k}`, kind: "course", key: r.k, title: ct, groupId: "course", ...base, courseId: r.k, ...lockOf(r.k), canEdit: !!rights?.admin });
+      else if (b) {
+        // 成交百寶箱的區塊相簿單獨一個類別，不混在「課程區塊相簿」裡（業主 2026-11-25）。
+        const gid = b.course_id === treasure ? "treasure" : "block";
+        groups[gid]!.push({ id: `block:${r.k}`, kind: "block", key: r.k, title: b.title, subtitle: gid === "treasure" ? undefined : b.course_title, groupId: gid, ...base, courseId: b.course_id, ...lockOf(b.course_id), canEdit: !!rights?.admin });
+      }
     }
   }
+  // 獎銜達標的人可以上傳（相簿齒輪的「上傳權限」；資料夾自己的設定優先於類別）。
+  if (ctx.session && perms.size) {
+    const codes = [...new Set([...perms.values()].filter(Boolean))];
+    const elig = await eligibilityFor(ctx.session, await ranks(ctx.db), codes);
+    for (const list of Object.values(groups))
+      for (const f of list) {
+        const eff = perms.get(f.id) ?? perms.get(`group:${f.groupId}`);
+        if (eff && elig.get(eff) === true && !f.locked) f.canEdit = true;
+      }
+  }
   const sort = (a: AlbumFolder, b: AlbumFolder) => b.count - a.count || a.title.localeCompare(b.title, "zh-Hant");
-  const defs: [string, string][] = [["edm", "中心 EDM"], ["cover", "中心封面照片"], ["series", "系列封面照片"], ["course", "課程封面照片"], ["block", "課程區塊相簿"]];
+  const defs: [string, string][] = [["edm", "中心 EDM"], ["cover", "中心封面照片"], ["series", "系列封面照片"], ["course", "課程封面照片"], ["block", "課程區塊相簿"], ["treasure", "成交百寶箱"]];
   const order = cfg.albumOrder ?? [];
   const pos = (id: string) => (order.includes(id) ? order.indexOf(id) : 100 + defs.findIndex((d) => d[0] === id));
   const out = defs
@@ -2585,7 +2603,7 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
     .sort((a, b) => pos(a.id) - pos(b.id));
   return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out };
 }
-function coverItem(r: { id: string; scope: CoverScope; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
+function coverItem(r: { id: string; scope: CoverScope; created_at?: string | null; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
     scope: r.scope === "edm" ? "edm" : "cover",
@@ -2598,6 +2616,7 @@ function coverItem(r: { id: string; scope: CoverScope; scene_text?: string | nul
     durationSec: r.duration_sec,
     ...(r.scope === "edm" ? { eventDate: r.event_date ?? null, text: r.ocr_text ?? "" } : r.ocr_text ? { text: r.ocr_text } : {}),
     ...(r.scene_text ? { scene: r.scene_text } : {}),
+    ...(r.created_at ? { createdAt: r.created_at } : {}),
   };
 }
 /** 儲存區（業主 2026-11-23）：只有中心有「EDM」分頁；系列、課程一律只有 cover。沒帶或不認得時，中心當 edm（舊版 App 的相簿上傳）。 */
@@ -2606,9 +2625,9 @@ const coverScopeOf = (kind: CoverMediaKind, v: unknown): CoverScope => (kind !==
 async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, scope?: CoverScope): Promise<CoverMediaItem[]> {
   const where = (kind === "center" ? "cm.owner_kind = 'center' AND cm.center_key = ?" : "cm.owner_kind = ? AND cm.owner_key = ?") + (scope ? " AND cm.scope = ?" : "");
   // 課程 EDM（綁定課程的照片）不受 100 張上限限制，所以讀取上限放寬。
-  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, cm.ocr_text, cm.event_date, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, cm.position, CASE WHEN cm.scope = 'edm' THEN cm.event_date IS NULL ELSE 0 END, CASE WHEN cm.scope = 'edm' THEN cm.event_date END DESC, cm.created_at, cm.rowid LIMIT 2000`);
+  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, cm.ocr_text, cm.event_date, cm.created_at, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, cm.position, CASE WHEN cm.scope = 'edm' THEN cm.event_date IS NULL ELSE 0 END, CASE WHEN cm.scope = 'edm' THEN cm.event_date END DESC, cm.created_at, cm.rowid LIMIT 2000`);
   const args = [...(kind === "center" ? [lookup] : [kind, lookup]), ...(scope ? [scope] : [])];
-  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; ocr_text: string | null; event_date: string | null; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; created_at: string | null; ocr_text: string | null; event_date: string | null; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
   return results.map(coverItem);
 }
 /**
@@ -2659,8 +2678,53 @@ async function fillImageDims(env: Env, db: D1Database, kind: CoverMediaKind, loo
     }
   }
 }
+/**
+ * 相簿「誰可以上傳」的獎銜設定（業主 2026-11-25，超級管理員在相簿齒輪設定；成交百寶箱預設白金以上）：
+ * 資料夾自己的設定優先於類別；有設定而且會員獎銜達標，就算有上傳權（只限上傳與補預覽圖、資訊，不能刪除、排序別人的照片）。
+ */
+async function albumPermMap(db: D1Database): Promise<Map<string, string>> {
+  const { results } = await db.prepare("SELECT key, upload_min_rank FROM album_permissions").all<{ key: string; upload_min_rank: string }>();
+  return new Map(results.map((r) => [r.key, r.upload_min_rank]));
+}
+/** 一個封面位置（kind＋key＋scope）對應的相簿資料夾編號與大類別。 */
+async function albumRefOf(db: D1Database, kind: CoverMediaKind, key: string, scope: CoverScope | string | undefined): Promise<{ folderId: string; groupId: string; blockOff?: boolean }> {
+  if (kind === "center") {
+    const sc = scope === "edm" ? "edm" : "cover";
+    return { folderId: `center:${centerKey(key)}:${sc}`, groupId: sc };
+  }
+  if (kind === "series") return { folderId: `series:${key}`, groupId: "series" };
+  const blk = await db.prepare("SELECT l.course_id, c.block_photos FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ? AND l.kind = 'section'").bind(key).first<{ course_id: string; block_photos: number }>();
+  if (blk) return { folderId: `block:${key}`, groupId: blk.course_id === (await treasureCourseId(db).catch(() => null)) ? "treasure" : "block", blockOff: blk.block_photos !== 1 };
+  return { folderId: `course:${key}`, groupId: "course" };
+}
+async function albumRankAllows(ctx: Ctx, ref: { folderId: string; groupId: string; blockOff?: boolean }): Promise<boolean> {
+  if (!ctx.session || ref.blockOff) return false;
+  const perms = await albumPermMap(ctx.db);
+  const eff = perms.get(ref.folderId) ?? perms.get(`group:${ref.groupId}`);
+  if (!eff) return false;
+  const elig = await eligibilityFor(ctx.session, await ranks(ctx.db), [eff]);
+  return elig.get(eff) === true;
+}
 /** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
-async function requireCoverOwner(ctx: Ctx, fromBody = false): Promise<{ s: Session; kind: CoverMediaKind; lookup: string; centerKey: string | null; ownerKey: string; scope: CoverScope }> {
+async function requireCoverOwner(ctx: Ctx, fromBody = false) {
+  const base = ctx;
+  try {
+    return await requireCoverOwnerBase(base, fromBody);
+  } catch (e) {
+    // 上傳（不是排序、刪除）：原本沒權限，但相簿「上傳權限」設定的獎銜達標也可以。
+    if (!fromBody && ctx.session) {
+      const kind = coverKindOf(ctx.url.searchParams.get("kind"));
+      const key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
+      const scope = coverScopeOf(kind, ctx.url.searchParams.get("scope"));
+      if (key && (await albumRankAllows(ctx, await albumRefOf(ctx.db, kind, key, scope)))) {
+        const ck = kind === "center" ? centerKey(key) : null;
+        return { s: ctx.session, kind, lookup: ck ?? key, centerKey: ck, ownerKey: kind === "center" ? "" : key, scope };
+      }
+    }
+    throw e;
+  }
+}
+async function requireCoverOwnerBase(ctx: Ctx, fromBody = false): Promise<{ s: Session; kind: CoverMediaKind; lookup: string; centerKey: string | null; ownerKey: string; scope: CoverScope }> {
   let kind: CoverMediaKind;
   let key: string;
   let scopeRaw: unknown;
@@ -2691,6 +2755,19 @@ async function requireCoverOwner(ctx: Ctx, fromBody = false): Promise<{ s: Sessi
 }
 /** 刪除、換預覽圖時：依資料列所屬的封面檢查權限。 */
 async function requireCoverRowOwner(ctx: Ctx, row: CoverRow): Promise<Session> {
+  try {
+    return await requireCoverRowOwnerBase(ctx, row);
+  } catch (e) {
+    // 補預覽圖、資訊（PUT）：上傳權限設定達標的人也可以（刪除不行）。
+    if (ctx.req.method === "PUT" && ctx.session) {
+      const kind: CoverMediaKind = row.owner_kind === "center" ? "center" : row.owner_kind === "series" ? "series" : "course";
+      const key = kind === "center" ? (row.center_key ?? "") : row.owner_key;
+      if (key && (await albumRankAllows(ctx, kind === "center" ? { folderId: `center:${row.center_key}:${row.scope === "edm" ? "edm" : "cover"}`, groupId: row.scope === "edm" ? "edm" : "cover" } : await albumRefOf(ctx.db, kind, key, row.scope)))) return ctx.session;
+    }
+    throw e;
+  }
+}
+async function requireCoverRowOwnerBase(ctx: Ctx, row: CoverRow): Promise<Session> {
   const s = requireMember(ctx);
   if (row.owner_kind === "center") {
     const rights = await rightsOf(ctx);
@@ -4304,6 +4381,85 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/admin\/albums\/permissions$/,
+    async (ctx) => {
+      // 相簿「誰可以上傳」總覽（業主 2026-11-25，只有超級管理員）：各大類別與各資料夾目前的最低獎銜設定。
+      requireSuperAdmin(ctx);
+      const [idx, perms, rk] = await Promise.all([albumsIndex(ctx), albumPermMap(ctx.db), ranks(ctx.db)]);
+      return {
+        ranks: [...rk.values()].filter((r) => r.code !== "none").map((r) => ({ code: r.code, name: r.name })),
+        groups: idx.groups.map((g) => ({ id: g.id, label: g.label, uploadMinRank: perms.get(`group:${g.id}`) ?? "" })),
+        folders: idx.groups.flatMap((g) => g.folders.map((f) => ({ id: f.id, title: f.title, groupId: g.id, count: f.count, uploadMinRank: perms.get(f.id) ?? null }))),
+      } satisfies AlbumPermissions;
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/albums\/permission$/,
+    async (ctx) => {
+      // 設定某個大類別（group:…）或某個資料夾的最低上傳獎銜；uploadMinRank＝""：只有原本的管理權限；null：資料夾沿用類別設定。
+      const s = requireSuperAdmin(ctx);
+      const b = await readJson<{ key?: unknown; uploadMinRank?: unknown }>(ctx.req);
+      const key = typeof b.key === "string" ? b.key.slice(0, 200) : "";
+      if (!/^(group:(edm|cover|series|course|block|treasure)|(center|series|course|block):.{1,160})$/.test(key)) return fail(400, "invalid_key", "相簿代碼不正確");
+      if (b.uploadMinRank === null && !key.startsWith("group:")) {
+        await ctx.db.prepare("DELETE FROM album_permissions WHERE key = ?").bind(key).run();
+      } else {
+        const code = typeof b.uploadMinRank === "string" ? b.uploadMinRank : "";
+        if (code && !(await ranks(ctx.db)).has(code)) return fail(400, "invalid_rank", "獎銜不正確");
+        await ctx.db.prepare("INSERT INTO album_permissions (key, upload_min_rank, updated_by, updated_at) VALUES (?1, ?2, ?3, datetime('now')) ON CONFLICT(key) DO UPDATE SET upload_min_rank = ?2, updated_by = ?3, updated_at = datetime('now')").bind(key, code, s.sub).run();
+      }
+      await audit(ctx.db, s.sub, "album.permission", "album", key, String(b.uploadMinRank)).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/albums\/info$/,
+    async (ctx) => {
+      // 相簿資訊總覽（業主 2026-11-25，只有超級管理員）：R2 佔用、上傳者姓名數量與排名、最近一次上傳、檔案大小排序、瀏覽數排序，以及上傳權限。
+      requireSuperAdmin(ctx);
+      const id = (ctx.url.searchParams.get("id") ?? "").slice(0, 200);
+      const f = (await albumsIndex(ctx)).groups.flatMap((g) => g.folders).find((x) => x.id === id);
+      if (!f) return fail(404, "not_found", "找不到這個相簿");
+      const where = f.kind === "center" ? "owner_kind = 'center' AND center_key = ? AND scope = ?" : f.kind === "series" ? "owner_kind = 'series' AND owner_key = ?" : "owner_kind = 'course' AND owner_key = ?";
+      const args = f.kind === "center" ? [id.split(":").slice(1, -1).join(":"), f.scope ?? "edm"] : [f.key];
+      const [tot, up, big, hot, perms] = await Promise.all([
+        ctx.db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS bytes, MAX(created_at) AS last FROM cover_media WHERE ${where}`).bind(...args).first<{ n: number; bytes: number; last: string | null }>(),
+        ctx.db.prepare(`SELECT COALESCE(NULLIF(uploader_name, ''), '（不明）') AS name, COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS bytes FROM cover_media WHERE ${where} GROUP BY created_by, uploader_name ORDER BY n DESC, bytes DESC LIMIT 30`).bind(...args).all<{ name: string; n: number; bytes: number }>(),
+        ctx.db.prepare(`SELECT id, r2_key, bytes FROM cover_media WHERE ${where} AND kind = 'image' ORDER BY bytes DESC LIMIT 10`).bind(...args).all<{ id: string; r2_key: string; bytes: number }>(),
+        ctx.db.prepare(`SELECT id, r2_key, views FROM cover_media WHERE ${where} AND kind = 'image' ORDER BY views DESC, created_at DESC LIMIT 10`).bind(...args).all<{ id: string; r2_key: string; views: number }>(),
+        albumPermMap(ctx.db),
+      ]);
+      const own = perms.get(id) ?? null;
+      const groupRank = perms.get(`group:${f.groupId}`) ?? "";
+      return {
+        id,
+        title: f.title,
+        count: tot?.n ?? 0,
+        bytes: tot?.bytes ?? 0,
+        lastUploadAt: tot?.last ?? null,
+        uploaders: up.results.map((r) => ({ name: r.name, count: r.n, bytes: r.bytes })),
+        bySize: big.results.map((r) => ({ id: r.id, url: pubUrl(r.r2_key, 0), bytes: r.bytes })),
+        byViews: hot.results.map((r) => ({ id: r.id, url: pubUrl(r.r2_key, 0), views: r.views })),
+        uploadMinRank: own,
+        effectiveRank: own ?? groupRank,
+        groupId: f.groupId,
+        groupRank,
+      } satisfies AlbumInfo;
+    },
+  ],
+  [
+    "POST",
+    /^\/cover-media\/([\w-]{1,40})\/view$/,
+    async (ctx, [id]) => {
+      // 相簿照片瀏覽數 +1（看圖畫面看過一次；同一次開啟網站同一張只送一次，由前端控制）。
+      await ctx.db.prepare("UPDATE cover_media SET views = views + 1 WHERE id = ? AND kind = 'image'").bind(id).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "GET",
     /^\/albums\/folder$/,
     async (ctx) => {
       // 相簿專區的一個資料夾（業主 2026-11-25）：沒有權限的人禁止進入（鎖定的課程、區塊相簿回 403 與原因）。
@@ -4388,7 +4544,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/cover-media\/([\w-]{1,40})\/poster$/,
     async (ctx, [id]) => {
       // 影片的預覽圖（第一格畫面，瀏覽器擷取）：影片還沒載入時先顯示它。
-      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, kind, poster_key FROM cover_media WHERE id = ?").bind(id).first<CoverRow>();
+      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, scope, kind, poster_key FROM cover_media WHERE id = ?").bind(id).first<CoverRow>();
       if (!row || row.kind !== "video") return fail(404, "not_found", "找不到這支影片");
       const s = await requireCoverRowOwner(ctx, row);
       const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
@@ -4408,7 +4564,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/cover-media\/([\w-]{1,40})\/meta$/,
     async (ctx, [id]) => {
       // 上傳時瀏覽器讀出的原始檔資訊與 EXIF（業主 2026-11-24）：存成 JSON，給圖片「資訊」面板顯示。
-      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, kind FROM cover_media WHERE id = ?").bind(id).first<CoverRow>();
+      const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, scope, kind FROM cover_media WHERE id = ?").bind(id).first<CoverRow>();
       if (!row) return fail(404, "not_found", "找不到這張照片");
       await requireCoverRowOwner(ctx, row);
       const body = await readJson<{ exif?: unknown; file?: unknown }>(ctx.req);
