@@ -28,6 +28,11 @@ export function SemanticExtras({ items, big }: { items: SemanticHit[]; big?: boo
   );
 }
 
+/** 依「教材卡的顯示順序」把其他項目分成：排在教材卡清單上方／下方（設定頁可調，業主 2026-11-25）。 */
+export function splitExtras(items: SemanticHit[], coursePrio: number): { above: SemanticHit[]; below: SemanticHit[] } {
+  return { above: items.filter((h) => (h.prio ?? 0) < coursePrio), below: items.filter((h) => (h.prio ?? 0) >= coursePrio) };
+}
+
 /** 資料類別膠囊標籤（搜尋結果共用）。 */
 export function TagPill({ label, big }: { label: string; big?: boolean }) {
   const { c } = useTheme();

@@ -27,7 +27,7 @@ export type ParamDef = {
 
 export const GROUPS: { key: ParamDef["group"]; title: string; intro: string }[] = [
   { key: "semantic", title: "意思相近搜尋（AI 語意搜尋）", intro: "正式名稱：語意搜尋（Semantic Search）。AI 嵌入模型（Embedding，目前是 BGE-M3）把課程名稱、章節標題轉成一串數字（向量），搜尋時把你輸入的字也轉成向量，找出「意思最接近」的課程；所以搜「疼痛」也找得到「不舒服」。換用哪個模型請到「AI 模型」頁。" },
-  { key: "sources", title: "語意搜尋要搜哪些資料（搜尋結果的膠囊標籤＝資料類別）", intro: "每一類資料各自開關；開了之後，排程每 10 分鐘會替新資料補向量（每次最多 300 筆，用 AI 額度）。搜尋結果裡，課程卡直接顯示在清單，其他類別顯示在「意思相近的其他項目」，每筆前面有膠囊標籤告訴你它是哪一類。關掉不會刪向量，之後重新打開立刻可用。" },
+  { key: "sources", title: "語意搜尋要搜哪些資料（搜尋結果的膠囊標籤＝資料類別）", intro: "每一類資料各自開關；開了之後，排程每 10 分鐘會替新資料補向量（每次最多 300 筆，用 AI 額度）。搜尋結果裡，教材卡顯示在課程清單，其他類別顯示在「意思相近的其他項目」，每筆前面有膠囊標籤告訴你它是哪一類。關掉不會刪向量，之後重新打開立刻可用。" },
   { key: "phonetic", title: "同音搜尋（語音辨識錯字）", intro: "不用 AI、不花額度。把文字轉成拼音比對，語音把「益之源」聽成「一支援」也找得到。" },
   { key: "fuzzy", title: "模糊比對（打錯字）", intro: "不用 AI、不花額度。容許漏字、多字、錯字（例如「益支源」找得到「益之源」）；字元比對＝查詢的每個字都出現在同一門課就算符合。" },
   { key: "rank", title: "結果排序", intro: "決定找到很多結果時誰排前面。" },
@@ -38,7 +38,7 @@ export const PARAMS: ParamDef[] = [
   { key: "semanticEnabled", group: "semantic", label: "啟用意思相近搜尋", desc: "關閉後完全不呼叫 AI，只用字面、同音、模糊比對。完全比對有結果時本來就不會呼叫 AI，只有「找不到」才補找。", advice: "建議開。想省 AI 額度或結果太雜時才關。", type: "bool", default: true },
   { key: "semanticMin", group: "semantic", label: "相似度門檻", desc: "AI 判斷兩段文字意思有多接近（0～1，越高越像）。低於這個數字的不顯示。調高＝更準但可能漏掉；調低＝找得多但會混進不相干的課（例如搜「水機」出現保養品）。", advice: "建議 0.62。看到不相干的結果就每次調高 0.03；漏掉該找到的就調低 0.03。", type: "number", default: 0.62, min: 0.4, max: 0.9, step: 0.01 },
   { key: "semanticLimit", group: "semantic", label: "最多顯示幾筆（Top-K）", desc: "AI 最多回傳幾門課（章節另外算）。越大結果越多、越雜。", advice: "建議 24；課程不多可降到 10～15。", type: "number", default: 24, min: 5, max: 50, step: 1, unit: "筆" },
-  { key: "semSrcCourse", group: "sources", label: "課程卡　［標籤：課程卡］", desc: "搜尋欄位：courses.title（課程名稱）。", advice: "建議開（核心）。", type: "bool", default: true },
+  { key: "semSrcCourse", group: "sources", label: "教材卡　［標籤：教材卡］", desc: "搜尋欄位：courses.title（教材卡名稱）。", advice: "建議開（核心）。", type: "bool", default: true },
   { key: "semSrcLesson", group: "sources", label: "單一教材　［標籤：單一教材］", desc: "搜尋欄位：lessons.title（教材標題，不含區塊）。點結果直接到所屬課程。", advice: "建議開。", type: "bool", default: true },
   { key: "semSrcSection", group: "sources", label: "區塊　［標籤：區塊］", desc: "搜尋欄位：lessons.title（課程裡的區塊／分組名稱）。", advice: "建議開。", type: "bool", default: true },
   { key: "semSrcSeries", group: "sources", label: "系列卡　［標籤：系列卡］", desc: "搜尋欄位：courses.series（系列名稱，同名只算一張）。點結果到系列頁。", advice: "建議開。", type: "bool", default: true },
@@ -61,11 +61,11 @@ export const PARAMS: ParamDef[] = [
 
 
 /** 每一類資料的「加分」與「顯示順序」（業主 2026-11-25：測試「水機」時單一教材 0.53 全被門檻擋掉，要能自己調各類的優先順序）。 */
-const DEFAULT_PRIO: Record<string, number> = { series: 1, center: 2, lesson: 3, section: 4, intro: 5, edm: 6, photo: 7, course: 0 };
+const DEFAULT_PRIO: Record<string, number> = { series: 1, center: 2, lesson: 3, section: 4, intro: 5, edm: 6, photo: 7, course: 9 };
 for (const x of SOURCES) {
   const cap = x.kind.charAt(0).toUpperCase() + x.kind.slice(1);
   PARAMS.push({ key: `semBoost${cap}`, group: "sources", label: `${x.label}：加分`, desc: "把這一類的相似度分數加上這個數字，再去跟門檻比、再排序。例如門檻 0.65、某類分數只有 0.53：加 0.12 就變 0.65、會顯示。想讓這一類更容易出現、排更前面就加；0＝不加。", advice: "建議 0。看到該找到的資料卡在門檻下面，就用「試搜尋」看差多少，加這個差距。", type: "number", default: 0, min: 0, max: 0.4, step: 0.01 });
-  if (x.kind !== "course") PARAMS.push({ key: `semPrio${cap}`, group: "sources", label: `${x.label}：顯示順序`, desc: "「意思相近的其他項目」裡，數字小的類別排前面（1＝最前）；同一個順序再比分數高低。課程卡固定顯示在下方的課程清單，不受影響。", advice: `建議 ${DEFAULT_PRIO[x.kind] ?? 5}。`, type: "number", default: DEFAULT_PRIO[x.kind] ?? 5, min: 1, max: 9, step: 1 });
+  PARAMS.push({ key: `semPrio${cap}`, group: "sources", label: `${x.label}：顯示順序`, desc: x.kind === "course" ? "教材卡（課程清單）跟「意思相近的其他項目」各類比先後：數字比它小的類別顯示在教材卡清單上方，數字比它大（或一樣）的顯示在清單下方。9＝最後。" : "數字小的類別排前面（1＝最前，同一個順序再比分數高低）；也跟「教材卡」的順序比：比教材卡小的顯示在教材卡清單上方，其餘在下方。", advice: `建議 ${DEFAULT_PRIO[x.kind] ?? 5}。`, type: "number", default: DEFAULT_PRIO[x.kind] ?? 5, min: 1, max: 9, step: 1 });
 }
 
 export type SearchSettings = Record<string, boolean | number | string>;
