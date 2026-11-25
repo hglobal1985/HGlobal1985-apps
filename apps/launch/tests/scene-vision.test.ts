@@ -42,7 +42,7 @@ test("相簿照片場景辨識：只辨識區塊照片（不辨識封面與中�
   assert.ok(prog.ai.remaining > 0);
 });
 
-test("場景搜尋：比對標籤、依區塊分組、鎖住的課程不回結果", async () => {
+test("場景搜尋：比對標籤、依區塊分組、鎖住的課程標上鎖頭與原因、長句反向比對", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, DEMO_LOGIN: "on" };
   const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
@@ -50,12 +50,19 @@ test("場景搜尋：比對標籤、依區塊分組、鎖住的課程不回結�
   await run("INSERT INTO lessons (id, course_id, position, title, kind, media_type) VALUES ('b1', 'c1', 1, '家庭清潔', 'section', 'demo'), ('b2', 'c2', 1, '限定區', 'section', 'demo')");
   await run("INSERT INTO cover_media (id, owner_kind, owner_key, kind, r2_key, position, scope, scene_status, scene_text) VALUES ('m1', 'course', 'b1', 'image', 'album/a/1.jpg', 0, 'cover', 'done', '室內，講師，白板'), ('m2', 'course', 'b1', 'image', 'album/a/2.jpg', 1, 'cover', 'done', '戶外，聽講'), ('m3', 'course', 'b2', 'image', 'album/a/3.jpg', 0, 'cover', 'done', '室內，講師')");
   const login = async (sub: string) => ((await (await handleApi(new Request("https://learn.test/api/v2/auth/demo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub }) }), env)).json()) as { token: string }).token;
-  const search = async (q: string, token?: string) => ((await (await handleApi(new Request(`https://learn.test/api/v2/search/scenes?q=${encodeURIComponent(q)}`, { headers: token ? { authorization: `Bearer ${token}` } : {} }), env)).json()) as { hits: { blockId: string; count: number; scene: string; courseTitle: string }[] }).hits;
+  const search = async (q: string, token?: string) => ((await (await handleApi(new Request(`https://learn.test/api/v2/search/scenes?q=${encodeURIComponent(q)}`, { headers: token ? { authorization: `Bearer ${token}` } : {} }), env)).json()) as { hits: { blockId: string; count: number; scene: string; courseTitle: string; locked?: boolean; lockLines?: string[] }[] }).hits;
   const stu = await login("demo-student");
   const hits = await search("講師", stu);
-  assert.deepEqual(hits.map((h) => [h.blockId, h.count]), [["b1", 1]], "限定課（鑽石以上）對白金學員鎖住，不出現");
-  assert.equal(hits[0]!.scene, "講師");
-  assert.equal(hits[0]!.courseTitle, "成交百寶箱");
+  assert.deepEqual(hits.map((h) => [h.blockId, h.count]).sort(), [["b1", 1], ["b2", 1]], "限定課（鑽石以上）對白金學員鎖住，仍然搜尋得到");
+  const b1 = hits.find((h) => h.blockId === "b1")!;
+  const b2 = hits.find((h) => h.blockId === "b2")!;
+  assert.equal(b1.locked, undefined, "有權限的不標鎖");
+  assert.equal(b2.locked, true, "沒權限的標上鎖頭");
+  assert.ok((b2.lockLines ?? []).some((t) => t.includes("獎銜")), "附上原因");
+  const long = await search("請問講師在白板前面聽講的那張", stu);
+  assert.ok(long.some((h) => h.blockId === "b1"), "長句也能用標籤反向比對找到");
+  assert.equal(b1.scene, "講師");
+  assert.equal(b1.courseTitle, "成交百寶箱");
   assert.equal((await search("白", stu)).length, 0, "太短不搜");
   assert.equal((await search("白板", stu)).length, 1);
   assert.equal((await search("講師 白板", stu))[0]!.count, 1, "多個詞要都符合");
