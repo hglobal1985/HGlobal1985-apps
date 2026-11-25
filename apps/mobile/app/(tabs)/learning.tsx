@@ -8,6 +8,7 @@ import { StyleSheet, View } from "react-native";
 import { api, type CourseSummary } from "@/api/client";
 import { SaplingBar } from "@/features/achievements/sapling-bar";
 import { confirmSheet } from "@/features/confirm";
+import { ElderCourseRow } from "@/features/elder/elder-search";
 import { CourseCard } from "@/features/courses/course-card";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
@@ -92,7 +93,9 @@ export default function LearningScreen() {
           <Button label="回到剛才的學習" icon="play-circle-outline" onPress={() => router.push(lessonHref(resume.courseId, resume.lessonId) as never)} fullWidth />
         </Card>
       ) : null}
-      {inProgress.length ? (
+      {/* 至尊模式：清單展示跟首頁搜尋結果一樣（ElderCourseRow，業主 2026-11-25） */}
+      {elder && inProgress.length ? <View>{inProgress.map((course) => <ElderCourseRow key={course.id} course={course} />)}</View> : null}
+      {!elder && inProgress.length ? (
         <CardGrid>
           {inProgress.map((course) => (
             <CourseCard key={course.id} course={course} onHide={canHide(course) ? () => hide(course) : undefined} />
@@ -101,8 +104,9 @@ export default function LearningScreen() {
       ) : null}
       {finished.length ? (
         <Section title="已完成">
+          {elder ? <View>{finished.map((course) => <ElderCourseRow key={course.id} course={course} />)}</View> : null}
           <CardGrid>
-            {finished.map((course) => (
+            {(elder ? [] : finished).map((course) => (
               <CourseCard key={course.id} course={course} onHide={canHide(course) ? () => hide(course) : undefined} />
             ))}
           </CardGrid>
