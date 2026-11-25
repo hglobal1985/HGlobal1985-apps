@@ -305,25 +305,28 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const synonyms = useSynonyms();
   const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? [], synonyms) : null), [needIndex, courses, searchData.data, synonyms]);
   // 打錯字也找得到（業主 2026-11-23）：完全比對沒有結果時，先用模糊比對（差 1～2 個字），再用 AI 語意搜尋找意思相近的；兩者合併顯示並標示「相近結果」。
-  const exact = searchIndex ? (chapterMode ? matchLessons(searchIndex, q) : matchCourses(searchIndex, q)) : null;
-  const noExact = !!exact && exact.size === 0;
+  const exactRaw = searchIndex ? (chapterMode ? matchLessons(searchIndex, q) : matchCourses(searchIndex, q)) : null;
   const searchSt = useSearchSettings();
-  const semantic = useSemantic(expandQuery(synonyms, q), noExact && searchSt.semanticEnabled);
-  const phonetic = usePhonetic(q, noExact && searchSt.phoneticEnabled);
+  // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：語意搜尋每次都跑（原樣送出查詢字）；開著而且有結果（或還在找）就只顯示它的結果，
+  // 字面、同音、模糊、字元比對都不混進來；語意沒結果才退回它們。章節模式維持原本（完全比對沒結果才補語意）。
+  const semantic = useSemantic(q, searchSt.semanticEnabled && (!chapterMode || (!!exactRaw && exactRaw.size === 0)));
+  const semOnly = searchSt.semanticEnabled && !chapterMode && !!q.trim() && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
+  const exact = semOnly && exactRaw ? new Set<string>() : exactRaw;
+  const noExact = !!exact && exact.size === 0;
+  const phonetic = usePhonetic(q, noExact && !semOnly && searchSt.phoneticEnabled);
   // 搜尋結果的關聯性順序（至尊模式共用 rankCourses）：同音、模糊、字元比對、AI 語意各自的順序傳給排序。
   const nearInfo = useMemo(() => {
     if (!noExact || !searchIndex || chapterMode) return null;
     const byLesson = new Map((searchData.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
     const lc = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && searchIndex.haystack.has(x));
     // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：語意搜尋開著而且有結果（或還在找）時只顯示它的結果，沒結果才退回同音／模糊／字元比對。
-    const semOnly = searchSt.semanticEnabled && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
     return {
       fuzzy: semOnly ? new Set<string>() : fuzzyCourses(searchIndex, q),
       chars: semOnly ? new Set<string>() : charsCourses(searchIndex, q),
       phonetic: semOnly ? [] : [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
       semantic: [...semantic.courses].filter((id) => searchIndex.haystack.has(id)),
     };
-  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, semantic.extras, semantic.loading, phonetic.courses, phonetic.lessons, searchData.data, searchSt]);
+  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, semantic.extras, semantic.loading, phonetic.courses, phonetic.lessons, searchData.data, searchSt, semOnly]);
   const near = useMemo(() => {
     if (!noExact || !searchIndex) return null;
     const out = new Set<string>();
@@ -686,7 +689,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               // 中心頁完全沒有課程：固定提示文字（地址由中心的編輯面板設定；沒設定就不顯示地址那一行）
               <EmptyState icon="library-outline" title="線上課程準備中" body={["線下課程週週精彩", centerInfo.data?.[normCenter(center)] ? `地址：${centerInfo.data[normCenter(center)]}` : "", "請洽中心負責人"].filter(Boolean).join("\n")} />
             ) : (
-              <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : matched ? "找不到符合的課程" : "沒有符合條件的課程"} />
+              <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : matched ? (semantic.extras.length ? "沒有相近的教材卡，請看上方其他項目" : "找不到符合的課程") : "沒有符合條件的課程"} />
             )
           ) : null}
           {mode === "center" && center === ALL && !centerList.loading && !centers.length ? (
