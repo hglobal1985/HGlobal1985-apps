@@ -8,7 +8,7 @@ import type { D1Database } from "./d1.ts";
 export type SourceKind = "course" | "lesson" | "section" | "series" | "center" | "intro" | "edm" | "photo";
 export type Candidate = { kind: SourceKind; ref: string; txt: string };
 /** thumb＝左邊縮圖（沒有就由畫面顯示預設圖）；image＝要「直接放大看」的原圖（EDM、相片），有它就不跳頁；link＝要前往的頁面。 */
-export type Hit = { kind: SourceKind; tag: string; prio: number; id: string; title: string; sub: string; link: string; thumb: string | null; image?: string; score: number };
+export type Hit = { kind: SourceKind; tag: string; prio: number; id: string; title: string; sub: string; link: string; thumb: string | null; image?: string; score: number; /** 所屬課程（要鎖頭標記與原因的命中才有）。 */ courseId?: string; /** 目前這位使用者沒有權限（API 層依權限補上）。 */ locked?: boolean; lockLines?: string[] };
 
 export const SOURCES: { kind: SourceKind; param: string; tag: string; label: string; fields: string }[] = [
   { kind: "course", param: "semSrcCourse", tag: "教材卡", label: "教材卡", fields: "courses.title（教材卡名稱）" },
@@ -65,15 +65,16 @@ export async function resolveHits(db: D1Database, hits: { kind: SourceKind; ref:
       out.push({ ...base, title: c.name, sub: "", link: `/courses?center=${enc(c.name)}`, thumb: c.thumb });
     } else if (h.kind === "intro") {
       const c = await courseOf(h.ref);
-      if (c) out.push({ ...base, title: c.title, sub: h.txt.slice(0, 60), link: `/course/${c.id}`, thumb: pub(c.k, c.v ?? 0) });
+      if (c) out.push({ ...base, title: c.title, sub: h.txt.slice(0, 60), link: `/course/${c.id}`, thumb: pub(c.k, c.v ?? 0), courseId: c.id });
     } else if (h.kind === "lesson" || h.kind === "section") {
       const l = await db.prepare(`SELECT l.title, c.id AS cid, c.title AS ct, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ? AND ${PUBLIC}`).bind(h.ref).first<{ title: string; cid: string; ct: string; k: string | null; v: number | null }>();
-      if (l) out.push({ ...base, title: l.title, sub: l.ct, link: h.kind === "lesson" ? `/course/${l.cid}?lesson=${enc(h.ref)}` : `/course/${l.cid}?block=${enc(h.ref)}`, thumb: pub(l.k, l.v ?? 0) });
+      if (l) out.push({ ...base, title: l.title, sub: l.ct, link: h.kind === "lesson" ? `/course/${l.cid}?lesson=${enc(h.ref)}` : `/course/${l.cid}?block=${enc(h.ref)}`, thumb: pub(l.k, l.v ?? 0), courseId: l.cid });
     } else if (h.kind === "edm" || h.kind === "photo") {
       const m = await db.prepare("SELECT owner_kind, owner_key, center_key, kind, r2_key, poster_key FROM cover_media WHERE id = ?").bind(h.ref).first<{ owner_kind: string; owner_key: string; center_key: string | null; kind: string; r2_key: string; poster_key: string | null }>();
       if (!m || m.kind !== "image") continue;
       let title = "";
       let link = "";
+      let courseId: string | undefined;
       if (m.owner_kind === "center" && m.center_key) {
         const c = await centerOf(m.center_key);
         (title = c.name), (link = `/courses?center=${enc(c.name)}`);
@@ -81,10 +82,10 @@ export async function resolveHits(db: D1Database, hits: { kind: SourceKind; ref:
       else {
         // 課程的 EDM／相片：owner_key 是課程編號，或（區塊照片）區塊的編號。
         const c = (await courseOf(m.owner_key)) ?? (await db.prepare(`SELECT c.id, c.title FROM lessons l JOIN courses c ON c.id = l.course_id WHERE l.id = ? AND ${PUBLIC}`).bind(m.owner_key).first<{ id: string; title: string }>());
-        if (c) (title = c.title), (link = `/course/${c.id}`);
+        if (c) (title = c.title), (link = `/course/${c.id}`), (courseId = c.id);
       }
       // 直接放大看圖（link 留著，放大畫面可再前往）；縮圖＝圖片本身。
-      if (title) out.push({ ...base, title, sub: h.txt.replace(/\s+/g, " ").slice(0, 60), link, thumb: pub(m.r2_key), image: pub(m.r2_key)! });
+      if (title) out.push({ ...base, title, sub: h.txt.replace(/\s+/g, " ").slice(0, 60), link, thumb: pub(m.r2_key), image: pub(m.r2_key)!, ...(courseId ? { courseId } : {}) });
     }
   }
   return out;

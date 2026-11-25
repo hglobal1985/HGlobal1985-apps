@@ -4573,17 +4573,16 @@ const routes: [string, RegExp, Handler][] = [
         tagsOf = hitTags;
       }
       const locks = new Map<string, LockState>();
-      const groups = new Map<string, { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; tags: Set<string> }>();
+      const groups = new Map<string, { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; tags: Set<string>; locked: boolean; lockLines: string[] }>();
       for (const r of results) {
         if (!locks.has(r.course_id)) locks.set(r.course_id, await lockStateOfKey(ctx, r.course_id));
         const lk = locks.get(r.course_id)!;
-        if (lk.locked && !lk.manages) continue;
-        const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>() };
+        const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>(), locked: lk.locked && !lk.manages, lockLines: lk.lines };
         g.count++;
         for (const t of tagsOf ? tagsOf(r) : r.scene_text.split("，")) if (tagsOf || tokens.some((k) => t.toLowerCase().includes(k))) g.tags.add(t);
         groups.set(r.block_id, g);
       }
-      return { hits: [...groups.values()].slice(0, 20).map((g) => ({ blockId: g.blockId, courseId: g.courseId, courseTitle: g.courseTitle, blockTitle: g.blockTitle, count: g.count, scene: [...g.tags].slice(0, 6).join("，") })) };
+      return { hits: [...groups.values()].slice(0, 20).map((g) => ({ blockId: g.blockId, courseId: g.courseId, courseTitle: g.courseTitle, blockTitle: g.blockTitle, count: g.count, scene: [...g.tags].slice(0, 6).join("，"), ...(g.locked ? { locked: true, lockLines: g.lockLines } : {}) })) };
     },
   ],
   [
@@ -4593,7 +4592,23 @@ const routes: [string, RegExp, Handler][] = [
       // 語意搜尋（業主 2026-11-23）：只回「意思相近的課程與章節編號」；前端只顯示自己（依權限）已取得索引裡有的，所以這裡不洩漏任何內容。
       requireMember(ctx);
       const { semanticSearch } = await import("./semantic-search.ts");
-      return semanticSearch(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "");
+      const r = await semanticSearch(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "");
+      // 沒有權限的內容也找得到（業主 2026-11-25）：標上 locked＋原因，畫面在縮圖中央蓋鎖頭；鎖住的圖片不給放大用的圖址。
+      const locks = new Map<string, LockState>();
+      const extras = [];
+      for (const h of r.extras) {
+        if (!h.courseId) {
+          extras.push(h);
+          continue;
+        }
+        if (!locks.has(h.courseId)) locks.set(h.courseId, await lockStateOfKey(ctx, h.courseId));
+        const lk = locks.get(h.courseId)!;
+        if (lk.locked && !lk.manages) {
+          const { image: _image, ...rest } = h;
+          extras.push({ ...rest, locked: true, lockLines: lk.lines });
+        } else extras.push(h);
+      }
+      return { ...r, extras };
     },
   ],
   [

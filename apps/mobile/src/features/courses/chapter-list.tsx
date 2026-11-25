@@ -8,7 +8,10 @@ import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, CardThumb } from "@/ui";
+import { AppText, CardThumb, ThumbLock } from "@/ui";
+import { flashText } from "@/ui/flash-notice";
+import { useSession } from "@/state/session";
+import { lockReason } from "./lock-reason";
 import type { SearchLesson } from "./course-search";
 import { SpeakerMark } from "./speaker-mark";
 import { SummaryMark } from "./summary-mark";
@@ -23,6 +26,7 @@ export type ChapterItem = { lesson: SearchLesson; course: CourseSummary; locked:
 export function ChapterList({ items }: { items: ChapterItem[] }) {
   const thumb = useThumb();
   const { c } = useTheme();
+  const { member } = useSession();
   return (
     <View>
       {items.map(({ lesson, course, locked }) => {
@@ -34,7 +38,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
             key={lesson.id}
             accessibilityRole="button"
             accessibilityLabel={`${lesson.title}${who ? `，${who}` : ""}`}
-            onPress={() => (markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))}
+            onPress={() => (locked && flashText(lockReason(course, !!member)), markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))}
             style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
           >
             <View style={styles.thumb}>
@@ -43,6 +47,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
               ) : (
                 <CardThumb kind="course" id={course.id} />
               )}
+              {locked ? <ThumbLock size={26} /> : null}
             </View>
             <View style={styles.mid}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -80,7 +85,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
                 <View style={styles.lock}>
                   <Ionicons name="lock-closed-outline" size={13} color={c.textMuted} />
                   <AppText variant="caption" tone="muted">
-                    報名後觀看
+                    {lockReason(course, !!member)}
                   </AppText>
                 </View>
               ) : null}
