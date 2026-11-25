@@ -70,3 +70,20 @@ test("場景搜尋：比對標籤、依區塊分組、鎖住的課程標上鎖�
   const adm = await login("demo-admin");
   assert.equal((await search("講師", adm)).length, 2, "管理者看得到全部");
 });
+
+test("圖片資訊：訪客也能看，GPS 與上傳者帳號拿掉；鎖住課程的照片不給", async () => {
+  const db = createTestDb();
+  const env: Env = { DB: db, DEMO_LOGIN: "on" };
+  const run = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
+  await run("INSERT INTO courses (id, title, is_list, status, series, view_scope, is_public, min_rank_code) VALUES ('c1', '公開課', 0, 'published', '', 'all', 1, 'none'), ('c2', '限定課', 0, 'published', '', 'all', 0, 'diamond')");
+  await run("INSERT INTO lessons (id, course_id, position, title, kind, media_type) VALUES ('b1', 'c1', 1, '區', 'section', 'demo'), ('b2', 'c2', 1, '限', 'section', 'demo')");
+  await run("INSERT INTO cover_media (id, owner_kind, owner_key, kind, r2_key, position, scope, created_by, meta) VALUES ('m1', 'course', 'b1', 'image', 'a/1.jpg', 0, 'cover', 'u1', ?), ('m2', 'course', 'b2', 'image', 'a/2.jpg', 0, 'cover', 'u1', '{}')", JSON.stringify({ exif: { Make: "X", latitude: 25, longitude: 121 } }));
+  const get = (id: string) => handleApi(new Request(`https://learn.test/api/v2/cover-media/${id}/info`), env);
+  const r = await get("m1");
+  assert.equal(r.status, 200);
+  const j = (await r.json()) as { exif: Record<string, unknown>; uploaderSub: string };
+  assert.equal(j.exif.Make, "X");
+  assert.equal(j.exif.latitude, undefined, "GPS 不給非管理者");
+  assert.equal(j.uploaderSub, "");
+  assert.equal((await get("m2")).status, 403, "鎖住課程的照片不給");
+});

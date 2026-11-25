@@ -68,7 +68,7 @@ const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "bo
  * 在全螢幕看圖（EdmLightbox）右上角的驚嘆號按鈕開關；視窗右上角也有 X。
  */
 export function EdmInfoPanel({ id, top = 140, onClose }: { id: string; top?: number; onClose: () => void }) {
-  const r = useApi<MediaInfo>(`/admin/cover-media/${id}/info`);
+  const r = useApi<MediaInfo>(`/cover-media/${id}/info`);
   const info = r.data;
   const [showRaw, setShowRaw] = useState(false);
   const copy = async (t: string) => {
