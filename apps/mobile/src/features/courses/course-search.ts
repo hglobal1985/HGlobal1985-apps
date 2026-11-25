@@ -160,7 +160,7 @@ export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
  * 數每個單元的文字命中幾個片段，命中越多越前面，取前 `limit` 筆。兩字片段命中分數 3、單字 1；完全沒命中才會回空。
  * 超派、至尊共用（useSearchEngine）。
  */
-export function looseLessons(index: SearchIndex, q: string, limit = 30): string[] {
+export function looseLessons(index: SearchIndex, q: string, limit = 30, minScore = 1): string[] {
   const text = q.toLowerCase().replace(/[\s\u3000]+/g, "");
   const chars = [...new Set([...text])];
   const bigrams = new Set<string>();
@@ -170,7 +170,7 @@ export function looseLessons(index: SearchIndex, q: string, limit = 30): string[
     let sc = 0;
     for (const b of bigrams) if (hay.includes(b)) sc += 3;
     if (!sc) for (const ch of chars) if (hay.includes(ch)) sc += 1;
-    if (sc) scored.push([id, sc]);
+    if (sc >= minScore) scored.push([id, sc]);
   }
   return scored.sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
 }

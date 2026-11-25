@@ -209,10 +209,10 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
                   <AppText variant="headline">{chapters.length ? `找到 ${chapters.length} 個單元` : eng.loading ? "正在找相近的單元…" : eng.extras.length ? `找到 ${eng.extras.length} 個相近的項目` : ""}</AppText>
                 ) : null}
                 {!voice.listening ? <SceneHits q={q} big /> : null}
-                <SemanticExtras items={eng.extras} big />
               </View>
             ) : undefined;
-  const listFooter: ReactNode = undefined;
+  // 其他項目（EDM、相片、系列…）排在單元清單「後面」，字面符合的單元才是主角（業主 2026-11-25：想要的那筆被擠到最下面）。
+  const listFooter: ReactNode = key ? <SemanticExtras items={eng.extras} big /> : undefined;
   const renderRow = (item: Row) => item.chapter ? <ElderChapterRow key={item.key} item={item.chapter} /> : <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />;
 
   return (

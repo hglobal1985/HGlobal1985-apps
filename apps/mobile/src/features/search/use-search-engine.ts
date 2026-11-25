@@ -59,7 +59,7 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
     const exactL = matchLessons(index, key);
     let hit: Set<string>;
     let loose: string[] = [];
-    if (exactL && exactL.size) hit = exactL;
+    if (exactL && exactL.size) hit = new Set(exactL);
     else {
       hit = new Set<string>();
       if (!semOnly) for (const id of fuzzyLessons(index, key)) hit.add(id);
@@ -71,6 +71,9 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
         for (const id of loose) hit.add(id);
       }
     }
+    // 字面符合太少（不到 8 個）時，補上「至少有兩個相鄰兩字片段命中」的單元排在後面（業主 2026-11-25：搜「晚安修護面膜」只有 1 個單元、關聯結果太少）。
+    const extraRel: string[] = exactL && exactL.size && exactL.size < 8 ? looseLessons(index, key, 20, 6).filter((id) => !exactL.has(id)) : [];
+    for (const id of extraRel) hit.add(id);
     const byId = new Map(all.map((x) => [x.id, x]));
     const canWatch = (x: CourseSummary) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
     const rand = (id: string) => {
@@ -90,6 +93,10 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
       [...semantic.lessons].forEach((id, i) => !rank.has(id) && rank.set(id, 1000 + i));
       loose.forEach((id, i) => !rank.has(id) && rank.set(id, 2000 + i)); // 最相近：命中片段多的在前
       return out.sort((a, b) => (rank.get(a.lesson.id) ?? 5000) - (rank.get(b.lesson.id) ?? 5000) || rand(a.lesson.id) - rand(b.lesson.id));
+    }
+    if (extraRel.length) {
+      const order = new Map(extraRel.map((id, i) => [id, i + 1]));
+      return out.sort((a, b) => (order.get(a.lesson.id) ?? 0) - (order.get(b.lesson.id) ?? 0) || rand(a.lesson.id) - rand(b.lesson.id));
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
   }, [key, index, all, idx.data, semOnly, semantic.lessons, semantic.loading, phonetic.lessons, phonetic.loading, member, seed]);
