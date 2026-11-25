@@ -12,6 +12,7 @@ import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { BlockPhotos, blockPhotoCount, hasBlockPhotos } from "@/features/courses/block-photos";
 import { AppText, NoticeBox, Screen } from "@/ui";
+import { CollapseBand, CoverMiniFloat } from "@/ui/collapse-band";
 
 /** 至尊模式課程頁要列的項目：有章節列章節；只有教材（清單卡）就列教材。分類標題、完整版不列。 */
 export function elderItems(course: CourseDetail): Lesson[] {
@@ -192,7 +193,10 @@ export function ElderCourse({
   locked,
   lockedLines,
   albumFocus,
+  miniCover,
 }: {
+  /** 封面縮成圓球／小視窗時裡面顯示的畫面（超派模式同一個 CourseMiniCover）。 */
+  miniCover?: ReactNode;
   /** 從搜尋的「場景」結果進來：直接展開相簿的這個區塊（業主 2026-11-24）。 */
   albumFocus?: string;
   course: CourseDetail;
@@ -234,9 +238,10 @@ export function ElderCourse({
   return (
     <View style={{ flex: 1 }}>
       {player}
+      {/* 封面釘在上方、往下滑縮小（業主 2026-11-25：與超派模式同一個元件 CollapseBand＋CoverMiniFloat，靜態封面縮到最後是圓球）。 */}
+      {player ? null : <CollapseBand>{cover}</CollapseBand>}
       <Screen header={false} footer={tab === "intro" ? action : null}>
         {/* 課程卡首頁（業主 2026-11-24：與中心卡統一）：最上面封面（含訂閱鈕、點閱數；正在播放時上方已是播放器，不再放封面）→ 公告黃色區塊 → 上課／介紹。 */}
-        {player ? null : cover}
         {announce}
         <View style={[styles.tabs, { backgroundColor: c.surfaceMuted }]} accessibilityRole="tablist">
           {(
@@ -256,13 +261,10 @@ export function ElderCourse({
             );
           })}
         </View>
-        <AppText variant="title" accessibilityRole="header">
-          {course.title}
-        </AppText>
         {message}
         {tab === "learn" ? (
           <>
-            {!items.length ? <NoticeBox text="課程內容準備中，敬請期待。" /> : null}
+            {!items.length && !blocks.lead.length && !blocks.blocks.length ? <NoticeBox text="課程內容準備中，敬請期待。" /> : null}
             {locked ? (
               <Pressable accessibilityRole="button" onPress={() => setTab("intro")} style={[styles.lockBox, { backgroundColor: c.warningSoft, borderColor: c.warning, borderWidth: bw }]}>
                 <Ionicons name="lock-closed" size={28} color={c.warning} />
@@ -322,6 +324,7 @@ export function ElderCourse({
           </>
         )}
       </Screen>
+      {miniCover && !player ? <CoverMiniFloat cover={miniCover} label={course.title} /> : null}
     </View>
   );
 }

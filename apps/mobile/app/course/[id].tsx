@@ -393,6 +393,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           locked={allLocked}
           lockedLines={[lockedText, ...(needRank ? [needRank] : [])]}
           albumFocus={album}
+          miniCover={<CourseMiniCover course={course} />}
         />
       </View>
     );
