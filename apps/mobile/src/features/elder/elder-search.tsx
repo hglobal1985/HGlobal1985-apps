@@ -4,7 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import { FlatList, Image, ScrollView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type CourseSummary } from "@/api/client";
-import { buildSearchIndex, charsCourses, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
+import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
+import { useSynonyms } from "@/features/courses/use-synonyms";
 import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
 import { SceneHits } from "@/features/courses/scene-hits";
@@ -68,14 +69,15 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   });
   const all = useMemo(() => (courses.data ?? []).filter(listable), [courses.data]);
   const itemsOf = useZoneItems(all);
-  const index = useMemo(() => (idx.data ? buildSearchIndex(all, idx.data.lessons) : buildSearchIndex(all, [])), [all, idx.data]);
+  const synonyms = useSynonyms();
+  const index = useMemo(() => buildSearchIndex(all, idx.data?.lessons ?? [], synonyms), [all, idx.data, synonyms]);
   // 與寰宇大學（超派模式）同一套找法（業主 2026-11-24 回報：語音說「線上白金」找不到課）：
   // 完全比對 → 模糊比對＋字元比對 → AI 語意搜尋（完全比對沒結果時才送出，合併顯示）。
   // 語音辨識有時會在句中加標點（「線上，白金」）：比對前一律換成空白。
   const key = useMemo(() => q.replace(/[。．.！!？?，,、；;：:「」“”"'（）()]+/g, " ").trim(), [q]);
   const exact = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
   const noExact = !!exact && exact.size === 0;
-  const semantic = useSemantic(key, noExact);
+  const semantic = useSemantic(expandQuery(synonyms, key), noExact);
   const phonetic = usePhonetic(key, noExact);
   // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
   const results = useMemo(() => {
@@ -158,7 +160,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           按一下，用說的
         </AppText>
         <AppText tone="muted" style={{ textAlign: "center" }}>
-          {voice.supported ? "例如：「營養課」" : "會打開鍵盤，請按鍵盤上的麥克風說話"}
+          {voice.supported ? "例如：「王老師　表揚大會　淨水器　營養」，說錯字也找得到" : "會打開鍵盤，請按鍵盤上的麥克風說話"}
         </AppText>
         {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
       </View>
