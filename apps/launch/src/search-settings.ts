@@ -49,6 +49,8 @@ export const PARAMS: ParamDef[] = [
   { key: "semSrcPhoto", group: "sources", label: "相片（AI 場景辨識）　［標籤：相片］", desc: "搜尋欄位：cover_media.scene_text（相簿與區塊照片的場景標籤）。點結果到該相片所屬的中心／課程。", advice: "建議開。", type: "bool", default: true },
   { key: "phoneticEnabled", group: "phonetic", label: "啟用同音搜尋", desc: "關閉後，語音辨識錯字就不會再靠拼音補找。", advice: "建議開（免費）。", type: "bool", default: true },
   { key: "phoneticMinSyllables", group: "phonetic", label: "至少幾個字才比對", desc: "查詢太短（單字）會亂配，所以字數不到就不比對。調成 1 時，說一個字（例如「水」）也會找同音字，但結果會很雜。", advice: "建議 2。", type: "number", default: 2, min: 1, max: 4, step: 1, unit: "字" },
+  { key: "synonymPhonetic", group: "phonetic", label: "關聯詞也支援同音錯字", desc: "打的字跟「搜尋關聯詞」裡的某個詞同音、近音（例如「和本翠」＝漢本萃），就把同一組的所有詞一起拿去找。關閉後關聯詞只認完全相同的字。", advice: "建議開（免費）。", type: "bool", default: true },
+  { key: "synonymTypoFrom", group: "phonetic", label: "關聯詞幾個字以上容許錯 1 個音", desc: "關聯詞比對錯字的寬鬆度；字數不到這個數字的關聯詞必須音完全相同。數字越小越寬鬆；填 9 等於完全不容許。", advice: "建議 3。", type: "number", default: 3, min: 2, max: 9, step: 1, unit: "字" },
   { key: "phoneticTypoFrom", group: "phonetic", label: "幾個字以上容許錯 1 個音", desc: "查詢夠長時，容許有 1 個字的音不一樣。數字越小越寬鬆（短詞也容許錯）；填 9 等於完全不容許。", advice: "建議 4。", type: "number", default: 4, min: 3, max: 9, step: 1, unit: "字" },
   { key: "fuzzyEnabled", group: "fuzzy", label: "啟用模糊比對（打錯字）", desc: "容許漏字、多字、錯字。", advice: "建議開（免費）。", type: "bool", default: true },
   { key: "fuzzyMaxDiff", group: "fuzzy", label: "最多容許差幾個字", desc: "上限。實際容許數依詞長：1～2 字必須完全一樣、3～4 字差 1、5 字以上差 2；這裡的數字是再往下壓的天花板。填 0＝等於關閉。", advice: "建議 2。覺得亂配就改 1。", type: "number", default: 2, min: 0, max: 3, step: 1, unit: "字" },

@@ -130,9 +130,10 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
   run(qs, 0);
   // 自訂關聯詞（業主 2026-11-25：故意打錯字「和本翠」要找得到「漢本萃＝智慧草本＝中藥」）：
   // 查詢的音節與某個關聯詞「相同，或 3 個音節以上差 1 個音節」，就把同組的所有詞也當查詢找一遍（分數略低一點）。
-  for (const g of await synonymGroups(db)) {
+  for (const g of st.synonymPhonetic === false ? [] : await synonymGroups(db)) {
+    const typoFrom = Number(st.synonymTypoFrom ?? 3);
     const sylOf = g.map((t) => syllables(t));
-    const hitTerm = sylOf.some((ts) => ts.length >= 2 && qs.length >= 2 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 0) || (ts.length >= 3 && qs.length >= 3 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 1)));
+    const hitTerm = sylOf.some((ts) => ts.length >= 2 && qs.length >= 2 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 0) || (ts.length >= typoFrom && qs.length >= 3 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 1)));
     if (hitTerm) for (const ts of sylOf) if (ts.length >= 2) run(ts.slice(0, 40), -0.3);
   }
   const hit = [...best.values()].sort((a, b) => b.s - a.s);
