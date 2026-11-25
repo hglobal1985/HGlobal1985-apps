@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { api } from "@/api/client";
 import { useUiConfig } from "@/state/ui-config";
+import { confirmAsk } from "@/features/confirm";
 import { Button, NoticeBox } from "@/ui";
 import { centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
@@ -70,6 +71,47 @@ function FormatTable() {
         品牌 logo 不轉格式（要保留透明背景）；GIF 動圖不處理。透明背景的圖轉成上面格式時會用白色墊底。已經存在雲端的舊圖不會回頭轉檔。
       </AppText>
     </View>
+  );
+}
+
+type RecompressStatus = { job: { running: boolean; startedAt: string | null; stoppedAt: string | null }; total: number; pending: number; done: number; skip: number; fail: number; bytes: number; saved: number; target: { format: string; quality: number } };
+
+/** 舊照片重新壓縮（業主 2026-11-25）：把相簿裡所有舊照片依上面「相簿照片」的格式與畫質重壓、覆蓋原檔（不可復原）。按「開始」才會跑，排程每 10 分鐘分批處理，這裡每 10 秒更新進度。 */
+function RecompressSection() {
+  const { c } = useTheme();
+  const { data, reload } = useApi<RecompressStatus>("/admin/recompress/status");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!data?.job.running) return;
+    const t = setInterval(reload, 10000);
+    return () => clearInterval(t);
+  }, [data?.job.running]); // eslint-disable-line react-hooks/exhaustive-deps
+  const act = async (a: "start" | "stop") => {
+    if (a === "start" && !(await confirmAsk("重新壓縮所有舊照片", `會把相簿裡所有舊照片，依目前「相簿照片」設定（${data?.target.format.toUpperCase()}、畫質 ${data?.target.quality}%）重新壓縮並覆蓋原檔。站內不保留原圖，覆蓋後無法復原；已經是目標格式的會跳過。要先調整格式或畫質，請先取消、改好並儲存設定。確定開始？`, "開始重新壓縮"))) return;
+    setBusy(true);
+    try {
+      await api("POST", `/admin/recompress/${a}`);
+      reload();
+    } finally {
+      setBusy(false);
+    }
+  };
+  if (!data) return null;
+  const doneAll = data.total - data.pending;
+  const pctDone = data.total ? Math.round((doneAll / data.total) * 100) : 0;
+  return (
+    <Section title="舊照片重新壓縮">
+      <Card>
+        <NoticeBox tone="warning" text="把相簿裡所有舊照片（中心 EDM、中心封面、系列與課程封面輪播、區塊相簿）依上面「相簿照片」的格式與畫質重新壓縮，覆蓋原檔，不可復原。不包含縮圖（縮圖由即時縮圖處理）、品牌 logo、課程單張封面與課表。" />
+        <View style={{ height: 10, borderRadius: 5, backgroundColor: c.surfaceMuted, overflow: "hidden" }}>
+          <View style={{ width: `${pctDone}%`, height: "100%", backgroundColor: c.accent }} />
+        </View>
+        <AppText variant="callout">{`已處理 ${doneAll} / ${data.total} 張（${pctDone}%）・${data.job.running ? "進行中" : data.pending ? "已暫停／尚未開始" : "全部完成"}`}</AppText>
+        <AppText variant="caption" tone="muted">{`已重新壓縮 ${data.done} 張・跳過 ${data.skip} 張（已是目標格式或沒變小）・失敗 ${data.fail} 張・等待 ${data.pending} 張`}</AppText>
+        <AppText variant="caption" tone="muted">{`目前相簿照片總大小 ${sizeText(data.bytes)}；這次已節省 ${sizeText(data.saved)}`}</AppText>
+        {data.job.running ? <Button variant="cancel" label="暫停" loading={busy} onPress={() => void act("stop")} fullWidth /> : <Button label={data.done || data.skip ? "繼續重新壓縮" : "開始重新壓縮所有舊照片"} icon="contract-outline" loading={busy} disabled={!data.pending} onPress={() => void act("start")} fullWidth />}
+      </Card>
+    </Section>
   );
 }
 
@@ -175,6 +217,7 @@ export default function StorageScreen() {
           <Button label="儲存上傳設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={saveLim} fullWidth />
         </Card>
       </Section>
+      <RecompressSection />
       <Section title="封面輪播與短影音">
         <Card>
           <NoticeBox tone="info" text="中心、系列、課程的封面可放不限張數的照片或 1 分鐘內的短影音，會自動輪播；中心頁的「相簿」與封面輪播是同一份資料。影片在上傳者的瀏覽器內先壓縮再上傳（不需要另外付費），規範如下。" />
