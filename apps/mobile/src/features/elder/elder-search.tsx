@@ -18,7 +18,7 @@ import { UI_SCALE } from "@/theme/ui-scale";
 import { elderTextScale } from "@/lib/elder-mode";
 import { fitFontSize } from "@/ui/course-cover";
 import { ELDER_FIELD } from "@/ui/elder-controls";
-import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback, ThumbLock } from "@/ui";
+import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbDuration, ThumbFallback, ThumbLock } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { lockReason } from "@/features/courses/lock-reason";
 import { TileCover } from "@/features/courses/series-tile";
@@ -445,6 +445,7 @@ function ElderChapterRow({ item }: { item: ChapterItem }) {
           )
         ) : <TileCover rep={course} width={w} height={h} flat inSeries={false} title={course.title} />}
         {locked ? <ThumbLock size={Math.round(w * 0.4)} /> : null}
+        <ThumbDuration minutes={lesson.minutes} big />
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <AppText variant="headline" numberOfLines={3} style={{ fontWeight: "800" }}>{lesson.title}</AppText>
