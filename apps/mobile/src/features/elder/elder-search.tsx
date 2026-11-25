@@ -22,7 +22,9 @@ import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/u
 import { TileCover } from "@/features/courses/series-tile";
 import { ElderCenterPage } from "./elder-center";
 import { ElderInvite, ElderSeriesHead } from "./elder-heads";
-import { centerKeyOf, centerTitle } from "@/features/format";
+import { centerKeyOf, centerTitle, eventDays } from "@/features/format";
+import { lessonHref } from "@/lib/lesson-href";
+import type { ChapterItem } from "@/features/courses/chapter-list";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
@@ -67,7 +69,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   });
   // 搜尋引擎：與超派模式是同一個模組（features/search/use-search-engine.ts），業主 2026-11-25。
   const eng = useSearchEngine(q, courses.data ?? []);
-  const { key, all, results, semantic, phonetic } = eng;
+  const { key, all, chapters, semantic, phonetic } = eng;
   const itemsOf = useZoneItems(all);
   // 從搜尋結果點「中心卡」會帶 ?center=中心名稱 來到課程分頁：直接打開該中心頁（業主 2026-11-25）。
   const { center: centerParam } = useLocalSearchParams<{ center?: string }>();
@@ -82,11 +84,11 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   }, [mode, centerParam, itemsOf]); // eslint-disable-line react-hooks/exhaustive-deps
   // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
-    if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x, tag: "教材卡" }));
+    if (key) return chapters.map((x) => ({ key: x.lesson.id, title: x.lesson.title, rep: x.course, chapter: x }));
     if (mode !== "browse" || !zone) return [];
     if (sub) return (sub.children ?? []).map((x) => ({ key: x.id, title: x.title, count: x.materialCount, rep: x }));
     return itemsOf(zone);
-  }, [key, results, mode, zone, sub, itemsOf]);
+  }, [key, chapters, mode, zone, sub, itemsOf]);
   // 「繼續上課」只出現在至尊首頁的初始畫面：搜尋中、找不到課程、分類裡都不顯示（業主 2026-11-25）。
   const cont = mode === "home" && !q.trim() && !sub ? lastCourse(courses.data ?? []) : null;
   const searching = q.trim().length > 0;
@@ -121,7 +123,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       </View>
       {member ? null : <LoginPrompt />}
       {searching ? (
-        <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : semantic.extras.length ? `找到 ${semantic.extras.length} 個相近的項目` : "找不到這個課程"}</AppText>
+        <AppText variant="headline">{chapters.length ? `找到 ${chapters.length} 個單元` : eng.loading ? "正在找相近的單元…" : eng.extras.length ? `找到 ${eng.extras.length} 個相近的項目` : "找不到這個單元"}</AppText>
       ) : null}
       {searching ? <SceneHits q={q} big /> : null}
     </View>
@@ -150,7 +152,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         )}
         {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
       </View>
-    ) : key && !results.length && !semantic.extras.length && !semantic.loading && !phonetic.loading ? (
+    ) : key && !chapters.length && !eng.extras.length && !eng.loading ? (
       // 找不到課程：畫面中央放錄音鈕，按一下再說一次（業主 2026-11-25）。
       <View style={styles.center}>
         <AppText variant="headline" style={{ textAlign: "center" }}>{`找不到「${q.trim()}」，再說一次試試看`}</AppText>
@@ -185,10 +187,10 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
               </View>
             ) : key ? (
               // 其他項目放進「可捲動」的清單裡（業主 2026-11-25：放在固定的上半部，項目一多就佔滿畫面、清單捲不動）。
-              <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).above} big />
+              <SemanticExtras items={eng.extras} big />
             ) : undefined;
-  const listFooter: ReactNode = key ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).below} big /> : undefined;
-  const renderRow = (item: Row) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />;
+  const listFooter: ReactNode = undefined;
+  const renderRow = (item: Row) => item.chapter ? <ElderChapterRow key={item.key} item={item.chapter} /> : <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />;
 
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
@@ -333,7 +335,7 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
 const WAVE_ANIM = (Platform.OS === "web" ? { transitionProperty: "height", transitionDuration: "90ms", transitionTimingFunction: "ease-out" } : {}) as object;
 
 /** 至尊模式的課程列：大縮圖、大字標題、狀態（已報名／審核中／免費／付費）。整列都可以點。 */
-export type Row = { key: string; title: string; tag?: string; count?: number; rep: CourseSummary; children?: CourseSummary[]; series?: boolean; coverUrl?: string | null };
+export type Row = { key: string; title: string; tag?: string; /** 搜尋結果的單元（章節）列。 */ chapter?: ChapterItem; count?: number; rep: CourseSummary; children?: CourseSummary[]; series?: boolean; coverUrl?: string | null };
 
 export function ElderCourseRow({ course, title, count, onPress, series, coverUrl, typeTag }: { course: CourseSummary; /** 搜尋結果：資料類別膠囊標籤（課程卡／教材卡）。 */ typeTag?: string; title?: string; /** 有給＝標籤顯示「N 項教材」（分類清單，與超派模式一致）；沒給＝顯示報名狀態。 */ count?: number; onPress?: () => void; /** true＝這列是系列（封面用系列封面）。 */ series?: boolean; /** 中心列：中心封面圖（與超派模式的中心卡一致）。 */ coverUrl?: string | null }) {
   const { c } = useTheme();
@@ -372,6 +374,35 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
  * 畫字時會再乘「平板倍數 × 至尊倍數」，所以估算要在放大前的尺寸上算。
  */
 const TITLE_SIZE = 22;
+/** 搜尋結果的「單元」列（跟超派 ChapterList 同內容同順序，業主 2026-11-25）：大縮圖、標題、日期與所屬教材卡、狀態；點下去能看就直接播放，不能看進課程頁。 */
+function ElderChapterRow({ item }: { item: ChapterItem }) {
+  const { c } = useTheme();
+  const thumb = useThumb();
+  const { lesson, course, locked } = item;
+  const w = Math.round(96 * UI_SCALE);
+  const h = Math.round((w * 4) / 3);
+  const open = !locked && lesson.ready;
+  const date = lesson.eventDate ? eventDays(lesson.eventDate, null) : course.eventStart ? eventDays(course.eventStart, course.eventEnd) : "";
+  const cover = lesson.coverUrl || course.coverUrl || course.edmUrl;
+  const status = lesson.completed ? "已完成" : !lesson.ready ? "敬請期待" : locked ? "報名後觀看" : "";
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={`${lesson.title}，${course.title}`} onPress={() => router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never)} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
+      <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
+        {cover ? <Image source={{ uri: thumb(resolveUrl(cover), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <TileCover rep={course} width={w} height={h} flat inSeries={false} title={course.title} />}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+        <AppText variant="headline" numberOfLines={3} style={{ fontWeight: "800" }}>{lesson.title}</AppText>
+        <AppText variant="callout" tone="muted" numberOfLines={2}>{[date, course.title].filter(Boolean).join(" · ")}</AppText>
+        {status ? (
+          <View style={[styles.tag, { backgroundColor: c.accentSoft }]}>
+            <AppText variant="callout" style={{ color: c.accentText, fontWeight: "700" }}>{status}</AppText>
+          </View>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
 function FitTitle({ text }: { text: string }) {
   const [box, setBox] = useState({ w: 0, h: 0 });
   const k = UI_SCALE * elderTextScale();

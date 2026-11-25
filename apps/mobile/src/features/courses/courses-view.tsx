@@ -234,7 +234,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [rowW, setRowW] = useState(0);
   const [wantIndex, setWantIndex] = useState(false);
   const chapterMode = mode === "chapter" && !q.trim(); // 有搜尋字時一律顯示引擎的教材卡結果（業主 2026-11-25）
-  const searchData = useApi<{ lessons: SearchLesson[] }>(wantIndex || chapterMode ? "/search-index" : null);
+  const searchData = useApi<{ lessons: SearchLesson[] }>(chapterMode ? "/search-index" : null);
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
   // 卡片排序模式（業主 2026-11-18：方案 2，◀ ▶ 與相鄰交換）：只有超級管理員、只在「所有系列」；課程系列與清單專區各排各的。
@@ -449,7 +449,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const sceneBox = q.trim() ? (
     <>
       <SceneHits q={q} />
-      <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).above} />
+      <SemanticExtras items={eng.extras} />
     </>
   ) : null;
   const termsBox = terms.length ? (
@@ -639,11 +639,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             <EmptyState icon="calendar-outline" title="還沒有課表" body="中心上傳課表後會顯示在這裡" />
           </>
         )
-      ) : chapterMode ? (
+      ) : chapterMode || eng.searching ? (
+        // 有搜尋字＝一律顯示引擎的「單元」清單（業主 2026-11-25：以超派原本的搜尋結果為準，至尊與它一致）。
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
-          {data && searchData.data && !chapterItems.length ? <EmptyState icon="library-outline" title={semantic.loading || phonetic.loading ? "正在找相近的結果…" : q.trim() ? "找不到符合的章節" : "沒有符合條件的章節"} /> : null}
-          <ChapterList items={chapterItems} />
+          {data && (eng.searching ? !eng.chapters.length : searchData.data && !chapterItems.length) ? <EmptyState icon="library-outline" title={eng.loading ? "正在找相近的結果…" : q.trim() ? (eng.extras.length ? "沒有符合的章節，請看上方其他項目" : "找不到符合的章節") : "沒有符合條件的章節"} /> : null}
+          <ChapterList items={eng.searching ? eng.chapters : chapterItems} />
         </>
       ) : (
         <>
@@ -696,7 +697,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
                 ))
               : null}
           </View>
-          {q.trim() ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).below} /> : null}
         </>
       )}
       {archivedBlock}
