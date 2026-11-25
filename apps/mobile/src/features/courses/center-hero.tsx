@@ -101,7 +101,7 @@ export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover
         </Pressable>
       ) : null}
       {open && art && !media.length ? <EdmLightbox uri={art.edmUrl} title={title} onClose={() => setOpen(false)} /> : null}
-      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} items={images.map((x) => ({ uri: x.url, title }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
+      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} items={images.map((x) => ({ uri: x.url, title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
     </Animated.View>
   );
 }

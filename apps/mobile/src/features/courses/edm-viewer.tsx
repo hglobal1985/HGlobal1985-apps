@@ -90,7 +90,7 @@ export function EdmStage({ course, stats, canManageAlbum = false }: { course: Co
           </SheetScroll>
         </BottomSheet>
       ) : null}
-      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={course.title} items={images.map((x) => ({ uri: x.url, title: course.title }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
+      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={course.title} items={images.map((x) => ({ uri: x.url, title: course.title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
       {course.brand && open ? <EdmLightbox uri={course.brand.logoUrl} bg={(scheme === "dark" && course.brand.bgColorDark) || course.brand.bgColor || undefined} title={course.title} onClose={() => setOpen(false)} /> : null}
       {!course.brand && course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
     </StageFrame>

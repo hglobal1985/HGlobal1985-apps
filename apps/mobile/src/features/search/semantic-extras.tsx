@@ -48,7 +48,7 @@ export function SemanticExtras({ items, big }: { items: SemanticHit[]; big?: boo
           </View>
         </Pressable>
       ))}
-      {view?.image ? <EdmLightbox uri={resolveUrl(view.image)} title={view.title} onClose={() => setView(null)} /> : null}
+      {view?.image ? <EdmLightbox uri={resolveUrl(view.image)} title={view.title} items={[{ uri: view.image, title: view.title, id: view.id.slice(view.id.indexOf(":") + 1) }]} onClose={() => setView(null)} /> : null}
     </View>
   );
 }
