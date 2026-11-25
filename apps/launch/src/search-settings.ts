@@ -9,7 +9,7 @@ const KEY = "search_settings";
 
 export type ParamDef = {
   key: string;
-  group: "semantic" | "phonetic" | "fuzzy" | "rank" | "edm";
+  group: "semantic" | "sources" | "phonetic" | "fuzzy" | "rank" | "edm";
   label: string;
   /** 這個參數做什麼（白話）。 */
   desc: string;
@@ -26,6 +26,7 @@ export type ParamDef = {
 
 export const GROUPS: { key: ParamDef["group"]; title: string; intro: string }[] = [
   { key: "semantic", title: "意思相近搜尋（AI 語意搜尋）", intro: "正式名稱：語意搜尋（Semantic Search）。AI 嵌入模型（Embedding，目前是 BGE-M3）把課程名稱、章節標題轉成一串數字（向量），搜尋時把你輸入的字也轉成向量，找出「意思最接近」的課程；所以搜「疼痛」也找得到「不舒服」。換用哪個模型請到「AI 模型」頁。" },
+  { key: "sources", title: "語意搜尋要搜哪些資料（搜尋結果的膠囊標籤＝資料類別）", intro: "每一類資料各自開關；開了之後，排程每 10 分鐘會替新資料補向量（每次最多 300 筆，用 AI 額度）。搜尋結果裡，課程卡直接顯示在清單，其他類別顯示在「意思相近的其他項目」，每筆前面有膠囊標籤告訴你它是哪一類。關掉不會刪向量，之後重新打開立刻可用。" },
   { key: "phonetic", title: "同音搜尋（語音辨識錯字）", intro: "不用 AI、不花額度。把文字轉成拼音比對，語音把「益之源」聽成「一支援」也找得到。" },
   { key: "fuzzy", title: "模糊比對（打錯字）", intro: "不用 AI、不花額度。容許漏字、多字、錯字（例如「益支源」找得到「益之源」）；字元比對＝查詢的每個字都出現在同一門課就算符合。" },
   { key: "rank", title: "結果排序", intro: "決定找到很多結果時誰排前面。" },
@@ -36,6 +37,14 @@ export const PARAMS: ParamDef[] = [
   { key: "semanticEnabled", group: "semantic", label: "啟用意思相近搜尋", desc: "關閉後完全不呼叫 AI，只用字面、同音、模糊比對。完全比對有結果時本來就不會呼叫 AI，只有「找不到」才補找。", advice: "建議開。想省 AI 額度或結果太雜時才關。", type: "bool", default: true },
   { key: "semanticMin", group: "semantic", label: "相似度門檻", desc: "AI 判斷兩段文字意思有多接近（0～1，越高越像）。低於這個數字的不顯示。調高＝更準但可能漏掉；調低＝找得多但會混進不相干的課（例如搜「水機」出現保養品）。", advice: "建議 0.62。看到不相干的結果就每次調高 0.03；漏掉該找到的就調低 0.03。", type: "number", default: 0.62, min: 0.4, max: 0.9, step: 0.01 },
   { key: "semanticLimit", group: "semantic", label: "最多顯示幾筆（Top-K）", desc: "AI 最多回傳幾門課（章節另外算）。越大結果越多、越雜。", advice: "建議 24；課程不多可降到 10～15。", type: "number", default: 24, min: 5, max: 50, step: 1, unit: "筆" },
+  { key: "semSrcCourse", group: "sources", label: "課程卡　［標籤：課程卡］", desc: "搜尋欄位：courses.title（課程名稱）。", advice: "建議開（核心）。", type: "bool", default: true },
+  { key: "semSrcLesson", group: "sources", label: "單一教材　［標籤：單一教材］", desc: "搜尋欄位：lessons.title（教材標題，不含區塊）。點結果直接到所屬課程。", advice: "建議開。", type: "bool", default: true },
+  { key: "semSrcSection", group: "sources", label: "區塊　［標籤：區塊］", desc: "搜尋欄位：lessons.title（課程裡的區塊／分組名稱）。", advice: "建議開。", type: "bool", default: true },
+  { key: "semSrcSeries", group: "sources", label: "系列卡　［標籤：系列卡］", desc: "搜尋欄位：courses.series（系列名稱，同名只算一張）。點結果到系列頁。", advice: "建議開。", type: "bool", default: true },
+  { key: "semSrcCenter", group: "sources", label: "中心卡　［標籤：中心卡］", desc: "搜尋欄位：center_names.display_name／courses.host_center_key（中心名稱）。點結果到中心頁。", advice: "建議開。", type: "bool", default: true },
+  { key: "semSrcIntro", group: "sources", label: "課程介紹　［標籤：課程介紹］（我補充的）", desc: "搜尋欄位：courses.description（課程說明，只取前 200 字）。能用「內容」找課，例如搜「改善睡眠」找到介紹裡有講到的課。", advice: "建議開；但介紹文字很長又雜時，結果會偏多，可再調高相似度門檻。", type: "bool", default: true },
+  { key: "semSrcEdm", group: "sources", label: "EDM 海報（OCR 文字辨識）　［標籤：EDM］", desc: "搜尋欄位：cover_media.ocr_text（scope＝edm，AI 辨識完成的海報文字，只取前 200 字）。點結果到該海報所屬的中心／系列／課程。", advice: "建議開。海報文字很多又雜，通常分數較低，必要時用試搜尋看分數。", type: "bool", default: true },
+  { key: "semSrcPhoto", group: "sources", label: "相片（AI 場景辨識）　［標籤：相片］", desc: "搜尋欄位：cover_media.scene_text（相簿與區塊照片的場景標籤）。點結果到該相片所屬的中心／課程。", advice: "建議開。", type: "bool", default: true },
   { key: "phoneticEnabled", group: "phonetic", label: "啟用同音搜尋", desc: "關閉後，語音辨識錯字就不會再靠拼音補找。", advice: "建議開（免費）。", type: "bool", default: true },
   { key: "phoneticMinSyllables", group: "phonetic", label: "至少幾個字才比對", desc: "查詢太短（單字）會亂配，所以字數不到就不比對。調成 1 時，說一個字（例如「水」）也會找同音字，但結果會很雜。", advice: "建議 2。", type: "number", default: 2, min: 1, max: 4, step: 1, unit: "字" },
   { key: "phoneticTypoFrom", group: "phonetic", label: "幾個字以上容許錯 1 個音", desc: "查詢夠長時，容許有 1 個字的音不一樣。數字越小越寬鬆（短詞也容許錯）；填 9 等於完全不容許。", advice: "建議 4。", type: "number", default: 4, min: 3, max: 9, step: 1, unit: "字" },

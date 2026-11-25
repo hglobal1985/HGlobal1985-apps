@@ -5,6 +5,7 @@
  */
 import type { D1Database, Env } from "./d1.ts";
 import { loadSearchSettings } from "./search-settings.ts";
+import { SOURCES, candidates, resolveHits, tagOf, type Hit, type SourceKind } from "./search-sources.ts";
 import { AiStopped, loadSelection, markExhausted, refundAi, reserveAi } from "./ai-models.ts";
 
 /** 相似度門檻：低於這個不算相近（BGE-M3 的餘弦相似度；偏保守，寧可少一點也不要不相干）。 */
@@ -53,64 +54,70 @@ async function embed(env: Env, db: D1Database, texts: string[]): Promise<number[
   }
 }
 
-/** 排程：替還沒有向量（或標題改過）的已上架課程與章節補向量，每次最多 3 批。額度用完或沒綁定 AI 就停。 */
+/** 排程：替還沒有向量（或文字改過）的各類資料補向量（課程、教材、區塊、系列、中心、課程介紹、EDM、相片；見 search-sources.ts），每次最多 3 批。額度用完或沒綁定 AI 就停。 */
 export async function indexSearchVectors(env: Env, db: D1Database = env.DB): Promise<number> {
   if (!env.AI) return 0;
-  await db.prepare("DELETE FROM search_vectors WHERE (kind = 'course' AND ref_id NOT IN (SELECT id FROM courses)) OR (kind = 'lesson' AND ref_id NOT IN (SELECT id FROM lessons))").run();
+  const st = await loadSearchSettings(db);
+  const enabled = new Set(SOURCES.filter((x) => st[x.param]).map((x) => x.kind));
+  const cands = await candidates(db, (k) => enabled.has(k));
+  const have = new Map((await db.prepare("SELECT kind, ref_id, txt FROM search_vectors").all<{ kind: string; ref_id: string; txt: string }>()).results.map((r) => [`${r.kind}\u0001${r.ref_id}`, r.txt]));
+  // 已不存在（下架、刪除）的資料：只清「已開啟的來源」，沒開的來源向量留著，重新打開就能立刻用。
+  const live = new Set(cands.map((x) => `${x.kind}\u0001${x.ref}`));
+  const gone = [...have.keys()].filter((k) => !live.has(k) && enabled.has(k.split("\u0001")[0] as SourceKind));
+  for (let i = 0; i < gone.length; i += 50) await db.batch(gone.slice(i, i + 50).map((k) => db.prepare("DELETE FROM search_vectors WHERE kind = ? AND ref_id = ?").bind(...(k.split("\u0001") as [string, string]))));
+  const todo = cands.filter((x) => have.get(`${x.kind}\u0001${x.ref}`) !== x.txt);
   let done = 0;
   for (let round = 0; round < 3; round++) {
-    const { results } = await db
-      .prepare(
-        `SELECT 'course' AS kind, c.id AS ref_id, c.title AS txt FROM courses c LEFT JOIN search_vectors v ON v.kind = 'course' AND v.ref_id = c.id WHERE c.status = 'published' AND c.title <> '' AND (v.ref_id IS NULL OR v.txt <> c.title)
-         UNION ALL
-         SELECT 'lesson', l.id, l.title FROM lessons l JOIN courses c ON c.id = l.course_id LEFT JOIN search_vectors v ON v.kind = 'lesson' AND v.ref_id = l.id WHERE c.status = 'published' AND l.title <> '' AND (v.ref_id IS NULL OR v.txt <> l.title)
-         LIMIT ?`,
-      )
-      .bind(BATCH)
-      .all<{ kind: string; ref_id: string; txt: string }>();
-    if (!results.length) break;
+    const batch = todo.slice(round * BATCH, (round + 1) * BATCH);
+    if (!batch.length) break;
     try {
-      const vecs = await embed(env, db, results.map((r) => r.txt.slice(0, 200)));
-      await db.batch(results.map((r, i) => db.prepare("INSERT OR REPLACE INTO search_vectors (kind, ref_id, txt, vec) VALUES (?, ?, ?, ?)").bind(r.kind, r.ref_id, r.txt, packVec(vecs[i]!))));
-      done += results.length;
+      const vecs = await embed(env, db, batch.map((r) => r.txt.slice(0, 200)));
+      await db.batch(batch.map((r, i) => db.prepare("INSERT OR REPLACE INTO search_vectors (kind, ref_id, txt, vec) VALUES (?, ?, ?, ?)").bind(r.kind, r.ref, r.txt, packVec(vecs[i]!))));
+      done += batch.length;
     } catch (e) {
       if (e instanceof AiStopped) break;
       console.error("search vectors", e instanceof Error ? e.message : "error");
       break;
     }
   }
-  if (done) cache = null;
+  if (done || gone.length) cache = null;
   return done;
 }
 
-type Row = { kind: string; id: string; v: Int8Array };
+type Row = { kind: string; id: string; txt: string; v: Int8Array };
 let cache: { at: number; rows: Row[] } | null = null;
 async function allVectors(db: D1Database): Promise<Row[]> {
   if (cache && Date.now() - cache.at < 600_000) return cache.rows;
-  const { results } = await db.prepare("SELECT kind, ref_id, vec FROM search_vectors").all<{ kind: string; ref_id: string; vec: string }>();
-  const rows = results.map((r) => ({ kind: r.kind, id: r.ref_id, v: unpackVec(r.vec) }));
+  const { results } = await db.prepare("SELECT kind, ref_id, txt, vec FROM search_vectors").all<{ kind: string; ref_id: string; txt: string; vec: string }>();
+  const rows = results.map((r) => ({ kind: r.kind, id: r.ref_id, txt: r.txt, v: unpackVec(r.vec) }));
   cache = { at: Date.now(), rows };
   return rows;
 }
 
-/** 查詢文字 → 意思最接近的課程與章節編號（依相似度由高到低，各最多 limit 個）。額度用完或沒有向量回空清單。 */
-export async function semanticSearch(env: Env, db: D1Database, q: string, limitArg?: number): Promise<{ courses: string[]; lessons: string[] }> {
+/** 查詢文字 → 意思最接近的課程、教材編號（前端依自己的索引過濾）＋其他類別的命中（系列、中心、區塊、課程介紹、EDM、相片；已附標題、連結與膠囊標籤）。依相似度由高到低，各最多 limit 個。額度用完或沒有向量回空。 */
+export async function semanticSearch(env: Env, db: D1Database, q: string, limitArg?: number): Promise<{ courses: string[]; lessons: string[]; extras: Hit[] }> {
+  const none = { courses: [], lessons: [], extras: [] };
   const text = q.trim().slice(0, 100);
-  if (text.length < 2) return { courses: [], lessons: [] };
-  const st = await loadSearchSettings(db); // 門檻、筆數由「搜尋與 AI 設定」決定
-  if (!st.semanticEnabled) return { courses: [], lessons: [] };
+  if (text.length < 2) return none;
+  const st = await loadSearchSettings(db); // 門檻、筆數、資料來源由「搜尋與 AI 設定」決定
+  if (!st.semanticEnabled) return none;
   const limit = limitArg ?? (st.semanticLimit as number);
   const min = st.semanticMin as number;
-  const rows = await allVectors(db);
-  if (!rows.length) return { courses: [], lessons: [] };
+  const enabled = new Set(SOURCES.filter((x) => st[x.param]).map((x) => x.kind as string));
+  const rows = (await allVectors(db)).filter((r) => enabled.has(r.kind));
+  if (!rows.length) return none;
   let qv: Int8Array;
   try {
     qv = unpackVec(packVec((await embed(env, db, [text]))[0]!));
   } catch {
-    return { courses: [], lessons: [] };
+    return none;
   }
   const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) })).filter((x) => x.s >= min).sort((a, b) => b.s - a.s);
-  return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id) };
+  const other = scored.filter((x) => x.r.kind !== "course" && x.r.kind !== "lesson").slice(0, Math.min(limit, 12));
+  const extras = await resolveHits(db, other.map((x) => ({ kind: x.r.kind as SourceKind, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
+  // 單一教材也列在「其他項目」（標籤：單一教材），不再把它的課程混進課程清單。
+  const lessonHits = await resolveHits(db, scored.filter((x) => x.r.kind === "lesson").slice(0, Math.min(limit, 12)).map((x) => ({ kind: "lesson" as const, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
+  return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id), extras: [...extras, ...lessonHits].sort((a, b) => b.score - a.score) };
 }
 
 /** 試搜尋（設定頁用，超級管理員）：列出最接近的前 N 筆與相似度分數，方便依實際數字調「相似度門檻」。不套用門檻與開關。 */
@@ -128,13 +135,5 @@ export async function semanticDebug(env: Env, db: D1Database, q: string, n = 20)
     return { min, rows: [], note: "AI 沒有回應（額度用完或模型未啟用）" };
   }
   const top = rows.map((r) => ({ r, s: cosine(qv, r.v) })).sort((a, b) => b.s - a.s).slice(0, n);
-  const courseIds = top.filter((x) => x.r.kind === "course").map((x) => x.r.id);
-  const lessonIds = top.filter((x) => x.r.kind === "lesson").map((x) => x.r.id);
-  const titles = new Map<string, string>();
-  for (const [table, ids] of [["courses", courseIds], ["lessons", lessonIds]] as const) {
-    if (!ids.length) continue;
-    const { results } = await db.prepare(`SELECT id, title FROM ${table} WHERE id IN (${ids.map(() => "?").join(",")})`).bind(...ids).all<{ id: string; title: string }>();
-    for (const r of results) titles.set(r.id, r.title);
-  }
-  return { min, rows: top.map((x) => ({ kind: x.r.kind === "course" ? "課程" : "章節", title: titles.get(x.r.id) ?? x.r.id, score: Math.round(x.s * 1000) / 1000 })) };
+  return { min, rows: top.map((x) => ({ kind: tagOf(x.r.kind), title: x.r.txt.replace(/\s+/g, " ").slice(0, 80), score: Math.round(x.s * 1000) / 1000 })) };
 }

@@ -25,6 +25,7 @@ import { ElderInvite, ElderSeriesHead } from "./elder-heads";
 import { centerTitle } from "@/features/format";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
+import { SemanticExtras, TagPill } from "@/features/search/semantic-extras";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -92,7 +93,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       const fuzzy = fuzzyCourses(index, key);
       const chars = charsCourses(index, key);
       const phon = [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
-      const sem = [...semantic.courses, ...lessonCourses(semantic.lessons)].filter((id) => index.haystack.has(id));
+      const sem = [...semantic.courses].filter((id) => index.haystack.has(id));
       ids = new Set([...fuzzy, ...chars, ...phon, ...sem]);
       near = { phonetic: phon, semantic: sem, fuzzy, chars };
     }
@@ -100,7 +101,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   }, [key, index, all, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
   // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
-    if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x }));
+    if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x, tag: x.isList ? "教材卡" : "課程卡" }));
     if (mode !== "browse" || !zone) return [];
     if (sub) return (sub.children ?? []).map((x) => ({ key: x.id, title: x.title, count: x.materialCount, rep: x }));
     return itemsOf(zone);
@@ -142,6 +143,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : "找不到這個課程"}</AppText>
       ) : null}
       {searching ? <SceneHits q={q} big /> : null}
+      {searching ? <SemanticExtras items={semantic.extras} big /> : null}
     </View>
   );
 
@@ -168,7 +170,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         )}
         {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
       </View>
-    ) : key && !results.length && !semantic.loading && !phonetic.loading ? (
+    ) : key && !results.length && !semantic.extras.length && !semantic.loading && !phonetic.loading ? (
       // 找不到課程：畫面中央放錄音鈕，按一下再說一次（業主 2026-11-25）。
       <View style={styles.center}>
         <AppText variant="headline" style={{ textAlign: "center" }}>{`找不到「${q.trim()}」，再說一次試試看`}</AppText>
@@ -247,7 +249,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
               </View>
             ) : undefined
           }
-          renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} />}
+          renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />}
           initialNumToRender={60} maxToRenderPerBatch={60} windowSize={21}
         />
       ) : (
@@ -336,9 +338,9 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
 const WAVE_ANIM = (Platform.OS === "web" ? { transitionProperty: "height", transitionDuration: "90ms", transitionTimingFunction: "ease-out" } : {}) as object;
 
 /** 至尊模式的課程列：大縮圖、大字標題、狀態（已報名／審核中／免費／付費）。整列都可以點。 */
-export type Row = { key: string; title: string; count?: number; rep: CourseSummary; children?: CourseSummary[]; series?: boolean; coverUrl?: string | null };
+export type Row = { key: string; title: string; tag?: string; count?: number; rep: CourseSummary; children?: CourseSummary[]; series?: boolean; coverUrl?: string | null };
 
-export function ElderCourseRow({ course, title, count, onPress, series, coverUrl }: { course: CourseSummary; title?: string; /** 有給＝標籤顯示「N 項教材」（分類清單，與超派模式一致）；沒給＝顯示報名狀態。 */ count?: number; onPress?: () => void; /** true＝這列是系列（封面用系列封面）。 */ series?: boolean; /** 中心列：中心封面圖（與超派模式的中心卡一致）。 */ coverUrl?: string | null }) {
+export function ElderCourseRow({ course, title, count, onPress, series, coverUrl, typeTag }: { course: CourseSummary; /** 搜尋結果：資料類別膠囊標籤（課程卡／教材卡）。 */ typeTag?: string; title?: string; /** 有給＝標籤顯示「N 項教材」（分類清單，與超派模式一致）；沒給＝顯示報名狀態。 */ count?: number; onPress?: () => void; /** true＝這列是系列（封面用系列封面）。 */ series?: boolean; /** 中心列：中心封面圖（與超派模式的中心卡一致）。 */ coverUrl?: string | null }) {
   const { c } = useTheme();
   // 封面一律直式 4:3（寬 3：高 4），封面挑選與超派模式同一份程式（TileCover，業主 2026-11-24 永久指示）。
   const w = Math.round(96 * UI_SCALE);
@@ -354,10 +356,13 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
       </View>
       <View style={{ flex: 1, height: h, gap: 6, minWidth: 0 }}>
         <FitTitle text={label} />
-        <View style={[styles.tag, { backgroundColor: strong ? c.accent : c.accentSoft }]}>
-          <AppText variant="callout" style={{ color: strong ? c.textOnAccent : c.accentText, fontWeight: "700" }}>
-            {tag}
-          </AppText>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+          {typeTag ? <TagPill label={typeTag} big /> : null}
+          <View style={[styles.tag, { backgroundColor: strong ? c.accent : c.accentSoft }]}>
+            <AppText variant="callout" style={{ color: strong ? c.textOnAccent : c.accentText, fontWeight: "700" }}>
+              {tag}
+            </AppText>
+          </View>
         </View>
       </View>
       {/* 不放右側箭頭（業主 2026-11-24：讓標題文字完整呈現），整列都可以點。 */}
