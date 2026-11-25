@@ -235,6 +235,26 @@ function iosPipOk() {
 function iosPresentation() {
   return (video as unknown as IosVideo | null)?.webkitPresentationMode;
 }
+/**
+ * YouTube 內嵌影片縮小瀏覽器（業主 2026-11-25：要繼續在通知欄播放）：記下縮小前正在播放；縮小後若 YouTube 自己把影片暫停了，
+ * 在 0.6、1.5、3 秒各補送一次「播放」指令，並維持通知欄的播放狀態。YouTube 對手機瀏覽器的背景播放有自己的限制，補送不一定會成功。
+ */
+function ytKeepPlaying() {
+  const t = snap.track;
+  if (!t || t.mode !== "youtube" || !snap.playing || !intent) return;
+  const id = snap.loadId;
+  for (const ms of [600, 1500, 3000]) {
+    setTimeout(() => {
+      if (!document.hidden || snap.loadId !== id || !intent || snap.track?.mode !== "youtube") return;
+      if (!snap.playing) ytCommand("playVideo");
+      try {
+        navigator.mediaSession.playbackState = "playing";
+      } catch {
+        /* 沒有 Media Session 就算了 */
+      }
+    }, ms);
+  }
+}
 /** 縮小瀏覽器時，影片播放中就嘗試進入手機的浮動小視窗（業主 2026-11-25）；被拒絕（多半是手機沒開授權）就記下來，回來時教使用者開。 */
 function tryAutoPip() {
   const t = snap.track;
@@ -274,6 +294,7 @@ if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       tryAutoPip();
+      ytKeepPlaying();
       onHidden();
     } else {
       toForeground();
