@@ -10,7 +10,7 @@ const KEY = "search_settings";
 
 export type ParamDef = {
   key: string;
-  group: "semantic" | "sources" | "phonetic" | "fuzzy" | "rank" | "memory" | "edm";
+  group: "semantic" | "sources" | "phonetic" | "fuzzy" | "related" | "rank" | "scene" | "memory" | "edm";
   label: string;
   /** 這個參數做什麼（白話）。 */
   desc: string;
@@ -30,7 +30,9 @@ export const GROUPS: { key: ParamDef["group"]; title: string; intro: string }[] 
   { key: "sources", title: "語意搜尋要搜哪些資料（搜尋結果的膠囊標籤＝資料類別）", intro: "每一類資料各自開關；開了之後，排程每 10 分鐘會替新資料補向量（每次最多 300 筆，用 AI 額度）。搜尋結果裡，教材卡顯示在課程清單，其他類別顯示在「意思相近的其他項目」，每筆前面有膠囊標籤告訴你它是哪一類。關掉不會刪向量，之後重新打開立刻可用。" },
   { key: "phonetic", title: "同音搜尋（語音辨識錯字）", intro: "不用 AI、不花額度。把文字轉成拼音比對，語音把「益之源」聽成「一支援」也找得到。" },
   { key: "fuzzy", title: "模糊比對（打錯字）", intro: "不用 AI、不花額度。容許漏字、多字、錯字（例如「益支源」找得到「益之源」）；字元比對＝查詢的每個字都出現在同一門課就算符合。" },
+  { key: "related", title: "相關單元補充與最相近結果（關鍵詞片段計分）", intro: "不用 AI、不花額度。把你輸入的字拆成相鄰 2～4 字的「關鍵詞片段」（例如「晚安修護面膜」→ 面膜、晚安、修護…），看每個單元的文字命中幾個片段、越長的片段越重要。用在兩個地方：①字面完全符合的單元太少時，補上相關的單元；②什麼都找不到時，退到「最相近的單元」，結果不留空白。" },
   { key: "rank", title: "結果排序", intro: "決定找到很多結果時誰排前面。" },
+  { key: "scene", title: "相簿照片場景搜尋與沒有權限的內容", intro: "搜尋時比對相簿照片的 AI 場景標籤（成交百寶箱等區塊照片），以及沒有權限的內容要不要也列出來。" },
   { key: "memory", title: "搜尋記憶", intro: "點了搜尋結果、按返回時，要不要回到剛剛的搜尋畫面。" },
   { key: "edm", title: "EDM 海報辨識的 AI 參數", intro: "這兩項 AI 工作（辨識海報文字、把文字整理成欄位）共用的生成參數；其他 AI 工作用模型預設值。" },
 ];
@@ -52,6 +54,25 @@ export const PARAMS: ParamDef[] = [
   { key: "synonymPhonetic", group: "phonetic", label: "關聯詞也支援同音錯字", desc: "打的字跟「搜尋關聯詞」裡的某個詞同音、近音（例如「和本翠」＝漢本萃），就把同一組的所有詞一起拿去找。關閉後關聯詞只認完全相同的字。", advice: "建議開（免費）。", type: "bool", default: true },
   { key: "synonymTypoFrom", group: "phonetic", label: "關聯詞幾個字以上容許錯 1 個音", desc: "關聯詞比對錯字的寬鬆度；字數不到這個數字的關聯詞必須音完全相同。數字越小越寬鬆；填 9 等於完全不容許。", advice: "建議 3。", type: "number", default: 3, min: 2, max: 9, step: 1, unit: "字" },
   { key: "phoneticTypoFrom", group: "phonetic", label: "幾個字以上容許錯 1 個音", desc: "查詢夠長時，容許有 1 個字的音不一樣。數字越小越寬鬆（短詞也容許錯）；填 9 等於完全不容許。", advice: "建議 4。", type: "number", default: 4, min: 3, max: 9, step: 1, unit: "字" },
+  { key: "phoneticFiller", group: "phonetic", label: "先去掉口語虛詞再比對", desc: "把「如何、怎麼、請問、我要、的、嗎…」這類口語虛詞去掉再轉拼音，長句問話也找得到。", advice: "建議開。", type: "bool", default: true },
+  { key: "phoneticCoverPct", group: "phonetic", label: "短查詢（5 個音以內）要覆蓋幾％才列出", desc: "查詢被拆成片段比對時，短查詢至少要有這個比例的音節找得到才算符合。數字越大越嚴格。", advice: "建議 75。", type: "number", default: 75, min: 40, max: 100, step: 5, unit: "％" },
+  { key: "phoneticLongMinSyllables", group: "phonetic", label: "口語長句至少覆蓋幾個音", desc: "長句（多個關鍵詞串在一起）至少要有這麼多音節找得到才列出，避免隨便兩個常見詞就配上。", advice: "建議 4。", type: "number", default: 4, min: 2, max: 10, step: 1, unit: "個音" },
+  { key: "phoneticMaxSyllables", group: "phonetic", label: "長句最多看前幾個音", desc: "口語長句只取前面這麼多個音節比對（越大越慢）。", advice: "建議 40。", type: "number", default: 40, min: 10, max: 80, step: 5, unit: "個音" },
+  { key: "relatedEnabled", group: "related", label: "字面符合太少時補相關單元", desc: "字面完全符合的單元不到下面設定的數量時，補上「命中關鍵詞片段」的單元，排在字面符合的後面。", advice: "建議開。", type: "bool", default: true },
+  { key: "relatedBelow", group: "related", label: "字面符合少於幾個才補", desc: "字面完全符合的單元少於這個數字，才去補相關單元。", advice: "建議 8。", type: "number", default: 8, min: 1, max: 30, step: 1, unit: "個" },
+  { key: "relatedMax", group: "related", label: "最多補幾個相關單元", desc: "補上的相關單元最多幾個（也是「最相近」結果的上限）。", advice: "建議 30。", type: "number", default: 30, min: 5, max: 60, step: 5, unit: "個" },
+  { key: "relatedMinScore", group: "related", label: "補相關單元的最低分", desc: "關鍵詞片段計分的最低門檻：2 字片段 3 分、3 字 6 分、4 字 10 分（可在下面調整）。3＝命中一個 2 字片段就列出；調高＝只列命中更多或更長片段的。", advice: "建議 3。", type: "number", default: 3, min: 1, max: 20, step: 1, unit: "分" },
+  { key: "gramScore2", group: "related", label: "2 字片段每個幾分", desc: "查詢裡相鄰 2 個字（例如「面膜」）出現在單元文字裡的得分。", advice: "建議 3。", type: "number", default: 3, min: 1, max: 20, step: 1, unit: "分" },
+  { key: "gramScore3", group: "related", label: "3 字片段每個幾分", desc: "相鄰 3 個字（例如「修護面」）的得分，應比 2 字高。", advice: "建議 6。", type: "number", default: 6, min: 1, max: 30, step: 1, unit: "分" },
+  { key: "gramScore4", group: "related", label: "4 字片段每個幾分", desc: "相鄰 4 個字（例如「晚安修護」）的得分，應最高。", advice: "建議 10。", type: "number", default: 10, min: 1, max: 40, step: 1, unit: "分" },
+  { key: "gramCommonPct", group: "related", label: "常見片段不算分的門檻", desc: "某個片段出現在這個比例以上的單元裡，就當成太常見（例如「教學」「說明」），不算分，避免雜訊。", advice: "建議 30。", type: "number", default: 30, min: 5, max: 100, step: 5, unit: "％" },
+  { key: "looseEnabled", group: "related", label: "什麼都找不到時退到「最相近」", desc: "字面、模糊、同音、AI 都沒結果時，改列出關鍵詞片段分數最高的單元，結果不留空白。關閉＝顯示「找不到」。", advice: "建議開。", type: "bool", default: true },
+  { key: "lexBonus", group: "rank", label: "AI 語意搜尋：字面相關度加分", desc: "AI 相似度之外，再加上「查詢字的相鄰兩字有幾成出現在該筆文字」× 這個數字。0＝只看 AI。", advice: "建議 0.3。", type: "number", default: 0.3, min: 0, max: 1, step: 0.05 },
+  { key: "lexPenalty", group: "rank", label: "EDM、相片、課程介紹：完全沒有字面命中的扣分", desc: "這三類長文字最容易被 AI 誤判。查詢字連一個相鄰兩字都沒命中時，分數扣掉這個數字（0.5 幾乎等於不列）。0＝不扣。", advice: "建議 0.5。", type: "number", default: 0.5, min: 0, max: 1, step: 0.05 },
+  { key: "chaptersShuffle", group: "rank", label: "字面符合的單元每次打開頁面洗牌", desc: "開＝同一批字面符合的單元，每次開頁面順序隨機（公平曝光）；關＝固定順序。", advice: "建議開。", type: "bool", default: true },
+  { key: "sceneReverse", group: "scene", label: "場景搜尋：長句反向比對標籤", desc: "整句比對不到照片標籤時，改成「照片的某個標籤（2 字以上）出現在你說的話裡」就算符合，說一長串也找得到蔬菜水果的照片。", advice: "建議開。", type: "bool", default: true },
+  { key: "sceneMaxPhotos", group: "scene", label: "場景搜尋：每個區塊最多帶幾張照片", desc: "點場景結果直接全螢幕看圖時，一次最多載入幾張符合的照片。", advice: "建議 40。", type: "number", default: 40, min: 5, max: 100, step: 5, unit: "張" },
+  { key: "showLocked", group: "scene", label: "沒有權限的內容也列在搜尋結果", desc: "開＝沒權限的課程、教材、照片也搜尋得到，縮圖中央蓋鎖頭、寫出需要的權限，點了顯示原因；關＝場景與其他項目看不到的就不列。", advice: "建議開（業主指示）。", type: "bool", default: true },
   { key: "fuzzyEnabled", group: "fuzzy", label: "啟用模糊比對（打錯字）", desc: "容許漏字、多字、錯字。", advice: "建議開（免費）。", type: "bool", default: true },
   { key: "fuzzyMaxDiff", group: "fuzzy", label: "最多容許差幾個字", desc: "上限。實際容許數依詞長：1～2 字必須完全一樣、3～4 字差 1、5 字以上差 2；這裡的數字是再往下壓的天花板。填 0＝等於關閉。", advice: "建議 2。覺得亂配就改 1。", type: "number", default: 2, min: 0, max: 3, step: 1, unit: "字" },
   { key: "charsEnabled", group: "fuzzy", label: "啟用字元比對", desc: "查詢的每個字（不分順序）都出現在同一門課的文字裡就算符合，例如「線上白金」找得到「安麗與白金線上溝通會」。", advice: "建議開。", type: "bool", default: true },

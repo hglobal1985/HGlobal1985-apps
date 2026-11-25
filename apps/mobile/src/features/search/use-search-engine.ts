@@ -28,6 +28,7 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
   const synonyms = useSynonyms();
   const index = useMemo(() => buildSearchIndex(all, idx.data?.lessons ?? [], synonyms), [all, idx.data, synonyms]);
   const searchSt = useSearchSettings();
+  const gram = { w2: searchSt.gramScore2, w3: searchSt.gramScore3, w4: searchSt.gramScore4, commonPct: searchSt.gramCommonPct };
   const exactRaw = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
   const semantic = useSemantic(key, searchSt.semanticEnabled);
   const semOnly = searchSt.semanticEnabled && !!key && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
@@ -66,17 +67,18 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
       for (const id of semantic.lessons) if (index.lessonHay.has(id)) hit.add(id);
       for (const id of phonetic.lessons) if (index.lessonHay.has(id)) hit.add(id);
       // 都找不到時（等 AI、同音找完之後）：退到「最相近的單元」，搜尋結果不留空白（業主 2026-11-25）。
-      if (!hit.size && idx.data && !semantic.loading && !phonetic.loading) {
-        loose = looseLessons(index, key);
+      if (!hit.size && searchSt.looseEnabled && idx.data && !semantic.loading && !phonetic.loading) {
+        loose = looseLessons(index, key, searchSt.relatedMax, 1, gram);
         for (const id of loose) hit.add(id);
       }
     }
     // 字面符合太少（不到 8 個）時，補上「至少有兩個相鄰兩字片段命中」的單元排在後面（業主 2026-11-25：搜「晚安修護面膜」只有 1 個單元、關聯結果太少）。
-    const extraRel: string[] = exactL && exactL.size && exactL.size < 8 ? looseLessons(index, key, 30, 3).filter((id) => !exactL.has(id)) : [];
+    const extraRel: string[] = exactL && exactL.size && searchSt.relatedEnabled && exactL.size < searchSt.relatedBelow ? looseLessons(index, key, searchSt.relatedMax, searchSt.relatedMinScore, gram).filter((id) => !exactL.has(id)) : [];
     for (const id of extraRel) hit.add(id);
     const byId = new Map(all.map((x) => [x.id, x]));
     const canWatch = (x: CourseSummary) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
     const rand = (id: string) => {
+      if (!searchSt.chaptersShuffle) return 0;
       let h = seed | 0;
       for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 2654435761);
       return (h ^ (h >>> 15)) >>> 0;
@@ -84,7 +86,7 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
     const out: ChapterItem[] = [];
     for (const l of idx.data?.lessons ?? []) {
       const co = byId.get(l.courseId);
-      if (co && hit.has(l.id)) out.push({ lesson: l, course: co, locked: !canWatch(co) });
+      if (co && hit.has(l.id) && (searchSt.showLocked || canWatch(co))) out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     // 字面符合＝洗牌（跟超派原本的單元模式一樣）；「相近」找到的依相關度排：同音（覆蓋越多越前面）> AI 語意。
     if (!(exactL && exactL.size)) {
@@ -99,7 +101,7 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
       return out.sort((a, b) => (order.get(a.lesson.id) ?? 0) - (order.get(b.lesson.id) ?? 0) || rand(a.lesson.id) - rand(b.lesson.id));
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [key, index, all, idx.data, semOnly, semantic.lessons, semantic.loading, phonetic.lessons, phonetic.loading, member, seed]);
+  }, [key, index, all, idx.data, semOnly, semantic.lessons, semantic.loading, phonetic.lessons, phonetic.loading, member, seed, searchSt]);
   // 其他類別命中裡的「單一教材」已經在單元清單裡，不重複列。
   const extras = useMemo(() => semantic.extras.filter((h) => h.kind !== "lesson"), [semantic.extras]);
   return { key, searching: !!key, all, index, results, semantic, phonetic, chapters, extras, coursePrio: semantic.coursePrio, loading: semantic.loading || phonetic.loading };

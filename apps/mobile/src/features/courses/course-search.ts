@@ -160,7 +160,8 @@ export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
  * 數每個單元的文字命中幾個片段，命中越多越前面，取前 `limit` 筆。兩字片段命中分數 3、單字 1；完全沒命中才會回空。
  * 超派、至尊共用（useSearchEngine）。
  */
-export function looseLessons(index: SearchIndex, q: string, limit = 30, minScore = 1): string[] {
+export type GramOpts = { w2: number; w3: number; w4: number; commonPct: number };
+export function looseLessons(index: SearchIndex, q: string, limit = 30, minScore = 1, o: GramOpts = { w2: 3, w3: 6, w4: 10, commonPct: 30 }): string[] {
   const text = q.toLowerCase().replace(/[\s\u3000]+/g, "");
   const chars = [...new Set([...text])];
   // 查詢字的所有 2～4 字片段（業主 2026-11-25：搜「晚安修護面膜」要找到所有「面膜」相關的單元）：
@@ -168,13 +169,13 @@ export function looseLessons(index: SearchIndex, q: string, limit = 30, minScore
   const grams = new Set<string>();
   for (let n = 2; n <= 4; n++) for (let i = 0; i + n <= text.length; i++) grams.add(text.slice(i, i + n));
   const total = index.lessonHay.size || 1;
-  const weight = (g: string) => (g.length === 2 ? 3 : g.length === 3 ? 6 : 10);
+  const weight = (g: string) => (g.length === 2 ? o.w2 : g.length === 3 ? o.w3 : o.w4);
   const df = new Map<string, number>();
   for (const hay of index.lessonHay.values()) for (const g of grams) if (hay.includes(g)) df.set(g, (df.get(g) ?? 0) + 1);
   const scored: [string, number][] = [];
   for (const [id, hay] of index.lessonHay) {
     let sc = 0;
-    for (const g of grams) if ((df.get(g) ?? 0) <= total * 0.3 && hay.includes(g)) sc += weight(g);
+    for (const g of grams) if ((df.get(g) ?? 0) <= total * (o.commonPct / 100) && hay.includes(g)) sc += weight(g);
     if (!sc) for (const ch of chars) if (hay.includes(ch)) sc += 1;
     if (sc >= minScore) scored.push([id, sc]);
   }

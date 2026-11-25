@@ -4636,7 +4636,9 @@ const routes: [string, RegExp, Handler][] = [
       // 反向比對（業主 2026-11-25：說了一長句「洗蔬菜水果清潔劑…」卻找不到蔬菜水果的照片）：整句塞不進標籤時，
       // 改成「照片的某個標籤（至少 2 字、不是『室內』這類泛稱）出現在查詢句子裡」就算符合，命中標籤越多的照片越前面。
       let tagsOf: ((r: SceneRow) => string[]) | null = null;
-      if (!results.length) {
+      const { loadSearchSettings } = await import("./search-settings.ts");
+      const sst = await loadSearchSettings(ctx.db);
+      if (!results.length && sst.sceneReverse !== false) {
         const full = tokens.join("");
         const GENERIC = new Set(["室內", "室外", "圖片", "桌子", "椅子", "天花板", "窗戶", "燈光", "手指", "手腕", "手臂", "桌上物品"]);
         const hitTags = (r: SceneRow) => r.scene_text.split("，").map((t) => t.trim()).filter((t) => t.length >= 2 && !GENERIC.has(t) && full.includes(t.toLowerCase()));
@@ -4649,9 +4651,10 @@ const routes: [string, RegExp, Handler][] = [
       for (const r of results) {
         if (!locks.has(r.course_id)) locks.set(r.course_id, await lockStateOfKey(ctx, r.course_id));
         const lk = locks.get(r.course_id)!;
+        if (sst.showLocked === false && lk.locked && !lk.manages) continue;
         const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>(), locked: lk.locked && !lk.manages, lockLines: lk.lines, photos: [] };
         g.count++;
-        if (!g.locked && g.photos.length < 40) g.photos.push({ id: r.id, url: pubUrl(r.r2_key, 0) });
+        if (!g.locked && g.photos.length < Number(sst.sceneMaxPhotos ?? 40)) g.photos.push({ id: r.id, url: pubUrl(r.r2_key, 0) });
         for (const t of tagsOf ? tagsOf(r) : r.scene_text.split("，")) if (tagsOf || tokens.some((k) => t.toLowerCase().includes(k))) g.tags.add(t);
         groups.set(r.block_id, g);
       }
@@ -4677,6 +4680,7 @@ const routes: [string, RegExp, Handler][] = [
         if (!locks.has(h.courseId)) locks.set(h.courseId, await lockStateOfKey(ctx, h.courseId));
         const lk = locks.get(h.courseId)!;
         if (lk.locked && !lk.manages) {
+          if ((await (await import("./search-settings.ts")).loadSearchSettings(ctx.db)).showLocked === false) continue;
           const { image: _image, ...rest } = h;
           extras.push({ ...rest, locked: true, lockLines: lk.lines });
         } else extras.push(h);

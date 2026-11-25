@@ -98,7 +98,7 @@ async function allVectors(db: D1Database): Promise<Row[]> {
  * 字面相關度（業主 2026-11-25：搜「晚安修護面膜」，出來一堆完全不相干的 EDM）：AI 相似度之外，再看查詢字的「相鄰兩字」有幾成出現在這筆文字裡。
  * 加分＝0.3 × 命中比例；EDM、相片、課程介紹這類長文字最容易被 AI 誤判，完全沒有任何相鄰兩字命中的直接扣 0.5（等於不列）。後台「試搜尋」與實際搜尋共用。
  */
-export function lexAdjust(query: string, txt: string, kind: string): number {
+export function lexAdjust(query: string, txt: string, kind: string, bonus = 0.3, penalty = 0.5): number {
   const q = query.toLowerCase().replace(/[\s\u3000]+/g, "");
   const t = txt.toLowerCase().replace(/[\s\u3000]+/g, "");
   const grams = new Set<string>();
@@ -108,7 +108,7 @@ export function lexAdjust(query: string, txt: string, kind: string): number {
   for (const g of grams) if (t.includes(g)) hit++;
   const cov = hit / grams.size;
   const noisy = kind === "edm" || kind === "photo" || kind === "intro";
-  return 0.3 * cov - (noisy && hit === 0 ? 0.5 : 0);
+  return bonus * cov - (noisy && hit === 0 ? penalty : 0);
 }
 
 /** 查詢文字 → 意思最接近的課程、教材編號（前端依自己的索引過濾）＋其他類別的命中（系列、中心、區塊、課程介紹、EDM、相片；已附標題、連結與膠囊標籤）。依相似度由高到低，各最多 limit 個。額度用完或沒有向量回空。 */
@@ -131,7 +131,7 @@ export async function semanticSearch(env: Env, db: D1Database, q: string, limitA
   }
   const boost = (kind: string) => Number(st[`semBoost${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] ?? 0);
   const prio = (kind: string) => Number(st[`semPrio${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] ?? 5);
-  const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) + boost(r.kind) + lexAdjust(text, r.txt, r.kind) })).filter((x) => x.s >= min).sort((a, b) => b.s - a.s);
+  const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) + boost(r.kind) + lexAdjust(text, r.txt, r.kind, Number(st.lexBonus ?? 0.3), Number(st.lexPenalty ?? 0.5)) })).filter((x) => x.s >= min).sort((a, b) => b.s - a.s);
   const other = scored.filter((x) => x.r.kind !== "course" && x.r.kind !== "lesson").slice(0, Math.min(limit, 12));
   const extras = await resolveHits(db, other.map((x) => ({ kind: x.r.kind as SourceKind, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
   // 單一教材也列在「其他項目」（標籤：單一教材），不再把它的課程混進課程清單。
@@ -157,7 +157,7 @@ export async function semanticDebug(env: Env, db: D1Database, q: string, n = 20)
   const cap = (k: string) => k.charAt(0).toUpperCase() + k.slice(1);
   const boost = (kind: string) => Number(st[`semBoost${cap(kind)}`] ?? 0);
   const prio = (kind: string) => Number(st[`semPrio${cap(kind)}`] ?? 5);
-  const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) + boost(r.kind) + lexAdjust(text, r.txt, r.kind) }));
+  const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) + boost(r.kind) + lexAdjust(text, r.txt, r.kind, Number(st.lexBonus ?? 0.3), Number(st.lexPenalty ?? 0.5)) }));
   // 先取分數最高的 n 筆，再照實際顯示順序排（過門檻的在前）。
   const top = scored.sort((a, b) => b.s - a.s).slice(0, n).sort((a, b) => Number(b.s >= min) - Number(a.s >= min) || prio(a.r.kind) - prio(b.r.kind) || b.s - a.s);
   return { min, rows: top.map((x) => ({ kind: tagOf(x.r.kind), title: x.r.txt.replace(/\s+/g, " ").slice(0, 80), score: Math.round(x.s * 1000) / 1000, boost: boost(x.r.kind), pass: x.s >= min })) };

@@ -71,14 +71,18 @@ export const stripFiller = (q: string) => {
 export async function phoneticSearch(db: D1Database, q: string, limit = 24): Promise<{ courses: string[]; lessons: string[] }> {
   const st = await loadSearchSettings(db);
   if (!st.phoneticEnabled) return { courses: [], lessons: [] };
-  const qs = syllables(stripFiller(q.trim().slice(0, 100))).slice(0, 40);
+  const maxSyl = Number(st.phoneticMaxSyllables ?? 40);
+  const qText = q.trim().slice(0, 100);
+  const qs = syllables(st.phoneticFiller === false ? qText : stripFiller(qText)).slice(0, maxSyl);
   if (qs.length < (st.phoneticMinSyllables as number)) return { courses: [], lessons: [] };
   // 整串連續符合（最高分）；否則「拆片段」：查詢裡每一段連續的音節只要在這筆資料的任何欄位出現就算覆蓋到，
   // 覆蓋率夠高就列出，覆蓋越多排越前面（業主 2026-11-25：「一支援安裝」＝「益之源」同音錯字＋「安裝」，中間隔著別的字）。
   const bigrams = (e: Entry) => (e.bg ??= new Set(e.segs.flatMap((s) => s.syl.slice(0, -1).map((a, i) => `${a}|${s.syl[i + 1]}`))));
+  const coverPct = Number(st.phoneticCoverPct ?? 75);
+  const longMin = Number(st.phoneticLongMinSyllables ?? 4);
   const scoreOf = (qs: string[]) => {
     const k = allow(qs.length, st.phoneticTypoFrom as number);
-    const n = Math.min(qs.length, 40); // 口語長句最多看前 40 個音節
+    const n = Math.min(qs.length, maxSyl); // 口語長句最多看前幾個音節（後台可調）
     return (e: Entry) => {
     let best = 0;
     for (const s of e.segs) {
@@ -110,7 +114,7 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
     const got = covered.filter(Boolean).length;
     // 門檻：短查詢（≤5 音節）覆蓋 75%；口語長句（多個關鍵詞串在一起）不看比例——
     // 至少覆蓋 4 個音節，而且有一個 ≥3 音節的詞或覆蓋 ≥6 個音節（避免隨便兩個常見雙字詞就配上）。
-    if (n <= 5 ? got < 0.75 * n : got < 4 || (longest < 3 && got < 6)) return 0;
+    if (n <= 5 ? got < (coverPct / 100) * n : got < longMin || (longest < 3 && got < 6)) return 0;
     // 分數：覆蓋的音節越多越前面；最長詞加一點分。
     return w * (got / n) + got * 0.05 + longest * 0.05;
     };
@@ -134,7 +138,7 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
     const typoFrom = Number(st.synonymTypoFrom ?? 3);
     const sylOf = g.map((t) => syllables(t));
     const hitTerm = sylOf.some((ts) => ts.length >= 2 && qs.length >= 2 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 0) || (ts.length >= typoFrom && qs.length >= 3 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 1)));
-    if (hitTerm) for (const ts of sylOf) if (ts.length >= 2) run(ts.slice(0, 40), -0.3);
+    if (hitTerm) for (const ts of sylOf) if (ts.length >= 2) run(ts.slice(0, maxSyl), -0.3);
   }
   const hit = [...best.values()].sort((a, b) => b.s - a.s);
   return { courses: hit.filter((x) => x.e.kind === "course").slice(0, limit).map((x) => x.e.id), lessons: hit.filter((x) => x.e.kind === "lesson").slice(0, limit).map((x) => x.e.id) };
