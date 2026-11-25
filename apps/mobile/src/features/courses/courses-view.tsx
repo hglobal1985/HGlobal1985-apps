@@ -40,7 +40,7 @@ import { useSynonyms } from "./use-synonyms";
 import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
 import { usePhonetic } from "./use-phonetic";
 import { recallQuery, useRememberedQuery } from "@/lib/search-memory";
-import { useSemantic } from "./use-semantic";
+import { useSearchEngine } from "@/features/search/use-search-engine";
 import { useSearchSettings } from "./use-search-settings";
 import { SceneHits } from "./scene-hits";
 import { SemanticExtras, splitExtras } from "@/features/search/semantic-extras";
@@ -233,7 +233,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   }); // eslint-disable-line react-hooks/exhaustive-deps
   const [rowW, setRowW] = useState(0);
   const [wantIndex, setWantIndex] = useState(false);
-  const chapterMode = mode === "chapter";
+  const chapterMode = mode === "chapter" && !q.trim(); // 有搜尋字時一律顯示引擎的教材卡結果（業主 2026-11-25）
   const searchData = useApi<{ lessons: SearchLesson[] }>(wantIndex || chapterMode ? "/search-index" : null);
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
@@ -302,51 +302,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const canEditArt = activeCenter !== ALL && canEditCenterArt(member, activeCenter);
   const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter)));
   const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
-  const needIndex = wantIndex || chapterMode;
-  const synonyms = useSynonyms();
-  const searchIndex = useMemo(() => (needIndex ? buildSearchIndex(courses, searchData.data?.lessons ?? [], synonyms) : null), [needIndex, courses, searchData.data, synonyms]);
-  // 打錯字也找得到（業主 2026-11-23）：完全比對沒有結果時，先用模糊比對（差 1～2 個字），再用 AI 語意搜尋找意思相近的；兩者合併顯示並標示「相近結果」。
-  const exactRaw = searchIndex ? (chapterMode ? matchLessons(searchIndex, q) : matchCourses(searchIndex, q)) : null;
-  const searchSt = useSearchSettings();
-  // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：語意搜尋每次都跑（原樣送出查詢字）；開著而且有結果（或還在找）就只顯示它的結果，
-  // 字面、同音、模糊、字元比對都不混進來；語意沒結果才退回它們。章節模式維持原本（完全比對沒結果才補語意）。
-  const semantic = useSemantic(q, searchSt.semanticEnabled && (!chapterMode || (!!exactRaw && exactRaw.size === 0)));
-  const semOnly = searchSt.semanticEnabled && !chapterMode && !!q.trim() && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
-  const exact = semOnly && exactRaw ? new Set<string>() : exactRaw;
-  const noExact = !!exact && exact.size === 0;
-  const phonetic = usePhonetic(q, (noExact || semOnly) && searchSt.phoneticEnabled);
-  // 搜尋結果的關聯性順序（至尊模式共用 rankCourses）：同音、模糊、字元比對、AI 語意各自的順序傳給排序。
-  const nearInfo = useMemo(() => {
-    if (!noExact || !searchIndex || chapterMode) return null;
-    const byLesson = new Map((searchData.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
-    const lc = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && searchIndex.haystack.has(x));
-    // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：語意搜尋開著而且有結果（或還在找）時只顯示它的結果，沒結果才退回同音／模糊／字元比對。
-    return {
-      fuzzy: semOnly ? new Set<string>() : fuzzyCourses(searchIndex, q),
-      chars: semOnly ? new Set<string>() : charsCourses(searchIndex, q),
-      phonetic: [...phonetic.courses, ...lc(phonetic.lessons)].filter((id) => searchIndex.haystack.has(id)),
-      semantic: [...semantic.courses].filter((id) => searchIndex.haystack.has(id)),
-    };
-  }, [noExact, searchIndex, chapterMode, q, semantic.courses, semantic.lessons, semantic.extras, semantic.loading, phonetic.courses, phonetic.lessons, searchData.data, searchSt, semOnly]);
-  const near = useMemo(() => {
-    if (!noExact || !searchIndex) return null;
-    const out = new Set<string>();
-    if (chapterMode) {
-      for (const id of fuzzyLessons(searchIndex, q)) out.add(id);
-      for (const id of semantic.lessons) if (searchIndex.lessonHay.has(id)) out.add(id);
-      for (const id of phonetic.lessons) if (searchIndex.lessonHay.has(id)) out.add(id);
-    } else if (nearInfo) {
-      for (const id of [...nearInfo.fuzzy, ...nearInfo.chars, ...nearInfo.phonetic, ...nearInfo.semantic]) out.add(id);
-    }
-    return out;
-  }, [noExact, searchIndex, q, chapterMode, semantic.lessons, phonetic.lessons, nearInfo]);
-  const nearMode = !!near && near.size > 0;
-  const matched = nearMode && !chapterMode ? near : searchIndex ? (chapterMode ? matchCourses(searchIndex, q) : exact) : null;
+  // 搜尋引擎：與至尊模式是同一個模組（features/search/use-search-engine.ts，業主 2026-11-25：同樣的關鍵字兩邊結果要一樣）。
+  // 有搜尋字時，結果一律是引擎排好的教材卡（不受分類、中心限制）＋其他類別的相近項目；章節模式只在沒搜尋字時使用。
+  const eng = useSearchEngine(q, courses);
+  const { semantic, phonetic } = eng;
+  const searchIndex = eng.searching ? eng.index : null; // 輸入時的關聯詞建議
+  const matched = useMemo(() => (eng.searching ? new Set(eng.results.map((x) => x.id)) : null), [eng.searching, eng.results]);
   const terms = searchIndex && q.trim() && q !== picked ? suggestTerms(searchIndex, q) : [];
   // 搜尋時不受兩頁分流限制（搜得到所有課程）；其餘只看目前這一頁的課程。
-  const filtered = (matched ? courses : pool).filter((x) => (matched ? matched.has(x.id) : inCategory(x) && inCenter(x) ));
-  // 搜尋結果排序（業主 2026-11-24，至尊模式共用）：關聯性高 > 日期最新 > 已報名；有搜尋時不再套系列手動排序。
-  const list = useMemo(() => (matched && searchIndex && !chapterMode ? rankCourses(searchIndex, filtered, q, nearInfo ?? {}) : filtered), [matched, searchIndex, chapterMode, filtered, q, nearInfo, searchSt]);
+  const filtered = eng.searching ? eng.results : pool.filter((x) => inCategory(x) && inCenter(x));
+  const list = filtered;
   const pickTerm = (text: string) => {
     const head = q.trim().split(/\s+/).slice(0, -1).join(" ");
     const next = head ? `${head} ${text}` : text;
@@ -447,7 +412,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const chapterItems = useMemo<ChapterItem[]>(() => {
     if (!chapterMode) return [];
     const byId = new Map(courses.map((x) => [x.id, x]));
-    const hit = nearMode ? near : exact;
     const canWatch = (x: (typeof courses)[number]) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
     const rand = (id: string) => {
       let h = shuffleSeed | 0;
@@ -458,12 +422,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     for (const l of searchData.data?.lessons ?? []) {
       const co = byId.get(l.courseId);
       if (!co) continue;
-      if (hit ? !hit.has(l.id) : !inCategory(co) || !inCenter(co)) continue; // 單元頁顯示全部課程（含中心課程）
+      if (!inCategory(co) || !inCenter(co)) continue; // 單元頁顯示全部課程（含中心課程）；有搜尋字時不走這裡
       if (!unitFilterPass(unitFilter, l)) continue;
       out.push({ lesson: l, course: co, locked: !canWatch(co) });
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [chapterMode, courses, searchData.data, searchIndex, q, nearMode, near, exact, category, brandSel, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chapterMode, courses, searchData.data, searchIndex, q, category, brandSel, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
   // 一列幾張（業主 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
   const cols = flat ? portraitColumns(boxW) : tileColumns(boxW);

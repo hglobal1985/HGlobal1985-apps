@@ -27,10 +27,8 @@ import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZo
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
 import { useRememberedQuery } from "@/lib/search-memory";
+import { listable, useSearchEngine } from "@/features/search/use-search-engine";
 import { useVoice } from "./use-voice";
-
-/** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
-const listable = (x: CourseSummary) => x.status === "published" && x.viewScope !== "link_login" && x.viewScope !== "link_guest";
 
 /** 排序：已報名（上過）的優先，其次活動日期新的在前，清單卡最後。 */
 function order(list: CourseSummary[]) {
@@ -63,14 +61,13 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const [zone, setZone] = useState<ElderZone | null>(null);
   const [sub, setSub] = useState<Row | null>(null); // 系列／中心再往下一層
   const input = useRef<{ focus: () => void } | null>(null);
-  // 搜尋索引（章節標題、分享者、日期…）：開始找的時候才下載。
-  const wantIndex = q.trim().length > 0;
-  const idx = useApi<{ lessons: SearchLesson[] }>(wantIndex ? "/search-index" : null);
   const voice = useVoice((text, final) => {
     setHeard(text);
     if (final || text) setQ(text);
   });
-  const all = useMemo(() => (courses.data ?? []).filter(listable), [courses.data]);
+  // 搜尋引擎：與超派模式是同一個模組（features/search/use-search-engine.ts），業主 2026-11-25。
+  const eng = useSearchEngine(q, courses.data ?? []);
+  const { key, all, results, semantic, phonetic } = eng;
   const itemsOf = useZoneItems(all);
   // 從搜尋結果點「中心卡」會帶 ?center=中心名稱 來到課程分頁：直接打開該中心頁（業主 2026-11-25）。
   const { center: centerParam } = useLocalSearchParams<{ center?: string }>();
@@ -83,38 +80,6 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     setZone("centers");
     setSub(row);
   }, [mode, centerParam, itemsOf]); // eslint-disable-line react-hooks/exhaustive-deps
-  const synonyms = useSynonyms();
-  const index = useMemo(() => buildSearchIndex(all, idx.data?.lessons ?? [], synonyms), [all, idx.data, synonyms]);
-  // 與寰宇大學（超派模式）同一套找法（業主 2026-11-24 回報：語音說「線上白金」找不到課）：
-  // 完全比對 → 模糊比對＋字元比對 → AI 語意搜尋（完全比對沒結果時才送出，合併顯示）。
-  // 語音辨識有時會在句中加標點（「線上，白金」）：比對前一律換成空白。
-  const key = useMemo(() => q.replace(/[。．.！!？?，,、；;：:「」“”"'（）()]+/g, " ").trim(), [q]);
-  const exactRaw = useMemo(() => (key ? matchCourses(index, key) : null), [index, key]);
-  const searchSt = useSearchSettings();
-  // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：語意搜尋每次都跑（查詢字原樣送出，不加關聯詞）；開著而且有結果（或還在找）就**只顯示它的結果**，
-  // 字面、同音、模糊、字元比對都不混進來；語意沒結果才退回它們（語音辨識錯字仍找得到）。
-  const semantic = useSemantic(key, searchSt.semanticEnabled);
-  const semOnly = searchSt.semanticEnabled && !!key && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
-  const exact = semOnly && exactRaw ? new Set<string>() : exactRaw;
-  const noExact = !!exact && exact.size === 0;
-  const phonetic = usePhonetic(key, (noExact || semOnly) && searchSt.phoneticEnabled);
-  // 排序（業主 2026-11-24，與超派模式共用 rankCourses）：關聯性高 > 日期最新 > 已報名。
-  const results = useMemo(() => {
-    if (!key) return [];
-    const byLesson = new Map((idx.data?.lessons ?? []).map((l) => [l.id, l.courseId]));
-    const lessonCourses = (ids: Iterable<string>) => [...ids].map((lid) => byLesson.get(lid)).filter((x): x is string => !!x && index.haystack.has(x));
-    let ids: Set<string> = exact ?? new Set();
-    let near: Parameters<typeof rankCourses>[3] = {};
-    if (!ids.size) {
-      const fuzzy = semOnly ? new Set<string>() : fuzzyCourses(index, key);
-      const chars = semOnly ? new Set<string>() : charsCourses(index, key);
-      const phon = [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
-      const sem = [...semantic.courses].filter((id) => index.haystack.has(id));
-      ids = new Set([...fuzzy, ...chars, ...phon, ...sem]);
-      near = { phonetic: phon, semantic: sem, fuzzy, chars };
-    }
-    return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
-  }, [key, index, all, exact, semantic.courses, semantic.lessons, semOnly, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
   // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
     if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x, tag: "教材卡" }));
