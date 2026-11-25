@@ -161,7 +161,7 @@ export function normalizeApp(raw: unknown): AppSettings {
     libraryKeyBadges: num(r.libraryKeyBadges, d.libraryKeyBadges, 1, 1000),
     listBaseQuota: num(r.listBaseQuota, d.listBaseQuota, 0, 50),
     listUnlocks: normalizeListUnlocks(r.listUnlocks),
-    fileMaxMb: num(r.fileMaxMb, d.fileMaxMb, 1, 95),
+    fileMaxMb: 95, // 教材檔案單檔上限固定最高 95MB、不可調（業主 2026-11-25；舊設定存的值一律忽略）
     imageMaxSide: num(r.imageMaxSide, d.imageMaxSide, 400, 4096),
     imageQuality: num(r.imageQuality, d.imageQuality, 30, 100),
     centerMaxSide: num(r.centerMaxSide, d.centerMaxSide, 800, 4096),
