@@ -1138,9 +1138,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const photoKeys = [...new Set(photoKeyOf.values())];
   if (photoKeys.length) {
     const { results } = await ctx.db
-      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec, scene_text, ocr_text FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
+      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec, scene_text, ocr_text, uploader_name, uploader_avatar FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
       .bind(...photoKeys)
-      .all<{ id: string; owner_key: string; scene_text: string; ocr_text: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+      .all<{ id: string; owner_key: string; scene_text: string; ocr_text: string; uploader_name: string | null; uploader_avatar: string | null; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
     for (const r of results) photosOf.set(r.owner_key, [...(photosOf.get(r.owner_key) ?? []), coverItem(r)]);
   }
   const [eligibility, canRoster, registrations] = await Promise.all([eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]), canSeeRoster(ctx, s, row, manages), manages ? registrationCount(ctx.db, id) : Promise.resolve(0)]);
@@ -2603,7 +2603,7 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
     .sort((a, b) => pos(a.id) - pos(b.id));
   return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out };
 }
-function coverItem(r: { id: string; scope: CoverScope; created_at?: string | null; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
+function coverItem(r: { id: string; scope: CoverScope; created_at?: string | null; uploader_name?: string | null; uploader_avatar?: string | null; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
   return {
     id: r.id,
     scope: r.scope === "edm" ? "edm" : "cover",
@@ -2617,6 +2617,7 @@ function coverItem(r: { id: string; scope: CoverScope; created_at?: string | nul
     ...(r.scope === "edm" ? { eventDate: r.event_date ?? null, text: r.ocr_text ?? "" } : r.ocr_text ? { text: r.ocr_text } : {}),
     ...(r.scene_text ? { scene: r.scene_text } : {}),
     ...(r.created_at ? { createdAt: r.created_at } : {}),
+    ...(r.uploader_name ? { uploader: r.uploader_name, ...(r.uploader_avatar ? { uploaderAvatar: r.uploader_avatar } : {}) } : {}),
   };
 }
 /** 儲存區（業主 2026-11-23）：只有中心有「EDM」分頁；系列、課程一律只有 cover。沒帶或不認得時，中心當 edm（舊版 App 的相簿上傳）。 */
@@ -2625,9 +2626,9 @@ const coverScopeOf = (kind: CoverMediaKind, v: unknown): CoverScope => (kind !==
 async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, scope?: CoverScope): Promise<CoverMediaItem[]> {
   const where = (kind === "center" ? "cm.owner_kind = 'center' AND cm.center_key = ?" : "cm.owner_kind = ? AND cm.owner_key = ?") + (scope ? " AND cm.scope = ?" : "");
   // 課程 EDM（綁定課程的照片）不受 100 張上限限制，所以讀取上限放寬。
-  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, cm.ocr_text, cm.event_date, cm.created_at, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, cm.position, CASE WHEN cm.scope = 'edm' THEN cm.event_date IS NULL ELSE 0 END, CASE WHEN cm.scope = 'edm' THEN cm.event_date END DESC, cm.created_at, cm.rowid LIMIT 2000`);
+  const st = db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.course_id, cm.ocr_text, cm.event_date, cm.created_at, cm.uploader_name, cm.uploader_avatar, c.title AS course_title FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE ${where} ORDER BY cm.scope, cm.position, CASE WHEN cm.scope = 'edm' THEN cm.event_date IS NULL ELSE 0 END, CASE WHEN cm.scope = 'edm' THEN cm.event_date END DESC, cm.created_at, cm.rowid LIMIT 2000`);
   const args = [...(kind === "center" ? [lookup] : [kind, lookup]), ...(scope ? [scope] : [])];
-  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; created_at: string | null; ocr_text: string | null; event_date: string | null; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+  const { results } = await st.bind(...args).all<{ id: string; scope: CoverScope; created_at: string | null; uploader_name: string | null; uploader_avatar: string | null; ocr_text: string | null; event_date: string | null; course_id: string | null; course_title: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
   return results.map(coverItem);
 }
 /**
@@ -2924,7 +2925,7 @@ async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind
   const pos = (await (o.kind === "center" ? st.bind(o.centerKey, o.scope) : st.bind(o.kind, o.ownerKey, o.scope)).first<{ p: number }>())?.p ?? 0;
   await db.batch([
     db.prepare("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, poster_key, width, height, duration_sec, bytes, position, created_by, scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, o.kind, o.centerKey, o.ownerKey, x.kind, x.r2Key, x.posterKey, x.width, x.height, x.durationSec, x.bytes, pos, x.by, o.scope),
-    db.prepare("UPDATE cover_media SET uploader_name = ? WHERE id = ?").bind((o.s.name ?? "").slice(0, 60), id),
+    db.prepare("UPDATE cover_media SET uploader_name = ?, uploader_avatar = ? WHERE id = ?").bind((o.s.name ?? "").slice(0, 60), o.s.kind === "central" ? (o.s.avatarUrl ?? "").slice(0, 500) : "", id),
     audit(db, x.by, "cover_media.add", o.kind, o.centerKey ?? o.ownerKey, id),
   ]);
   return id;
@@ -4489,9 +4490,9 @@ const routes: [string, RegExp, Handler][] = [
       if (!tokens.length || tokens.join("").length < 2) return { items: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
       const { results } = await ctx.db
-        .prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, cm.event_date, cm.owner_kind, cm.center_key, cm.owner_key FROM cover_media cm WHERE cm.kind = 'image' AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text || ' ' || COALESCE(cm.event_date, '')) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 400`)
+        .prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, cm.event_date, cm.uploader_name, cm.uploader_avatar, cm.owner_kind, cm.center_key, cm.owner_key FROM cover_media cm WHERE cm.kind = 'image' AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text || ' ' || COALESCE(cm.event_date, '')) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 400`)
         .bind(...tokens.map(like))
-        .all<{ id: string; scope: CoverScope; kind: "image"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number; scene_text: string; ocr_text: string; event_date: string | null; owner_kind: string; center_key: string | null; owner_key: string }>();
+        .all<{ id: string; scope: CoverScope; kind: "image"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number; scene_text: string; ocr_text: string; event_date: string | null; uploader_name: string | null; uploader_avatar: string | null; owner_kind: string; center_key: string | null; owner_key: string }>();
       const folders = new Map((await albumsIndex(ctx)).groups.flatMap((g) => g.folders).map((f) => [f.id, f]));
       const items = [];
       for (const r of results) {
