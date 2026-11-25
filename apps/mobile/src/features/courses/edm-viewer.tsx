@@ -92,7 +92,7 @@ export function EdmStage({ course, stats, canManageAlbum = false }: { course: Co
           </SheetScroll>
         </BottomSheet>
       ) : null}
-      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={course.title} items={images.map((x) => ({ uri: x.url, title: course.title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
+      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={course.title} items={images.map((x) => lightboxItem(x, course.title))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
       {course.brand && open ? <EdmLightbox uri={course.brand.logoUrl} bg={(scheme === "dark" && course.brand.bgColorDark) || course.brand.bgColor || undefined} title={course.title} onClose={() => setOpen(false)} /> : null}
       {!course.brand && course.edmUrl && open ? <EdmLightbox uri={course.edmUrl} title={course.title} onClose={() => setOpen(false)} /> : null}
     </StageFrame>
@@ -150,7 +150,9 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
 const viewedIds = new Set<string>(); // 這次開啟網站已回報過瀏覽的照片編號
 let helpHiddenMemory = true; // 預設縮成十字圖示，點圖示才展開（業主 2026-11-24）
 /** id＝相簿照片編號（有給、而且看的人有管理權限時，右上角多一顆「圖片資訊」驚嘆號鈕；業主 2026-11-24）。 */
-export type LightboxItem = { uri: string; title: string; bg?: string; id?: string };
+export type LightboxItem = { uri: string; title: string; bg?: string; id?: string; /** 上傳者暱稱與頭像（相簿照片）：單張看圖時顯示在「第幾張，共幾張」同一列最左邊。 */ uploader?: { name: string; avatar?: string } };
+/** 相簿照片 → 看圖項目（所有入口共用，確保上傳者資訊一致帶進看圖畫面；業主 2026-11-25）。 */
+export const lightboxItem = (x: { url: string; id: string; uploader?: string; uploaderAvatar?: string }, title: string): LightboxItem => ({ uri: x.url, title, id: x.id, ...(x.uploader ? { uploader: { name: x.uploader, ...(x.uploaderAvatar ? { avatar: x.uploaderAvatar } : {}) } } : {}) });
 export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, index = 0, library = false }: { /** 直接以「相簿」資料夾檢視開場（相簿專區入口：沒有照片、先選資料夾；業主 2026-11-25）。 */ library?: boolean; uri: string; title: string; onClose: () => void; /** 看的人有管理權限時才傳 true：顯示「圖片資訊」鈕（內容含上傳者與 EXIF）。 */ showInfo?: boolean; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
   useEffect(() => trackFeature("edm_zoom"), []);
   // 真正的全螢幕：進來時收起瀏覽器的網址列與按鈕，關閉時還原（lib/fullscreen.ts；不支援的瀏覽器略過）。
@@ -339,6 +341,19 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   const [helpW, setHelpW] = useState(0);
   // 單行自動縮小：中文每字約一個字寬；可用寬度＝長條寬度扣掉圖示與左右留白。
   const helpSize = helpW ? Math.max(11, Math.min(26, Math.floor((helpW - 32 - 24 - 10 - 60) / (hint.length * 1.05)))) : 18;
+  const upl = cur.uploader;
+  const uploaderChip = upl ? (
+    <View style={[styles.counter, { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 4, flexShrink: 1 }]}>
+      {upl.avatar ? (
+        <Image source={{ uri: upl.avatar }} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "#444" }} accessibilityIgnoresInvertColors />
+      ) : (
+        <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: "#4a4a4f", alignItems: "center", justifyContent: "center" }}>
+          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{[...upl.name][0] ?? "?"}</AppText>
+        </View>
+      )}
+      <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", flexShrink: 1 }}>{upl.name}</AppText>
+    </View>
+  ) : null;
   const helpBar = (
     <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} onLayout={(e) => setHelpW(e.nativeEvent.layout.width)} pointerEvents="box-none">
       <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />
@@ -385,6 +400,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
           <View style={{ position: "absolute", left: 16, top: topY, width: toolSize, height: toolSize, borderRadius: toolSize / 2, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no">
             <Image source={require("../../../assets/logo.png")} style={{ width: toolSize - 10, height: toolSize - 10 }} resizeMode="contain" accessibilityIgnoresInvertColors />
           </View>
+          {upl && smallLand ? <View style={{ position: "absolute", left: 16, top: topY + toolSize + 8, maxWidth: win.width * 0.4 }} pointerEvents="none">{uploaderChip}</View> : null}
           <View style={[styles.top, { top: topY }, smallLand ? { left: undefined, right: 12 } : null, !smallLand && land && { flexDirection: "row-reverse", alignItems: "flex-start" }]} pointerEvents="box-none">
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
               <View style={[styles.row, smallLand && { flexDirection: "column", alignItems: "flex-end" }]} pointerEvents="box-none">
@@ -395,10 +411,15 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
                 {list.length ? tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />) : null}
                 {tool("關閉", () => closeNow.current(), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
               </View>
-              {/* 第幾張、共幾張：獨立標籤，放在「關閉」鈕正下方（業主 2026-11-21）。 */}
-              {many ? (
-                <View style={styles.counter} pointerEvents="none">
-                  <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{`第 ${idx + 1} 張，共 ${list.length} 張`}</AppText>
+              {/* 上傳者（頭像＋暱稱）在最左、「第幾張，共幾張」在最右，同一列（業主 2026-11-25；小螢幕橫放時上傳者改放左上 logo 下方）。 */}
+              {many || (upl && !smallLand) ? (
+                <View style={{ alignSelf: "stretch", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }} pointerEvents="none">
+                  {upl && !smallLand ? uploaderChip : <View />}
+                  {many ? (
+                    <View style={styles.counter}>
+                      <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{`第 ${idx + 1} 張，共 ${list.length} 張`}</AppText>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
             </View>
@@ -407,7 +428,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
           </View>
           {!hideHelp && smallLand ? <View style={{ position: "absolute", left: toolSize + 28, right: toolSize + 28, top: topY }} pointerEvents="box-none">{helpBar}</View> : null}
           {grid && list.length ? <LightboxGrid list={list} current={idx} heading={over?.title} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
-          {libOpen ? <LightboxLibrary initial={over?.folder ? { folder: over.folder, items: [] } : null} onClose={() => (over || library || !list.length ? onClose() : setLibOpen(false))} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => ({ uri: x.url, title: p.title, id: x.id })) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
+          {libOpen ? <LightboxLibrary initial={over?.folder ? { folder: over.folder, items: [] } : null} onClose={() => (over || library || !list.length ? onClose() : setLibOpen(false))} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => lightboxItem(x, p.title)) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
           {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>

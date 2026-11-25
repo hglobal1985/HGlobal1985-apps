@@ -8,7 +8,7 @@ import { useTheme } from "@/theme/theme";
 import { layoutOf } from "@/theme/layout";
 import { maxContentWidth, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
-import { EdmLightbox } from "./edm-viewer";
+import { EdmLightbox, lightboxItem } from "./edm-viewer";
 import { CoverBadges, type CoverStats } from "./cover-stats";
 import { CoverCarousel } from "./cover-carousel";
 
@@ -103,7 +103,7 @@ export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover
         </Pressable>
       ) : null}
       {open && art && !media.length ? <EdmLightbox uri={art.edmUrl} title={title} onClose={() => setOpen(false)} /> : null}
-      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} items={images.map((x) => ({ uri: x.url, title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
+      {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} items={images.map((x) => lightboxItem(x, title))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
     </Animated.View>
   );
   // 往下滑縮成迷你小視窗的「大到小封面動畫」直接串接共用模組 CollapseBand（量封面位置、縮小途中隱藏本體；shrink＝false：高度仍由這裡隨捲動縮放）。

@@ -12,7 +12,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, EmptyState } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
-import { EdmLightbox } from "./edm-viewer";
+import { EdmLightbox, lightboxItem } from "./edm-viewer";
 
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
 const GAP = 6;
@@ -114,7 +114,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
           </View>
         ))}
       </View>
-      {view !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} showInfo={(canEdit && scope === "edm") || infoOk} items={images.map((x) => ({ uri: x.url, title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === view))} onClose={() => setView(null)} /> : null}
+      {view !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} showInfo={(canEdit && scope === "edm") || infoOk} items={images.map((x) => lightboxItem(x, title))} index={Math.max(0, images.findIndex((x) => x.id === view))} onClose={() => setView(null)} /> : null}
       {play ? <VideoModal item={play} onClose={() => setPlay(null)} /> : null}
     </View>
   );

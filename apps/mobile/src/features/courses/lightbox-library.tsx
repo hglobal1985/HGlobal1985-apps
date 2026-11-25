@@ -1,3 +1,4 @@
+import { lightboxItem } from "./edm-viewer";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
@@ -292,7 +293,7 @@ export function LightboxLibrary({ onPick, onClose, initial }: { onPick: (p: Libr
           <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6 }}>
             <LightboxGrid
               embedded
-              list={shown.map((x) => ({ uri: x.url, title: folderName(view.folder), id: x.id }))}
+              list={shown.map((x) => lightboxItem(x, folderName(view.folder)))}
               current={-1}
               heading={folderName(view.folder)}
               extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}</View>) : undefined}
