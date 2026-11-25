@@ -15,9 +15,12 @@ import { AppText, GuestGate, Button, Card, EmptyState, ErrorView, LoadingView, S
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 
+import { useBorderW } from "@/lib/elder-mode";
+
 export default function NoticesScreen() {
   const elder = useModeProfile().bigLayout; // 大字版面（至尊模式）：一欄直排、內文展開、不顯示大標題
   const { c } = useTheme();
+  const pinBw = useBorderW(2); // 框線粗細統一用全站規範（至尊 4、超派 2；業主 2026-11-25），審核置頂框用紅色
   const { member, invalidate } = useSession();
   const { data, error, loading, reload } = useApi<Notice[]>(member ? "/notifications" : null);
   const unread = (data ?? []).filter((n) => !n.read).length;
@@ -146,10 +149,10 @@ export default function NoticesScreen() {
       {pinned.length ? (
         <View style={{ gap: 6, marginTop: space.xs }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Ionicons name="pin" size={14} color={c.accentText} />
-            <AppText variant="caption" style={{ fontWeight: "800", color: c.accentText }}>{`等待處理的審核（${pinned.length}）`}</AppText>
+            <Ionicons name="pin" size={14} color={c.danger} />
+            <AppText variant="caption" style={{ fontWeight: "800", color: c.danger }}>{`等待處理的審核（${pinned.length}）`}</AppText>
           </View>
-          <Card style={{ paddingVertical: 4, borderWidth: 2, borderColor: c.accent }}>{pinned.map((n, i) => renderRow(n, i))}</Card>
+          <Card style={{ paddingVertical: 4, borderWidth: pinBw, borderColor: c.danger }}>{pinned.map((n, i) => renderRow(n, i))}</Card>
         </View>
       ) : null}
       {groupByDay(rest, (n) => n.createdAt).map((g) => (
