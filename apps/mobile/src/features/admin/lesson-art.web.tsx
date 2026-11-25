@@ -116,8 +116,8 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
       </AppText>
       <View style={styles.thumbs}>
         <View style={styles.col}>
-          {lesson.coverUrl ? <Image source={{ uri: resolveUrl(lesson.coverUrl) }} style={styles.cover} resizeMode="cover" accessibilityLabel="橫式封面" /> : <View style={[styles.cover, styles.empty]}><AppText variant="caption" tone="muted">橫式 16:9{"\n"}未設定</AppText></View>}
-          {lesson.coverUrl ? <Button variant="ghost" label="移除橫式" disabled={busy} onPress={() => remove("cover")} /> : null}
+          {lesson.coverUrl && !lesson.coverAuto ? <Image source={{ uri: resolveUrl(lesson.coverUrl) }} style={styles.cover} resizeMode="cover" accessibilityLabel="橫式封面" /> : <View style={[styles.cover, styles.empty]}><AppText variant="caption" tone="muted">橫式 16:9{"\n"}未設定</AppText></View>}
+          {lesson.coverUrl && !lesson.coverAuto ? <Button variant="ghost" label="移除橫式" disabled={busy} onPress={() => remove("cover")} /> : null}
         </View>
         <View style={styles.col}>
           {lesson.posterUrl ? <Image source={{ uri: resolveUrl(lesson.posterUrl) }} style={styles.poster} resizeMode="cover" accessibilityLabel="直式封面" /> : <View style={[styles.poster, styles.empty]}><AppText variant="caption" tone="muted">直式 3:4{"\n"}未設定</AppText></View>}

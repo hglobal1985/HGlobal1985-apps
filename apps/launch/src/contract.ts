@@ -294,6 +294,8 @@ export type Lesson = {
   brand?: BrandCover | null;
   /** 章節自己的封面：橫式 16:9（清單縮圖）與直式；沒設定為 null（改用課程封面）。 */
   coverUrl?: string | null;
+  /** true＝coverUrl 不是上傳的，是 YouTube 縮圖（業主 2026-11-25）；編輯畫面不可把它當成已上傳的封面。 */
+  coverAuto?: boolean;
   posterUrl?: string | null;
   /** 章節日期是否「跟著課程日期」（沒有自己設定日期）；eventDate 已是算好的實際日期。 */
   dateFollows?: boolean;

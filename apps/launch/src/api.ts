@@ -1167,8 +1167,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       sharerRank: l.sharer_rank,
       sharerRankName: rankMap.get(l.sharer_rank)?.name ?? "",
       sharerTitle: l.sharer_title,
-      // 章節封面：只用手動上傳的（不再抓 YouTube 縮圖，業主 2026-11-22）；沒有就 null＝用課程封面。
-      coverUrl: linkCover.has(l.id) ? linkCover.get(l.id)! : l.cover_key ? pubUrl(l.cover_key, l.art_version) : null,
+      // 章節／教材封面：手動上傳的優先；沒有且是 YouTube 影片＝用 YouTube 縮圖（coverAuto＝不是上傳的，編輯畫面不當成已上傳）；其餘 null＝用課程封面。
+      coverUrl: linkCover.has(l.id) ? linkCover.get(l.id)! : l.cover_key ? pubUrl(l.cover_key, l.art_version) : ytThumbOf(l.media_type, l.media_ref),
+      ...(!linkCover.has(l.id) && !l.cover_key && ytThumbOf(l.media_type, l.media_ref) ? { coverAuto: true } : {}),
       posterUrl: l.poster_key ? pubUrl(l.poster_key, l.art_version) : null,
       // 還沒上傳／設定內容的章節（新增課程時自動建立的空白示範章節）＝敬請期待。
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
@@ -1477,6 +1478,8 @@ function thumbTransform(t: ThumbSettings, w: number): Record<string, unknown> {
   return o;
 }
 const thumbOutput = (t: ThumbSettings): Record<string, unknown> => ({ quality: t.qualityLevel || t.quality, ...(t.anim ? {} : { anim: false }), ...(t.metadata !== "none" ? { metadata: t.metadata } : {}) });
+/** YouTube 教材沒有指定封面時的預設縮圖（業主 2026-11-25 全網新規則，取代 2026-11-22「完全移除 YouTube 抓封面」）：用 YouTube 自己的 16:9 縮圖。 */
+const ytThumbOf = (type: string | null | undefined, ref: string | null | undefined) => (type === "youtube" && ref ? `https://i.ytimg.com/vi/${encodeURIComponent(ref)}/mqdefault.jpg` : null);
 const pubUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 const cleanAnnouncement = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, 120) : "");
 const ART_TYPES = new Set(["president", "sound"]);
@@ -4627,8 +4630,8 @@ const routes: [string, RegExp, Handler][] = [
           isShorts: r.isShorts === 1,
           isMaterial: r.lessonKind === "material",
           minutes: r.minutes,
-          // 只給章節自己上傳的封面；沒有就留空，畫面改用課程封面（不再用 YouTube 縮圖，業主 2026-11-22）。
-          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : null,
+          // 上傳的封面優先；沒有且是 YouTube 影片＝YouTube 縮圖（業主 2026-11-25）；其餘留空，畫面改用課程封面。
+          coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : ytThumbOf(r.mediaType, r.mediaRef),
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,
           completed: r.done === 1,
         })),

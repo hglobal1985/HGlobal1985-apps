@@ -41,8 +41,8 @@ test("素材清單：建立時沒有章節、公開免費；YouTube 教材在 Ap
   // 清單裡的影片不再用 YouTube 縮圖（業主 2026-11-22）：沒上傳封面就是 null。
   await call("PATCH", `/admin/courses/${id}`, admin, { isShorts: true }); // 短影音清單的影片才會出現在「單元」索引
   const idx = (await call<{ lessons: { id: string; coverUrl: string | null }[] }>("GET", "/search-index", student)).data.lessons.find((l) => l.id === video.id)!;
-  assert.equal(idx.coverUrl, null);
-  assert.equal((await call<CourseDetail>("GET", `/courses/${id}`, student)).data.lessons.find((l) => l.id === video.id)!.coverUrl, null);
+  assert.equal(idx.coverUrl, "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg", "YouTube 教材沒封面＝YouTube 縮圖");
+  assert.equal((await call<CourseDetail>("GET", `/courses/${id}`, student)).data.lessons.find((l) => l.id === video.id)!.coverUrl, "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg");
   assert.equal(after.progressPercent, 0, "教材類不計學習進度");
 
   // 影片換成一般連結、再換回 YouTube
