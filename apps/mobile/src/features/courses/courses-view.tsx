@@ -615,9 +615,8 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
               <HeaderAddToList target={{ kind: "center", ref: activeCenter }} title={centerTitle(activeCenter)} />
               <HeaderInvite title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
-          } /> : undefined} hero={centerHero} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
+          } /> : undefined} hero={centerHero} heroFooter={centerHero ? <BroadcastZone center={activeCenter} title={`${centerTitle(activeCenter)}公告`} reloadKey={bcTick} /> : undefined} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
       {/* 廣播公告緊貼封面正下方、左右滿版（業主 2026-11-21），所以放在第一個。 */}
-      {activeCenter !== ALL ? <BroadcastZone center={activeCenter} title={`${centerTitle(activeCenter)}公告`} reloadKey={bcTick} /> : null}
       <LoginPrompt />
       {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
       {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
@@ -703,7 +702,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {canCreateCourse(member) || canEditArt || canAnnounce ? <View style={{ height: 64 }} /> : null}
     </Screen>
     {/* 中心封面往下滑縮成迷你小視窗（業主 2026-11-24；與影片迷你小視窗同規格，共用 ui/mini-window）。 */}
-    {activeCenter !== ALL ? <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.carousel} title={centerTitle(activeCenter)} />} label={centerTitle(activeCenter)} /> : null}
+    {activeCenter !== ALL ? <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.carousel} title={centerTitle(activeCenter)} />} label={centerTitle(activeCenter)} range={centerHeroFull(winWidth, winHeight)} /> : null}
     {canCreateCourse(member) || canEditArt || canAnnounce ? (
       <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["photos", "schedule"] as const) : []), ...(canAnnounce ? (["announce"] as const) : [])]} />
     ) : null}

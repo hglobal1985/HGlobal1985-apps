@@ -192,9 +192,8 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         path={sharePath}
         extra={admin ? <TopBarButton label={editing ? "完成" : "編輯"} accessibilityLabel={editing ? "完成編輯系列" : "編輯系列"} iconName={editing ? "checkmark-circle-outline" : "create-outline"} onPress={() => setEditing((v) => !v)} /> : undefined}
       />
-      <Screen wide header={false} hero={<CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
+      <Screen wide header={false} hero={<CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroFooter={<BroadcastZone series={series} title={`${shownTitle}公告`} reloadKey={bcTick} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
         {/* 系列公告緊貼封面下方（業主 2026-11-21）；課程頁、各中心頁各有自己的公告橫條。 */}
-        <BroadcastZone series={series} title={`${shownTitle}公告`} reloadKey={bcTick} />
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}
@@ -248,7 +247,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         {admin || canCreateCourse(member) ? <View style={{ height: 64 }} /> : null}
       </Screen>
       {/* 系列封面往下滑縮成迷你小視窗（業主 2026-11-24；與影片迷你小視窗同規格）。 */}
-      <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.items} title={shownTitle} />} label={shownTitle} />
+      <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.items} title={shownTitle} />} label={shownTitle} range={centerHeroFull(winW, winHeight)} />
       {/* 右下角「＋」（業主 2026-11-23：除了中心卡，每個頁面都要有新增鈕）：有新增權限的人可新增教材卡（系列預先選好目前這個系列）；超級管理員另可新增公告（目前這個系列，或首頁公告）。 */}
       {admin || canCreateCourse(member) ? <AddMaterialFab kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(admin ? (["announce"] as const) : [])]} onPick={(k) => (k === "announce" ? setComposeOpen(true) : setNewOpen(true))} /> : null}
       {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultSeries={series !== UNCATEGORIZED ? series : undefined} /> : null}
