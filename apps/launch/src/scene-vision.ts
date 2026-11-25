@@ -83,6 +83,15 @@ export async function sceneImage(env: Env, db: D1Database, rowId: string): Promi
   await db.prepare("UPDATE cover_media SET scene_text = ?, scene_status = 'done', scene_model = ? WHERE id = ?").bind(scene, model, rowId).run();
 }
 
+/** 還沒辨識場景的相簿照片編號（區塊照片；批次排程 ai-batch.ts 用）。 */
+export async function sceneIds(db: D1Database, limit: number): Promise<string[]> {
+  const { results } = await db
+    .prepare("SELECT cm.id FROM cover_media cm WHERE cm.owner_kind = 'course' AND cm.kind = 'image' AND (cm.scene_status = '' OR (cm.scene_status = 'working' AND cm.scene_at < ?)) AND EXISTS (SELECT 1 FROM lessons l WHERE l.id = cm.owner_key AND l.kind = 'section') ORDER BY cm.created_at DESC LIMIT ?")
+    .bind(new Date(Date.now() - 10 * 60_000).toISOString(), limit)
+    .all<{ id: string }>();
+  return results.map((r) => r.id);
+}
+
 /** 背景處理還沒辨識的相簿照片（區塊照片；每次最多 limit 張；額度用完或沒綁定 AI 就停）。 */
 export async function scenePending(env: Env, db: D1Database, limit = 3): Promise<void> {
   if (!env.AI) return;
