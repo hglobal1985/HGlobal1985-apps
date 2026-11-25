@@ -9,6 +9,7 @@ import { useSession } from "@/state/session";
 import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.web";
 import { engine } from "./engine.web";
 import { usePlayer } from "./use-player";
+import { PipHelp } from "./pip-help";
 
 const CIRCLE = MINI_CIRCLE;
 /** 頁面往下滑多少像素，影片就完全縮成迷你播放器。 */
@@ -408,6 +409,7 @@ export function PlayerLayer() {
       ) : null}
       </div>
     </div>
+    <PipHelp />
     {/* 迷你小視窗＝全站同一個元件（ui/mini-window.tsx，封面迷你小視窗也用它）：按鈕列、拖曳、位置記憶、小圓圖都由它負責；這裡只提供畫面格（影片疊在上面）與動作 */}
     <div style={{ position: "fixed", inset: 0, zIndex: 999, pointerEvents: "none" }}>
       <MiniWindow

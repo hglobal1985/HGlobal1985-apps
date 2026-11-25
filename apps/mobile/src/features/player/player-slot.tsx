@@ -1,3 +1,4 @@
+import { notePipStarted } from "./pip-help-store";
 import { VideoView } from "expo-video";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
@@ -30,7 +31,7 @@ export function PlayerSlot({ trackKey }: { trackKey: string }) {
   return (
     <View onLayout={(e) => shrink === 0 && setH0(e.nativeEvent.layout.height)} style={shrink > 0 && h0 ? { height: Math.round(h0 * (1 - shrink)), overflow: "hidden" } : undefined}>
     <StageFrame>
-      <View style={StyleSheet.absoluteFill}>{p && !atMini ? <VideoView ref={view} player={p} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="contain" allowsPictureInPicture startsPictureInPictureAutomatically /> : null}</View>
+      <View style={StyleSheet.absoluteFill}>{p && !atMini ? <VideoView ref={view} player={p} style={StyleSheet.absoluteFill} nativeControls={false} contentFit="contain" allowsPictureInPicture startsPictureInPictureAutomatically onPictureInPictureStart={notePipStarted} /> : null}</View>
     </StageFrame>
     </View>
   );
