@@ -28,7 +28,7 @@ import type { ChapterItem } from "@/features/courses/chapter-list";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
-import { useRememberedQuery } from "@/lib/search-memory";
+import { markFromSearch, useRememberedQuery } from "@/lib/search-memory";
 import { listable, useSearchEngine } from "@/features/search/use-search-engine";
 import { useVoice } from "./use-voice";
 
@@ -57,7 +57,10 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const { member } = useSession();
   useProfileRedirect(member); // 會員資料沒填完：登入後自動帶到至尊模式頁、捲到沒填的欄位（業主 2026-11-24）
   const courses = useApi<CourseSummary[]>("/courses");
-  const [q, setQ] = useRememberedQuery("elder"); // 返回時回到剛剛的搜尋結果
+  // 搜尋字只有首頁記住（返回時回到剛剛的搜尋結果）；課程分頁沒有搜尋，不套用記憶（業主 2026-11-25：搜尋結果不應出現在課程頁）。
+  const mem = useRememberedQuery("elder");
+  const plain = useState("");
+  const [q, setQ] = mode === "home" ? mem : plain;
   const [heard, setHeard] = useState<string | null>(null);
   // 課程分頁的四大分類（業主 2026-11-24，D 款）：null＝顯示四張大卡；選了一區＝列出該區課程。
   const [zone, setZone] = useState<ElderZone | null>(null);
@@ -386,7 +389,7 @@ function ElderChapterRow({ item }: { item: ChapterItem }) {
   const cover = lesson.coverUrl || course.coverUrl || course.edmUrl;
   const status = lesson.completed ? "已完成" : !lesson.ready ? "敬請期待" : locked ? "報名後觀看" : "";
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${lesson.title}，${course.title}`} onPress={() => router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never)} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${lesson.title}，${course.title}`} onPress={() => (markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
         {cover ? <Image source={{ uri: thumb(resolveUrl(cover), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <TileCover rep={course} width={w} height={h} flat inSeries={false} title={course.title} />}
       </View>

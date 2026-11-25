@@ -1,3 +1,4 @@
+import { markFromSearch } from "@/lib/search-memory";
 import { lessonHref } from "@/lib/lesson-href";
 import { useThumb } from "@/lib/thumb";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -33,7 +34,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
             key={lesson.id}
             accessibilityRole="button"
             accessibilityLabel={`${lesson.title}${who ? `，${who}` : ""}`}
-            onPress={() => router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never)}
+            onPress={() => (markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))}
             style={[styles.row, { backgroundColor: c.surface, borderColor: c.border }]}
           >
             <View style={styles.thumb}>
