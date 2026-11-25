@@ -132,10 +132,10 @@ export async function semanticSearch(env: Env, db: D1Database, q: string, limitA
   const boost = (kind: string) => Number(st[`semBoost${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] ?? 0);
   const prio = (kind: string) => Number(st[`semPrio${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] ?? 5);
   const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) + boost(r.kind) + lexAdjust(text, r.txt, r.kind, Number(st.lexBonus ?? 0.3), Number(st.lexPenalty ?? 0.5)) })).filter((x) => x.s >= min).sort((a, b) => b.s - a.s);
-  const other = scored.filter((x) => x.r.kind !== "course" && x.r.kind !== "lesson").slice(0, Math.min(limit, 12));
+  const other = scored.filter((x) => x.r.kind !== "course" && x.r.kind !== "lesson").slice(0, limit);
   const extras = await resolveHits(db, other.map((x) => ({ kind: x.r.kind as SourceKind, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
   // 單一教材也列在「其他項目」（標籤：單一教材），不再把它的課程混進課程清單。
-  const lessonHits = await resolveHits(db, scored.filter((x) => x.r.kind === "lesson").slice(0, Math.min(limit, 12)).map((x) => ({ kind: "lesson" as const, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
+  const lessonHits = await resolveHits(db, scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => ({ kind: "lesson" as const, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
   return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id), extras: [...extras, ...lessonHits].map((h) => ({ ...h, prio: prio(h.kind) })).sort((a, b) => a.prio - b.prio || b.score - a.score), coursePrio: prio("course") };
 }
 

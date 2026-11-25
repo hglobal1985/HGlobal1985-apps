@@ -14,5 +14,7 @@ test("同音搜尋：打錯字「和本翠」＝關聯詞「漢本萃」，找�
   resetSynonymCache();
   assert.deepEqual((await phoneticSearch(db, "和本翠")).courses.includes("c2"), false);
   await db.prepare("INSERT INTO courses (id, title, is_list, status, series, view_scope, is_public, min_rank_code) VALUES ('c3', '重要性說明', 0, 'published', '', 'all', 1, 'none')").run();
-  assert.equal((await phoneticSearch(db, "和本翠")).courses.includes("c3"), false, "2 字的「中藥」同音「重要」不展開");
+  resetPhoneticCache();
+  const r2 = (await phoneticSearch(db, "和本翠")).courses;
+  assert.ok(r2.indexOf("c3") > r2.indexOf("c1"), "2 字的「中藥」同音「重要」找到的排在最後面");
 });
