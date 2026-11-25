@@ -134,6 +134,18 @@ function FieldLine({ stack, children }: { stack: boolean; children: ReactNode })
  * 完善個人資料表單（兩種模式共用同一份，業主 2026-11-24：欄位改了兩邊自動一起變）。
  * inline＝直接放在頁面裡（至尊模式的模式頁，沒有「關閉」鈕、儲存後不關閉）；預設＝上拉選單。
  */
+/** 已儲存的資料是否「全部填完」（與畫面上的必填規則相同）：至尊頁用它決定進頁是編輯狀態還是檢視狀態（業主 2026-11-25）。 */
+function formComplete(d: View_ | null): boolean {
+  if (!d) return false;
+  const v = formVals(d);
+  if (!v.legal_name.trim()) return false;
+  if (!d.enabled) return true;
+  if (!v.upline_platinum.trim() || !v.upline_diamond.trim() || !v.education_system.trim() || !v.rank.trim()) return false;
+  const sys = v.education_system.trim();
+  const hg = sys !== NONE_TERM && d.hglobalSystems.some((t) => norm(t) === norm(sys));
+  return !hg || !!v.education_center.trim();
+}
+
 export function ProfilePrompt({ onClose, initial: first, inline = false, focusMissing = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean; /** 資料載入後，標出沒填的欄位並捲到第一個（至尊模式登入後自動帶到模式頁，業主 2026-11-24）。 */ focusMissing?: boolean }) {
   /** 一欄由上往下排（至尊模式頁，字放大後三欄橫排會被擠爛）；上拉選單版維持原本的緊湊三欄。 */
   const stack = inline;
@@ -205,10 +217,27 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
   const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name") && vals[k].trim() !== initial[k].trim()) : [];
   // 尚未儲存的離開攔截（業主 2026-11-24，只有至尊模式頁的表單）：有改動還沒儲存時，離開畫面前把畫面捲到儲存鈕、顯示「尚未儲存」與「放棄」。
   const dirty = inline && (changed.length > 0 || (wantAmway && !data?.enabled));
+  // 檢視／編輯狀態（業主 2026-11-25，只有至尊頁）：資料沒填完＝每次進頁都是編輯狀態，離開前一定先問「資料未完成是否放棄？」；
+  // 資料全部填完並儲存之後，再進頁是檢視狀態（欄位不能點），要按「編輯」才能改。
+  const savedComplete = formComplete(data);
+  const [editing, setEditing] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (inline && editing === null && data) setEditing(!formComplete(data));
+  }, [inline, editing, data]);
+  const justSaved = useRef(false);
+  useEffect(() => {
+    if (justSaved.current && savedComplete) {
+      justSaved.current = false;
+      setEditing(false);
+    }
+  }, [savedComplete, data]);
+  const readOnly = inline && editing === false;
+  const incomplete = inline && editing === true && !savedComplete;
+  const guarded = inline && editing === true && (dirty || !savedComplete);
   const [leaving, setLeaving] = useState<(() => void) | null>(null);
   const saveBox = useRef<HostInstance>(null);
   useEffect(() => {
-    if (!dirty) {
+    if (!guarded) {
       setUnsavedGuard(null);
       setLeaving(null);
       return;
@@ -219,11 +248,11 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
       return false;
     });
     return () => setUnsavedGuard(null);
-  }, [dirty]);
+  }, [guarded]);
   // 瀏覽器／手機的返回鍵也要攔（業主 2026-11-24）：有未儲存的改動時先在歷史紀錄多塞一筆「同網址」的記號，
   // 按返回只是退掉這筆記號（畫面不動）；這時再塞回去、顯示「尚未儲存」；按「放棄」才真的退兩步離開。改動儲存或放棄後把記號收掉。
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined" || !dirty) return;
+    if (Platform.OS !== "web" || typeof window === "undefined" || !guarded) return;
     window.history.pushState({ unsavedMark: true }, "", window.location.href);
     let leaving = false;
     const onPop = () => {
@@ -239,7 +268,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
       window.removeEventListener("popstate", onPop);
       if (!leaving && (window.history.state as { unsavedMark?: boolean } | null)?.unsavedMark) window.history.back();
     };
-  }, [dirty]);
+  }, [guarded]);
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
   /** 選的系統是不是寰宇：只有寰宇才能選「中心」（業主 2026-11-22）；其他系統、「無」、還沒選，中心都不能選。 */
@@ -309,6 +338,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
       setSysNotice(r.systemNotice ?? null);
       if (r.form) apply(r.form);
       else load();
+      if (!r.errors.length && !r.systemNotice) justSaved.current = true; // 儲存成功且資料都填完 → 回到檢視狀態
       if (!r.errors.length && !r.systemNotice) trackFeature("profile_edit");
       setShowBad(false);
       setMsg(r.systemNotice && !r.errors.length ? { ok: false, text: "「系統」需要修改，請看下方紅字提醒" } : r.errors.length ? { ok: false, text: r.errors[0] } : { ok: true, text: r.pending ? "已儲存，部分欄位等待審核" : "已儲存到會員中心" });
@@ -419,7 +449,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
           ) : null}
           {!data && !error ? <AppText tone="muted">讀取中…</AppText> : null}
           {data ? (
-            <>
+            <View pointerEvents={readOnly ? "none" : "auto"} style={[{ gap: space.xs }, readOnly ? { opacity: 0.8 } : null]} accessibilityState={{ disabled: readOnly }}>
               {/* 本名（四個中文字寬）＋縮小的手機推播（業主 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
               <View style={stack ? { gap: space.sm } : [styles.line, { alignItems: "flex-end" }]}>
                 <View style={stack ? { width: "100%" } : { width: 168 }}>
@@ -500,7 +530,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                   </>
                 ) : null}
               </View>
-            </>
+            </View>
           ) : null}
       </Body>
       {leaving ? (
@@ -508,15 +538,32 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
           <AppText variant="headline" style={{ color: c.warning }}>
             尚未儲存
           </AppText>
-          <AppText>資料還沒有儲存。請按「儲存」；不想存就按「放棄」，會還原成原本的資料，並留在這一頁。</AppText>
+          <AppText>{incomplete ? "會員資料還沒有填完整。要先把資料填完再儲存，還是放棄、直接離開？" : "資料還沒有儲存。請按「儲存」；不想存就按「放棄」，會還原成原本的資料，並留在這一頁。"}</AppText>
         </View>
       ) : null}
       <View ref={saveBox} collapsable={false} style={styles.actions}>
         {inline ? (
-          // 至尊模式頁：有未儲存的改動時，「放棄」在儲存鈕左邊、同一列（業主 2026-11-24）。
-          dirty ? (
+          // 至尊模式頁（業主 2026-11-25）：檢視狀態＝「編輯｜儲存」同一列（儲存灰掉）；編輯狀態有改動或資料沒填完被攔下時，「放棄」在儲存鈕左邊。
+          readOnly ? (
             <View style={{ flex: 1 }}>
-              <Button variant="cancel" label="放棄" icon="close" onPress={() => { if (data) apply(data); setLeaving(null); setUnsavedGuard(null); }} fullWidth />
+              <Button variant="secondary" label="編輯" icon="create-outline" onPress={() => setEditing(true)} fullWidth />
+            </View>
+          ) : dirty || (leaving && incomplete) ? (
+            <View style={{ flex: 1 }}>
+              <Button
+                variant="cancel"
+                label="放棄"
+                icon="close"
+                onPress={() => {
+                  const go = leaving;
+                  if (data) apply(data);
+                  setLeaving(null);
+                  setUnsavedGuard(null);
+                  if (incomplete && go) go(); // 資料沒填完：放棄＝真的離開；其餘（有改動的完整資料）＝還原並留在這一頁
+                  else if (savedComplete) setEditing(false);
+                }}
+                fullWidth
+              />
             </View>
           ) : null
         ) : (
@@ -525,7 +572,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
           </View>
         )}
         <View style={{ flex: 1 }}>
-          <Button label="儲存" icon="save-outline" onPress={save} disabled={busy || (!changed.length && !(wantAmway && !data?.enabled))} loading={busy} fullWidth />
+          <Button label="儲存" icon="save-outline" onPress={save} disabled={busy || readOnly || (!changed.length && !(wantAmway && !data?.enabled))} loading={busy} fullWidth />
         </View>
       </View>
     {popup && Platform.OS === "web" ? createPortal(popup, document.body) : popup}
