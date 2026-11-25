@@ -1,13 +1,14 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { Platform, Pressable, TextInput, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
 import { useTheme } from "@/theme/theme";
-import { radius, space, type } from "@/theme/tokens";
+import { radius, space } from "@/theme/tokens";
 import { AppText, Card } from "@/ui";
 import { LockMask } from "@/ui";
 import { blockPhotoCount } from "./block-photos";
 import { CoverAlbum } from "./album";
+import { AlbumSearchBar, albumSearchable, matchAlbumItem, useAlbumSearch } from "./album-search";
 
 /** 有照片的區塊（相簿分頁、「瀏覽本區照片」都以這份為準）。 */
 export const albumBlocks = (course: CourseDetail): Lesson[] => course.lessons.filter((l) => l.section && !!l.photoKey && blockPhotoCount(l) > 0);
@@ -22,10 +23,10 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
   const all = albumBlocks(course);
   const [open, setOpen] = useState<string | null>(openId ?? null);
   // 場景搜尋（業主 2026-11-24）：AI 辨識出的行為、場景、物品標籤；有搜尋時只列出符合的照片，符合的區塊自動展開。
-  const [q, setQ] = useState("");
-  const key = q.trim().toLowerCase();
-  const hasScene = all.some((g) => g.photos!.some((p) => p.scene));
-  const groups = key ? all.map((g) => ({ ...g, photos: g.photos!.filter((p) => (p.scene ?? "").toLowerCase().includes(key)) })).filter((g) => g.photos.length) : all;
+  // 搜尋改用共用模組 album-search.tsx（場景標籤＋照片裡的文字 OCR；業主 2026-11-25，與中心 EDM 一致）。
+  const { q, setQ, key } = useAlbumSearch();
+  const hasScene = all.some((g) => albumSearchable(g.photos!));
+  const groups = key ? all.map((g) => ({ ...g, photos: g.photos!.filter((p) => matchAlbumItem(p, key)) })).filter((g) => g.photos.length) : all;
   useEffect(() => {
     if (!openId) return;
     setOpen(openId);
@@ -33,16 +34,11 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
     const t = setTimeout(() => document.getElementById(`alb-${openId}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250);
     return () => clearTimeout(t);
   }, [openId]);
-  if (!groups.length) return <AppText tone="muted">還沒有照片</AppText>;
+  if (!all.length) return <AppText tone="muted">還沒有照片</AppText>;
   return (
     <View style={{ gap: space.sm }}>
       {hasScene ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-          <View style={{ paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, backgroundColor: c.accent }}>
-            <AppText variant="caption" style={{ color: c.textOnAccent, fontWeight: "800" }}>場景</AppText>
-          </View>
-          <TextInput value={q} onChangeText={setQ} placeholder="搜尋照片裡的場景、行為、物品" placeholderTextColor={c.textMuted} accessibilityLabel="搜尋照片場景" style={{ flex: 1, minHeight: 44, borderWidth: 1, borderColor: c.border, borderRadius: radius.md, paddingHorizontal: space.md, color: c.text, backgroundColor: c.surface, ...type.body }} />
-        </View>
+        <AlbumSearchBar q={q} setQ={setQ} />
       ) : null}
       {key && !groups.length ? <AppText tone="muted">沒有符合的照片</AppText> : null}
       {groups.map((g) => {

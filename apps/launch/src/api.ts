@@ -1,6 +1,7 @@
 import { ensureBrandCards } from "./brand-cards.ts";
 import { reserveThumb, thumbUsage } from "./thumb-quota.ts";
 import { scenePending } from "./scene-vision.ts";
+import { photoOcrPending } from "./photo-ocr.ts";
 import { kickFilePhotos } from "./block-photos.ts";
 import { ensureTreasureLinks, syncSeriesOrderFromTreasure, syncTreasureFromSeriesOrder, treasureCourseId } from "./treasure-box.ts";
 import { renameForType, shrinkImage, shrinkStored } from "./image-store.ts";
@@ -1133,9 +1134,9 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const photoKeys = [...new Set(photoKeyOf.values())];
   if (photoKeys.length) {
     const { results } = await ctx.db
-      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec, scene_text FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
+      .prepare(`SELECT id, owner_key, scope, kind, r2_key, poster_key, width, height, duration_sec, scene_text, ocr_text FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' AND owner_key IN (${photoKeys.map(() => "?").join(",")}) ORDER BY owner_key, position`)
       .bind(...photoKeys)
-      .all<{ id: string; owner_key: string; scene_text: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
+      .all<{ id: string; owner_key: string; scene_text: string; ocr_text: string; scope: CoverScope; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }>();
     for (const r of results) photosOf.set(r.owner_key, [...(photosOf.get(r.owner_key) ?? []), coverItem(r)]);
   }
   const [eligibility, canRoster, registrations] = await Promise.all([eligibilityFor(s, rankMap, [row.min_rank_code, DIAMOND]), canSeeRoster(ctx, s, row, manages), manages ? registrationCount(ctx.db, id) : Promise.resolve(0)]);
@@ -2545,7 +2546,7 @@ function coverItem(r: { id: string; scope: CoverScope; scene_text?: string | nul
     width: r.width,
     height: r.height,
     durationSec: r.duration_sec,
-    ...(r.scope === "edm" ? { eventDate: r.event_date ?? null, text: r.ocr_text ?? "" } : {}),
+    ...(r.scope === "edm" ? { eventDate: r.event_date ?? null, text: r.ocr_text ?? "" } : r.ocr_text ? { text: r.ocr_text } : {}),
     ...(r.scene_text ? { scene: r.scene_text } : {}),
   };
 }
@@ -4263,7 +4264,7 @@ const routes: [string, RegExp, Handler][] = [
       const id = await addCoverRow(ctx.db, o, { kind: "image", r2Key: key, posterKey: null, width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")), durationSec: 0, bytes: shrunk.data.byteLength, by: o.s.sub });
       // 中心 EDM：上傳後在背景用視覺模型辨識文字與活動日期（搜尋與依日期排序用）；失敗不影響上傳。
       if (o.kind === "center" && o.scope === "edm" && ctx.defer) ctx.defer(ocrEdmImage(ctx.env, ctx.db, id).catch(() => undefined));
-      if (o.kind === "course" && ctx.defer) ctx.defer(scenePending(ctx.env, ctx.db, 2).catch(() => undefined)); // 區塊照片：上傳後背景辨識場景（業主 2026-11-24）
+      if (o.kind === "course" && ctx.defer) ctx.defer(Promise.all([scenePending(ctx.env, ctx.db, 2), photoOcrPending(ctx.env, ctx.db, 2)]).catch(() => undefined)); // 區塊照片：上傳後背景辨識場景（業主 2026-11-24）
       return { id, items: await coverItems(ctx.db, o.kind, o.lookup) };
     },
   ],
@@ -4643,9 +4644,9 @@ const routes: [string, RegExp, Handler][] = [
       if (!tokens.length || tokens.join("").length < 2) return { hits: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
       type SceneRow = { id: string; r2_key: string; block_id: string; scene_text: string; block_title: string; course_id: string; course_title: string };
-      const base = `SELECT cm.id, cm.r2_key, cm.owner_key AS block_id, cm.scene_text, l.title AS block_title, l.course_id, c.title AS course_title FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.scene_status = 'done' AND c.status = 'published'`;
+      const base = `SELECT cm.id, cm.r2_key, cm.owner_key AS block_id, cm.scene_text, l.title AS block_title, l.course_id, c.title AS course_title FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND (cm.scene_status = 'done' OR cm.ocr_status = 'done') AND c.status = 'published'`;
       let { results } = await ctx.db
-        .prepare(`${base} AND ${tokens.map(() => "lower(cm.scene_text) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 300`)
+        .prepare(`${base} AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 300`)
         .bind(...tokens.map(like))
         .all<SceneRow>();
       // 反向比對（業主 2026-11-25：說了一長句「洗蔬菜水果清潔劑…」卻找不到蔬菜水果的照片）：整句塞不進標籤時，
@@ -6455,12 +6456,15 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx) => {
       // 設定 › AI 文字辨識：中心 EDM 文字辨識、相簿場景辨識的完成張數與進度，以及今天的 AI 額度（已用、剩餘）。
       requireSuperAdmin(ctx);
-      const [ocr, scene, st, used] = await Promise.all([
+      const [ocr, scene, photoOcr, st, used] = await Promise.all([
         ctx.db
           .prepare("SELECT center_key AS grp, COUNT(*) AS total, SUM(ocr_status = 'done') AS done, SUM(ocr_status = 'failed') AS failed FROM cover_media WHERE owner_kind = 'center' AND scope = 'edm' AND kind = 'image' GROUP BY center_key ORDER BY total DESC")
           .all<{ grp: string | null; total: number; done: number; failed: number }>(),
         ctx.db
           .prepare("SELECT cm.owner_key AS grp, c.title || ' › ' || l.title AS label, COUNT(*) AS total, SUM(cm.scene_status = 'done') AS done, SUM(cm.scene_status = 'failed') AS failed FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.kind = 'image' GROUP BY cm.owner_key ORDER BY total DESC")
+          .all<{ grp: string; label: string; total: number; done: number; failed: number }>(),
+        ctx.db
+          .prepare("SELECT cm.owner_key AS grp, c.title || ' › ' || l.title AS label, COUNT(*) AS total, SUM(cm.ocr_status = 'done') AS done, SUM(cm.ocr_status = 'failed') AS failed FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.kind = 'image' GROUP BY cm.owner_key ORDER BY total DESC")
           .all<{ grp: string; label: string; total: number; done: number; failed: number }>(),
         loadAiSettings(ctx.db),
         aiTodayUsed(ctx.db),
@@ -6474,6 +6478,7 @@ const routes: [string, RegExp, Handler][] = [
       return {
         ocr: pack(ocr.results.map((r) => ({ label: r.grp || "（未知中心）", total: r.total, done: r.done, failed: r.failed }))),
         scene: pack(scene.results),
+        photoOcr: pack(photoOcr.results),
         ai: { capEnabled: st.capEnabled, dailyCap: st.dailyCap, used, remaining: Math.max(0, st.dailyCap - used) },
       };
     },

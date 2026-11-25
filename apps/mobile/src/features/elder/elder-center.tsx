@@ -3,7 +3,7 @@ import { View } from "react-native";
 import type { CenterArt, CourseSummary } from "@/api/client";
 import { CenterHero } from "@/features/courses/center-hero";
 import { useCoverStats } from "@/features/courses/cover-stats";
-import { CoverAlbum } from "@/features/courses/album";
+import { SearchableAlbum } from "@/features/courses/album-search";
 import { CenterMaterialsCard } from "@/features/courses/center-list";
 import { ScheduleCard, useCenterSchedules } from "@/features/courses/center-schedule";
 import { useCoverMedia } from "@/features/courses/cover-media";
@@ -36,7 +36,7 @@ export function ElderCenterPage({ center, courses, renderCourses }: { center: st
   const announce = useElderBroadcastBlock({ center, label: centerTitle(center) });
   const blocks: ElderBlock[] = [
     ...(announce ? [announce] : []),
-    { key: "album", title: "EDM", sub: cm.edm.length ? `${cm.edm.length} 張` : undefined, body: () => <CoverAlbum kind="center" scope="edm" ownerKey={center} title={centerTitle(center)} items={cm.edm} canEdit={canEditCenterArt(member, center)} onChanged={cm.reload} /> },
+    { key: "album", title: "EDM", sub: cm.edm.length ? `${cm.edm.length} 張` : undefined, body: () => <SearchableAlbum kind="center" scope="edm" ownerKey={center} title={centerTitle(center)} items={cm.edm} canEdit={canEditCenterArt(member, center)} onChanged={cm.reload} /> },
     {
       key: "schedule",
       title: "課表",

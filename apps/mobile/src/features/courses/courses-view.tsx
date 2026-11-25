@@ -22,7 +22,7 @@ import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull, HeroMiniCover } from "./center-hero";
 import { CoverMiniFloat } from "@/ui/collapse-band";
-import { CoverAlbum } from "./album";
+import { SearchableAlbum } from "./album-search";
 import { canEditCenterArt } from "./center-rights";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { BottomSheet } from "@/ui/bottom-sheet";
@@ -631,7 +631,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {centerPage && tab === "album" ? (
-        <CoverAlbum kind="center" scope="edm" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={edmShown} canEdit={canEditArt} onChanged={cm.reload} emptyHint={q.trim() ? "找不到符合的 EDM" : undefined} />
+        <SearchableAlbum kind="center" scope="edm" ownerKey={activeCenter} title={centerTitle(activeCenter)} items={edmShown} canEdit={canEditArt} onChanged={cm.reload} emptyHint={q.trim() ? "找不到符合的 EDM" : undefined} />
       ) : centerPage && tab === "schedule" ? (
         sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : (
           <>
