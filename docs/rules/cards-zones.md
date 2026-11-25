@@ -72,3 +72,5 @@
 - **全螢幕相簿按「上傳照片」選好檔案後視窗整個消失、沒有上傳（業主 2026-11-25 回報，已修）**：原因＝`lib/back-close.ts` 的 `useBackToClose` 規定「瀏覽器全螢幕被退出就關閉視窗」，而電腦瀏覽器開檔案選擇視窗時會自己收起全螢幕，視窗被當成使用者要關閉而卸載，上傳元件跟著消失。修法：`holdFullscreenClose()`／`releaseFullscreenClose()`——`AlbumUploadButton`（網頁版）在開檔案選擇視窗前呼叫 hold，選好檔案或按取消後 release（再緩衝 1.5 秒），這段期間全螢幕被收起不關閉視窗；收起後下一次點一下畫面會自動再進全螢幕（`EdmLightbox` 的 `fullscreenchange` 監聽）。**瀏覽器會在檔案選擇視窗開啟時收起全螢幕，網頁無法阻止**，只能保證視窗不消失、上傳照常進行。之後任何全螢幕視窗裡要開檔案選擇的按鈕，都要照這個做法。
 
 - **相簿記住上次位置（業主 2026-11-25）**：退出相簿時記住最後看的類別、資料夾、單張照片，下次進入顯示同一條路徑。`lib/album-memory.ts`（`loadAlbumPos`／`saveAlbumPos`，存在這支裝置的 localStorage，只是個人便利、不上傳伺服器；沒有 localStorage 就只記這次開啟期間）。`mode`＝`library`：`LightboxLibrary` 的 `restore` 在資料讀回來後開到上次的類別／資料夾（`group`、`folder`；沒權限或不存在就停在首頁／該類別），位置變動時記下（還原完成前、讀取資料夾中不記，免得蓋掉）；`mode`＝`photo`：`EdmLightbox library` 一開場就讀 `/albums/folder` 直接開回上次那張照片，讀不到（被刪、被鎖）回到資料夾檢視。只有相簿專區入口（`library`）會記，一般看圖不記。
+
+- **從單張照片按 ✕ 回到縮圖清單，自動停在剛剛那張的位置（業主 2026-11-25）**：`LightboxGrid`（嵌入版與「檢視全部」蓋滿版共用）收到 `current`（剛剛那張的索引）就在第一次有照片、量好寬度後捲到該列（`scroller.scrollTo`，不動畫、停在上方留約半格），並用白框標出那張；相簿資料夾回來時 `EdmLightbox` 把 `focusId`（`list[idx].id`）經 `initial` 交給 `LightboxLibrary`，由它算出索引；換資料夾就清掉 `focusId`。

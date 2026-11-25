@@ -34,7 +34,7 @@ const folderName = (f: AlbumFolder) => (f.kind === "center" ? centerTitle(f.titl
  * ④沒有權限的資料夾（鎖定的課程、區塊相簿）禁止進入，點了只顯示原因（伺服器也會擋）。
  * 點資料夾 → onPick（交給全螢幕看圖換成這個資料夾的照片並進入「檢視全部」格狀畫面）。
  */
-export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到上次位置（相簿專區入口）：類別與資料夾；沒有 initial 才套用。 */ restore?: { group: string | null; folder: string | null } | null; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[] } | null }) {
+export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到上次位置（相簿專區入口）：類別與資料夾；沒有 initial 才套用。 */ restore?: { group: string | null; folder: string | null } | null; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[]; focusId?: string } | null }) {
   const thumb = useThumb();
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
@@ -81,6 +81,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       const items = r.items.filter((x) => x.kind === "image");
       if (!items.length) return void flashText("這個相簿還沒有照片");
       setView({ folder: f, items });
+      setFocusId(undefined);
       setQ("");
     } catch (e) {
       flashText((e as Error).message);
@@ -217,6 +218,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // 回到上次位置（業主 2026-11-25）：資料讀回來後，開到上次的類別／資料夾；沒權限或不存在了就停在相簿首頁／該類別。
   const [ready, setReady] = useState(!restore || !!initial);
+  const [focusId, setFocusId] = useState<string | undefined>(initial?.focusId); // 回到資料夾時要停在哪張照片
   useEffect(() => {
     if (ready || !data) return;
     setReady(true);
@@ -310,7 +312,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
             <LightboxGrid
               embedded
               list={shown.map((x) => lightboxItem(x, folderName(view.folder)))}
-              current={-1}
+              current={focusId ? shown.findIndex((x) => x.id === focusId) : -1}
               heading={folderName(view.folder)}
               extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}</View>) : undefined}
               onPick={(i) => onPick({ folder: view.folder, title: folderName(view.folder), items: shown, index: i })}
