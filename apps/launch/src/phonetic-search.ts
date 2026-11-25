@@ -48,11 +48,11 @@ async function load(db: D1Database): Promise<Entry[]> {
   if (cache && Date.now() - cache.at < 600_000) return cache.rows;
   const [c, l] = await Promise.all([
     db.prepare("SELECT id, title, series, teacher FROM courses WHERE status = 'published'").all<{ id: string; title: string; series: string | null; teacher: string | null }>(),
-    db.prepare("SELECT l.id AS id, l.course_id AS course_id, l.title AS title FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND l.title <> ''").all<{ id: string; course_id: string; title: string }>(),
+    db.prepare("SELECT l.id AS id, l.course_id AS course_id, l.title AS title, c.title AS ct, c.series AS cs FROM lessons l JOIN courses c ON c.id = l.course_id WHERE c.status = 'published' AND l.title <> ''").all<{ id: string; course_id: string; title: string; ct: string; cs: string | null }>(),
   ]);
   const rows: Entry[] = [
     ...c.results.map((r): Entry => ({ kind: "course", id: r.id, courseId: r.id, segs: [{ syl: syllables(r.title), w: 4 }, { syl: syllables(r.teacher ?? ""), w: 2.5 }, { syl: syllables(r.series ?? ""), w: 2.5 }] })),
-    ...l.results.map((r): Entry => ({ kind: "lesson", id: r.id, courseId: r.course_id, segs: [{ syl: syllables(r.title), w: 2 }] })),
+    ...l.results.map((r): Entry => ({ kind: "lesson", id: r.id, courseId: r.course_id, segs: [{ syl: syllables(r.title), w: 2 }, { syl: syllables(r.ct), w: 1 }, { syl: syllables(r.cs ?? ""), w: 1 }] })),
   ];
   cache = { at: Date.now(), rows };
   return rows;
@@ -65,14 +65,34 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
   const qs = syllables(q.trim().slice(0, 100));
   if (qs.length < (st.phoneticMinSyllables as number)) return { courses: [], lessons: [] };
   const k = allow(qs.length, st.phoneticTypoFrom as number);
+  // 整串連續符合（最高分）；否則「拆片段」：查詢裡每一段連續的音節只要在這筆資料的任何欄位出現就算覆蓋到，
+  // 覆蓋率夠高就列出，覆蓋越多排越前面（業主 2026-11-25：「一支援安裝」＝「益之源」同音錯字＋「安裝」，中間隔著別的字）。
+  const n = qs.length;
   const score = (e: Entry) => {
     let best = 0;
     for (const s of e.segs) {
       if (!s.syl.length) continue;
-      if (approxSyl(s.syl, qs, 0)) best = Math.max(best, s.w);
+      if (approxSyl(s.syl, qs, 0)) best = Math.max(best, s.w + 0.5);
       else if (k && approxSyl(s.syl, qs, k)) best = Math.max(best, s.w - 1.5);
     }
-    return best;
+    if (best > 0 || n < 4) return best;
+    const covered = new Array<boolean>(n).fill(false);
+    let w = 0;
+    for (let len = n - 1; len >= 2; len--) {
+      for (let st0 = 0; st0 + len <= n; st0++) {
+        if (covered.slice(st0, st0 + len).every(Boolean)) continue;
+        const win = qs.slice(st0, st0 + len);
+        for (const s of e.segs) {
+          if (s.syl.length && approxSyl(s.syl, win, 0)) {
+            for (let i = st0; i < st0 + len; i++) covered[i] = true;
+            w = Math.max(w, s.w);
+            break;
+          }
+        }
+      }
+    }
+    const cov = covered.filter(Boolean).length / n;
+    return cov >= 0.75 ? w * cov : 0;
   };
   const hit = (await load(db)).map((e) => ({ e, s: score(e) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
   return { courses: hit.filter((x) => x.e.kind === "course").slice(0, limit).map((x) => x.e.id), lessons: hit.filter((x) => x.e.kind === "lesson").slice(0, limit).map((x) => x.e.id) };
