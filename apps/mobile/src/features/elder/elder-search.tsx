@@ -103,7 +103,8 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     if (sub) return (sub.children ?? []).map((x) => ({ key: x.id, title: x.title, count: x.materialCount, rep: x }));
     return itemsOf(zone);
   }, [key, results, mode, zone, sub, itemsOf]);
-  const cont = mode === "home" ? lastCourse(courses.data ?? []) : null;
+  // 「繼續上課」只出現在至尊首頁的初始畫面：搜尋中、找不到課程、分類裡都不顯示（業主 2026-11-25）。
+  const cont = mode === "home" && !q.trim() && !sub ? lastCourse(courses.data ?? []) : null;
   const searching = q.trim().length > 0;
   const mic = () => {
     if (voice.listening) return voice.stop();
