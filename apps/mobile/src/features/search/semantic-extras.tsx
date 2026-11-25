@@ -2,6 +2,7 @@ import { router, type Href } from "expo-router";
 import { useState } from "react";
 import { Image, Pressable, View } from "react-native";
 import { resolveUrl } from "@/api/client";
+import { markFromSearch } from "@/lib/search-memory";
 import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
@@ -30,7 +31,7 @@ export function SemanticExtras({ items, big }: { items: SemanticHit[]; big?: boo
           key={x.id}
           accessibilityRole="link"
           accessibilityLabel={`${x.tag}：${x.title}`}
-          onPress={() => (x.image ? setView(x) : router.push(x.link as Href))}
+          onPress={() => (x.image ? setView(x) : (markFromSearch(), router.push(x.link as Href)))}
           style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, borderBottomWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
         >
           <View style={{ width: w, height: h, borderRadius: radius.md, overflow: "hidden", backgroundColor: c.surfaceMuted }}>

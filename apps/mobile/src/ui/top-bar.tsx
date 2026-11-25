@@ -1,3 +1,4 @@
+import { consumeFromSearch } from "@/lib/search-memory";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, usePathname } from "expo-router";
 import type { ReactNode } from "react";
@@ -22,7 +23,11 @@ export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTo
   const insets = useSafeAreaInsets();
   const path = usePathname();
   const fallback = path.startsWith("/course") || path.startsWith("/learn") ? "/courses" : path.startsWith("/orders") || path.startsWith("/admin") || path.startsWith("/settings") || path.startsWith("/achievements") ? "/me" : "/";
-  const back = onBack ?? (() => (!backAlways && router.canGoBack() ? router.back() : router.replace((backTo ?? fallback) as never)));
+  const back = onBack ?? (() => {
+    const fromSearch = consumeFromSearch(); // 從搜尋結果點進來：返回一定回到搜尋結果那一頁（業主 2026-11-25）
+    if ((!backAlways || fromSearch) && router.canGoBack()) router.back();
+    else router.replace((backTo ?? fallback) as never);
+  });
   const top = safeTop ? insets.top : 0;
   return (
     <View style={styles.wrap}>

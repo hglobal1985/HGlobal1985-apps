@@ -25,3 +25,17 @@ export function useRememberedQuery(key: string): [string, (v: string) => void] {
   );
   return [q, setQ];
 }
+
+/**
+ * 從搜尋結果點進去（業主 2026-11-25）：按返回要回到「點結果的那一頁」（首頁搜尋結果），而不是被頁面的 backTo 導去課程頁。
+ * 點結果時呼叫 markFromSearch；TopBar 的返回用 consumeFromSearch 判斷（有效時間同搜尋記憶）。
+ */
+let fromSearchAt = 0;
+export const markFromSearch = () => {
+  fromSearchAt = Date.now();
+};
+export const consumeFromSearch = (): boolean => {
+  const ok = fromSearchAt > 0 && Date.now() - fromSearchAt < ttl;
+  fromSearchAt = 0;
+  return ok;
+};
