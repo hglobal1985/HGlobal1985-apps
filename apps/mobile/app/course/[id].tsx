@@ -156,8 +156,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
     const sn = engine.getSnapshot();
     if (sn.track && sn.collapsed) engine.keepMiniOnce();
     // 迷你狀態＝影片浮在畫面上（沒有佔用這一頁）、或這一頁往下滑已縮成迷你播放器、或是小圓圖。
-    setStayMini(!!sn.track && (sn.slotKey !== sn.track.key || sn.collapsed || bandY >= SHRINK_PX - 2));
-    engine.expectSwitch();
+    const stay = !!sn.track && (sn.slotKey !== sn.track.key || sn.collapsed || bandY >= SHRINK_PX - 2);
+    setStayMini(stay);
+    engine.expectSwitch(stay);
     setPlayingId(lid);
   };
 
