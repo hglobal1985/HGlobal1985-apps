@@ -120,28 +120,34 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
     };
   };
   const entries = await load(db);
-  const best = new Map<string, { e: Entry; s: number }>();
-  const run = (qsx: string[], bonus: number) => {
+  const best = new Map<string, { e: Entry; s: number; short: boolean }>();
+  // short＝這次是靠「太短的關聯詞」（例如 2 字的「中藥」同音「重要」）找到的：只要有任何不是 short 的命中就當一般結果，否則排在最後面並限制筆數。
+  const run = (qsx: string[], bonus: number, short = false) => {
     const sc = scoreOf(qsx);
     for (const e of entries) {
       const s = sc(e);
-      if (s > 0) {
-        const cur = best.get(`${e.kind}:${e.id}`);
-        if (!cur || cur.s < s + bonus) best.set(`${e.kind}:${e.id}`, { e, s: s + bonus });
-      }
+      if (s <= 0) continue;
+      const key = `${e.kind}:${e.id}`;
+      const cur = best.get(key);
+      const val = { e, s: s + bonus, short };
+      if (!cur || (cur.short && !short) || (cur.short === short && cur.s < val.s)) best.set(key, val);
     }
   };
   run(qs, 0);
   // 自訂關聯詞（業主 2026-11-25：故意打錯字「和本翠」要找得到「漢本萃＝智慧草本＝中藥」）：
   // 查詢的音節與某個關聯詞「相同，或 3 個音節以上差 1 個音節」，就把同組的所有詞也當查詢找一遍（分數略低一點）。
+  const expandMin = Number(st.synonymExpandMinChars ?? 2);
+  const shortBelow = Number(st.synonymShortBelow ?? 3);
   for (const g of st.synonymPhonetic === false ? [] : await synonymGroups(db)) {
     const typoFrom = Number(st.synonymTypoFrom ?? 3);
-    const expandMin = Number(st.synonymExpandMinChars ?? 3);
     const sylOf = g.map((t) => syllables(t));
     const hitTerm = sylOf.some((ts) => ts.length >= 2 && qs.length >= 2 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 0) || (ts.length >= typoFrom && qs.length >= 3 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 1)));
-    if (hitTerm) for (const ts of sylOf) if (ts.length >= Math.max(2, expandMin)) run(ts.slice(0, maxSyl), -0.3);
+    if (hitTerm) for (const ts of sylOf) if (ts.length >= Math.max(2, expandMin)) run(ts.slice(0, maxSyl), -0.3, ts.length < shortBelow);
   }
-  const hit = [...best.values()].sort((a, b) => b.s - a.s);
+  const all = [...best.values()];
+  const main = all.filter((x) => !x.short).sort((a, b) => b.s - a.s);
+  const tail = all.filter((x) => x.short).sort((a, b) => b.s - a.s).slice(0, Number(st.synonymShortMax ?? 5));
+  const hit = [...main, ...tail];
   return { courses: hit.filter((x) => x.e.kind === "course").slice(0, limit).map((x) => x.e.id), lessons: hit.filter((x) => x.e.kind === "lesson").slice(0, limit).map((x) => x.e.id) };
 }
 
