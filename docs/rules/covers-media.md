@@ -66,3 +66,5 @@
 - **YouTube 教材沒指定封面＝用 YouTube 縮圖（業主 2026-11-25 全網新規則，至尊＋超派；取代 2026-11-22「完全移除 YouTube 抓封面」中「章節／教材封面」的部分）**：後端 `api.ts` 的 `ytThumbOf(media_type, media_ref)` ＝ `https://i.ytimg.com/vi/<影片編號>/mqdefault.jpg`（16:9、沒有黑邊）；課程詳細頁每堂教材與 `/search-index` 的 `coverUrl`：**上傳的封面優先，沒有且是 YouTube 影片就用它**；用 YouTube 縮圖時另帶 `coverAuto: true`（`CourseLesson.coverAuto`），編輯畫面（`lesson-art.web.tsx`）不可把它當成已上傳的封面（不顯示、不給「移除」）。因此單元清單（超派 `ChapterList`、至尊 `ElderChapterRow`）、播放器通知欄／鎖定畫面的封面都自動用到。**課程（教材卡）本身的封面維持：上傳 EDM／封面 > 課程標題文字封面，仍不抓 YouTube 縮圖。** 課程頁章節／教材列目前是圖示列（沒有縮圖），沒有一併改。
 
 - **相片／影片上傳不限張數（業主 2026-11-25，取代所有「最多 100 張」的舊規則）**：中心 EDM、封面輪播、各類相簿（系列、課程、區塊照片）一律不設張數上限；已移除 `COVER_MEDIA_MAX`，後端 `coverRoom` 不再檢查，上傳按鈕只顯示目前張數「上傳EDM（n）」。
+
+- **全螢幕看圖「檢視全部」（業主 2026-11-25）**：`EdmLightbox` 有一組圖（`items` 超過一張）時，上方工具列多一顆格狀圖示「檢視全部」（`features/courses/lightbox-grid.tsx` 的 `LightboxGrid`）：手機 3 欄縮圖格；點一下＝回單張看那一張；**長按一張進入複選**（之後點一下＝勾選／取消，右上角圓形勾），複選時工具列變成「全選／下載／分享／取消複選」，沒選任何張時下載與分享停用；沒在複選時只有「回到單張檢視」鈕。分享用 `lib/share.ts` 的 `shareImages`（網頁一次傳多個圖片檔給系統分享選單；不支援就分享連結；App 因系統一次只能傳一個檔案，改傳所有圖片連結文字）；下載用 `downloadImages`（網頁依序下載，App 走分享選單）。Esc 先關格狀畫面。
