@@ -10,7 +10,7 @@ import { SynonymsEditor } from "@/features/search/synonyms-editor";
 
 type Def = { key: string; group: string; label: string; desc: string; advice: string; type: "bool" | "number" | "choice"; default: boolean | number | string; min?: number; max?: number; step?: number; unit?: string; choices?: { value: string; label: string }[] };
 type Data = { values: Record<string, boolean | number | string>; params: Def[]; groups: { key: string; title: string; intro: string }[] };
-type Test = { min: number; rows: { kind: string; title: string; score: number }[]; note?: string };
+type Test = { min: number; rows: { kind: string; title: string; score: number; boost?: number }[]; note?: string };
 
 const fmt = (v: number, step = 1) => (step < 1 ? v.toFixed(step < 0.1 ? 2 : 2).replace(/0+$/, "").replace(/\.$/, "") || "0" : String(v));
 
@@ -100,7 +100,7 @@ export default function SearchSettingsScreen() {
           {g.key === "semantic" ? (
             <Card style={{ gap: space.sm }}>
               <AppText variant="headline">試搜尋（看相似度分數）</AppText>
-              <AppText variant="callout">輸入一個詞（例如「水機」），列出 AI 認為最接近的前 20 筆與分數。把「不相干」與「該找到」的分數對照，門檻就設在兩者中間。目前門檻 {fmt(Number(cur.semanticMin), 0.01)}。</AppText>
+              <AppText variant="callout">輸入一個詞（例如「水機」），列出 AI 認為最接近的前 20 筆與分數（已含各類的「加分」）。沒顯示但你想要的，把門檻調低到它的分數，或替那一類加分。目前門檻 {fmt(Number(cur.semanticMin), 0.01)}。</AppText>
               <TextInput value={q} onChangeText={setQ} placeholder="輸入要測試的搜尋詞" placeholderTextColor={c.textMuted} onSubmitEditing={runTest} returnKeyType="search" style={[styles.input, { borderColor: c.border, backgroundColor: c.surface, color: c.text }]} />
               <Button label={testing ? "搜尋中…" : "試搜尋"} onPress={runTest} disabled={testing || q.trim().length < 2} />
               {test?.note ? <AppText variant="callout" tone="muted">{test.note}</AppText> : null}
@@ -111,7 +111,7 @@ export default function SearchSettingsScreen() {
                     <AppText variant="headline" style={{ minWidth: 62, color: pass ? c.accentText : c.textMuted }}>{r.score.toFixed(2)}</AppText>
                     <View style={{ flex: 1 }}>
                       <AppText variant="callout" tone={pass ? undefined : "muted"} numberOfLines={2}>{r.title}</AppText>
-                      <AppText variant="caption" tone="muted">{`${r.kind}　${pass ? "會顯示" : "低於門檻，不顯示"}`}</AppText>
+                      <AppText variant="caption" tone="muted">{`${r.kind}　${pass ? "會顯示" : "低於門檻，不顯示"}${r.boost ? `　（已含加分 +${r.boost}）` : ""}`}</AppText>
                     </View>
                   </View>
                 );
