@@ -125,7 +125,7 @@ function VideoModal({ item, onClose }: { item: CoverMediaItem; onClose: () => vo
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="關閉" />
         {Platform.OS === "web" ? createElement("video", { src: resolveUrl(item.url), poster: item.posterUrl ? resolveUrl(item.posterUrl) : undefined, controls: true, autoPlay: true, playsInline: true, style: { maxWidth: "100%", maxHeight: "100%", background: "#000" } }) : null}
         <Pressable accessibilityRole="button" accessibilityLabel="關閉" onPress={onClose} style={styles.close}>
-          <Ionicons name="close" size={26} color="#fff" />
+          <Ionicons name="close" size={26} color="#fff" {...({ uiOnly: true } as object)} />
         </Pressable>
       </View>
     </Modal>

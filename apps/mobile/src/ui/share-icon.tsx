@@ -13,6 +13,6 @@ export const isApplePlatform = (): boolean => {
  * iOS＝方框加向上箭頭（share-outline）；Android 與其他＝三個圓點相連（share-social-outline）。
  * 全站所有「分享」按鈕都用這個元件，不要自己畫別的圖示。
  */
-export function ShareIcon({ size = 24, color }: { size?: number; color: string }) {
-  return <Ionicons name={isApplePlatform() ? "share-outline" : "share-social-outline"} size={size} color={color} />;
+export function ShareIcon({ size = 24, color, uiOnly }: { size?: number; color: string; /** 固定版面（例如全螢幕看圖工具列）：不吃至尊倍數。 */ uiOnly?: boolean }) {
+  return <Ionicons name={isApplePlatform() ? "share-outline" : "share-social-outline"} size={size} color={color} {...(uiOnly ? ({ uiOnly: true } as object) : null)} />;
 }

@@ -99,6 +99,9 @@ export function EdmStage({ course, stats, canManageAlbum = false }: { course: Co
 
 /** 網頁：放大視窗裡拖曳圖片時，不觸發整頁的下拉重新整理（lib/web-pull-refresh.ts 認得 data-no-pull-refresh；業主 2026-11-17）。 */
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
+/** 全螢幕看圖的上方工具列：圖示與文字只吃平板／電腦倍數、不吃至尊倍數，至尊模式與超派模式長得一樣（業主 2026-11-25）。 */
+const UI_ONLY = { uiOnly: true } as object;
+const UI_ONLY_TEXT = { dataSet: { uiOnly: "" } } as object;
 const NO_PULL = Platform.OS === "web" ? ({ dataSet: { noPullRefresh: "" } } as object) : {};
 
 /**
@@ -308,10 +311,10 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
           {many && desktop ? (
             <>
               <View style={[styles.side, { left: 16 }]} pointerEvents="box-none">
-                {tool("上一張", () => go(-1), <Ionicons name="chevron-back" size={28} color="#fff" />, idx === 0)}
+                {tool("上一張", () => go(-1), <Ionicons name="chevron-back" size={28} color="#fff" {...UI_ONLY} />, idx === 0)}
               </View>
               <View style={[styles.side, { right: 16 }]} pointerEvents="box-none">
-                {tool("下一張", () => go(1), <Ionicons name="chevron-forward" size={28} color="#fff" />, idx === list.length - 1)}
+                {tool("下一張", () => go(1), <Ionicons name="chevron-forward" size={28} color="#fff" {...UI_ONLY} />, idx === list.length - 1)}
               </View>
             </>
           ) : null}
@@ -319,28 +322,28 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
           <View style={[styles.top, land && { flexDirection: "row-reverse", alignItems: "flex-start" }]} pointerEvents="box-none">
             <View style={{ alignItems: "flex-end", gap: space.xs }} pointerEvents="box-none">
               <View style={styles.row} pointerEvents="box-none">
-                {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" />) : null}
-                {canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} />) : null}
-                {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" />)}
-                {tool("分享", share, <ShareIcon size={24} color="#fff" />)}
-                {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" />)}
+                {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />) : null}
+                {canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
+                {tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />)}
+                {tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />)}
+                {tool("關閉", onClose, <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
               </View>
               {/* 第幾張、共幾張：獨立標籤，放在「關閉」鈕正下方（業主 2026-11-21）。 */}
               {many ? (
                 <View style={styles.counter} pointerEvents="none">
-                  <AppText variant="callout" style={{ color: "#fff", fontWeight: "800" }}>{`第 ${idx + 1} 張，共 ${list.length} 張`}</AppText>
+                  <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{`第 ${idx + 1} 張，共 ${list.length} 張`}</AppText>
                 </View>
               ) : null}
             </View>
             {/* 操作說明：強制單行，字太多時自動縮小（業主 2026-11-21）。 */}
             {!hideHelp ? (
               <View style={[styles.help, land && { flex: 1, alignSelf: "auto" }]} onLayout={(e) => setHelpW(e.nativeEvent.layout.width)} pointerEvents="box-none">
-                <Ionicons name="move" size={24} color="#fff" />
+                <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />
                 <AppText variant="caption" numberOfLines={1} {...NO_SCALE} style={{ color: "#fff", fontWeight: "800", fontSize: helpSize, lineHeight: helpSize + 8, flexShrink: 1, flexGrow: 1 }}>
                   {hint}
                 </AppText>
                 {/* 縮小：按了變成十字圖示，排在下載鈕左邊（業主 2026-11-21）。 */}
-                {tool("縮小操作說明", () => setHelp(true), <Ionicons name="contract" size={24} color="#fff" />)}
+                {tool("縮小操作說明", () => setHelp(true), <Ionicons name="contract" size={24} color="#fff" {...UI_ONLY} />)}
               </View>
             ) : null}
           </View>

@@ -155,6 +155,27 @@ export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
 }
 
 /**
+ * 最相近的單元（業主 2026-11-25：長句搜尋「洗蔬菜水果清潔劑花椰菜番茄農藥殘留」整頁空白，要一定看到結果）：
+ * 前面所有找法（字面、模糊、字元、同音、AI）都沒結果時的最後一道：把查詢拆成相鄰兩字的片段（也可拆成單字），
+ * 數每個單元的文字命中幾個片段，命中越多越前面，取前 `limit` 筆。兩字片段命中分數 3、單字 1；完全沒命中才會回空。
+ * 超派、至尊共用（useSearchEngine）。
+ */
+export function looseLessons(index: SearchIndex, q: string, limit = 30): string[] {
+  const text = q.toLowerCase().replace(/[\s\u3000]+/g, "");
+  const chars = [...new Set([...text])];
+  const bigrams = new Set<string>();
+  for (let i = 0; i + 1 < text.length; i++) bigrams.add(text.slice(i, i + 2));
+  const scored: [string, number][] = [];
+  for (const [id, hay] of index.lessonHay) {
+    let sc = 0;
+    for (const b of bigrams) if (hay.includes(b)) sc += 3;
+    if (!sc) for (const ch of chars) if (hay.includes(ch)) sc += 1;
+    if (sc) scored.push([id, sc]);
+  }
+  return scored.sort((a, b) => b[1] - a[1]).slice(0, limit).map(([id]) => id);
+}
+
+/**
  * 字元比對（業主 2026-11-24：語音輸入「線上白金」要找得到「安麗與白金線上溝通會」）：
  * 查詢的每個字（不分順序）都出現在同一門課的文字裡就算符合；至少 3 個字才用，避免太短亂配。
  * 只在完全比對與模糊比對都沒結果時才用，且不需要 AI，額度用完也找得到。
