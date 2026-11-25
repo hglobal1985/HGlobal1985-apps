@@ -80,7 +80,10 @@ export default function SearchSettingsScreen() {
   const same = (p: Def) => cur[p.key] === p.default;
   return (
     <Screen header={false}>
-      <NoticeBox text="每一項改了就立刻儲存，超派、至尊模式的搜尋同時生效（手機畫面要關掉重開才會載入）。不確定就維持建議值；要全部還原按最下方「全部恢復建議值」。" />
+      <NoticeBox text="這一頁所有設定都不用按儲存：每改一項（含下方搜尋關聯詞，打完字停一下）就立即存好、立即生效，超派、至尊模式同時套用。不確定就維持建議值；要全部還原按最下方「全部恢復建議值」。" />
+      <Section title="搜尋關聯詞（打字自動儲存）">
+        <SynonymsEditor />
+      </Section>
       {data.groups.map((g) => (
         <Section key={g.key} title={g.title}>
           <AppText variant="caption" tone="muted">{g.intro}</AppText>
@@ -121,9 +124,6 @@ export default function SearchSettingsScreen() {
         </Section>
       ))}
       <Button label="全部恢復建議值" variant="cancel" onPress={() => save({}, true)} />
-      <Section title="搜尋關聯詞">
-        <SynonymsEditor />
-      </Section>
     </Screen>
   );
 }
