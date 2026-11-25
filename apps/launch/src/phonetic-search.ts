@@ -136,9 +136,10 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
   // 查詢的音節與某個關聯詞「相同，或 3 個音節以上差 1 個音節」，就把同組的所有詞也當查詢找一遍（分數略低一點）。
   for (const g of st.synonymPhonetic === false ? [] : await synonymGroups(db)) {
     const typoFrom = Number(st.synonymTypoFrom ?? 3);
+    const expandMin = Number(st.synonymExpandMinChars ?? 3);
     const sylOf = g.map((t) => syllables(t));
     const hitTerm = sylOf.some((ts) => ts.length >= 2 && qs.length >= 2 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 0) || (ts.length >= typoFrom && qs.length >= 3 && Math.abs(ts.length - qs.length) <= 1 && approxSyl(ts, qs, 1)));
-    if (hitTerm) for (const ts of sylOf) if (ts.length >= 2) run(ts.slice(0, maxSyl), -0.3);
+    if (hitTerm) for (const ts of sylOf) if (ts.length >= Math.max(2, expandMin)) run(ts.slice(0, maxSyl), -0.3);
   }
   const hit = [...best.values()].sort((a, b) => b.s - a.s);
   return { courses: hit.filter((x) => x.e.kind === "course").slice(0, limit).map((x) => x.e.id), lessons: hit.filter((x) => x.e.kind === "lesson").slice(0, limit).map((x) => x.e.id) };
