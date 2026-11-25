@@ -122,21 +122,26 @@ export async function semanticSearch(env: Env, db: D1Database, q: string, limitA
   return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id), extras: [...extras, ...lessonHits].map((h) => ({ ...h, prio: prio(h.kind) })).sort((a, b) => a.prio - b.prio || b.score - a.score), coursePrio: prio("course") };
 }
 
-/** 試搜尋（設定頁用，超級管理員）：列出最接近的前 N 筆與相似度分數，方便依實際數字調「相似度門檻」。不套用門檻與開關。 */
-export async function semanticDebug(env: Env, db: D1Database, q: string, n = 20): Promise<{ min: number; rows: { kind: string; title: string; score: number; boost: number }[]; note?: string }> {
+/** 試搜尋（設定頁用，超級管理員）：跟實際搜尋同一套規則——只列「已開啟」的來源、分數含加分、依「顯示順序」再依分數排序、標出過不過門檻。業主 2026-11-25：以這裡的結果為最終樣式。 */
+export async function semanticDebug(env: Env, db: D1Database, q: string, n = 20): Promise<{ min: number; rows: { kind: string; title: string; score: number; boost: number; pass: boolean }[]; note?: string }> {
   const st = await loadSearchSettings(db);
   const min = st.semanticMin as number;
   const text = q.trim().slice(0, 100);
   if (text.length < 2) return { min, rows: [], note: "請輸入至少 2 個字" };
-  const rows = await allVectors(db);
-  if (!rows.length) return { min, rows: [], note: "還沒有建立向量索引（排程每 10 分鐘補一批）" };
+  const enabled = new Set(SOURCES.filter((x) => st[x.param]).map((x) => x.kind as string));
+  const rows = (await allVectors(db)).filter((r) => enabled.has(r.kind));
+  if (!rows.length) return { min, rows: [], note: "還沒有建立向量索引，或所有來源都關閉了（排程每 10 分鐘補一批）" };
   let qv: Int8Array;
   try {
     qv = unpackVec(packVec((await embed(env, db, [text]))[0]!));
   } catch {
     return { min, rows: [], note: "AI 沒有回應（額度用完或模型未啟用）" };
   }
-  const boost = (kind: string) => Number(st[`semBoost${kind.charAt(0).toUpperCase()}${kind.slice(1)}`] ?? 0);
-  const top = rows.map((r) => ({ r, s: cosine(qv, r.v) + boost(r.kind) })).sort((a, b) => b.s - a.s).slice(0, n);
-  return { min, rows: top.map((x) => ({ kind: tagOf(x.r.kind), title: x.r.txt.replace(/\s+/g, " ").slice(0, 80), score: Math.round(x.s * 1000) / 1000, boost: boost(x.r.kind) })) };
+  const cap = (k: string) => k.charAt(0).toUpperCase() + k.slice(1);
+  const boost = (kind: string) => Number(st[`semBoost${cap(kind)}`] ?? 0);
+  const prio = (kind: string) => Number(st[`semPrio${cap(kind)}`] ?? 5);
+  const scored = rows.map((r) => ({ r, s: cosine(qv, r.v) + boost(r.kind) }));
+  // 先取分數最高的 n 筆，再照實際顯示順序排（過門檻的在前）。
+  const top = scored.sort((a, b) => b.s - a.s).slice(0, n).sort((a, b) => Number(b.s >= min) - Number(a.s >= min) || prio(a.r.kind) - prio(b.r.kind) || b.s - a.s);
+  return { min, rows: top.map((x) => ({ kind: tagOf(x.r.kind), title: x.r.txt.replace(/\s+/g, " ").slice(0, 80), score: Math.round(x.s * 1000) / 1000, boost: boost(x.r.kind), pass: x.s >= min })) };
 }

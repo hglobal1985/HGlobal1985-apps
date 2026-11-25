@@ -90,15 +90,18 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     let ids: Set<string> = exact ?? new Set();
     let near: Parameters<typeof rankCourses>[3] = {};
     if (!ids.size) {
-      const fuzzy = fuzzyCourses(index, key);
-      const chars = charsCourses(index, key);
-      const phon = [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
+      // 以後台「試搜尋」為最終樣式（業主 2026-11-25）：AI 語意搜尋開著而且有結果（或還在找）時，只顯示語意搜尋的結果；
+      // 沒結果才退回同音、模糊、字元比對（語音辨識錯字仍找得到）。
+      const semOnly = searchSt.semanticEnabled && (semantic.loading || semantic.courses.size > 0 || semantic.extras.length > 0);
+      const fuzzy = semOnly ? new Set<string>() : fuzzyCourses(index, key);
+      const chars = semOnly ? new Set<string>() : charsCourses(index, key);
+      const phon = semOnly ? [] : [...phonetic.courses, ...lessonCourses(phonetic.lessons)].filter((id) => index.haystack.has(id));
       const sem = [...semantic.courses].filter((id) => index.haystack.has(id));
       ids = new Set([...fuzzy, ...chars, ...phon, ...sem]);
       near = { phonetic: phon, semantic: sem, fuzzy, chars };
     }
     return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
-  }, [key, index, all, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
+  }, [key, index, all, exact, semantic.courses, semantic.lessons, semantic.extras, semantic.loading, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
   // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
     if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x, tag: "教材卡" }));

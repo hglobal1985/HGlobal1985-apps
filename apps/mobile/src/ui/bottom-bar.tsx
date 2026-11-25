@@ -49,6 +49,11 @@ let lastCoursesHref: string | null = null;
  * 超派模式的模式鍵「偷看」動畫（業主 2026-11-24）：平常顯示「超派＋火箭」，每隔 3 秒換成「至尊＋皇冠」閃爍幾下，再換回「超派＋火箭」，
  * 提醒使用者這裡可以切換到至尊模式。只在超派模式執行（至尊模式固定顯示「至尊＋皇冠」）。
  */
+/** 網頁：最近有捲動（含系統「滾動截圖」自動捲動）就暫停模式鍵動畫（業主 2026-11-25：手機系統提示「此頁面有影響拼接效果的功能」，畫面一直在變動會讓長截圖拼接失敗）。 */
+let lastScrollAt = 0;
+if (Platform.OS === "web" && typeof window !== "undefined") window.addEventListener("scroll", () => (lastScrollAt = Date.now()), { capture: true, passive: true });
+const recentlyScrolled = () => Platform.OS === "web" && Date.now() - lastScrollAt < 10_000;
+
 function useModePeek(enabled: boolean) {
   const [peek, setPeek] = useState(false);
   const fade = useRef(new Animated.Value(1)).current;
@@ -65,6 +70,7 @@ function useModePeek(enabled: boolean) {
     const cycle = () => {
       timer = setTimeout(() => {
         if (!alive) return;
+        if (recentlyScrolled()) return cycle(); // 正在捲動／截圖：這一輪不動，3 秒後再看
         // 淡出火箭 → 換成皇冠 → 閃爍兩下 → 淡出 → 換回火箭
         to(0, 160).start(() => {
           if (!alive) return;
