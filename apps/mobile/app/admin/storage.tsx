@@ -171,7 +171,7 @@ export default function StorageScreen() {
       </Section>
       <Section title="封面輪播與短影音">
         <Card>
-          <NoticeBox tone="info" text="中心、系列、課程的封面最多放 100 張照片或 1 分鐘內的短影音，會自動輪播；中心頁的「相簿」與封面輪播是同一份資料。影片在上傳者的瀏覽器內先壓縮再上傳（不需要另外付費），規範如下。" />
+          <NoticeBox tone="info" text="中心、系列、課程的封面可放不限張數的照片或 1 分鐘內的短影音，會自動輪播；中心頁的「相簿」與封面輪播是同一份資料。影片在上傳者的瀏覽器內先壓縮再上傳（不需要另外付費），規範如下。" />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             輪播
           </AppText>

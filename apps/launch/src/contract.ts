@@ -464,10 +464,8 @@ export type Notice = { id: string; title: string; body: string; link: string; re
 export type CentralReview = { id: string; /** 申請人（只在審核者本人開啟時即時讀取，不保存）。 */ member_id?: string; display_name: string | null; /** 申請人本名與上手（中央即時提供，不保存；讀不到就沒有）。 */ legal_name?: string | null; upline_platinum?: string | null; upline_diamond?: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
 /** available＝false：這位會員沒有審核權限、或中央暫時不可用（畫面直接不顯示審核區）。 */
 /** App 內指派職務（業主 2026-11-21，中央串接指令 2026-11-21.1）：職務選項一律用中央回傳的 assignable_roles，不寫死。 */
-/** 每個封面（中心、課程、系列）最多放幾張照片／影片（業主 2026-11-21）。 */
-export const COVER_MEDIA_MAX = 100;
 export type CoverMediaKind = "center" | "series" | "course";
-/** 儲存區（業主 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，上限各 100 張；系列、課程只有 cover。 */
+/** 儲存區（業主 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，張數不設上限（業主 2026-11-25）；系列、課程只有 cover。 */
 export type CoverScope = "cover" | "edm";
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
 export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（業主 2026-11-24）。 */ scene?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
