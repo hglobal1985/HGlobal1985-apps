@@ -6,6 +6,8 @@ import { useTheme } from "@/theme/theme";
 import { radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, NoticeBox, Screen, Section, SegmentTabs } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
+import { clearSemanticMemo } from "@/features/courses/use-semantic";
+import { clearPhoneticMemo } from "@/features/courses/use-phonetic";
 import { SynonymsEditor } from "@/features/search/synonyms-editor";
 
 type Def = { key: string; group: string; label: string; desc: string; advice: string; type: "bool" | "number" | "choice"; default: boolean | number | string; min?: number; max?: number; step?: number; unit?: string; choices?: { value: string; label: string }[] };
@@ -36,6 +38,8 @@ export default function SearchSettingsScreen() {
     try {
       const r = await api<{ values: Data["values"] }>("PUT", "/admin/search-settings", reset ? { reset: true } : { values: patch });
       setVals(r.values);
+      clearSemanticMemo();
+      clearPhoneticMemo();
       invalidate();
       flashText(reset ? "已全部恢復建議值" : "已儲存");
     } catch (e) {
