@@ -26,6 +26,7 @@ import { centerTitle } from "@/features/format";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
+import { useRememberedQuery } from "@/lib/search-memory";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -56,7 +57,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const { member } = useSession();
   useProfileRedirect(member); // 會員資料沒填完：登入後自動帶到至尊模式頁、捲到沒填的欄位（業主 2026-11-24）
   const courses = useApi<CourseSummary[]>("/courses");
-  const [q, setQ] = useState("");
+  const [q, setQ] = useRememberedQuery("elder"); // 返回時回到剛剛的搜尋結果
   const [heard, setHeard] = useState<string | null>(null);
   // 課程分頁的四大分類（業主 2026-11-24，D 款）：null＝顯示四張大卡；選了一區＝列出該區課程。
   const [zone, setZone] = useState<ElderZone | null>(null);
