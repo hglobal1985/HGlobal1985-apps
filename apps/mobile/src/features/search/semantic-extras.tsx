@@ -7,7 +7,8 @@ import { useThumb } from "@/lib/thumb";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
-import { AppText, ThumbFallback } from "@/ui";
+import { AppText, ThumbFallback, ThumbLock } from "@/ui";
+import { flashText } from "@/ui/flash-notice";
 import { EdmLightbox } from "@/features/courses/edm-viewer";
 import type { SemanticHit } from "@/features/courses/use-semantic";
 
@@ -31,17 +32,18 @@ export function SemanticExtras({ items, big }: { items: SemanticHit[]; big?: boo
           key={x.id}
           accessibilityRole="link"
           accessibilityLabel={`${x.tag}：${x.title}`}
-          onPress={() => (x.image ? setView(x) : (markFromSearch(), router.push(x.link as Href)))}
+          onPress={() => (x.locked && flashText((x.lockLines ?? ["目前無法使用"]).join("，")), x.locked && x.kind !== "lesson" && x.kind !== "section" && x.kind !== "intro" ? undefined : x.image ? setView(x) : (markFromSearch(), router.push(x.link as Href)))}
           style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: space.md, paddingVertical: space.sm, borderBottomWidth: 1, borderColor: c.border, opacity: pressed ? 0.7 : 1 }]}
         >
           <View style={{ width: w, height: h, borderRadius: radius.md, overflow: "hidden", backgroundColor: c.surfaceMuted }}>
             {x.thumb ? <Image source={{ uri: thumb(resolveUrl(x.thumb), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <ThumbFallback />}
+            {x.locked ? <ThumbLock size={Math.round(w * 0.4)} /> : null}
           </View>
           <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
             <AppText variant={big ? "headline" : "body"} numberOfLines={2} style={{ fontWeight: "700" }}>{x.title}</AppText>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <TagPill label={x.tag} />
-              {x.sub ? <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flex: 1 }}>{x.sub}</AppText> : null}
+              {x.locked || x.sub ? <AppText variant="caption" tone="muted" numberOfLines={x.locked ? 2 : 1} style={{ flex: 1 }}>{x.locked ? (x.lockLines ?? ["沒有權限"])[0] : x.sub}</AppText> : null}
             </View>
           </View>
         </Pressable>

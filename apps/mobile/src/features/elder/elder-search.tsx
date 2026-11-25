@@ -18,7 +18,9 @@ import { UI_SCALE } from "@/theme/ui-scale";
 import { elderTextScale } from "@/lib/elder-mode";
 import { fitFontSize } from "@/ui/course-cover";
 import { ELDER_FIELD } from "@/ui/elder-controls";
-import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback } from "@/ui";
+import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbFallback, ThumbLock } from "@/ui";
+import { flashText } from "@/ui/flash-notice";
+import { lockReason } from "@/features/courses/lock-reason";
 import { TileCover } from "@/features/courses/series-tile";
 import { ElderCenterPage } from "./elder-center";
 import { ElderInvite, ElderSeriesHead } from "./elder-heads";
@@ -419,16 +421,18 @@ function ElderChapterRow({ item }: { item: ChapterItem }) {
   const { c } = useTheme();
   const thumb = useThumb();
   const { lesson, course, locked } = item;
+  const { member } = useSession();
   const w = Math.round(96 * UI_SCALE);
   const h = Math.round((w * 4) / 3);
   const open = !locked && lesson.ready;
   const date = lesson.eventDate ? eventDays(lesson.eventDate, null) : course.eventStart ? eventDays(course.eventStart, course.eventEnd) : "";
   const cover = lesson.coverUrl || course.coverUrl || course.edmUrl;
-  const status = lesson.completed ? "已完成" : !lesson.ready ? "敬請期待" : locked ? "報名後觀看" : "";
+  const status = lesson.completed ? "已完成" : !lesson.ready ? "敬請期待" : locked ? lockReason(course, !!member) : "";
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={`${lesson.title}，${course.title}`} onPress={() => (markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${lesson.title}，${course.title}`} onPress={() => (locked && flashText(lockReason(course, !!member)), markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
         {cover ? <Image source={{ uri: thumb(resolveUrl(cover), w * 2) }} style={{ width: w, height: h }} resizeMode="cover" /> : <TileCover rep={course} width={w} height={h} flat inSeries={false} title={course.title} />}
+        {locked ? <ThumbLock size={Math.round(w * 0.4)} /> : null}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
         <AppText variant="headline" numberOfLines={3} style={{ fontWeight: "800" }}>{lesson.title}</AppText>
