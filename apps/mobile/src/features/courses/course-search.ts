@@ -163,12 +163,18 @@ export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
 export function looseLessons(index: SearchIndex, q: string, limit = 30, minScore = 1): string[] {
   const text = q.toLowerCase().replace(/[\s\u3000]+/g, "");
   const chars = [...new Set([...text])];
-  const bigrams = new Set<string>();
-  for (let i = 0; i + 1 < text.length; i++) bigrams.add(text.slice(i, i + 2));
+  // 查詢字的所有 2～4 字片段（業主 2026-11-25：搜「晚安修護面膜」要找到所有「面膜」相關的單元）：
+  // 越長的片段越重要（2 字 3 分、3 字 6 分、4 字 10 分）；幾乎每筆都有的常見片段（出現在 30% 以上的單元）不算分，避免雜訊。
+  const grams = new Set<string>();
+  for (let n = 2; n <= 4; n++) for (let i = 0; i + n <= text.length; i++) grams.add(text.slice(i, i + n));
+  const total = index.lessonHay.size || 1;
+  const weight = (g: string) => (g.length === 2 ? 3 : g.length === 3 ? 6 : 10);
+  const df = new Map<string, number>();
+  for (const hay of index.lessonHay.values()) for (const g of grams) if (hay.includes(g)) df.set(g, (df.get(g) ?? 0) + 1);
   const scored: [string, number][] = [];
   for (const [id, hay] of index.lessonHay) {
     let sc = 0;
-    for (const b of bigrams) if (hay.includes(b)) sc += 3;
+    for (const g of grams) if ((df.get(g) ?? 0) <= total * 0.3 && hay.includes(g)) sc += weight(g);
     if (!sc) for (const ch of chars) if (hay.includes(ch)) sc += 1;
     if (sc >= minScore) scored.push([id, sc]);
   }

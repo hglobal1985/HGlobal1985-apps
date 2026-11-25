@@ -72,7 +72,7 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
       }
     }
     // 字面符合太少（不到 8 個）時，補上「至少有兩個相鄰兩字片段命中」的單元排在後面（業主 2026-11-25：搜「晚安修護面膜」只有 1 個單元、關聯結果太少）。
-    const extraRel: string[] = exactL && exactL.size && exactL.size < 8 ? looseLessons(index, key, 20, 6).filter((id) => !exactL.has(id)) : [];
+    const extraRel: string[] = exactL && exactL.size && exactL.size < 8 ? looseLessons(index, key, 30, 3).filter((id) => !exactL.has(id)) : [];
     for (const id of extraRel) hit.add(id);
     const byId = new Map(all.map((x) => [x.id, x]));
     const canWatch = (x: CourseSummary) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
