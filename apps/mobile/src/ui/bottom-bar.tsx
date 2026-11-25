@@ -68,24 +68,45 @@ function useModePeek(enabled: boolean) {
     const to = (v: number, d: number) => Animated.timing(fade, { toValue: v, duration: d, useNativeDriver: native });
     let alive = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let busy = false; // 動畫進行中
+    let lastAt = 0; // 這一輪動畫開始的時間
     const cycle = () => {
       timer = setTimeout(() => {
         if (!alive) return;
         if (recentlyScrolled()) return cycle(); // 正在捲動／截圖：這一輪不動，3 秒後再看
         // 淡出火箭 → 換成皇冠 → 閃爍兩下 → 淡出 → 換回火箭
+        busy = true;
+        lastAt = Date.now();
         to(0, 160).start(() => {
           if (!alive) return;
           setPeek(true);
           Animated.sequence([to(1, 160), to(0.25, 220), to(1, 220), to(0.25, 220), to(1, 220), Animated.delay(250), to(0, 160)]).start(() => {
             if (!alive) return;
             setPeek(false);
-            to(1, 160).start(() => alive && cycle());
+            to(1, 160).start(() => {
+              busy = false;
+              if (alive) cycle();
+            });
           });
         });
       }, 3000);
     };
     cycle();
+    // 保險（業主 2026-11-25 回報：右下角模式鍵有時整個消失＝透明度卡在 0，例如分頁在背景時動畫被暫停）：
+    // 動畫超過 3 秒還沒走完，或沒在動畫卻不是完全不透明，就強制還原成完全顯示並重新排程。
+    const watchdog = setInterval(() => {
+      if (!alive) return;
+      if (busy && Date.now() - lastAt > 3000) {
+        fade.stopAnimation();
+        fade.setValue(1);
+        setPeek(false);
+        busy = false;
+        if (timer) clearTimeout(timer);
+        cycle();
+      }
+    }, 1000);
     return () => {
+      clearInterval(watchdog);
       alive = false;
       if (timer) clearTimeout(timer);
       fade.stopAnimation();
@@ -199,7 +220,7 @@ export function BottomBar() {
           accessibilityLabel={profile.key === "elder" ? `目前是${profile.name}模式。按這裡調整字體、看訂單紀錄、帳號，或換回${MODE_PROFILES.super.name}模式` : `目前是${profile.name}模式。按這裡切換到${MODE_PROFILES.elder.name}模式（大字簡易版）`}
           onPress={() => runGuarded(() => (profile.modeKey === "page" ? router.navigate("/mode") : switchToElder()))}
         >
-          <Animated.View style={[styles.cell, elder && styles.cellElder, modeOn && { backgroundColor: c.navPill }, { opacity: peekFade }]}>
+          <Animated.View style={[styles.cell, elder && styles.cellElder, modeOn && { backgroundColor: c.navPill }, profile.key === "elder" ? null : { opacity: peekFade }]}>
             <View style={{ width: iconBox, height: iconBox, alignItems: "center", justifyContent: "center" }}>
               {showElder ? <CrownIcon size={Math.round(iconSize * UI_SCALE)} color={modeColor} /> : <Ionicons name={MAKER_ICON} size={iconSize} color={modeColor} {...({ uiOnly: true } as object)} />}
             </View>
