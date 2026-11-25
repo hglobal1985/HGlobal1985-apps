@@ -11,6 +11,7 @@ import { EdmStage } from "@/features/courses/edm-viewer";
 import { useCoverStats } from "@/features/courses/cover-stats";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { engine } from "@/features/player/engine";
+import { usePlayer } from "@/features/player/use-player";
 import { useLessonSession } from "@/features/player/use-lesson-session";
 import { lessonHref } from "@/lib/lesson-href";
 import { BlockEditList, BlockPhotosSheet, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
@@ -29,6 +30,7 @@ import { albumTotal } from "@/features/courses/block-album";
 import { CourseMiniCover } from "@/features/courses/edm-viewer";
 import { CoverMiniFloat } from "@/ui/collapse-band";
 import { LessonStage } from "@/features/player/lesson-stage";
+import { setStayMini, useStayMini } from "@/features/player/stay-mini";
 import { ElderCourse } from "@/features/elder/elder-course";
 import { ElderBroadcastBox } from "@/features/elder/elder-broadcast";
 import { useModeProfile } from "@/lib/app-mode";
@@ -140,16 +142,34 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   if (session.pinned && session.track) lastStage.current = { key: session.track.key, audio: session.track.mode === "audio" };
   if (!playingId || editing) lastStage.current = null;
   const playLesson = playingId && !editing ? course?.lessons.find((l) => l.id === playingId) : undefined;
-  const stage = playLesson ? (session.pinned && session.track ? { key: session.track.key, audio: session.track.mode === "audio" } : lastStage.current) : null;
+  const stayMini = useStayMini(); // 迷你播放器／小圓圖正在播時點別的影片：就在迷你播放器播，不長出整頁播放器（業主 2026-11-25）
+  const stage = playLesson && !stayMini ? (session.pinned && session.track ? { key: session.track.key, audio: session.track.mode === "audio" } : lastStage.current) : null;
   const playLegacy = !!playLesson && session.legacyYoutube && !!session.playback;
   const playChapters = course ? course.lessons.filter((l) => !l.material && !l.section) : [];
   const playNext = playLesson && !playLesson.material ? playChapters[playChapters.findIndex((l) => l.id === playLesson.id) + 1] : undefined;
   // 進入課程頁就是「播放器版面」（業主 2026-11-17）：還沒按播放時，舞台是 EDM 加大播放鈕、下方是待機的控制列；按下去才開始載入並播放第一堂。
   const firstPlayable = course && !editing ? course.lessons.find((l) => !l.locked && !l.full && !l.section && (course.isList ? l.material : !l.material)) : undefined;
   const playLesson_ = (lid: string) => {
+    const sn = engine.getSnapshot();
+    if (sn.track && sn.collapsed) engine.keepMiniOnce();
+    setStayMini(!!sn.track && sn.slotKey !== sn.track.key);
     engine.expectSwitch();
     setPlayingId(lid);
   };
+
+  // 從別的頁面點某一堂進來、而且迷你播放器／小圓圖正在播別支影片：沿用迷你播放器，不整頁播放。
+  useEffect(() => {
+    if (!lesson) return;
+    const sn = engine.getSnapshot();
+    if (!sn.track || sn.track.lessonId === lesson || sn.slotKey === sn.track.key) return;
+    if (sn.collapsed) engine.keepMiniOnce();
+    setStayMini(true);
+  }, [lesson]);
+  const playerTrack = usePlayer().track;
+  useEffect(() => {
+    if (!playerTrack) setStayMini(false); // 迷你播放器被關掉：下次回到整頁播放
+  }, [playerTrack]);
+  useEffect(() => () => setStayMini(false), []);
 
   // 課程介紹頁需登入：未登入導向登入，完成後回到這一頁。「完全公開」的課程例外，訪客直接看得到。
   if (ready && !member && !course && !loading) return <Redirect href={{ pathname: "/me", params: { next: `/course/${id}` } }} />;

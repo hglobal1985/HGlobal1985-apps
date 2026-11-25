@@ -8,6 +8,7 @@ import { createPortal } from "react-dom";
 import { useSession } from "@/state/session";
 import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.web";
 import { engine } from "./engine.web";
+import { setStayMini } from "./stay-mini";
 import { usePlayer } from "./use-player";
 import { PipHelp } from "./pip-help";
 
@@ -339,6 +340,7 @@ export function PlayerLayer() {
   const maximize = () => {
     // 已在課程頁、只是被滑動縮成迷你：回到頁面最上方就會自動還原。
     if (inline && shrunk) return void scroller.current?.scrollTo({ top: 0, behavior: "smooth" });
+    setStayMini(false); // 最大化＝回到整頁播放
     if (t) router.push(lessonHref(t.courseId, t.lessonId) as never);
   };
 

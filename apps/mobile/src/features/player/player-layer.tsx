@@ -9,6 +9,7 @@ import { resolveUrl } from "@/api/client";
 import { useSession } from "@/state/session";
 import { engine } from "./engine";
 import { scrollPlayerPageTop, useShrink } from "./shrink";
+import { setStayMini } from "./stay-mini";
 import { usePlayer } from "./use-player";
 import { notePipStarted } from "./pip-help-store";
 import { PipHelp, useNativePipHelp } from "./pip-help";
@@ -81,7 +82,7 @@ function MiniLayer() {
           const sn = engine.getSnapshot();
           if (sn.collapsed) resizeRef.current(false);
           else if (shrunkRef.current) scrollPlayerPageTop(); // 在課程頁被滑動縮小：點一下回到頁面最上方就還原
-          else if (sn.track) router.push(lessonHref(sn.track.courseId, sn.track.lessonId) as never);
+          else if (sn.track) (setStayMini(false), router.push(lessonHref(sn.track.courseId, sn.track.lessonId) as never));
           return;
         }
         placeRef.current(cur.current.x + g.dx, cur.current.y + g.dy);
