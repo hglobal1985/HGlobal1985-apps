@@ -17,9 +17,9 @@ import { MiniWindow } from "./mini-window";
  */
 /** 頁面往下滑多少像素，封面就完全縮成迷你（同影片的 SHRINK_PX）。 */
 export const MINI_PX = 140;
-export const miniProgress = (y: number) => Math.min(1, Math.max(0, y / MINI_PX));
+export const miniProgress = (y: number, range = MINI_PX) => Math.min(1, Math.max(0, y / range));
 
-export function CollapseBand({ children, enabled = true }: { children: ReactNode; /** false＝不縮（例如大螢幕左右分欄，封面在左欄、內容在右欄）。 */ enabled?: boolean }) {
+export function CollapseBand({ children, enabled = true, shrink = true, range = MINI_PX }: { children: ReactNode; /** false＝不縮（例如大螢幕左右分欄，封面在左欄、內容在右欄）。 */ enabled?: boolean; /** false＝封面自己負責縮矮（中心頁、系列頁的 hero 隨捲動縮放），這裡只量位置、縮小途中隱藏本體讓小視窗畫變形框。 */ shrink?: boolean; /** 往下滑多少像素算縮完（預設 MINI_PX；hero 的縮放範圍＝展開高度）。 */ range?: number }) {
   const y = useBandScroll();
   const [full, setFull] = useState(0); // 展開時的高度（只在沒縮時量）
   const box = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any;
@@ -28,14 +28,14 @@ export function CollapseBand({ children, enabled = true }: { children: ReactNode
   // 登記需要的額外捲動空間：封面縮完＝捲動區多出 full，可捲範圍會跟著少 full（內容短的頁面也要捲得到縮完；見 band-extra.ts）。
   useEffect(() => {
     if (!enabled || !full) return;
-    setBandExtra(MINI_PX + full + 24);
+    setBandExtra(range + full + 24);
     return () => setBandExtra(0);
-  }, [enabled, full]);
+  }, [enabled, full, range]);
   if (!enabled) return <View>{children}</View>;
-  const p = miniProgress(y);
+  const p = miniProgress(y, range);
   const shown = full ? Math.round(full * (1 - p)) : undefined;
   return (
-    <View style={shown !== undefined && p > 0 ? { height: shown, overflow: "hidden" } : undefined}>
+    <View style={shrink && shown !== undefined && p > 0 ? { height: shown, overflow: "hidden" } : undefined}>
       {/* 縮小途中封面本體隱藏，由小視窗那邊畫「大邊框由大到小」的變形框（與影片縮小一致，MiniWindow 的 morph） */}
       <View
         ref={box}
@@ -58,13 +58,13 @@ export function CollapseBand({ children, enabled = true }: { children: ReactNode
  * 與影片迷你小視窗一模一樣的規格與功能（ui/mini-spec.ts、ui/mini-window.tsx）：黃＝最小化（小圓圖）、綠＝最大化（回到頂端、封面展開）、紅＝關閉（這次先不再浮出，回到頂端再往下滑才會再出現），可任意拖曳、位置記在本機。
  * enabled＝false（例如影片在播放、大螢幕分欄）不顯示。
  */
-export function CoverMiniFloat({ cover, enabled = true, label }: { cover: ReactNode; enabled?: boolean; label: string }) {
+export function CoverMiniFloat({ cover, enabled = true, label, range = MINI_PX }: { cover: ReactNode; enabled?: boolean; label: string; /** 縮完要滑多少像素（要和成對的 CollapseBand 一致；預設 MINI_PX）。 */ range?: number }) {
   const y = useBandScroll();
   const focused = useIsFocused(); // 堆在後面、沒在看的頁面不出圓球
   const [closed, setClosed] = useState(false);
   // 靜態封面往下滑：一浮出就直接縮到最小的圓球（業主 2026-11-25）；點圓球才展開成小視窗，回到頂端再往下滑又從圓球開始。
   const [collapsed, setCollapsed] = useState(true);
-  const p = miniProgress(y);
+  const p = miniProgress(y, range);
   useEffect(() => {
     if (p <= 0.02) {
       setClosed(false); // 回到頂端就恢復，下次往下滑再浮出

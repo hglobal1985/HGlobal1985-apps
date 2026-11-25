@@ -41,6 +41,7 @@ export function Screen({
   top,
   topBar,
   hero,
+  heroFooter,
   heroHeight = 0,
   scrollY,
   wide = false,
@@ -63,6 +64,8 @@ export function Screen({
   topBar?: ReactNode;
   /** 固定在上方功能列之下、捲動區之上的滿版區塊（例如中心頁的照片）；搭配 scrollY 讓它隨捲動縮放。 */
   hero?: ReactNode;
+  /** 釘在 hero 正下方的區塊（例如中心頁、系列頁的黃色公告列）：hero 縮矮到不見後它仍留在上方功能列之下，永遠看得到；高度自動量測並墊進捲動內容的上方留白。 */
+  heroFooter?: ReactNode;
   /** hero 完全展開時的高度：捲動內容最上方會墊出同樣高的空間（hero 是蓋在捲動區上面的浮動層，不改變捲動區大小，避免課程少時來回閃動）。 */
   heroHeight?: number;
   /** 提供時，頁面捲動位移會寫進這個 Animated.Value（hero 內插縮放用）。 */
@@ -78,6 +81,7 @@ export function Screen({
   const refreshControl = usePullRefresh();
   const [slot, setSlot] = useState<ReactNode>(null);
   const bandExtra = useBandExtra();
+  const [pinH, setPinH] = useState(0); // heroFooter 的高度
   const [areaH, setAreaH] = useState(0); // 捲動區的高度（撐出「下滑縮小」需要的捲動空間用）
   const bar = footer ?? slot;
   // 大螢幕版面（業主 2026-11-18）：內容寬度與左右留白依畫面寬度（theme/layout.ts）。
@@ -94,7 +98,7 @@ export function Screen({
       </View>
     ) : null}
     <View style={{ flex: 1 }} onLayout={(e) => setAreaH(Math.round(e.nativeEvent.layout.height))}>
-    {hero ? <View style={[styles.heroLayer, { backgroundColor: c.background }]}>{hero}</View> : null}
+    {hero ? <View style={[styles.heroLayer, { backgroundColor: c.background }]}>{hero}{heroFooter ? <View onLayout={(e) => setPinH(Math.round(e.nativeEvent.layout.height))}>{heroFooter}</View> : null}</View> : null}
     <Scroller
       scrollY={scrollY}
       refreshControl={refreshControl}
@@ -102,7 +106,7 @@ export function Screen({
       contentContainerStyle={[
         styles.content,
         gutter,
-        { paddingTop: (top ? space.md : (header ? insets.top : 0) + (tight ? space.xs : space.lg)) + (hero ? heroHeight : 0), paddingBottom: space.xxl },
+        { paddingTop: (top ? space.md : (header ? insets.top : 0) + (tight ? space.xs : space.lg)) + (hero ? heroHeight + (heroFooter ? pinH : 0) : 0), paddingBottom: space.xxl },
         bandExtra && areaH ? { minHeight: areaH + bandExtra } : null,
       ]}
       contentInsetAdjustmentBehavior="automatic"

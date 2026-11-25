@@ -1,3 +1,4 @@
+import { CollapseBand } from "@/ui/collapse-band";
 import { useRef, useState } from "react";
 import { Animated, Image, Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
@@ -48,7 +49,7 @@ export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover
   const frame = inline
     ? { height: boxW ? full : 200, borderRadius: 18 }
     : [heroW < winW ? { alignSelf: "center" as const, width: heroW } : null, { height: at(full, 0) }];
-  return (
+  const hero = (
     <Animated.View onLayout={inline ? (e) => setBoxW(Math.round(e.nativeEvent.layout.width)) : undefined} style={[styles.box, url ? { backgroundColor: "#fff" } : null, frame]}>
       {media.length && heroW ? (
         // 封面輪播：高度固定為展開高度，往上捲縮成窄橫幅時整組跟著往上移一半，維持置中（業主 2026-11-21）。
@@ -104,6 +105,8 @@ export function CenterHero({ art, media = [], scrollY, stats, title, onEditCover
       {openId !== null && images.length ? <EdmLightbox uri={images[0]!.url} title={title} items={images.map((x) => ({ uri: x.url, title, id: x.id }))} index={Math.max(0, images.findIndex((x) => x.id === openId))} onClose={() => setOpenId(null)} /> : null}
     </Animated.View>
   );
+  // 往下滑縮成迷你小視窗的「大到小封面動畫」直接串接共用模組 CollapseBand（量封面位置、縮小途中隱藏本體；shrink＝false：高度仍由這裡隨捲動縮放）。
+  return inline ? hero : <CollapseBand shrink={false} range={Math.max(1, full)}>{hero}</CollapseBand>;
 }
 
 /**
