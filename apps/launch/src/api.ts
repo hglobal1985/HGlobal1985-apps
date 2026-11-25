@@ -4,6 +4,7 @@ import { scenePending } from "./scene-vision.ts";
 import { photoOcrPending } from "./photo-ocr.ts";
 import { loadJob, recompressStatus, runRecompress, saveJob } from "./recompress.ts";
 import { kickFilePhotos } from "./block-photos.ts";
+import { HW_ROUTES, homeworkStorageOwners, type HwDeps } from "./homework.ts";
 import { ensureTreasureLinks, syncSeriesOrderFromTreasure, syncTreasureFromSeriesOrder, treasureCourseId } from "./treasure-box.ts";
 import { renameForType, shrinkImage, shrinkStored } from "./image-store.ts";
 import { flushPushes, vapidPublicKey } from "./push.ts";
@@ -6787,6 +6788,7 @@ const routes: [string, RegExp, Handler][] = [
         put(b.logo_key, HQ, "image");
         put(b.bg_key, HQ, "image");
       }
+      for (const x of await homeworkStorageOwners(ctx.db)) put(x.key, centerOf.get(x.courseId) ?? HQ, "other"); // 作業檔案（業主 2026-11-25）
       const rows = new Map<string, { center: string; total: number; image: number; doc: number; audio: number; other: number }>();
       const totals = { image: 0, doc: 0, audio: 0, other: 0 };
       let total = 0;
@@ -8433,6 +8435,35 @@ const routes: [string, RegExp, Handler][] = [
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 /** 處理 /api/v2/*；其他路徑交給靜態網站。 */
+// ---------- 作業（業主 2026-11-25）：路由與邏輯在 homework.ts，這裡只接上登入、權限與通知 ----------
+/** 作業的「老師」（可以出作業、評分）：管理員、有這門課修改權的人、這門課「費用與審核」的審核窗口（群組成員、指定身份、指定的會員）。 */
+async function hwIsTeacher(ctx: Ctx, courseId: string): Promise<boolean> {
+  const s = ctx.session;
+  if (!s) return false;
+  if (s.role === "admin") return true;
+  const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub, review_group_id FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string; review_group_id: string | null }>();
+  if (!c) return false;
+  const rights = await rightsOf(ctx);
+  if (rights.any && courseCan(rights, s, c).edit) return true;
+  const sc = await reviewScope(ctx, s);
+  return (!!c.review_group_id && sc.groups.some((g) => g.groupId === c.review_group_id)) || sc.courses.some((x) => x.courseId === courseId);
+}
+function hwDeps(ctx: Ctx): HwDeps {
+  const s = ctx.session;
+  const memo = new Map<string, Promise<boolean>>();
+  return {
+    db: ctx.db,
+    env: ctx.env,
+    url: ctx.url,
+    req: ctx.req,
+    me: s ? { sub: s.sub, name: s.name || "會員", admin: s.role === "admin" } : null,
+    fail,
+    notify: (sub, title, body, link) => notify(ctx.db, { sub }, title, body, link),
+    isTeacher: (courseId) => memo.get(courseId) ?? (memo.set(courseId, hwIsTeacher(ctx, courseId)), memo.get(courseId)!),
+  };
+}
+routes.push(...HW_ROUTES.map(([m, re, fn]) => [m, re, (ctx: Ctx, p: string[]) => fn(hwDeps(ctx), p)] as [string, RegExp, Handler]));
+
 export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
   const url = new URL(req.url);
   const origin = req.headers.get("origin");
