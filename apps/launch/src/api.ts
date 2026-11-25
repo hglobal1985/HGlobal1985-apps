@@ -2778,11 +2778,16 @@ async function requireCoverRowOwnerBase(ctx: Ctx, row: CoverRow): Promise<Sessio
   return s;
 }
 /** 圖片資訊（相簿照片）：管理者看完整內容；其他人拿掉 GPS 與帳號編號，鎖住課程的照片不給。 */
+/** R2 裡這個檔案目前的格式：type＝R2 記錄的 Content-Type，ext＝檔名副檔名（type 查不到時的備援），bytes＝實際大小。 */
+async function storedInfo(env: Env, key: string, fallbackBytes: number): Promise<{ type: string; ext: string; bytes: number }> {
+  const head = key && env.MEDIA ? await env.MEDIA.head(key).catch(() => null) : null;
+  return { type: head?.httpMetadata?.contentType ?? "", ext: (/\.([A-Za-z0-9]{2,5})$/.exec(key)?.[1] ?? "").toLowerCase(), bytes: head?.size ?? fallbackBytes };
+}
 async function coverMediaInfo(ctx: Ctx, id: string) {
   // 圖片資訊面板（業主 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
   // 其他人看到同樣的面板，但 EXIF 的 GPS 位置（緯度、經度、海拔）與上傳者帳號編號會拿掉，沒權限看的課程照片也不給。
   const r = await ctx.db
-    .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
+    .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.r2_key, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
     .bind(id)
     .first<Record<string, string | number | null>>();
   if (!r) return fail(404, "not_found", "找不到這張照片");
@@ -2838,6 +2843,8 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
         return { fields: null, other: "", stale: true };
       }
     })(),
+    // 目前存在 R2 的檔案格式（業主 2026-11-25，所有人都看得到）：以 R2 實際的檔案類型為準，查不到就看檔名副檔名。
+    stored: await storedInfo(ctx.env, String(r.r2_key ?? ""), Number(r.bytes) || 0),
     file: meta.file ?? {},
     exif: manager ? meta.exif ?? {} : Object.fromEntries(Object.entries(meta.exif ?? {}).filter(([k]) => !/^(latitude|longitude|GPS)/i.test(k))),
   };
@@ -2890,6 +2897,7 @@ async function imageInfoByKey(ctx: Ctx) {
     eventDate: null,
     ocrText: "",
     structured: { fields: null, other: "", stale: false },
+    stored: await storedInfo(ctx.env, k, head?.size ?? 0),
     file: { type: head?.httpMetadata?.contentType ?? "", bytes: head?.size ?? 0 },
     exif: {},
     basic: true,

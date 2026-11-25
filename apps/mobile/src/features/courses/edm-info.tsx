@@ -29,6 +29,8 @@ export type MediaInfo = {
   ocrText: string;
   /** 套入「AI 文字辨識」欄位格式後的內容；fields 為 null＝還沒整理好（顯示清理過的原文）。 */
   structured: { fields: [string, string][] | null; other: string; stale: boolean };
+  /** 目前存在 R2 的檔案：type＝R2 記錄的檔案類型、ext＝檔名副檔名、bytes＝實際大小（所有人都看得到）。 */
+  stored?: { type: string; ext: string; bytes: number };
   /** 不是相簿照片（沒有辨識文字、上傳者）。 */
   basic?: boolean;
   file: { name?: string; type?: string; bytes?: number; width?: number; height?: number; lastModified?: string };
@@ -50,6 +52,13 @@ const when = (v?: string | null) => {
 /** 複製用：照欄位格式排好的純文字（沒整理好就是辨識原文）。 */
 const formatted = (i: MediaInfo) =>
   i.structured.fields ? [...i.structured.fields.filter(([, v]) => v).map(([k, v]) => `${k}：${v}`), ...(i.structured.other ? [`其他內容：${i.structured.other}`] : [])].join("\n") : i.ocrText;
+/** R2 儲存格式白話名稱（AVIF／JPEG／WebP／PNG…）；以 R2 檔案類型為準，沒有就看副檔名。 */
+const FORMAT_NAME: Record<string, string> = { avif: "AVIF", jpeg: "JPEG", jpg: "JPEG", webp: "WebP", png: "PNG", gif: "GIF", heic: "HEIC" };
+export const storedFormat = (s?: { type: string; ext: string }): string => {
+  if (!s) return "—";
+  const k = s.type.replace(/^image\//, "").toLowerCase() || s.ext;
+  return FORMAT_NAME[k] ?? (k ? k.toUpperCase() : "未知");
+};
 const OCR_STATUS: Record<string, string> = { "": "尚未辨識（稍後會自動辨識）", working: "辨識中…", done: "已辨識", failed: "辨識失敗" };
 const OWNER: Record<string, string> = { center: "中心", series: "系列", course: "課程" };
 
@@ -73,6 +82,20 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
   const r = useApi<MediaInfo>(id ? `/cover-media/${id}/info` : `/image-info?k=${encodeURIComponent(imageKey ?? "")}`);
   const info = r.data;
   const [showRaw, setShowRaw] = useState(false);
+  // 每個區塊預設收起，點標題才展開（業主 2026-11-25）。
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const sec = (id: string, title: string, body: React.ReactNode) => {
+    const on = open.has(id);
+    return (
+      <View style={styles.sec}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${title}，${on ? "點一下收起" : "點一下展開"}`} onPress={() => setOpen((s0) => { const n = new Set(s0); if (n.has(id)) n.delete(id); else n.add(id); return n; })} style={styles.secHead}>
+          <Text style={[styles.h, { flex: 1 }]}>{title}</Text>
+          <Ionicons name={on ? "chevron-up" : "chevron-down"} size={20} color="#ffd54f" />
+        </Pressable>
+        {on ? body : null}
+      </View>
+    );
+  };
   const copy = async (t: string) => {
     try {
       await navigator.clipboard.writeText(t);
@@ -103,12 +126,17 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
           <Ionicons name="close" size={24} color="#fff" />
         </Pressable>
       </View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: space.md, gap: space.lg }} showsVerticalScrollIndicator>
+      {info?.stored ? (
+        <View style={styles.fmt}>
+          <Ionicons name="server-outline" size={18} color="#9fd8ff" />
+          <Text style={styles.fmtText}>{`R2 儲存格式：${storedFormat(info.stored)}　${size(info.stored.bytes)}`}</Text>
+        </View>
+      ) : null}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: space.md, gap: space.md }} showsVerticalScrollIndicator>
         {!info ? <Text style={styles.v}>{r.error ? `讀取失敗：${r.error}` : "讀取中…"}</Text> : null}
         {info ? (
           <>
-            {info.basic ? null : <View style={styles.sec}>
-              <Text style={styles.h}>① 辨識後的圖片文字</Text>
+            {info.basic ? null : sec("ocr", "① 辨識後的圖片文字", <>
               {info.kind === "video" ? <Text style={styles.v}>影片沒有文字辨識。</Text> : (
                 <>
                   <Text style={styles.sub}>{`狀態：${OCR_STATUS[info.ocrStatus] ?? info.ocrStatus}`}{info.eventDate ? `　活動日期：${info.eventDate}` : ""}</Text>
@@ -152,9 +180,8 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
                   ) : <Text style={styles.v}>{info.ocrStatus === "done" ? "沒有辨識出文字。" : "目前還沒有辨識出的文字。"}</Text>}
                 </>
               )}
-            </View>}
-            <View style={styles.sec}>
-              <Text style={styles.h}>{info.basic ? "行動大學站內資訊" : "② 行動大學站內資訊"}</Text>
+            </>)}
+            {sec("site", info.basic ? "行動大學站內資訊" : "② 行動大學站內資訊", <>
               {info.basic ? null : row("上傳者", info.uploader || "（未記錄）")}
               {row("上傳時間", when(info.uploadedAt))}
               {row("所屬", `${OWNER[info.ownerKind] ?? info.ownerKind}：${info.ownerKey || "—"}`)}
@@ -163,16 +190,16 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
               {info.basic ? null : row("排序位置", `第 ${info.position + 1} 位`)}
               {info.basic ? null : row("類型", info.kind === "video" ? `影片（${info.durationSec} 秒）` : "圖片")}
               {row("站內尺寸", info.width && info.height ? `${info.width} × ${info.height} px` : "—")}
-              {row("站內檔案大小", size(info.bytes))}
+              {row("R2 儲存格式", info.stored ? `${storedFormat(info.stored)}${info.stored.type ? `（${info.stored.type}）` : ""}` : "—")}
+              {row("站內檔案大小", size(info.stored?.bytes ?? info.bytes))}
               {info.basic ? row("檔案類型", f.type || "—") : row("上傳的原始檔", f.name ? f.name : "（舊資料，沒有記錄）")}
               {f.name ? row("原始檔大小", `${size(f.bytes)}　${f.width && f.height ? `${f.width} × ${f.height} px` : ""}　${f.type ?? ""}`) : null}
               {f.lastModified ? row("原始檔修改時間", when(f.lastModified)) : null}
               {info.ocrModel ? row("辨識模型", info.ocrModel) : null}
               {info.ocrAt ? row("辨識時間", when(info.ocrAt)) : null}
               {row("圖片編號", info.id)}
-            </View>
-            <View style={styles.sec}>
-              <Text style={styles.h}>{info.basic ? "拍攝資訊（EXIF）" : "③ EXIF 詳細資訊"}</Text>
+            </>)}
+            {sec("exif", info.basic ? "拍攝資訊（EXIF）" : "③ EXIF 詳細資訊", <>
               {exifRows.length ? exifRows : <Text style={styles.v}>沒有 EXIF（舊照片、截圖、LINE／社群軟體傳來的圖通常沒有；站內存放的圖已壓縮，EXIF 只在上傳時讀取）。</Text>}
               {gps ? (
                 <Pressable accessibilityRole="link" onPress={() => (typeof window !== "undefined" ? window.open(gps, "_blank") : undefined)} style={styles.btn}>
@@ -180,7 +207,7 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
                   <Text style={styles.btnText}>在地圖開啟拍攝位置</Text>
                 </Pressable>
               ) : null}
-            </View>
+            </>)}
           </>
         ) : null}
       </ScrollView>
@@ -193,7 +220,10 @@ const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 6, paddingTop: 6, minHeight: 52 },
   title: { color: "#fff", fontSize: 18, fontWeight: "800" },
   x: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.15)" },
-  sec: { gap: 8 },
+  sec: { gap: 8, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12 },
+  secHead: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 36 },
+  fmt: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 6 },
+  fmtText: { color: "#9fd8ff", fontSize: 15, fontWeight: "800" },
   h: { color: "#ffd54f", fontSize: 16, fontWeight: "800" },
   fk: { color: "#9fd8ff", fontSize: 13, fontWeight: "800" },
   sub: { color: "#ddd", fontSize: 14 },
