@@ -1,10 +1,7 @@
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { api } from "@/api/client";
-import { confirmAsk } from "@/features/confirm";
-import { isSuperAdmin } from "@/lib/roles";
-import { useApi, useSession } from "@/state/session";
+import { useApi } from "@/state/session";
 import { flashText } from "@/ui/flash-notice";
 import { space } from "@/theme/tokens";
 
@@ -26,6 +23,9 @@ export type MediaInfo = {
   courseId: string | null;
   courseTitle: string | null;
   ocrStatus: string;
+  sceneStatus: string;
+  sceneText: string;
+  queue: { pending: number; perHour: number; etaMin: number | null; quotaOut: boolean };
   ocrModel: string;
   ocrAt: string | null;
   eventDate: string | null;
@@ -63,6 +63,13 @@ export const storedFormat = (s?: { type: string; ext: string }): string => {
   return FORMAT_NAME[k] ?? (k ? k.toUpperCase() : "未知");
 };
 const OCR_STATUS: Record<string, string> = { "": "尚未辨識（稍後會自動辨識）", working: "辨識中…", done: "已辨識", failed: "辨識失敗" };
+const aiState = (st: string, done: string) => (st === "done" ? done : st === "working" ? "辨識中…" : st === "failed" ? "辨識失敗" : "排隊等待辨識");
+const queueLine = (q: { pending: number; perHour: number; etaMin: number | null; quotaOut: boolean }) => {
+  if (q.quotaOut) return `全站還有 ${q.pending} 張待辨識；今天的 AI 免費額度已用完，明天自動繼續。`;
+  if (q.etaMin == null) return `全站還有 ${q.pending} 張待辨識，每 10 分鐘自動處理一批。`;
+  const eta = q.etaMin >= 120 ? `約 ${Math.ceil(q.etaMin / 60)} 小時` : `約 ${q.etaMin} 分鐘`;
+  return `全站還有 ${q.pending} 張待辨識，目前每小時約處理 ${q.perHour} 張，全部完成${eta}（本張排在其中，辨識完會自動寫入）。`;
+};
 const OWNER: Record<string, string> = { center: "中心", series: "系列", course: "課程" };
 
 // EXIF 欄位的中文名稱；沒列在這裡的欄位最後以原名顯示。
@@ -84,23 +91,6 @@ const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "bo
 export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string; /** 沒有相簿照片編號時，用圖片網址裡的儲存檔名查（課程封面、品牌 logo、課表…）。 */ imageKey?: string; top?: number; onClose: () => void }) {
   const r = useApi<MediaInfo>(id ? `/cover-media/${id}/info` : `/image-info?k=${encodeURIComponent(imageKey ?? "")}`);
   const info = r.data;
-  const { member } = useSession();
-  const [busy, setBusy] = useState(false);
-  // 超級管理員：依「相簿」目前的存檔格式與畫質重新壓縮這一張（測試畫質用；業主 2026-11-25）。
-  const recompress = async () => {
-    if (!id || busy) return;
-    if (!(await confirmAsk("重新壓縮這張照片", "會依「設定 › 儲存空間管理 › 相簿照片」目前的格式與畫質，把這張照片再壓一次並取代原檔。站內不保留原圖，所以是從現在這一份再壓縮，畫質會比直接用原圖壓差一點。要精準比較請重新上傳原圖。", "重新壓縮"))) return;
-    setBusy(true);
-    try {
-      const x = await api<{ changed: boolean; before: number; after: number; format: string; message?: string }>("POST", `/admin/cover-media/${id}/recompress`);
-      flashText(x.changed ? `已壓縮：${size(x.before)} → ${size(x.after)}（${x.format.replace("image/", "").toUpperCase()}）` : (x.message ?? "沒有變更"));
-      r.reload();
-    } catch (e) {
-      flashText((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
   const [showRaw, setShowRaw] = useState(false);
   // 每個區塊預設收起，點標題才展開（業主 2026-11-25）。
   const [open, setOpen] = useState<Set<string>>(new Set());
@@ -148,13 +138,22 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
       </View>
       {info?.stored ? (
         <View style={styles.fmt}>
-          <Ionicons name="server-outline" size={18} color="#9fd8ff" />
-          <Text style={[styles.fmtText, { flex: 1 }]}>{`R2 儲存格式：${storedFormat(info.stored)}　${size(info.stored.bytes)}`}</Text>
-          {id && info.kind === "image" && isSuperAdmin(member) ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="依相簿設定重新壓縮這張照片" disabled={busy} onPress={() => void recompress()} style={[styles.btn, { minHeight: 36, paddingHorizontal: 12, opacity: busy ? 0.5 : 1 }]}>
-              <Ionicons name="contract-outline" size={16} color="#fff" />
-              <Text style={styles.btnText}>{busy ? "壓縮中…" : "重新壓縮"}</Text>
-            </Pressable>
+          <View style={styles.fmtRow}>
+            <Ionicons name="server-outline" size={18} color="#9fd8ff" />
+            <Text style={styles.fmtText}>{`R2 儲存格式：${storedFormat(info.stored)}　${size(info.stored.bytes)}`}</Text>
+          </View>
+          {info.kind === "image" && !info.basic ? (
+            <>
+              <View style={styles.fmtRow}>
+                <Ionicons name="text-outline" size={18} color="#9fd8ff" />
+                <Text style={styles.fmtText}>{`文字辨識（OCR）：${aiState(info.ocrStatus, info.ocrText ? "已辨識，有文字" : "已辨識，沒有文字")}`}</Text>
+              </View>
+              <View style={styles.fmtRow}>
+                <Ionicons name="eye-outline" size={18} color="#9fd8ff" />
+                <Text style={styles.fmtText}>{`場景辨識：${aiState(info.sceneStatus, info.sceneText ? info.sceneText : "已辨識")}`}</Text>
+              </View>
+              {info.ocrStatus === "done" && info.sceneStatus === "done" ? null : <Text style={styles.fmtSub}>{queueLine(info.queue)}</Text>}
+            </>
           ) : null}
         </View>
       ) : null}
@@ -248,8 +247,10 @@ const styles = StyleSheet.create({
   x: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.15)" },
   sec: { gap: 8, backgroundColor: "rgba(255,255,255,0.06)", borderRadius: 12, padding: 12 },
   secHead: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 36 },
-  fmt: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingBottom: 6 },
-  fmtText: { color: "#9fd8ff", fontSize: 15, fontWeight: "800" },
+  fmt: { gap: 4, paddingHorizontal: 16, paddingBottom: 8 },
+  fmtRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  fmtSub: { color: "#9fd8ff", fontSize: 13, lineHeight: 18 },
+  fmtText: { flex: 1, color: "#9fd8ff", fontSize: 15, fontWeight: "800", lineHeight: 21 },
   h: { color: "#ffd54f", fontSize: 16, fontWeight: "800" },
   fk: { color: "#9fd8ff", fontSize: 13, fontWeight: "800" },
   sub: { color: "#ddd", fontSize: 14 },
