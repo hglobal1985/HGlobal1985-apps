@@ -1,3 +1,4 @@
+import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
 import { setBandExtra } from "./band-extra";
@@ -59,6 +60,7 @@ export function CollapseBand({ children, enabled = true }: { children: ReactNode
  */
 export function CoverMiniFloat({ cover, enabled = true, label }: { cover: ReactNode; enabled?: boolean; label: string }) {
   const y = useBandScroll();
+  const focused = useIsFocused(); // 堆在後面、沒在看的頁面不出圓球
   const [closed, setClosed] = useState(false);
   // 靜態封面往下滑：一浮出就直接縮到最小的圓球（業主 2026-11-25）；點圓球才展開成小視窗，回到頂端再往下滑又從圓球開始。
   const [collapsed, setCollapsed] = useState(true);
@@ -72,7 +74,7 @@ export function CoverMiniFloat({ cover, enabled = true, label }: { cover: ReactN
   if (!enabled) return null;
   return (
     <MiniWindow
-      visible={p > 0.02 && !closed}
+      visible={focused && p > 0.02 && !closed}
       morph={{ p, from: getBandRect() }}
       windowContent={cover}
       circleContent={cover}

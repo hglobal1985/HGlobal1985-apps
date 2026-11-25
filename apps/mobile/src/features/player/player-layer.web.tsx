@@ -429,6 +429,7 @@ export function PlayerLayer() {
         onTap={() => !justSwitched() && engine.toggle()}
         collapsed={s.collapsed}
         onCollapsedChange={(v) => engine.setCollapsed(v)}
+        priority={2}
         slotRef={slotRef}
         running={s.playing}
         getBottomEdge={bottomEdge}

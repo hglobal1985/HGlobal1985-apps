@@ -1,11 +1,31 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { GradientFrame } from "./gradient-frame";
 import type { Rect } from "./band-rect";
 import { MINI_BAR, MINI_BAR_BG, MINI_BTN, MINI_BTN_COLORS, MINI_BTN_GLYPH_COLOR, MINI_CIRCLE, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, MINI_RADIUS, miniFloatWidth } from "./mini-spec";
 
 type Pos = { x: number; y: number };
+
+/**
+ * 全站「永遠只有一個」迷你小視窗／圓球（業主 2026-11-25：頁面疊著好幾層時，每層的封面圓球與影片迷你播放器同時出現，大亂）。
+ * 每個 MiniWindow 登記自己是否想顯示與優先權（影片／音檔播放器 2 > 封面 1）；只有「優先權最高、同優先權最後才出現」的那一個真的畫出來。
+ */
+const reg = new Map<string, { prio: number; seq: number }>();
+let seqNo = 0;
+const regSubs = new Set<() => void>();
+const winner = (): string | null => {
+  let best: [string, { prio: number; seq: number }] | null = null;
+  for (const e of reg) if (!best || e[1].prio > best[1].prio || (e[1].prio === best[1].prio && e[1].seq > best[1].seq)) best = e;
+  return best ? best[0] : null;
+};
+const setWant = (id: string, want: boolean, prio: number) => {
+  const had = reg.get(id);
+  if (want && !had) reg.set(id, { prio, seq: ++seqNo });
+  else if (!want && had) reg.delete(id);
+  else return;
+  regSubs.forEach((f) => f());
+};
 /** 預設位置的底邊：網頁版＝底部分頁列的上緣（小視窗放在分頁列上方），其他＝這一層的底部。 */
 function defaultBottomEdge(h: number): number {
   if (Platform.OS !== "web" || typeof document === "undefined") return h;
@@ -19,7 +39,7 @@ function defaultBottomEdge(h: number): number {
  * 三顆按鈕永遠顯示；手指按住可任意拖曳位置，位置記在本機（與影片迷你播放器共用同一個位置）；小圓圖也能拖曳、點一下恢復小視窗。
  * 尺寸、顏色、時間都來自 ui/mini-spec.ts（影片迷你播放器用同一份）。放在頁面最外層（滿版透明層，只有小視窗本身會接觸摸）。
  */
-export function MiniWindow({ visible, opacity = 1, windowContent, circleContent, label, maximizeLabel, onMaximize, onClose, onTap, collapsed: collapsedProp, onCollapsedChange, slotRef, running = true, getBottomEdge, morph }: {
+export function MiniWindow({ visible, opacity = 1, windowContent, circleContent, label, maximizeLabel, onMaximize, onClose, onTap, collapsed: collapsedProp, onCollapsedChange, slotRef, running = true, getBottomEdge, morph, priority = 1 }: {
   visible: boolean;
   opacity?: number;
   /** 小視窗裡的畫面（16:9，填滿）。 */
@@ -44,7 +64,16 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
   getBottomEdge?: () => number;
   /** 往下滑縮小的變形過程（0～1）：有給 from（封面原本的位置）就畫「大邊框由大到小」的框，p 到 1 才換成真正的小視窗／圓球（與影片縮成迷你播放器同一種動畫）。 */
   morph?: { p: number; from: Rect | null };
+  /** 同時有好幾個想顯示時，優先權高的留下（影片／音檔播放器 2、封面 1）。 */
+  priority?: number;
 }) {
+  const myId = useId();
+  useEffect(() => {
+    setWant(myId, visible, priority);
+    return () => setWant(myId, false, priority);
+  }, [myId, visible, priority]);
+  const win = useSyncExternalStore((f) => (regSubs.add(f), () => void regSubs.delete(f)), winner, () => null);
+  const mine = win === myId;
   const [area, setArea] = useState({ w: 0, h: 0 });
   const root = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any;
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
@@ -133,14 +162,14 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
   ];
   const tree = (
     <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: 30 }]} ref={root} onLayout={(e) => (setArea({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }), root.current?.measureInWindow((x: number, y: number) => setOrigin({ x, y })))}>
-      {visible && area.w && morphing ? (
+      {visible && mine && area.w && morphing ? (
         <View pointerEvents="none" style={{ position: "absolute", left: mx, top: my, width: mwid, height: mhei }}>
           <GradientFrame width={mwid} height={mhei} radius={mrad} flush>
             <View style={{ width: "100%", height: "100%", overflow: "hidden" }}>{collapsed ? circleContent : windowContent}</View>
           </GradientFrame>
         </View>
       ) : null}
-      {visible && area.w && !morphing ? (
+      {visible && mine && area.w && !morphing ? (
         <View {...responder.panHandlers} {...({ dataSet: { noPullRefresh: "" } } as object)} accessibilityLabel={label} style={[{ position: "absolute", left: cur.x, top: cur.y, width: W, opacity }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab", userSelect: "none", WebkitUserSelect: "none" } as object) : null]}>
           {collapsed ? (
             <View accessibilityRole="button" accessibilityLabel="恢復小視窗（可按住拖曳移動）" style={{ width: MINI_CIRCLE, height: MINI_CIRCLE }}>
