@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { centerKeyOf } from "@/features/format";
-import { groupBySeries, orderGroups, sortCourses } from "@/features/courses/sort";
+import { groupBySeries, orderGroups, seriesOrdered, sortCourses } from "@/features/courses/sort";
 import { useSeriesSettings } from "@/features/courses/series-settings";
 import { elderTextScale } from "@/lib/elder-mode";
 import { useApi, useSession } from "@/state/session";
@@ -130,7 +130,7 @@ export function useZoneItems(all: CourseSummary[]): (zone: ElderZone) => ZoneIte
           const sessions = cards.length ? cards : g.sessions;
           const rep = sessions.includes(g.nearest) ? g.nearest : sessions[0]!;
           const inSeries = !!rep.series && sessions.length >= 2;
-          return { key: g.key, title: inSeries ? settings.titleOf(rep.series) : rep.title, count: sum(sessions), rep, series: inSeries, children: inSeries ? sessions : undefined };
+          return { key: g.key, title: inSeries ? settings.titleOf(rep.series) : rep.title, count: sum(sessions), rep, series: inSeries, children: inSeries ? seriesOrdered(sessions) : undefined }; // 系列裡的梯次排序與超派（系列選單／系列頁）同一個 seriesOrdered（業主 2026-11-25：銅章會議最新在上）
         });
     const centerItems = (): ZoneItem[] =>
       (centers.data ?? [])

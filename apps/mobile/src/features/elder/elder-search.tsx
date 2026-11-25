@@ -156,9 +156,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
             <Ionicons name="mic" size={60} color={c.textOnAccent} {...({ uiOnly: true } as object)} />
           </View>
         </Pressable>
-        <AppText variant="headline" style={{ textAlign: "center", lineHeight: 20 }}>
-          按一下，用說的
-        </AppText>
+        <FitLine text="按一下，用說的" max={44} />
         {voice.supported ? <TypoHint /> : null}
         {voice.supported ? <SearchHint /> : (
           <AppText tone="muted" style={{ textAlign: "center" }}>
@@ -260,27 +258,29 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
 }
 
 /** 搜尋提示文字（業主 2026-11-25）：首頁麥克風下方與「正在聽」畫面共用這一個，改這裡兩邊一起變；行距縮到最小。 */
-export const SEARCH_HINT = "例如：「王老師　表揚大會　淨水器　營養」";
+export const SEARCH_HINT = "例如：「王老師 表揚大會 淨水器 營養」"; // 空格一律半型
 export const TYPO_HINT = "說錯字不用改 都能找得到";
-export function SearchHint() {
-  return (
-    <AppText tone="muted" style={{ textAlign: "center", lineHeight: 17 }}>
-      {SEARCH_HINT}
-    </AppText>
-  );
-}
-/** 中央黑色標題下方的黑字提示：寬度強制一行，太長自動縮小字體（業主 2026-11-25）。首頁與「正在聽」共用。 */
-export function TypoHint() {
+/** 一行文字的估計寬度（以「字級」為單位）：半型空格 0.32、其他半型 0.6、中文與全型 1。 */
+const lineUnits = (t: string) => [...t].reduce((n, ch) => n + (ch === " " ? 0.32 : ch.charCodeAt(0) < 128 ? 0.6 : 1), 0);
+/** 強制一行、字級自動放到剛好塞滿可用寬度（業主 2026-11-25）：太長自動縮小，短的放大到 max 為止。首頁與「正在聽」共用。 */
+export function FitLine({ text, max = 30, min = 10, weight = "700", muted, tight }: { text: string; max?: number; min?: number; weight?: "400" | "700" | "800"; muted?: boolean; tight?: boolean }) {
   const [w, setW] = useState(0);
   const k = UI_SCALE * elderTextScale();
-  const size = w ? Math.max(10, Math.min(22, Math.floor(w / k / ([...TYPO_HINT].length * 1.05)))) : 18;
+  const size = w ? Math.max(min, Math.min(max, Math.floor(w / k / (lineUnits(text) * 1.06)))) : Math.min(max, 18);
   return (
-    <View style={{ alignSelf: "stretch", marginTop: -space.sm }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
-      <AppText numberOfLines={1} style={{ textAlign: "center", fontSize: size, lineHeight: size, fontWeight: "700" }}>
-        {TYPO_HINT}
+    <View style={{ alignSelf: "stretch", ...(tight ? { marginTop: -space.sm } : null) }} onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+      <AppText tone={muted ? "muted" : undefined} numberOfLines={1} style={{ textAlign: "center", fontSize: size, lineHeight: Math.round(size * 1.15), fontWeight: weight }}>
+        {text}
       </AppText>
     </View>
   );
+}
+export function SearchHint() {
+  return <FitLine text={SEARCH_HINT} max={22} weight="400" muted />;
+}
+/** 中央黑色標題下方的黑字提示（業主 2026-11-25：強制一行、自動縮放到最大寬度）。 */
+export function TypoHint() {
+  return <FitLine text={TYPO_HINT} max={30} tight />;
 }
 
 /** 「正在聽…」：跟著聲音大小即時高低跳動的音波＋聽到的字＋停止鈕（業主 2026-11-24）。 */
@@ -290,6 +290,11 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
   const min = Math.round(14 * UI_SCALE);
   return (
     <View style={styles.center} accessibilityLiveRegion="polite">
+      {heard ? (
+        <AppText numberOfLines={3} style={{ color: c.danger, textAlign: "center", fontWeight: "800", fontSize: 34, lineHeight: 42 }}>
+          {`聽到：「${heard}」`}
+        </AppText>
+      ) : null}
       <View style={[styles.wave, { height: max }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         {levels.map((v, i) => (
           <View key={i} style={[{ width: Math.round(14 * UI_SCALE), height: Math.round(min + v * (max - min)), borderRadius: 8, backgroundColor: c.accent }, WAVE_ANIM]} />
@@ -297,9 +302,11 @@ function Listening({ heard, levels, onStop }: { heard: string | null; levels: nu
       </View>
       <AppText variant="title" style={{ lineHeight: 26 }}>正在聽…</AppText>
       <TypoHint />
-      <AppText tone="muted" style={{ textAlign: "center" }}>
-        {heard ? `聽到：「${heard}」` : "請說出想找的課程"}
-      </AppText>
+      {heard ? null : (
+        <AppText tone="muted" style={{ textAlign: "center" }}>
+          請說出想找的課程
+        </AppText>
+      )}
       <SearchHint />
       <Pressable accessibilityRole="button" onPress={onStop} style={[styles.stop, { borderColor: c.danger, borderWidth: ELDER_FIELD.borderWidth }]}>
         <AppText variant="headline" style={{ color: c.danger }}>
