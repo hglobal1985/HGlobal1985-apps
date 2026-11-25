@@ -7406,6 +7406,7 @@ const routes: [string, RegExp, Handler][] = [
         ...groups.map((g) => ctx.db.prepare("INSERT INTO search_synonyms (terms) VALUES (?)").bind(JSON.stringify(g))),
         audit(ctx.db, s.sub, "search_synonyms.save", "setting", "search_synonyms", String(groups.length)),
       ]);
+      (await import("./phonetic-search.ts")).resetSynonymCache();
       return { ok: true, groups: groups.length };
     },
   ],
