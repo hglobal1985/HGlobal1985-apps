@@ -141,12 +141,12 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
       {editing ? <EditApproveSheet review={editing} onClose={() => setEditing(null)} onPick={(v, label) => (setEditing(null), void decide(editing, "approve", v, label))} /> : null}
       {/* 已處理的申請紀錄（業主 2026-11-19；2026-11-22 改頭像清單、依日期分組）：審核完成後保留在這裡，不會消失。 */}
       {history.data?.length
-        ? groupByDay(history.data, (h) => h.decided_at).map((g) => (
+        ? [{ day: "已處理", rows: history.data }].map((g) => (
             <View key={g.day} style={{ gap: 6, marginTop: space.sm }}>
               <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
-                {`已處理 · ${g.day}`}
+                已處理
               </AppText>
-              <Card style={{ paddingVertical: 4 }}>
+              <Card style={{ paddingVertical: 4, opacity: 0.45 }}>
                 {g.rows.map((h, i) => {
                   const ok = h.status === "approved";
                   const name = applicantLabel(h.legal_name, h.applicant_name) || "會員";

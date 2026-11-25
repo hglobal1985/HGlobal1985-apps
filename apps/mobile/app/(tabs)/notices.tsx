@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { api, type Notice, type NoticeCategory } from "@/api/client";
 import { noticeTarget } from "@/features/format";
-import { CentralReviewList, groupByDay, hhmm, useCentralReviews } from "@/features/notices/central-reviews";
+import { CentralReviewList, hhmm, useCentralReviews } from "@/features/notices/central-reviews";
 import { NoticeSheet } from "@/features/notices/notice-sheet";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -71,7 +71,7 @@ export default function NoticesScreen() {
   };
   const wrapSeen = (n: Notice, row: ReactNode) => (mode === "achievement" || mode === "subscribe" ? <SeenRow key={n.id} onSeen={() => markSeen(n)}>{row}</SeenRow> : row);
   const renderRow = (n: Notice, i: number) => (
-      <Pressable key={n.id} accessibilityRole="button" accessibilityLabel={`${n.title}${n.read ? "" : "，未讀"}`} onPress={() => open(n)} style={({ pressed }) => [{ flexDirection: elder ? "column" : "row", alignItems: elder ? "stretch" : "center", gap: elder ? 8 : 10, paddingVertical: 12, minHeight: 64 }, i > 0 && { borderTopWidth: 1, borderColor: c.border }, pressed && { opacity: 0.7 }]}>
+      <Pressable key={n.id} accessibilityRole="button" accessibilityLabel={`${n.title}${n.read ? "" : "，未讀"}`} onPress={() => open(n)} style={({ pressed }) => [{ flexDirection: elder ? "column" : "row", alignItems: elder ? "stretch" : "center", gap: elder ? 8 : 10, paddingVertical: 12, minHeight: 64 }, n.read && !n.pending && { opacity: 0.45 }, i > 0 && { borderTopWidth: 1, borderColor: c.border }, pressed && { opacity: 0.7 }]}>
         <View style={elder ? { flexDirection: "row", alignItems: "center", gap: 10 } : { flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
         <View style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: n.read ? c.surfaceMuted : c.accentSoft }}>
           <Ionicons name={n.category === "achievement" ? "trophy-outline" : n.category === "review" ? "ribbon-outline" : n.category === "comment" ? "chatbubble-outline" : "notifications-outline"} size={20} color={n.read ? c.textMuted : c.accentText} />
@@ -159,14 +159,10 @@ export default function NoticesScreen() {
       ) : null}
       {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
       {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
-      {groupByDay(rest, (n) => n.createdAt).map((g) => (
-        <View key={g.day} style={{ gap: 6, marginTop: space.xs }}>
-          <AppText variant="caption" tone="muted" style={{ fontWeight: "800" }}>
-            {g.day}
-          </AppText>
-          <Card style={{ paddingVertical: 4 }}>{g.rows.map((n, i) => wrapSeen(n, renderRow(n, i)))}</Card>
-        </View>
-      ))}
+      {/* 已處理／已讀的通知整列刷淡，不分日期、全部相黏排成一張清單（業主 2026-11-25）。 */}
+      {rest.length ? (
+        <Card style={{ paddingVertical: 4, marginTop: space.xs }}>{rest.map((n, i) => wrapSeen(n, renderRow(n, i)))}</Card>
+      ) : null}
       {preview ? (
         <NoticeSheet notice={preview} onClose={() => setPreview(null)} onOpen={preview.link ? () => router.push(noticeTarget(preview.link) as Href) : undefined} />
       ) : null}
