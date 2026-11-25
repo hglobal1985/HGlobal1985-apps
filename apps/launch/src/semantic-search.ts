@@ -95,8 +95,8 @@ async function allVectors(db: D1Database): Promise<Row[]> {
 }
 
 /** 查詢文字 → 意思最接近的課程、教材編號（前端依自己的索引過濾）＋其他類別的命中（系列、中心、區塊、課程介紹、EDM、相片；已附標題、連結與膠囊標籤）。依相似度由高到低，各最多 limit 個。額度用完或沒有向量回空。 */
-export async function semanticSearch(env: Env, db: D1Database, q: string, limitArg?: number): Promise<{ courses: string[]; lessons: string[]; extras: Hit[] }> {
-  const none = { courses: [], lessons: [], extras: [] };
+export async function semanticSearch(env: Env, db: D1Database, q: string, limitArg?: number): Promise<{ courses: string[]; lessons: string[]; extras: Hit[]; coursePrio: number }> {
+  const none = { courses: [], lessons: [], extras: [], coursePrio: 9 };
   const text = q.trim().slice(0, 100);
   if (text.length < 2) return none;
   const st = await loadSearchSettings(db); // 門檻、筆數、資料來源由「搜尋與 AI 設定」決定
@@ -119,7 +119,7 @@ export async function semanticSearch(env: Env, db: D1Database, q: string, limitA
   const extras = await resolveHits(db, other.map((x) => ({ kind: x.r.kind as SourceKind, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
   // 單一教材也列在「其他項目」（標籤：單一教材），不再把它的課程混進課程清單。
   const lessonHits = await resolveHits(db, scored.filter((x) => x.r.kind === "lesson").slice(0, Math.min(limit, 12)).map((x) => ({ kind: "lesson" as const, ref: x.r.id, txt: x.r.txt, score: Math.round(x.s * 1000) / 1000 })));
-  return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id), extras: [...extras, ...lessonHits].sort((a, b) => prio(a.kind) - prio(b.kind) || b.score - a.score) };
+  return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id), extras: [...extras, ...lessonHits].map((h) => ({ ...h, prio: prio(h.kind) })).sort((a, b) => a.prio - b.prio || b.score - a.score), coursePrio: prio("course") };
 }
 
 /** 試搜尋（設定頁用，超級管理員）：列出最接近的前 N 筆與相似度分數，方便依實際數字調「相似度門檻」。不套用門檻與開關。 */

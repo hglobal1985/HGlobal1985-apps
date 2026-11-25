@@ -42,7 +42,7 @@ import { usePhonetic } from "./use-phonetic";
 import { useSemantic } from "./use-semantic";
 import { useSearchSettings } from "./use-search-settings";
 import { SceneHits } from "./scene-hits";
-import { SemanticExtras } from "@/features/search/semantic-extras";
+import { SemanticExtras, splitExtras } from "@/features/search/semantic-extras";
 import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses, type SeriesGroup } from "./sort";
 import { useApi, useSession } from "@/state/session";
@@ -479,7 +479,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const sceneBox = q.trim() ? (
     <>
       <SceneHits q={q} />
-      <SemanticExtras items={semantic.extras} />
+      <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).above} />
     </>
   ) : null;
   const termsBox = terms.length ? (
@@ -728,6 +728,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
                 ))
               : null}
           </View>
+          {q.trim() ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).below} /> : null}
         </>
       )}
       {archivedBlock}

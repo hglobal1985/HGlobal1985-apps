@@ -25,7 +25,7 @@ import { ElderInvite, ElderSeriesHead } from "./elder-heads";
 import { centerTitle } from "@/features/format";
 import { ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
-import { SemanticExtras, TagPill } from "@/features/search/semantic-extras";
+import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
 import { useVoice } from "./use-voice";
 
 /** 至尊模式列得出來的課程：上架中、不是「只限網址」的課程（清單卡也列，排在課程後面）。 */
@@ -101,7 +101,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   }, [key, index, all, exact, semantic.courses, semantic.lessons, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
   // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
-    if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x, tag: x.isList ? "教材卡" : "課程卡" }));
+    if (key) return results.map((x) => ({ key: x.id, title: x.title, rep: x, tag: "教材卡" }));
     if (mode !== "browse" || !zone) return [];
     if (sub) return (sub.children ?? []).map((x) => ({ key: x.id, title: x.title, count: x.materialCount, rep: x }));
     return itemsOf(zone);
@@ -143,7 +143,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : "找不到這個課程"}</AppText>
       ) : null}
       {searching ? <SceneHits q={q} big /> : null}
-      {searching ? <SemanticExtras items={semantic.extras} big /> : null}
+      {searching ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).above} big /> : null}
     </View>
   );
 
@@ -249,6 +249,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
               </View>
             ) : undefined
           }
+          ListFooterComponent={key ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).below} big /> : undefined}
           renderItem={({ item }) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />}
           initialNumToRender={60} maxToRenderPerBatch={60} windowSize={21}
         />

@@ -7,10 +7,10 @@ import type { D1Database } from "./d1.ts";
 
 export type SourceKind = "course" | "lesson" | "section" | "series" | "center" | "intro" | "edm" | "photo";
 export type Candidate = { kind: SourceKind; ref: string; txt: string };
-export type Hit = { kind: SourceKind; tag: string; id: string; title: string; sub: string; link: string; score: number };
+export type Hit = { kind: SourceKind; tag: string; prio: number; id: string; title: string; sub: string; link: string; score: number };
 
 export const SOURCES: { kind: SourceKind; param: string; tag: string; label: string; fields: string }[] = [
-  { kind: "course", param: "semSrcCourse", tag: "課程卡", label: "課程卡", fields: "courses.title（課程名稱）" },
+  { kind: "course", param: "semSrcCourse", tag: "教材卡", label: "教材卡", fields: "courses.title（教材卡名稱）" },
   { kind: "lesson", param: "semSrcLesson", tag: "單一教材", label: "單一教材", fields: "lessons.title（教材標題，不含區塊）" },
   { kind: "section", param: "semSrcSection", tag: "區塊", label: "區塊（課程裡的分組）", fields: "lessons.title（kind＝區塊）" },
   { kind: "series", param: "semSrcSeries", tag: "系列卡", label: "系列卡", fields: "courses.series（系列名稱，同名只算一張）" },
@@ -50,7 +50,7 @@ export async function resolveHits(db: D1Database, hits: { kind: SourceKind; ref:
   const centerName = async (key: string) => (await db.prepare("SELECT display_name AS n FROM center_names WHERE center_key = ?").bind(key).first<{ n: string }>())?.n || key;
   const courseOf = (id: string) => db.prepare(`SELECT c.id, c.title FROM courses c WHERE c.id = ? AND ${PUBLIC}`).bind(id).first<{ id: string; title: string }>();
   for (const h of hits) {
-    const base = { kind: h.kind, tag: tagOf(h.kind), id: `${h.kind}:${h.ref}`, score: h.score };
+    const base = { kind: h.kind, tag: tagOf(h.kind), prio: 0, id: `${h.kind}:${h.ref}`, score: h.score };
     if (h.kind === "series") out.push({ ...base, title: h.txt, sub: "", link: `/series/${enc(h.ref)}` });
     else if (h.kind === "center") out.push({ ...base, title: await centerName(h.ref), sub: "", link: `/courses?center=${enc(h.ref)}` });
     else if (h.kind === "intro") {
