@@ -144,10 +144,9 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       </View>
       {member ? null : <LoginPrompt />}
       {searching ? (
-        <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : "找不到這個課程"}</AppText>
+        <AppText variant="headline">{results.length ? `找到 ${results.length} 堂課` : semantic.loading || phonetic.loading ? "正在找相近的課程…" : semantic.extras.length ? `找到 ${semantic.extras.length} 個相近的項目` : "找不到這個課程"}</AppText>
       ) : null}
       {searching ? <SceneHits q={q} big /> : null}
-      {searching ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).above} big /> : null}
     </View>
   );
 
@@ -207,6 +206,9 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
                   <ElderZoneCard key={z.id} zone={z} count={itemsOf(z.id).reduce((n, x) => n + x.count, 0)} onPress={() => (setSub(null), setZone(z.id))} />
                 ))}
               </View>
+            ) : key ? (
+              // 其他項目放進「可捲動」的清單裡（業主 2026-11-25：放在固定的上半部，項目一多就佔滿畫面、清單捲不動）。
+              <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).above} big />
             ) : undefined;
   const listFooter: ReactNode = key ? <SemanticExtras items={splitExtras(semantic.extras, semantic.coursePrio).below} big /> : undefined;
   const renderRow = (item: Row) => <ElderCourseRow course={item.rep} title={item.title} count={item.count} onPress={item.children ? () => setSub(item) : undefined} series={item.series} coverUrl={item.coverUrl} typeTag={item.tag} />;
