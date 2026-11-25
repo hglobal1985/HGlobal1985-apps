@@ -1028,6 +1028,23 @@ async function lockStateOfKey(ctx: Ctx, courseId: string): Promise<LockState> {
   return lockStateOf(ctx, row, rankMap, state, rights, await eligibilityFor(ctx.session, rankMap, row.min_rank_code === "none" ? [] : [row.min_rank_code]));
 }
 
+/** 一次算出多門課的鎖定狀態（搜尋結果用）：課程列一次查完，獎銜表、報名狀態、權限、資格也各只查一次，不再每門課重查（以前 100 筆結果要等近 10 秒）。 */
+async function lockStatesOf(ctx: Ctx, courseIds: string[]): Promise<Map<string, LockState>> {
+  const out = new Map<string, LockState>();
+  const ids = [...new Set(courseIds)];
+  if (!ids.length) return out;
+  const rows: CourseRow[] = [];
+  for (let i = 0; i < ids.length; i += 90) {
+    const part = ids.slice(i, i + 90);
+    rows.push(...(await ctx.db.prepare(`${COURSE_SELECT} WHERE c.id IN (${part.map(() => "?").join(",")})`).bind(...part).all<CourseRow>()).results);
+  }
+  const [rankMap, state, rights] = await Promise.all([ranks(ctx.db), memberCourseState(ctx.db, ctx.session?.sub), ctx.session ? rightsOf(ctx) : Promise.resolve(null)]);
+  const eligibility = await eligibilityFor(ctx.session, rankMap, [...new Set(rows.map((r) => r.min_rank_code).filter((c) => c !== "none"))]);
+  for (const r of rows) out.set(r.id, await lockStateOf(ctx, r, rankMap, state, rights, eligibility));
+  for (const id of ids) if (!out.has(id)) out.set(id, { locked: false, manages: false, lines: [] });
+  return out;
+}
+
 async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const s = ctx.session;
   // 這一頁需要的資料全部同時查（2026-11-21 載入速度優化：以前一個查完才查下一個，課程頁要等 12 趟資料庫來回）。
@@ -4646,10 +4663,9 @@ const routes: [string, RegExp, Handler][] = [
         results = all.results.map((r) => [r, hitTags(r).length] as const).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).map(([r]) => r);
         tagsOf = hitTags;
       }
-      const locks = new Map<string, LockState>();
+      const locks = await lockStatesOf(ctx, results.map((r) => r.course_id));
       const groups = new Map<string, { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; tags: Set<string>; locked: boolean; lockLines: string[]; photos: { id: string; url: string }[] }>();
       for (const r of results) {
-        if (!locks.has(r.course_id)) locks.set(r.course_id, await lockStateOfKey(ctx, r.course_id));
         const lk = locks.get(r.course_id)!;
         if (sst.showLocked === false && lk.locked && !lk.manages) continue;
         const g = groups.get(r.block_id) ?? { blockId: r.block_id, courseId: r.course_id, courseTitle: r.course_title, blockTitle: r.block_title, count: 0, tags: new Set<string>(), locked: lk.locked && !lk.manages, lockLines: lk.lines, photos: [] };
@@ -4670,17 +4686,13 @@ const routes: [string, RegExp, Handler][] = [
       const { semanticSearch } = await import("./semantic-search.ts");
       const r = await semanticSearch(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "");
       // 沒有權限的內容也找得到（業主 2026-11-25）：標上 locked＋原因，畫面在縮圖中央蓋鎖頭；鎖住的圖片不給放大用的圖址。
-      const locks = new Map<string, LockState>();
+      const locks = await lockStatesOf(ctx, r.extras.flatMap((h) => (h.courseId ? [h.courseId] : [])));
+      const showLocked = (await (await import("./search-settings.ts")).loadSearchSettings(ctx.db)).showLocked !== false;
       const extras = [];
       for (const h of r.extras) {
-        if (!h.courseId) {
-          extras.push(h);
-          continue;
-        }
-        if (!locks.has(h.courseId)) locks.set(h.courseId, await lockStateOfKey(ctx, h.courseId));
-        const lk = locks.get(h.courseId)!;
-        if (lk.locked && !lk.manages) {
-          if ((await (await import("./search-settings.ts")).loadSearchSettings(ctx.db)).showLocked === false) continue;
+        const lk = h.courseId ? locks.get(h.courseId) : undefined;
+        if (lk && lk.locked && !lk.manages) {
+          if (!showLocked) continue;
           const { image: _image, ...rest } = h;
           extras.push({ ...rest, locked: true, lockLines: lk.lines });
         } else extras.push(h);

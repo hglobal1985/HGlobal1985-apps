@@ -49,13 +49,19 @@ const pub = (key: string | null | undefined, v = 0) => (key ? `/api/v2/media/pub
 /** 把「非課程／非章節」的命中補上標題、縮圖與去向（只處理分數最高的幾筆）。看不到的（下架、只限網址）直接略過。
  *  去向（業主 2026-11-25）：單一教材＝直接播放、區塊＝直接開該區塊、教材卡／課程介紹＝課程頁、系列卡＝系列頁、中心卡＝中心頁、EDM／相片＝直接放大看圖。 */
 export async function resolveHits(db: D1Database, hits: { kind: SourceKind; ref: string; txt: string; score: number }[]): Promise<Hit[]> {
+  // 每筆各自查，改成同時查（以前一筆一筆等，100 筆要好幾秒）；順序維持原樣。
+  const all: Hit[][] = [];
+  for (let i = 0; i < hits.length; i += 30) all.push(...(await Promise.all(hits.slice(i, i + 30).map((h) => resolveOne(db, h)))));
+  return all.flat();
+}
+async function resolveOne(db: D1Database, h: { kind: SourceKind; ref: string; txt: string; score: number }): Promise<Hit[]> {
   const out: Hit[] = [];
   const centerOf = async (key: string) => {
     const r = await db.prepare("SELECT (SELECT display_name FROM center_names WHERE center_key = ?1) AS n, (SELECT COALESCE(cover_key, edm_key) FROM center_art WHERE center_key = ?1) AS k, (SELECT art_version FROM center_art WHERE center_key = ?1) AS v").bind(key).first<{ n: string | null; k: string | null; v: number | null }>();
     return { name: r?.n || key, thumb: pub(r?.k, r?.v ?? 0) };
   };
   const courseOf = (id: string) => db.prepare(`SELECT c.id, c.title, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM courses c WHERE c.id = ? AND ${PUBLIC}`).bind(id).first<{ id: string; title: string; k: string | null; v: number | null }>();
-  for (const h of hits) {
+  {
     const base = { kind: h.kind, tag: tagOf(h.kind), prio: 0, id: `${h.kind}:${h.ref}`, score: h.score };
     if (h.kind === "series") {
       const a = await db.prepare("SELECT COALESCE(cover_key, edm_key) AS k, art_version AS v FROM series_art WHERE series = ?").bind(h.ref).first<{ k: string | null; v: number | null }>();
@@ -71,7 +77,7 @@ export async function resolveHits(db: D1Database, hits: { kind: SourceKind; ref:
       if (l) out.push({ ...base, title: l.title, sub: l.ct, link: h.kind === "lesson" ? `/course/${l.cid}?lesson=${enc(h.ref)}` : `/course/${l.cid}?block=${enc(h.ref)}`, thumb: pub(l.k, l.v ?? 0), courseId: l.cid });
     } else if (h.kind === "edm" || h.kind === "photo") {
       const m = await db.prepare("SELECT owner_kind, owner_key, center_key, kind, r2_key, poster_key FROM cover_media WHERE id = ?").bind(h.ref).first<{ owner_kind: string; owner_key: string; center_key: string | null; kind: string; r2_key: string; poster_key: string | null }>();
-      if (!m || m.kind !== "image") continue;
+      if (!m || m.kind !== "image") return out;
       let title = "";
       let link = "";
       let courseId: string | undefined;
