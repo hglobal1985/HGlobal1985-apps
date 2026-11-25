@@ -72,6 +72,7 @@ export const PARAMS: ParamDef[] = [
   { key: "looseEnabled", group: "related", label: "什麼都找不到時退到「最相近」", desc: "字面、模糊、同音、AI 都沒結果時，改列出關鍵詞片段分數最高的單元，結果不留空白。關閉＝顯示「找不到」。", advice: "建議開。", type: "bool", default: true },
   { key: "lexBonus", group: "rank", label: "AI 語意搜尋：字面相關度加分", desc: "AI 相似度之外，再加上「查詢字的相鄰兩字有幾成出現在該筆文字」× 這個數字。0＝只看 AI。", advice: "建議 0.3。", type: "number", default: 0.3, min: 0, max: 1, step: 0.05 },
   { key: "lexPenalty", group: "rank", label: "EDM、相片、課程介紹：完全沒有字面命中的扣分", desc: "這三類長文字最容易被 AI 誤判。查詢字連一個相鄰兩字都沒命中時，分數扣掉這個數字（0.5 幾乎等於不列）。0＝不扣。", advice: "建議 0.5。", type: "number", default: 0.5, min: 0, max: 1, step: 0.05 },
+  { key: "lexPenaltyAll", group: "rank", label: "其他類別（教材卡、單元、系列、中心…）完全沒有字面命中的扣分", desc: "AI 有時會把完全沒有字面關聯的內容（例如搜「純粹和本翠」冒出淨水器、年會）判成相近。查詢字連一個相鄰兩字都沒命中時，分數扣掉這個數字，等於提高門檻、降低排名。0＝不扣。注意：靠 AI 找「同義詞」（例如搜「水機」找到益之源）的結果字面也沒命中，扣太多會漏掉。", advice: "建議 0.08；無關結果還是太多就調高（0.15），漏掉同義詞就調低。", type: "number", default: 0.08, min: 0, max: 0.5, step: 0.01 },
   { key: "chaptersShuffle", group: "rank", label: "字面符合的單元每次打開頁面洗牌", desc: "開＝同一批字面符合的單元，每次開頁面順序隨機（公平曝光）；關＝固定順序。", advice: "建議開。", type: "bool", default: true },
   { key: "sceneReverse", group: "scene", label: "場景搜尋：長句反向比對標籤", desc: "整句比對不到照片標籤時，改成「照片的某個標籤（2 字以上）出現在你說的話裡」就算符合，說一長串也找得到蔬菜水果的照片。", advice: "建議開。", type: "bool", default: true },
   { key: "sceneMaxPhotos", group: "scene", label: "場景搜尋：每個區塊最多帶幾張照片", desc: "點場景結果直接全螢幕看圖時，一次最多載入幾張符合的照片。", advice: "建議 40。", type: "number", default: 40, min: 5, max: 100, step: 5, unit: "張" },
