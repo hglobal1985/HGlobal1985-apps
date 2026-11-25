@@ -143,7 +143,7 @@ export default function StorageScreen() {
     <Screen header={false}>
       <Section title="上傳設定與圖片壓縮">
         <Card>
-          <Stepper label="手機／電腦上傳的單檔上限" hint="從這支裝置選檔案上傳時，超過就不能上傳，並提示改貼雲端連結（最多 95MB）" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
+          <Stepper label="教材檔案上傳的單檔上限" hint="只管「教材檔案」（PDF、Word、音檔等）從這支裝置選檔案上傳；超過就不能上傳，並提示改貼雲端連結（最多 95MB）。相簿照片、影片不受這個限制（照片會先自動壓縮，影片看下面的短影音規範）。" value={lim.fileMaxMb} min={1} max={95} step={5} unit="MB" onChange={(v) => setLim((x) => ({ ...x, fileMaxMb: v }))} />
           <NoticeBox tone="info" text="所有上傳到雲端的圖片（封面、EDM、教材圖片、雲端硬碟匯入、匯入工作…全站）都會先壓縮才存，不保留原圖；使用者下載到的就是壓縮後的版本；下載、分享到手機時不會再縮小解析度（尺寸維持站內儲存的樣子，AVIF／WebP 只換成 JPEG 格式，畫質 95）。LINE 等 App 收到照片後自己可能再壓縮，那不是行動大學控制的。長邊在上限內的圖片尺寸不變，但仍會照下面設定的畫質壓縮。" />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             存檔格式（所有上傳的圖片一律轉成這種格式）
