@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useApi, useSession } from "@/state/session";
 import type { CourseSummary } from "@/api/client";
 import type { ChapterItem } from "@/features/courses/chapter-list";
-import { buildSearchIndex, charsCourses, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, type SearchLesson } from "@/features/courses/course-search";
+import { buildSearchIndex, charsCourses, fuzzyCourses, fuzzyLessons, looseLessons, matchCourses, matchLessons, rankCourses, type SearchLesson } from "@/features/courses/course-search";
 import { useSearchSettings } from "@/features/courses/use-search-settings";
 import { usePhonetic } from "@/features/courses/use-phonetic";
 import { useSemantic } from "@/features/courses/use-semantic";
@@ -58,12 +58,18 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
     if (!key) return [];
     const exactL = matchLessons(index, key);
     let hit: Set<string>;
+    let loose: string[] = [];
     if (exactL && exactL.size) hit = exactL;
     else {
       hit = new Set<string>();
       if (!semOnly) for (const id of fuzzyLessons(index, key)) hit.add(id);
       for (const id of semantic.lessons) if (index.lessonHay.has(id)) hit.add(id);
       for (const id of phonetic.lessons) if (index.lessonHay.has(id)) hit.add(id);
+      // 都找不到時（等 AI、同音找完之後）：退到「最相近的單元」，搜尋結果不留空白（業主 2026-11-25）。
+      if (!hit.size && idx.data && !semantic.loading && !phonetic.loading) {
+        loose = looseLessons(index, key);
+        for (const id of loose) hit.add(id);
+      }
     }
     const byId = new Map(all.map((x) => [x.id, x]));
     const canWatch = (x: CourseSummary) => (member?.role === "admin" && x.isList) || x.enrollment === "opened" || (x.isPublic && x.isList) || x.watchFree;
@@ -82,10 +88,11 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
       const rank = new Map<string, number>();
       [...phonetic.lessons].forEach((id, i) => rank.set(id, i));
       [...semantic.lessons].forEach((id, i) => !rank.has(id) && rank.set(id, 1000 + i));
+      loose.forEach((id, i) => !rank.has(id) && rank.set(id, 2000 + i)); // 最相近：命中片段多的在前
       return out.sort((a, b) => (rank.get(a.lesson.id) ?? 5000) - (rank.get(b.lesson.id) ?? 5000) || rand(a.lesson.id) - rand(b.lesson.id));
     }
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
-  }, [key, index, all, idx.data, semOnly, semantic.lessons, phonetic.lessons, member, seed]);
+  }, [key, index, all, idx.data, semOnly, semantic.lessons, semantic.loading, phonetic.lessons, phonetic.loading, member, seed]);
   // 其他類別命中裡的「單一教材」已經在單元清單裡，不重複列。
   const extras = useMemo(() => semantic.extras.filter((h) => h.kind !== "lesson"), [semantic.extras]);
   return { key, searching: !!key, all, index, results, semantic, phonetic, chapters, extras, coursePrio: semantic.coursePrio, loading: semantic.loading || phonetic.loading };
