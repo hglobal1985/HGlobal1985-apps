@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { GradientFrame } from "./gradient-frame";
+import type { Rect } from "./band-rect";
 import { MINI_BAR, MINI_BAR_BG, MINI_BTN, MINI_BTN_COLORS, MINI_BTN_GLYPH_COLOR, MINI_CIRCLE, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, MINI_RADIUS, miniFloatWidth } from "./mini-spec";
 
 type Pos = { x: number; y: number };
@@ -12,7 +13,7 @@ type Pos = { x: number; y: number };
  * 三顆按鈕永遠顯示；手指按住可任意拖曳位置，位置記在本機（與影片迷你播放器共用同一個位置）；小圓圖也能拖曳、點一下恢復小視窗。
  * 尺寸、顏色、時間都來自 ui/mini-spec.ts（影片迷你播放器用同一份）。放在頁面最外層（滿版透明層，只有小視窗本身會接觸摸）。
  */
-export function MiniWindow({ visible, opacity = 1, windowContent, circleContent, label, maximizeLabel, onMaximize, onClose, onTap, collapsed: collapsedProp, onCollapsedChange, slotRef, running = true, getBottomEdge }: {
+export function MiniWindow({ visible, opacity = 1, windowContent, circleContent, label, maximizeLabel, onMaximize, onClose, onTap, collapsed: collapsedProp, onCollapsedChange, slotRef, running = true, getBottomEdge, morph }: {
   visible: boolean;
   opacity?: number;
   /** 小視窗裡的畫面（16:9，填滿）。 */
@@ -35,8 +36,12 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
   running?: boolean;
   /** 預設位置（還沒拖曳過）的底邊 y 座標；沒傳＝這一層的底部。網頁版影片用它避開底部分頁列。 */
   getBottomEdge?: () => number;
+  /** 往下滑縮小的變形過程（0～1）：有給 from（封面原本的位置）就畫「大邊框由大到小」的框，p 到 1 才換成真正的小視窗／圓球（與影片縮成迷你播放器同一種動畫）。 */
+  morph?: { p: number; from: Rect | null };
 }) {
   const [area, setArea] = useState({ w: 0, h: 0 });
+  const root = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any;
+  const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [collapsedOwn, setCollapsedOwn] = useState(false);
   const collapsed = collapsedProp ?? collapsedOwn;
   const setCollapsed = (v: boolean) => {
@@ -107,14 +112,29 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
     setCollapsed(toCircle);
   };
   live.current = { cur, clampPos, onTap, collapsed, restore: () => resize(false) };
+  // 縮小途中：外框從封面原本的位置與大小，平順縮到圓球／小視窗的位置（流光大邊框，與影片一致）
+  const t = morph ? Math.min(1, morph.p / 0.98) : 1;
+  const morphing = !!morph?.from && morph.p < 0.98;
+  const tx = cur.x, ty = collapsed ? cur.y : cur.y + MINI_BAR, tw = collapsed ? W : mw, th = collapsed ? W : mh;
+  const fr = morph?.from ?? { x: tx + origin.x, y: ty + origin.y, w: tw, h: th };
+  const lerp = (a: number, b: number) => Math.round(a + (b - a) * t);
+  const mx = lerp(fr.x - origin.x, tx), my = lerp(fr.y - origin.y, ty), mwid = lerp(fr.w, tw), mhei = lerp(fr.h, th);
+  const mrad = lerp(10, collapsed ? W / 2 : MINI_RADIUS);
   const buttons = [
     { key: "min", label: "最小化（縮成小圓圖）", glyph: MINI_GLYPHS.min, color: MINI_BTN_COLORS.min, act: () => resize(true) },
     { key: "max", label: maximizeLabel, glyph: MINI_GLYPHS.max, color: MINI_BTN_COLORS.max, act: onMaximize },
     { key: "close", label: "關閉小視窗", glyph: MINI_GLYPHS.close, color: MINI_BTN_COLORS.close, act: onClose },
   ];
   return (
-    <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: 30 }]} onLayout={(e) => setArea({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
-      {visible && area.w ? (
+    <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex: 30 }]} ref={root} onLayout={(e) => (setArea({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height }), root.current?.measureInWindow((x: number, y: number) => setOrigin({ x, y })))}>
+      {visible && area.w && morphing ? (
+        <View pointerEvents="none" style={{ position: "absolute", left: mx, top: my, width: mwid, height: mhei }}>
+          <GradientFrame width={mwid} height={mhei} radius={mrad} flush>
+            <View style={{ width: "100%", height: "100%", overflow: "hidden" }}>{collapsed ? circleContent : windowContent}</View>
+          </GradientFrame>
+        </View>
+      ) : null}
+      {visible && area.w && !morphing ? (
         <View {...responder.panHandlers} accessibilityLabel={label} style={[{ position: "absolute", left: cur.x, top: cur.y, width: W, opacity }, Platform.OS === "web" ? ({ touchAction: "none", cursor: "grab", userSelect: "none", WebkitUserSelect: "none" } as object) : null]}>
           {collapsed ? (
             <View accessibilityRole="button" accessibilityLabel="恢復小視窗（可按住拖曳移動）" style={{ width: MINI_CIRCLE, height: MINI_CIRCLE }}>

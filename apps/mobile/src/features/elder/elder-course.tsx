@@ -3,7 +3,7 @@ import { useBorderW } from "@/lib/elder-mode";
 import { useEffect, useState, type ReactNode } from "react";
 import { Linking, Pressable, StyleSheet, View } from "react-native";
 import type { CourseDetail, Lesson } from "@/api/client";
-import { centerTitle } from "@/features/format";
+import { centerTitle, eventDays } from "@/features/format";
 import { downloadMaterial, isDownloadUrl } from "@/lib/download-material";
 import { trackFeature } from "@/lib/feature-track";
 import { flashText } from "@/ui/flash-notice";
@@ -12,6 +12,7 @@ import { radius, space } from "@/theme/tokens";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { BlockPhotos, blockPhotoCount, hasBlockPhotos } from "@/features/courses/block-photos";
 import { AppText, NoticeBox, Screen } from "@/ui";
+import { NowPlayingIcon } from "@/ui/now-playing-icon";
 import { CollapseBand, CoverMiniFloat } from "@/ui/collapse-band";
 
 /** 至尊模式課程頁要列的項目：有章節列章節；只有教材（清單卡）就列教材。分類標題、完整版不列。 */
@@ -339,40 +340,54 @@ function InfoLine({ icon, text, strong }: { icon: "person" | "list" | "calendar"
   );
 }
 
-/** 一課一列：下一課（或正在播放）是實心綠底大列；已上完的淡色打勾；鎖住的顯示鎖頭。 */
+/**
+ * 一課一列（業主 2026-11-25：不再是圓角矩形卡，改成跟首頁搜尋結果一樣的清單列——底線分隔）：
+ * 正在播放的整列換成綠底白字、右側播放圖示有動畫（NowPlayingIcon）；下一課淡綠底；已上完的淡色打勾；鎖住的顯示鎖頭。
+ * 第二行：時間長度，右邊接日期（同一種文字格式，業主 2026-11-25）。
+ */
 function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson; highlight: boolean; playing: boolean; onPress: () => void }) {
   const { c } = useTheme();
-  const bw = useBorderW(2);
-  const fg = highlight ? c.textOnAccent : c.text;
   const circle = Math.round(44 * UI_SCALE);
   const link = !!l.linkType && !l.full && !!l.linkUrl;
   const status = !l.ready && !link ? "敬請期待" : l.locked ? "報名後才能看" : link ? (isDownloadUrl(l.linkUrl!) ? "按一下下載" : "按一下開啟") : playing ? "播放中" : l.minutes ? `${Math.max(1, Math.round(l.minutes))} 分鐘` : null;
+  const date = l.eventDate ? eventDays(l.eventDate, null) : null;
+  const on = playing; // 正在播放＝整列變色
+  const fg = on ? c.textOnAccent : c.text;
+  const sub = on ? c.textOnAccent : c.textMuted;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`第 ${l.position} ${l.material ? "部" : "課"}：${l.title}${l.completed ? "，已上完" : ""}${status ? `，${status}` : ""}`}
+      accessibilityLabel={`第 ${l.position} ${l.material ? "部" : "課"}：${l.title}${l.completed ? "，已上完" : ""}${status ? `，${status}` : ""}${date ? `，${date}` : ""}`}
       onPress={onPress}
       style={({ pressed }) => [
         styles.row,
-        highlight ? { backgroundColor: c.accent, borderColor: c.accent, minHeight: 96, borderWidth: bw } : { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw },
-        l.completed && !highlight && { opacity: 0.6 },
+        { borderBottomColor: c.border },
+        on ? { backgroundColor: c.accent } : highlight ? { backgroundColor: c.accentSoft } : null,
+        l.completed && !on && { opacity: 0.6 },
         pressed && { opacity: 0.8 },
       ]}
     >
-      <View style={[styles.num, { width: circle, height: circle, backgroundColor: highlight ? c.textOnAccent : c.accentSoft }]}>
+      <View style={[styles.num, { width: circle, height: circle, backgroundColor: on ? c.textOnAccent : c.accentSoft }]}>
         {l.completed ? <Ionicons name="checkmark" size={24} color={c.accent} /> : <AppText variant="headline" style={{ color: c.accent }}>{String(l.position)}</AppText>}
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <AppText variant="headline" numberOfLines={3} style={{ color: fg }}>
           {l.title}
         </AppText>
-        {status ? (
-          <AppText variant="callout" style={{ color: highlight ? c.textOnAccent : c.textMuted }}>
-            {status}
-          </AppText>
+        {status || date ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: space.md }}>
+            {status ? <AppText variant="callout" style={{ color: sub }}>{status}</AppText> : null}
+            {date ? <AppText variant="callout" style={{ color: sub }}>{date}</AppText> : null}
+          </View>
         ) : null}
       </View>
-      {l.locked ? <Ionicons name="lock-closed" size={26} color={c.textMuted} /> : l.ready || link ? <Ionicons name={link ? (isDownloadUrl(l.linkUrl!) ? "download-outline" : "open-outline") : playing ? "volume-high" : "play"} size={highlight ? 34 : 26} color={highlight ? c.navPill : c.accent} /> : null}
+      {l.locked ? (
+        <Ionicons name="lock-closed" size={26} color={on ? c.textOnAccent : c.textMuted} />
+      ) : on ? (
+        <NowPlayingIcon size={38} lessonId={l.id} color={c.textOnAccent} />
+      ) : l.ready || link ? (
+        <Ionicons name={link ? (isDownloadUrl(l.linkUrl!) ? "download-outline" : "open-outline") : "play"} size={26} color={c.accent} />
+      ) : null}
     </Pressable>
   );
 }
@@ -380,7 +395,7 @@ function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson;
 const styles = StyleSheet.create({
   tabs: { flexDirection: "row", borderRadius: radius.lg + 4, padding: 6, gap: 6 },
   tab: { flex: 1, minHeight: 60, borderRadius: radius.lg, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  row: { flexDirection: "row", alignItems: "center", gap: space.md, borderWidth: 2, borderRadius: radius.lg + 4, paddingHorizontal: space.md, paddingVertical: space.md, minHeight: 76 },
+  row: { flexDirection: "row", alignItems: "center", gap: space.md, borderBottomWidth: 1, paddingHorizontal: space.sm, paddingVertical: space.md, minHeight: 76 },
   num: { borderRadius: 999, alignItems: "center", justifyContent: "center" },
   badge: { minWidth: 40, height: 40, borderRadius: 20, paddingHorizontal: 8, marginRight: 6, alignItems: "center", justifyContent: "center" },
   block: { flexDirection: "row", alignItems: "center", gap: 2, borderRadius: radius.lg + 4, paddingLeft: space.md, paddingRight: space.xs, paddingVertical: space.md, minHeight: 76 },
