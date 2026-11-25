@@ -21,16 +21,12 @@ import { AppText } from "@/ui";
  */
 export type ElderZone = "hglobal" | "centers" | "amway_material" | "amway_brand";
 
-export const ELDER_ZONES: { id: ElderZone; label: string; icon: "library" | "business" | "folder-open" | "pricetag" | "gift"; unit: string }[] = [
+export const ELDER_ZONES: { id: ElderZone; label: string; icon: "library" | "business" | "folder-open" | "pricetag"; unit: string }[] = [
   { id: "hglobal", label: "寰宇課程活動", icon: "library", unit: "項教材" },
   { id: "centers", label: "寰宇教育中心", icon: "business", unit: "項教材" },
   { id: "amway_material", label: "安麗官方資源", icon: "folder-open", unit: "項教材" },
   { id: "amway_brand", label: "安麗品牌館", icon: "pricetag", unit: "項教材" },
 ];
-
-/** 「課程」分頁四大分類下面多一張獨立的「成交百寶箱」大卡（業主 2026-11-24）：直接進成交百寶箱課程頁（id 同後端 treasure-box.ts）。 */
-export const TREASURE_ID = "cqqxw4z2";
-export const TREASURE_CARD = { id: "hglobal", label: "成交百寶箱", icon: "gift", unit: "項教材" } as const satisfies (typeof ELDER_ZONES)[number];
 
 export const elderZoneOf = (x: CourseSummary): ElderZone => (x.centerCourse ? "centers" : x.zone);
 
