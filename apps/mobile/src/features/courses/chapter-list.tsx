@@ -8,7 +8,7 @@ import { resolveUrl, type CourseSummary } from "@/api/client";
 import { eventDays, minutesText, sharerLine } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, CardThumb, ThumbLock } from "@/ui";
+import { AppText, CardThumb, ThumbDuration, ThumbLock } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { useSession } from "@/state/session";
 import { lockReason } from "./lock-reason";
@@ -48,6 +48,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
                 <CardThumb kind="course" id={course.id} />
               )}
               {locked ? <ThumbLock size={26} /> : null}
+              <ThumbDuration minutes={lesson.minutes} />
             </View>
             <View style={styles.mid}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -64,7 +65,7 @@ export function ChapterList({ items }: { items: ChapterItem[] }) {
               ) : null}
               <View style={styles.meta}>
                 <AppText variant="caption" tone="muted" numberOfLines={1} style={{ flexShrink: 1 }}>
-                  {[date, minutesText(lesson.minutes)].filter(Boolean).join(" · ")}
+                  {date}
                 </AppText>
                 <AppText variant="caption" tone="muted" numberOfLines={1} style={{ maxWidth: "45%" }}>
                   {course.title}
