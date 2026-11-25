@@ -7,6 +7,7 @@ import { CommentBoard } from "@/features/comments/comment-board";
 import { confirmAsk, confirmSheet } from "@/features/confirm";
 import { InviteJoin } from "@/features/courses/invite-join";
 import { BroadcastZone } from "@/features/broadcast/broadcast-zone";
+import { CourseHomeworkEntry } from "@/features/homework/course-entry";
 import { EdmStage } from "@/features/courses/edm-viewer";
 import { useCoverStats } from "@/features/courses/cover-stats";
 import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
@@ -497,6 +498,8 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           <NoticeBox tone="success" text="恭喜！你已完成這門課程的最後一堂。" />
         ) : null}
         {!editing ? stickyNotice : null}
+        {/* 作業入口（業主 2026-11-25）：已開通的學員與老師才看得到 */}
+        {!editing && member && !course.isList ? <CourseHomeworkEntry courseId={course.id} /> : null}
         {/* 有審核權限的人（不是編輯模式）也能看報名名單（業主 2026-11-20）。 */}
         {!editing && course.canRoster ? (
           <Card style={{ paddingVertical: 0 }}>

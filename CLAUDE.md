@@ -76,6 +76,7 @@
 - `docs/rules/youtube-sync-import.md`：YouTube 同步、匯入工作、一次性匯入（13 條）
 - `docs/rules/performance-ops.md`：載入速度、部署、伺服器效能與維運（1 條）
 - `docs/rules/elder-mode.md`：至尊模式（長輩大字簡易版）／超派模式切換、字體放大、跟著手機字體（1 條）
+- `docs/rules/homework.md`：作業（學員繳交、老師批改評分、分組、誰看得到）（1 條）
 - **自動規則搜尋**：業主每次送出訊息，`.claude/hooks/rules-search.py` 會自動用訊息內容比對 `docs/rules/`，把可能相關的規則標題列在對話開頭（【自動規則搜尋】）；看到時務必讀對應條目。沒有列出不代表沒有規則，仍要自己 grep 確認。
 - 舊版完整 CLAUDE.md 在 git 歷史（2026-11-22 瘦身前最後一版），所有內容已原文搬進上面的分檔。
 

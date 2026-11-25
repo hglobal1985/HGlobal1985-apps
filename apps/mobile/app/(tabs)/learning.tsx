@@ -14,6 +14,7 @@ import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { CardGrid, GuestGate, AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section, Select } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
+import { MyHomeworkCard } from "@/features/homework/my-homework-card";
 
 export default function LearningScreen() {
   const profile = useModeProfile();
@@ -74,6 +75,8 @@ export default function LearningScreen() {
       }
     >
       <SaplingBar saplings={(data ?? []).reduce((n, x) => n + x.completedLessons, 0)} />
+      {/* 我的作業（業主 2026-11-25）：有作業的學員、要批改的老師才看得到 */}
+      <MyHomeworkCard />
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
       {pending.length ? <NoticeBox tone="warning" text={`${pending.length} 堂課程等待管理員確認，開通後會通知你。`} /> : null}

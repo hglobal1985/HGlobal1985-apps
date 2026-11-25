@@ -586,6 +586,9 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />
       <ListRow icon="list-outline" title="報名名單" subtitle="查看報名學員、匯出 CSV、移除資格" onPress={() => onOpen("roster")} />
       <ListRow icon="logo-youtube" title="YouTube 播放清單" subtitle="匯入播放清單、同步新影片" onPress={() => onOpen("youtube")} />
+      {/* 作業（業主 2026-11-25）：出作業、批改評分、學員分組，開新頁面操作 */}
+      {course.isList ? null : <ListRow icon="document-text-outline" title="作業與批改" subtitle="出作業、看誰交了、評分與評語" onPress={() => router.push(`/homework/${course.id}`)} />}
+      {course.isList ? null : <ListRow icon="people-outline" title="學員分組" subtitle="排組、指定組長（組長可看同組作業）" onPress={() => router.push(`/homework/groups/${course.id}`)} />}
     </Card>
   );
 }
