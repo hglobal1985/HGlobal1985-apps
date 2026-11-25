@@ -3,6 +3,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, type ElementRef } from "react";
 import { Animated, Easing, Pressable, StyleSheet, TextInput } from "react-native";
 import { useTheme } from "@/theme/theme";
+import { VoiceMic } from "./voice-mic";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 
 /** 收起來時只有一顆放大鏡（寬 minTouch）。 */
@@ -40,6 +41,7 @@ export function SearchBox({ open, onOpen, onClose, value, onChange, rowWidth }: 
             autoCorrect={false}
             style={[styles.input, type.body, { color: c.text }, { outlineStyle: "none" } as object]}
           />
+          <VoiceMic onText={onChange} onUnsupported={() => input.current?.focus()} />
           <Pressable accessibilityRole="button" accessibilityLabel="清除搜尋並收起" onPress={onClose} hitSlop={6} style={styles.icon}>
             <Ionicons name="close-circle" size={22} color={c.textMuted} />
           </Pressable>
@@ -86,6 +88,7 @@ export function InlineSearch({ open, onOpen, onClose, value, onChange, collapsed
         autoCorrect={false}
         style={[styles.input, type.body, { color: c.text }, { outlineStyle: "none" } as object]}
       />
+      {open || value ? <VoiceMic onText={(t) => (onOpen(), onChange(t))} onUnsupported={() => input.current?.focus()} /> : null}
       {open || value ? (
         <Pressable accessibilityRole="button" accessibilityLabel="清除搜尋並收起" onPress={() => (onChange(""), input.current?.blur(), onClose())} hitSlop={6} style={styles.icon}>
           <Ionicons name="close-circle" size={22} color={c.textMuted} />
