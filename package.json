@@ -1,0 +1,13 @@
+{
+  "name": "check",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": ["apps/api", "apps/app"],
+  "scripts": {
+    "test": "npm test -w @check/api",
+    "typecheck": "npm run typecheck -w @check/api && npm run typecheck -w @check/app",
+    "build:web": "npm run build:web -w @check/app",
+    "deploy": "npm run build:web && npm run deploy -w @check/api"
+  }
+}
