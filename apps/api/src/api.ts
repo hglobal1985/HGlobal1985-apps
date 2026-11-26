@@ -181,7 +181,19 @@ const ROLE_LABEL: Record<string, string> = { student: "學員", teacher: "老師
 
 async function submissionView(c: Ctx, s: Row, opts: { hideScores: boolean; withComments: boolean }): Promise<SubmissionView> {
   const db = c.env.DB;
-  const files = (await db.prepare("SELECT * FROM files WHERE submission_id = ? ORDER BY position, created_at").bind(s.id).all<Row>()).results.map(fileView);
+  const fileRows = (await db.prepare("SELECT * FROM files WHERE submission_id = ? ORDER BY position, created_at").bind(s.id).all<Row>()).results;
+  const files = fileRows.map(fileView);
+  // 照片直接附上 10 分鐘有效的讀取憑證（畫面要顯示縮圖；只有看得到這份作業的人才會拿到）
+  const photos = fileRows.filter((f) => f.kind === "photo" && f.r2_key);
+  if (photos.length) {
+    const exp = Date.now() + 600_000;
+    const ts = photos.map((f) => ({ f, t: rid(24) }));
+    await db.batch(ts.map(({ f, t }) => db.prepare("INSERT INTO tickets (id, file_id, member_id, expires_at) VALUES (?, ?, ?, ?)").bind(t, f.id, c.sub, exp)));
+    for (const { f, t } of ts) {
+      const v = files.find((x) => x.id === f.id);
+      if (v) v.url = `/f/${t}`;
+    }
+  }
   let comments: CommentView[] = [];
   if (opts.withComments) {
     const rows = (await db.prepare("SELECT * FROM comments WHERE submission_id = ? AND hidden = 0 ORDER BY created_at").bind(s.id).all<Row>()).results;
@@ -531,7 +543,7 @@ async function people(c: Ctx, activityId: string): Promise<PeopleView> {
     status: m.status === "pending" ? "pending" : "active",
     groupId: (m.group_id as string) ?? null,
     isLeader: !!m.is_leader,
-    total: a.teacher || (leaderGroup && m.group_id === leaderGroup) ? (totals.get(String(m.member_id)) ?? 0) : null,
+    total: m.role === "student" && (a.teacher || (leaderGroup && m.group_id === leaderGroup)) ? (totals.get(String(m.member_id)) ?? 0) : null,
   });
   const students = ms.filter((m) => m.role === "student" && m.status === "active");
   const visibleGroups = a.teacher ? groups : groups.filter((g) => g.id === a.m?.groupId);
@@ -564,7 +576,7 @@ async function personAction(c: Ctx, activityId: string, memberId: string, body: 
     case "approve":
       needManager(a);
       await db.prepare("UPDATE members SET status = 'active' WHERE activity_id = ? AND member_id = ?").bind(activityId, memberId).run();
-      await notify(db, [memberId], "已加入作業", `你已加入「${title}」，可以開始交作業了。`, `/a/${activityId}`);
+      await notify(db, [memberId], "已加入作業", `你已加入「${title}」，可以開始交作業了。`, `/activity/${activityId}`);
       return;
     case "reject":
     case "remove":
@@ -604,7 +616,7 @@ async function personAction(c: Ctx, activityId: string, memberId: string, body: 
         db.prepare("UPDATE members SET is_leader = 0 WHERE activity_id = ? AND group_id = ?").bind(activityId, target!.group_id),
         db.prepare("UPDATE members SET is_leader = 1 WHERE activity_id = ? AND member_id = ?").bind(activityId, memberId),
       ]);
-      await notify(db, [memberId], "你被指定為組長", `「${title}」：你可以確認或退回組員的作業。`, `/a/${activityId}`);
+      await notify(db, [memberId], "你被指定為組長", `「${title}」：你可以確認或退回組員的作業。`, `/activity/${activityId}`);
       return;
     }
     default:
@@ -746,7 +758,7 @@ on("PATCH", "/activities/:id", async (c, [id], req) => {
   await c.env.DB.prepare(`UPDATE activities SET ${sets.join(", ")} WHERE id = ?`).bind(...vals, id).run();
   if (b.status === "open" && a.activity.status === "draft") {
     const ids = (await c.env.DB.prepare("SELECT member_id FROM members WHERE activity_id = ? AND role = 'student' AND status = 'active'").bind(id).all<Row>()).results.map((r) => String(r.member_id));
-    await notify(c.env.DB, ids, "作業開放了", `「${a.activity.title}」已開放繳交。`, `/a/${id}`);
+    await notify(c.env.DB, ids, "作業開放了", `「${a.activity.title}」已開放繳交。`, `/activity/${id}`);
   }
   return { ok: true };
 });
@@ -1162,7 +1174,7 @@ on("POST", "/lessons/:id/remind", async (c, [id]) => {
   if (!l) fail(404, "找不到這一堂");
   needTeacher(await access(c, String(l!.activity_id)));
   const ids = await notSubmitted(c.env.DB, l!);
-  await notify(c.env.DB, ids, "作業提醒", `「${l!.title}」還有作業沒交${l!.due_at ? `，截止時間 ${twTime(String(l!.due_at))}` : ""}。`, `/a/${l!.activity_id}`);
+  await notify(c.env.DB, ids, "作業提醒", `「${l!.title}」還有作業沒交${l!.due_at ? `，截止時間 ${twTime(String(l!.due_at))}` : ""}。`, `/activity/${l!.activity_id}`);
   return { reminded: ids.length };
 });
 async function notSubmitted(db: D1Database, lesson: Row): Promise<string[]> {
@@ -1390,7 +1402,7 @@ export async function scheduled(env: Env): Promise<void> {
     const sent = new Set((await db.prepare("SELECT member_id FROM reminders_sent WHERE lesson_id = ? AND kind = ?").bind(l.id, kind).all<Row>()).results.map((r) => String(r.member_id)));
     const todo = ids.filter((x) => !sent.has(x));
     if (!todo.length) continue;
-    await notify(db, todo, kind === "d1" ? "作業明天截止" : "作業 3 天後截止", `「${l.atitle}」${l.title}：截止時間 ${twTime(String(l.due_at))}，記得交作業。`, `/a/${l.activity_id}`);
+    await notify(db, todo, kind === "d1" ? "作業明天截止" : "作業 3 天後截止", `「${l.atitle}」${l.title}：截止時間 ${twTime(String(l.due_at))}，記得交作業。`, `/activity/${l.activity_id}`);
     await db.batch(todo.map((m) => db.prepare("INSERT INTO reminders_sent (lesson_id, member_id, kind) VALUES (?, ?, ?) ON CONFLICT DO NOTHING").bind(l.id, m, kind)));
   }
   // 檔案保存期限

@@ -102,6 +102,7 @@ export type ActivityView = {
   counts: { students: number; groups: number; pendingJoin: number; toReview: number };
 };
 
+/** url：連結的網址；照片則是 10 分鐘有效的讀取網址（/f/…）。 */
 export type FileView = { id: string; kind: Kind; name: string; size: number; contentType: string; url?: string; body?: string };
 export type CommentView = { id: string; memberId: string; name: string; roleLabel: string; body: string; createdAt: string; mine: boolean };
 
