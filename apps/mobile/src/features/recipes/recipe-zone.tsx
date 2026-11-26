@@ -91,10 +91,10 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
       <AppText numberOfLines={2} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16, marginTop: 8, marginHorizontal: 4 }}>{r.title}</AppText>
       {/* 總覽縮圖不顯示照片張數（杜杜龍 2026-11-26）；只在有影片時標示 */}
       {r.videos ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13, marginHorizontal: 4, marginTop: 2 }}>{`${r.videos} 影片`}</AppText> : null}
-      {/* 分類標籤右邊：上傳者所屬中心（自動抓取、不可變更；杜杜龍 2026-11-26） */}
+      {/* 卡片下方一列：上傳者暱稱（左）＋所屬中心（右）；不顯示分類（杜杜龍 2026-11-26，分類用上方標籤篩選）。中心自動抓取、不可變更 */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, margin: 4 }}>
-        {r.categoryName ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 13, flexShrink: 0, fontWeight: "700" }}>{r.categoryName}</AppText> : null}
-        {r.authorCenter ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9fe3b8", fontSize: 13, flex: 1, textAlign: "right" }}>{centerTitle(r.authorCenter)}</AppText> : null}
+        {r.authorName ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 13, flex: 1, fontWeight: "700" }}>{r.authorName}</AppText> : <View style={{ flex: 1 }} />}
+        {r.authorCenter ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9fe3b8", fontSize: 13, flexShrink: 0, maxWidth: "55%", textAlign: "right" }}>{centerTitle(r.authorCenter)}</AppText> : null}
       </View>
     </Pressable>
   );
