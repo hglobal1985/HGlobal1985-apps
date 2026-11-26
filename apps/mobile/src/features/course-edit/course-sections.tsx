@@ -18,10 +18,11 @@ import { BrandField, CategoryField, HostField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
 import { RosterSheet } from "./roster-sheet";
 import { YoutubeSyncSheet } from "./youtube-import";
+import { ShortLinkSheet } from "./short-link-sheet";
 import { afterSheetClose } from "@/lib/sheet-back";
 
 /** 編輯面板的種類（每一區各自一個底部面板、各自儲存）。 */
-export type SectionKey = "basics" | "when" | "price" | "enroll" | "advanced" | "status" | "roster" | "youtube";
+export type SectionKey = "basics" | "when" | "price" | "enroll" | "advanced" | "status" | "roster" | "youtube" | "shortlink";
 
 /** 一次儲存（只送這一區的欄位）：帶 ifUpdatedAt，別人剛改過就先問「重新載入」或「仍要覆蓋」；重要資訊有人報名時先提醒。 */
 export function useCourseSave(course: CourseDetail, onSaved: (d: CourseDetail) => void) {
@@ -566,18 +567,22 @@ export function SectionSheet({ section, ...p }: SheetProps & { section: SectionK
   if (section === "enroll") return <EnrollSheet {...p} />;
   if (section === "advanced") return <AdvancedSheet {...p} />;
   if (section === "roster") return <RosterSheet course={p.course} onClose={p.onClose} />;
+  if (section === "shortlink") return <ShortLinkSheet {...p} />;
   if (section === "youtube") return <YoutubeSyncSheet course={p.course} onClose={p.onClose} />;
   return <StatusSheet {...p} />;
 }
 
 /** 編輯模式中，課程頁上的「課程設定」清單：每一列點了從下方彈出那一區。副標顯示目前設定，一眼看得到。 */
 export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: (s: SectionKey) => void }) {
+  const { member } = useSession();
   const price = course.admin?.basePriceTwd ?? 0;
   const priceText = course.priceTba ? "費用尚未公布" : price === 0 ? "免費" : `${ntd(price)}${course.earlyBird ? "・早鳥" : ""}${course.diamondFree ? "・鑽石免費" : ""}`;
   const when = [course.eventStart ? eventDays(course.eventStart, course.eventEnd) : "未設定日期", placeText(course)].filter(Boolean).join("・");
   const statusText = course.status === "published" ? "上架中" : course.status === "archived" ? "已下架封存" : "未上架";
   return (
     <Card style={{ paddingVertical: 0 }}>
+      {/* 短網址（杜杜龍 2026-11-26）：只有超級管理員看得到，設定頁的「短網址」照舊保留、兩邊同步。 */}
+      {isSuperAdmin(member) ? <ListRow icon="link-outline" title="短網址" subtitle={`只有超級管理員才會顯示・${course.shortPath ? `/${course.shortPath}` : "設定系列、中心、分類的短網址"}`} onPress={() => onOpen("shortlink")} /> : null}
       <ListRow icon="create-outline" title="基本資料" subtitle={[course.title, course.teacher && `主講 ${course.teacher}`, course.category, course.series && `系列 ${course.series}`].filter(Boolean).join("・")} onPress={() => onOpen("basics")} />
       {/* 清單卡沒有時間地點與費用（一律公開免費）。 */}
       <ListRow icon="calendar-outline" title="時間與地點" subtitle={when} onPress={() => onOpen("when")} />
