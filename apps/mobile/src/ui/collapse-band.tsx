@@ -53,6 +53,30 @@ export function CollapseBand({ children, enabled = true, shrink = true, range = 
 }
 
 /**
+ * 跟著封面一起縮掉的「待機控制列」（播放鈕＋時間軸＋倒數時間；杜杜龍 2026-11-26：下滑封面縮成迷你／圓球之後，時間軸也要跟著隱藏，全站統一）。
+ * 用法：包住釘在封面下方的控制列（LessonStage 的待機控制列）；進度與 `CollapseBand` 完全同步（同一個捲動位移、同一個 range），
+ * 封面縮多少、它就縮多少，縮完高度 0＝整條不見，回到頂端自動還原。影片播放中的控制列（PlayerControls）本來就包在播放區塊裡、跟著影片縮掉，不走這裡。
+ * 不登記額外的捲動空間、不量封面位置，所以不會和 CollapseBand 打架。
+ */
+export function CollapseFollow({ children, enabled = true, range = MINI_PX }: { children: ReactNode; enabled?: boolean; range?: number }) {
+  const y = useBandScroll();
+  const [full, setFull] = useState(0);
+  if (!enabled) return <View>{children}</View>;
+  const p = miniProgress(y, range);
+  return (
+    <View style={full && p > 0 ? { height: Math.round(full * (1 - p)), overflow: "hidden" } : undefined}>
+      <View
+        onLayout={(e) => {
+          if (p === 0) setFull(Math.round(e.nativeEvent.layout.height)); // 只在沒縮時量展開高度
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+}
+
+/**
  * 封面縮成的迷你小視窗（成對的 CollapseBand 把封面縮掉之後，右下角浮出它）：放在頁面最外層。cover＝小視窗與小圓圖裡顯示的封面（填滿）。
  * 一浮出就是最小的圓球（點一下才展開成小視窗；影片播放時則是有紅綠燈按鈕的迷你播放器，見 features/player）。
  * 與影片迷你小視窗一模一樣的規格與功能（ui/mini-spec.ts、ui/mini-window.tsx）：黃＝最小化（小圓圖）、綠＝最大化（回到頂端、封面展開）、紅＝關閉（這次先不再浮出，回到頂端再往下滑才會再出現），可任意拖曳、位置記在本機。
