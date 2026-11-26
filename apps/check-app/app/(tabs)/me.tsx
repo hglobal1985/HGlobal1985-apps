@@ -1,22 +1,20 @@
 import { router } from "expo-router";
-import { Linking, Platform, ScrollView, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { ActivityCard } from "../../../api/src/contract";
+import { Linking, Platform, View } from "react-native";
+import type { ActivityCard } from "@check/contract";
 import { deleteAccount, devSignOut, openMemberCenter, signOutAll, webLoginAvailable } from "@/central/auth";
 import { APP_VERSION, INTEGRATED_VERSION, PRIVACY_URL } from "@/central/config";
-import { useData, useSession } from "@/session";
-import { size, useColors } from "@/theme";
-import { Avatar, Btn, Card, confirmSheet, flash, flashError, Section, T, TopBar } from "@/ui";
+import { setElder, useElderOn } from "@/lib/elder-mode";
+import { useFeature } from "@/lib/app-mode";
+import { useData, useSession } from "@/state/session";
+import { Avatar, Btn, Card, confirmSheet, flash, flashError, Screen, Section, T, Toggle } from "@/kit";
 
 export default function MePage() {
-  const c = useColors();
-  const ins = useSafeAreaInsets();
   const { me } = useSession();
   const home = useData<ActivityCard[]>("/home");
+  const elder = useElderOn();
+  const canDelete = useFeature("deleteAccount");
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <TopBar title="我的" back={false} />
-      <ScrollView contentContainerStyle={{ padding: size.gap, gap: 12, maxWidth: size.pageMax, width: "100%", alignSelf: "center", paddingBottom: 24 + ins.bottom }}>
+    <Screen title="我的" back={false}>
         <Card style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <Avatar name={me?.name || "會員"} url={me?.avatarUrl} sizePx={56} />
           <View style={{ flex: 1 }}>
@@ -34,6 +32,10 @@ export default function MePage() {
             <T muted>›</T>
           </Card>
         ))}
+        <Section title="顯示模式" />
+        <Card>
+          <Toggle label="至尊模式（大字簡易版）" note="字放大、選單改成整頁顯示；和寰宇行動大學的至尊模式相同" value={elder} onChange={(on) => setElder({ on })} />
+        </Card>
         <Section title="帳號" />
         <Card style={{ gap: 10 }}>
           <Btn kind="grey" flex={false} label="編輯會員資料" onPress={() => openMemberCenter().catch(flashError)} />
@@ -48,7 +50,7 @@ export default function MePage() {
               await signOutAll();
             }}
           />
-          <Btn
+          {canDelete ? <Btn
             kind="cancel"
             flex={false}
             label="刪除帳號"
@@ -61,10 +63,9 @@ export default function MePage() {
                 flashError(e);
               }
             }}
-          />
+          /> : null}
         </Card>
         <T tiny muted style={{ textAlign: "center" }}>寰宇繳作業系統 {APP_VERSION}・串接 {INTEGRATED_VERSION}</T>
-      </ScrollView>
-    </View>
+    </Screen>
   );
 }

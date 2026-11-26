@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { api } from "@/api";
-import { Btn, Card, flash, flashError, Screen, T } from "@/ui";
+import { api } from "@/api/client";
+import { Btn, Card, flash, flashError, Screen, T } from "@/kit";
 
 /** 老師邀請連結（24 小時、只能一人使用）。 */
 export default function Invite() {

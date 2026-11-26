@@ -1,7 +1,7 @@
 /** 分享：一律呼叫系統分享選單（網頁 Web Share，不支援就複製連結）。 */
 import { Platform, Share } from "react-native";
-import { WEB_ORIGIN } from "../central/config";
-import { flash } from "../ui";
+import { WEB_ORIGIN } from "@/central/config";
+import { flash } from "@/kit";
 
 export async function shareLink(path: string, text: string): Promise<void> {
   const url = WEB_ORIGIN + path;

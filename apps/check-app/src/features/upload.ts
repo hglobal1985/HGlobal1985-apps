@@ -4,7 +4,7 @@
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { Platform } from "react-native";
-import { LIMITS, type Kind } from "../../../api/src/contract";
+import { LIMITS, type Kind } from "@check/contract";
 
 export type Picked = { blob: Blob; name: string; kind: Kind; durationSec?: number };
 

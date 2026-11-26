@@ -1,10 +1,10 @@
 import { useLocalSearchParams } from "expo-router";
 import { Linking, Platform, View } from "react-native";
-import { KINDS, type Kind } from "../../../api/src/contract";
+import { KINDS, type Kind } from "@check/contract";
 import { WEB_ORIGIN } from "@/central/config";
 import { dateOnly, mb } from "@/format";
-import { useData } from "@/session";
-import { Btn, Card, Empty, Loading, Note, Screen, T } from "@/ui";
+import { useData } from "@/state/session";
+import { Btn, Card, Empty, Loading, Note, Screen, T } from "@/kit";
 
 type F = { id: string; kind: Kind; name: string; size: number; url: string; body?: string; member: string; item: string; lesson: string };
 

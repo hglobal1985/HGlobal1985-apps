@@ -1,8 +1,8 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { api } from "@/api";
-import { useData } from "@/session";
-import { Btn, Card, flash, flashError, Loading, Note, Screen, T } from "@/ui";
+import { api } from "@/api/client";
+import { useData } from "@/state/session";
+import { Btn, Card, flash, flashError, Loading, Note, Screen, T } from "@/kit";
 
 type Info = { activityId: string; title: string; groupName: string | null; approval: boolean; joined: string | null };
 

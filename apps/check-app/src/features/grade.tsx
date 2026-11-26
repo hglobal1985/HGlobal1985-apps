@@ -1,9 +1,9 @@
 /** 評分工具：依項目的計分方式自動換成對應的控制（核定件數、分數、星等、通過）。 */
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { MODES, pointsFor, type ItemCard, type SubmissionView } from "../../../api/src/contract";
-import { useColors } from "../theme";
-import { Card, Chip, Field, Stepper, T } from "../ui";
+import { MODES, pointsFor, type ItemCard, type SubmissionView } from "@check/contract";
+import { useColors } from "@/kit";
+import { Card, Chip, Field, Stepper, T } from "@/kit";
 
 export type GradeInput = { approved: number; score: string; stars: number; comment: string };
 export const initialGrade = (s: SubmissionView): GradeInput => ({ approved: s.approved ?? s.declared ?? 0, score: s.score != null ? String(s.score) : "", stars: s.stars ?? 0, comment: s.comment ?? "" });
@@ -17,12 +17,8 @@ export function GradePanel({ item, sub, value, onChange }: { item: ItemCard; sub
   return (
     <View style={{ gap: 10 }}>
       {item.mode === "count" ? (
-        <Card style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ flex: 1 }}>
-            <T bold>核定{item.unit}數</T>
-            <T tiny muted>學員申報 {sub.declared ?? 0} {item.unit}</T>
-          </View>
-          <Stepper value={value.approved} onChange={(n) => set({ approved: n })} />
+        <Card>
+          <Stepper label={`核定${item.unit}數`} hint={`學員申報 ${sub.declared ?? 0} ${item.unit}`} unit={item.unit} value={value.approved} onChange={(n) => set({ approved: n })} />
         </Card>
       ) : null}
       {item.mode === "stars" ? (

@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import type { ActivityCard } from "../../../api/src/contract";
-import { useData, useSession } from "@/session";
-import { useColors } from "@/theme";
+import type { ActivityCard } from "@check/contract";
+import { useData, useSession } from "@/state/session";
+import { useColors } from "@/kit";
 
 export default function TabsLayout() {
   const c = useColors();

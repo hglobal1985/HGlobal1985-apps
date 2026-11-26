@@ -1,6 +1,6 @@
 /** 作業項目的狀態標籤與說明（全 App 共用）。 */
-import { MODES, ruleText, STATUS_LABEL, type ItemCard, type SubStatus } from "../../../api/src/contract";
-import { Chip, type ChipTone } from "../ui";
+import { MODES, ruleText, STATUS_LABEL, type ItemCard, type SubStatus } from "@check/contract";
+import { Chip, type ChipTone } from "@/kit";
 
 export const TONE: Record<SubStatus | "none", ChipTone> = { none: "plain", draft: "wait", submitted: "wait", leader_ok: "wait", returned: "bad", graded: "ok" };
 export function StatusChip({ status, points, late }: { status: SubStatus | "none"; points?: number | null; late?: boolean }) {

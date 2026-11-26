@@ -1,13 +1,13 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import type { ItemCard, SubmissionView } from "../../../api/src/contract";
-import { api } from "@/api";
+import type { ItemCard, SubmissionView } from "@check/contract";
+import { api } from "@/api/client";
 import { Comments, FileGrid } from "@/features/files";
 import { gradeBody, GradePanel, gradeReady, initialGrade, type GradeInput } from "@/features/grade";
 import { itemRule, StatusChip } from "@/features/items";
-import { useData } from "@/session";
-import { Avatar, Btn, Card, Field, flash, flashError, Loading, Note, Screen, Sheet, T } from "@/ui";
+import { useData } from "@/state/session";
+import { Avatar, Btn, Card, Field, flash, flashError, Loading, Note, Screen, Sheet, T } from "@/kit";
 
 type V = { submission: SubmissionView; item: ItemCard; canGrade: boolean; canLeaderReview: boolean };
 

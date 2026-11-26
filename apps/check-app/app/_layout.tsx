@@ -1,15 +1,26 @@
+import "@/lib/global-scale"; // 共用：全站字體、圖示、按鈕放大（平板、電腦、至尊模式）
+import "@/lib/install-app"; // 共用：「加入主畫面」要最早載入
 import { Stack, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { installBottomGap } from "@/lib/bottom-gap";
+import { installNoPageZoom } from "@/lib/no-page-zoom";
+import { installStableScrollbar } from "@/lib/stable-scrollbar";
+import { installWebPullRefresh } from "@/lib/web-pull-refresh";
 import { devSignIn, signIn, webLoginAvailable } from "@/central/auth";
 import { PRIVACY_URL } from "@/central/config";
-import { SessionProvider, useSession } from "@/session";
-import { font, useColors } from "@/theme";
-import { Btn, Field, flashError, Hosts, Loading, T } from "@/ui";
+import { SessionProvider, useSession } from "@/state/session";
+import { font, useColors } from "@/kit";
+import { Btn, Field, flashError, Hosts, Loading, T } from "@/kit";
 
 export default function Root() {
+  // 共用的全站行為（與行動大學相同）：禁止雙指縮放頁面、底部安全區、下拉重新整理、固定捲軸位置。
+  useEffect(() => installNoPageZoom(), []);
+  useEffect(() => installBottomGap(), []);
+  useEffect(() => installWebPullRefresh(), []);
+  useEffect(() => installStableScrollbar(), []);
   return (
     <SafeAreaProvider>
       <Hosts>

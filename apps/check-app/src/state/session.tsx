@@ -2,15 +2,27 @@
 import { useFocusEffect } from "expo-router";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
-import type { Me } from "../../api/src/contract";
-import { api } from "./api";
-import { appConfig, currentMember, handleWebReturn, olderThan, onAuthChange, restore, restoreDev, ssoCheck, finishDeleteAccount, type AppStatus } from "./central/auth";
-import { APP_VERSION } from "./central/config";
-import { flash } from "./ui";
+import type { Me } from "@check/contract";
+import { api } from "@/api/client";
+import { appConfig, currentMember, handleWebReturn, olderThan, onAuthChange, restore, restoreDev, ssoCheck, finishDeleteAccount, type AppStatus } from "@/central/auth";
+import { APP_VERSION } from "@/central/config";
+import { flash } from "@/kit";
 
 type Gate = "ok" | "paused" | "killed" | "update";
-type Session = { ready: boolean; signedIn: boolean; me: Me | null; gate: Gate; reloadMe: () => Promise<void>; deleted: boolean };
-const Ctx = createContext<Session>({ ready: false, signedIn: false, me: null, gate: "ok", reloadMe: async () => {}, deleted: false });
+type Session = {
+  ready: boolean;
+  signedIn: boolean;
+  me: Me | null;
+  gate: Gate;
+  reloadMe: () => Promise<void>;
+  deleted: boolean;
+  /** 共用元件（下拉重新整理）用：目前登入的會員、重新讀會員資料、讓所有頁面重讀資料。 */
+  member: Me | null;
+  refreshMember: (maxAgeMs?: number) => Promise<void>;
+  invalidate: () => void;
+  version: number;
+};
+const Ctx = createContext<Session>({ ready: false, signedIn: false, me: null, gate: "ok", reloadMe: async () => {}, deleted: false, member: null, refreshMember: async () => {}, invalidate: () => {}, version: 0 });
 export const useSession = () => useContext(Ctx);
 
 function gateOf(s: AppStatus | null): Gate {
@@ -27,6 +39,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<Me | null>(null);
   const [gate, setGate] = useState<Gate>("ok");
   const [deleted, setDeleted] = useState(false);
+  const [version, setVersion] = useState(0);
+  const invalidate = useCallback(() => setVersion((v) => v + 1), []);
 
   const reloadMe = useCallback(async () => {
     if (!currentMember()) {
@@ -84,7 +98,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     else setMe(null);
   }, [signedIn, reloadMe]);
 
-  return <Ctx.Provider value={{ ready, signedIn, me, gate, reloadMe, deleted }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, signedIn, me, gate, reloadMe, deleted, member: me, refreshMember: reloadMe, invalidate, version }}>{children}</Ctx.Provider>;
 }
 
 /** 讀資料：進入畫面時讀取，回到畫面時自動重讀。 */
@@ -92,6 +106,7 @@ export function useData<T>(path: string | null): { data: T | null; error: string
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const { version } = useContext(Ctx);
   const pathRef = useRef(path);
   pathRef.current = path;
   const reload = useCallback(async () => {
@@ -109,7 +124,7 @@ export function useData<T>(path: string | null): { data: T | null; error: string
   useFocusEffect(
     useCallback(() => {
       void reload();
-    }, [reload, path]),
+    }, [reload, path, version]),
   );
   return { data, error, loading, reload, set: setData };
 }

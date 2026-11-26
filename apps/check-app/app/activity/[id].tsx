@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
-import { KINDS, type ActivityView } from "../../../api/src/contract";
-import { api } from "@/api";
+import { KINDS, type ActivityView } from "@check/contract";
+import { api } from "@/api/client";
 import { itemRule, StatusChip } from "@/features/items";
 import { dueText, leftText } from "@/format";
-import { useData } from "@/session";
-import { useColors } from "@/theme";
-import { Btn, Card, Chip, Empty, flash, flashError, Loading, Note, Progress, Screen, Seg, T } from "@/ui";
+import { useData } from "@/state/session";
+import { useColors } from "@/kit";
+import { Btn, Card, Chip, Empty, flash, flashError, Loading, Note, Progress, Screen, Seg, T } from "@/kit";
 
 export default function ActivityPage() {
   const { id } = useLocalSearchParams<{ id: string }>();

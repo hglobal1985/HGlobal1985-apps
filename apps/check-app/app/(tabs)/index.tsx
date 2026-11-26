@@ -1,35 +1,24 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { RefreshControl, ScrollView, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { ActivityCard } from "../../../api/src/contract";
-import { api } from "@/api";
+import { Text, View } from "react-native";
+import type { ActivityCard } from "@check/contract";
+import { api } from "@/api/client";
 import { dateOnly, leftText, parseTw, shortDue } from "@/format";
-import { useData, useSession } from "@/session";
-import { font, size, useColors } from "@/theme";
-import { Btn, Card, Chip, Empty, Field, flash, flashError, Loading, Note, Progress, Sheet, T, TopBar } from "@/ui";
+import { useData, useSession } from "@/state/session";
+import { Btn, Card, Chip, Empty, Field, flash, flashError, font, Loading, Note, Progress, Screen, Sheet, T, useColors } from "@/kit";
 
 export default function Home() {
-  const c = useColors();
   const { me } = useSession();
-  const { data, loading, reload, error } = useData<ActivityCard[]>("/home");
+  const { data, loading, error } = useData<ActivityCard[]>("/home");
   const [adding, setAdding] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const ins = useSafeAreaInsets();
   return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <TopBar title="我的作業" back={false} right={me?.superAdmin ? <Btn small flex={false} label="＋新增作業" onPress={() => setAdding(true)} /> : undefined} />
-      <ScrollView
-        contentContainerStyle={{ padding: size.gap, gap: 12, maxWidth: size.pageMax, width: "100%", alignSelf: "center", paddingBottom: 24 + ins.bottom }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await reload(); setRefreshing(false); }} />}
-      >
+    <Screen title="我的作業" back={false} right={me?.superAdmin ? <Btn small flex={false} label="＋新增作業" onPress={() => setAdding(true)} /> : undefined}>
         {loading && !data ? <Loading /> : null}
         {error && !data ? <Note tone="bad">{error}</Note> : null}
         {data && !data.length ? <Empty title="目前沒有作業" note="請點作業管理員給你的加入連結，加入後就會出現在這裡。" /> : null}
         {data?.map((a) => <ActivityHero key={a.id} a={a} />)}
-      </ScrollView>
       <NewActivity open={adding} onClose={() => setAdding(false)} onDone={(id) => { setAdding(false); router.push(`/manage/${id}`); }} />
-    </View>
+    </Screen>
   );
 }
 

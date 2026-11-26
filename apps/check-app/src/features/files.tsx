@@ -2,11 +2,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Image, Linking, Modal, Platform, Pressable, Text, View } from "react-native";
-import { API_BASE } from "../api";
-import type { CommentView, FileView } from "../../../api/src/contract";
-import { api, openFile } from "../api";
-import { useColors } from "../theme";
-import { Avatar, Btn, confirmSheet, Field, flash, flashError, Section, Sheet, T } from "../ui";
+import { API_BASE } from "@/api/client";
+import type { CommentView, FileView } from "@check/contract";
+import { api, openFile } from "@/api/client";
+import { useColors } from "@/kit";
+import { Avatar, Btn, confirmSheet, Field, flash, flashError, Section, Sheet, T } from "@/kit";
 
 const ICON: Record<FileView["kind"], keyof typeof Ionicons.glyphMap> = { photo: "image-outline", video: "play-circle-outline", file: "document-text-outline", link: "link-outline", text: "create-outline" };
 

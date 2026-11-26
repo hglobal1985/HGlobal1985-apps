@@ -1,14 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, View } from "react-native";
-import { DEFAULT_KINDS, KINDS, MODES, type ActivitySettings, type ActivityView, type ItemCard, type ItemMode, type Kind, type LessonView } from "../../../api/src/contract";
-import { api, API_BASE } from "@/api";
+import { DEFAULT_KINDS, KINDS, MODES, type ActivitySettings, type ActivityView, type ItemCard, type ItemMode, type Kind, type LessonView } from "@check/contract";
+import { api, API_BASE } from "@/api/client";
 import { accessToken } from "@/central/auth";
 import { itemRule } from "@/features/items";
 import { shareLink } from "@/features/share";
 import { dateOnly, dueText, isoToTwInput, mb, parseTw } from "@/format";
-import { useData } from "@/session";
-import { Btn, Card, Chip, confirmSheet, Field, flash, flashError, Loading, Note, Screen, Section, Seg, Sheet, T, Toggle } from "@/ui";
+import { useData } from "@/state/session";
+import { Btn, Card, Chip, confirmSheet, Field, flash, flashError, Loading, Note, Screen, Section, Seg, Sheet, T, Toggle } from "@/kit";
 
 /** 管理：作業設定、每一堂與作業項目、加入連結、檔案保存。只有管理員。 */
 export default function Manage() {

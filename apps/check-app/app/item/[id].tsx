@@ -1,14 +1,14 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import { KINDS, LIMITS, MODES, pointsFor, type ItemView, type Kind } from "../../../api/src/contract";
-import { api, upload } from "@/api";
+import { KINDS, LIMITS, MODES, pointsFor, type ItemView, type Kind } from "@check/contract";
+import { api, upload } from "@/api/client";
 import { Comments, FileGrid } from "@/features/files";
 import { itemRule, StatusChip } from "@/features/items";
 import { pickFiles, pickPhotos, pickVideo, takePhoto, type Picked } from "@/features/upload";
 import { dueText, leftText } from "@/format";
-import { useData } from "@/session";
-import { Avatar, Btn, Card, Check, Chip, Field, flash, flashError, Loading, Note, Progress, Screen, Section, Seg, Sheet, Stepper, T } from "@/ui";
+import { useData } from "@/state/session";
+import { Avatar, Btn, Card, Check, Chip, Field, flash, flashError, Loading, Note, Progress, Screen, Section, Seg, Sheet, Stepper, T } from "@/kit";
 
 export default function ItemPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -161,12 +161,8 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
                 這一項收：{v.item.kinds.map((k) => KINDS[k]).join("、")}。照片 {LIMITS.photoMB}MB、檔案 {LIMITS.fileMB}MB 內；短影片 3 分鐘內。
               </T>
               {v.item.mode === "count" ? (
-                <Card style={{ flexDirection: "row", alignItems: "center" }}>
-                  <View style={{ flex: 1 }}>
-                    <T bold>我完成的{v.item.unit}數</T>
-                    <T tiny muted>預估 {pointsFor(v.item, { approved: declared })} 分，老師核定後才算</T>
-                  </View>
-                  <Stepper value={declared} onChange={setDeclared} />
+                <Card>
+                  <Stepper label={`我完成的${v.item.unit}數`} hint={`預估 ${pointsFor(v.item, { approved: declared })} 分，老師核定後才算`} unit={v.item.unit} value={declared} onChange={setDeclared} />
                 </Card>
               ) : null}
               <Field value={note} onChangeText={setNote} placeholder="給老師的說明（選填）" multiline />

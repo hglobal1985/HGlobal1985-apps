@@ -1,13 +1,13 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { View } from "react-native";
-import type { ActivityView, QueueEntry } from "../../../api/src/contract";
-import { api } from "@/api";
+import type { ActivityView, QueueEntry } from "@check/contract";
+import { api } from "@/api/client";
 import { Comments, FileGrid } from "@/features/files";
 import { gradeBody, GradePanel, gradeReady, initialGrade, type GradeInput } from "@/features/grade";
 import { itemRule } from "@/features/items";
-import { useData } from "@/session";
-import { Avatar, Btn, Card, Chip, Empty, Field, flash, flashError, Loading, Note, Progress, Screen, Sheet, T } from "@/ui";
+import { useData } from "@/state/session";
+import { Avatar, Btn, Card, Chip, Empty, Field, flash, flashError, Loading, Note, Progress, Screen, Sheet, T } from "@/kit";
 
 /** 批改台：一份一份往下批（老師評分；組長確認或退回）。 */
 export default function Review() {

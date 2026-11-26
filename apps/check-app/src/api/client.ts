@@ -1,7 +1,10 @@
 /** 呼叫自己的後端（/api/…）。自動帶 Access Token；401 先換發再試一次。 */
 import { Platform } from "react-native";
-import { accessToken, refresh } from "./central/auth";
-import { WEB_ORIGIN } from "./central/config";
+import { accessToken, refresh } from "@/central/auth";
+import { WEB_ORIGIN } from "@/central/config";
+
+/** 共用元件（讀取失敗畫面）用到的訊息。 */
+export const UPGRADING_MSG = "系統升級中，請稍後再試";
 
 export const API_BASE = Platform.OS === "web" ? "" : WEB_ORIGIN;
 

@@ -14,7 +14,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "../../packages/ui/src/**/*.d.ts"
   ],
   "exclude": [
     "node_modules",

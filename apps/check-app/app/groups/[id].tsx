@@ -1,11 +1,11 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
-import type { PeopleView, Person } from "../../../api/src/contract";
-import { api } from "@/api";
+import type { PeopleView, Person } from "@check/contract";
+import { api } from "@/api/client";
 import { shareLink } from "@/features/share";
-import { useData } from "@/session";
-import { Avatar, Btn, Card, Chip, confirmSheet, Empty, Field, flash, flashError, Loading, Note, Screen, Section, Sheet, T } from "@/ui";
+import { useData } from "@/state/session";
+import { Avatar, Btn, Card, Chip, confirmSheet, Empty, Field, flash, flashError, Loading, Note, Screen, Section, Sheet, T } from "@/kit";
 
 type Act = { label: string; run: () => Promise<unknown>; done: string; confirm?: [string, string]; danger?: boolean };
 
