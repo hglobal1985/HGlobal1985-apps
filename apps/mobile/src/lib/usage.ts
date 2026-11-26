@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, Dimensions, Platform } from "react-native";
 import { api } from "@/api/client";
+import { currentModeKey } from "./elder-mode";
 
 /**
  * 使用統計回報（業主 2026-11-22，管理員 > 設定 > 使用統計）：匿名回報裝置（手機／平板／電腦）、系統（iOS／Android／其他）、
@@ -37,7 +38,7 @@ export function markOwnerDevice() {
 
 export function trackUsage(kind: Kind, target?: string) {
   try {
-    void ownerReady.then(() => api("POST", "/usage", { kind, ...detect(), ...(target ? { target } : {}), ...(ownerDevice ? { owner: 1 } : {}) })).catch(() => undefined);
+    void ownerReady.then(() => api("POST", "/usage", { kind, ...detect(), mode: currentModeKey(), ...(target ? { target } : {}), ...(ownerDevice ? { owner: 1 } : {}) })).catch(() => undefined);
   } catch {
     /* 統計失敗不影響使用 */
   }

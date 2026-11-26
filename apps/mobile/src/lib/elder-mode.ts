@@ -155,3 +155,4 @@ export function useBorderW(base: number): number {
 }
 /** 根版面用：全站字體倍數改變時換一個新值。 */
 export const useElderVersion = () => useSyncExternalStore(subscribe, elderVersion, elderVersion);
+export const currentModeKey = (): "elder" | "super" => (prefs.on ? "elder" : "super");
