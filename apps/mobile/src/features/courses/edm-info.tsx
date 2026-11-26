@@ -62,7 +62,7 @@ export const storedFormat = (s?: { type: string; ext: string }): string => {
   const k = s.type.replace(/^image\//, "").toLowerCase() || s.ext;
   return FORMAT_NAME[k] ?? (k ? k.toUpperCase() : "未知");
 };
-const OCR_STATUS: Record<string, string> = { "": "尚未辨識（稍後會自動辨識）", working: "辨識中…", done: "已辨識", failed: "辨識失敗" };
+const OCR_STATUS: Record<string, string> = { "": "尚未辨識（稍後會自動辨識）", working: "辨識中…", done: "已辨識", failed: "辨識失敗", skip: "不做文字辨識（食譜照片）" };
 const aiState = (st: string, done: string) => (st === "done" ? done : st === "working" ? "辨識中…" : st === "failed" ? "辨識失敗" : "排隊等待辨識");
 const queueLine = (q: { pending: number; perHour: number; etaMin: number | null; quotaOut: boolean }, what: string) => {
   if (q.quotaOut) return `全站還有 ${q.pending} 張${what}待辨識；今天的 AI 免費額度已用完，明天自動繼續。`;
@@ -145,9 +145,9 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
               {row("R2 儲存格式", `${storedFormat(info.stored)}　${size(info.stored.bytes)}`)}
               {info.kind === "image" && !info.basic ? (
                 <>
-                  {row("文字辨識", info.queue.ocrOn || info.ocrStatus === "done" ? aiState(info.ocrStatus, info.ocrText ? "已辨識，有文字" : "已辨識，沒有文字") : "已關閉")}
+                  {row("文字辨識", info.ocrStatus === "skip" ? "食譜照片不做文字辨識" : info.queue.ocrOn || info.ocrStatus === "done" ? aiState(info.ocrStatus, info.ocrText ? "已辨識，有文字" : "已辨識，沒有文字") : "已關閉")}
                   {isEdm ? null : row("場景辨識", info.queue.sceneOn || info.sceneStatus === "done" ? aiState(info.sceneStatus, info.sceneText ? info.sceneText : "已辨識") : "已關閉")}
-                  {info.queue.pending > 0 && (info.ocrStatus !== "done" || (!isEdm && info.queue.sceneOn && info.sceneStatus !== "done")) ? <Text style={styles.fmtSub}>{queueLine(info.queue, isEdm ? "EDM " : "相簿照片")}</Text> : null}
+                  {info.queue.pending > 0 && ((info.ocrStatus !== "done" && info.ocrStatus !== "skip") || (!isEdm && info.queue.sceneOn && info.sceneStatus !== "done")) ? <Text style={styles.fmtSub}>{queueLine(info.queue, isEdm ? "EDM " : "相簿照片")}</Text> : null}
                 </>
               ) : null}
             </>, "#9fd8ff") : null}

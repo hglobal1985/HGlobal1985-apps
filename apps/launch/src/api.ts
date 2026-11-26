@@ -3072,6 +3072,7 @@ async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind
     db.prepare("INSERT INTO cover_media (id, owner_kind, center_key, owner_key, kind, r2_key, poster_key, width, height, duration_sec, bytes, position, created_by, scope) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").bind(id, o.kind, o.centerKey, o.ownerKey, x.kind, x.r2Key, x.posterKey, x.width, x.height, x.durationSec, x.bytes, pos, x.by, o.scope),
     db.prepare("UPDATE cover_media SET uploader_name = ?, uploader_avatar = ? WHERE id = ?").bind((o.s.name ?? "").slice(0, 60), o.s.kind === "central" ? (o.s.avatarUrl ?? "").slice(0, 500) : "", id),
     audit(db, x.by, "cover_media.add", o.kind, o.centerKey ?? o.ownerKey, id),
+    ...(o.ownerKey.startsWith("rcp:") ? [db.prepare("UPDATE cover_media SET ocr_status = 'skip' WHERE id = ?").bind(id)] : []), // 食譜照片不做文字辨識（只做場景）
   ]);
   return id;
 }
@@ -5088,7 +5089,7 @@ const routes: [string, RegExp, Handler][] = [
       await bucket.put(key, shrunk.data, { httpMetadata: { contentType: shrunk.type } });
       const size = imageSize(new Uint8Array(shrunk.data as ArrayBuffer)) ?? { width: dim(ctx.url.searchParams.get("w")), height: dim(ctx.url.searchParams.get("h")) };
       await ctx.db.batch([
-        ctx.db.prepare("UPDATE cover_media SET r2_key = ?, width = ?, height = ?, bytes = ?, ocr_status = '', ocr_text = '', event_date = NULL WHERE id = ?").bind(key, size.width, size.height, shrunk.data.byteLength, id),
+        ctx.db.prepare("UPDATE cover_media SET r2_key = ?, width = ?, height = ?, bytes = ?, ocr_status = CASE WHEN owner_key LIKE 'rcp:%' THEN 'skip' ELSE '' END, ocr_text = '', event_date = NULL WHERE id = ?").bind(key, size.width, size.height, shrunk.data.byteLength, id),
         ...(row.course_id ? [ctx.db.prepare("UPDATE courses SET edm_key = ?, cover_rect = NULL, art_version = art_version + 1 WHERE id = ?").bind(key, row.course_id)] : []),
         audit(ctx.db, s.sub, "cover_media.replace", row.owner_kind, row.center_key ?? row.owner_key, id),
       ]);
@@ -7352,7 +7353,7 @@ const routes: [string, RegExp, Handler][] = [
           .prepare("SELECT center_key AS grp, COUNT(*) AS total, SUM(ocr_status = 'done') AS done, SUM(ocr_status = 'failed') AS failed FROM cover_media WHERE owner_kind = 'center' AND scope = 'edm' AND kind = 'image' GROUP BY center_key ORDER BY total DESC")
           .all<{ grp: string | null; total: number; done: number; failed: number }>(),
         ctx.db
-          .prepare("SELECT cm.owner_key AS grp, c.title || ' › ' || l.title AS label, COUNT(*) AS total, SUM(cm.scene_status = 'done') AS done, SUM(cm.scene_status = 'failed') AS failed FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.kind = 'image' GROUP BY cm.owner_key ORDER BY total DESC")
+          .prepare("SELECT * FROM (SELECT cm.owner_key AS grp, c.title || ' › ' || l.title AS label, COUNT(*) AS total, SUM(cm.scene_status = 'done') AS done, SUM(cm.scene_status = 'failed') AS failed FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.kind = 'image' GROUP BY cm.owner_key UNION ALL SELECT 'recipes' AS grp, '食譜（全部食譜照片）' AS label, COUNT(*) AS total, SUM(cm.scene_status = 'done') AS done, SUM(cm.scene_status = 'failed') AS failed FROM cover_media cm WHERE cm.owner_kind = 'course' AND cm.owner_key LIKE 'rcp:%' AND cm.kind = 'image' HAVING COUNT(*) > 0) ORDER BY total DESC")
           .all<{ grp: string; label: string; total: number; done: number; failed: number }>(),
         ctx.db
           .prepare("SELECT cm.owner_key AS grp, c.title || ' › ' || l.title AS label, COUNT(*) AS total, SUM(cm.ocr_status = 'done') AS done, SUM(cm.ocr_status = 'failed') AS failed FROM cover_media cm JOIN lessons l ON l.id = cm.owner_key AND l.kind = 'section' JOIN courses c ON c.id = l.course_id WHERE cm.owner_kind = 'course' AND cm.kind = 'image' GROUP BY cm.owner_key ORDER BY total DESC")
