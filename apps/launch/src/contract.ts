@@ -930,6 +930,9 @@ export type ShareSettings = {
   linkLead: string;
   siteName: string;
   titleSeparator: string;
+  /** 標題最後面的小圖示（預設 🎓；可清空＝不加）。 */
+  titleBadge: string;
+  /** （已不用於預覽卡片，保留欄位相容舊設定）地址前的圖示。 */
   addressIcon: string;
   showAddress: boolean;
   showQuote: boolean;
@@ -953,6 +956,7 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   linkLead: "按此開啟網址 👉",
   siteName: "寰宇行動大學",
   titleSeparator: " | ",
+  titleBadge: "🎓",
   addressIcon: "📍",
   showAddress: true,
   showQuote: true,

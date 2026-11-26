@@ -72,7 +72,7 @@ test("分享預覽：沒設短網址的中心／分類／系列、已上架課�
   assert.equal(await get("/courses"), html, "沒有參數的 /courses 維持預設");
 });
 
-test("中心分享預覽：標題＝中心名稱 | 寰宇行動大學 🎓；說明＝一句學習金句（不放地址）；短網址與 /courses?center= 一致", async () => {
+test("中心分享預覽：標題＝中心名稱 | 寰宇行動大學 🎓；中心卡第二行＝地址（沒填地址才用金句）；短網址與 /courses?center= 一致", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, DEMO_LOGIN: "on" };
   await db.prepare("DELETE FROM quotes").run();
@@ -84,14 +84,14 @@ test("中心分享預覽：標題＝中心名稱 | 寰宇行動大學 🎓；說
     return { title: /property="og:title" content="([^"]*)"/.exec(page)?.[1], desc: /property="og:description" content="([^"]*)"/.exec(page)?.[1] };
   };
   const q = "/courses?center=%E5%BD%B0%E5%8C%96%20151";
-  assert.deepEqual(await meta("/ch"), { title: "彰化 | 寰宇行動大學 🎓", desc: "每天進步一點點" }, "第二行只有金句");
+  assert.deepEqual(await meta("/ch"), { title: "彰化 | 寰宇行動大學 🎓", desc: "每天進步一點點" }, "中心還沒填地址：退回金句");
   await db.prepare("INSERT INTO center_info (center_key, center_label, address) VALUES ('彰化 151', '彰化 151', '彰化市中山路 1 號')").run();
-  const want = { title: "彰化 | 寰宇行動大學 🎓", desc: "每天進步一點點" }; // 有地址也不顯示（杜杜龍 2026-11-26 一律格式）
+  const want = { title: "彰化 | 寰宇行動大學 🎓", desc: "📍 彰化市中山路 1 號" }; // 中心卡第二行固定是地址（杜杜龍 2026-11-26）
   assert.deepEqual(await meta("/ch"), want, "短網址");
   assert.deepEqual(await meta(q), want, "沒設短網址的網址");
   assert.deepEqual(await meta(`${q}&category=%E6%96%B0%E4%BA%BA`), { title: "彰化・新人 | 寰宇行動大學 🎓", desc: want.desc }, "中心＋分類");
   await db.prepare("DELETE FROM quotes").run();
-  assert.equal((await meta("/ch")).desc, "寰宇行動大學", "沒有金句：退回站名");
+  assert.equal((await meta("/ch")).desc, "📍 彰化市中山路 1 號", "有地址：不受金句影響，固定顯示地址");
 });
 
 test("分享預覽：縮寫照設定的大小寫顯示（og:url）、輸入不分大小寫；總部課程 /hq/…", async () => {
@@ -130,17 +130,17 @@ test("分享預設值：改標題格式、地址圖示、開關後，預覽卡�
     const page = await (await w.fetch(new Request(`https://learn.test${path}`), env)).text();
     return { title: /property="og:title" content="([^"]*)"/.exec(page)?.[1], desc: /property="og:description" content="([^"]*)"/.exec(page)?.[1] };
   };
-  const base = { title: "彰化 | 寰宇行動大學 🎓", desc: "每天進步一點點" };
+  const base = { title: "彰化 | 寰宇行動大學 🎓", desc: "📍 彰化市中山路 1 號" };
   assert.deepEqual(await meta("/ch"), base, "預設");
   assert.deepEqual(await meta("/course/c1"), { title: "彰化的課 | 寰宇行動大學 🎓", desc: "每天進步一點點" }, "單堂課程＝課程名稱");
 
   assert.equal((await call("PUT", "/admin/ui-config", student, { share: { siteName: "X" } })).status, 403, "只有超級管理員能改");
   const put = await call("PUT", "/admin/ui-config", admin, { share: { siteName: "寰宇大學", titleSeparator: "｜", addressIcon: "🏠", showQuote: false, courseText: "聽完 {課程名稱} by {主講人}" } });
   assert.equal(put.status, 200);
-  assert.deepEqual(await meta("/ch"), { title: "彰化｜寰宇大學 🎓", desc: "寰宇大學" }, "改了格式（金句關閉＝站名）");
+  assert.deepEqual(await meta("/ch"), { title: "彰化｜寰宇大學 🎓", desc: "🏠 彰化市中山路 1 號" }, "改了格式：中心卡第二行是地址");
   assert.deepEqual(await meta("/course/c1"), { title: "彰化的課｜寰宇大學 🎓", desc: "寰宇大學" });
   await call("PUT", "/admin/ui-config", admin, { share: { showAddress: false } });
-  assert.equal((await meta("/ch")).desc, "寰宇大學", "金句關閉＝備用文字（站名）");
+  assert.equal((await meta("/ch")).desc, "寰宇大學", "地址與金句都關閉＝備用文字（站名）");
   await call("PUT", "/admin/ui-config", admin, { share: { siteName: "", titleSeparator: "   " } });
   assert.equal((await meta("/ch")).title, "彰化 | 寰宇行動大學 🎓", "站名、分隔符號清成空白＝退回預設，不會存成空的");
 

@@ -84,10 +84,10 @@ export default function ShareDefaultsScreen() {
 
   // 即時預覽（範例資料）
   const card = (name: string, address: string) => ({
-    title: `${name}${s.titleSeparator}${s.siteName}${s.siteName.includes("🎓") ? "" : " 🎓"}`, // 一律格式：名稱 | 寰宇行動大學 🎓（杜杜龍 2026-11-26）
+    title: `${name}${s.titleSeparator}${s.siteName}${s.titleBadge && !s.siteName.includes(s.titleBadge) ? ` ${s.titleBadge}` : ""}`, // 名稱 | 站名 圖示
     desc: (s.showQuote ? "每天進步一點點，一年後強大 37 倍。" : "") || s.fallbackDescription || s.siteName, // 第二行只放一句隨機學習金句（不再放地址）
   });
-  const center = card("彰化中心", "彰化市中山路 1 號");
+  const center = { title: card("彰化中心", "").title, desc: s.showAddress ? `${s.addressIcon ? `${s.addressIcon} ` : ""}彰化市中山路 1 號` : card("彰化中心", "").desc }; // 中心卡第二行＝地址
   const hq = card(s.hqName, "");
   const sampleUrl = "https://learn.hglobal1985.com/136/wang-xiaoming-001";
 
@@ -123,13 +123,21 @@ export default function ShareDefaultsScreen() {
 
       <Section fold title="④ LINE 預覽卡片（標題與備註）">
         <Card>
-          {input("站名", "標題最後面固定的名稱（程式會自動再加上 🎓）", s.siteName, (v) => set("siteName", v))}
+          {input("站名", "標題最後面固定的名稱，例如「寰宇行動大學」", s.siteName, (v) => set("siteName", v))}
+          {input("站名後面的小圖示", "預設 🎓；清空＝不加圖示。圖示的樣子由每個人的手機系統決定", s.titleBadge, (v) => set("titleBadge", v))}
           {input("標題的分隔符號", "名稱與站名中間，例如「 | 」（前後空白也會保留）", s.titleSeparator, (v) => set("titleSeparator", v))}
-                              {toggle("備註顯示學習金句", "第二行放一句隨機學習金句，每次 LINE 重新抓取都會重抽（金句在設定頁的學習金句編輯）", s.showQuote, (v) => set("showQuote", v))}
+                              {toggle("課程、系列、分類：第二行顯示學習金句", "第二行放一句隨機學習金句，每次 LINE 重新抓取都會重抽（金句在設定頁的學習金句編輯）", s.showQuote, (v) => set("showQuote", v))}
+          {toggle("中心卡：第二行顯示地址", "中心卡（中心短網址與中心頁）的第二行固定是地址，不是金句；中心沒填地址才退回金句。地址在中心頁編輯", s.showAddress, (v) => set("showAddress", v))}
+          {input("中心卡地址前的圖示", "放在地址最前面（可以清空＝不加圖示）。圖示的樣子由每個人的手機系統決定", s.addressIcon, (v) => set("addressIcon", v))}
           {input("總部主辦課程的名稱", "中心頁的名稱：總部（沒有主辦中心）時用這個名稱", s.hqName, (v) => set("hqName", v))}
           {input("備註的備用文字", "沒有金句（或關閉金句）時顯示；空白＝顯示站名", s.fallbackDescription, (v) => set("fallbackDescription", v))}
           <AppText variant="caption" tone="muted">
-            一律格式（杜杜龍 2026-11-26）：第一行＝「課程、系列或中心名稱 | 寰宇行動大學 🎓」，第二行＝一句隨機學習金句；不再顯示地址。
+            一律格式：第一行＝「課程、系列或中心名稱＋分隔符號＋站名＋圖示」；第二行：課程、系列、分類＝一句隨機學習金句，中心卡＝地址。
+          </AppText>
+
+          <AppText variant="callout" style={{ fontWeight: "800", marginTop: 8 }}>下面這些不能在這一頁改，要這樣設定：</AppText>
+          <AppText variant="caption" tone="muted">
+            {"① 第一行的「名稱」：來自課程、系列、中心本身的名稱。課程／系列改名到該課程或系列的「基本資料」；中心名稱預設取自會員中心系統（去掉數字代碼），要自訂顯示名稱到「教育中心自訂名稱」。\n② 第二行：金句內容到「設定 › 編輯學習金句」新增、修改、刪除；中心卡的地址到該中心頁的「地址」編輯。\n③ 預覽卡的縮圖：課程用課程封面或 EDM、系列用系列 EDM、中心用中心封面，沒圖才用網站圖示。換圖到各自的封面或 EDM 設定。\n④ LINE 什麼時候重新抓取：由 LINE 決定，我們無法強制，所以同一個連結在 LINE 的快取期間看到的預覽（含金句）不會變。想讓某個連結立刻重抓：在連結最後面加「?」和任意字再分享，例如 learn.hglobal1985.com/amway/dd?v=2，LINE 會把它當新網址重新抓取。\n⑤ 說明文字太長時各平台（LINE、Facebook）會自己截斷，這個不能設定。"}
           </AppText>
         </Card>
       </Section>
