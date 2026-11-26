@@ -35,11 +35,11 @@ export const overlayAbove = (order: number) => overlayOrders.some((o) => o > ord
 /** 自己退掉多記的那筆瀏覽紀錄之前呼叫：讓其他監聽 popstate 的畫面略過這一次。 */
 export const markOverlayPop = () => void (lastOverlayPop = Date.now());
 
-export function useBackToClose(onClose: () => void): void {
+export function useBackToClose(onClose: () => void, enabled = true): void {
   const close = useRef(onClose);
   close.current = onClose;
   useEffect(() => {
-    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (!enabled || Platform.OS !== "web" || typeof window === "undefined") return;
     let popped = false;
     let wasFs = false;
     const myOrder = nextOrder();
