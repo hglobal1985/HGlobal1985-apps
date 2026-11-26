@@ -4578,9 +4578,11 @@ const routes: [string, RegExp, Handler][] = [
       if (typeof b.body === "string" && b.body.length > BODY_MAX) return fail(400, "body_too_long", `食譜文字最多 ${BODY_MAX} 字`);
       if (categoryId && !(await ctx.db.prepare("SELECT 1 AS ok FROM recipe_categories WHERE id = ?").bind(categoryId).first())) return fail(400, "invalid_category", "找不到這個分類");
       const status = b.finish === true && row.status === "draft" ? (manager ? "published" : "pending") : row.status;
+      const submitted = status === "pending" && row.status === "draft";
       await ctx.db.batch([
         ctx.db.prepare("UPDATE recipes SET title = ?, category_id = ?, body = ?, status = ?, updated_at = datetime('now') WHERE id = ?").bind(title, categoryId, body, status, id),
         audit(ctx.db, s.sub, "recipe.save", "recipe", id!, status),
+        ...(submitted ? [notify(ctx.db, { role: "admin" }, "有新的食譜投稿，等待審核", `${s.name ?? "會員"} 投稿了「${title}」，請到食譜專區審核。`, `/recipe/${id}`)] : []),
       ]);
       return recipeDetail(ctx, await recipeRow(ctx, id!));
     },
@@ -4594,7 +4596,11 @@ const routes: [string, RegExp, Handler][] = [
       if (!(await recipeManager(ctx))) return fail(403, "forbidden", "只有管理者可以審核食譜");
       const row = await recipeRow(ctx, id!);
       if (row.status !== "pending") return fail(409, "not_pending", "這道食譜不是待審核狀態");
-      await ctx.db.batch([ctx.db.prepare("UPDATE recipes SET status = 'published', updated_at = datetime('now') WHERE id = ?").bind(id), audit(ctx.db, s.sub, "recipe.approve", "recipe", id!)]);
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE recipes SET status = 'published', updated_at = datetime('now') WHERE id = ?").bind(id),
+        audit(ctx.db, s.sub, "recipe.approve", "recipe", id!),
+        notify(ctx.db, { sub: row.author_sub }, "你投稿的食譜已通過審核", `「${row.title}」已經發佈，所有人都看得到了。`, `/recipe/${id}`),
+      ]);
       return { ok: true };
     },
   ],

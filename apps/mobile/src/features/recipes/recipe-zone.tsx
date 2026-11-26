@@ -5,6 +5,10 @@ import { Image, Pressable, ScrollView, Share, TextInput, useWindowDimensions, Vi
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, resolveUrl, type CoverMediaItem, type RecipeCard, type RecipeDetail, type RecipesResponse } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
+import { AddToListSheet } from "@/features/my-lists/add-to-list";
+import { useMark } from "@/features/my-lists/store";
+import { useFeature } from "@/lib/app-mode";
+import { absoluteUrl } from "@/lib/share";
 import { useSheetBack } from "@/lib/sheet-back";
 import { trackUsage } from "@/lib/usage";
 import { useThumb } from "@/lib/thumb";
@@ -128,11 +132,15 @@ export function RecipeZone({ onBack, onOpenPhotos }: { onBack: () => void; onOpe
 }
 
 /** 單道食譜：可左右滑的照片（點照片放大看圖）、名稱、分類、文字與影片、複製／分享；管理者與投稿者（待審核時）可修改、刪除，管理者可核准。 */
-function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit }: { id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
+export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit }: { id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const thumb = useThumb();
+  const { member } = useSession();
   const detail = useApi<RecipeDetail>(`/recipes/${id}`);
+  const inList = useMark({ kind: "recipe", ref: id });
+  const listOn = useFeature("addToList");
+  const [listOpen, setListOpen] = useState(false);
   const photosApi = useApi<CoverMediaItem[]>(`/cover-media?kind=course&key=${encodeURIComponent(`rcp:${id}`)}`);
   const closeRef = useRef<() => unknown>(onClose);
   closeRef.current = onClose;
@@ -157,7 +165,7 @@ function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit }: { id
   );
   const share = async () => {
     try {
-      await Share.share({ title: d!.title, message: text });
+      await Share.share({ title: d!.title, message: `${text}\n\n${absoluteUrl(`/recipe/${id}`)}` });
     } catch {
       await Clipboard.setStringAsync(text);
       flashText("已複製食譜文字");
@@ -225,6 +233,7 @@ function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit }: { id
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
                 {d.body ? act("複製文字", "copy-outline", () => void Clipboard.setStringAsync(text).then(() => flashText("已複製食譜文字"))) : null}
                 {act("分享", "share-outline", () => void share())}
+                {d.status === "published" && listOn ? act(inList ? `已加入 ${inList} 份清單` : "加入我的清單", "bookmark-outline", () => (member ? setListOpen(true) : flashText("請先登入才能加入我的清單")), inList ? "#FFD43B" : "#262629", inList ? "#1F1A00" : "#fff") : null}
                 {d.manager && d.status === "pending" ? act("核准", "checkmark-circle-outline", () => void approve(), "#0c603c") : null}
                 {d.canEdit ? act("編輯", "create-outline", onEdit) : null}
                 {d.canEdit ? act("刪除", "trash-outline", () => void remove(), "#3a1c1c", "#ff8a80") : null}
@@ -233,6 +242,7 @@ function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit }: { id
           ) : null}
         </View>
       </ScrollView>
+      {listOpen && d ? <AddToListSheet target={{ kind: "recipe", ref: id }} title={d.title} onClose={() => setListOpen(false)} /> : null}
     </View>
   );
 }

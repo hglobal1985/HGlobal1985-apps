@@ -40,6 +40,12 @@ test("食譜：草稿 → 會員投稿待審核 → 管理者核准；權限與�
   assert.equal(saved.status, 200);
   assert.equal(saved.data.status, "pending", "會員投稿進待審核");
   assert.equal(saved.data.body, "材料：\n牛番茄\nhttps://youtu.be/AbC123xyz");
+  type Notices = { notifications?: { title: string; link: string }[] } | { title: string; link: string }[];
+  const notices = async (token: string) => {
+    const r = (await call<Notices>("GET", "/notifications", { token })).data;
+    return Array.isArray(r) ? r : (r.notifications ?? []);
+  };
+  assert.ok((await notices(admin)).some((n) => n.title === "有新的食譜投稿，等待審核" && n.link === `/recipe/${id}`), "會員投稿：通知管理者");
   assert.equal((await call<List>("GET", "/recipes", { token: b })).data.recipes.length, 0, "別的會員看不到待審核");
   const mine = (await call<List>("GET", "/recipes", { token: a })).data.recipes;
   assert.deepEqual(mine.map((r) => [r.status, r.canEdit, r.videos]), [["pending", true, 1]], "投稿者看得到自己的，可修改");
@@ -51,6 +57,13 @@ test("食譜：草稿 → 會員投稿待審核 → 管理者核准；權限與�
   assert.equal((await call("POST", `/recipes/${id}/approve`, { token: a })).status, 403, "會員不能自己核准");
   assert.equal((await call("POST", `/recipes/${id}/approve`, { token: admin })).status, 200);
   assert.equal((await call<List>("GET", "/recipes", { token: b })).data.recipes[0]?.title, "瑪格麗特披薩", "核准後所有人看得到");
+  assert.ok((await notices(a)).some((n) => n.title === "你投稿的食譜已通過審核"), "核准後通知投稿者");
+  // 加入我的清單：食譜也能加入，已發佈才算有效
+  type MyList = { id: string; items?: { kind: string; ref: string; title: string; missing: boolean }[] };
+  const made = await call<{ id: string }>("POST", "/my-lists", { token: b, body: { title: "晚餐", kind: "recipe", ref: id } });
+  assert.equal(made.status, 200, "清單可放食譜");
+  const mine2 = (await call<MyList>("GET", `/my-lists/${made.data.id}`, { token: b })).data;
+  assert.deepEqual(mine2.items?.map((i) => [i.kind, i.title, i.missing]), [["recipe", "瑪格麗特披薩", false]]);
   assert.equal((await call("PUT", `/recipes/${id}`, { token: a, body: { title: "改名" } })).status, 403, "核准後投稿者不能再改");
   assert.equal((await call("GET", `/recipes?q=${encodeURIComponent("牛番茄")}`)).status, 200);
   assert.equal(((await call<List>("GET", `/recipes?q=${encodeURIComponent("牛番茄")}`)).data).recipes.length, 1, "文字內容也能搜尋");
