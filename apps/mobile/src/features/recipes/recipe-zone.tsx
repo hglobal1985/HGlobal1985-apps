@@ -132,7 +132,7 @@ export function RecipeZone({ onBack, onOpenPhotos }: { onBack: () => void; onOpe
 }
 
 /** 單道食譜：可左右滑的照片（點照片放大看圖）、名稱、分類、文字與影片、複製／分享；管理者與投稿者（待審核時）可修改、刪除，管理者可核准。 */
-export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit }: { id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
+export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit, standalone = false }: { /** 獨立頁面（不在相簿裡）：上方要避開手機瀏海。 */ standalone?: boolean; id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const thumb = useThumb();
@@ -157,10 +157,10 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit 
     setIdx(i);
   };
   const text = d ? `${d.title}\n\n${d.body}` : "";
+  // 功能按鈕只顯示圖示、全部強制一列（杜杜龍 2026-11-26）；文字只留給無障礙朗讀。
   const act = (label: string, icon: string, onPress: () => void, bg = "#262629", fg = "#fff") => (
-    <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{ minHeight: 44, paddingHorizontal: 14, borderRadius: 22, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: bg }}>
-      <Ionicons name={icon as never} size={20} color={fg} {...UI_ONLY} />
-      <AppText {...UI_ONLY_TEXT} style={{ color: fg, fontWeight: "800", fontSize: 15 }}>{label}</AppText>
+    <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{ flex: 1, maxWidth: 64, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: bg }}>
+      <Ionicons name={icon as never} size={24} color={fg} {...UI_ONLY} />
     </Pressable>
   );
   const share = async () => {
@@ -190,23 +190,26 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit 
 
   return (
     <View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "#000", zIndex: 10 }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
+      {/* 功能圖示一列：放在標題上方的空白區（相簿裡已有上方工具列，所以只留一點間距；獨立頁面要避開手機瀏海） */}
+      <View style={{ paddingTop: standalone ? insets.top + 12 : 10 }}>
+        {d ? (
+      <View style={{ flexDirection: "row", flexWrap: "nowrap", gap: 8, paddingHorizontal: 16, paddingBottom: 10 }}>
+          {d.body ? act("複製文字", "copy-outline", () => void Clipboard.setStringAsync(text).then(() => flashText("已複製食譜文字"))) : null}
+          {act("分享", "share-outline", () => void share())}
+          {d.status === "published" && listOn ? act(inList ? `已加入 ${inList} 份清單` : "加入我的清單", "bookmark-outline", () => (member ? setListOpen(true) : flashText("請先登入才能加入我的清單")), inList ? "#FFD43B" : "#262629", inList ? "#1F1A00" : "#fff") : null}
+          {d.manager && d.status === "pending" ? act("核准", "checkmark-circle-outline", () => void approve(), "#0c603c") : null}
+          {d.canEdit ? act("編輯", "create-outline", onEdit) : null}
+          {d.canEdit ? act("刪除", "trash-outline", () => void remove(), "#3a1c1c", "#ff8a80") : null}
+      </View>
+        ) : null}
+      </View>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
         {round("回食譜列表", "chevron-back", onClose)}
         <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 19 }}>{d?.title ?? "食譜"}</AppText>
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40, alignItems: "center" }}>
         <View style={{ width: w, gap: 14 }}>
           {!d ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{detail.error ? "找不到這道食譜" : "讀取中…"}</AppText> : null}
-          {d ? (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                {d.body ? act("複製文字", "copy-outline", () => void Clipboard.setStringAsync(text).then(() => flashText("已複製食譜文字"))) : null}
-                {act("分享", "share-outline", () => void share())}
-                {d.status === "published" && listOn ? act(inList ? `已加入 ${inList} 份清單` : "加入我的清單", "bookmark-outline", () => (member ? setListOpen(true) : flashText("請先登入才能加入我的清單")), inList ? "#FFD43B" : "#262629", inList ? "#1F1A00" : "#fff") : null}
-                {d.manager && d.status === "pending" ? act("核准", "checkmark-circle-outline", () => void approve(), "#0c603c") : null}
-                {d.canEdit ? act("編輯", "create-outline", onEdit) : null}
-                {d.canEdit ? act("刪除", "trash-outline", () => void remove(), "#3a1c1c", "#ff8a80") : null}
-            </View>
-          ) : null}
           {photos.length ? (
             <View>
               <ScrollView ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / w))} style={{ width: w, height: h, borderRadius: 12 }}>
