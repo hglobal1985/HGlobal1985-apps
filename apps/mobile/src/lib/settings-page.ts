@@ -2,6 +2,7 @@ import { useNavigation } from "expo-router";
 import { useEffect, useRef } from "react";
 import { BackHandler, Platform } from "react-native";
 import { markOverlayPop } from "./back-close";
+import { sheetPopRecent } from "./sheet-back";
 import { choiceSheet } from "@/features/confirm";
 import { setUnsavedGuard } from "./unsaved-guard";
 
@@ -27,6 +28,8 @@ export function useUnsavedPrompt({ dirty, save, discard }: { dirty: boolean; sav
         { key: "stay", label: "繼續編輯", variant: "cancel" },
       ],
     });
+    // 選單（BottomSheet）自己關閉時會退掉它多記的那一筆瀏覽紀錄，等它退完再動歷史，避免連退兩頁
+    if (Platform.OS === "web") await new Promise((r) => setTimeout(r, 450));
     if (pick === "save") {
       if (await live.current.save()) {
         bypass.current = true;
@@ -72,14 +75,14 @@ export function useUnsavedPrompt({ dirty, save, discard }: { dirty: boolean; sav
     const push = () => window.history.pushState({ ...(window.history.state ?? {}), hgDirty: 1 }, "", window.location.href);
     push();
     const onPop = () => {
-      if (!active || popped) return;
+      if (!active || popped || sheetPopRecent()) return;
       popped = true;
       void ask(
         () => window.history.back(),
         () => {
           popped = false;
           push();
-        },
+        }, // 繼續編輯：補回多記的那一筆（上面已等選單退完）
       );
     };
     window.addEventListener("popstate", onPop);

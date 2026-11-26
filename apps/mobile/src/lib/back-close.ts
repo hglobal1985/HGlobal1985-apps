@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { sheetPopRecent } from "./sheet-back";
 import { Platform } from "react-native";
 
 /**
@@ -33,7 +34,7 @@ export function useBackToClose(onClose: () => void): void {
       if (!popped) lastOverlayPop = Date.now(); // 捕捉階段先記下，讓其他 popstate 監聽者能略過
     };
     const onPop = () => {
-      if (popped) return;
+      if (popped || sheetPopRecent()) return; // 上層的上拉面板處理的上一頁，不是離開這個全螢幕視窗
       popped = true;
       close.current();
     };
