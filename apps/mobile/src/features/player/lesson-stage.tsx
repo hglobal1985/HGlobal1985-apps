@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import type { Playback } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { AppText, LoadingLadybug } from "@/ui";
-import { CollapseBand } from "@/ui/collapse-band";
+import { CollapseBand, CollapseFollow } from "@/ui/collapse-band";
 import { InlineAudio } from "./audio-bar";
 import { LessonPlayer } from "./lesson-player";
 import { PlayerControls } from "./player-controls";
@@ -58,6 +58,8 @@ export function LessonStage({
     <>
       {idle ? <CollapseBand enabled={collapseIdle}>{idle}</CollapseBand> : null}
       {idleBar ? (
+        // 封面縮成迷你／圓球之後，待機控制列（時間軸）也跟著縮掉（杜杜龍 2026-11-26，共用 CollapseFollow）。
+        <CollapseFollow enabled={collapseIdle}>
         <View style={[styles.idleBar, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
           <Pressable accessibilityRole="button" accessibilityLabel="播放" onPress={idleBar.onPlay} hitSlop={8} style={styles.idlePlay}>
             {idleBar.loading ? <LoadingLadybug size={32} /> : <Ionicons name="play" size={26} color={c.text} />}
@@ -65,6 +67,7 @@ export function LessonStage({
           <View style={[styles.idleTrack, { backgroundColor: c.border }]} />
           <AppText variant="callout" tone="muted">{`-${Math.floor(idleBar.minutes)}:00`}</AppText>
         </View>
+        </CollapseFollow>
       ) : null}
     </>
   );
