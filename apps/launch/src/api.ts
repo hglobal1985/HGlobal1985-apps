@@ -6911,6 +6911,19 @@ const routes: [string, RegExp, Handler][] = [
     },
   ],
   [
+    "POST",
+    /^\/admin\/ai\/run-now$/,
+    async (ctx) => {
+      // 設定 › AI 文字辨識「立即開始辨識」（業主 2026-11-26）：不等每 10 分鐘的排程，馬上在這個請求裡跑一輪（最多約 70 秒（Cloudflare 連線上限約 100 秒），依「辨識優先順序與開關」）；
+      // 前端會連續呼叫直到沒有待辨識或額度用完。
+      const s = requireSuperAdmin(ctx);
+      const { runAiBatch } = await import("./ai-batch.ts");
+      const r = await runAiBatch(ctx.env, ctx.db, { budgetSec: 70 });
+      await audit(ctx.db, s.sub, "ai.run_now", "setting", "ai_batch", `done=${r.done} stopped=${r.stopped}`).run();
+      return r;
+    },
+  ],
+  [
     "GET",
     /^\/admin\/ai\/progress$/,
     async (ctx) => {
