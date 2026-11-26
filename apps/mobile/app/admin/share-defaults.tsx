@@ -147,6 +147,7 @@ export default function ShareDefaultsScreen() {
           {input("食譜短網址的路徑", "食譜分享出去的網址＝網域／這個路徑／流水號（例：learn.hglobal1985.com/icook/001，編號 3 位數，不夠再加位數）。只能用小寫英文字母與連字號（-），不可含數字。改了以後，舊路徑的網址仍然打得開", s.recipePrefix, (v) => set("recipePrefix", v.toLowerCase().replace(/[^a-z-]/g, "")), { placeholder: "icook" })}
           <AppText variant="caption" tone="muted">{`預覽：learn.hglobal1985.com/${s.recipePrefix || "icook"}/001`}</AppText>
           {input("食譜分享最後的說明與網址", "分享食譜時，接在食譜文字最後面（自成一段）：{網址} 會換成這道食譜的短網址", s.recipeText, (v) => set("recipeText", v), { multiline: true })}
+          {input("食譜分享的上傳者說明", "接在網址下面（空一行）：{暱稱}＝上傳者的暱稱（不是本名）、{中心}＝上傳者所屬中心（自動抓取、不可手動改；沒有中心時省略）", s.recipeUploaderText, (v) => set("recipeUploaderText", v))}
           {s.recipeAliases.length ? (
             <AppText variant="caption" tone="muted">{`以前用過、仍然有效的路徑：${s.recipeAliases.join("、")}`}</AppText>
           ) : null}

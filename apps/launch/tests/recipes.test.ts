@@ -92,6 +92,19 @@ test("食譜：草稿 → 會員投稿待審核 → 管理者核准；權限與�
   assert.equal((await call<Detail>("GET", `/recipes/${id}`)).data.shortPath, "/cook/001");
   assert.equal((await call("PUT", "/admin/short-links", { token: admin, body: { kind: "series", value: "X", slug: "cook" } })).status, 409, "別的短網址不能佔用食譜前綴");
 
+  // 上傳者：暱稱與所屬中心；超級管理員可更換（從已註冊會員用暱稱搜尋）
+  assert.equal((await call<{ authorName: string; admin: boolean }>("GET", `/recipes/${id}`, { token: admin })).data.admin, true);
+  assert.equal((await call<{ admin: boolean }>("GET", `/recipes/${id}`, { token: a })).data.admin, false);
+  await env.DB.prepare("INSERT OR REPLACE INTO member_profiles (sub, name, avatar) VALUES ('demo-silver', '銀章小明', '')").run();
+  assert.equal((await call("GET", "/admin/recipe-authors?q=" + encodeURIComponent("小明"), { token: a })).status, 403, "只有超級管理員能搜尋");
+  const found = (await call<{ members: { sub: string; name: string }[] }>("GET", "/admin/recipe-authors?q=" + encodeURIComponent("小明"), { token: admin })).data.members;
+  assert.deepEqual(found.map((m) => [m.sub, m.name]), [["demo-silver", "銀章小明"]], "暱稱可搜尋");
+  assert.equal((await call("PUT", `/admin/recipes/${id}/author`, { token: a, body: { sub: "demo-silver" } })).status, 403);
+  assert.equal((await call("PUT", `/admin/recipes/${id}/author`, { token: admin, body: { sub: "nobody" } })).status, 404, "只能換成已註冊的會員");
+  const changed = await call<{ authorName: string }>("PUT", `/admin/recipes/${id}/author`, { token: admin, body: { sub: "demo-silver" } });
+  assert.equal(changed.data.authorName, "銀章小明");
+  assert.equal((await call<List>("GET", "/recipes", { token: admin })).data.recipes.find((r) => r.id === id) !== undefined, true);
+
   // 管理者新增、直接發佈
   const id2 = (await call<{ id: string }>("POST", "/recipes", { token: admin })).data.id;
   assert.equal((await call<{ status: string }>("PUT", `/recipes/${id2}`, { token: admin, body: { title: "南瓜濃湯", categoryId: "soup", finish: true } })).data.status, "published", "管理者直接發佈");

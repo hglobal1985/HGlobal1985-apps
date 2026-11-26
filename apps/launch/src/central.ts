@@ -860,6 +860,48 @@ export async function lookupLegalNames(secret: string | undefined, subs: string[
 }
 
 /**
+ * 會員所屬教育中心（杜杜龍 2026-11-26，食譜「更換上傳者」時自動帶入新上傳者的中心）：用服務 Token 呼叫 members/lookup 讀 education_center（use＝display）；
+ * 只放記憶體快取 10 分鐘。**需要杜杜龍在中央「平台設定」替這款 App 勾選 education_center**，沒勾（403）、失敗、逾時一律回空，呼叫端就不填中心。
+ */
+export async function lookupCenterLabels(secret: string | undefined, subs: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const ids = [...new Set(subs)].slice(0, 100);
+  const need: string[] = [];
+  for (const id of ids) {
+    const hit = memo.get(`ctr:${id}`);
+    if (hit && hit.until > Date.now()) {
+      if (hit.value) out.set(id, hit.value as string);
+    } else need.push(id);
+  }
+  if (!need.length || !secret) return out;
+  const token = await serviceToken(secret);
+  if (!token) return out;
+  try {
+    const res = await centralFetch(`${CENTRAL}/v1/apps/${APP_ID}/members/lookup`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ member_ids: need, fields: ["education_center"], use: "display" }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (res.status === 401) svcToken = null;
+    if (!res.ok) return out;
+    const b = (await res.json().catch(() => null)) as { members?: unknown[] } | null;
+    for (const raw of b?.members ?? []) {
+      const m = raw as { member_id?: unknown; id?: unknown; fields?: Record<string, unknown> };
+      const id = typeof m.member_id === "string" ? m.member_id : typeof m.id === "string" ? m.id : "";
+      const v = m.fields?.education_center;
+      const label = typeof v === "string" ? v : v && typeof v === "object" ? ([(v as Record<string, unknown>).label, (v as Record<string, unknown>).name, (v as Record<string, unknown>).value].find((x) => typeof x === "string" && x) as string | undefined) ?? "" : "";
+      if (!id) continue;
+      memo.set(`ctr:${id}`, { value: label.trim().slice(0, 60), until: Date.now() + 600_000 });
+      if (label.trim()) out.set(id, label.trim().slice(0, 60));
+    }
+  } catch {
+    /* 讀不到就不填中心 */
+  }
+  return out;
+}
+
+/**
  * 清單分享者名片的獎銜與獎章圖（杜杜龍 2026-11-21；Amway 資料，**不寫資料庫、不寫日誌**，只放記憶體短暫快取 10 分鐘）：
  * 串接指令 2026-11-22.1：用服務 Token 呼叫 `POST /v1/apps/learn/members/lookup`（fields＝rank，use＝display），
  * 中央直接回 `rank_label`（獎銜中文名稱）與 `rank_badge`（`badge_url`＋`badge:{width,height,art_top,art_bottom}`）；

@@ -33,6 +33,7 @@ const KEY_COLS: [string, string][] = [
   ["center_schedules", "center_key"],
   ["cover_media", "center_key"],
   ["center_cover_cfg", "center_key"],
+  ["recipes", "author_center_key"],
 ];
 /** 同一列還有「顯示名稱」欄位的表：換鑰匙時一起換成中央的新名稱。 */
 const LABEL_COLS: Record<string, string> = {
@@ -44,6 +45,7 @@ const LABEL_COLS: Record<string, string> = {
   review_group_members: "center_label",
   review_groups: "owner_center_label",
   orders: "center_label",
+  recipes: "author_center_label",
 };
 
 export async function reconcileCenters(db: D1Database, labels: string[]): Promise<number> {
