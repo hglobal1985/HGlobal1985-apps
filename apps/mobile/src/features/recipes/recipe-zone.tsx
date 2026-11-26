@@ -131,6 +131,17 @@ export function RecipeZone({ onBack, onOpenPhotos }: { onBack: () => void; onOpe
   );
 }
 
+/**
+ * 相簿裡的單道食譜：瀏覽器上一頁／返回手勢＝回食譜列表（多記一筆瀏覽紀錄，關閉時退掉）。
+ * 獨立頁面（`/icook/編號`）不能用：離開時它的「退掉紀錄」會把剛前往的頁面又退回食譜頁（杜杜龍 2026-11-26 螢幕錄影：按返回鈕一閃回課程頁又跳回食譜）。
+ */
+function BackToList({ onClose }: { onClose: () => unknown }) {
+  const closeRef = useRef<() => unknown>(onClose);
+  closeRef.current = onClose;
+  useSheetBack(closeRef);
+  return null;
+}
+
 /** 單道食譜：可左右滑的照片（點照片放大看圖）、名稱、分類、文字與影片、複製／分享；管理者與投稿者（待審核時）可修改、刪除，管理者可核准。 */
 export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit, standalone = false }: { /** 獨立頁面（不在相簿裡）：上方要避開手機瀏海。 */ standalone?: boolean; id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
   const insets = useSafeAreaInsets();
@@ -142,9 +153,6 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit,
   const listOn = useFeature("addToList");
   const [listOpen, setListOpen] = useState(false);
   const photosApi = useApi<CoverMediaItem[]>(`/cover-media?kind=course&key=${encodeURIComponent(`rcp:${id}`)}`);
-  const closeRef = useRef<() => unknown>(onClose);
-  closeRef.current = onClose;
-  useSheetBack(closeRef); // 瀏覽器上一頁／返回手勢＝回食譜列表
   const scroller = useRef<ScrollViewInstance | null>(null);
   const [idx, setIdx] = useState(0);
   const d = detail.data;
@@ -190,6 +198,7 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit,
 
   return (
     <View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "#000", zIndex: 10 }}>
+      {standalone ? null : <BackToList onClose={onClose} />}
       {/* 功能圖示一列：放在標題上方的空白區（相簿裡已有上方工具列，所以只留一點間距；獨立頁面要避開手機瀏海） */}
       <View style={{ paddingTop: standalone ? insets.top + 12 : 10 }}>
         {d ? (
