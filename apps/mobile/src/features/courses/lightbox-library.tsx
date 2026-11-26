@@ -240,7 +240,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       else n.add(id);
       return n;
     });
-  const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 * 2 - 36 - 8 * 3 - (large && side ? 280 : 0)) / 8.6)));
+  const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 - 104 - 36 - 8 * 3 - (large && side ? 280 : 0)) / 8.6)));
 
   // 資料夾裡的照片（此頁搜尋會過濾）
   const inSub = hasSubs && sub !== null ? view!.items.filter((p) => (p.folderId ?? "") === sub) : view?.items ?? [];
@@ -363,7 +363,10 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
           {btn("資料夾清單", () => setSide((v) => !v), "folder-open", side)}
           <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, minWidth: 0, color: "#fff", fontWeight: "900", fontSize: titleSize, lineHeight: titleSize + 6 }}>寰宇行動大學相簿</AppText>
-          {btn("關閉相簿", onClose, "close")}
+          {/* 右上角：文字「退出相簿」（杜杜龍 2026-11-26，取代圓形 ✕，避免和下層的關閉／返回混淆） */}
+          <Pressable accessibilityRole="button" accessibilityLabel="退出相簿" onPress={onClose} style={styles.exit}>
+            <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>退出相簿</AppText>
+          </Pressable>
         </View>
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
       {side && large ? sidebar : null}
@@ -440,4 +443,5 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
 
 const styles = StyleSheet.create({
   tool: { width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
+  exit: { height: 50, minWidth: 104, paddingHorizontal: 16, borderRadius: 25, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" },
 });
