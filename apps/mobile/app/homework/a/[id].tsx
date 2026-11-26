@@ -1,6 +1,7 @@
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { View } from "react-native";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api, type HwAssignmentView, type HwFile, type HwRosterRow, type HwStatus, type HwSubmission } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { AssignmentSheet } from "@/features/homework/assignment-sheet";
@@ -42,8 +43,8 @@ export default function AssignmentPage() {
   const status: HwStatus = mine?.status ?? "none";
   const canEdit = !!r?.enrolled && !!a?.open && status !== "graded";
   const dirtyNote = note !== (mine?.note ?? "");
-  const submit = async () => {
-    if (!a) return;
+  const submit = async (): Promise<boolean> => {
+    if (!a) return false;
     setBusy(true);
     setErr(null);
     try {
@@ -51,12 +52,16 @@ export default function AssignmentPage() {
       setMine(x.mine);
       flashText(status === "submitted" ? "已更新作業" : "已送出作業，批改好會通知你");
       reload();
+      return true;
     } catch (e) {
       setErr((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  // 作業說明打到一半還沒送出：離開（含瀏覽器上一頁、手勢）前主動詢問（杜杜龍 2026-11-26 永久指示）
+  useUnsavedPrompt({ dirty: canEdit && dirtyNote && !!note.trim(), save: submit, discard: () => setNote(mine?.note ?? "") });
   const remove = async (f: HwFile) => {
     if (!(await confirmSheet({ title: "移除這個檔案", message: f.name, confirmLabel: "移除", danger: true }))) return;
     try {

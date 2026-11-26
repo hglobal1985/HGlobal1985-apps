@@ -1,3 +1,4 @@
+import { useSheetBack } from "@/lib/sheet-back";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useModeProfile } from "@/lib/app-mode";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -47,6 +48,7 @@ export function BottomSheet({ onClose, children, swipeUpClose = false, onExpand,
   }, [c.surface]);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  useSheetBack(closeRef); // 瀏覽器上一頁／返回手勢＝關閉面板（有未存內容的面板自己會詢問）
   const upRef = useRef(swipeUpClose);
   upRef.current = swipeUpClose;
   const expandRef = useRef(onExpand);
