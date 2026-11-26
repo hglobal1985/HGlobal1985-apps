@@ -359,3 +359,12 @@ test("文字辨識：拆掉 JSON 殼並去掉卡住的重複行", async () => {
   const bad = '{"text":"\n' + "title:\n".repeat(40) + '生活層次\n從心觸動\n生活層次';
   assert.equal(cleanOcrText(bad), "生活層次\n從心觸動");
 });
+
+test("AI 回傳物件（Llama 4 Scout 的 JSON 回應）也能轉成文字並解析", async () => {
+  const { aiResponseText } = await import("../src/ai-image.ts");
+  const { parseVision } = await import("../src/edm-vision.ts");
+  const t = aiResponseText({ response: { event_date: "null", text: "好食光\n11/15(日)" } });
+  assert.equal(typeof t, "string");
+  assert.match(parseVision(t).text, /好食光/);
+  assert.equal(aiResponseText({ choices: [{ message: { content: "abc" } }] }), "abc");
+});

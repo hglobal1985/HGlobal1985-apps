@@ -1,4 +1,4 @@
-import { prepareVisionImage } from "./ai-image.ts";
+import { aiResponseText, prepareVisionImage } from "./ai-image.ts";
 /**
  * EDM 圖片辨識（業主 2026-11-23）：用 Workers AI 的視覺模型（設定 → AI 模型 →「EDM 圖片辨識」選用）讀出海報上的文字與活動日期，
  * 存在 cover_media 的 ocr_text／event_date，用於搜尋與 EDM 依活動日期排序。額度走 reserveAi（和其他 AI 工作共用每日免費額度）。
@@ -96,8 +96,8 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
   let out = "";
   try {
     const dataUri = `data:${type};base64,${toBase64(bytes)}`;
-    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: (await loadSearchSettings(db)).edmVisionMaxTokens as number } as never)) as { response?: string; choices?: { message?: { content?: string } }[] };
-    out = res?.response ?? res?.choices?.[0]?.message?.content ?? "";
+    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: (await loadSearchSettings(db)).edmVisionMaxTokens as number } as never)) as { response?: unknown; choices?: { message?: { content?: string } }[] };
+    out = aiResponseText(res);
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     if (/3036|daily free allocation/i.test(msg)) {
@@ -119,7 +119,13 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
     }
     return fail();
   }
-  const { text, date } = parseVision(out);
+  let parsed: { text: string; date: string | null };
+  try {
+    parsed = parseVision(out);
+  } catch {
+    return fail(); // 解析出錯不可卡在「處理中」
+  }
+  const { text, date } = parsed;
   await db.prepare("UPDATE cover_media SET ocr_text = ?, event_date = ?, ocr_status = 'done', ocr_model = ?, ocr_fields = '', ocr_fmt = '' WHERE id = ?").bind(text, date, model, rowId).run();
   // 接著套入欄位格式（業主 2026-11-24）；額度用完或失敗不影響辨識結果，之後背景會補整理。
   await structureEdm(env, db, rowId).catch(() => undefined);

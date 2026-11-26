@@ -1,4 +1,4 @@
-import { prepareVisionImage } from "./ai-image.ts";
+import { aiResponseText, prepareVisionImage } from "./ai-image.ts";
 /**
  * 相簿照片文字辨識 OCR（業主 2026-11-25）：讀出照片裡看得到的文字（招牌、白板、產品包裝、投影片…），存到 cover_media.ocr_text，
  * 和「場景標籤」一起用於相簿搜尋（BlockAlbum／中心 EDM 共用的 AlbumSearch 模組）與全站場景搜尋。
@@ -49,8 +49,8 @@ export async function ocrPhoto(env: Env, db: D1Database, rowId: string): Promise
   try {
     const maxTokens = Number((await loadSearchSettings(db)).photoOcrMaxTokens ?? 600);
     const dataUri = `data:${type};base64,${toBase64(bytes)}`;
-    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: maxTokens } as never)) as { response?: string; choices?: { message?: { content?: string } }[] };
-    out = res?.response ?? res?.choices?.[0]?.message?.content ?? "";
+    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: maxTokens } as never)) as { response?: unknown; choices?: { message?: { content?: string } }[] };
+    out = aiResponseText(res);
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     if (/3036|daily free allocation/i.test(msg)) {
@@ -71,7 +71,12 @@ export async function ocrPhoto(env: Env, db: D1Database, rowId: string): Promise
     }
     return fail();
   }
-  let text = NONE.test(out.trim()) ? "" : cleanOcrText(out).slice(0, 2000);
+  let text = "";
+  try {
+    text = NONE.test(out.trim()) ? "" : cleanOcrText(out).slice(0, 2000);
+  } catch {
+    return fail();
+  }
   // 模型卡住亂重複：整段幾乎都是重複垃圾，清掉後剩不到 3 成，視為沒有可用文字。
   if (out.length > 200 && text.length < out.length * 0.15 && text.length < 40) text = "";
   await db.prepare("UPDATE cover_media SET ocr_text = ?, ocr_status = 'done', ocr_model = ? WHERE id = ?").bind(text, model, rowId).run();
