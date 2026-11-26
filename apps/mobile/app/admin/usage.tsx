@@ -11,7 +11,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
  * 可交叉統計（選「列」和「欄」兩個維度）並用裝置、系統、時段篩選。資料來自 App 匿名回報（`lib/usage.ts`），不含會員身分。
  */
 type Table = { since: string; rows: { label: string; cells: number[]; total: number }[]; cols: string[]; total: number; truncated: boolean };
-type Dim = "device" | "os" | "slot" | "hour" | "day" | "kind" | "item";
+type Dim = "device" | "os" | "slot" | "hour" | "day" | "kind" | "item" | "mode";
 const KINDS = [
   { key: "visit", label: "開啟網站／App" },
   { key: "card_course", label: "課程卡" },
@@ -21,6 +21,7 @@ const KINDS = [
 const DIMS: { key: Dim; label: string }[] = [
   { key: "device", label: "裝置" },
   { key: "os", label: "系統" },
+  { key: "mode", label: "使用模式" },
   { key: "slot", label: "時段" },
   { key: "hour", label: "每小時" },
   { key: "day", label: "日期" },
@@ -29,14 +30,17 @@ const DIMS: { key: Dim; label: string }[] = [
 ];
 const PRESETS: { label: string; kinds: string[]; rows: Dim; cols: Dim | null }[] = [
   { label: "手機／電腦／平板", kinds: ["visit"], rows: "device", cols: null },
+  { label: "至尊／超派模式", kinds: ["visit"], rows: "mode", cols: null },
   { label: "iOS／Android", kinds: ["visit"], rows: "os", cols: null },
   { label: "哪個時段最多人", kinds: ["visit"], rows: "slot", cols: null },
   { label: "首頁卡片點閱", kinds: ["card_course", "card_series", "card_center"], rows: "item", cols: null },
   { label: "裝置 × 系統", kinds: ["visit"], rows: "device", cols: "os" },
+  { label: "模式 × 裝置", kinds: ["visit"], rows: "mode", cols: "device" },
   { label: "裝置 × 時段", kinds: ["visit"], rows: "device", cols: "slot" },
 ];
 const DEVICE = [["", "全部"], ["mobile", "手機"], ["tablet", "平板"], ["desktop", "電腦"]] as const;
 const OS = [["", "全部"], ["ios", "iOS"], ["android", "Android"], ["other", "其他"]] as const;
+const MODE = [["", "全部"], ["elder", "至尊模式"], ["super", "超派模式"]] as const;
 const SLOT = [["", "全部"], ["0", "凌晨"], ["1", "早上"], ["2", "下午"], ["3", "晚上"]] as const;
 const DAYS = [7, 30, 90];
 
@@ -67,8 +71,9 @@ function Custom({ admin }: { admin: boolean }) {
   const [device, setDevice] = useState("");
   const [os, setOs] = useState("");
   const [slot, setSlot] = useState("");
+  const [mode, setMode] = useState("");
   const [days, setDays] = useState(30);
-  const qs = `kinds=${kinds.join(",")}&rows=${rows}${cols ? `&cols=${cols}` : ""}&days=${days}${device ? `&device=${device}` : ""}${os ? `&os=${os}` : ""}${slot ? `&slot=${slot}` : ""}${admin ? "&admin=1" : ""}`;
+  const qs = `kinds=${kinds.join(",")}&rows=${rows}${cols ? `&cols=${cols}` : ""}&days=${days}${device ? `&device=${device}` : ""}${os ? `&os=${os}` : ""}${slot ? `&slot=${slot}` : ""}${mode ? `&mode=${mode}` : ""}${admin ? "&admin=1" : ""}`;
   const { data, error, loading, reload } = useApi<Table>(`/admin/usage?${qs}`);
   const toggle = (k: string) => setKinds((v) => (v.includes(k) ? (v.length > 1 ? v.filter((x) => x !== k) : v) : [...v, k]));
   const max = Math.max(1, ...(data?.rows.flatMap((r) => (data.cols.length ? r.cells : [r.total])) ?? [1]));
@@ -104,6 +109,11 @@ function Custom({ admin }: { admin: boolean }) {
         <View style={styles.wrap}>
           {OS.map(([k, l]) => (
             <Chip key={`o${k}`} label={l === "全部" ? "全部系統" : l} on={os === k} onPress={() => setOs(k)} />
+          ))}
+        </View>
+        <View style={styles.wrap}>
+          {MODE.map(([k, l]) => (
+            <Chip key={`m${k}`} label={l === "全部" ? "全部模式" : l} on={mode === k} onPress={() => setMode(k)} />
           ))}
         </View>
         <View style={styles.wrap}>
@@ -199,6 +209,7 @@ const top = (d: Table, what: string, noun = "最多") => {
 const CARDS = "kinds=card_course,card_series,card_center";
 const QUESTIONS: Q[] = [
   { icon: "phone-portrait-outline", title: "大家用手機、電腦還是平板？", qs: "kinds=visit&rows=device&days=30", view: "bars", answer: (d) => top(d, "") },
+  { icon: "accessibility-outline", title: "至尊模式和超派模式各幾成？", qs: "kinds=visit&rows=mode&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "logo-apple", title: "iPhone 和 Android 各幾成？", qs: "kinds=visit&rows=os&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "time-outline", title: "一天中哪個時段最多人看？", qs: "kinds=visit&rows=slot&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "logo-apple", title: "iPhone 用戶都在幾點看？", qs: "kinds=visit&rows=slot&os=ios&device=mobile&days=30", view: "bars", answer: (d) => top(d, "iPhone 用戶的") },
