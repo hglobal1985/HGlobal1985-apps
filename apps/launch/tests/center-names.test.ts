@@ -26,14 +26,14 @@ test("教育中心自訂名稱：權限、讀取、還原預設、分享標題�
   // 分享預覽標題用自訂名稱
   await env.DB.prepare("INSERT INTO short_links (slug, kind, value) VALUES ('tp', 'center', '台北中心')").run();
   const w = createWorker(files);
-  assert.match(await (await w.fetch(new Request("https://learn.test/tp"), env)).text(), /property="og:title" content="大台北教育中心 \| 寰宇行動大學"/);
+  assert.match(await (await w.fetch(new Request("https://learn.test/tp"), env)).text(), /property="og:title" content="大台北教育中心 \| 寰宇行動大學 🎓"/);
   // 英文縮寫網址只有最高權限管理員能改（中心會長也不行）
   assert.equal((await call("PUT", "/admin/short-links", president, { kind: "center", value: "台北中心", slug: "tpe" })).status, 403);
   // 總部可以改任何中心；空白＝還原預設
   assert.equal((await call("PUT", "/admin/center-name?center=台中中心", admin, { name: "中部教育中心" })).status, 200);
   assert.equal((await call("PUT", "/admin/center-name?center=台北中心", admin, { name: "  " })).status, 200);
   assert.deepEqual((await call<Record<string, string>>("GET", "/center-names", student)).data, { 台中中心: "中部教育中心" });
-  assert.match(await (await w.fetch(new Request("https://learn.test/tp"), env)).text(), /property="og:title" content="台北中心 \| 寰宇行動大學"/);
+  assert.match(await (await w.fetch(new Request("https://learn.test/tp"), env)).text(), /property="og:title" content="台北中心 \| 寰宇行動大學 🎓"/);
 });
 
 test("教育中心地址：權限（同中心 EDM）、讀取、清除", async () => {
