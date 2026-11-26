@@ -3,6 +3,7 @@ import { ensureBrandCards } from "./brand-cards.ts";
 import { ensureTreasureLinks } from "./treasure-box.ts";
 import { migrateFilePhotos } from "./block-photos.ts";
 import { runAiBatch } from "./ai-batch.ts";
+import { fixEdmYears } from "./edm-vision.ts";
 import { runRecompress } from "./recompress.ts";
 import { backfillYoutube } from "./youtube.ts";
 import { processFirstSyncs, processImportJobs } from "./imports.ts";
@@ -50,6 +51,7 @@ export function createWorker(staticFiles: StaticFiles) {
         await ensureTreasureLinks(env).catch((e) => console.error("treasure links", e instanceof Error ? e.message : "error")); // 成交百寶箱 ↔ 品牌館（業主 2026-11-24）
         await migrateFilePhotos(env).catch((e) => console.error("block photos", e instanceof Error ? e.message : "error")); // 區塊裡以教材檔案上傳的圖片 → 相簿（業主 2026-11-24）
         await runRecompress(env, env.DB).catch((e) => console.error("recompress", e instanceof Error ? e.message : "error")); // 舊照片重新壓縮（業主 2026-11-25，設定頁按「開始」才會跑）
+        await fixEdmYears(env.DB).catch(() => undefined); // EDM 活動日期年份＝上傳年（業主 2026-11-26）
         await runAiBatch(env, env.DB).catch((e) => console.error("ai batch", e instanceof Error ? e.message : "error")); // AI 辨識批次排程：EDM 文字、相簿照片 OCR、場景（業主 2026-11-25）
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
         await indexSearchVectors(env).catch((e) => console.error("search vectors", e instanceof Error ? e.message : "error"));

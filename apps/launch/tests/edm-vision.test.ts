@@ -18,14 +18,17 @@ test("parseVision 不是 JSON 時整段當文字", () => {
   assert.equal(r.date, null);
 });
 
-test("inferDate 有星期就挑星期對得上的年份", () => {
-  const now = new Date("2026-11-23T00:00:00Z");
-  assert.equal(inferDate('"11/24日（二）晚上7:30" "活動舉辦日期" : 2023-11-24', now), "2026-11-24");
-  assert.equal(inferDate("12月5日（六）", now), "2026-12-05");
+test("inferDate 沒寫年份一律用上傳年份（不管星期、不管最近年份）", () => {
+  const up = new Date("2026-11-10T04:00:00Z");
+  assert.equal(inferDate("11/24日（二）晚上7:30", up), "2026-11-24");
+  assert.equal(inferDate("12月5日（六）", up), "2026-12-05");
+  assert.equal(inferDate("1/8 講座", up), "2026-01-08");
+  assert.equal(inferDate("1/8 講座", new Date("2025-12-31T20:00:00Z")), "2026-01-08", "台灣時間已是 2026");
 });
-test("inferDate 完整日期優先、沒有星期挑最近年份", () => {
-  const now = new Date("2026-11-23T00:00:00Z");
-  assert.equal(inferDate("2027年1月8日 講座", now), "2027-01-08");
-  assert.equal(inferDate("1/8 講座", now), "2027-01-08");
-  assert.equal(inferDate("沒有日期", now), null);
+test("inferDate 海報有寫完整年份就照海報；沒有日期回 null", () => {
+  const up = new Date("2026-11-10T04:00:00Z");
+  assert.equal(inferDate("日期: 2027 / 1 / 8 講座", up), "2027-01-08");
+  assert.equal(inferDate("2027年1月8日 講座", up), "2027-01-08");
+  assert.equal(inferDate("沒有日期", up), null);
 });
+
