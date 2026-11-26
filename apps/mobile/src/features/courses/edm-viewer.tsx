@@ -1,5 +1,7 @@
 import { trackFeature } from "@/lib/feature-track";
 import { useBackToClose } from "@/lib/back-close";
+import { InlinePage } from "@/lib/inline-page";
+import { usePageBack } from "@/lib/page-back";
 import { enterFullscreen, exitFullscreen } from "@/lib/fullscreen";
 import { useThumb } from "@/lib/thumb";
 import Ionicons from "@expo/vector-icons/Ionicons";
@@ -199,7 +201,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
       alive = false;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  closeNow.current = () => (over && !libOpen ? setLibOpen(true) : onClose());
+  closeNow.current = () => (grid ? setGrid(false) : over && !libOpen ? setLibOpen(true) : onClose());
   // 全螢幕被系統收起（例如管理員按「上傳照片」開檔案選擇視窗）：下一次點一下畫面就自動再進全螢幕，停留在相簿裡操作（杜杜龍 2026-11-25）。
   useEffect(() => {
     if (inline || Platform.OS !== "web" || typeof document === "undefined") return;
@@ -224,6 +226,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   gridRef.current = grid;
   const safe = useSafeAreaInsets();
   const insets = inline ? { top: 0, bottom: 0, left: 0, right: 0 } : safe;
+  usePageBack(() => (closeNow.current(), true), 1, inline); // 相簿頁：上方工具列的返回鍵＝按 ✕（單張退回資料夾，最上層離開相簿）
   const win = useWindowDimensions();
   const base: LightboxItem[] = items && items.length ? items : uri ? [{ uri, title, bg }] : [];
   const list = over ? over.items : base;
@@ -464,7 +467,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
           </View>
           {!hideHelp && smallLand ? <View style={{ position: "absolute", left: toolSize + 28, right: toolSize + 28, top: topY }} pointerEvents="box-none">{helpBar}</View> : null}
           {grid && list.length ? <LightboxGrid list={list} current={idx} heading={over?.title} onPick={(i) => { setIdx(i); setGrid(false); }} onClose={() => setGrid(false)} /> : null}
-          {libOpen ? <LightboxLibrary inline={inline} restore={restore ? { group: restore.group, folder: restore.folder } : null} initial={over?.folder ? { folder: over.folder, items: [], focusId: list[idx]?.id } : null} onClose={() => (over || library || !list.length ? onClose() : setLibOpen(false))} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => lightboxItem(x, p.title)) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
+          {libOpen ? <LightboxLibrary restore={restore ? { group: restore.group, folder: restore.folder } : null} initial={over?.folder ? { folder: over.folder, items: [], focusId: list[idx]?.id } : null} onPick={(p) => { setOver({ title: p.title, folder: p.folder, items: p.items.map((x) => lightboxItem(x, p.title)) }); setIdx(p.index ?? 0); setGrid(p.index === undefined); setLibOpen(false); }} /> : null}
           {infoOpen && canInfo ? <EdmInfoPanel id={cur.id} imageKey={imageKey} top={land ? 84 : 150} onClose={() => setInfoOpen(false)} /> : null}
         </View>
       </View>
@@ -474,7 +477,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
 
 /** 相簿頁用：不開視窗，直接填滿頁面內容區（上方工具列與下方選單列照常顯示）。 */
 function InlineShell({ children }: { children?: ReactNode; transparent?: boolean; animationType?: string; onRequestClose?: () => void; statusBarTranslucent?: boolean }) {
-  return <View style={{ flex: 1, backgroundColor: "#000" }}>{children}</View>;
+  return <View style={{ flex: 1, backgroundColor: "#000" }}><InlinePage>{children}</InlinePage></View>;
 }
 
 const styles = StyleSheet.create({

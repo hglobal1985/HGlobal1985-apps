@@ -1,20 +1,19 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import * as Clipboard from "expo-clipboard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useInsets } from "@/lib/inline-page";
+import { usePageBack } from "@/lib/page-back";
 import { api, resolveUrl, type CoverMediaItem, type RecipeCard, type RecipeDetail, type RecipesResponse } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
-import { AddToListSheet } from "@/features/my-lists/add-to-list";
-import { useMark } from "@/features/my-lists/store";
-import { useFeature } from "@/lib/app-mode";
+import { HeaderAddToList } from "@/features/my-lists/add-to-list";
+import { HeaderInvite } from "@/features/invite-button";
 import { centerTitle } from "@/features/format";
-import { shareRecipeText } from "@/lib/share";
 import { useSheetBack } from "@/lib/sheet-back";
 import { trackUsage } from "@/lib/usage";
 import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
-import { AppText } from "@/ui";
+import { AppText, TopBarButton } from "@/ui";
+import { useHeaderSlot } from "@/ui/header-slot";
 import { FLASH_ICON, flashText, showFlash } from "@/ui/flash-notice";
 import { RecipeBody } from "./recipe-body";
 import { AlbumBackHeader, AlbumRoundButton } from "@/features/courses/album-header";
@@ -23,19 +22,13 @@ import { RecipeEditor, RecipeSheet } from "./recipe-editor";
 const UI_ONLY = { uiOnly: true } as object;
 const UI_ONLY_TEXT = { dataSet: { uiOnly: "" } } as object;
 
-const round = (label: string, icon: string, onPress: () => void) => (
-  <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center" }}>
-    <Ionicons name={icon as never} size={24} color="#fff" {...UI_ONLY} />
-  </Pressable>
-);
-
 /**
  * 相簿專區的「食譜」（杜杜龍 2026-11-26）：一道食譜＝名稱＋分類＋多張照片＋一篇純文字（獨立一行的 YouTube 網址＝站內播放的影片卡片）。
  * 列表（分類標籤、搜尋名稱與整篇文字、右下「＋新增食譜」）→ 單道食譜（可左右滑的照片、文字、影片、複製／分享）。
  * 所有會員都能投稿（進「待審核」）；管理者（超級管理員、總部管理員、相簿齒輪「食譜」上傳獎銜達標者）直接發佈、審核、管理分類。
  */
-export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /** 從側邊欄點某個分類進來時預先選好。 */ initialCat?: string; /** 相簿上方共用搜尋列（`AlbumSearchBar`）的字：食譜頁不自己做搜尋框。 */ q: string; onBack: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void }) {
-  const insets = useSafeAreaInsets();
+export function RecipeZone({ q, initialCat = "all", onOpenPhotos }: { /** 從側邊欄點某個分類進來時預先選好。 */ initialCat?: string; /** 相簿上方共用搜尋列（`AlbumSearchBar`）的字：食譜頁不自己做搜尋框。 */ q: string; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void }) {
+  const insets = useInsets();
   const win = useWindowDimensions();
   const thumb = useThumb();
   const { member } = useSession();
@@ -51,6 +44,9 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
   const [catSheet, setCatSheet] = useState(false);
   const [ver, setVer] = useState(0); // 編輯完成後讓還開著的單道食譜重新讀取（不關閉單道畫面，免得返回紀錄錯亂）
   useEffect(() => trackUsage("album_folder", "食譜"), []);
+  // 上方工具列：管理者的「設定」（食譜分類）；返回鍵＝先關單道食譜，再回相簿首頁（相簿看圖／資料夾層的處理在 LightboxLibrary）。
+  useHeaderSlot(3, data?.manager ? <TopBarButton label="設定" accessibilityLabel="管理食譜分類" iconName="settings-outline" onPress={() => setCatSheet(true)} /> : null);
+  usePageBack(() => (openId ? (setOpenId(null), true) : false), 3);
 
   const recipes = data?.recipes ?? [];
   const cats = data?.categories ?? [];
@@ -123,7 +119,7 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
   return (
     <View style={{ flex: 1, minHeight: 0 }}>
       {/* 返回列：與相簿其他類別同一個共用元件（搜尋列在它上面，由相簿統一提供） */}
-      <AlbumBackHeader title="🍳 食譜" meta={`${recipes.length} 道食譜`} onBack={onBack} right={<View style={{ flexDirection: "row", gap: 8 }}>{sortBtn}{data?.manager ? <AlbumRoundButton label="管理分類" icon="settings-outline" onPress={() => setCatSheet(true)} /> : null}</View>} />
+      <AlbumBackHeader title="🍳 食譜" meta={`${recipes.length} 道食譜`} right={sortBtn} />
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
           {chipBtn("all", `全部 ${recipes.length}`)}
@@ -143,7 +139,7 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
         <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>新增食譜</AppText>
       </Pressable>
       {openId ? <RecipeDetailView id={openId} onClose={() => setOpenId(null)} onOpenPhotos={onOpenPhotos} onChanged={reload} onEdit={() => setEdit({ id: openId, isNew: false })} refreshKey={ver} /> : null}
-      {edit ? <RecipeEditor id={edit.id} isNew={edit.isNew} cats={cats} manager={!!data?.manager} onCatsChanged={reload} onClose={() => (setEdit(null), setVer((v) => v + 1), reload())} /> : null}
+      {edit ? <RecipeEditor id={edit.id} isNew={edit.isNew} cats={cats} manager={!!data?.manager} onCatsChanged={reload} onClose={() => (setEdit(null), setVer((v) => v + 1), reload())} onDeleted={() => (setEdit(null), setOpenId(null), reload())} /> : null}
       {catSheet ? <CategorySheet cats={cats} admin={!!data?.admin} onClose={() => setCatSheet(false)} onChanged={reload} /> : null}
     </View>
   );
@@ -162,15 +158,10 @@ function BackToList({ onClose }: { onClose: () => unknown }) {
 
 /** 單道食譜：可左右滑的照片（點照片放大看圖）、名稱、分類、文字與影片、複製／分享；管理者與投稿者（待審核時）可修改、刪除，管理者可核准。 */
 export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit, standalone = false, refreshKey = 0 }: { /** 編輯完成後 +1：重新讀取這道食譜。 */ refreshKey?: number; /** 獨立頁面（不在相簿裡）：上方要避開手機瀏海。 */ standalone?: boolean; id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const win = useWindowDimensions();
   const thumb = useThumb();
-  const { member } = useSession();
   const detail = useApi<RecipeDetail>(`/recipes/${id}`);
-  const inList = useMark({ kind: "recipe", ref: id });
-  const listOn = useFeature("addToList");
-  const [listOpen, setListOpen] = useState(false);
-  const [authorOpen, setAuthorOpen] = useState(false);
   const photosApi = useApi<CoverMediaItem[]>(`/cover-media?kind=course&key=${encodeURIComponent(`rcp:${id}`)}`);
   useEffect(() => {
     if (refreshKey) (detail.reload(), photosApi.reload());
@@ -186,16 +177,6 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit,
     scroller.current?.scrollTo({ x: i * w, animated: true });
     setIdx(i);
   };
-  const text = d ? `${d.title}\n\n${d.body}` : "";
-  // 功能按鈕只顯示圖示、全部強制一列（杜杜龍 2026-11-26）；文字只留給無障礙朗讀。
-  const act = (label: string, icon: string, onPress: () => void, bg = "#262629", fg = "#fff") => (
-    <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{ flex: 1, maxWidth: 64, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", backgroundColor: bg }}>
-      <Ionicons name={icon as never} size={24} color={fg} {...UI_ONLY} />
-    </Pressable>
-  );
-  const share = async () => {
-    if ((await shareRecipeText({ title: d!.title, body: d!.body, path: d!.shortPath ?? `/recipe/${id}`, uploader: d!.authorName, center: d!.authorCenter ? centerTitle(d!.authorCenter) : "" })) === "copied") flashText("已複製食譜文字與連結");
-  };
   const approve = async () => {
     try {
       await api("POST", `/recipes/${id}/approve`);
@@ -206,38 +187,23 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit,
       flashText((e as Error).message);
     }
   };
-  const remove = async () => {
-    if (!(await confirmAsk("刪除食譜", `「${d!.title}」與它的所有照片會一起刪除，無法復原。`, "刪除"))) return;
-    try {
-      await api("DELETE", `/recipes/${id}`);
-      flashText("已刪除");
-      onChanged();
-      onClose();
-    } catch (e) {
-      flashText((e as Error).message);
-    }
-  };
-
+  // 上方工具列（TopBar，杜杜龍 2026-11-26）：編輯、清單、邀請（分享）；管理者看待審核的食譜多一顆「核准」。更換上傳者、刪除移到編輯頁裡。按鈕只用共用元件。
+  useHeaderSlot(
+    4,
+    d ? (
+      <>
+        {d.canEdit ? <TopBarButton label="編輯" accessibilityLabel="編輯食譜" iconName="create-outline" onPress={onEdit} /> : null}
+        {d.manager && d.status === "pending" ? <TopBarButton label="核准" accessibilityLabel="核准這道食譜" iconName="checkmark-circle-outline" onPress={() => void approve()} /> : null}
+        {d.status === "published" ? <HeaderAddToList target={{ kind: "recipe", ref: id }} title={d.title} /> : null}
+        <HeaderInvite title={d.title} path={d.shortPath ?? `/recipe/${id}`} recipe={{ body: d.body, uploader: d.authorName, center: d.authorCenter ? centerTitle(d.authorCenter) : "" }} />
+      </>
+    ) : null,
+  );
   return (
     <View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "#000", zIndex: 10 }}>
       {standalone ? null : <BackToList onClose={onClose} />}
-      {/* 功能圖示一列：放在標題上方的空白區（相簿裡已有上方工具列，所以只留一點間距；獨立頁面要避開手機瀏海） */}
-      <View style={{ paddingTop: standalone ? insets.top + 12 : 10 }}>
-        {d ? (
-      <View style={{ flexDirection: "row", flexWrap: "nowrap", gap: 8, paddingHorizontal: 16, paddingBottom: 10 }}>
-          {d.body ? act("複製文字", "copy-outline", () => void Clipboard.setStringAsync(text).then(() => flashText("已複製食譜文字"))) : null}
-          {act("分享", "share-outline", () => void share())}
-          {d.status === "published" && listOn ? act(inList ? `已加入 ${inList} 份清單` : "加入我的清單", "bookmark-outline", () => (member ? setListOpen(true) : flashText("請先登入才能加入我的清單")), inList ? "#FFD43B" : "#262629", inList ? "#1F1A00" : "#fff") : null}
-          {d.manager && d.status === "pending" ? act("核准", "checkmark-circle-outline", () => void approve(), "#0c603c") : null}
-          {d.admin ? act("更換上傳者", "person-circle-outline", () => setAuthorOpen(true)) : null}
-          {d.canEdit ? act("編輯", "create-outline", onEdit) : null}
-          {d.canEdit ? act("刪除", "trash-outline", () => void remove(), "#3a1c1c", "#ff8a80") : null}
-      </View>
-        ) : null}
-      </View>
-      <View style={{ paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
-        {round("回食譜列表", "chevron-back", onClose)}
-        <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 19 }}>{d?.title ?? "食譜"}</AppText>
+      <View style={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 8 }}>
+        <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "900", fontSize: 20, lineHeight: 28 }}>{d?.title ?? "食譜"}</AppText>
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40, alignItems: "center" }}>
         <View style={{ width: w, gap: 14 }}>
@@ -274,8 +240,6 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit,
           ) : null}
         </View>
       </ScrollView>
-      {authorOpen && d ? <AuthorSheet recipeId={id} current={d.authorName} onClose={() => setAuthorOpen(false)} onChanged={() => (detail.reload(), onChanged())} /> : null}
-      {listOpen && d ? <AddToListSheet target={{ kind: "recipe", ref: id }} title={d.title} onClose={() => setListOpen(false)} /> : null}
     </View>
   );
 }
@@ -320,66 +284,6 @@ function CategorySheet({ cats, admin, onClose, onChanged }: { cats: { id: string
           <AppText {...UI_ONLY_TEXT} style={{ color: "#9fe3b8", fontWeight: "800", fontSize: 16 }}>新增分類</AppText>
         </Pressable>
       )}
-    </RecipeSheet>
-  );
-}
-
-type AuthorHit = { sub: string; name: string; legalName: string; avatar: string | null; center: string };
-/**
- * 更換食譜上傳者（只有超級管理員，杜杜龍 2026-11-26）：從行動大學已註冊的會員直接輸入名字挑選，暱稱與本名都能搜尋；
- * 換了以後，上傳者暱稱與所屬中心跟著變（中心取自會員中心，不能手動填）。本名只給超級管理員在這裡辨識同名的人，不存進資料庫。
- */
-function AuthorSheet({ recipeId, current, onClose, onChanged }: { recipeId: string; current: string; onClose: () => void; onChanged: () => void }) {
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState<AuthorHit[] | null>(null);
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    const t = q.trim();
-    if (!t) return void setHits(null);
-    let alive = true;
-    const timer = setTimeout(() => {
-      api<{ members: AuthorHit[] }>("GET", `/admin/recipe-authors?q=${encodeURIComponent(t)}`)
-        .then((r) => alive && setHits(r.members))
-        .catch((e: Error) => alive && (setHits([]), flashText(e.message)));
-    }, 350);
-    return () => {
-      alive = false;
-      clearTimeout(timer);
-    };
-  }, [q]);
-  const pick = async (m: AuthorHit) => {
-    if (busy) return;
-    if (!(await confirmAsk("更換上傳者", `這道食譜的上傳者改成「${m.name}」？所屬中心會跟著換成他的中心。`, "更換"))) return;
-    setBusy(true);
-    try {
-      await api("PUT", `/admin/recipes/${recipeId}/author`, { sub: m.sub, name: m.name });
-      flashText(`已更換上傳者為「${m.name}」`);
-      onChanged();
-      onClose();
-    } catch (e) {
-      flashText((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <RecipeSheet title="更換上傳者" onClose={onClose}>
-      <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`目前上傳者：${current || "（沒有）"}。暱稱可以搜尋所有會員中心的會員（2 個字以上）；本名只找得到用過行動大學的會員。`}</AppText>
-      <TextInput value={q} onChangeText={setQ} autoFocus placeholder="輸入暱稱或本名" placeholderTextColor="#6f6f75" accessibilityLabel="搜尋會員" style={{ borderWidth: 2, borderColor: "#2e7d32", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#fff", backgroundColor: "#0b0b0b" }} />
-      {q.trim() && hits === null ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>搜尋中…</AppText> : null}
-      {hits && !hits.length ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>找不到符合的會員</AppText> : null}
-      {(hits ?? []).map((m) => (
-        <Pressable key={m.sub} accessibilityRole="button" accessibilityLabel={`選擇 ${m.name}`} onPress={() => void pick(m)} style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, borderRadius: 12, backgroundColor: "#262629", paddingHorizontal: 12 }}>
-          <View style={{ width: 40, height: 40, borderRadius: 20, overflow: "hidden", backgroundColor: "#3a3a3d", alignItems: "center", justifyContent: "center" }}>
-            {m.avatar ? <Image source={{ uri: m.avatar }} style={{ width: "100%", height: "100%" }} accessibilityIgnoresInvertColors /> : <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{m.name.slice(0, 1)}</AppText>}
-          </View>
-          <View style={{ flex: 1 }}>
-            <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{m.name}</AppText>
-            {m.center ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9fe3b8", fontSize: 13 }}>{centerTitle(m.center)}</AppText> : null}
-            {m.legalName ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13 }}>{`本名：${m.legalName}`}</AppText> : null}
-          </View>
-        </Pressable>
-      ))}
     </RecipeSheet>
   );
 }

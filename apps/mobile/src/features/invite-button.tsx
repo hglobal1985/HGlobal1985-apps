@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
-import { absoluteUrl, shareLink } from "@/lib/share";
+import * as Clipboard from "expo-clipboard";
+import { absoluteUrl, recipeShareText, shareLink, shareRecipeText } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Button, ShareIcon, TopBarButton } from "@/ui";
@@ -14,13 +15,15 @@ import { flashText } from "@/ui/flash-notice";
  * QR Code 在手機上自己產生（不連外部服務、不洩漏網址）。要改外觀只改這個檔案；新增可分享的頁面，在它的上方工具列放 HeaderInvite。
  */
 type ShareCourse = { teacher: string; teacherTitle?: string; title: string };
-export function HeaderInvite({ title, path, course, list }: { title: string; path: string; course?: ShareCourse; list?: { title: string } }) {
+/** 食譜（杜杜龍 2026-11-26）：分享傳整篇食譜文字（名稱、內文、短網址、上傳者），並多一顆「複製食譜文字」。 */
+type ShareRecipe = { body: string; uploader?: string; center?: string };
+export function HeaderInvite({ title, path, course, list, recipe }: { title: string; path: string; course?: ShareCourse; list?: { title: string }; recipe?: ShareRecipe }) {
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
   return (
     <>
       <TopBarButton label="邀請" accessibilityLabel="邀請：顯示這一頁的 QR Code 與網址" tone="accent" icon={<QrGlyph size={22} color={c.accent} />} onPress={() => setOpen(true)} />
-      {open ? <InviteSheet title={title} path={path} course={course} list={list} onClose={() => setOpen(false)} /> : null}
+      {open ? <InviteSheet title={title} path={path} course={course} list={list} recipe={recipe} onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
@@ -46,7 +49,7 @@ export function QrGlyph({ size = 22, color }: { size?: number; color: string }) 
   );
 }
 
-function InviteSheet({ title, path, course, list, onClose }: { title: string; path: string; course?: ShareCourse; list?: { title: string }; onClose: () => void }) {
+function InviteSheet({ title, path, course, list, recipe, onClose }: { title: string; path: string; course?: ShareCourse; list?: { title: string }; recipe?: ShareRecipe; onClose: () => void }) {
   const { c } = useTheme();
   const url = absoluteUrl(path);
   const copy = async () => {
@@ -58,7 +61,7 @@ function InviteSheet({ title, path, course, list, onClose }: { title: string; pa
     }
   };
   const share = async () => {
-    const r = await shareLink(title, path, course, undefined, undefined, list); // 課程／清單頁沿用原本的分享文字範本
+    const r = recipe ? await shareRecipeText({ title, body: recipe.body, path, uploader: recipe.uploader, center: recipe.center }) : await shareLink(title, path, course, undefined, undefined, list); // 課程／清單頁沿用原本的分享文字範本
     if (r === "copied") flashText("已複製連結");
   };
   return (
@@ -86,6 +89,13 @@ function InviteSheet({ title, path, course, list, onClose }: { title: string; pa
             </Pressable>
           </View>
         </View>
+        {recipe ? (
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Button variant="secondary" label="複製食譜文字" icon="copy-outline" onPress={() => void Clipboard.setStringAsync(recipeShareText({ title, body: recipe.body, path, uploader: recipe.uploader, center: recipe.center })).then(() => flashText("已複製食譜文字"))} fullWidth />
+            </View>
+          </View>
+        ) : null}
       </View>
     </BottomSheet>
   );
