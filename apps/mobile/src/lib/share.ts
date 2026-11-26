@@ -175,10 +175,12 @@ export async function shareImages(title: string, urls: string[]): Promise<"share
  * 在「設定 › 分享預設值」）。**不傳照片檔案**：實測 LINE 收到「照片＋文字」只收照片、把文字丟掉，所以照片改由 LINE 預覽卡的縮圖呈現（圖＝食譜封面照片，見 `og.ts` 的 `recipeMeta`）。
  * 網頁／App 都呼叫系統分享選單；電腦（沒有分享選單）複製文字。
  */
-export function recipeShareText(o: { title: string; body: string; path: string }): string {
-  return [o.title, o.body.trim(), shareSettings.recipeText.replaceAll("{網址}", absolute(o.path))].filter(Boolean).join("\n\n");
+export function recipeShareText(o: { title: string; body: string; path: string; uploader?: string; center?: string }): string {
+  // 最後一段（網址下面空一行）：「食譜上傳：暱稱 所屬中心」，範本 `recipeUploaderText`；沒有中心就只有暱稱（杜杜龍 2026-11-26）。
+  const by = o.uploader ? shareSettings.recipeUploaderText.replaceAll("{暱稱}", o.uploader).replaceAll("{中心}", o.center ?? "").replace(/[ \u3000]+$/, "").trim() : "";
+  return [o.title, o.body.trim(), shareSettings.recipeText.replaceAll("{網址}", absolute(o.path)), by].filter(Boolean).join("\n\n");
 }
-export const shareRecipeText = (o: { title: string; body: string; path: string }) => shareText(o.title, recipeShareText(o));
+export const shareRecipeText = (o: { title: string; body: string; path: string; uploader?: string; center?: string }) => shareText(o.title, recipeShareText(o));
 
 /** 一次下載多張圖片：網頁依序觸發瀏覽器下載（每張間隔一下，避免被瀏覽器擋下）；App 交給系統分享選單。 */
 export async function downloadImages(urls: string[], baseName: string): Promise<void> {

@@ -100,7 +100,7 @@ import { ensureCentersReconciled } from "./center-reconcile.ts";
 import { BODY_MAX, CATEGORY_MAX, cleanBody, cleanTitle as cleanRecipeTitle, assignNumber, deleteRecipe, isRecipePrefix, listRecipes, recipeByShortPath, recipePrefixes, newId as newRecipeId, purgeStaleDrafts, recipeIdOfKey } from "./recipes.ts";
 import { recipeShortPath, type RecipeDetail } from "./contract.ts";
 import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, recordEvent, recordItemHit, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
-import { centralDeleteAccount, lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, lookupLegalNames, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
+import { centralDeleteAccount, lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, lookupLegalNames, lookupCenterLabels, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
 import { LINK_DEFAULT_TITLE, classifyLink, parseHttpsUrl } from "./links.ts";
 import { itemIconType } from "./link-rules.ts";
@@ -2826,9 +2826,9 @@ async function recipeManager(ctx: Ctx): Promise<boolean> {
   if (ctx.session.roles.includes("super_admin") || (await rightsOf(ctx)).admin) return true;
   return albumRankAllows(ctx, { folderId: "recipe", groupId: "recipe" });
 }
-type RecipeRow = { number: number | null; id: string; title: string; category_id: string; body: string; status: "draft" | "pending" | "published"; author_sub: string; author_name: string; updated_at: string };
+type RecipeRow = { author_center_label: string; number: number | null; id: string; title: string; category_id: string; body: string; status: "draft" | "pending" | "published"; author_sub: string; author_name: string; updated_at: string };
 async function recipeRow(ctx: Ctx, id: string): Promise<RecipeRow> {
-  return (await ctx.db.prepare("SELECT number, id, title, category_id, body, status, author_sub, author_name, updated_at FROM recipes WHERE id = ?").bind(id).first<RecipeRow>()) ?? fail(404, "not_found", "找不到這道食譜");
+  return (await ctx.db.prepare("SELECT number, id, title, category_id, body, status, author_sub, author_name, author_center_label, updated_at FROM recipes WHERE id = ?").bind(id).first<RecipeRow>()) ?? fail(404, "not_found", "找不到這道食譜");
 }
 async function requireRecipeEdit(ctx: Ctx, id: string): Promise<{ s: Session; row: RecipeRow; manager: boolean }> {
   const s = requireMember(ctx);
@@ -2843,7 +2843,7 @@ async function recipeDetail(ctx: Ctx, row: RecipeRow): Promise<RecipeDetail> {
   if (row.status !== "published" && !manager && !mine) fail(404, "not_found", "找不到這道食譜");
   const cat = row.category_id ? await ctx.db.prepare("SELECT name FROM recipe_categories WHERE id = ?").bind(row.category_id).first<{ name: string }>() : null;
   const shortPath = row.number && row.status === "published" ? recipeShortPath((await recipePrefixes(ctx.db)).cur, row.number) : null;
-  return { id: row.id, number: row.number, shortPath, title: row.title, categoryId: row.category_id, categoryName: cat?.name ?? "", body: row.body, status: row.status, authorName: row.author_name, updatedAt: row.updated_at, canEdit: manager || (mine && row.status !== "published"), manager };
+  return { authorCenter: row.author_center_label, admin: !!ctx.session?.roles.includes("super_admin"), id: row.id, number: row.number, shortPath, title: row.title, categoryId: row.category_id, categoryName: cat?.name ?? "", body: row.body, status: row.status, authorName: row.author_name, updatedAt: row.updated_at, canEdit: manager || (mine && row.status !== "published"), manager };
 }
 /** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
 async function requireCoverOwner(ctx: Ctx, fromBody = false) {
@@ -4556,7 +4556,7 @@ const routes: [string, RegExp, Handler][] = [
       // 開始編輯一道新食譜：先建一筆草稿（照片要有地方放）；按「儲存」才送出，放棄或沒存的草稿會被刪掉。
       const s = requireMember(ctx);
       const id = newRecipeId();
-      await ctx.db.prepare("INSERT INTO recipes (id, author_sub, author_name) VALUES (?, ?, ?)").bind(id, s.sub, (s.name ?? "").slice(0, 60)).run();
+      await ctx.db.prepare("INSERT INTO recipes (id, author_sub, author_name, author_center_key, author_center_label) VALUES (?, ?, ?, ?, ?)").bind(id, s.sub, (s.name ?? "").slice(0, 60), s.center?.key ?? "", s.center?.label ?? "").run(); // 上傳者所屬中心：自動抓、不可手動改
       return { id };
     },
   ],
@@ -4614,6 +4614,52 @@ const routes: [string, RegExp, Handler][] = [
       await deleteRecipe(ctx.db, ctx.env, id!);
       await audit(ctx.db, s.sub, "recipe.delete", "recipe", id!).run();
       return { ok: true };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/recipe-authors$/,
+    async (ctx) => {
+      // 更換食譜上傳者時挑會員（只有超級管理員）：從行動大學已註冊（用過的）會員裡找，暱稱與本名都能搜尋。
+      // 暱稱＝本站記的 member_profiles；本名只在這一次搜尋時向會員中心讀（記憶體短暫快取，不存資料庫、不寫日誌、不記搜尋字）。
+      requireSuperAdmin(ctx);
+      const q = (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 30);
+      if (q.length < 1) return { members: [] };
+      const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+      const [byNick, pool] = await Promise.all([
+        ctx.db.prepare("SELECT sub, name, avatar FROM member_profiles WHERE name <> '' AND name LIKE ? ESCAPE '\\' ORDER BY updated_at DESC LIMIT 20").bind(like).all<{ sub: string; name: string; avatar: string }>(),
+        ctx.db.prepare("SELECT sub, name, avatar FROM member_profiles WHERE name <> '' ORDER BY updated_at DESC LIMIT 400").all<{ sub: string; name: string; avatar: string }>(),
+      ]);
+      const chunks: string[][] = [];
+      for (let i = 0; i < pool.results.length; i += 100) chunks.push(pool.results.slice(i, i + 100).map((p) => p.sub));
+      const legal = new Map<string, string>();
+      for (const m of await Promise.all(chunks.map((c) => lookupLegalNames(ctx.env.CENTRAL_SERVICE_SECRET, c).catch(() => new Map<string, string>())))) for (const [k, v] of m) legal.set(k, v);
+      const ql = q.toLowerCase();
+      const out = new Map<string, { sub: string; name: string; legalName: string; avatar: string | null }>();
+      for (const p of [...byNick.results, ...pool.results.filter((p) => (legal.get(p.sub) ?? "").toLowerCase().includes(ql))]) {
+        if (out.size >= 20) break;
+        if (!out.has(p.sub)) out.set(p.sub, { sub: p.sub, name: p.name, legalName: legal.get(p.sub) ?? "", avatar: p.avatar || null });
+      }
+      return { members: [...out.values()] };
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/recipes\/([a-z0-9]{6,16})\/author$/,
+    async (ctx, [id]) => {
+      // 更換食譜上傳者（只有超級管理員）：新上傳者的暱稱、所屬中心一起換（中心取自會員中心，不可手動填）。
+      const s = requireSuperAdmin(ctx);
+      const b = await readJson<{ sub?: unknown }>(ctx.req);
+      const sub = typeof b.sub === "string" ? b.sub.slice(0, 80) : "";
+      await recipeRow(ctx, id!);
+      const prof = sub ? await ctx.db.prepare("SELECT name FROM member_profiles WHERE sub = ? AND name <> ''").bind(sub).first<{ name: string }>() : null;
+      if (!prof) return fail(404, "member_not_found", "找不到這位會員（需要是行動大學已註冊的會員）");
+      const label = (await lookupCenterLabels(ctx.env.CENTRAL_SERVICE_SECRET, [sub]).catch(() => new Map<string, string>())).get(sub) ?? "";
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE recipes SET author_sub = ?, author_name = ?, author_center_key = ?, author_center_label = ?, updated_at = datetime('now') WHERE id = ?").bind(sub, prof.name.slice(0, 60), label ? centerKey(label) : "", label, id),
+        audit(ctx.db, s.sub, "recipe.author", "recipe", id!, sub),
+      ]);
+      return recipeDetail(ctx, await recipeRow(ctx, id!));
     },
   ],
   [

@@ -70,6 +70,7 @@ export function normalizeShare(raw: unknown): ShareSettings {
     reviewerInviteText: str(r.reviewerInviteText, d.reviewerInviteText, 300),
     recipePrefix: typeof r.recipePrefix === "string" && RECIPE_PREFIX_RE.test(r.recipePrefix.trim().toLowerCase()) ? r.recipePrefix.trim().toLowerCase() : d.recipePrefix,
     recipeAliases: Array.isArray(r.recipeAliases) ? [...new Set((r.recipeAliases as unknown[]).filter((x): x is string => typeof x === "string" && RECIPE_PREFIX_RE.test(x)))].slice(0, 20) : d.recipeAliases,
+    recipeUploaderText: str(r.recipeUploaderText, d.recipeUploaderText, 80),
     recipeText: (() => {
       const t = str(r.recipeText, d.recipeText, 100);
       return t.includes("{網址}") ? t : `${t} {網址}`;
