@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useInsets } from "@/lib/inline-page";
+import { usePageBack } from "@/lib/page-back";
 import { api, resolveUrl, type AlbumInfo, type AlbumPermissions } from "@/api/client";
 import { useThumb } from "@/lib/thumb";
 import { useApi } from "@/state/session";
@@ -26,7 +27,8 @@ const when = (iso: string | null) => {
  * ②`AlbumInfoPanel`：每個資料夾上傳鈕右邊的齒輪——這個相簿的資訊總覽（R2 佔用、上傳者排名、最近上傳、檔案大小與瀏覽數排序）與上傳權限。
  */
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
+  usePageBack(() => (onClose(), true), 6); // 上方工具列的返回鍵＝關閉這個面板
   return (
     <View style={[StyleSheet.absoluteFill, { zIndex: 20 }]} pointerEvents="box-none">
       <Pressable accessibilityLabel="關閉" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.6)" }]} onPress={onClose} />

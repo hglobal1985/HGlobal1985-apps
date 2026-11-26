@@ -8,6 +8,7 @@ import { runGuarded } from "@/lib/unsaved-guard";
 import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
 import { barHeight, minTouch } from "@/theme/tokens";
+import { runPageBack } from "@/lib/page-back";
 
 /**
  * 全站「上方返回工具列」的唯一來源（杜杜龍 2026-11-15 永久指示：所有頁面的上方工具列一律一致）。
@@ -25,6 +26,7 @@ export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTo
   const path = usePathname();
   const fallback = path.startsWith("/course") || path.startsWith("/learn") ? "/courses" : path.startsWith("/orders") || path.startsWith("/admin") || path.startsWith("/settings") || path.startsWith("/achievements") ? "/me" : "/";
   const back = onBack ?? (() => {
+    if (runPageBack()) return; // 頁面裡還有一層可以退（相簿的資料夾、單道食譜…），先退那一層
     const fromSearch = consumeFromSearch(); // 從搜尋結果點進來：返回一定回到搜尋結果那一頁（杜杜龍 2026-11-25）
     if ((!backAlways || fromSearch) && router.canGoBack()) router.back();
     else router.replace((backTo ?? fallback) as never);

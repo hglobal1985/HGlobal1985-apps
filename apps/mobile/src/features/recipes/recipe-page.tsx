@@ -1,11 +1,14 @@
-import { router, Stack } from "expo-router";
+import { router } from "expo-router";
 import { useState } from "react";
 import { Platform, View } from "react-native";
 import { type CoverMediaItem, type RecipesResponse } from "@/api/client";
 import { EdmLightbox, lightboxItem } from "@/features/courses/edm-viewer";
 import { RecipeEditor } from "@/features/recipes/recipe-editor";
 import { RecipeDetailView } from "@/features/recipes/recipe-zone";
+import { InlinePage } from "@/lib/inline-page";
+import { usePageBack } from "@/lib/page-back";
 import { useApi } from "@/state/session";
+import { HeaderSlotScreen } from "@/ui/header-slot";
 
 /**
  * 單道食譜的獨立頁面（杜杜龍 2026-11-26）：網址 /前綴/流水號（例 /icook/001，前綴在「設定 › 分享預設值」）與 /recipe/食譜編號（通知、清單用）都顯示這一頁。
@@ -23,12 +26,15 @@ export function RecipePage({ id: rid }: { id: string }) {
     if (Platform.OS === "web" && typeof window !== "undefined") return window.location.replace("/courses");
     router.replace("/courses");
   };
+  usePageBack(() => (leave(), true), 1); // 上方工具列的返回鍵（沒有上一頁就回課程頁，見上面 leave）
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
-      <Stack.Screen options={{ headerShown: false }} />
+      <InlinePage>
+      <HeaderSlotScreen title="食譜" backTo="/courses" />
       <RecipeDetailView key={ver} standalone id={rid} onClose={leave} onOpenPhotos={(title, items, index) => setPhotos({ title, items, index })} onChanged={list.reload} onEdit={() => setEdit(true)} />
-      {edit ? <RecipeEditor id={rid} isNew={false} cats={list.data?.categories ?? []} manager={!!list.data?.manager} onCatsChanged={list.reload} onClose={() => (setEdit(false), setVer((v) => v + 1), list.reload())} /> : null}
+      {edit ? <RecipeEditor id={rid} isNew={false} cats={list.data?.categories ?? []} manager={!!list.data?.manager} onCatsChanged={list.reload} onClose={() => (setEdit(false), setVer((v) => v + 1), list.reload())} onDeleted={leave} /> : null}
       {photos ? <EdmLightbox uri={photos.items[photos.index]?.url ?? ""} title={photos.title} items={photos.items.map((x) => lightboxItem(x, photos.title))} index={photos.index} onClose={() => setPhotos(null)} /> : null}
+      </InlinePage>
     </View>
   );
 }

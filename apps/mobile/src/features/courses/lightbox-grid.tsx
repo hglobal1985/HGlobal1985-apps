@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useInsets } from "@/lib/inline-page";
 import { resolveUrl } from "@/api/client";
 import { downloadImages, shareImages } from "@/lib/share";
 import { trackUsage } from "@/lib/usage";
@@ -22,7 +22,7 @@ const NO_SELECT = Platform.OS === "web" ? ({ userSelect: "none", WebkitUserSelec
 export function LightboxGrid({ list, current, onPick, onClose, heading, extra, actions, embedded = false, parent, onMove }: { /** 標題上方的小字（區塊相簿的子資料夾：上層區塊名稱）。 */ parent?: string; /** 複選時多一顆「移到資料夾」鈕（有管理權限的區塊相簿用）；回傳選取的照片編號。 */ onMove?: (ids: string[]) => void; /** 標題列右邊的圖示按鈕（例如排序）。 */ actions?: ReactNode; /** 嵌在相簿資料夾檢視裡（不蓋滿畫面、不自帶黑底）：左邊是返回鈕（杜杜龍 2026-11-25）。 */ embedded?: boolean; list: LightboxItem[]; current: number; onPick: (i: number) => void; onClose: () => void; /** 相簿資料夾名稱（從「相簿」進來時顯示在標籤上）。 */ heading?: string; /** 格子上方的額外內容（例如有權限者的「上傳照片」按鈕）。 */ extra?: ReactNode }) {
   const thumb = useThumb();
   const win = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const insets = useInsets();
   const [sel, setSel] = useState<Set<number> | null>(null); // null＝一般模式；Set＝複選模式
   const [busy, setBusy] = useState(false);
   const gap = 4;
@@ -70,7 +70,6 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
   return (
     <View style={embedded ? { flex: 1, minHeight: 0 } : [StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto" onLayout={embedded ? (e) => setBoxW(Math.floor(e.nativeEvent.layout.width)) : undefined}>
       <View style={{ paddingTop: embedded ? 8 : insets.top + 16, paddingHorizontal: embedded ? 0 : 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: space.xs }}>
-        {embedded && !sel ? btn("回上一頁（資料夾總覽）", onClose, <Ionicons name="chevron-back" size={26} color="#fff" {...UI_ONLY} />) : null}
         {/* 資料夾名稱（杜杜龍 2026-11-25）：沒有張數統計、太長自動變兩行；右邊的排序按鈕固定顯示，不會被名稱擠掉。 */}
         <View style={[styles.label, embedded && heading && !sel ? { flex: 1, minWidth: 0, maxWidth: undefined } : null]}>
           {parent && !sel ? <AppText {...UI_ONLY_TEXT} numberOfLines={1} style={{ color: "#9a9aa0", fontSize: 12 }}>{parent}</AppText> : null}

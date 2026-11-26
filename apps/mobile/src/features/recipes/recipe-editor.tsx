@@ -4,11 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, resolveUrl, type CoverMediaItem, type RecipeCategory, type RecipeDetail } from "@/api/client";
-import { choiceSheet, confirmSheet } from "@/features/confirm";
+import { choiceSheet, confirmAsk, confirmSheet } from "@/features/confirm";
+import { centerTitle } from "@/features/format";
 import { Sheet } from "@/features/courses/album-admin";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { youtubeIdOfLine } from "@/lib/recipe-text";
+import { useInsets } from "@/lib/inline-page";
+import { usePageBack } from "@/lib/page-back";
 import { useSheetBack } from "@/lib/sheet-back";
+import { barHeight } from "@/theme/tokens";
 import { useThumb } from "@/lib/thumb";
 import { useApi } from "@/state/session";
 import { AppText } from "@/ui";
@@ -37,15 +41,18 @@ export function RecipeSheet({ title, onClose, children }: { title: string; onClo
  * 蓋滿整個螢幕（網頁用 fixed，蓋過相簿自己的上方工具列），最上面固定一列「取消（左）｜標題｜儲存（右）」，內容在下面捲動。
  * 上一頁／返回手勢＝呼叫 `onCancel`（有未存內容的會問「儲存／放棄／繼續編輯」）。
  */
-export function RecipeFullPage({ title, onCancel, onSave, saving, children }: { title: string; onCancel: () => unknown; onSave: () => unknown; saving?: boolean; children: React.ReactNode }) {
-  const insets = useSafeAreaInsets();
+export function RecipeFullPage({ title, onCancel, onSave, saving, children, overlay }: { title: string; onCancel: () => unknown; onSave: () => unknown; saving?: boolean; children: React.ReactNode; /** 疊在整頁上面的面板（要放在這裡才不會被整頁蓋住）。 */ overlay?: React.ReactNode }) {
+  const insets = useInsets();
+  const safe = useSafeAreaInsets();
   const ref = useRef(onCancel);
   ref.current = onCancel;
   useSheetBack(ref);
-  const frame = Platform.OS === "web" ? ({ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 } as object) : StyleSheet.absoluteFill;
+  usePageBack(() => (void onCancel(), true), 5); // 上方工具列的返回鍵＝取消（有未存內容會問儲存／放棄／繼續編輯）
+  // 整頁編輯：網頁用 fixed 蓋住內容區，但要留出上方工具列（TopBar）的高度，取消／儲存鈕才不會被工具列遮住（杜杜龍 2026-11-26）。
+  const frame = Platform.OS === "web" ? ({ position: "fixed", top: safe.top + barHeight, left: 0, right: 0, bottom: 0 } as object) : StyleSheet.absoluteFill;
   return (
     <View style={[frame, { zIndex: 40, backgroundColor: "#101010" }]}>
-      <View style={{ paddingTop: insets.top + 10, paddingBottom: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#333", backgroundColor: "#101010" }}>
+      <View style={{ paddingTop: 10, paddingBottom: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#333", backgroundColor: "#101010" }}>
         <Pressable accessibilityRole="button" accessibilityLabel="取消" onPress={() => void onCancel()} style={{ minHeight: 48, minWidth: 84, paddingHorizontal: 16, borderRadius: 24, borderWidth: 2, borderColor: "#ff6b6b", alignItems: "center", justifyContent: "center" }}>
           <AppText {...UI_ONLY_TEXT} style={{ color: "#ff6b6b", fontWeight: "800", fontSize: 16 }}>取消</AppText>
         </Pressable>
@@ -55,6 +62,7 @@ export function RecipeFullPage({ title, onCancel, onSave, saving, children }: { 
         </Pressable>
       </View>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 60, gap: 16 }}>{children}</ScrollView>
+      {overlay}
     </View>
   );
 }
@@ -69,7 +77,7 @@ const chip = (label: string, on: boolean, onPress: () => void, key = label) => (
  * 新增／修改一道食譜（杜杜龍 2026-11-26）：名稱、分類、照片（可一次選很多張，第一張＝封面）、一篇食譜文字（一鍵貼上整篇；獨立一行的 YouTube 網址＝影片卡片）。
  * 新增時先建一筆草稿（照片要有地方放）：按「儲存」才送出（管理者直接發佈、會員進待審核）；取消／放棄會刪掉草稿。有改動就離開（取消、上一頁、返回手勢）會問「儲存／放棄／繼續編輯」。
  */
-export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged }: { id: string; isNew: boolean; cats: RecipeCategory[]; manager: boolean; onClose: (saved: boolean) => void; onCatsChanged: () => void }) {
+export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged, onDeleted }: { id: string; isNew: boolean; cats: RecipeCategory[]; manager: boolean; onClose: (saved: boolean) => void; onCatsChanged: () => void; /** 在編輯頁刪除這道食譜之後（呼叫端要把食譜頁一起關掉）。 */ onDeleted?: () => void }) {
   const thumb = useThumb();
   const detail = useApi<RecipeDetail>(isNew ? null : `/recipes/${id}`);
   const photos = useApi<CoverMediaItem[]>(`/cover-media?kind=course&key=${encodeURIComponent(`rcp:${id}`)}`);
@@ -82,6 +90,7 @@ export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged 
   const [sel, setSel] = useState({ start: 0, end: 0 });
   const [yt, setYt] = useState<string | null>(null); // 插入影片連結的輸入列（null＝收起）
   const [newCat, setNewCat] = useState<string | null>(null);
+  const [authorOpen, setAuthorOpen] = useState(false);
 
   useEffect(() => {
     const d = detail.data;
@@ -112,6 +121,16 @@ export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged 
       return false;
     } finally {
       setBusy(false);
+    }
+  };
+  const removeRecipe = async () => {
+    if (!(await confirmAsk("刪除食譜", `「${detail.data?.title ?? title}」與它的所有照片會一起刪除，無法復原。`, "刪除"))) return;
+    try {
+      await api("DELETE", `/recipes/${id}`);
+      flashText("已刪除");
+      (onDeleted ?? (() => finish(false)))();
+    } catch (e) {
+      flashText((e as Error).message);
     }
   };
   const requestClose = async () => {
@@ -223,7 +242,7 @@ export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged 
   );
 
   return (
-    <RecipeFullPage title={isNew ? "新增食譜" : "修改食譜"} onCancel={requestClose} onSave={() => void save().then((ok) => ok && finish(true))} saving={busy}>
+    <RecipeFullPage title={isNew ? "新增食譜" : "修改食譜"} onCancel={requestClose} onSave={() => void save().then((ok) => ok && finish(true))} saving={busy} overlay={authorOpen && detail.data ? <AuthorSheet recipeId={id} current={detail.data.authorName} onClose={() => setAuthorOpen(false)} onChanged={() => (detail.reload(), onCatsChanged())} /> : null}>
       {!ready ? (
         <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>讀取中…</AppText>
       ) : (
@@ -301,9 +320,87 @@ export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged 
             />
             <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13, textAlign: "right" }}>{`${body.length} / ${BODY_MAX}`}</AppText>
           </View>
+          {/* 管理（杜杜龍 2026-11-26，從單道食譜頁上方移到這裡）：更換上傳者（超級管理員）、刪除這道食譜（有權限者；新增中的草稿用「取消」就會丟掉，不顯示） */}
+          {!isNew && (detail.data?.admin || detail.data?.canEdit) ? (
+            <View style={{ gap: 10 }}>
+              {label("管理", "")}
+              {detail.data?.admin ? <ManageButton icon="person-circle-outline" text={`更換上傳者（目前：${detail.data.authorName || "沒有"}）`} onPress={() => setAuthorOpen(true)} /> : null}
+              {detail.data?.canEdit ? <ManageButton danger icon="trash-outline" text="刪除這道食譜" onPress={() => void removeRecipe()} /> : null}
+            </View>
+          ) : null}
           {!manager && isNew ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13, textAlign: "center" }}>會員投稿的食譜會先送給管理者審核，通過後所有人才看得到。</AppText> : null}
         </>
       )}
     </RecipeFullPage>
   );
 }
+
+function ManageButton({ icon, text, onPress, danger = false }: { icon: string; text: string; onPress: () => void; danger?: boolean }) {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel={text} onPress={onPress} style={{ minHeight: 52, borderRadius: 12, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, backgroundColor: danger ? "#3a1c1c" : "#262629" }}>
+      <Ionicons name={icon as never} size={22} color={danger ? "#ff8a80" : "#fff"} {...UI_ONLY} />
+      <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: danger ? "#ff8a80" : "#fff", fontWeight: "700", fontSize: 16 }}>{text}</AppText>
+    </Pressable>
+  );
+}
+
+type AuthorHit = { sub: string; name: string; legalName: string; avatar: string | null; center: string };
+/**
+ * 更換食譜上傳者（只有超級管理員，杜杜龍 2026-11-26）：從行動大學已註冊的會員直接輸入名字挑選，暱稱與本名都能搜尋；
+ * 換了以後，上傳者暱稱與所屬中心跟著變（中心取自會員中心，不能手動填）。本名只給超級管理員在這裡辨識同名的人，不存進資料庫。
+ */
+function AuthorSheet({ recipeId, current, onClose, onChanged }: { recipeId: string; current: string; onClose: () => void; onChanged: () => void }) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<AuthorHit[] | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const t = q.trim();
+    if (!t) return void setHits(null);
+    let alive = true;
+    const timer = setTimeout(() => {
+      api<{ members: AuthorHit[] }>("GET", `/admin/recipe-authors?q=${encodeURIComponent(t)}`)
+        .then((r) => alive && setHits(r.members))
+        .catch((e: Error) => alive && (setHits([]), flashText(e.message)));
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [q]);
+  const pick = async (m: AuthorHit) => {
+    if (busy) return;
+    if (!(await confirmAsk("更換上傳者", `這道食譜的上傳者改成「${m.name}」？所屬中心會跟著換成他的中心。`, "更換"))) return;
+    setBusy(true);
+    try {
+      await api("PUT", `/admin/recipes/${recipeId}/author`, { sub: m.sub, name: m.name });
+      flashText(`已更換上傳者為「${m.name}」`);
+      onChanged();
+      onClose();
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <RecipeSheet title="更換上傳者" onClose={onClose}>
+      <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`目前上傳者：${current || "（沒有）"}。暱稱可以搜尋所有會員中心的會員（2 個字以上）；本名只找得到用過行動大學的會員。`}</AppText>
+      <TextInput value={q} onChangeText={setQ} autoFocus placeholder="輸入暱稱或本名" placeholderTextColor="#6f6f75" accessibilityLabel="搜尋會員" style={{ borderWidth: 2, borderColor: "#2e7d32", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#fff", backgroundColor: "#0b0b0b" }} />
+      {q.trim() && hits === null ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>搜尋中…</AppText> : null}
+      {hits && !hits.length ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>找不到符合的會員</AppText> : null}
+      {(hits ?? []).map((m) => (
+        <Pressable key={m.sub} accessibilityRole="button" accessibilityLabel={`選擇 ${m.name}`} onPress={() => void pick(m)} style={{ flexDirection: "row", alignItems: "center", gap: 12, minHeight: 56, borderRadius: 12, backgroundColor: "#262629", paddingHorizontal: 12 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, overflow: "hidden", backgroundColor: "#3a3a3d", alignItems: "center", justifyContent: "center" }}>
+            {m.avatar ? <Image source={{ uri: m.avatar }} style={{ width: "100%", height: "100%" }} accessibilityIgnoresInvertColors /> : <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800" }}>{m.name.slice(0, 1)}</AppText>}
+          </View>
+          <View style={{ flex: 1 }}>
+            <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{m.name}</AppText>
+            {m.center ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9fe3b8", fontSize: 13 }}>{centerTitle(m.center)}</AppText> : null}
+            {m.legalName ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13 }}>{`本名：${m.legalName}`}</AppText> : null}
+          </View>
+        </Pressable>
+      ))}
+    </RecipeSheet>
+  );
+}
+

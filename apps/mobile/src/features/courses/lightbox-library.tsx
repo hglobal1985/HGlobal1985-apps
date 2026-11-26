@@ -1,8 +1,7 @@
 import { lightboxItem } from "./edm-viewer";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMediaItem, type RecipesResponse } from "@/api/client";
 import { centerTitle } from "@/features/format";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
@@ -14,11 +13,13 @@ import { SubfolderHome, SubfolderSheet, useSubfolders, type FolderSheetState } f
 import { AlbumSearchBar, matchAlbumItem, useAlbumSemantic } from "./album-search";
 import { trackUsage } from "@/lib/usage";
 import { saveAlbumPos } from "@/lib/album-memory";
+import { useInsets } from "@/lib/inline-page";
+import { usePageBack } from "@/lib/page-back";
 import { isSuperAdmin } from "@/lib/roles";
 import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
-import { space } from "@/theme/tokens";
-import { AppText } from "@/ui";
+import { AppText, TopBarButton } from "@/ui";
+import { useHeaderSlot } from "@/ui/header-slot";
 import { FLASH_ICON, flashText, showFlash } from "@/ui/flash-notice";
 
 const UI_ONLY = { uiOnly: true } as object;
@@ -38,10 +39,9 @@ const folderName = (f: AlbumFolder) => (f.kind === "center" ? centerTitle(f.titl
  * ④沒有權限的資料夾（鎖定的課程、區塊相簿）禁止進入，點了只顯示原因（伺服器也會擋）。
  * 點資料夾 → onPick（交給全螢幕看圖換成這個資料夾的照片並進入「檢視全部」格狀畫面）。
  */
-export function LightboxLibrary({ onPick, onClose, initial, restore, inline = false }: { /** 放在一般頁面裡（上有工具列、下有選單列）：不留手機安全區。 */ inline?: boolean; onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到上次位置（相簿專區入口）：類別與資料夾；沒有 initial 才套用。 */ restore?: { group: string | null; folder: string | null } | null; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[]; focusId?: string } | null }) {
+export function LightboxLibrary({ onPick, initial, restore }: { onPick: (p: LibraryPick) => void; /** 回到上次位置（相簿專區入口）：類別與資料夾；沒有 initial 才套用。 */ restore?: { group: string | null; folder: string | null } | null; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[]; focusId?: string } | null }) {
   const thumb = useThumb();
-  const safe = useSafeAreaInsets();
-  const insets = inline ? { top: -8, bottom: 0, left: 0, right: 0 } : safe;
+  const insets = useInsets();
   const win = useWindowDimensions();
   const { member } = useSession();
   const admin = isSuperAdmin(member);
@@ -218,7 +218,6 @@ export function LightboxLibrary({ onPick, onClose, initial, restore, inline = fa
     </Pressable>
   );
 
-  const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 - 104 - 36 - 8 * 3) / 8.6)));
 
   // 資料夾裡的照片（此頁搜尋會過濾）
   const inSub = hasSubs && sub !== null ? view!.items.filter((p) => (p.folderId ?? "") === sub) : view?.items ?? [];
@@ -259,6 +258,17 @@ export function LightboxLibrary({ onPick, onClose, initial, restore, inline = fa
     }
   };
 
+  // 上方工具列（TopBar）：右側「設定」鈕（超級管理員）——相簿首頁／類別＝全部相簿的上傳權限；打開資料夾＝這個資料夾的資訊與權限。返回鍵＝退一層（資料夾 → 類別 → 首頁；已在首頁回傳 false，交給相簿看圖離開頁面）。
+  useHeaderSlot(1, admin ? <TopBarButton label="設定" accessibilityLabel={view ? "相簿資訊與權限" : "相簿權限設定"} iconName="settings-outline" onPress={() => setPanel(view ? "info" : "perms")} /> : null);
+  usePageBack(() => {
+    if (view) {
+      if (hasSubs && sub !== null) setSub(null);
+      else (setGroup(cur?.id ?? null), setView(null), setSortBy(null));
+      return true;
+    }
+    if (group) return (setGroup(null), setQ(""), true);
+    return false;
+  }, 2);
   useEffect(() => {
     if (view && !view.items.length) void reloadView(); // 從單張看圖回到資料夾：重新讀這個資料夾的照片
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -281,14 +291,6 @@ export function LightboxLibrary({ onPick, onClose, initial, restore, inline = fa
 
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto">
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {admin ? btn("相簿權限設定", () => setPanel("perms"), "settings-outline") : null}
-          <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, minWidth: 0, color: "#fff", fontWeight: "900", fontSize: titleSize, lineHeight: titleSize + 6 }}>寰宇行動大學相簿</AppText>
-          {/* 右上角：文字「退出相簿」（杜杜龍 2026-11-26，取代圓形 ✕，避免和下層的關閉／返回混淆） */}
-          <Pressable accessibilityRole="button" accessibilityLabel="退出相簿" onPress={onClose} style={styles.exit}>
-            <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>退出相簿</AppText>
-          </Pressable>
-        </View>
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* 搜尋列：與頁面相簿共用 AlbumSearchBar（深色款＋「此頁／全部」切換），永遠顯示 */}
@@ -296,16 +298,14 @@ export function LightboxLibrary({ onPick, onClose, initial, restore, inline = fa
           <AlbumSearchBar dark q={q} setQ={setQ} scope={scope} onScope={setScope} placeholder={scope === "page" ? (inRecipe ? "搜尋食譜的名稱、食材" : view ? "搜尋這個資料夾的照片" : cur ? `搜尋「${cur.label}」裡的資料夾與照片` : "搜尋相簿類別與資料夾") : "搜尋全部相簿的場景、照片文字"} />
         </View>
         {/* 類別返回列：在某個類別裡時，回到相簿首頁（類別資料夾） */}
-        {cur && !view ? <AlbumBackHeader title={cur.label} meta={`${cur.folders.length} 個資料夾`} onBack={() => (setGroup(null), setQ(""))} /> : null}
+        {cur && !view ? <AlbumBackHeader title={cur.label} meta={`${cur.folders.length} 個資料夾`} /> : null}
         {inRecipe && !(scope === "all" && key) ? (
-          <RecipeZone key={recipeCat} initialCat={recipeCat} q={q} onBack={() => (setGroup(null), setQ(""))} onOpenPhotos={(title, items, index) => onPick({ folder: null, title, items, index })} />
+          <RecipeZone key={recipeCat} initialCat={recipeCat} q={q} onOpenPhotos={(title, items, index) => onPick({ folder: null, title, items, index })} />
         ) : view && hasSubs && sub === null && !key && sf.subs ? (
           <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6, gap: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              {btn("回上一頁（類別）", () => (setGroup(cur?.id ?? null), setView(null), setSortBy(null)), "chevron-back")}
               <AppText numberOfLines={2} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 18 }}>{folderName(view.folder)}</AppText>
               {sf.subs.canManage ? btn("管理資料夾", () => setFsheet({ t: "manage" }), "folder-open-outline") : null}
-              {admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}
             </View>
             <SubfolderHome subs={sf.subs} bottomPad={insets.bottom + 32} onOpen={(id) => setSub(id)} onNew={() => setFsheet({ t: "new", move: false })} onMenu={(id) => setFsheet({ t: "menu", id })} />
           </View>
@@ -318,7 +318,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore, inline = fa
               heading={hasSubs && sub !== null ? subName : folderName(view.folder)}
               parent={hasSubs && sub !== null ? folderName(view.folder) : undefined}
               onMove={isBlock && sf.subs?.canManage ? (ids) => (setMoveIds(ids), setFsheet({ t: "move" })) : undefined}
-              extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} folder={sub || undefined} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{isBlock && !hasSubs && sf.subs?.canManage ? btn("新增資料夾", () => setFsheet({ t: "new", move: false }), "folder-open-outline") : null}{admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}</View>) : undefined}
+              extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} folder={sub || undefined} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{isBlock && !hasSubs && sf.subs?.canManage ? btn("新增資料夾", () => setFsheet({ t: "new", move: false }), "folder-open-outline") : null}</View>) : undefined}
               onPick={(i) => onPick({ folder: view.folder, title: folderName(view.folder), items: shown, index: i })}
               actions={<View style={{ flexDirection: "row", gap: 8 }}>{view.folder.kind === "center" && view.folder.scope === "edm" ? sortBtn("date", "calendar-outline", "活動日期排序") : null}{sortBtn("upload", "time-outline", "上傳時間排序")}</View>}
               onClose={() => (hasSubs && sub !== null ? setSub(null) : (setGroup(cur?.id ?? null), setView(null), setSortBy(null)))}
