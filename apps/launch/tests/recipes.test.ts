@@ -80,6 +80,8 @@ test("食譜：草稿 → 會員投稿待審核 → 管理者核准；權限與�
   const meta = await resolveShareMeta(env.DB, new URL("https://learn.test/icook/001"));
   assert.ok(meta?.title.startsWith("瑪格麗特披薩"), "預覽卡標題＝食譜名稱＋站名");
   assert.ok(meta?.title.includes("寰宇行動大學"));
+  assert.ok(meta?.image.endsWith("/icon-512.png"), "還沒有照片：用網站圖示");
+  assert.equal((await call("GET", `/recipes/${id}/cover`)).status, 404, "沒有照片：封面縮圖 404");
   assert.equal((await resolveShareMeta(env.DB, new URL("https://learn.test/recipe/" + id)))?.title, meta?.title, "/recipe/編號 同一張卡");
   assert.equal(await resolveShareMeta(env.DB, new URL("https://learn.test/icook/009")), null);
   assert.equal((await call("PUT", "/admin/ui-config", { token: a, body: { share: { recipePrefix: "cook" } } })).status, 403, "只有超級管理員能改前綴");

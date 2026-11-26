@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, resolveUrl, type CoverMediaItem, type RecipeCard, type RecipeDetail, type RecipesResponse } from "@/api/client";
-import { choiceSheet, confirmAsk } from "@/features/confirm";
+import { confirmAsk } from "@/features/confirm";
 import { AddToListSheet } from "@/features/my-lists/add-to-list";
 import { useMark } from "@/features/my-lists/store";
 import { useFeature } from "@/lib/app-mode";
-import { canSharePhotos, prepareRecipePhotos, shareRecipePhotos, shareRecipeText } from "@/lib/share";
+import { shareRecipeText } from "@/lib/share";
 import { useSheetBack } from "@/lib/sheet-back";
 import { trackUsage } from "@/lib/usage";
 import { useThumb } from "@/lib/thumb";
@@ -163,34 +163,8 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit 
       <AppText {...UI_ONLY_TEXT} style={{ color: fg, fontWeight: "800", fontSize: 15 }}>{label}</AppText>
     </Pressable>
   );
-  // 開啟食譜就先把所有照片準備成檔案：網頁分享必須在點下去後很短時間內呼叫（杜杜龍 2026-11-26）。
-  const files = useRef<Promise<File[]> | null>(null);
-  const photoKey = photos.map((p) => p.id).join(",");
-  useEffect(() => {
-    files.current = photos.length ? prepareRecipePhotos(photos.map((p) => p.url), d?.title || "食譜") : null;
-  }, [photoKey, d?.title]); // eslint-disable-line react-hooks/exhaustive-deps
   const share = async () => {
-    const o = { title: d!.title, body: d!.body, path: d!.shortPath ?? `/recipe/${id}` };
-    // LINE 收到「照片＋文字」只會收照片（杜杜龍 2026-11-26 實測），所以有照片的食譜分兩個動作，各自完整送出。
-    if (!photos.length || !files.current || !canSharePhotos()) {
-      if ((await shareRecipeText(o)) === "copied") flashText("已複製食譜文字與連結");
-      return;
-    }
-    const pick = await choiceSheet({
-      title: "分享這道食譜",
-      message: "LINE 一次只收得下「照片」或「文字」其中一種，所以分開傳。建議先傳文字與連結（附預覽圖），再傳照片。",
-      options: [
-        { key: "text", label: "分享文字與連結（含影片連結）", variant: "primary" },
-        { key: "photos", label: `分享所有照片（${photos.length} 張，文字會先複製）`, variant: "secondary" },
-        { key: "cancel", label: "取消", variant: "cancel" },
-      ],
-    });
-    if (pick === "text") {
-      if ((await shareRecipeText(o)) === "copied") flashText("已複製食譜文字與連結");
-    } else if (pick === "photos") {
-      const r = await shareRecipePhotos({ ...o, files: files.current });
-      if (r === "shared") flashText("照片已送出；食譜文字已複製，可在對話裡貼上");
-    }
+    if ((await shareRecipeText({ title: d!.title, body: d!.body, path: d!.shortPath ?? `/recipe/${id}` })) === "copied") flashText("已複製食譜文字與連結");
   };
   const approve = async () => {
     try {
