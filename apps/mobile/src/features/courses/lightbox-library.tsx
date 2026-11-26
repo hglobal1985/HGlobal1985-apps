@@ -3,9 +3,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, TextInput, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMediaItem } from "@/api/client";
+import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMediaItem, type RecipesResponse } from "@/api/client";
 import { centerTitle } from "@/features/format";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
+import { RecipeZone } from "@/features/recipes/recipe-zone";
 import { LightboxGrid } from "./lightbox-grid";
 import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
 import { SubfolderHome, SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
@@ -44,10 +45,12 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const admin = isSuperAdmin(member);
   const { data, loading, error, reload } = useApi<AlbumsResponse>("/albums");
   const [group, setGroup] = useState<string | null>(null);
+  const recipes = useApi<RecipesResponse>("/recipes"); // 食譜專區（杜杜龍 2026-11-26）：相簿首頁的「食譜」類別卡與數量
   const large = win.width >= 900;
   const [side, setSide] = useState(large); // 大螢幕資料夾清單預設一直顯示
   // 目前打開的資料夾（null＝資料夾總覽）：搜尋列、類別標籤、側邊欄在資料夾裡一樣永遠顯示（杜杜龍 2026-11-25）。
   const [view, setView] = useState<{ folder: AlbumFolder; items: CoverMediaItem[] } | null>(initial ?? null);
+  const inRecipe = group === "recipe" && !view;
   const [q, setQ] = useState("");
   const [scope, setScope] = useState<"page" | "all">("page");
   const [found, setFound] = useState<Found[] | null>(null);
@@ -199,6 +202,28 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       </Pressable>
     );
   };
+  // 食譜專區的類別卡（杜杜龍 2026-11-26）：不是照片資料夾，點進去是食譜列表；永遠顯示（沒有食譜時也要有入口讓會員投稿）。
+  const recipeList = recipes.data?.recipes ?? [];
+  const recipeCard = () => {
+    const half = Math.floor((cardW - 6) / 2);
+    const withThumb = recipeList.filter((r) => r.thumb);
+    return (
+      <Pressable key="recipe" accessibilityRole="button" accessibilityLabel={`食譜，${recipeList.length} 道`} onPress={() => (setGroup("recipe"), setQ(""))} style={({ pressed }) => [{ width: cardW, borderRadius: 12, backgroundColor: "#262629", padding: 3, opacity: pressed ? 0.75 : 1 }]}>
+        <View style={{ width: cardW - 6, height: cardW - 6, borderRadius: 9, overflow: "hidden", flexDirection: "row", flexWrap: "wrap", gap: 2, backgroundColor: "#1a1a1c" }}>
+          {[0, 1, 2, 3].map((i) => (
+            <View key={i} style={{ width: half - 1, height: half - 1, backgroundColor: "#2e2e31", alignItems: "center", justifyContent: "center" }}>
+              {withThumb[i]?.thumb ? <Image source={{ uri: thumb(resolveUrl(withThumb[i]!.thumb!), 200) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : i === 0 && !withThumb.length ? <Ionicons name="restaurant-outline" size={28} color="#6f6f75" {...UI_ONLY} /> : null}
+            </View>
+          ))}
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 6, paddingVertical: 6 }}>
+          <Ionicons name="restaurant" size={16} color="#cfcfd4" {...UI_ONLY} />
+          <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800" }}>食譜</AppText>
+          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{`${recipeList.length} 道`}</AppText>
+        </View>
+      </Pressable>
+    );
+  };
   const btn = (label: string, onPress: () => void, icon: string, on = false) => (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={[styles.tool, on && { backgroundColor: "#2e7d32" }]}>
       <Ionicons name={icon as never} size={24} color="#fff" {...UI_ONLY} />
@@ -323,6 +348,11 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
             </View>
           );
         })}
+        {/* 食譜專區（杜杜龍 2026-11-26） */}
+        <Pressable accessibilityRole="button" accessibilityLabel="食譜" onPress={() => (setView(null), setGroup("recipe"), setQ(""), !large && setSide(false))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingHorizontal: 12, backgroundColor: inRecipe ? "#2e7d32" : "transparent" }}>
+          <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>食譜</AppText>
+          <AppText {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 14 }}>{recipeList.length}</AppText>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -338,9 +368,9 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       {side && large ? sidebar : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* 搜尋列：與頁面相簿共用 AlbumSearchBar（深色款＋「此頁／全部」切換），永遠顯示 */}
-        <View style={{ paddingHorizontal: 16 }}>
+        {!inRecipe ? <View style={{ paddingHorizontal: 16 }}>
           <AlbumSearchBar dark q={q} setQ={setQ} scope={scope} onScope={setScope} placeholder={scope === "page" ? (view ? "搜尋這個資料夾的照片" : cur ? `搜尋「${cur.label}」裡的資料夾與照片` : "搜尋相簿類別與資料夾") : "搜尋全部相簿的場景、照片文字"} />
-        </View>
+        </View> : null}
         {/* 類別返回列：在某個類別裡時，回到相簿首頁（類別資料夾） */}
         {cur && !view ? (
           <View style={{ paddingHorizontal: 16, paddingTop: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -349,7 +379,9 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
             <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`${cur.folders.length} 個資料夾`}</AppText>
           </View>
         ) : null}
-        {view && hasSubs && sub === null && !key && sf.subs ? (
+        {inRecipe ? (
+          <RecipeZone onBack={() => (setGroup(null), setQ(""))} onOpenPhotos={(title, items, index) => onPick({ folder: null, title, items, index })} />
+        ) : view && hasSubs && sub === null && !key && sf.subs ? (
           <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6, gap: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               {btn("回上一頁（類別）", () => (setGroup(cur?.id ?? null), setView(null), setSortBy(null)), "chevron-back")}
@@ -387,10 +419,10 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
           ) : (
             <>
               {/* 相簿首頁：每個「類別」就是一個資料夾（有新類別會自動出現）；進去才是該類別的資料夾 */}
-              {!cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeCats.map(catCard)}</View> : null}
+              {!cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeCats.map(catCard)}{!key || "食譜".includes(key) ? recipeCard() : null}</View> : null}
               {!cur && key ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeFolderHits.map(card)}</View> : null}
               {cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View> : null}
-              {data && ((cur && !folders.length) || (!cur && !homeCats.length && !homeFolderHits.length)) && !(key && pageFound?.length) ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? (pageFound === null && key.length >= 2 ? "搜尋中…" : "沒有符合的資料夾或照片") : "還沒有相簿照片"}</AppText> : null}
+              {data && ((cur && !folders.length) || (!cur && !homeCats.length && !homeFolderHits.length && !(!key || "食譜".includes(key)))) && !(key && pageFound?.length) ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? (pageFound === null && key.length >= 2 ? "搜尋中…" : "沒有符合的資料夾或照片") : "還沒有相簿照片"}</AppText> : null}
               {key ? photosBlock() : null}
             </>
           )}

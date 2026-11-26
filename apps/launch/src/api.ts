@@ -97,6 +97,8 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
+import { BODY_MAX, CATEGORY_MAX, cleanBody, cleanTitle as cleanRecipeTitle, deleteRecipe, listRecipes, newId as newRecipeId, purgeStaleDrafts, recipeIdOfKey } from "./recipes.ts";
+import type { RecipeDetail } from "./contract.ts";
 import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, recordEvent, recordItemHit, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
 import { centralDeleteAccount, lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, lookupLegalNames, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
@@ -2815,6 +2817,33 @@ async function subfoldersOf(ctx: Ctx, key: string): Promise<AlbumSubfolders> {
     canManage,
   };
 }
+/**
+ * 食譜專區的權限（杜杜龍 2026-11-26）：管理者＝超級管理員、總部管理員，或「食譜」上傳獎銜（相簿齒輪 group:recipe）達標的會員——可直接發佈、審核投稿、新增與改名分類、修改任何食譜。
+ * 一般會員可以投稿（進「待審核」），投稿者自己在草稿與待審核時可修改、刪除；核准後只有管理者能改。
+ */
+async function recipeManager(ctx: Ctx): Promise<boolean> {
+  if (!ctx.session) return false;
+  if (ctx.session.roles.includes("super_admin") || (await rightsOf(ctx)).admin) return true;
+  return albumRankAllows(ctx, { folderId: "recipe", groupId: "recipe" });
+}
+type RecipeRow = { id: string; title: string; category_id: string; body: string; status: "draft" | "pending" | "published"; author_sub: string; author_name: string; updated_at: string };
+async function recipeRow(ctx: Ctx, id: string): Promise<RecipeRow> {
+  return (await ctx.db.prepare("SELECT id, title, category_id, body, status, author_sub, author_name, updated_at FROM recipes WHERE id = ?").bind(id).first<RecipeRow>()) ?? fail(404, "not_found", "找不到這道食譜");
+}
+async function requireRecipeEdit(ctx: Ctx, id: string): Promise<{ s: Session; row: RecipeRow; manager: boolean }> {
+  const s = requireMember(ctx);
+  const row = await recipeRow(ctx, id);
+  const manager = await recipeManager(ctx);
+  if (!manager && !(row.author_sub === s.sub && row.status !== "published")) fail(403, "forbidden", "這道食譜已經發佈，只有管理者能修改");
+  return { s, row, manager };
+}
+async function recipeDetail(ctx: Ctx, row: RecipeRow): Promise<RecipeDetail> {
+  const manager = await recipeManager(ctx);
+  const mine = !!ctx.session && row.author_sub === ctx.session.sub;
+  if (row.status !== "published" && !manager && !mine) fail(404, "not_found", "找不到這道食譜");
+  const cat = row.category_id ? await ctx.db.prepare("SELECT name FROM recipe_categories WHERE id = ?").bind(row.category_id).first<{ name: string }>() : null;
+  return { id: row.id, title: row.title, categoryId: row.category_id, categoryName: cat?.name ?? "", body: row.body, status: row.status, authorName: row.author_name, updatedAt: row.updated_at, canEdit: manager || (mine && row.status !== "published"), manager };
+}
 /** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
 async function requireCoverOwner(ctx: Ctx, fromBody = false) {
   const base = ctx;
@@ -2860,7 +2889,9 @@ async function requireCoverOwnerBase(ctx: Ctx, fromBody = false): Promise<{ s: S
     return { s, kind, lookup: key, centerKey: null, ownerKey: key, scope };
   }
   const s = requireMember(ctx);
-  await requireCourseArt(ctx, s, await courseOfCoverKey(ctx.db, key));
+  const rid = recipeIdOfKey(key);
+  if (rid) await requireRecipeEdit(ctx, rid); // 食譜照片（杜杜龍 2026-11-26）：管理者，或投稿者自己在草稿／待審核時
+  else await requireCourseArt(ctx, s, await courseOfCoverKey(ctx.db, key));
   return { s, kind, lookup: key, centerKey: null, ownerKey: key, scope };
 }
 /** 刪除、換預覽圖時：依資料列所屬的封面檢查權限。 */
@@ -2884,6 +2915,7 @@ async function requireCoverRowOwnerBase(ctx: Ctx, row: CoverRow): Promise<Sessio
     const mine = rights.center && row.center_key === centerKey(rights.center.label);
     if (!rights.admin && !(mine && (rights.staff || rights.editor?.editOthers))) fail(403, "forbidden", "只能修改自己中心的封面");
   } else if (row.owner_kind === "series") requireSuperAdmin(ctx);
+  else if (recipeIdOfKey(row.owner_key)) await requireRecipeEdit(ctx, recipeIdOfKey(row.owner_key)!);
   else await requireCourseArt(ctx, s, await courseOfCoverKey(ctx.db, row.owner_key));
   return s;
 }
@@ -4505,6 +4537,116 @@ const routes: [string, RegExp, Handler][] = [
       return coverItems(ctx.db, kind, lookup);
     },
   ],
+  // ---------- 食譜專區（杜杜龍 2026-11-26；規則與資料在 recipes.ts） ----------
+  [
+    "GET",
+    /^\/recipes$/,
+    async (ctx) => {
+      if (ctx.defer) ctx.defer(purgeStaleDrafts(ctx.db, ctx.env).catch(() => undefined));
+      const manager = await recipeManager(ctx);
+      const r = await listRecipes(ctx.db, { me: ctx.session?.sub ?? null, manager, q: (ctx.url.searchParams.get("q") ?? "").trim().slice(0, 40), pub: (k) => pubUrl(k, 0) });
+      return { ...r, manager, admin: !!ctx.session?.roles.includes("super_admin"), canSubmit: !!ctx.session } satisfies import("./contract.ts").RecipesResponse;
+    },
+  ],
+  [
+    "POST",
+    /^\/recipes$/,
+    async (ctx) => {
+      // 開始編輯一道新食譜：先建一筆草稿（照片要有地方放）；按「儲存」才送出，放棄或沒存的草稿會被刪掉。
+      const s = requireMember(ctx);
+      const id = newRecipeId();
+      await ctx.db.prepare("INSERT INTO recipes (id, author_sub, author_name) VALUES (?, ?, ?)").bind(id, s.sub, (s.name ?? "").slice(0, 60)).run();
+      return { id };
+    },
+  ],
+  [
+    "GET",
+    /^\/recipes\/([a-z0-9]{6,16})$/,
+    async (ctx, [id]) => recipeDetail(ctx, await recipeRow(ctx, id!)),
+  ],
+  [
+    "PUT",
+    /^\/recipes\/([a-z0-9]{6,16})$/,
+    async (ctx, [id]) => {
+      // 修改或送出：finish＝true 代表按了「儲存」（名稱必填；草稿 → 管理者直接發佈、會員進待審核）；false 只存內容（不改狀態）。
+      const { s, row, manager } = await requireRecipeEdit(ctx, id!);
+      const b = await readJson<{ title?: unknown; categoryId?: unknown; body?: unknown; finish?: unknown }>(ctx.req);
+      const title = cleanRecipeTitle(b.title);
+      const body = cleanBody(b.body);
+      const categoryId = typeof b.categoryId === "string" ? b.categoryId.slice(0, 20) : "";
+      if (b.finish === true && !title) return fail(400, "title_required", "請輸入食譜名稱");
+      if (typeof b.body === "string" && b.body.length > BODY_MAX) return fail(400, "body_too_long", `食譜文字最多 ${BODY_MAX} 字`);
+      if (categoryId && !(await ctx.db.prepare("SELECT 1 AS ok FROM recipe_categories WHERE id = ?").bind(categoryId).first())) return fail(400, "invalid_category", "找不到這個分類");
+      const status = b.finish === true && row.status === "draft" ? (manager ? "published" : "pending") : row.status;
+      await ctx.db.batch([
+        ctx.db.prepare("UPDATE recipes SET title = ?, category_id = ?, body = ?, status = ?, updated_at = datetime('now') WHERE id = ?").bind(title, categoryId, body, status, id),
+        audit(ctx.db, s.sub, "recipe.save", "recipe", id!, status),
+      ]);
+      return recipeDetail(ctx, await recipeRow(ctx, id!));
+    },
+  ],
+  [
+    "POST",
+    /^\/recipes\/([a-z0-9]{6,16})\/approve$/,
+    async (ctx, [id]) => {
+      // 審核：核准會員投稿（只有管理者；不核准就刪除）。
+      const s = requireMember(ctx);
+      if (!(await recipeManager(ctx))) return fail(403, "forbidden", "只有管理者可以審核食譜");
+      const row = await recipeRow(ctx, id!);
+      if (row.status !== "pending") return fail(409, "not_pending", "這道食譜不是待審核狀態");
+      await ctx.db.batch([ctx.db.prepare("UPDATE recipes SET status = 'published', updated_at = datetime('now') WHERE id = ?").bind(id), audit(ctx.db, s.sub, "recipe.approve", "recipe", id!)]);
+      return { ok: true };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/recipes\/([a-z0-9]{6,16})$/,
+    async (ctx, [id]) => {
+      const { s } = await requireRecipeEdit(ctx, id!);
+      await deleteRecipe(ctx.db, ctx.env, id!);
+      await audit(ctx.db, s.sub, "recipe.delete", "recipe", id!).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/recipes\/categories$/,
+    async (ctx) => {
+      const s = requireMember(ctx);
+      if (!(await recipeManager(ctx))) return fail(403, "forbidden", "只有有權限的人可以新增分類");
+      const b = await readJson<{ name?: unknown }>(ctx.req);
+      const name = typeof b.name === "string" ? b.name.trim() : "";
+      if (!name || name.length > CATEGORY_MAX) return fail(400, "invalid_name", `分類名稱要 1 到 ${CATEGORY_MAX} 個字`);
+      if (await ctx.db.prepare("SELECT 1 AS ok FROM recipe_categories WHERE name = ?").bind(name).first()) return fail(409, "name_taken", "已經有同名的分類");
+      const id = newRecipeId();
+      await ctx.db.prepare("INSERT INTO recipe_categories (id, name, position, created_by) VALUES (?, ?, (SELECT COALESCE(MAX(position), -1) + 1 FROM recipe_categories), ?)").bind(id, name, s.sub).run();
+      return { id };
+    },
+  ],
+  [
+    "PUT",
+    /^\/recipes\/categories\/([a-z0-9]{3,16})$/,
+    async (ctx, [id]) => {
+      requireMember(ctx);
+      if (!(await recipeManager(ctx))) return fail(403, "forbidden", "只有有權限的人可以改分類名稱");
+      const b = await readJson<{ name?: unknown }>(ctx.req);
+      const name = typeof b.name === "string" ? b.name.trim() : "";
+      if (!name || name.length > CATEGORY_MAX) return fail(400, "invalid_name", `分類名稱要 1 到 ${CATEGORY_MAX} 個字`);
+      if (await ctx.db.prepare("SELECT 1 AS ok FROM recipe_categories WHERE name = ? AND id <> ?").bind(name, id).first()) return fail(409, "name_taken", "已經有同名的分類");
+      await ctx.db.prepare("UPDATE recipe_categories SET name = ? WHERE id = ?").bind(name, id).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/recipes\/categories\/([a-z0-9]{3,16})$/,
+    async (ctx, [id]) => {
+      // 刪除分類：只有超級管理員；裡面的食譜變成「未分類」。
+      requireSuperAdmin(ctx);
+      await ctx.db.batch([ctx.db.prepare("UPDATE recipes SET category_id = '' WHERE category_id = ?").bind(id), ctx.db.prepare("DELETE FROM recipe_categories WHERE id = ?").bind(id)]);
+      return { ok: true };
+    },
+  ],
   [
     "GET",
     /^\/albums$/,
@@ -4519,7 +4661,7 @@ const routes: [string, RegExp, Handler][] = [
       const [idx, perms, rk] = await Promise.all([albumsIndex(ctx), albumPermMap(ctx.db), ranks(ctx.db)]);
       return {
         ranks: [...rk.values()].filter((r) => r.code !== "none").map((r) => ({ code: r.code, name: r.name })),
-        groups: idx.groups.map((g) => ({ id: g.id, label: g.label, uploadMinRank: perms.get(`group:${g.id}`) ?? "" })),
+        groups: [...idx.groups.map((g) => ({ id: g.id, label: g.label, uploadMinRank: perms.get(`group:${g.id}`) ?? "" })), { id: "recipe", label: "食譜（直接發佈、審核投稿、管理分類）", uploadMinRank: perms.get("group:recipe") ?? "" }],
         folders: idx.groups.flatMap((g) => g.folders.map((f) => ({ id: f.id, title: f.title, groupId: g.id, count: f.count, uploadMinRank: perms.get(f.id) ?? null }))),
       } satisfies AlbumPermissions;
     },
@@ -4532,7 +4674,7 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireSuperAdmin(ctx);
       const b = await readJson<{ key?: unknown; uploadMinRank?: unknown }>(ctx.req);
       const key = typeof b.key === "string" ? b.key.slice(0, 200) : "";
-      if (!/^(group:(edm|cover|series|course|block|treasure)|(center|series|course|block):.{1,160})$/.test(key)) return fail(400, "invalid_key", "相簿代碼不正確");
+      if (!/^(group:(edm|cover|series|course|block|treasure|recipe)|(center|series|course|block):.{1,160})$/.test(key)) return fail(400, "invalid_key", "相簿代碼不正確");
       if (b.uploadMinRank === null && !key.startsWith("group:")) {
         await ctx.db.prepare("DELETE FROM album_permissions WHERE key = ?").bind(key).run();
       } else {
