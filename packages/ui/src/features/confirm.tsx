@@ -1,7 +1,8 @@
 import { useSyncExternalStore } from "react";
 import { StyleSheet, View } from "react-native";
 import { space } from "@/theme/tokens";
-import { AppText, Button } from "@/ui";
+import { AppText } from "@/ui/text";
+import { Button } from "@/ui/button";
 import { BottomSheet } from "@/ui/bottom-sheet";
 
 /**

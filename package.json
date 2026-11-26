@@ -5,7 +5,10 @@
   "type": "module",
   "workspaces": [
     "apps/launch",
-    "apps/mobile"
+    "apps/mobile",
+    "apps/check-api",
+    "apps/check-app",
+    "packages/ui"
   ],
   "devDependencies": {
     "eslint": "^9.0.0",

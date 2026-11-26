@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useElderOn } from "./elder-mode";
+import { useElderOn } from "@/lib/elder-mode";
 
 /**
  * 使用模式設定檔（杜杜龍 2026-11-24：為了長期修改維護穩定，兩種模式的差異全部集中在這一個檔案）。

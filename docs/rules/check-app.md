@@ -1,0 +1,8 @@
+# 杜杜龍規則：寰宇繳作業系統（check）
+
+- **寰宇繳作業系統（杜杜龍 2026-11-26）**：獨立 App（iOS、Android、網頁），專門繳作業；第一份作業是「美力之星 第二屆」。完整需求在 `docs/check/spec.md`。原本放在 GitHub `hglobal1985/check`，杜杜龍 2026-11-26 決定併進 `learn` 專案（保留修改紀錄），舊專案封存。對外仍是兩個獨立的 App：網址 https://check.hglobal1985.com、Cloudflare Worker `check`（D1 `check`、R2 `check`）、中央會員登記 `check`、商店上各自一個 App（套件名稱 `com.hglobal1985.check`）。
+- **程式位置**：後端 `apps/check-api`（測試 `npm test -w @check/api`；本機 `apps/check-api/wrangler.local.jsonc`，不提交，`DEV_LOGIN=on` 才能用「dev:代號」登入，admin 開頭＝超級管理員）；App `apps/check-app`（型別檢查 `npx tsc --noEmit -p apps/check-app/tsconfig.json`；前後端共用格式用 `@check/contract`＝`apps/check-api/src/contract.ts`）。建立美力之星各堂與項目：`node apps/check-api/scripts/seed-meili.mjs <網址> <Token> [作業編號]`。
+- **畫面一律用共用元件**（見 `docs/rules/shared-ui.md`）：`apps/check-app/src/kit.tsx` 只是把繳作業系統原本的元件名稱接到共用元件上，不可在裡面另畫樣式；新畫面直接 import 共用元件。
+- **中央會員**：串接指令永遠以 https://id.hglobal1985.com/handoff/check 最新版為準，只補差異；版本寫在 `apps/check-api/src/central.ts` 與 `apps/check-app/src/central/config.ts` 的 `INTEGRATED_VERSION`。登入只走中央登入中繼（網頁 Refresh Token 放 sessionStorage，照串接指令）；會員主鍵只用 member_id；不保存 Amway 資料；顯示名稱是必要副本（表 `people`），中央 webhook `member.deleted` 會連同作業檔案全部刪除（`deleteMemberData`）。webhook 網址 `https://check.hglobal1985.com/api/central/webhook`，金鑰 `CENTRAL_WEBHOOK_SECRET` 由杜杜龍在 Cloudflare 後台設定。
+- **權限**：活動管理員＝中央超級管理員或活動 manager；老師＝管理員或活動 teacher；只有老師能評分；組長只能確認／退回（要寫原因）、留言、編自己這組；同組組員互看已送出的作業，預設看不到分數。作業檔案沒有公開網址，一律用 10 分鐘有效的下載憑證（`/f/<憑證>`）。
+- **部署**：繳作業系統還沒上線；第一次部署到正式環境、送審 App Store／Google Play 前要先問杜杜龍。

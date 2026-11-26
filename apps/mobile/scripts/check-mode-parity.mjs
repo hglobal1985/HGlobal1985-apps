@@ -25,6 +25,10 @@ const walk = (d) => {
 };
 walk(join(base, "src"));
 walk(join(base, "app"));
+// 共用元件（杜杜龍 2026-11-26：行動大學與繳作業系統共用，放在 packages/ui）也一起檢查。
+const shared = join(base, "../../packages/ui/src");
+const sharedStart = files.length;
+walk(shared);
 
 // 規則 2 的白名單：模式本身的設定與切換。
 const MODE_ALLOW = [/^lib\/app-mode\.tsx$/, /^lib\/elder-mode\.ts$/, /^lib\/global-scale\.ts$/, /^ui\/bottom-bar\.tsx$/, /^features\/elder\//];
@@ -32,8 +36,8 @@ const PERM_PROP = /\b((?:can|show|allow|hide)[A-Z]\w*|canEdit|editable|readOnly)
 const MODE_CHECK = /\bkey\s*[!=]==\s*"(elder|super)"|\buseElderOn\s*\(|\bgetElder\(\)\.on\b/g;
 
 const errors = [];
-for (const f of files) {
-  const rel = relative(base, f).replaceAll("\\", "/").replace(/^src\//, "");
+for (const [k, f] of files.entries()) {
+  const rel = (k >= sharedStart ? relative(shared, f) : relative(base, f)).replaceAll("\\", "/").replace(/^src\//, "");
   const lines = readFileSync(f, "utf8").split("\n");
   lines.forEach((line, i) => {
     if (line.includes("mode-parity-ok")) return; // 真的有必要時，在該行加註解「mode-parity-ok：原因」

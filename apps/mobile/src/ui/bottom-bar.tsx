@@ -24,7 +24,7 @@ const elderNavHeight = Math.round((UI_SCALE > 1 ? 80 : 72) * UI_SCALE);
 const MAKER_ICON: IconName = "rocket-outline";
 /** 只吃平板／電腦倍數、不吃至尊模式倍數（lib/global-scale.ts）。 */
 const UI_ONLY = { dataSet: { uiOnly: "" } } as object;
-import { AppText } from "./text";
+import { AppText } from "@/ui/text";
 import { UniversityIcon } from "./university-icon";
 
 type IconName = ComponentProps<typeof Ionicons>["name"];

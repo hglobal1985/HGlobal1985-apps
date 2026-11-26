@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "寰宇繳作業系統",
+    "slug": "check",
+    "scheme": "check",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-web-browser",
+      "expo-document-picker",
+      ["expo-image-picker", { "photosPermission": "選擇要繳交的照片與影片", "cameraPermission": "拍攝要繳交的照片與影片" }]
+    ],
+    "web": { "bundler": "metro", "output": "single", "name": "寰宇繳作業系統", "lang": "zh-Hant" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.hglobal1985.check",
+      "buildNumber": "1",
+      "infoPlist": { "ITSAppUsesNonExemptEncryption": false },
+      "entitlements": { "keychain-access-groups": ["$(AppIdentifierPrefix)com.hglobal1985.shared"] }
+    },
+    "android": { "package": "com.hglobal1985.check", "versionCode": 1 },
+    "extra": {
+      "appleTeamId": ""
+    }
+  }
+}

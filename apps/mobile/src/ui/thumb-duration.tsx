@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { minutesText } from "@/features/format";
-import { AppText } from "./text";
+import { AppText } from "@/ui/text";
 
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
 

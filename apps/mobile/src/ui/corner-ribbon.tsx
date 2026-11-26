@@ -1,5 +1,5 @@
 import { StyleSheet, View } from "react-native";
-import { AppText } from "./text";
+import { AppText } from "@/ui/text";
 
 /**
  * 卡片角落的斜緞帶（不擋點擊）。side：left＝左上角（資格或狀態）、right＝右上角（日期倒數）。

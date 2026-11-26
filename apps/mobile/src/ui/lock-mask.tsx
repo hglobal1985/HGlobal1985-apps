@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Pressable, StyleSheet } from "react-native";
 import { space } from "@/theme/tokens";
-import { AppText } from "./text";
+import { AppText } from "@/ui/text";
 
 /**
  * 「沒有權限」的鎖頭遮罩（杜杜龍 2026-11-21 要求做成全站唯一的模組元件）：

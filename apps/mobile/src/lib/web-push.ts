@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import { isIos as isIosDevice } from "./install-app";
+import { isIos as isIosDevice } from "@/lib/install-app";
 import { api } from "@/api/client";
 
 /**

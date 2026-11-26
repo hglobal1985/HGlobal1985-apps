@@ -1,0 +1,19 @@
+{
+  "name": "@check/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --no-warnings --experimental-strip-types --test tests/*.test.ts",
+    "dev": "wrangler dev -c wrangler.local.jsonc",
+    "migrate": "wrangler d1 migrations apply check --remote",
+    "deploy": "wrangler d1 migrations apply check --remote && wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251101.0",
+    "@types/node": "^22.10.0",
+    "typescript": "~5.9.0",
+    "wrangler": "^4.40.0"
+  }
+}

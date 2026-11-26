@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type Ref } from "react";
 import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { GradientFrame } from "./gradient-frame";
-import type { Rect } from "./band-rect";
+import { GradientFrame } from "@/ui/gradient-frame";
+import type { Rect } from "@/ui/band-rect";
 import { MINI_BAR, MINI_BAR_BG, MINI_BTN, MINI_BTN_COLORS, MINI_BTN_GLYPH_COLOR, MINI_CIRCLE, MINI_GLYPHS, MINI_MARGIN, MINI_POS_KEY, MINI_RADIUS, miniFloatWidth } from "./mini-spec";
 
 type Pos = { x: number; y: number };
