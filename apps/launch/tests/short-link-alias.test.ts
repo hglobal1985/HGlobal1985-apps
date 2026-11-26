@@ -32,3 +32,16 @@ test("短網址改名後，舊縮寫仍然有效（杜杜龍 2026-11-26）；清
   assert.equal((await call("GET", "/short-links/old1")).status, 404, "清除＝全部失效");
   assert.equal((await call("GET", "/short-links/new1")).status, 404);
 });
+
+test("短網址欄位空白按儲存＝系統隨機產生預設縮寫，並顯示在總覽（杜杜龍 2026-11-26）", async () => {
+  const { call, login } = setup();
+  const admin = await login("demo-admin");
+  await call("POST", "/admin/keywords", admin, { kind: "series", value: "白金會" }).catch(() => undefined);
+  const r = await call<{ kind: string; value: string; slug: string | null }[]>("PUT", "/admin/short-links", admin, { kind: "series", value: "白金會", slug: "" });
+  assert.equal(r.status, 200);
+  const slug = r.data.find((x) => x.kind === "series" && x.value === "白金會")?.slug;
+  assert.match(slug ?? "", /^[a-z2-9]{6}$/, "自動產生 6 位小寫英數字");
+  assert.equal((await call<{ value: string }>("GET", `/short-links/${slug}`)).data.value, "白金會", "產生的縮寫可以直接使用");
+  const list = (await call<{ value: string; slug: string | null }[]>("GET", "/admin/short-links", admin)).data;
+  assert.equal(list.find((x) => x.value === "白金會")?.slug, slug, "總覽畫面也看得到");
+});

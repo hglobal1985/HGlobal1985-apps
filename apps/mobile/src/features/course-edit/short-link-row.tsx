@@ -57,7 +57,7 @@ export function ShortLinkRow({ item, onChanged, readOnly = false }: { item: Shor
         <TextInput
           value={draft}
           onChangeText={(v) => setDraft(v.replace(/[^A-Za-z0-9-]/g, ""))}
-          placeholder="英文縮寫"
+          placeholder={readOnly ? "英文縮寫" : "留空＝自動產生"}
           placeholderTextColor={c.textMuted}
           autoCapitalize="none"
           autoCorrect={false}
@@ -73,7 +73,22 @@ export function ShortLinkRow({ item, onChanged, readOnly = false }: { item: Shor
         </AppText>
       ) : null}
       <View style={styles.btnRow}>
-        {readOnly ? null : <Button label="儲存縮寫" icon="checkmark-outline" disabled={busy || !dirty || !value} loading={busy} onPress={() => run(() => api("PUT", "/admin/short-links", { kind: item.kind, value: item.value, slug: value }), `已儲存：${host()}/${value}`)} />}
+        {readOnly ? null : <Button label={!item.slug && !value ? "自動產生並儲存" : "儲存縮寫"} icon="checkmark-outline" disabled={busy || (item.slug ? !dirty || !value : false)} loading={busy} onPress={async () => {
+          // 空白＝系統隨機產生預設縮寫（杜杜龍 2026-11-26），產生後直接顯示在欄位裡。
+          setBusy(true);
+          setMsg(null);
+          try {
+            const list = await api<ShortLinkItem[]>("PUT", "/admin/short-links", { kind: item.kind, value: item.value, slug: value });
+            const got = list.find((x) => x.kind === item.kind && x.value === item.value)?.slug ?? value;
+            setDraft(got);
+            onChanged();
+            flashText(`已儲存：${host()}/${got}${value ? "" : "（自動產生）"}`);
+          } catch (e) {
+            setMsg((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }} />}
         {item.slug && !dirty ? (
           <>
             <Pressable accessibilityRole="button" accessibilityLabel={`分享 ${item.value} 的短網址`} onPress={share} style={[styles.shareBtn, { borderColor: c.border }]}>

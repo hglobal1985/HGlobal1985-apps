@@ -7981,7 +7981,15 @@ const routes: [string, RegExp, Handler][] = [
       if (kind === "location") fail(400, "invalid_kind", "只有分類、系列與中心可以設定短網址");
       const value = keywordText(body.value);
       if (kind === "center") await assertCentralCenters(ctx, [value]);
-      const slug = typeof body.slug === "string" ? body.slug.trim() : ""; // 照輸入的大小寫保存與顯示；比對時不分大小寫
+      let slug = typeof body.slug === "string" ? body.slug.trim() : ""; // 照輸入的大小寫保存與顯示；比對時不分大小寫
+      // 欄位空白按儲存＝系統隨機產生一個預設縮寫（杜杜龍 2026-11-26）：6 位小寫英數字、不與網站頁面或別人的縮寫（含舊縮寫）重複。
+      if (!slug) {
+        for (let i = 0; i < 20 && !slug; i++) {
+          const cand = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => "abcdefghjkmnpqrstuvwxyz23456789"[b % 31]).join("");
+          if (!RESERVED_SLUGS.has(cand) && !(await slugTarget(ctx.db, cand))) slug = cand;
+        }
+        if (!slug) return fail(500, "slug_generate_failed", "產生縮寫失敗，請再按一次");
+      }
       if (RESERVED_SLUGS.has(slug.toLowerCase())) fail(400, "reserved_slug", `「${slug}」是網站頁面名稱，請換一個縮寫`);
       if (!SLUG_RE.test(slug)) fail(400, "invalid_slug", "縮寫只能用英文字母（大小寫都可以）、數字與連字號（-），長度 2～30 字");
       const taken = await slugTarget(ctx.db, slug);

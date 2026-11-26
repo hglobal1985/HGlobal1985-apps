@@ -44,14 +44,14 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
   const nowUrl = course.shortPath ? `https://${host()}/${course.shortPath}` : `https://${host()}/course/${course.id}`;
 
   const save = async () => {
-    if (!s) return setError("請先填「系列縮寫」");
-    if (!m) return setError("請填「卡片名稱」");
     setBusy(true);
     setError(null);
     try {
-      if (s !== curSeries) await api("PUT", "/admin/short-links", { kind: "series", value: course.series, slug: s });
-      if (m.toLowerCase() !== curMat.toLowerCase()) {
-        const d = await api<CourseDetail>("PATCH", `/admin/courses/${course.id}`, { matUrl: m, ifUpdatedAt: course.admin?.updatedAt });
+      // 空白＝系統自動產生預設值（杜杜龍 2026-11-26）：系列縮寫由伺服器產生，卡片名稱這裡產生 5 位小寫英數字。
+      if ((s && s !== curSeries) || (!s && !curSeries)) await api("PUT", "/admin/short-links", { kind: "series", value: course.series, slug: s });
+      const mNew = m || (curMat ? "" : Array.from(crypto.getRandomValues(new Uint8Array(5)), (b) => "abcdefghjkmnpqrstuvwxyz23456789"[b % 31]).join(""));
+      if (mNew && mNew.toLowerCase() !== curMat.toLowerCase()) {
+        const d = await api<CourseDetail>("PATCH", `/admin/courses/${course.id}`, { matUrl: mNew, ifUpdatedAt: course.admin?.updatedAt });
         onSaved(d);
       }
       flashText("已儲存網址");
@@ -96,15 +96,15 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
                   <AppText variant="callout" tone="muted">/</AppText>
                   <AppText variant="callout" style={{ fontWeight: "800" }}>② 卡片名稱</AppText>
                 </View>
-                <Field label={`① 系列縮寫（整個「${course.series}」系列共用的前段）`} value={s} onChange={(v) => setSeriesSlug(clean(v))} placeholder="例如：amway" />
+                <Field label={`① 系列縮寫（整個「${course.series}」系列共用的前段）`} value={s} onChange={(v) => setSeriesSlug(clean(v))} placeholder="例如：amway（留空＝自動產生）" />
                 <AppText variant="caption" tone="muted">改這一段，同系列所有卡的網址前段都會一起換；舊的縮寫仍然有效。</AppText>
-                <Field label="② 卡片名稱（只屬於這張卡，同系列內不能重複）" value={m} onChange={(v) => setMatUrl(clean(v).toLowerCase())} placeholder="例如：dd" />
+                <Field label="② 卡片名稱（只屬於這張卡，同系列內不能重複）" value={m} onChange={(v) => setMatUrl(clean(v).toLowerCase())} placeholder="例如：dd（留空＝自動產生）" />
                 <View style={{ gap: 2 }}>
                   <AppText variant="caption" tone="muted">儲存後的完整網址</AppText>
                   <AppText variant="callout" style={{ fontWeight: "800", color: full ? c.accentText : c.textMuted }}>{full || "兩段都填好之後，這裡會顯示完整網址"}</AppText>
                 </View>
                 {error ? <AppText variant="caption" tone="danger">{error}</AppText> : null}
-                <Button label="儲存網址" icon="checkmark-outline" loading={busy} disabled={busy || !dirty} onPress={() => void save()} fullWidth />
+                <Button label={!s && !m ? "自動產生並儲存" : "儲存網址"} icon="checkmark-outline" loading={busy} disabled={busy || (!dirty && !!(curSeries && curMat))} onPress={() => void save()} fullWidth />
                 <AppText variant="caption" tone="muted">原本的網址（/course/…）和你改掉的舊縮寫都會繼續有效，已經分享出去的連結不會失效。</AppText>
               </View>
             ) : course.isList ? (
