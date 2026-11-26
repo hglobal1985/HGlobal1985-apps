@@ -22,8 +22,9 @@ const validDate = (y: number, m: number, d: number): string | null => {
   return new Date(iso + "T00:00:00Z").toISOString().slice(0, 10) === iso ? iso : null;
 };
 /**
- * 從辨識出的文字推活動日期（業主 2026-11-26 規定）：EDM 上的日期通常沒寫年份，**一律用「上傳當下的年份」**（台灣時間）建檔；
- * 海報上明確寫了完整年份（YYYY-MM-DD／YYYY年M月D日／YYYY/M/D）就照海報。只有月日（M/D、M月D日）→ 上傳年＋月日。找不到回 null。
+ * 從辨識出的文字推活動日期（業主 2026-11-26 規定）：EDM 上的日期通常沒寫年份，年份取「離上傳日最近」的那一年（台灣時間；
+ * 試上傳前一年、當年、後一年三種，挑與上傳日相差天數最少的，所以 1 月上傳 12 月的海報會是前一年、12 月上傳 1 月的活動會是隔年）。
+ * 海報上明確寫了完整年份（YYYY-MM-DD／YYYY年M月D日／YYYY/M/D）就照海報。找不到回 null。
  * uploaded＝這張 EDM 上傳的時間（沒給就用現在）。
  */
 export function inferDate(text: string, uploaded = new Date()): string | null {
@@ -34,8 +35,10 @@ export function inferDate(text: string, uploaded = new Date()): string | null {
   }
   const md = /(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})\s*日?/.exec(text);
   if (!md) return null;
-  const year = new Date(uploaded.getTime() + 8 * 3600_000).getUTCFullYear();
-  return validDate(year, +md[1]!, +md[2]!);
+  const tw = new Date(uploaded.getTime() + 8 * 3600_000);
+  const base = Date.UTC(tw.getUTCFullYear(), tw.getUTCMonth(), tw.getUTCDate());
+  const cands = [-1, 0, 1].map((d) => validDate(tw.getUTCFullYear() + d, +md[1]!, +md[2]!)).filter((x): x is string => !!x);
+  return cands.sort((a, b) => Math.abs(Date.parse(a) - base) - Math.abs(Date.parse(b) - base))[0] ?? null;
 }
 
 /** 從模型回的文字找出 JSON；活動日期必須是真實存在的 YYYY-MM-DD，否則當作沒有。 */
@@ -130,7 +133,7 @@ export async function edmOcrIds(db: D1Database, limit: number): Promise<string[]
 
 /** 背景處理還沒辨識的中心 EDM 圖（每次最多 limit 張；額度用完或沒綁定 AI 就停）。 */
 export async function ocrPending(env: Env, db: D1Database, limit = 3): Promise<void> {
-  await fixEdmYears(db);
+  await fillMissingEdmDates(db);
   if (!env.AI) return;
   const { results } = await db.prepare("SELECT id FROM cover_media WHERE owner_kind = 'center' AND scope = 'edm' AND kind = 'image' AND (ocr_status = '' OR (ocr_status = 'working' AND ocr_at < ?)) ORDER BY created_at DESC LIMIT ?").bind(new Date(Date.now() - 600_000).toISOString(), limit).all<{ id: string }>();
   for (const r of results) {
@@ -144,11 +147,11 @@ export async function ocrPending(env: Env, db: D1Database, limit = 3): Promise<v
 }
 
 /**
- * 補齊／校正 EDM 活動日期的年份（業主 2026-11-26）：已辨識的 EDM 依上傳年份重新推日期（不用 AI、可重複執行）。
- * 規則見 `inferDate`：沒寫年份一律用上傳當年；海報寫了完整年份就照海報。排程、讀中心 EDM、「立即開始辨識」都會順便跑。
+ * 只補「還沒有活動日期」的已辨識 EDM（用已存的文字依 `inferDate` 推，不用 AI）。已經有日期的不會被改動
+ * （業主 2026-11-26：改成「最近年份」規則後，舊的不用重算）。
  */
-export async function fixEdmYears(db: D1Database): Promise<number> {
-  const { results } = await db.prepare("SELECT id, ocr_text, event_date, created_at FROM cover_media WHERE scope = 'edm' AND kind = 'image' AND ocr_status = 'done' AND ocr_text <> '' LIMIT 500").all<{ id: string; ocr_text: string; event_date: string | null; created_at: string | null }>();
+export async function fillMissingEdmDates(db: D1Database): Promise<number> {
+  const { results } = await db.prepare("SELECT id, ocr_text, event_date, created_at FROM cover_media WHERE scope = 'edm' AND kind = 'image' AND ocr_status = 'done' AND ocr_text <> '' AND event_date IS NULL LIMIT 500").all<{ id: string; ocr_text: string; event_date: string | null; created_at: string | null }>();
   let n = 0;
   for (const r of results) {
     const d = inferDate(r.ocr_text, r.created_at ? new Date(r.created_at) : undefined);

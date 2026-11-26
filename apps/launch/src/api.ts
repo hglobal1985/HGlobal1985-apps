@@ -109,7 +109,7 @@ import { drawZoneVideoBadges } from "./zone-video-badges.ts";
 import { isCoverKey, isKeyInUse, listInUseCards, listUnusedCovers, type InUseCard } from "./cover-library.ts";
 import { evaluateAchievements } from "./achievements.ts";
 import { TranscribeError, transcribeNext, transcriptView } from "./transcribe.ts";
-import { fixEdmYears, ocrEdmImage, ocrPending } from "./edm-vision.ts";
+import { ocrEdmImage, ocrPending } from "./edm-vision.ts";
 import { DEFAULT_FIELDS, OTHER as EDM_OTHER, cleanOcrText, fmtOf, loadFields, normalizeFields, saveFields, structureEdm, structurePending, structureStats, type Structured } from "./edm-structure.ts";
 import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnection, loadSettings, loadSettings as loadAiSettings, todayUsed as aiTodayUsed, normalizeSelection, normalizeSettings, saveSelection, saveSettings, usageSummary } from "./ai-models.ts";
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
@@ -6923,7 +6923,6 @@ const routes: [string, RegExp, Handler][] = [
       // 前端會連續呼叫直到沒有待辨識或額度用完。
       const s = requireSuperAdmin(ctx);
       const { runAiBatch } = await import("./ai-batch.ts");
-      await fixEdmYears(ctx.db).catch(() => undefined);
       const r = await runAiBatch(ctx.env, ctx.db, { budgetSec: 70 });
       await audit(ctx.db, s.sub, "ai.run_now", "setting", "ai_batch", `done=${r.done} stopped=${r.stopped}`).run();
       return r;
