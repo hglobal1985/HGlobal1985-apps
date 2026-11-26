@@ -4,7 +4,7 @@ import { isSuperAdmin } from "@/lib/roles";
 import { useApi, useSession } from "@/state/session";
 
 /**
- * 系列卡的設定（業主 2026-11-19）：標題只改顯示（識別名稱不動）、是否顯示在「所有系列」；「未分類」系列只有超級管理員看得到。
+ * 系列卡的設定（杜杜龍 2026-11-19）：標題只改顯示（識別名稱不動）、是否顯示在「所有系列」；「未分類」系列只有超級管理員看得到。
  * 全站要顯示系列名稱、判斷系列要不要出現，一律用這裡，不可各自判斷。
  */
 export function useSeriesSettings() {

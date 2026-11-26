@@ -6,7 +6,7 @@ import { setCentralFetch } from "../src/central.ts";
 import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-// 業主 2026-11-20：向中央讀資料「先給舊的、背景更新」＋獎銜定義只問一次＋Server-Timing 記錄中央呼叫。
+// 杜杜龍 2026-11-20：向中央讀資料「先給舊的、背景更新」＋獎銜定義只問一次＋Server-Timing 記錄中央呼叫。
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: "jwk" }), kid: "k1", use: "sig", alg: "RS256" };
 const ISS = "https://id.hglobal1985.com";

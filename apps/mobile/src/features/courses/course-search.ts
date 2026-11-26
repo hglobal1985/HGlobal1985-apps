@@ -7,7 +7,7 @@ export type SearchTerm = { kind: "系列" | "課程" | "主講人" | "獎銜" | 
 export type SearchIndex = { haystack: Map<string, string>; /** 章節模式用：每一堂自己的搜尋文字（含所屬課程的主講人、系列、日期）。 */ lessonHay: Map<string, string>; terms: SearchTerm[] };
 
 /**
- * 自訂關聯詞（業主 2026-11-25）：課程文字裡只要有某一組的任何一個詞，這組的其他詞也加進這門課的搜尋文字（各自獨立一段，
+ * 自訂關聯詞（杜杜龍 2026-11-25）：課程文字裡只要有某一組的任何一個詞，這組的其他詞也加進這門課的搜尋文字（各自獨立一段，
  * 所以「王儷凱」打錯字也能用模糊比對找到「王老師」的課）。回傳一個把文字補上關聯詞的函式。
  */
 export function withSynonyms(groups: string[][]): (hay: string) => string {
@@ -15,7 +15,7 @@ export function withSynonyms(groups: string[][]): (hay: string) => string {
   if (!gs.length) return (hay) => hay;
   return (hay) => {
     let out = hay;
-    // 單字的詞（例如「水」）不當觸發條件：幾乎每門課都有，會讓所有課都被補上同組的詞（業主 2026-11-25 回報搜「水機」跑出美護髮、口腔保健）。
+    // 單字的詞（例如「水」）不當觸發條件：幾乎每門課都有，會讓所有課都被補上同組的詞（杜杜龍 2026-11-25 回報搜「水機」跑出美護髮、口腔保健）。
     for (const g of gs) if (g.some((t) => [...t].length >= 2 && hay.includes(t))) for (const t of g) if (!out.includes(t)) out += `\u0001${t}`;
     return out;
   };
@@ -55,7 +55,7 @@ export function buildSearchIndex(courses: CourseSummary[], lessons: SearchLesson
   const haystack = new Map<string, string>();
   const lessonHay = new Map<string, string>();
   for (const c of courses) {
-    // 搜尋範圍也含「主辦中心、主辦／指導單位、分類、品牌」與「EDM」關鍵字（有 EDM 海報的課程；業主 2026-11-24：搜「新竹 EDM」不可沒有結果）。
+    // 搜尋範圍也含「主辦中心、主辦／指導單位、分類、品牌」與「EDM」關鍵字（有 EDM 海報的課程；杜杜龍 2026-11-24：搜「新竹 EDM」不可沒有結果）。
     const parts: string[] = [c.title, c.series, c.teacher, c.teacherRankName, c.teacherTitle, c.hostCenter, c.hostUnit, c.guidanceUnit, c.category, c.brandName ?? "", c.edmUrl ? "EDM 海報" : ""];
     const courseParts: string[] = [...parts];
     add("課程", c.title);
@@ -112,7 +112,7 @@ export function suggestTerms(index: SearchIndex, q: string, limit = 8): SearchTe
 }
 
 /**
- * 模糊比對（業主 2026-11-23，容錯打錯字）：在一段文字裡找「最多差 k 個字」的相似片段（Sellers 近似子字串比對）。
+ * 模糊比對（杜杜龍 2026-11-23，容錯打錯字）：在一段文字裡找「最多差 k 個字」的相似片段（Sellers 近似子字串比對）。
  * 差 k 個字＝漏字、多字、錯字都算；例：「益支源」找得到「益之源」。
  */
 export function approxIncludes(text: string, pat: string, k: number): boolean {
@@ -155,7 +155,7 @@ export function fuzzyLessons(index: SearchIndex, q: string): Set<string> {
 }
 
 /**
- * 最相近的單元（業主 2026-11-25：長句搜尋「洗蔬菜水果清潔劑花椰菜番茄農藥殘留」整頁空白，要一定看到結果）：
+ * 最相近的單元（杜杜龍 2026-11-25：長句搜尋「洗蔬菜水果清潔劑花椰菜番茄農藥殘留」整頁空白，要一定看到結果）：
  * 前面所有找法（字面、模糊、字元、同音、AI）都沒結果時的最後一道：把查詢拆成相鄰兩字的片段（也可拆成單字），
  * 數每個單元的文字命中幾個片段，命中越多越前面，取前 `limit` 筆。兩字片段命中分數 3、單字 1；完全沒命中才會回空。
  * 超派、至尊共用（useSearchEngine）。
@@ -164,7 +164,7 @@ export type GramOpts = { w2: number; w3: number; w4: number; commonPct: number }
 export function looseLessons(index: SearchIndex, q: string, limit = 30, minScore = 1, o: GramOpts = { w2: 3, w3: 6, w4: 10, commonPct: 30 }): string[] {
   const text = q.toLowerCase().replace(/[\s\u3000]+/g, "");
   const chars = [...new Set([...text])];
-  // 查詢字的所有 2～4 字片段（業主 2026-11-25：搜「晚安修護面膜」要找到所有「面膜」相關的單元）：
+  // 查詢字的所有 2～4 字片段（杜杜龍 2026-11-25：搜「晚安修護面膜」要找到所有「面膜」相關的單元）：
   // 越長的片段越重要（2 字 3 分、3 字 6 分、4 字 10 分）；幾乎每筆都有的常見片段（出現在 30% 以上的單元）不算分，避免雜訊。
   const grams = new Set<string>();
   for (let n = 2; n <= 4; n++) for (let i = 0; i + n <= text.length; i++) grams.add(text.slice(i, i + n));
@@ -183,7 +183,7 @@ export function looseLessons(index: SearchIndex, q: string, limit = 30, minScore
 }
 
 /**
- * 字元比對（業主 2026-11-24：語音輸入「線上白金」要找得到「安麗與白金線上溝通會」）：
+ * 字元比對（杜杜龍 2026-11-24：語音輸入「線上白金」要找得到「安麗與白金線上溝通會」）：
  * 查詢的每個字（不分順序）都出現在同一門課的文字裡就算符合；至少 3 個字才用，避免太短亂配。
  * 只在完全比對與模糊比對都沒結果時才用，且不需要 AI，額度用完也找得到。
  */
@@ -196,7 +196,7 @@ export function charsCourses(index: SearchIndex, q: string): Set<string> {
 }
 
 /**
- * 搜尋結果排序（業主 2026-11-24）：關聯性高 > 日期最新 > 已報名；至尊、超派共用這一個。
+ * 搜尋結果排序（杜杜龍 2026-11-24）：關聯性高 > 日期最新 > 已報名；至尊、超派共用這一個。
  * 關聯性：課程名稱完全包含（名稱就是查詢字最高）＞主講人／系列／獎銜包含＞章節或日期包含＞同音＞模糊＞字元比對＞AI 語意（依伺服器給的相似度順序）。
  * near.phonetic／near.semantic 是伺服器依相似度排好的課程編號。
  */
@@ -218,7 +218,7 @@ export function rankCourses(index: SearchIndex, list: CourseSummary[], q: string
   const enrolled = (c: CourseSummary) => (c.enrollment === "opened" ? 2 : c.enrollment === "pending" ? 1 : 0);
   return list
     .map((c) => ({ c, r: rel(c) }))
-    // 只是「相近」（同音、模糊、AI 語意）的品牌／清單卡排在課程後面（業主 2026-11-25）；字面完全符合的不受影響。
+    // 只是「相近」（同音、模糊、AI 語意）的品牌／清單卡排在課程後面（杜杜龍 2026-11-25）；字面完全符合的不受影響。
     .sort((a, b) => (TUNE.listCardsLast ? Number(a.c.isList && a.r < 3) - Number(b.c.isList && b.r < 3) : 0) || b.r - a.r || (date(b.c) > date(a.c) ? 1 : date(b.c) < date(a.c) ? -1 : 0) || enrolled(b.c) - enrolled(a.c))
     .map((x) => x.c);
 }

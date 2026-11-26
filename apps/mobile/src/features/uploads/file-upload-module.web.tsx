@@ -11,7 +11,7 @@ import { UploadProgress } from "./upload-progress";
 type DriveCfg = { ready: boolean; clientId: string; apiKey: string; appId: string; maxBytes: number };
 
 /**
- * 「上傳檔案」模組（業主 2026-11-18，教材新增／清單新增教材／區塊新增教材共用，要改只改這一個檔案）：
+ * 「上傳檔案」模組（杜杜龍 2026-11-18，教材新增／清單新增教材／區塊新增教材共用，要改只改這一個檔案）：
  * 檔案一律存在行動大學的儲存空間（R2），下載一律經過權限檢查與一次性連結。兩種資料來源：
  * ① 從這支裝置（手機、平板、電腦）選圖片、照片、文件（不可影片，單檔大小有上限）；圖片自動壓縮（長邊與畫質同封面），選好立刻上傳並建立教材。
  * ② 從使用者「自己的」Google 雲端硬碟選擇（Google Picker；使用者授權一次性權杖，伺服器讀取後轉存到 R2，權杖不保存；Google 文件、試算表、簡報自動轉成 PDF、Excel、PowerPoint）。

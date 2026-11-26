@@ -7,7 +7,7 @@ import { resetBandScroll, scrollBandTop, useBandScroll } from "./band-scroll";
 import { MiniWindow } from "./mini-window";
 
 /**
- * 「封面區」下滑縮成迷你播放器的模組（業主 2026-11-24 永久指示：影片播放區和封面區都要，超派、至尊、App、網頁同一份）。
+ * 「封面區」下滑縮成迷你播放器的模組（杜杜龍 2026-11-24 永久指示：影片播放區和封面區都要，超派、至尊、App、網頁同一份）。
  * 設計＝課程頁影片播放時的迷你播放器（features/player）：頁面往下滑，上方釘住的區塊平順縮矮到不見（內容第一列往上補），
  * 同時右下角（底部選單上方）浮出一個迷你小視窗（同樣的流光邊框、同樣的寬度、16:9），點一下回到頂端、封面展開；往上滑回頂端再還原。
  * 有影片在播放時，由全站播放器（features/player，SHRINK_PX＝140）縮成浮動迷你播放器，不走這裡。
@@ -62,7 +62,7 @@ export function CoverMiniFloat({ cover, enabled = true, label, range = MINI_PX }
   const y = useBandScroll();
   const focused = useIsFocused(); // 堆在後面、沒在看的頁面不出圓球
   const [closed, setClosed] = useState(false);
-  // 靜態封面往下滑：一浮出就直接縮到最小的圓球（業主 2026-11-25）；點圓球才展開成小視窗，回到頂端再往下滑又從圓球開始。
+  // 靜態封面往下滑：一浮出就直接縮到最小的圓球（杜杜龍 2026-11-25）；點圓球才展開成小視窗，回到頂端再往下滑又從圓球開始。
   const [collapsed, setCollapsed] = useState(true);
   const p = miniProgress(y, range);
   useEffect(() => {

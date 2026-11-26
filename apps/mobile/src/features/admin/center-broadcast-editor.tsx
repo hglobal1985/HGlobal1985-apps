@@ -10,7 +10,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { FLASH_ICON, showFlash } from "@/ui/flash-notice";
 
 /**
- * 中心頁「編輯」裡的廣播公告設定（業主 2026-11-17）：可以新增多則公告輪播、改內容、刪除，並設定每則停留幾秒（預設 2 秒）。
+ * 中心頁「編輯」裡的廣播公告設定（杜杜龍 2026-11-17）：可以新增多則公告輪播、改內容、刪除，並設定每則停留幾秒（預設 2 秒）。
  * 每個動作按下就立刻儲存。新增公告時，訂閱這個中心的人會收到通知。
  */
 export function CenterBroadcastEditor({ center, onChanged }: { center: string; onChanged: () => void }) {

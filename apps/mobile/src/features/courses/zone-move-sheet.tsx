@@ -8,11 +8,11 @@ import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";
 import type { SeriesGroup } from "./sort";
 
-/** 專區的正式名稱（業主 2026-11-18）。 */
+/** 專區的正式名稱（杜杜龍 2026-11-18）。 */
 export const zoneLabel = (z: Zone) => ZONES.find((x) => x.id === z)?.label ?? z;
 
 /**
- * 跨專區移動（業主 2026-11-18）：標題列右邊的「移動」鈕開啟；列出其他專區的課程／清單（依專區分組），
+ * 跨專區移動（杜杜龍 2026-11-18）：標題列右邊的「移動」鈕開啟；列出其他專區的課程／清單（依專區分組），
  * 勾選後按「移入」，同系列的一起搬。只有超級管理員看得到。
  */
 export function ZoneMoveSheet({ target, groups, onMoved, onClose }: { target: Zone; groups: SeriesGroup[]; onMoved: () => void; onClose: () => void }) {

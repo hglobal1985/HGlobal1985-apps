@@ -17,7 +17,7 @@ const ACCEPT: Record<Pick, string> = {
 };
 
 /**
- * 學員繳交作業的上傳區（網頁版，業主 2026-11-25）：照片（自動壓縮）、短影片（3 分鐘內，在自己的瀏覽器壓縮後上傳）、檔案、連結。
+ * 學員繳交作業的上傳區（網頁版，杜杜龍 2026-11-25）：照片（自動壓縮）、短影片（3 分鐘內，在自己的瀏覽器壓縮後上傳）、檔案、連結。
  * 只顯示這份作業有開放的種類；按鈕大、一列兩顆，手機單手好按。
  */
 export function HomeworkUploader({ assignment, mine, onChanged }: { assignment: HwAssignment; mine: HwSubmission | null; onChanged: (m: HwSubmission) => void }) {

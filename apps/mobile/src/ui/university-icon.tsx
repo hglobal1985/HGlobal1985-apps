@@ -3,7 +3,7 @@ import { UI_SCALE } from "@/theme/ui-scale";
 
 /**
  * 「寰宇大學」分頁的建築物圖示（有柱子的學院）。自己畫成 SVG，不用 MaterialCommunityIcons：
- * 那個圖示字型有 1.3MB，只為了一個圖示就讓每個人開啟網站都多下載一大包（業主 2026-11-17 回報變慢）。
+ * 那個圖示字型有 1.3MB，只為了一個圖示就讓每個人開啟網站都多下載一大包（杜杜龍 2026-11-17 回報變慢）。
  * active＝實心；未選取＝線條。
  */
 export function UniversityIcon({ size = 24, color, active }: { size?: number; color: string; active?: boolean }) {

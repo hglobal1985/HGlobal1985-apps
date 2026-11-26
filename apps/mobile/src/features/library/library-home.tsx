@@ -14,7 +14,7 @@ const LibraryScreen = lazyPart(view, "LibraryScreen", <LoadingView />);
 const Shelves = lazyPart(view, "Shelves", <LoadingView />);
 
 /**
- * 設定 › 我的書櫃 的主畫面（業主 2026-11-17）：所有登入會員點進來都看到同一套木質書架介面；
+ * 設定 › 我的書櫃 的主畫面（杜杜龍 2026-11-17）：所有登入會員點進來都看到同一套木質書架介面；
  * 有書櫃鑰匙的人＝自己的書櫃（右上角齒輪進入設定）；沒有鑰匙的人＝空書架預覽，操作（齒輪）只提示「尚未解鎖書櫃鑰匙」。
  * 所有設定功能（名稱、密碼、書架與書的管理）都集中在齒輪裡（app/library-settings.tsx）。
  */

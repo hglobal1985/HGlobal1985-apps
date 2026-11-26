@@ -71,25 +71,25 @@ export const setCenterNames = (m: Record<string, string>) => {
 
 /**
  * 全站唯一的「教育中心名稱」來源：有自訂名稱（編輯中心頁設定）就用自訂；沒有就用預設格式「去掉數字代碼＋中心」
- * （「南京 062」→「南京中心」、「美國洛杉磯」→「美國洛杉磯中心」、「台北中心」→「台北中心」，與分享預覽標題的名稱部分一致，後端規則在 apps/launch/src/og.ts；業主 2026-11-15 指定預設改為 XX中心）。
+ * （「南京 062」→「南京中心」、「美國洛杉磯」→「美國洛杉磯中心」、「台北中心」→「台北中心」，與分享預覽標題的名稱部分一致，後端規則在 apps/launch/src/og.ts；杜杜龍 2026-11-15 指定預設改為 XX中心）。
  * 所有顯示中心名稱的地方一律用它。
  */
 export function centerTitle(label: string): string {
   const custom = customCenterNames[centerKeyOf(label)];
   if (custom) return custom;
-  // 業主 2026-11-17：取消「自動在後面加中心二個字」，中央的名稱怎麼寫就怎麼顯示（只拿掉尾巴的數字代碼）。
+  // 杜杜龍 2026-11-17：取消「自動在後面加中心二個字」，中央的名稱怎麼寫就怎麼顯示（只拿掉尾巴的數字代碼）。
   return label.replace(/\s*\d+\s*$/, "").trim() || label;
 }
 
-/** 中心簡稱（公告橫條用，業主 2026-11-21）：只留地名或中心名稱——「新竹中心」→「新竹」、「嘉義生活美學館」維持原樣。 */
+/** 中心簡稱（公告橫條用，杜杜龍 2026-11-21）：只留地名或中心名稱——「新竹中心」→「新竹」、「嘉義生活美學館」維持原樣。 */
 export function centerShort(label: string): string {
   const t = centerTitle(label);
   const s = t.replace(/(教育)?中心$/, "").trim();
   return s.length >= 2 ? s : t;
 }
 
-/** 章節長度：「12分鐘」（超過 60 分鐘也一樣用分鐘，不顯示「小時」、不加「約」；沒有長度回空字串。業主 2026-11-16）。 */
-/** 影片長度文字：60 分鐘以內「N分鐘」，超過 60 分鐘「X小時Y分鐘」（整點只寫「X小時」；業主 2026-11-25）。 */
+/** 章節長度：「12分鐘」（超過 60 分鐘也一樣用分鐘，不顯示「小時」、不加「約」；沒有長度回空字串。杜杜龍 2026-11-16）。 */
+/** 影片長度文字：60 分鐘以內「N分鐘」，超過 60 分鐘「X小時Y分鐘」（整點只寫「X小時」；杜杜龍 2026-11-25）。 */
 export const minutesText = (m: number | null | undefined): string => {
   if (!m || m <= 0) return "";
   if (m <= 60) return `${m}分鐘`;
@@ -98,7 +98,7 @@ export const minutesText = (m: number | null | undefined): string => {
   return r ? `${h}小時${r}分鐘` : `${h}小時`;
 };
 
-/** 章節的分享者顯示：「李講師﹒白金﹒經理」（姓名、獎銜、職稱用「﹒」連接，不加「分享者：」標題；沒填的略過；三者都沒填回空字串。業主 2026-11-16 全站統一）。 */
+/** 章節的分享者顯示：「李講師﹒白金﹒經理」（姓名、獎銜、職稱用「﹒」連接，不加「分享者：」標題；沒填的略過；三者都沒填回空字串。杜杜龍 2026-11-16 全站統一）。 */
 export function sharerLine(l: { sharer: string; sharerRankName: string; sharerTitle: string }): string {
   return [l.sharer, l.sharerRankName, l.sharerTitle].map((x) => x.trim()).filter(Boolean).join("﹒");
 }
@@ -106,7 +106,7 @@ export function sharerLine(l: { sharer: string; sharerRankName: string; sharerTi
 
 /**
  * 只有主辦單位的顯示（首頁區塊、課程資訊卡的「XX主辦」，不含指導單位）：
- * 一個主辦＝「美國洛杉磯中心主辦」；兩個以上＝去掉各中心後面的「中心」、用「/」連接（業主 2026-11-16）：「台中/彰化/員林主辦」。
+ * 一個主辦＝「美國洛杉磯中心主辦」；兩個以上＝去掉各中心後面的「中心」、用「/」連接（杜杜龍 2026-11-16）：「台中/彰化/員林主辦」。
  */
 export function hostLine(c: { hostUnit: string }): string {
   const hosts = c.hostUnit.split(/[、,，;；\n]+/).map((x) => x.trim()).filter(Boolean).map((x) => (x === "寰宇總部" ? x : centerTitle(x)));

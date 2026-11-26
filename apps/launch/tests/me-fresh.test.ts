@@ -22,7 +22,7 @@ test("新會員：沒勾 Amway 也會提醒；會員中心暫時查不到不記�
   // 模擬會員中心：amway 內容可隨時改，也可模擬暫時故障。
   let amway: unknown = { enabled: false, fields: {} };
   let amwayDown = false;
-  let legalName = "王小明"; // 本名必填（業主 2026-11-23）
+  let legalName = "王小明"; // 本名必填（杜杜龍 2026-11-23）
   setCentralFetch((url) => {
     const ok = (b: unknown) => Promise.resolve(new Response(JSON.stringify(b), { status: 200 }));
     if (url.endsWith("/oauth/jwks")) return ok({ keys: [jwk] });

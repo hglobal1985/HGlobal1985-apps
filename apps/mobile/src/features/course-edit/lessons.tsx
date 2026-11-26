@@ -60,7 +60,7 @@ export function useYoutubeLengthFix(course: CourseDetail | null | undefined, ena
   return detecting;
 }
 
-/** 章節面板：新增與編輯同一個畫面（業主 2026-11-16）。教材（material）另有 material-sheet.tsx。 */
+/** 章節面板：新增與編輯同一個畫面（杜杜龍 2026-11-16）。教材（material）另有 material-sheet.tsx。 */
 export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail; lesson: Lesson; onClose: () => void }) {
   if (lesson.section) return <SectionTitleSheet course={course} lesson={lesson} onClose={onClose} />;
   if (lesson.material) return <EditMaterialSheet course={course} lesson={lesson} onClose={onClose} />;
@@ -68,7 +68,7 @@ export function LessonSheet({ course, lesson, onClose }: { course: CourseDetail;
 }
 
 /**
- * 清單的「區塊」新增與編輯（業主 2026-11-18，由原本的「分類標題」升級）：區塊名稱、「顯示在上拉選單」勾選（預設勾選）；
+ * 清單的「區塊」新增與編輯（杜杜龍 2026-11-18，由原本的「分類標題」升級）：區塊名稱、「顯示在上拉選單」勾選（預設勾選）；
  * 勾選後出現封面（上傳；沒上傳就用品牌 logo）、品牌（單選）、分類（可複選）。區塊底下（到下一個區塊之前）的教材屬於這個區塊，學員點區塊標題可收合。
  * 沒傳 lesson＝新增（加在最後面，之後可用上下移動調整位置）；封面要區塊建立後才能上傳。
  */
@@ -131,12 +131,12 @@ export function SectionTitleSheet({ course, lesson, onClose }: { course: CourseD
 }
 
 /**
- * 清單編輯模式（業主 2026-11-18）：每個區塊一張卡（區塊標題列＋底下的教材＋「新增教材到這個區塊」），「新增區塊」獨立放在最下面。
+ * 清單編輯模式（杜杜龍 2026-11-18）：每個區塊一張卡（區塊標題列＋底下的教材＋「新增教材到這個區塊」），「新增區塊」獨立放在最下面。
  * 區塊的上下移動＝整個區塊（連同底下的教材）一起移；教材的上下移動只在區塊內。
  */
-export function BlockEditList({ extraMovable, items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, onPickMove, onAddPhotos, busy }: { /** 區塊「新增照片」（業主 2026-11-24，只有開放的課程；區塊要有 photoKey 才出現）。 */ onAddPhotos?: (head: Lesson) => void; /** 區塊外還有可以拉進區塊的項目（套裝課程的課程章節）。 */ extraMovable?: boolean; onMoveTo: (l: Lesson) => void; onPickMove: (blockId: string) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
+export function BlockEditList({ extraMovable, items, onEdit, onMoveItem, onMoveBlock, onCopy, onDelete, onAddMaterial, onAddBlock, onMoveTo, onPickMove, onAddPhotos, busy }: { /** 區塊「新增照片」（杜杜龍 2026-11-24，只有開放的課程；區塊要有 photoKey 才出現）。 */ onAddPhotos?: (head: Lesson) => void; /** 區塊外還有可以拉進區塊的項目（套裝課程的課程章節）。 */ extraMovable?: boolean; onMoveTo: (l: Lesson) => void; onPickMove: (blockId: string) => void; items: Lesson[]; onEdit: (l: Lesson) => void; onMoveItem: (group: Lesson[], from: number, to: number) => void; onMoveBlock: (groups: Lesson[][], from: number, to: number) => void; onCopy: (l: Lesson) => void; onDelete: (l: Lesson) => void; onAddMaterial: (blockId?: string) => void; onAddBlock: () => void; busy: boolean }) {
   const { c } = useTheme();
-  // 編輯模式的區塊預設全部收起，同一時間只展開一個（業主 2026-11-18）。
+  // 編輯模式的區塊預設全部收起，同一時間只展開一個（杜杜龍 2026-11-18）。
   const [openId, setOpenId] = useState<string | null>(null);
   const rows = items.filter((l) => !l.full);
   // 切成區塊：每組 = [區塊標題, 底下的教材…]；最前面還沒歸區塊的教材自成一組（沒有標題）。
@@ -208,7 +208,7 @@ export function BlockEditList({ extraMovable, items, onEdit, onMoveItem, onMoveB
       })}
       {!groups.length ? <Button variant="secondary" label="新增教材" icon="add" onPress={() => onAddMaterial()} fullWidth /> : null}
       {full.length ? <EditLessonRows group={full} word="教材" onEdit={onEdit} onMove={() => undefined} onCopy={onCopy} onDelete={onDelete} busy={busy} /> : null}
-      {/* 區塊是獨立的區域：新增區塊不跟教材清單混在一起（業主 2026-11-18）。 */}
+      {/* 區塊是獨立的區域：新增區塊不跟教材清單混在一起（杜杜龍 2026-11-18）。 */}
       <Button variant="secondary" label="新增區塊" icon="folder-open-outline" onPress={onAddBlock} fullWidth />
     </View>
   );
@@ -235,7 +235,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
   const [sharerRank, setSharerRank] = useState(lesson?.sharerRank ?? "");
   const [sharerTitle, setSharerTitle] = useState(lesson?.sharerTitle ?? "");
   const [media, setMedia] = useState<MediaDraft>(() => (lesson ? mediaDraftOf(lesson) : emptyMediaDraft()));
-  // 章節日期預設「同課程」（follow，業主 2026-11-16：勾選框一律顯示、預設打勾）：課程日期改了這堂跟著變；取消勾選才自己選日期。
+  // 章節日期預設「同課程」（follow，杜杜龍 2026-11-16：勾選框一律顯示、預設打勾）：課程日期改了這堂跟著變；取消勾選才自己選日期。
   const [follow, setFollow] = useState(isNew ? true : !!lesson.dateFollows);
   const [eventDate, setEventDate] = useState(lesson?.eventDate ?? courseDate ?? todayStr());
   const ownDate = follow ? "" : eventDate;
@@ -349,7 +349,7 @@ function ChapterSheet({ course, lesson, onClose }: { course: CourseDetail; lesso
       busy={busy === "create" || busy === "save"}
       error={msg?.tone === "danger" ? msg.text : null}
     >
-      {/* 「主題」（原「主講」）「總結」兩個勾選同一列（業主 2026-11-16）；每門課各只能一堂、兩者互斥。 */}
+      {/* 「主題」（原「主講」）「總結」兩個勾選同一列（杜杜龍 2026-11-16）；每門課各只能一堂、兩者互斥。 */}
       <View style={styles.checkRow}>
         <View style={{ flex: 1 }}>
           <Check label="主題" value={isSpeaker} onChange={pickSpeaker} />
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
   lessonMain: { flex: 1, minWidth: 0, minHeight: minTouch, justifyContent: "center", paddingLeft: space.sm },
 });
 
-/** 把教材移到另一個區塊（業主 2026-11-18）：列出所有區塊，點一個就搬到那個區塊的最後面。 */
+/** 把教材移到另一個區塊（杜杜龍 2026-11-18）：列出所有區塊，點一個就搬到那個區塊的最後面。 */
 export function MoveToBlockSheet({ items, lesson, onPick, onClose }: { items: Lesson[]; lesson: Lesson; onPick: (blockId: string) => void; onClose: () => void }) {
   const heads = items.filter((l) => l.section);
   const current = (() => {
@@ -505,7 +505,7 @@ export function MoveToBlockSheet({ items, lesson, onPick, onClose }: { items: Le
   );
 }
 
-/** 勾選本清單的教材，一次移到指定區塊的最後面（業主 2026-11-18）：列出清單內所有教材（依區塊分組），已在該區塊的灰掉不能勾。 */
+/** 勾選本清單的教材，一次移到指定區塊的最後面（杜杜龍 2026-11-18）：列出清單內所有教材（依區塊分組），已在該區塊的灰掉不能勾。 */
 export function PickMaterialsSheet({ items, blockId, onMove, onClose }: { items: Lesson[]; blockId: string; onMove: (ids: string[]) => void; onClose: () => void }) {
   const { c } = useTheme();
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -523,7 +523,7 @@ export function PickMaterialsSheet({ items, blockId, onMove, onClose }: { items:
       else n.add(id);
       return n;
     });
-  // 每個區塊可「一鍵全選」（業主 2026-11-23）：只算還不在目標區塊的教材；全部都選了就變成「取消全選」。
+  // 每個區塊可「一鍵全選」（杜杜龍 2026-11-23）：只算還不在目標區塊的教材；全部都選了就變成「取消全選」。
   const selectable = (blockKey: string | null) => (blockKey === blockId ? [] : rows.filter((r) => !r.l.section && r.block === blockKey).map((r) => r.l.id));
   const GroupHead = ({ title, ids }: { title: string; ids: string[] }) => {
     const all = ids.length > 0 && ids.every((id) => sel.has(id));

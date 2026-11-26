@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
 /**
- * 從 logo 圖挑出最常用的幾種顏色（業主 2026-11-18：品牌 logo 的「指定底色」自動建議 logo 常用的最多 5 種顏色）。
+ * 從 logo 圖挑出最常用的幾種顏色（杜杜龍 2026-11-18：品牌 logo 的「指定底色」自動建議 logo 常用的最多 5 種顏色）。
  * 只有網頁版做得到（用 canvas 取樣）；透明像素不算；相近的顏色歸成一組。讀不到就回空陣列。
  */
 export async function logoColors(url: string, max = 5): Promise<string[]> {

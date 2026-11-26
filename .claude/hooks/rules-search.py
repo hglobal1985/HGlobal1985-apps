@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""每次業主送出訊息時，自動用訊息內容搜尋 docs/rules/ 裡相關的業主規則，
+"""每次杜杜龍送出訊息時，自動用訊息內容搜尋 docs/rules/ 裡相關的杜杜龍規則，
 把「規則標題＋所在檔案」列給 AI（只列標題，量很小），避免 AI 漏讀分檔裡的細節規則。
-找不到就完全不輸出。任何錯誤都靜默結束，不影響對話。（業主 2026-11-22）"""
+找不到就完全不輸出。任何錯誤都靜默結束，不影響對話。（杜杜龍 2026-11-22）"""
 import glob, json, os, re, sys
 
 try:
@@ -41,7 +41,7 @@ try:
     hits.sort(key=lambda h: -h[0])
     top = hits[:8]
     files = sorted({h[1] for h in top})
-    print("【自動規則搜尋】業主的訊息可能牽涉到以下已定案的規則（完整內容在 docs/rules/ 對應檔案，動手改之前請先讀相關條目，後面的條目常會取代前面的）：")
+    print("【自動規則搜尋】杜杜龍的訊息可能牽涉到以下已定案的規則（完整內容在 docs/rules/ 對應檔案，動手改之前請先讀相關條目，後面的條目常會取代前面的）：")
     for _, name, title in top:
         print(f"- docs/rules/{name}：{title}")
     print("相關分檔：" + "、".join(files))

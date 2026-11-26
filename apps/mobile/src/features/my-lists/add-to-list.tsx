@@ -37,10 +37,10 @@ function useRequireLogin() {
 }
 
 /**
- * 上方工具列的「加入我的清單」圖示（業主 2026-11-21 方案 2）：放在邀請、分享旁；已加入時變黃色並顯示加入了幾份清單。
+ * 上方工具列的「加入我的清單」圖示（杜杜龍 2026-11-21 方案 2）：放在邀請、分享旁；已加入時變黃色並顯示加入了幾份清單。
  * 內頁（課程卡、教材卡、系列卡、中心卡）的上方工具列都放它（用 PageHeader 的 addToList 會自動有）。
  */
-/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（業主 2026-11-24）不顯示「加入我的清單」。 */
+/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（杜杜龍 2026-11-24）不顯示「加入我的清單」。 */
 export function HeaderAddToList(props: { target: ListRef; title: string }) {
   return !useFeature("addToList") ? null : <HeaderAddToListInner {...props} />;
 }
@@ -75,8 +75,8 @@ function HeaderAddToListInner({ target, title }: { target: ListRef; title: strin
   );
 }
 
-/** 教材列右側的圓形「加入清單」鈕（業主 2026-11-21 配方案 1：和分享鈕並排，已加入變黃色）。 */
-/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（業主 2026-11-24）不顯示「加入我的清單」。 */
+/** 教材列右側的圓形「加入清單」鈕（杜杜龍 2026-11-21 配方案 1：和分享鈕並排，已加入變黃色）。 */
+/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（杜杜龍 2026-11-24）不顯示「加入我的清單」。 */
 export function RowAddToList(props: { target: ListRef; title: string }) {
   return !useFeature("addToList") ? null : <RowAddToListInner {...props} />;
 }

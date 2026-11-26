@@ -29,7 +29,7 @@ type Found = CoverMediaItem & { folderId: string; folderTitle: string };
 const folderName = (f: AlbumFolder) => (f.kind === "center" ? centerTitle(f.title) : f.title);
 
 /**
- * 全螢幕看圖裡的「相簿」資料夾檢視（業主 2026-11-25，款式 C 為主架構＋B 的搜尋＋A 的側邊欄；與全螢幕看圖 `EdmLightbox`／「檢視全部」`LightboxGrid` 是同一套模組，不另做）：
+ * 全螢幕看圖裡的「相簿」資料夾檢視（杜杜龍 2026-11-25，款式 C 為主架構＋B 的搜尋＋A 的側邊欄；與全螢幕看圖 `EdmLightbox`／「檢視全部」`LightboxGrid` 是同一套模組，不另做）：
  * ①上方一排「大類別」標籤（中心 EDM、中心封面、系列、課程封面、區塊相簿），下面一律兩欄資料夾卡（4 格預覽、名稱、張數），資料夾自動按張數多到少排；
  * ②搜尋框可選「此頁」（預設，只搜目前類別的資料夾）或「全部」（搜全部相簿照片的場景標籤、照片文字 OCR）；
  * ③左上角選單鈕開側邊欄：列出大類別與目前類別的資料夾，超級管理員可在這裡用 ▲▼ 移動大類別的順序（存在 UiConfig.albumOrder；子項目不能移動）；
@@ -46,7 +46,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const [group, setGroup] = useState<string | null>(null);
   const large = win.width >= 900;
   const [side, setSide] = useState(large); // 大螢幕資料夾清單預設一直顯示
-  // 目前打開的資料夾（null＝資料夾總覽）：搜尋列、類別標籤、側邊欄在資料夾裡一樣永遠顯示（業主 2026-11-25）。
+  // 目前打開的資料夾（null＝資料夾總覽）：搜尋列、類別標籤、側邊欄在資料夾裡一樣永遠顯示（杜杜龍 2026-11-25）。
   const [view, setView] = useState<{ folder: AlbumFolder; items: CoverMediaItem[] } | null>(initial ?? null);
   const [q, setQ] = useState("");
   const [scope, setScope] = useState<"page" | "all">("page");
@@ -54,7 +54,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const [busy, setBusy] = useState(false);
   const [panel, setPanel] = useState<"perms" | "info" | null>(null); // 超級管理員的相簿管理面板
   const [sortBy, setSortBy] = useState<{ key: "date" | "upload"; dir: "asc" | "desc" } | null>(null); // 資料夾照片排序
-  // 區塊相簿的子資料夾（業主 2026-11-26）：sub＝null 是區塊總覽（資料夾卡）；""＝未分類；其他＝資料夾編號。
+  // 區塊相簿的子資料夾（杜杜龍 2026-11-26）：sub＝null 是區塊總覽（資料夾卡）；""＝未分類；其他＝資料夾編號。
   const [sub, setSub] = useState<string | null>(null);
   const [fsheet, setFsheet] = useState<FolderSheetState>(null);
   const [moveIds, setMoveIds] = useState<string[]>([]);
@@ -126,7 +126,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   };
 
   const gap = 10;
-  // 大螢幕開側邊欄時，主畫面變窄（相簿往右推）：資料夾卡片的欄數與寬度隨主畫面寬度算（業主 2026-11-25）。
+  // 大螢幕開側邊欄時，主畫面變窄（相簿往右推）：資料夾卡片的欄數與寬度隨主畫面寬度算（杜杜龍 2026-11-25）。
   const mainW = win.width - (win.width >= 900 && side ? 280 : 0) - insets.left - insets.right - 16 * 2;
   const cols = mainW >= 900 ? 5 : mainW >= 640 ? 4 : mainW >= 420 ? 3 : 2;
   const cardW = Math.floor((mainW - gap * (cols - 1)) / cols);
@@ -202,7 +202,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   // 資料夾裡的照片（此頁搜尋會過濾）
   const inSub = hasSubs && sub !== null ? view!.items.filter((p) => (p.folderId ?? "") === sub) : view?.items ?? [];
   const filtered = view ? (scope === "page" && key ? inSub.filter((p) => matchAlbumItem(p, key)) : inSub) : [];
-  // 排序（業主 2026-11-25）：活動日期、上傳時間；點一下遞減，再點遞增。沒有排序＝相簿原本的順序。沒有日期的照片永遠排最後。
+  // 排序（杜杜龍 2026-11-25）：活動日期、上傳時間；點一下遞減，再點遞增。沒有排序＝相簿原本的順序。沒有日期的照片永遠排最後。
   const shown = sortBy
     ? [...filtered].sort((a, b) => {
         const va = sortBy.key === "date" ? (a.eventDate ?? "") : (a.createdAt ?? "");
@@ -241,7 +241,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   useEffect(() => {
     if (view && !view.items.length) void reloadView(); // 從單張看圖回到資料夾：重新讀這個資料夾的照片
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // 回到上次位置（業主 2026-11-25）：資料讀回來後，開到上次的類別／資料夾；沒權限或不存在了就停在相簿首頁／該類別。
+  // 回到上次位置（杜杜龍 2026-11-25）：資料讀回來後，開到上次的類別／資料夾；沒權限或不存在了就停在相簿首頁／該類別。
   const [ready, setReady] = useState(!restore || !!initial);
   const [focusId, setFocusId] = useState<string | undefined>(initial?.focusId); // 回到資料夾時要停在哪張照片
   useEffect(() => {

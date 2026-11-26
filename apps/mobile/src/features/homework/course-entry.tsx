@@ -4,7 +4,7 @@ import { api, type HwCourseView } from "@/api/client";
 import { Card, ListRow, Pill } from "@/ui";
 
 /**
- * 課程頁的「作業」入口（業主 2026-11-25）：只有這門課已開通的學員、組員與老師看得到（作業不公開）；
+ * 課程頁的「作業」入口（杜杜龍 2026-11-25）：只有這門課已開通的學員、組員與老師看得到（作業不公開）；
  * 沒有作業時，只有老師看得到（才能出第一份）。點了進這門課的作業頁。
  */
 export function CourseHomeworkEntry({ courseId }: { courseId: string }) {

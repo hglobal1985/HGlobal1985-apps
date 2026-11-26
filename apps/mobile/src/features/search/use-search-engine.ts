@@ -12,7 +12,7 @@ import { useSynonyms } from "@/features/courses/use-synonyms";
 export const listable = (x: CourseSummary) => x.status === "published" && x.viewScope !== "link_login" && x.viewScope !== "link_guest";
 
 /**
- * 全站唯一的搜尋引擎（業主 2026-11-25：同樣的關鍵字，超派與至尊結果完全不同 → 重新串成同一個模組）。
+ * 全站唯一的搜尋引擎（杜杜龍 2026-11-25：同樣的關鍵字，超派與至尊結果完全不同 → 重新串成同一個模組）。
  * 超派（courses-view）與至尊（elder-search）都只呼叫這一個：同樣的候選課程、同樣的標點整理、同樣的找法與排序、同樣的後台設定。
  * 之後要改找法、條件、排序，只改這裡（與後台「搜尋與 AI 設定」「試搜尋」）；兩個畫面只負責把結果畫出來。
  *
@@ -51,7 +51,7 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
     }
     return rankCourses(index, all.filter((x) => ids.has(x.id)), key, near);
   }, [key, index, all, exact, semantic.courses, semantic.lessons, semOnly, phonetic.courses, phonetic.lessons, idx.data, searchSt]);
-  // 主結果＝「單元」（章節）清單（業主 2026-11-25：以超派原本的搜尋結果為正確，至尊要跟它一樣；超派原本搜尋一律是單元模式）：
+  // 主結果＝「單元」（章節）清單（杜杜龍 2026-11-25：以超派原本的搜尋結果為正確，至尊要跟它一樣；超派原本搜尋一律是單元模式）：
   // 有字面符合的章節就只列它們；沒有才合併 模糊＋語意（AI）＋同音 找到的章節。順序＝每次打開頁面洗牌一次（同一次瀏覽相對順序不變）。
   const { member } = useSession();
   const [seed] = useState(() => Math.floor(Math.random() * 2 ** 31));
@@ -66,13 +66,13 @@ export function useSearchEngine(q: string, courses: CourseSummary[]) {
       if (!semOnly) for (const id of fuzzyLessons(index, key)) hit.add(id);
       for (const id of semantic.lessons) if (index.lessonHay.has(id)) hit.add(id);
       for (const id of phonetic.lessons) if (index.lessonHay.has(id)) hit.add(id);
-      // 都找不到時（等 AI、同音找完之後）：退到「最相近的單元」，搜尋結果不留空白（業主 2026-11-25）。
+      // 都找不到時（等 AI、同音找完之後）：退到「最相近的單元」，搜尋結果不留空白（杜杜龍 2026-11-25）。
       if (!hit.size && searchSt.looseEnabled && idx.data && !semantic.loading && !phonetic.loading) {
         loose = looseLessons(index, key, searchSt.relatedMax, 1, gram);
         for (const id of loose) hit.add(id);
       }
     }
-    // 字面符合太少（不到 8 個）時，補上「至少有兩個相鄰兩字片段命中」的單元排在後面（業主 2026-11-25：搜「晚安修護面膜」只有 1 個單元、關聯結果太少）。
+    // 字面符合太少（不到 8 個）時，補上「至少有兩個相鄰兩字片段命中」的單元排在後面（杜杜龍 2026-11-25：搜「晚安修護面膜」只有 1 個單元、關聯結果太少）。
     const extraRel: string[] = exactL && exactL.size && searchSt.relatedEnabled && exactL.size < searchSt.relatedBelow ? looseLessons(index, key, searchSt.relatedMax, searchSt.relatedMinScore, gram).filter((id) => !exactL.has(id)) : [];
     for (const id of extraRel) hit.add(id);
     const byId = new Map(all.map((x) => [x.id, x]));

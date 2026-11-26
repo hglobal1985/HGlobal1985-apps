@@ -33,7 +33,7 @@ test("分享預覽：短網址標題＝名稱 | 寰宇行動大學，說明＝�
   assert.equal(withShareMeta("<head></head>", { title: "a", description: "b", url: "u", image: "i" }).includes('content="b"'), true);
 });
 
-test("中心分享標題：只去掉數字代碼，不自動加「中心」（業主 2026-11-17）", async () => {
+test("中心分享標題：只去掉數字代碼，不自動加「中心」（杜杜龍 2026-11-17）", async () => {
   assert.equal(centerShareName("南京中心 062"), "南京中心");
   assert.equal(centerShareName("美國洛杉磯中心"), "美國洛杉磯中心");
   assert.equal(centerShareName("嘉義生活美學館 166"), "嘉義生活美學館");
@@ -152,7 +152,7 @@ test("分享預設值：改標題格式、地址圖示、開關後，預覽卡�
   assert.match(shareMessage(S, "u", { teacher: "", title: "T" }), /這場 老師的這場/, "沒有主講人用「老師」");
 });
 
-test("分享預設值：舊預設的單堂課程範本自動升級成含 {職稱} 的新預設；業主自己改過的不動", async () => {
+test("分享預設值：舊預設的單堂課程範本自動升級成含 {職稱} 的新預設；杜杜龍自己改過的不動", async () => {
   const { normalizeShare } = await import("../src/ui-config.ts");
   const { DEFAULT_SHARE_SETTINGS } = await import("../src/contract.ts");
   const old = "我剛聽完這場 {主講人}的這場精彩演講 {課程名稱} 我就立刻想到要分享給你！";

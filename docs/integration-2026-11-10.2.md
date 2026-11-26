@@ -18,13 +18,13 @@
 
 - D1 影片、分類、留言及影片進度資料表未重新建置。
 - 已匯入的 Mux Signed 草稿仍為草稿，未公開。
-- 已存在的 `HGLOBAL_ID_CLIENT_SECRET` 不讀取、不刪除；依業主指令需另行核准移除。
+- 已存在的 `HGLOBAL_ID_CLIENT_SECRET` 不讀取、不刪除；依杜杜龍指令需另行核准移除。
 - 不進行原生 Google SDK 或舊 OIDC 登入。
 - 未修改中央會員 `hglobal1985/id`、DNS、既有金鑰或任何正式會員資料。
 
 ## 上線限制
 
-- 正式環境部署、商店發版需業主核准。
+- 正式環境部署、商店發版需杜杜龍核准。
 - 正式中央會員 `/v1/apps/learn/config` 必須已部署且回傳 active，Google 登入中繼才可端到端驗收。
 - 原生手機 App 需實際 iOS／Android 裝置驗證深層連結與安全儲存；原生應用尚未上架。
 - Mux Signed 播放需要既有 Mux Signing Key 安全配置到 learn Worker；不要在對話中提供私鑰。

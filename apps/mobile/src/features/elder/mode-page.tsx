@@ -12,8 +12,8 @@ import { Button, GuestGate, InstallCard, LoadingView, Screen } from "@/ui";
 import { askSwitchToMaker, FontSizeCard } from "./mode-actions";
 
 /**
- * 至尊模式頁（業主 2026-11-24：按底部「至尊」鍵整頁顯示，至尊模式一律不用上拉選單）。由上到下：
- * 最上方並排「訂單紀錄｜超派模式」（業主 2026-11-24）→ 會員抬頭（頭像＋姓名／獎銜，獎章在右邊與頭像同高）→ 會員資料表單（與超派模式是同一個元件 ProfilePrompt，不加標題）
+ * 至尊模式頁（杜杜龍 2026-11-24：按底部「至尊」鍵整頁顯示，至尊模式一律不用上拉選單）。由上到下：
+ * 最上方並排「訂單紀錄｜超派模式」（杜杜龍 2026-11-24）→ 會員抬頭（頭像＋姓名／獎銜，獎章在右邊與頭像同高）→ 會員資料表單（與超派模式是同一個元件 ProfilePrompt，不加標題）
  * → 字體大小（勾「跟著手機」時＋／－灰掉）→ 帳號。
  */
 export function ModePage() {
@@ -32,15 +32,15 @@ export function ModePage() {
   );
   return (
     <Screen>
-      {/* 最上方：「加到主畫面」邀請卡（業主 2026-11-24）；與超派首頁同一個元件，安裝後自動不再顯示。 */}
+      {/* 最上方：「加到主畫面」邀請卡（杜杜龍 2026-11-24）；與超派首頁同一個元件，安裝後自動不再顯示。 */}
       <InstallCard dismissible />
-      {/* 最上方：訊息通知（勾選）→ 前往完整版會員中心 → 並排「訂單紀錄｜超派模式」（業主 2026-11-24） */}
+      {/* 最上方：訊息通知（勾選）→ 前往完整版會員中心 → 並排「訂單紀錄｜超派模式」（杜杜龍 2026-11-24） */}
       {member ? (
         <>
           <PushSwitchRow banner />
         </>
       ) : null}
-      {/* 最上方並排：訂單紀錄｜超派模式（業主 2026-11-24） */}
+      {/* 最上方並排：訂單紀錄｜超派模式（杜杜龍 2026-11-24） */}
       <View style={{ flexDirection: "row", gap: space.sm }}>
         <View style={{ flex: 1 }}>
           <Button variant="secondary" label="訂單紀錄" onPress={() => runGuarded(() => router.push(member ? "/orders" : "/me"))} fullWidth />

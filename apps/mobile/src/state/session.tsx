@@ -81,7 +81,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           if (r.changed) m = known(await fetchMember());
           setSsoNext(r.next);
         } else if (!m && (await webSsoCheck())) return "redirecting";
-        // 已經登入：不再每開一個分頁就跳去會員中心檢查（業主 2026-11-21：以前每次都整頁重新載入一次）。
+        // 已經登入：不再每開一個分頁就跳去會員中心檢查（杜杜龍 2026-11-21：以前每次都整頁重新載入一次）。
         // 在會員中心登出所有裝置時，這裡的登入憑證會在下次換發時失效、自動變成未登入。
       }
       setMember(m);
@@ -122,7 +122,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   );
   // 回到 App／網頁（切回分頁、從背景回來）時，距離上次更新超過 10 分鐘才重新向伺服器（會員中心）拿一次最新的會員資料與獎銜；獎銜很少變動，不用頻繁詢問。
   // 開啟、重新整理一律立刻更新；App 沒有重新整理鈕，改用「下拉重新整理」（Screen）與「進入設定頁」（me.tsx）。
-  // 管理員登入：記下「這是業主本人的裝置／網路」，之後的操作不列入使用統計（業主 2026-11-23）。
+  // 管理員登入：記下「這是杜杜龍本人的裝置／網路」，之後的操作不列入使用統計（杜杜龍 2026-11-23）。
   const isAdminMember = member?.role === "admin";
   useEffect(() => {
     if (isAdminMember) markOwnerDevice();
@@ -266,7 +266,7 @@ export function useApi<T>(path: string | null, opts: { early?: boolean } = {}): 
     }, [load]),
   );
   const reload = useCallback(() => load(true), [load]);
-  // 讀取超過 12 秒還沒有資料（業主 2026-11-24 回報至尊模式「學習中」一直轉圈、本機重現不出來）：自動重抓一次，並把當時狀態回報到錯誤紀錄，方便追查。
+  // 讀取超過 12 秒還沒有資料（杜杜龍 2026-11-24 回報至尊模式「學習中」一直轉圈、本機重現不出來）：自動重抓一次，並把當時狀態回報到錯誤紀錄，方便追查。
   const stuck = !!path && data === undefined && !error && (loading || !ready);
   useEffect(() => {
     if (!stuck) return;

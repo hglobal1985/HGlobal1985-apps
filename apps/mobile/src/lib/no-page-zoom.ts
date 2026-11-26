@@ -28,7 +28,7 @@ export function installNoPageZoom(): () => void {
     if (e.touches.length > 1) e.preventDefault();
   };
   // iPad Safari 會忽略 user-scalable=no，而且捲動區塊裡的元素可能不受 html 的 touch-action 限制：
-  // 另外在最外層（capture）攔截所有雙指的 touchstart／touchmove／gesture 事件（業主永久指示：不開放頁面雙指縮放）。
+  // 另外在最外層（capture）攔截所有雙指的 touchstart／touchmove／gesture 事件（杜杜龍永久指示：不開放頁面雙指縮放）。
   // 影片與照片的雙指縮放是它們自己用手勢計算位置，這裡只取消瀏覽器預設的整頁縮放，不影響它們。
   const opts = { passive: false, capture: true } as const;
   window.addEventListener("touchstart", touch, opts);

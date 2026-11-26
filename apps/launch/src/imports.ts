@@ -35,7 +35,7 @@ async function placeOnTop(db: D1Database, courseId: string, newIds: string[]): P
 }
 
 /**
- * 同步來的教材卡一律「日期最新的在最上面」（業主 2026-11-20 回報舊影片被放到最下面）：把這張卡的教材依活動日期由新到舊重排
+ * 同步來的教材卡一律「日期最新的在最上面」（杜杜龍 2026-11-20 回報舊影片被放到最下面）：把這張卡的教材依活動日期由新到舊重排
  * （同一天維持原順序、沒有日期的放最後；章節在最前面、「完整版課程影片」在最後）。有區塊的卡是手動編排，不動。
  */
 export async function sortMaterialsByDate(db: D1Database, courseId: string): Promise<number> {
@@ -51,14 +51,14 @@ export async function sortMaterialsByDate(db: D1Database, courseId: string): Pro
   return order.length;
 }
 
-/** 同步的排序規則（業主 2026-11-20）。 */
+/** 同步的排序規則（杜杜龍 2026-11-20）。 */
 export const SYNC_SORT_MODES = ["date_desc", "top", "bottom"] as const;
 export type SyncSortMode = (typeof SYNC_SORT_MODES)[number];
 export const SYNC_SORT_LABEL: Record<SyncSortMode, string> = { date_desc: "依日期新到舊（預設；已手動排序的卡，新影片也依日期插入正確位置，不動其餘）", top: "新影片放最上面（其餘不動）", bottom: "新影片放最後面（其餘不動）" };
 export const asSortMode = (v: unknown): SyncSortMode => ((SYNC_SORT_MODES as readonly unknown[]).includes(v) ? (v as SyncSortMode) : "date_desc");
 
 /**
- * 新影片「依日期」插入（業主 2026-11-20：不論新舊影片，預設都照日期排，日期最新的在最上面，不是照加入時間）：
+ * 新影片「依日期」插入（杜杜龍 2026-11-20：不論新舊影片，預設都照日期排，日期最新的在最上面，不是照加入時間）：
  * 用在使用者已手動排序（鎖定）的卡——既有教材的順序完全不動，每支新影片只插入到「第一個比它更舊的教材」前面；找不到就放在教材最後面。
  * 有區塊的卡是手動編排，新影片仍放最前面（placeOnTop）。
  */
@@ -129,7 +129,7 @@ export async function readPlaylist(key: string, playlistId: string, skip: Set<st
 }
 
 /**
- * 依影片標題判讀主辦中心（業主 2026-11-19）：標題裡有中央清單某中心的名稱（去掉尾巴代碼與「中心」二字）就算；
+ * 依影片標題判讀主辦中心（杜杜龍 2026-11-19）：標題裡有中央清單某中心的名稱（去掉尾巴代碼與「中心」二字）就算；
  * 先比完整名稱（取最長的唯一一個），沒有再比名稱最後兩個字（例：標題寫「屏東」→「圓滿屏東中心 221」），只有唯一符合才採用；
  * 沒寫或有歧義就回空字串（不勾任何中心）。centers 只能是中央清單（central_snapshots），不混入本地資料。
  */
@@ -150,7 +150,7 @@ export function guessCenter(title: string, centers: string[]): string {
 const NOT_COPIED = new Set(["id", "title", "subtitle", "teacher", "host_unit", "host_center_key", "event_start", "event_end", "created_at", "updated_at", "edited_by_name", "edited_at", "created_by_sub", "sort_order", "series_order", "edm_key", "cover_key", "cover_bg_id", "art_version", "cover_rect", "edm_view_y", "url_name", "status", "teacher_rank", "teacher_title", "mat_url"]);
 
 /**
- * 播放清單 → 課程（業主 2026-11-19）：每支影片建一門課，設定照「示範課程」（job.course_id）複製；
+ * 播放清單 → 課程（杜杜龍 2026-11-19）：每支影片建一門課，設定照「示範課程」（job.course_id）複製；
  * 名稱＝「銅章會議X年X月」（X 取影片上傳日期），日期＝影片上傳日期，一個章節＝這支影片，主辦中心依標題判讀。
  * 先建成「草稿」，確認後再上架（note 會列出每支影片判讀的中心）。已經在同系列課程裡的影片不重複建立。
  */
@@ -288,7 +288,7 @@ export const SYNC_FORMAT_HELP = "可用：{年}、{月}、{日}（年月日，�
 export const defaultSyncFormat = (name: string): string => `{年}年{月}月 ${name}（主持{主持}）`;
 
 /**
- * 同步清單產生的教材名稱（業主 2026-11-20）：依這份同步自己的「命名規則」代入。
+ * 同步清單產生的教材名稱（杜杜龍 2026-11-20）：依這份同步自己的「命名規則」代入。
  * 例：規則「{年}年{月}月{日}日 王老師小線對焦」＋影片日期 2026-03-14 →「2026年3月14日 王老師小線對焦」。
  * 年月先看影片標題裡寫的「2026年11月」，沒有就用影片日期；日期判讀不到的欄位連同後面的單位字（年／月／日）一起省略。
  */
@@ -311,7 +311,7 @@ export function syncTitle(format: string, videoTitle: string, date: string | nul
     .replace(/\{日\}\s*[日號]?/g, day ? `${day}日` : "")
     .replace(/\{主持\}/g, host)
     .replace(/\{標題\}/g, t);
-  // 移除指定的文字（業主 2026-11-23）：對最後產生的名稱做，所以影片標題與規則裡的字都能移除。
+  // 移除指定的文字（杜杜龍 2026-11-23）：對最後產生的名稱做，所以影片標題與規則裡的字都能移除。
   return strip.reduce((acc, x) => acc.split(x).join(""), out).replace(/\s+/g, " ").trim();
 }
 
@@ -340,7 +340,7 @@ export async function existingVideoIds(db: D1Database, courseId: string): Promis
 }
 
 /**
- * 同步一份 YouTube 播放清單到教材卡（業主 2026-11-20）：只加還沒有的影片（用影片編號比對，已存在的不重複），
+ * 同步一份 YouTube 播放清單到教材卡（杜杜龍 2026-11-20）：只加還沒有的影片（用影片編號比對，已存在的不重複），
  * 每支影片一個教材（不開區塊），名稱依 syncTitle，日期＝影片日期，分鐘數由排程補。結果記在這份同步設定上。
  */
 export async function runYoutubeSync(env: Env, syncId: string): Promise<{ imported: number; note: string }> {
@@ -348,7 +348,7 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   const sync = await db.prepare("SELECT id, url, playlist_id, course_id, title_prefix, title_format, strip_text, sort_mode, sort_locked, use_app_player FROM youtube_syncs WHERE id = ?").bind(syncId).first<{ use_app_player: number; strip_text: string; id: string; url: string; playlist_id: string; course_id: string; title_prefix: string; title_format: string; sort_mode: string; sort_locked: number }>();
   if (!sync) return { imported: 0, note: "找不到這個同步設定" };
   const finish = async (out: { imported: number; note: string }) => {
-    // 只有「依日期新到舊」且沒有被手動鎖定時，才整張重排（手動排序永遠優先，業主 2026-11-20）。
+    // 只有「依日期新到舊」且沒有被手動鎖定時，才整張重排（手動排序永遠優先，杜杜龍 2026-11-20）。
     if (asSortMode(sync.sort_mode) === "date_desc" && !sync.sort_locked) await sortMaterialsByDate(db, sync.course_id);
     await db.prepare("UPDATE youtube_syncs SET last_synced_at = ?, last_imported = ?, last_note = ? WHERE id = ?").bind(new Date().toISOString(), out.imported, out.note.slice(0, 600), syncId).run();
     return out;
@@ -358,15 +358,15 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
   const read = await readPlaylist(env.YOUTUBE_API_KEY, sync.playlist_id, have);
   if ("error" in read) return finish({ imported: 0, note: read.error });
   if (!read.items.length) return finish({ imported: 0, note: "沒有新的影片（都已經同步過了）" });
-  // 最新的在最上面（業主 2026-11-20）：新影片依日期由新到舊，加在這份清單所有教材的最前面。
+  // 最新的在最上面（杜杜龍 2026-11-20）：新影片依日期由新到舊，加在這份清單所有教材的最前面。
   const items = [...read.items].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   const pos = await nextPos(db, sync.course_id);
   const ids = items.map(() => `${sync.course_id}-${short()}`);
   const lines: string[] = [];
-  // 名稱一樣的教材才加日期（業主 2026-11-20）：同一批裡、或和這張卡原本就有的教材同名，就在名稱後面加「（月/日）」。
+  // 名稱一樣的教材才加日期（杜杜龍 2026-11-20）：同一批裡、或和這張卡原本就有的教材同名，就在名稱後面加「（月/日）」。
   const existing = new Set((await db.prepare("SELECT title FROM lessons WHERE course_id = ?").bind(sync.course_id).all<{ title: string }>()).results.map((r) => r.title));
   const names = syncNamesFor(items, sync.title_format || defaultSyncFormat(sync.title_prefix), parseStrip(sync.strip_text), existing);
-  // 使用行動大學播放器（業主 2026-11-24，預設）：存成影片來源在 App 內播放；沒勾＝存成外部連結，點了開新網頁到 YouTube。
+  // 使用行動大學播放器（杜杜龍 2026-11-24，預設）：存成影片來源在 App 內播放；沒勾＝存成外部連結，點了開新網頁到 YouTube。
   const appPlayer = sync.use_app_player !== 0;
   await db.batch(
     items.flatMap((it, i) => {
@@ -390,7 +390,7 @@ export async function runYoutubeSync(env: Env, syncId: string): Promise<{ import
 }
 
 /**
- * 依這份同步目前的命名規則，重新命名「已經匯入」的教材（業主 2026-11-20：改規則後，舊的也要跟著改）。
+ * 依這份同步目前的命名規則，重新命名「已經匯入」的教材（杜杜龍 2026-11-20：改規則後，舊的也要跟著改）。
  * 重新讀播放清單取得影片標題與日期，只改名稱、不動其他欄位；同名時一樣加「（月/日）」。
  */
 export async function renameYoutubeSync(env: Env, syncId: string): Promise<{ renamed: number; note: string }> {

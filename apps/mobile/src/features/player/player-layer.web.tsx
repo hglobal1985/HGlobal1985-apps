@@ -21,7 +21,7 @@ function bottomEdge() {
   const bar = document.querySelector('[role="tablist"]');
   return bar ? bar.getBoundingClientRect().top : window.innerHeight;
 }
-// 迷你播放器的按鈕：實心黑底白字（業主 2026-11-17：取消半透明）。
+// 迷你播放器的按鈕：實心黑底白字（杜杜龍 2026-11-17：取消半透明）。
 /** 長按快轉的最高倍數：YouTube 內嵌播放器最高 2 倍（不分會員、免費，Premium 不影響內嵌播放速度）。 */
 const MAX_RATE = 2;
 const btn: CSSProperties = { position: "absolute", border: 0, borderRadius: 999, background: "#000", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation", font: "700 16px sans-serif", padding: 0 };
@@ -39,12 +39,12 @@ export function PlayerLayer() {
   const boxRef = useRef<HTMLDivElement>(null);
   const slotRef = useRef<unknown>(null); // 共用迷你小視窗（ui/mini-window.tsx）裡放畫面的那一格；真正的影片疊在它上面
   const [mini, setMini] = useState<"off" | "fade" | "on">("off"); // 迷你小視窗：off＝不顯示、fade＝縮小途中（只有影片在動）、on＝已縮成迷你
-  // 手機、平板橫放且影片播放中＝自動全螢幕；轉回直式就還原（業主 2026-11-24）。fullRef 給 tick 用（鋪滿整個視窗），pFull 給畫面（縮小鈕）。
+  // 手機、平板橫放且影片播放中＝自動全螢幕；轉回直式就還原（杜杜龍 2026-11-24）。fullRef 給 tick 用（鋪滿整個視窗），pFull 給畫面（縮小鈕）。
   const fullRef = useRef(false);
   const dismissed = useRef(false); // 使用者在橫放時自己按了縮小／退出全螢幕：這次橫放不再自動進入
   const realFs = useRef(false);
   const [pFull, setPFull] = useState(false);
-  // 往下滑頁面時，內嵌影片慢慢縮成迷你播放器（業主 2026-11-24）：scrollP＝頁面捲動的進度（0～1）、shrinkC＝畫面上平滑後的進度；
+  // 往下滑頁面時，內嵌影片慢慢縮成迷你播放器（杜杜龍 2026-11-24）：scrollP＝頁面捲動的進度（0～1）、shrinkC＝畫面上平滑後的進度；
   // 暫停播放且手機橫放（空間不夠）也直接縮成迷你。shrunk＝已完全縮成迷你播放器（顯示三顆按鈕、可拖曳）。
   const scrollP = useRef(0);
   const scroller = useRef<HTMLElement | null>(null);
@@ -62,7 +62,7 @@ export function PlayerLayer() {
     if (barTimer.current) clearTimeout(barTimer.current);
     if (!barHold.current) barTimer.current = setTimeout(() => setBarOn(false), 2000);
   }, []);
-  // 全螢幕手勢（業主 2026-11-24）：點左半邊＝倒退 10 秒、點右半邊＝快轉 10 秒；連續點（每次間隔不到 0.7 秒）每下 30 秒；
+  // 全螢幕手勢（杜杜龍 2026-11-24）：點左半邊＝倒退 10 秒、點右半邊＝快轉 10 秒；連續點（每次間隔不到 0.7 秒）每下 30 秒；
   // 長按＝用最快速度（2 倍）播放，放開還原。每次都在畫面上顯示簡短提示。控制列：碰一下畫面就顯示，2 秒沒動作自動隱藏。
   const [gHint, setGHint] = useState<{ text: string; side: "l" | "r" | "c"; n: number } | null>(null);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,7 +109,7 @@ export function PlayerLayer() {
     const inFull = fullRef.current || document.fullscreenElement === boxRef.current;
     const isTap = !!d && !wasHolding && !d.onBar && Date.now() - d.t < 400 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 12;
     if (!isTap || !inFull) return void wakeBar();
-    // 畫面分三塊各 33%：左＝倒退、中間＝顯示／隱藏控制列、右＝快轉（業主 2026-11-24）
+    // 畫面分三塊各 33%：左＝倒退、中間＝顯示／隱藏控制列、右＝快轉（杜杜龍 2026-11-24）
     const r = boxRef.current?.getBoundingClientRect();
     const frac = (e.clientX - (r?.left ?? 0)) / (r?.width || window.innerWidth);
     if (frac >= 1 / 3 && frac < 2 / 3) return void (d.wasOn ? hideBar() : wakeBar());
@@ -133,8 +133,8 @@ export function PlayerLayer() {
   }, [pFull, fsOn, wakeBar]);
   const exitRef = useRef<(() => void) | null>(null);
   const hostRef = useRef<HTMLDivElement>(null);
-  // YouTube 影片上的點擊一律擋掉（業主永久指示：不讓使用者點到 YouTube 自己的按鈕與連結，播放暫停只用下方控制列）。
-  // 業主 2026-11-17：LINE 等 App 內建瀏覽器也一律封鎖（不再有「第一次播放前放行」的例外），使用者要改用系統瀏覽器開啟才能播放（見紅色警示條）。
+  // YouTube 影片上的點擊一律擋掉（杜杜龍永久指示：不讓使用者點到 YouTube 自己的按鈕與連結，播放暫停只用下方控制列）。
+  // 杜杜龍 2026-11-17：LINE 等 App 內建瀏覽器也一律封鎖（不再有「第一次播放前放行」的例外），使用者要改用系統瀏覽器開啟才能播放（見紅色警示條）。
   const justSwitched = () => engine.recentlySwitched();
   const t = s.track;
   const isAudio = t?.mode === "audio";
@@ -142,10 +142,10 @@ export function PlayerLayer() {
   // 影片／YouTube：在課程頁內嵌，其餘時間是浮動小視窗；純音檔只有「縮小」時才有畫面（小圓圖）。
   const inline = !!t && !isAudio && inlineSlot;
   const floating = !!t && !inlineSlot && (!isAudio || s.collapsed);
-  const circle = (floating || (inline && shrunk)) && s.collapsed; // 課程頁往下滑縮成的迷你播放器也能最小化成小圓圖（業主 2026-11-24）
+  const circle = (floating || (inline && shrunk)) && s.collapsed; // 課程頁往下滑縮成的迷你播放器也能最小化成小圓圖（杜杜龍 2026-11-24）
   const windowed = (floating && !s.collapsed) || (inline && shrunk && !s.collapsed);
 
-  // 影片區的點擊擋板（只擋 YouTube 自己的按鈕與連結；播放暫停只用下方控制列）。已移除雙指放大與拖曳（業主 2026-11-24）。
+  // 影片區的點擊擋板（只擋 YouTube 自己的按鈕與連結；播放暫停只用下方控制列）。已移除雙指放大與拖曳（杜杜龍 2026-11-24）。
   const canBlock = inline && !shrunk && (t?.mode === "video" || t?.mode === "youtube");
 
   // 播放／暫停時，外框的反光流動跟著動或停。
@@ -176,7 +176,7 @@ export function PlayerLayer() {
   }, []);
 
   // 橫放自動全螢幕：影片（不含純音檔）播放中、觸控裝置（手機、平板）轉成橫放 → 進入全螢幕；轉回直式 → 退出。
-  // 瀏覽器常拒絕「沒有手指點擊」的全螢幕要求，拒絕時改用「鋪滿整個視窗」的假全螢幕，效果一樣（業主 2026-11-24）。
+  // 瀏覽器常拒絕「沒有手指點擊」的全螢幕要求，拒絕時改用「鋪滿整個視窗」的假全螢幕，效果一樣（杜杜龍 2026-11-24）。
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const land = window.matchMedia("(orientation: landscape)");
@@ -383,7 +383,7 @@ export function PlayerLayer() {
         </div>
       ) : null}
       {pFull || fsOn ? (
-        // 全螢幕裡看不到頁面下方的播放控制列，所以在播放框內放同一個控制列（時間軸、播放／暫停、倍速…；業主 2026-11-24 回報時間軸不見了）
+        // 全螢幕裡看不到頁面下方的播放控制列，所以在播放框內放同一個控制列（時間軸、播放／暫停、倍速…；杜杜龍 2026-11-24 回報時間軸不見了）
         <div ref={barRef} style={{ position: "absolute", left: 0, right: 0, bottom: 0, zIndex: 6, paddingBottom: "env(safe-area-inset-bottom, 0px)", opacity: barOn ? 1 : 0, pointerEvents: barOn ? "auto" : "none", transition: "opacity 0.25s" }}>
           <PlayerControls overlay />
         </div>

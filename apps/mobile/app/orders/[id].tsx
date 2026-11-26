@@ -97,7 +97,7 @@ export default function OrderScreen() {
   );
 }
 
-/** 金額一定要完整顯示（業主 2026-11-25 回報至尊模式只顯示「NT$…」）：依卡片寬度與字數自動縮字級，一行放得下為止（畫字時會再乘平板倍數×至尊倍數，所以在放大前的尺寸上算）。 */
+/** 金額一定要完整顯示（杜杜龍 2026-11-25 回報至尊模式只顯示「NT$…」）：依卡片寬度與字數自動縮字級，一行放得下為止（畫字時會再乘平板倍數×至尊倍數，所以在放大前的尺寸上算）。 */
 function FitAmount({ text, label, color }: { text: string; label: string; color: string }) {
   const [w, setW] = useState(0);
   const k = UI_SCALE * elderTextScale();

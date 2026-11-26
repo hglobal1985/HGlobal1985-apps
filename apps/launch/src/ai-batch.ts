@@ -1,5 +1,5 @@
 /**
- * AI 辨識批次排程（業主 2026-11-25：原本每 10 分鐘只辨識 3 張太慢，要批次處理、把每天免費額度盡量用完）。
+ * AI 辨識批次排程（杜杜龍 2026-11-25：原本每 10 分鐘只辨識 3 張太慢，要批次處理、把每天免費額度盡量用完）。
  * 每次排程在「處理時間」（aiBudgetSec）內，一輪一輪地取待辨識的照片、同時處理多張（aiConcurrency），直到：沒有待辨識的、今天的 AI 額度用完（AiStopped）、或時間到。
  * 順序：中心 EDM 文字辨識 ＞ 相簿照片文字 OCR ＞ 相簿場景辨識（額度不夠時前面的優先）。參數都在「設定 › 搜尋與 AI 設定 › AI 辨識排程」。
  */
@@ -26,7 +26,7 @@ export async function runAiBatch(env: Env, db: D1Database, opts: { budgetSec?: n
   const until = Date.now() + Math.max(30, opts.budgetSec ?? Number(st.aiBudgetSec ?? 240)) * 1000;
   let done = 0;
   let stopped = false;
-  // 依「設定 › AI 文字辨識」的優先順序（數字小的先）與開關（業主 2026-11-26）。
+  // 依「設定 › AI 文字辨識」的優先順序（數字小的先）與開關（杜杜龍 2026-11-26）。
   const order = JOBS.filter((j) => st[j.on] !== false).sort((a, b) => Number(st[a.prio] ?? 9) - Number(st[b.prio] ?? 9));
   for (const job of order) {
     while (!stopped && Date.now() < until) {

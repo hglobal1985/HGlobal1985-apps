@@ -1,5 +1,5 @@
 /**
- * 同音搜尋（業主 2026-11-24：語音辨識常把「益之源」聽成「一支援」，要找得到同音、近音的錯字）：
+ * 同音搜尋（杜杜龍 2026-11-24：語音辨識常把「益之源」聽成「一支援」，要找得到同音、近音的錯字）：
  * 把查詢文字與課程名稱、系列、主講人、章節標題都轉成拼音（不含聲調），並把台灣常見的近音（zh/z、ch/c、sh/s、
  * 後鼻音 ng/n、ü/u）視為相同，再比對「連續幾個音節相同」。不用 AI、不花額度，訪客也能用。
  * 只回課程與章節編號（依相似程度排序）；前端只顯示自己有權限的索引裡有的，所以不洩漏內容。
@@ -61,7 +61,7 @@ async function load(db: D1Database): Promise<Entry[]> {
 }
 
 /** 查詢 → 同音／近音的課程與章節編號（相似度高的在前）。查詢少於 2 個音節不比對（太短會亂配）。 */
-/** 口語問句的虛詞（「如何安裝」「怎麼辦」「請問」…）不拿來比對（業主 2026-11-25）：先去掉再轉拼音。 */
+/** 口語問句的虛詞（「如何安裝」「怎麼辦」「請問」…）不拿來比對（杜杜龍 2026-11-25）：先去掉再轉拼音。 */
 const FILLER = /有沒有|怎麼樣|怎麼辦|怎麼|怎樣|如何|請問|想知道|想要|我要|我想|可以|哪裡|什麼|為什麼|為何|嗎|呢|吧|啊|呀|的|了/g;
 export const stripFiller = (q: string) => {
   const t = q.replace(FILLER, " ").replace(/\s+/g, " ").trim();
@@ -76,7 +76,7 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
   const qs = syllables(st.phoneticFiller === false ? qText : stripFiller(qText)).slice(0, maxSyl);
   if (qs.length < (st.phoneticMinSyllables as number)) return { courses: [], lessons: [] };
   // 整串連續符合（最高分）；否則「拆片段」：查詢裡每一段連續的音節只要在這筆資料的任何欄位出現就算覆蓋到，
-  // 覆蓋率夠高就列出，覆蓋越多排越前面（業主 2026-11-25：「一支援安裝」＝「益之源」同音錯字＋「安裝」，中間隔著別的字）。
+  // 覆蓋率夠高就列出，覆蓋越多排越前面（杜杜龍 2026-11-25：「一支援安裝」＝「益之源」同音錯字＋「安裝」，中間隔著別的字）。
   const bigrams = (e: Entry) => (e.bg ??= new Set(e.segs.flatMap((s) => s.syl.slice(0, -1).map((a, i) => `${a}|${s.syl[i + 1]}`))));
   const coverPct = Number(st.phoneticCoverPct ?? 75);
   const longMin = Number(st.phoneticLongMinSyllables ?? 4);
@@ -134,7 +134,7 @@ export async function phoneticSearch(db: D1Database, q: string, limit = 24): Pro
     }
   };
   run(qs, 0);
-  // 自訂關聯詞（業主 2026-11-25：故意打錯字「和本翠」要找得到「漢本萃＝智慧草本＝中藥」）：
+  // 自訂關聯詞（杜杜龍 2026-11-25：故意打錯字「和本翠」要找得到「漢本萃＝智慧草本＝中藥」）：
   // 查詢的音節與某個關聯詞「相同，或 3 個音節以上差 1 個音節」，就把同組的所有詞也當查詢找一遍（分數略低一點）。
   const expandMin = Number(st.synonymExpandMinChars ?? 2);
   const shortBelow = Number(st.synonymShortBelow ?? 3);

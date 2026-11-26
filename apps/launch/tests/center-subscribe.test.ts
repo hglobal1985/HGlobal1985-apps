@@ -58,7 +58,7 @@ test("中心訂閱（從 688 開始、可取消）與廣播公告（新增、秒
   const after = (await call<{ title: string; body: string }[]>("GET", "/notifications", { token: b })).data.filter((n) => n.title === "新系列有新章節");
   assert.equal(after.length, before + 1, "30 分鐘內同一門課只通知一次");
   const mine = (await call<{ title: string; body: string }[]>("GET", "/notifications", { token: admin })).data.filter((n) => n.title === "已送出「新章節」通知");
-  assert.equal(mine.length, 1, "新增的人的確認通知 30 分鐘內合併成一則（業主 2026-11-24：一次傳 40 張照片不再跳 40 則）");
+  assert.equal(mine.length, 1, "新增的人的確認通知 30 分鐘內合併成一則（杜杜龍 2026-11-24：一次傳 40 張照片不再跳 40 則）");
   assert.ok(mine[0]!.body.includes("通知了 1 位系列訂閱者") && mine[0]!.body.includes("共新增 2 次"));
   assert.equal((await call("POST", `/admin/courses/${m2.id}/materials`, { token: admin, body: { url: "https://example.com/a.pdf", title: "講義" } })).status, 200);
   assert.ok((await call<{ title: string }[]>("GET", "/notifications", { token: b })).data.some((n) => n.title === "新系列有新教材"));

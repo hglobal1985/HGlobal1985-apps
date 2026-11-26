@@ -7,7 +7,7 @@ import { AppText, Card, Check, ErrorView, LoadingView, Screen } from "@/ui";
 import Ionicons from "@expo/vector-icons/Ionicons";
 
 /**
- * 管理員 > 使用統計（業主 2026-11-22）：手機／電腦／平板、iOS／Android、一天中的時段、首頁卡片點閱，
+ * 管理員 > 使用統計（杜杜龍 2026-11-22）：手機／電腦／平板、iOS／Android、一天中的時段、首頁卡片點閱，
  * 可交叉統計（選「列」和「欄」兩個維度）並用裝置、系統、時段篩選。資料來自 App 匿名回報（`lib/usage.ts`），不含會員身分。
  */
 type Table = { since: string; rows: { label: string; cells: number[]; total: number }[]; cols: string[]; total: number; truncated: boolean };
@@ -210,7 +210,7 @@ function Custom({ admin }: { admin: boolean }) {
   );
 }
 
-/** 現成問題（業主 2026-11-22 選定「點問題看答案」）：每題＝一組固定查詢＋一句白話答案。 */
+/** 現成問題（杜杜龍 2026-11-22 選定「點問題看答案」）：每題＝一組固定查詢＋一句白話答案。 */
 type Q = { icon: string; title: string; qs: string; view: "bars" | "table" | "trend"; answer: (d: Table) => string };
 const pct = (n: number, total: number) => Math.round((n / Math.max(1, total)) * 100);
 const top = (d: Table, what: string, noun = "最多") => {
@@ -360,14 +360,14 @@ function Question({ q, open, onToggle, admin }: { q: Q; open: boolean; onToggle:
 }
 
 /**
- * 管理員 > 使用統計（業主 2026-11-22）：點一個問題直接看答案（每題一組固定查詢，答案用一句白話）；
+ * 管理員 > 使用統計（杜杜龍 2026-11-22）：點一個問題直接看答案（每題一組固定查詢，答案用一句白話）；
  * 最下面「自己組合（進階）」才是自選列、欄、篩選的交叉表。資料來自 App 匿名回報（`lib/usage.ts`），不含會員身分。
  */
 export default function UsageScreen() {
   const { c } = useTheme();
-  const [openQ, setOpenQ] = useState<string | null>(null); // 預設全部收起（業主 2026-11-26）
+  const [openQ, setOpenQ] = useState<string | null>(null); // 預設全部收起（杜杜龍 2026-11-26）
   const [custom, setCustom] = useState(false);
-  const [admin, setAdmin] = useState(false); // 包含管理員（業主本人）操作；預設不含（業主 2026-11-23）
+  const [admin, setAdmin] = useState(false); // 包含管理員（杜杜龍本人）操作；預設不含（杜杜龍 2026-11-23）
   return (
     <Screen>
       <AppText variant="caption" tone="muted">

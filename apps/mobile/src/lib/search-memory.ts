@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 
 /**
- * 記住搜尋字（業主 2026-11-25）：點了某個搜尋結果、按返回時，要回到剛剛的搜尋結果，而不是空白的搜尋畫面。
+ * 記住搜尋字（杜杜龍 2026-11-25）：點了某個搜尋結果、按返回時，要回到剛剛的搜尋結果，而不是空白的搜尋畫面。
  * 只放在記憶體（重新整理或超過 設定的時間（預設 15 分鐘，「搜尋與 AI 設定」可改）就忘記）；清除搜尋框時一併清掉。超派、至尊兩邊的搜尋共用。
  */
 const mem = new Map<string, { q: string; at: number }>();
@@ -27,7 +27,7 @@ export function useRememberedQuery(key: string): [string, (v: string) => void] {
 }
 
 /**
- * 從搜尋結果點進去（業主 2026-11-25）：按返回要回到「點結果的那一頁」（首頁搜尋結果），而不是被頁面的 backTo 導去課程頁。
+ * 從搜尋結果點進去（杜杜龍 2026-11-25）：按返回要回到「點結果的那一頁」（首頁搜尋結果），而不是被頁面的 backTo 導去課程頁。
  * 點結果時呼叫 markFromSearch；TopBar 的返回用 consumeFromSearch 判斷（有效時間同搜尋記憶）。
  */
 let fromSearchAt = 0;

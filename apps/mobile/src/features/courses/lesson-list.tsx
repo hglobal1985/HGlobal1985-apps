@@ -41,7 +41,7 @@ export function ChapterList({ course, style, playingId, onPlay, onBlockedPress }
       {chapters.length === 0 || !anyReady ? (
         <ListRow icon="hourglass-outline" title="敬請期待" subtitle="課程內容準備中" />
       ) : (
-        // 章節列＝全站清單列 CompactRow（業主 2026-11-22：課程頁章節清單與「清單」頁同一套）：縮圖／圖示、第一行標題、第二行日期膠囊＋分鐘數＋主講人、右側分享鈕。
+        // 章節列＝全站清單列 CompactRow（杜杜龍 2026-11-22：課程頁章節清單與「清單」頁同一套）：縮圖／圖示、第一行標題、第二行日期膠囊＋分鐘數＋主講人、右側分享鈕。
         chapters.map((lesson) => {
           const soon = !lesson.ready;
           const playing = playingId === lesson.id;
@@ -70,14 +70,14 @@ export function ChapterList({ course, style, playingId, onPlay, onBlockedPress }
 }
 
 /**
- * 「其他教材」區塊的清單：外部連結教材（業主 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
+ * 「其他教材」區塊的清單：外部連結教材（杜杜龍 2026-11-16）——最左側是連結類型的官方 Logo（取代播放鈕）、點一下開啟外部連結、
  * 最右側有「分享」鈕（系統分享選單；文字範本在「設定 > 分享預設值」）。沒有連結的列（完整版課程影片、尚未改版的舊教材）維持原本的播放樣子。
  */
-export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb", onBrowsePhotos, albumOpen, onPhotosChanged }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（業主 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" | "album"; /** 區塊照片（業主 2026-11-24）：「瀏覽本區照片」跳到相簿分頁（要展開的區塊編號）。 */ onBrowsePhotos?: (blockId: string) => void; /** 相簿分頁要自動展開的區塊。 */ albumOpen?: string | null; onPhotosChanged?: () => void } & LessonPlayProps) {
+export function FullVersionList({ course, playingId, onPlay, openBlock, layout = "thumb", onBrowsePhotos, albumOpen, onPhotosChanged }: { course: CourseDetail; /** 從上拉選單點某個區塊進來：該區塊展開並捲到它，其他區塊維持收起。 */ openBlock?: string; /** 清單卡頁右上角的切換（杜杜龍 2026-11-19）：縮圖＝區塊封面格；詳細列表＝全部教材一列一列（區塊名稱＋數量當分隔）。 */ layout?: "thumb" | "detail" | "album"; /** 區塊照片（杜杜龍 2026-11-24）：「瀏覽本區照片」跳到相簿分頁（要展開的區塊編號）。 */ onBrowsePhotos?: (blockId: string) => void; /** 相簿分頁要自動展開的區塊。 */ albumOpen?: string | null; onPhotosChanged?: () => void } & LessonPlayProps) {
   const thumb = useThumb();
   const { c } = useTheme();
   const isBlocks = course.lessons.some((l) => l.section);
-  // 清單的區塊：預設全部收起（業主 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
+  // 清單的區塊：預設全部收起（杜杜龍 2026-11-18）；點一張區塊卡才在下方展開教材，只展開一個；從上拉選單指定的那個一進來就展開。
   useEffect(() => {
     if (!openBlock || typeof document === "undefined") return;
     const t = setTimeout(() => document.getElementById(`blk-${openBlock}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
@@ -103,7 +103,7 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
     const visibleBlocks = blocks.filter((b) => canEdit || b.items.some(shown) || hasBlockPhotos(b.head));
     const leadShown = lead.filter(shown);
     if (!visibleBlocks.length && !leadShown.length && !full.length) return null;
-    // 欄數隨螢幕寬度自動變：手機 2 欄，越寬越多，最多 5 欄（業主 2026-11-18）。
+    // 欄數隨螢幕寬度自動變：手機 2 欄，越寬越多，最多 5 欄（杜杜龍 2026-11-18）。
     const GAP = space.sm;
     if (layout === "detail") {
       return (
@@ -138,10 +138,10 @@ export function FullVersionList({ course, playingId, onPlay, openBlock, layout =
                 ) : b.head.brand ? (
                   <BrandCover brand={b.head.brand} fill />
                 ) : (
-                  // 沒有封面圖：直接用文字當封面（業主 2026-11-18）
+                  // 沒有封面圖：直接用文字當封面（杜杜龍 2026-11-18）
                   <CourseCover theme="" label="" title={b.head.title} fill />
                 )}
-                {/* 素材數＋展開／收起箭頭膠囊（業主 2026-11-18 款式 5） */}
+                {/* 素材數＋展開／收起箭頭膠囊（杜杜龍 2026-11-18 款式 5） */}
                 <View style={{ position: "absolute", right: 6, bottom: 6, flexDirection: "row", alignItems: "center", gap: 3, backgroundColor: "rgba(255,255,255,0.92)", borderWidth: 1, borderColor: c.accent, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }} accessibilityLabel={`${b.items.filter(shown).length}個教材，${on ? "已展開" : "已收起"}`}>
                   <AppText variant="caption" style={{ color: c.accentText, fontWeight: "800" }} {...({ dataSet: { noScale: "" } } as object)}>
                     {b.items.filter(shown).length + blockPhotoCount(b.head)}

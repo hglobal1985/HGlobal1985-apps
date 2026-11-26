@@ -45,7 +45,7 @@ const shown = (f: { value: string; pending: string | null }) => f.pending ?? f.v
 const formVals = (d: View_): Record<Key, string> => ({ legal_name: d.legalName, display_name: d.nickname, contact_email: d.email || d.googleEmail || "", education_system: shown(d.fields.education_system), education_center: shown(d.fields.education_center), rank: shown(d.fields.rank), upline_platinum: shown(d.fields.upline_platinum), upline_diamond: shown(d.fields.upline_diamond) });
 const norm = (s: string) => s.trim().toLowerCase();
 
-/** 欄位標籤：必填欄位旁有橘色「必填」小標籤（中央視覺規範）；「變更需再重新審核」一律固定顯示在第二行（業主 2026-11-22）；reserveNote＝同一排其他欄位有第二行時，這欄也留一行空間，下拉框才會對齊。 */
+/** 欄位標籤：必填欄位旁有橘色「必填」小標籤（中央視覺規範）；「變更需再重新審核」一律固定顯示在第二行（杜杜龍 2026-11-22）；reserveNote＝同一排其他欄位有第二行時，這欄也留一行空間，下拉框才會對齊。 */
 function Label({ text, tag, note, reserveNote, fit }: { /** 一行顯示、太長自動縮小字體。 */ fit?: boolean; text: string; tag?: string; note?: string; reserveNote?: boolean }) {
   const { c } = useTheme();
   return (
@@ -72,7 +72,7 @@ function Label({ text, tag, note, reserveNote, fit }: { /** 一行顯示、太�
 }
 
 /** 必填沒填時，整列用 2px 橘框＋淡橘底標示（中央視覺規範）。 */
-function Row({ bad, z, fixed, anchor, children }: { bad?: boolean; z?: number; /** 欄位代號：給「跳到沒填的欄位」定位用（nativeID＝pf-代號）。 */ anchor?: string; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，業主 2026-11-23）。 */ fixed?: boolean; children: ReactNode }) {
+function Row({ bad, z, fixed, anchor, children }: { bad?: boolean; z?: number; /** 欄位代號：給「跳到沒填的欄位」定位用（nativeID＝pf-代號）。 */ anchor?: string; /** 固定外框（透明框＋同樣的內距）：有沒有橘框，欄位位置都不會位移（三欄對齊用，杜杜龍 2026-11-23）。 */ fixed?: boolean; children: ReactNode }) {
   const { c } = useTheme();
   const bw2 = useBorderW(2);
   const box = { borderWidth: bw2, borderRadius: radius.md, padding: 4 };
@@ -96,7 +96,7 @@ function NoneBox({ on, onToggle, disabled }: { on: boolean; onToggle: () => void
   );
 }
 
-/** 「前往完整版會員中心」：強制單行、依畫面寬度自動縮小字體（業主 2026-11-24；網頁不支援 adjustsFontSizeToFit，所以自己用寬度與字數算）。 */
+/** 「前往完整版會員中心」：強制單行、依畫面寬度自動縮小字體（杜杜龍 2026-11-24；網頁不支援 adjustsFontSizeToFit，所以自己用寬度與字數算）。 */
 export function AccountCenterLink() {
   const { c } = useTheme();
   const onPress = openAccountCenter;
@@ -117,7 +117,7 @@ export function AccountCenterLink() {
   );
 }
 
-/** 一欄堆疊版面（至尊模式頁）：下拉選單與右邊的「無」勾選框並排同一列（業主 2026-11-24）；三欄版面維持原樣（無在選單下方）。 */
+/** 一欄堆疊版面（至尊模式頁）：下拉選單與右邊的「無」勾選框並排同一列（杜杜龍 2026-11-24）；三欄版面維持原樣（無在選單下方）。 */
 function FieldLine({ stack, children }: { stack: boolean; children: ReactNode }) {
   return stack ? <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>{children}</View> : <>{children}</>;
 }
@@ -131,10 +131,10 @@ function FieldLine({ stack, children }: { stack: boolean; children: ReactNode })
  * 必填沒填時標示橘框，不送出。直接用會員本人的身分寫回會員中心（行動大學不保存）。
  */
 /**
- * 完善個人資料表單（兩種模式共用同一份，業主 2026-11-24：欄位改了兩邊自動一起變）。
+ * 完善個人資料表單（兩種模式共用同一份，杜杜龍 2026-11-24：欄位改了兩邊自動一起變）。
  * inline＝直接放在頁面裡（至尊模式的模式頁，沒有「關閉」鈕、儲存後不關閉）；預設＝上拉選單。
  */
-/** 已儲存的資料是否「全部填完」（與畫面上的必填規則相同）：至尊頁用它決定進頁是編輯狀態還是檢視狀態（業主 2026-11-25）。 */
+/** 已儲存的資料是否「全部填完」（與畫面上的必填規則相同）：至尊頁用它決定進頁是編輯狀態還是檢視狀態（杜杜龍 2026-11-25）。 */
 function formComplete(d: View_ | null): boolean {
   if (!d) return false;
   const v = formVals(d);
@@ -146,7 +146,7 @@ function formComplete(d: View_ | null): boolean {
   return !hg || !!v.education_center.trim();
 }
 
-export function ProfilePrompt({ onClose, initial: first, inline = false, focusMissing = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean; /** 資料載入後，標出沒填的欄位並捲到第一個（至尊模式登入後自動帶到模式頁，業主 2026-11-24）。 */ focusMissing?: boolean }) {
+export function ProfilePrompt({ onClose, initial: first, inline = false, focusMissing = false }: { onClose: () => void; initial?: View_ | null; inline?: boolean; /** 資料載入後，標出沒填的欄位並捲到第一個（至尊模式登入後自動帶到模式頁，杜杜龍 2026-11-24）。 */ focusMissing?: boolean }) {
   /** 一欄由上往下排（至尊模式頁，字放大後三欄橫排會被擠爛）；上拉選單版維持原本的緊湊三欄。 */
   const stack = inline;
   const bwWarn = useBorderW(2);
@@ -193,14 +193,14 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
   }, [data?.enabled, wantAmway]);
 
   const amway = !!data?.enabled || wantAmway;
-  // 上手白金／上手鑽石（業主 2026-11-23）：自由輸入＋中央關聯詞（輸入時列出建議、點選填入）；兩欄的建議清單放在兩欄下方整列。
+  // 上手白金／上手鑽石（杜杜龍 2026-11-23）：自由輸入＋中央關聯詞（輸入時列出建議、點選填入）；兩欄的建議清單放在兩欄下方整列。
   const [uplineFocus, setUplineFocus] = useState<"upline_platinum" | "upline_diamond" | null>(null);
-  // 上手白金的關聯詞同時來自上手鑽石的詞庫（業主 2026-11-23）：兩個詞庫合併、去重。
+  // 上手白金的關聯詞同時來自上手鑽石的詞庫（杜杜龍 2026-11-23）：兩個詞庫合併、去重。
   const platOwn = useSuggestions(vals.upline_platinum, "upline_platinum", amway && uplineFocus === "upline_platinum");
   const platFromDiamond = useSuggestions(vals.upline_platinum, "upline_diamond", amway && uplineFocus === "upline_platinum");
   const diamSug = useSuggestions(vals.upline_diamond, "upline_diamond", amway && uplineFocus === "upline_diamond");
   const platSug = [...new Set([...platOwn, ...platFromDiamond])].slice(0, 50);
-  // 關聯詞選單：各自顯示在自己欄位的正上方、同寬；網頁版用 portal 掛到最上層，不被上拉視窗的邊緣遮住（業主 2026-11-23）。
+  // 關聯詞選單：各自顯示在自己欄位的正上方、同寬；網頁版用 portal 掛到最上層，不被上拉視窗的邊緣遮住（杜杜龍 2026-11-23）。
   const platBox = useRef<HostInstance>(null);
   const diamBox = useRef<HostInstance>(null);
   const [popRect, setPopRect] = useState<{ x: number; y: number; w: number } | null>(null);
@@ -212,12 +212,12 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
     const t = setTimeout(measure, 350); // 鍵盤升起、面板捲動之後再量一次
     return () => clearTimeout(t);
   }, [uplineFocus, upList.length]);
-  // Email 還空著時自動帶入 Google 登入信箱（業主 2026-11-23）：「原本的值」仍是空的，所以按儲存會一併寫回會員中心。
+  // Email 還空著時自動帶入 Google 登入信箱（杜杜龍 2026-11-23）：「原本的值」仍是空的，所以按儲存會一併寫回會員中心。
   const initial = data ? { ...formVals(data), contact_email: data.email } : null;
   const changed = initial ? (Object.keys(vals) as Key[]).filter((k) => (amway || k === "legal_name" || k === "display_name") && vals[k].trim() !== initial[k].trim()) : [];
-  // 尚未儲存的離開攔截（業主 2026-11-24，只有至尊模式頁的表單）：有改動還沒儲存時，離開畫面前把畫面捲到儲存鈕、顯示「尚未儲存」與「放棄」。
+  // 尚未儲存的離開攔截（杜杜龍 2026-11-24，只有至尊模式頁的表單）：有改動還沒儲存時，離開畫面前把畫面捲到儲存鈕、顯示「尚未儲存」與「放棄」。
   const dirty = inline && (changed.length > 0 || (wantAmway && !data?.enabled));
-  // 檢視／編輯狀態（業主 2026-11-25，只有至尊頁）：資料沒填完＝每次進頁都是編輯狀態，離開前一定先問「資料未完成是否放棄？」；
+  // 檢視／編輯狀態（杜杜龍 2026-11-25，只有至尊頁）：資料沒填完＝每次進頁都是編輯狀態，離開前一定先問「資料未完成是否放棄？」；
   // 資料全部填完並儲存之後，再進頁是檢視狀態（欄位不能點），要按「編輯」才能改。
   const savedComplete = formComplete(data);
   const [editing, setEditing] = useState<boolean | null>(null);
@@ -249,7 +249,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
     });
     return () => setUnsavedGuard(null);
   }, [guarded]);
-  // 瀏覽器／手機的返回鍵也要攔（業主 2026-11-24）：有未儲存的改動時先在歷史紀錄多塞一筆「同網址」的記號，
+  // 瀏覽器／手機的返回鍵也要攔（杜杜龍 2026-11-24）：有未儲存的改動時先在歷史紀錄多塞一筆「同網址」的記號，
   // 按返回只是退掉這筆記號（畫面不動）；這時再塞回去、顯示「尚未儲存」；按「放棄」才真的退兩步離開。改動儲存或放棄後把記號收掉。
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined" || !guarded) return;
@@ -271,7 +271,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
   }, [guarded]);
   const rankNone = vals.rank === "none";
   const rankLabel = (v: string) => data?.rankOptions.find((o) => o.value === v)?.label ?? v;
-  /** 選的系統是不是寰宇：只有寰宇才能選「中心」（業主 2026-11-22）；其他系統、「無」、還沒選，中心都不能選。 */
+  /** 選的系統是不是寰宇：只有寰宇才能選「中心」（杜杜龍 2026-11-22）；其他系統、「無」、還沒選，中心都不能選。 */
   const sysVal = vals.education_system.trim();
   const systemHg = !!data && !!sysVal && sysVal !== NONE_TERM && data.hglobalSystems.some((t) => norm(t) === norm(sysVal));
   /** 換系統時中心跟著連動：非寰宇的系統（含「無」）中心自動填「無」（中央規定三欄必填）；回到寰宇就清空讓會員自己選。 */
@@ -292,9 +292,9 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
   /** 標籤：沒填 → 「必填」；填了就隱藏；中心、獎銜（沒被改動時）等待審核 → 「審核中...」、已通過審核 → 「審核通過」（外觀都同必填）。 */
   const tagFor = (key: "education_system" | "education_center" | "rank" | "display_name" | "legal_name", reviewed = false): string | undefined => {
     const v = vals[key];
-    // 「必填」標籤依目前的選擇動態顯示（業主 2026-11-23）：中心只有系統是寰宇才需要填（非寰宇自動「無」、還沒選系統時還不能選），其他情況不顯示。
+    // 「必填」標籤依目前的選擇動態顯示（杜杜龍 2026-11-23）：中心只有系統是寰宇才需要填（非寰宇自動「無」、還沒選系統時還不能選），其他情況不顯示。
     if (key === "education_center" && !systemHg) return undefined;
-    if (!v.trim()) return undefined; // 不再顯示「必填」膠囊（業主 2026-11-23）：全部欄位都必填，未填按儲存會擋下並標橘框
+    if (!v.trim()) return undefined; // 不再顯示「必填」膠囊（杜杜龍 2026-11-23）：全部欄位都必填，未填按儲存會擋下並標橘框
     if (reviewed && data && key !== "display_name" && key !== "legal_name") {
       const f = data.fields[key];
       if (initial && v === initial[key]) {
@@ -343,10 +343,10 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
       setShowBad(false);
       setMsg(r.systemNotice && !r.errors.length ? { ok: false, text: "「系統」需要修改，請看下方紅字提醒" } : r.errors.length ? { ok: false, text: r.errors[0] } : { ok: true, text: r.pending ? "已儲存，部分欄位等待審核" : "已儲存到會員中心" });
       invalidate();
-      // 儲存成功後立刻重新取一次會員資料（業主 2026-11-23 回報本名按儲存後再進來又變空白）：
+      // 儲存成功後立刻重新取一次會員資料（杜杜龍 2026-11-23 回報本名按儲存後再進來又變空白）：
       // 首頁／設定頁保存的是開啟 App 時帶來的舊資料（含 profileForm、profileMissing），不更新的話再開面板會看到舊值，還會再次誤判「資料不全」而彈出。
       if (!r.errors.length && !r.systemNotice) await refreshMember(0).catch(() => undefined);
-      if (!r.errors.length && !r.systemNotice && !inline) onClose(); // 儲存成功就自動關閉視窗（業主 2026-11-19）；放在頁面裡的不關閉
+      if (!r.errors.length && !r.systemNotice && !inline) onClose(); // 儲存成功就自動關閉視窗（杜杜龍 2026-11-19）；放在頁面裡的不關閉
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message });
     } finally {
@@ -362,7 +362,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
   const sysWords = sysNotice ?? (sysWord ? (data?.hglobalCenterMessage ?? "").replace("{word}", sysWord) : null);
   const sysIsOther = !sysNone && (otherPick.education_system ?? (!!sysVal && !terms.education_system.includes(vals.education_system)));
   const anyNote = !!((!sysIsOther && noteFor("education_center")) || noteFor("rank"));
-  /** 三欄的外框：寬度剛好符合內容（業主 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
+  /** 三欄的外框：寬度剛好符合內容（杜杜龍 2026-11-22）；展開中的那一欄要蓋在其他欄與所有列上面。 */
   const colBox = (key: string, children: ReactNode) => (
     <View key={key} style={stack ? { width: "100%", zIndex: openKey === key ? 100 : 1 } : { flex: 1, flexBasis: 0, minWidth: 0, zIndex: openKey === key ? 100 : 1 }}>
       {children}
@@ -433,7 +433,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
     ) : null;
 
   return (
-    // 上拉選單（業主 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
+    // 上拉選單（杜杜龍 2026-11-18：取消置中彈窗）：統一用 BottomSheet，可下滑收起；欄位可捲動，儲存／關閉固定在最下面一列。
     <Wrap inline={inline} onClose={onClose} lift={!!openKey || !!uplineFocus}>
       <Body inline={inline} lift={!!openKey || !!uplineFocus} maxH={Math.round(winH * (winH >= winW ? 0.86 : 0.5))}>
           {stack ? null : <AccountCenterLink />}
@@ -450,7 +450,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
           {!data && !error ? <AppText tone="muted">讀取中…</AppText> : null}
           {data ? (
             <View pointerEvents={readOnly ? "none" : "auto"} style={[{ gap: space.xs }, readOnly ? { opacity: 0.8 } : null]} accessibilityState={{ disabled: readOnly }}>
-              {/* 本名（四個中文字寬）＋縮小的手機推播（業主 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
+              {/* 本名（四個中文字寬）＋縮小的手機推播（杜杜龍 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
               <View style={stack ? { gap: space.sm } : [styles.line, { alignItems: "flex-end" }]}>
                 <View style={stack ? { width: "100%" } : { width: 168 }}>
                   <Row anchor={"legal_name"} bad={showBad && missing.includes("legal_name")}>
@@ -464,9 +464,9 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                   </View>
                 )}
               </View>
-              {/* 「我是 Amway 會員」（業主 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（業主 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
+              {/* 「我是 Amway 會員」（杜杜龍 2026-11-19）：直接在這裡勾選，勾了馬上出現系統、中心、獎銜三欄（杜杜龍 2026-11-22 方案 B：三欄緊湊表單）；已勾選後要取消請到會員中心（取消會換掉會員編號）。 */}
               <View style={[styles.amwayCard, { zIndex: openKey || uplineFocus ? 500 : 5 }, inline ? { padding: 0 } : { backgroundColor: c.surfaceMuted }]}>
-                {/* 勾選之後這一列自動隱藏（業主 2026-11-23）：只剩三欄。 */}
+                {/* 勾選之後這一列自動隱藏（杜杜龍 2026-11-23）：只剩三欄。 */}
                 {!amway ? (
                   <Pressable onPress={() => !data.enabled && setWantAmway((v) => !v)} disabled={data.enabled} accessibilityRole="checkbox" accessibilityState={{ checked: amway, disabled: data.enabled }} style={[styles.none, { minHeight: 32 }]}>
                     <Icon name={amway ? "checkbox" : "square-outline"} size={26} color={amway ? c.accentText : c.textMuted} />
@@ -486,7 +486,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                         </View>
                       ))}
                     </View>
-                    {/* 順序：獎銜 > 系統 > 中心（業主 2026-11-22）。獎銜一律可選；中心只有系統是寰宇才能選。 */}
+                    {/* 順序：獎銜 > 系統 > 中心（杜杜龍 2026-11-22）。獎銜一律可選；中心只有系統是寰宇才能選。 */}
                     <View style={stack ? { gap: 8 } : { flexDirection: "row", gap: 8, zIndex: 30, alignItems: "flex-start" }}>
                       {colBox(
                         "rank",
@@ -510,7 +510,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                       )}
                       {sysCol.node}
                       {sysCol.other ? (
-                        // 系統選「其他」：隱藏中心欄，原位置改成自訂系統的輸入欄（業主 2026-11-23）。
+                        // 系統選「其他」：隱藏中心欄，原位置改成自訂系統的輸入欄（杜杜龍 2026-11-23）。
                         <View style={stack ? { width: "100%" } : { flex: 1, minWidth: 0 }}>
                           <Row fixed anchor={"education_system"} bad={showBad && missing.includes("education_system")}>
                             <Label text="自訂系統" tag={shortTag(tagFor("education_system"))} reserveNote={anyNote} />
@@ -543,7 +543,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
       ) : null}
       <View ref={saveBox} collapsable={false} style={styles.actions}>
         {inline ? (
-          // 至尊模式頁（業主 2026-11-25）：檢視狀態＝「編輯｜儲存」同一列（儲存灰掉）；編輯狀態有改動或資料沒填完被攔下時，「放棄」在儲存鈕左邊。
+          // 至尊模式頁（杜杜龍 2026-11-25）：檢視狀態＝「編輯｜儲存」同一列（儲存灰掉）；編輯狀態有改動或資料沒填完被攔下時，「放棄」在儲存鈕左邊。
           readOnly ? (
             <View style={{ flex: 1 }}>
               <Button variant="secondary" label="編輯" icon="create-outline" onPress={() => setEditing(true)} fullWidth />
@@ -581,7 +581,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
 }
 
 /** 外框：上拉選單，或放在頁面裡的卡片。 */
-/** lift＝有下拉選單展開：網頁的每個 View 都是獨立堆疊層，外框也要提到最上層，選單才不會被後面的按鈕、卡片蓋住（業主 2026-11-24）。 */
+/** lift＝有下拉選單展開：網頁的每個 View 都是獨立堆疊層，外框也要提到最上層，選單才不會被後面的按鈕、卡片蓋住（杜杜龍 2026-11-24）。 */
 function Wrap({ inline, onClose, lift, children }: { inline: boolean; onClose: () => void; lift: boolean; children: ReactNode }) {
   const { c } = useTheme();
   const elderOn = useModeProfile().bigLayout; // 大字版面＝至尊模式：大區塊不畫外框

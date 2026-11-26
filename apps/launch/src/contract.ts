@@ -82,7 +82,7 @@ export type CenterArt = { centerKey: string; center: string; edmUrl: string; cov
 /** 系列頁上方的照片（與中心的 CenterArt 同一套：EDM＋16:9 封面＋裁切框＋預設停留位置）。 */
 export type SeriesArt = { series: string; edmUrl: string; coverUrl: string | null; coverRect: { x: number; y: number; w: number } | null; edmViewY: number };
 
-/** 沒有系列的課程卡一律放進這個系列：只有超級管理員看得到（業主 2026-11-19）。清單卡沒有系列照舊直接在第一層。 */
+/** 沒有系列的課程卡一律放進這個系列：只有超級管理員看得到（杜杜龍 2026-11-19）。清單卡沒有系列照舊直接在第一層。 */
 export const UNCATEGORIZED = "未分類";
 /** 系列的設定（標題只改顯示，不動識別名稱 series）。 */
 export type SeriesSetting = { series: string; title: string; showInAll: boolean };
@@ -90,7 +90,7 @@ export type SeriesSetting = { series: string; title: string; showInAll: boolean 
 export type EnrollmentState = "opened" | "pending" | null;
 
 /**
- * 固定格式的文字封面（業主 2026-11-19）：名稱以這些字開頭的課程，封面一律只有文字＋咖啡色系底，且固定「名稱（換行）X年X月」兩行，
+ * 固定格式的文字封面（杜杜龍 2026-11-19）：名稱以這些字開頭的課程，封面一律只有文字＋咖啡色系底，且固定「名稱（換行）X年X月」兩行，
  * 不用 YouTube 縮圖當封面（後端 courseArt）。例：「銅章會議2026年10月」→ ["銅章會議", "2026年10月"]。要新增別的固定格式封面只改這張表。
  */
 export const TEXT_COVER_PREFIXES = ["銅章會議"] as const;
@@ -103,7 +103,7 @@ export function textCoverLines(title: string | null | undefined): string[] | nul
 }
 
 /** 誰可以瀏覽：所有人含訪客／所有會員／寰宇夥伴／中心會員。 */
-/** 寰宇大學「所有系列」檢視的三個專區（業主 2026-11-18）。空字串＝沒指定：課程放 hglobal、清單放 amway_material。 */
+/** 寰宇大學「所有系列」檢視的三個專區（杜杜龍 2026-11-18）。空字串＝沒指定：課程放 hglobal、清單放 amway_material。 */
 export type Zone = "hglobal" | "amway_material" | "amway_brand";
 export const ZONES: { id: Zone; label: string }[] = [
   { id: "hglobal", label: "寰宇課程活動" },
@@ -127,7 +127,7 @@ export type CourseSummary = {
   teacherTitle: string;
   /** 勾了「無」：沒有主講人、獎銜、職稱（畫面隱藏這三個欄位），專屬網址用課程名稱的英譯。 */
   noSpeaker: boolean;
-  /** 套裝課程（業主 2026-11-19）：只是分類篩選用途，不改變版面與功能；日期區間 7 天以上時編輯畫面會自動勾選。 */
+  /** 套裝課程（杜杜龍 2026-11-19）：只是分類篩選用途，不改變版面與功能；日期區間 7 天以上時編輯畫面會自動勾選。 */
   isPackage: boolean;
   category: string;
   /** iOS/Android 請求時一律為 null（商店規範：App 內不顯示價格）。 */
@@ -139,18 +139,18 @@ export type CourseSummary = {
   lessonCount: number;
   /** 有上傳教材：任何一堂（章節或其他教材）設了影音來源，或有附件。「寰宇教育中心」清單的排序只算這樣的課程。 */
   hasMaterial: boolean;
-  /** 品牌（業主 2026-11-18，獨立於分類）：brand_logos 的 id 與名稱。 */
+  /** 品牌（杜杜龍 2026-11-18，獨立於分類）：brand_logos 的 id 與名稱。 */
   brandId: string | null;
   brandName: string | null;
-  /** 所屬專區（業主 2026-11-18）。 */
+  /** 所屬專區（杜杜龍 2026-11-18）。 */
   zone: Zone;
   /** 選了品牌、且沒有手動上傳封面時才有：logo 圖、底色、底圖。 */
   brand: BrandCover | null;
-  /** 清單類別：勾了「顯示在上拉選單」的區塊（業主 2026-11-18）；課程類別永遠是空陣列。 */
+  /** 清單類別：勾了「顯示在上拉選單」的區塊（杜杜龍 2026-11-18）；課程類別永遠是空陣列。 */
   blocks: { id: string; title: string; coverUrl: string | null; brand: BrandCover | null; count: number; categories: string; brandId: string | null }[];
   /** 系列內的手動順序（0＝還沒排過；沒排過的新卡自動排最前面）。 */
   seriesOrder: number;
-  /** 在系列頁隱藏（業主 2026-11-19）：只是不在系列頁顯示，仍可用網址、搜尋、單元找到。 */
+  /** 在系列頁隱藏（杜杜龍 2026-11-19）：只是不在系列頁顯示，仍可用網址、搜尋、單元找到。 */
   seriesHidden: boolean;
   /** 素材（教材）數量：有影音來源或外部連結的項目數（清單卡的上拉選單標籤用）。 */
   materialCount: number;
@@ -158,10 +158,10 @@ export type CourseSummary = {
   eligible: boolean;
   /** 會長不受獎銜限制也可報名。 */
   allowPresident: boolean;
-  /** 指定邀請制（業主 2026-11-20）：不看獎銜、一律人工審核；inviteHasCode＝有設邀請碼（輸入正確免審核）。邀請碼本身只給課程管理者（GET /admin/courses/:id/invite）。 */
+  /** 指定邀請制（杜杜龍 2026-11-20）：不看獎銜、一律人工審核；inviteHasCode＝有設邀請碼（輸入正確免審核）。邀請碼本身只給課程管理者（GET /admin/courses/:id/invite）。 */
   inviteOnly: boolean;
   inviteHasCode: boolean;
-  /** 這位登入者能不能看這門課的報名名單（管理者、有審核權限的人；業主 2026-11-20）。 */
+  /** 這位登入者能不能看這門課的報名名單（管理者、有審核權限的人；杜杜龍 2026-11-20）。 */
   canRoster: boolean;
   /** 指導單位、主辦單位（空字串表示未設定）。 */
   guidanceUnit: string;
@@ -171,7 +171,7 @@ export type CourseSummary = {
   eventEnd: string | null;
   /** 完全公開：未登入的訪客也能瀏覽介紹與章節、觀看（只限免費課程）。 */
   isPublic: boolean;
-  /** 誰可以瀏覽（業主 2026-11-17）。 */
+  /** 誰可以瀏覽（杜杜龍 2026-11-17）。 */
   viewScope: ViewScope;
   /** 這位會員審核中的報名編號（沒有為 null）；點「付款審核中」直接進完整的報名明細與訊息頁。 */
   pendingOrderId: string | null;
@@ -193,13 +193,13 @@ export type CourseSummary = {
   started: boolean;
   /** 課程勾選「章節各自設定封面」：章節編輯時才會出現封面設定。 */
   chapterCovers: boolean;
-  /** 課程開放「區塊新增照片」（業主 2026-11-24，先只有成交百寶箱）：編輯模式每個區塊多一個「新增照片」，學員在區塊裡看照片格。 */
+  /** 課程開放「區塊新增照片」（杜杜龍 2026-11-24，先只有成交百寶箱）：編輯模式每個區塊多一個「新增照片」，學員在區塊裡看照片格。 */
   blockPhotos: boolean;
   /** 中心課程：只在「寰宇教育中心」頁出現，不在「全部課程」出現。 */
   centerCourse: boolean;
   /** 短影音專輯：這門課的章節與影音教材在「單元」頁歸類為短影音。 */
   isShorts: boolean;
-  /** 清單卡（業主 2026-11-16）：只有「其他教材」，沒有章節、時間地點、費用、主講人；影片教材在 App 內播放並計入學習進度。 */
+  /** 清單卡（杜杜龍 2026-11-16）：只有「其他教材」，沒有章節、時間地點、費用、主講人；影片教材在 App 內播放並計入學習進度。 */
   isList: boolean;
   /** 課程專屬網址路徑（中心縮寫/英譯姓名-編號）；缺資料時為 null，用 /course/編號。 */
   shortPath: string | null;
@@ -270,11 +270,11 @@ export type Lesson = {
   full?: boolean;
   /** 「其他教材」（不計入章節堂數與學習進度）。序號 position 與章節各自從 1 開始。 */
   material?: boolean;
-  /** 素材的「分類區域標題」（沒有內容，只是一個可收合的標題；業主 2026-11-17）。 */
+  /** 素材的「分類區域標題」（沒有內容，只是一個可收合的標題；杜杜龍 2026-11-17）。 */
   section?: boolean;
-  /** 區塊（section）專用（業主 2026-11-18）：顯示在上一層上拉選單、分類（「、」分隔，可複選）、品牌（單選）、沒上傳封面時的品牌 logo 封面。 */
+  /** 區塊（section）專用（杜杜龍 2026-11-18）：顯示在上一層上拉選單、分類（「、」分隔，可複選）、品牌（單選）、沒上傳封面時的品牌 logo 封面。 */
   inSheet?: boolean;
-  /** 連結區塊（品牌資訊卡的「新品特惠培訓直播」）：內容與封面都來自另一份清單的區塊（業主 2026-11-18）。 */
+  /** 連結區塊（品牌資訊卡的「新品特惠培訓直播」）：內容與封面都來自另一份清單的區塊（杜杜龍 2026-11-18）。 */
   linkedCourseId?: string;
   linkedBlockId?: string;
   /** 區塊照片：放這個區塊照片的區塊編號（連結區塊＝來源區塊）；沒有這個欄位＝這門課沒開放區塊照片。 */
@@ -294,7 +294,7 @@ export type Lesson = {
   brand?: BrandCover | null;
   /** 章節自己的封面：橫式 16:9（清單縮圖）與直式；沒設定為 null（改用課程封面）。 */
   coverUrl?: string | null;
-  /** true＝coverUrl 不是上傳的，是 YouTube 縮圖（業主 2026-11-25）；編輯畫面不可把它當成已上傳的封面。 */
+  /** true＝coverUrl 不是上傳的，是 YouTube 縮圖（杜杜龍 2026-11-25）；編輯畫面不可把它當成已上傳的封面。 */
   coverAuto?: boolean;
   posterUrl?: string | null;
   /** 章節日期是否「跟著課程日期」（沒有自己設定日期）；eventDate 已是算好的實際日期。 */
@@ -357,7 +357,7 @@ export type OrderEvent = {
   note?: string;
   createdAt: string;
 };
-/** 報名名單（業主 2026-11-20）：每位報名學員一列；上手白金／上手鑽石由中央即時提供（行動大學不保存），讀不到就是 null。 */
+/** 報名名單（杜杜龍 2026-11-20）：每位報名學員一列；上手白金／上手鑽石由中央即時提供（行動大學不保存），讀不到就是 null。 */
 export type RosterRow = {
   orderId: string;
   name: string;
@@ -380,7 +380,7 @@ export type Roster = {
   /** 讀不到上手資料的原因（狀態碼或錯誤代碼，除錯用）。 */
   uplineError?: string;
 };
-/** 系列「套用到全系列課程」（業主 2026-11-20）：可以套用的欄位（鍵＝課程儲存 API 的欄位名），依課程設定的大項分組；新增欄位只加在這一張表。 */
+/** 系列「套用到全系列課程」（杜杜龍 2026-11-20）：可以套用的欄位（鍵＝課程儲存 API 的欄位名），依課程設定的大項分組；新增欄位只加在這一張表。 */
 export const SERIES_APPLY_GROUPS = [
   { key: "basics", label: "基本資料", fields: ["category", "brandId", "isPackage"] },
   { key: "when", label: "時間與地點", fields: ["location", "locationNone", "isOnline"] },
@@ -455,21 +455,21 @@ export type ReviewGroup = {
   canManage: boolean;
 };
 
-/** 通知分類（通知頁的檢視模式：全部／審核／訂閱／留言；業主 2026-11-17）。 */
+/** 通知分類（通知頁的檢視模式：全部／審核／訂閱／留言；杜杜龍 2026-11-17）。 */
 export type NoticeCategory = "review" | "subscribe" | "comment" | "achievement" | "other";
-/** pending＝審核相關而且還沒處理（業主 2026-11-23：通知頁一律置頂）：待審的報名通知＝那筆報名還在待審；其他審核通知＝還沒讀。 */
+/** pending＝審核相關而且還沒處理（杜杜龍 2026-11-23：通知頁一律置頂）：待審的報名通知＝那筆報名還在待審；其他審核通知＝還沒讀。 */
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string; category: NoticeCategory; pending?: boolean };
 
 /** 中央的一筆「獎銜、中心」新申請（只即時顯示，不保存）。 */
 export type CentralReview = { id: string; /** 申請人（只在審核者本人開啟時即時讀取，不保存）。 */ member_id?: string; display_name: string | null; /** 申請人本名與上手（中央即時提供，不保存；讀不到就沒有）。 */ legal_name?: string | null; upline_platinum?: string | null; upline_diamond?: string | null; field_key: string; field_label: string; center: string | null; current_value: unknown; requested_value: unknown; created_at: string };
 /** available＝false：這位會員沒有審核權限、或中央暫時不可用（畫面直接不顯示審核區）。 */
-/** App 內指派職務（業主 2026-11-21，中央串接指令 2026-11-21.1）：職務選項一律用中央回傳的 assignable_roles，不寫死。 */
+/** App 內指派職務（杜杜龍 2026-11-21，中央串接指令 2026-11-21.1）：職務選項一律用中央回傳的 assignable_roles，不寫死。 */
 export type CoverMediaKind = "center" | "series" | "course";
-/** 儲存區（業主 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，張數不設上限（業主 2026-11-25）；系列、課程只有 cover。 */
+/** 儲存區（杜杜龍 2026-11-23）：cover＝封面編輯上傳的封面輪播照片；edm＝中心「EDM」分頁的照片。兩邊各自獨立，張數不設上限（杜杜龍 2026-11-25）；系列、課程只有 cover。 */
 export type CoverScope = "cover" | "edm";
-/** 「相簿」專區（業主 2026-11-25）：自動彙整全站所有用到相簿上傳功能的照片，依來源分成「資料夾」。 */
+/** 「相簿」專區（杜杜龍 2026-11-25）：自動彙整全站所有用到相簿上傳功能的照片，依來源分成「資料夾」。 */
 export type AlbumFolder = { /** 唯一識別：來源類型＋鍵值（＋儲存區）。 */ id: string; /** center＝中心；series＝系列；course＝課程封面；block＝課程區塊相簿（點開前往該課程的相簿分頁）。 */ kind: "center" | "series" | "course" | "block"; /** center／series／course 用 /cover-media 讀；block 用課程編號＋區塊編號前往課程頁。 */ key: string; scope?: CoverScope; title: string; subtitle?: string; count: number; thumb: string | null; /** 資料夾預覽用的前 4 張縮圖。 */ thumbs: string[]; courseId?: string; /** 沒有權限進入（鎖定的課程、區塊相簿）：禁止進入，點了只顯示原因。 */ locked: boolean; lockReason?: string; /** 所屬大類別代碼（edm／cover／series／course／block／treasure）。 */ groupId: string; /** 看的人可不可以在這個資料夾上傳照片（伺服器上傳時仍會再檢查）。 */ canEdit: boolean };
-/** 相簿資訊總覽（超級管理員，業主 2026-11-25）：R2 佔用、上傳者排名、最近上傳、檔案大小與瀏覽數排序，以及這個相簿的上傳權限。 */
+/** 相簿資訊總覽（超級管理員，杜杜龍 2026-11-25）：R2 佔用、上傳者排名、最近上傳、檔案大小與瀏覽數排序，以及這個相簿的上傳權限。 */
 export type AlbumInfo = {
   id: string;
   title: string;
@@ -486,14 +486,14 @@ export type AlbumInfo = {
   groupRank: string;
 };
 export type AlbumPermissions = { ranks: { code: string; name: string }[]; groups: { id: string; label: string; uploadMinRank: string }[]; folders: { id: string; title: string; groupId: string; count: number; uploadMinRank: string | null }[] };
-/** 區塊相簿的子資料夾（業主 2026-11-26）：folders 依張數多到少；uncat＝還沒分資料夾的照片（固定排最後）。 */
+/** 區塊相簿的子資料夾（杜杜龍 2026-11-26）：folders 依張數多到少；uncat＝還沒分資料夾的照片（固定排最後）。 */
 export type AlbumSubfolder = { id: string; name: string; count: number; thumbs: string[] };
 export type AlbumSubfolders = { folders: AlbumSubfolder[]; uncat: { count: number; thumbs: string[] }; canManage: boolean };
 export type AlbumGroup = { id: string; label: string; folders: AlbumFolder[] };
 export type AlbumsResponse = { total: number; groups: AlbumGroup[] };
 /** 封面輪播／相簿的一個項目：image 或短影音；width／height 為 0＝尺寸未知（當橫式）。 */
-export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（業主 2026-11-24）。 */ scene?: string; /** 上傳時間（相簿資料夾排序用）。 */ createdAt?: string; /** 上傳者暱稱與頭像（單張看圖顯示；舊照片沒有）。 */ uploader?: string; uploaderAvatar?: string; /** 區塊相簿的子資料夾編號（沒有＝未分類）。 */ folderId?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
-/** 縮圖符號（業主 2026-11-23）：系列卡、課程卡、中心卡的小縮圖。symbol＝emoji 或短文字（最多 4 個字）；fg 文字色、bg 底色（#RRGGBB）。 */
+export type CoverMediaItem = { id: string; scope: CoverScope; /** 相簿照片（區塊照片）的 AI 場景標籤，逗號分隔（杜杜龍 2026-11-24）。 */ scene?: string; /** 上傳時間（相簿資料夾排序用）。 */ createdAt?: string; /** 上傳者暱稱與頭像（單張看圖顯示；舊照片沒有）。 */ uploader?: string; uploaderAvatar?: string; /** 區塊相簿的子資料夾編號（沒有＝未分類）。 */ folderId?: string; /** 綁定的課程（課程 EDM 併入中心 EDM 空間；綁定的照片不能刪，只能更換）。 */ courseId?: string | null; courseTitle?: string | null; kind: "image" | "video"; url: string; posterUrl: string | null; width: number; height: number; durationSec: number; /** 中心 EDM：AI 辨識出的活動日期（YYYY-MM-DD）與海報文字（搜尋用）；還沒辨識完是 null／空字串。 */ eventDate?: string | null; text?: string };
+/** 縮圖符號（杜杜龍 2026-11-23）：系列卡、課程卡、中心卡的小縮圖。symbol＝emoji 或短文字（最多 4 個字）；fg 文字色、bg 底色（#RRGGBB）。 */
 export type ThumbBadgeKind = "course" | "series" | "center";
 export type ThumbBadge = { kind: ThumbBadgeKind; key: string; symbol: string; fg: string; bg: string };
 /** 設定頁總覽的一列：沒設定時 badge 是 null。 */
@@ -553,11 +553,11 @@ export type CourseComment = {
 };
 
 /** 品牌 logo 封面的組成：底圖（優先）或底色（沒有就白色）＋ logo 置中、四周留安全距離。 */
-export type BrandCover = { logoUrl: string; bgColor: string | null; /** 深色模式的底色（業主 2026-11-18）：使用者切換成深色模式時優先於底色與底圖；沒設定＝null。 */ bgColorDark: string | null; bgUrl: string | null };
+export type BrandCover = { logoUrl: string; bgColor: string | null; /** 深色模式的底色（杜杜龍 2026-11-18）：使用者切換成深色模式時優先於底色與底圖；沒設定＝null。 */ bgColorDark: string | null; bgUrl: string | null };
 /** 後台品牌 logo 管理用。 */
 export type BrandLogo = { id: string; name: string; logoUrl: string | null; bgColor: string | null; bgColorDark: string | null; bgUrl: string | null };
 
-/** 通知情境（Email 可逐項開關，業主 2026-11-18）：預設只有「付費課程相關的審核通知」要寄 Email，其餘預設不寄；手機推播不看這個，全部都推。 */
+/** 通知情境（Email 可逐項開關，杜杜龍 2026-11-18）：預設只有「付費課程相關的審核通知」要寄 Email，其餘預設不寄；手機推播不看這個，全部都推。 */
 export type NoticeKind = "paid_review" | "role" | "course_update" | "subscribe_new" | "broadcast" | "reminder" | "comment" | "badge" | "other";
 export const NOTICE_KINDS: { key: NoticeKind; label: string; desc: string; emailDefault: boolean }[] = [
   { key: "paid_review", label: "付費課程相關的審核通知", desc: "報名送出、待審核、繳費確認、開通、退回、延後、報名留言", emailDefault: true },
@@ -652,7 +652,7 @@ export type ProfileForm = {
 
 // ---------- 學習成就（徽章）----------
 export type AchievementType = "lessons_completed" | "courses_completed" | "courses_enrolled" | "learning_days" | "comments_posted" | "course_completed" | "streak_days" | "watch_minutes" | "centers_subscribed" | "series_subscribed" | "categories_explored" | "early_lessons" | "night_lessons" | "weekend_lessons" | "lessons_in_a_day" | "feature_used" | "subscriptions_total" | "material_video" | "lists_created" | "list_people" | "files_downloaded" | "target_lesson" | "series_completed";
-/** 任務分類（後台「徽章任務設定」用，業主 2026-11-18）。 */
+/** 任務分類（後台「徽章任務設定」用，杜杜龍 2026-11-18）。 */
 export type AchievementCategory = "progress" | "habit" | "time" | "explore" | "social" | "subscribe" | "feature" | "zone" | "list";
 export const ACHIEVEMENT_CATEGORIES: { key: AchievementCategory; label: string; icon: string; desc: string }[] = [
   { key: "progress", label: "學習進度", icon: "📈", desc: "學了多少：完成的堂數、課程、學習時間" },
@@ -692,7 +692,7 @@ export const ACHIEVEMENT_TYPES: Record<AchievementType, { label: string; unit: s
   series_completed: { label: "學完指定系列卡內的課程", unit: "門", category: "progress", hint: "指定系列裡，學完幾門課程卡就達成" },
 };
 
-// ---------- 成就產生器（業主 2026-11-22）：動詞＋對象＋時段＋數量＋單位，全部用下拉選單點選 ----------
+// ---------- 成就產生器（杜杜龍 2026-11-22）：動詞＋對象＋時段＋數量＋單位，全部用下拉選單點選 ----------
 /** 時段限制（只有「完成章節」可選）。 */
 export type AchTime = "any" | "early" | "night" | "weekend" | "day";
 export const ACH_TIMES: { key: AchTime; label: string }[] = [
@@ -901,7 +901,7 @@ export type UiConfig = {
 };
 
 /**
- * 分享預設值（業主 2026-11-16）：
+ * 分享預設值（杜杜龍 2026-11-16）：
  * - 分享選單送出的文字：一般（中心、分類、系列…）用 inviteText；單堂課程用 courseText（可用 {主講人}、{課程名稱}）；最後接 linkLead 與網址。
  * - LINE 等分享預覽卡片：標題＝「名稱＋titleSeparator＋siteName」；備註＝「addressIcon 地址」換行再接一句隨機學習金句（可各自關閉）。
  *   單堂課程的預覽卡片與它主辦的中心一致（標題、備註都用該中心的）；總部主辦的課程用 hqName，沒有地址。
@@ -940,7 +940,7 @@ export type ShareSettings = {
   materialText: string;
   /** 分享單一章節的文字範本（課程有兩堂以上章節時，章節清單每列右側的分享鈕）。{主講人}、{職稱}、{章節名稱} 一律取「這一堂章節」自己的設定（分享者、分享者職稱、章節名稱），不用課程的；{課程名稱} 是所屬課程。 */
   chapterText: string;
-  /** 分享「清單卡」（業主 2026-11-16：教材與課程分開設定）：清單頁右上角與課程列的分享，可用 {清單名稱}。 */
+  /** 分享「清單卡」（杜杜龍 2026-11-16：教材與課程分開設定）：清單頁右上角與課程列的分享，可用 {清單名稱}。 */
   listText: string;
   /** 分享清單卡裡的單一影片（每列右側的分享鈕，點開直接播放這一段）：可用 {影片名稱}、{清單名稱}。 */
   listItemText: string;
@@ -1013,7 +1013,7 @@ export type RecommendRules = {
   max: number;
 };
 /**
- * Cloudflare 即時縮圖的全部選項（業主 2026-11-20）：對應 Cloudflare Images 的參數。
+ * Cloudflare 即時縮圖的全部選項（杜杜龍 2026-11-20）：對應 Cloudflare Images 的參數。
  * 預設全部關閉或中性值；只有被改成非預設值的選項才會送給 Cloudflare。
  */
 export type ThumbSettings = {
@@ -1045,11 +1045,11 @@ export type ThumbSettings = {
   trim: number;
   borderWidth: number;
   borderColor: string;
-  /** 每月縮圖額度與優先順序（業主 2026-11-24）：封面 > 中心 EDM > 其他相簿；EDM、相簿各自最多用到額度的幾％（預留給更高優先的）。 */
+  /** 每月縮圖額度與優先順序（杜杜龍 2026-11-24）：封面 > 中心 EDM > 其他相簿；EDM、相簿各自最多用到額度的幾％（預留給更高優先的）。 */
   quota: { monthly: number; edmPct: number; albumPct: number };
 };
 export const THUMB_WIDTH_CHOICES = [240, 320, 480, 640, 800, 960, 1280, 1600];
-/** 平板、電腦用的大尺寸（業主 2026-11-20）：固定可用，不必在設定頁勾選。 */
+/** 平板、電腦用的大尺寸（杜杜龍 2026-11-20）：固定可用，不必在設定頁勾選。 */
 export const THUMB_WIDE_WIDTHS = [1280, 1600];
 
 export type AppSettings = {
@@ -1073,35 +1073,35 @@ export type AppSettings = {
   learnDonePct: number;
   /** 學習紀錄：播放進度每次回報的最短間隔（秒）。 */
   watchReportSec: number;
-  /** 集滿幾枚徽章自動解鎖「我的書櫃」鑰匙（業主 2026-11-18 起可在後台「徽章任務設定」調整）。 */
+  /** 集滿幾枚徽章自動解鎖「我的書櫃」鑰匙（杜杜龍 2026-11-18 起可在後台「徽章任務設定」調整）。 */
   libraryKeyBadges: number;
-  /** 「我的清單」（業主 2026-11-21）：每位會員一開始能建立幾份清單，以及完成指定學習成就後各多解鎖幾份（設定頁「清單解鎖設定」）。 */
+  /** 「我的清單」（杜杜龍 2026-11-21）：每位會員一開始能建立幾份清單，以及完成指定學習成就後各多解鎖幾份（設定頁「清單解鎖設定」）。 */
   listBaseQuota: number;
   listUnlocks: { achievementId: string; extra: number }[];
-  /** 上傳檔案設定（業主 2026-11-18，在「儲存空間管理」調整）：單檔大小上限（MB）、圖片壓縮長邊（像素）與畫質（%）。 */
+  /** 上傳檔案設定（杜杜龍 2026-11-18，在「儲存空間管理」調整）：單檔大小上限（MB）、圖片壓縮長邊（像素）與畫質（%）。 */
   fileMaxMb: number;
   imageMaxSide: number;
   imageQuality: number;
-  /** 中心封面照片（中心首頁圖）的壓縮：長邊與畫質，比一般圖片更高（業主 2026-11-18）。 */
+  /** 中心封面照片（中心首頁圖）的壓縮：長邊與畫質，比一般圖片更高（杜杜龍 2026-11-18）。 */
   centerMaxSide: number;
   centerQuality: number;
   /** EDM 海報原圖：長邊像素與畫質（小字與 QR code 要看得清楚，預設較高）。 */
   edmMaxSide: number;
   edmQuality: number;
-  /** 封面輪播與短影音（業主 2026-11-21，在「儲存空間管理」同一區調整）：照片停留秒數、短影音壓縮規範（在上傳者的瀏覽器內壓縮）。 */
+  /** 封面輪播與短影音（杜杜龍 2026-11-21，在「儲存空間管理」同一區調整）：照片停留秒數、短影音壓縮規範（在上傳者的瀏覽器內壓縮）。 */
   coverSec: number;
   videoMaxHeight: number;
   videoKbps: number;
   videoFps: number;
   videoMaxMb: number;
   videoMaxSec: number;
-  /** 所有上傳圖片存進雲端時統一轉成的格式（業主 2026-11-20；預設 JPEG，相容性最好）。 */
+  /** 所有上傳圖片存進雲端時統一轉成的格式（杜杜龍 2026-11-20；預設 JPEG，相容性最好）。 */
   storeFormat: "jpeg" | "webp" | "avif";
-  /** 相簿照片的獨立存檔格式與畫質（業主 2026-11-25，先在「成交百寶箱」試行；通過後才全站）。albumScope：off＝不啟用、treasure＝只有成交百寶箱、all＝全部相簿。 */
+  /** 相簿照片的獨立存檔格式與畫質（杜杜龍 2026-11-25，先在「成交百寶箱」試行；通過後才全站）。albumScope：off＝不啟用、treasure＝只有成交百寶箱、all＝全部相簿。 */
   albumFormat: "jpeg" | "webp" | "avif";
   albumQuality: number;
   albumScope: "off" | "treasure" | "all";
-  /** Cloudflare 即時縮圖（業主 2026-11-20 小範圍試用）：封面縮圖的所有選項，在「設定 › Cloudflare即時縮圖」調整。 */
+  /** Cloudflare 即時縮圖（杜杜龍 2026-11-20 小範圍試用）：封面縮圖的所有選項，在「設定 › Cloudflare即時縮圖」調整。 */
   thumb: ThumbSettings;
 };
 export const DEFAULT_APP_SETTINGS: AppSettings = {
@@ -1191,7 +1191,7 @@ export const KEYWORD_INFO: Record<KeywordKind, { title: string; hint: string }> 
   location: { title: "場地", hint: "課程的上課地點" },
 };
 
-// ---------- 我的書櫃（業主 2026-11-17） ----------
+// ---------- 我的書櫃（杜杜龍 2026-11-17） ----------
 export type LibraryItemType = "shelf" | "book";
 /** 書櫃裡的一格：shelf＝書架（分類標題，可收合）、book＝一本書（影片、簡報、PDF、連結）。locked＝這本書有密碼且尚未解鎖（沒有 url）。 */
 export type LibraryItem = {
@@ -1209,7 +1209,7 @@ export type LibraryItem = {
   pwExpiresAt?: string | null;
   pwExpired?: boolean;
 };
-/** 集滿這麼多枚徽章就自動解鎖書櫃鑰匙（業主 2026-11-17）。 */
+/** 集滿這麼多枚徽章就自動解鎖書櫃鑰匙（杜杜龍 2026-11-17）。 */
 export const LIBRARY_KEY_BADGES = 100;
 export type LibraryMine = { keys?: { have: number; need: number; blocked?: string }; library: null | { number: string; title: string; ownerName: string; views: number; pwSet: boolean; pwExpiresAt: string | null; pwExpired: boolean }; items: LibraryItem[] };
 /** 公開檢視：locked＝整座書櫃要先輸入密碼（items 是空的）；owner＝正在看自己的書櫃。 */
@@ -1217,7 +1217,7 @@ export type LibraryView = { number: string; title: string; ownerName: string; lo
 export type LibraryUnlock = { token: string; until: number };
 
 /**
- * 我的清單封面的漸層底色（業主 2026-11-22：會員不能上傳封面圖，只能選管理員的底圖或下面這些漸層）。
+ * 我的清單封面的漸層底色（杜杜龍 2026-11-22：會員不能上傳封面圖，只能選管理員的底圖或下面這些漸層）。
  * 10 種不同風格、白色粗體字疊上去都清楚；`hex`（起始色）是儲存用的代號（沿用舊的單色代號），`to` 是漸層終點色，由左上往右下 135 度。
  * 第一個是網站深綠（預設）。要增減或調色只改這一張表（前後端共用）。
  */
@@ -1234,10 +1234,10 @@ export const LIST_COVER_COLORS: { hex: string; to: string; name: string }[] = [
   { hex: "#137C83", to: "#3FB5AE", name: "湖水青" },
 ];
 
-/** 網站暫時無法服務（部署更新、系統錯誤、會員中心連不上、維護中…）時，全站統一顯示的白話提示（業主 2026-11-24 改文字）。後端、App 都用這一句。 */
+/** 網站暫時無法服務（部署更新、系統錯誤、會員中心連不上、維護中…）時，全站統一顯示的白話提示（杜杜龍 2026-11-24 改文字）。後端、App 都用這一句。 */
 export const UPGRADING_MSG = "網站功能正在升級中、請稍候再試";
 
-// ---------- 作業（業主 2026-11-25；第一個用在美力之星）：學員繳交、老師批改評分、學員分組 ----------
+// ---------- 作業（杜杜龍 2026-11-25；第一個用在美力之星）：學員繳交、老師批改評分、學員分組 ----------
 /** 學員可以交的種類：照片、短影片（3 分鐘內，上傳前自動壓縮）、檔案（PDF、Word、簡報…）、連結、文字心得。 */
 export type HwKind = "image" | "video" | "file" | "link" | "text";
 export const HW_KINDS: { key: HwKind; label: string }[] = [

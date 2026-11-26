@@ -17,7 +17,7 @@ test("系列卡：沒有系列的教材卡一律進「未分類」；系列設�
   assert.equal(course.status, 200);
   assert.equal(course.data.series, "未分類");
   const list = await call("POST", "/admin/courses", { title: "新清單", isList: true }, admin);
-  assert.equal(list.data.series, "未分類"); // 清單型教材卡也一樣（業主 2026-11-20）
+  assert.equal(list.data.series, "未分類"); // 清單型教材卡也一樣（杜杜龍 2026-11-20）
   // 課程卡清掉系列＝回到「未分類」
   await call("PATCH", `/admin/courses/${course.data.id}`, { series: "測試系列" }, admin);
   const back = await call("PATCH", `/admin/courses/${course.data.id}`, { series: "" }, admin);

@@ -7,7 +7,7 @@ import { Platform } from "react-native";
 /**
  * 中央會員登入（登入中繼，Google）。App 不持有密碼或 client secret。
  * Access Token：記憶體＋保存（App 用安全儲存、Web 用 localStorage，重開仍有效）；Refresh Token：App 用 SecureStore、Web 用 localStorage。
- * 業主 2026-11-21：「登入一次就永久通用，除非按登出」——網頁版以前存在 sessionStorage（關分頁、關瀏覽器、iPhone 主畫面 App 被系統關掉就登出），
+ * 杜杜龍 2026-11-21：「登入一次就永久通用，除非按登出」——網頁版以前存在 sessionStorage（關分頁、關瀏覽器、iPhone 主畫面 App 被系統關掉就登出），
  * 改存 localStorage；同一個瀏覽器的所有分頁共用同一份，換發時跨分頁加鎖（navigator.locks），避免兩個分頁拿同一張舊憑證去換，被會員中心判定盜用而整個作廢。
  */
 export const CENTRAL_URL = "https://id.hglobal1985.com";
@@ -22,7 +22,7 @@ const PENDING_KEY = "hglobal.learn.pending";
 const REAUTH_KEY = "hglobal.learn.reauth";
 
 /**
- * 「登入進行中」的暫存（業主 2026-11-21 回報：登出後再登入常出現「登入狀態已失效」）：
+ * 「登入進行中」的暫存（杜杜龍 2026-11-21 回報：登出後再登入常出現「登入狀態已失效」）：
  * 原本只放分頁暫存（sessionStorage），登入頁跳去 Google／會員中心再回來時，如果回來的不是原本那個分頁
  * （手機的「主畫面 App」、系統在背景回收分頁、換了瀏覽器視窗），暫存就不見了。
  * 現在同時寫一份到 localStorage（同一個瀏覽器所有分頁共用）；讀取時先看分頁暫存、沒有再看 localStorage，讀完兩邊都清掉。
@@ -251,7 +251,7 @@ export async function signInWithGoogle(returnTo = "/me"): Promise<"ok" | "cancel
 }
 
 async function finish(params: URLSearchParams, pending: Pending): Promise<void> {
-  // 行動大學這端不再限制登入要在幾分鐘內完成（業主 2026-11-21 取消登入逾時）；一次性的 nonce／state 是否有效由會員中心判斷。
+  // 行動大學這端不再限制登入要在幾分鐘內完成（杜杜龍 2026-11-21 取消登入逾時）；一次性的 nonce／state 是否有效由會員中心判斷。
   if (params.get("state") !== pending.state) throw new CentralError(400, "state", "登入驗證失敗，請重新登入");
   if (params.get("error")) throw new CentralError(400, "cancelled", "登入已取消");
   const idToken = params.get("id_token");
@@ -370,7 +370,7 @@ const here = () => safePath(globalThis.location.pathname + globalThis.location.s
 export function webSsoCheckDue(): boolean {
   if (!web || !globalThis.location || globalThis.location.hostname !== "learn.hglobal1985.com") return false;
   if (globalThis.location.pathname.startsWith("/auth/")) return false;
-  if (hasSavedWebLogin()) return false; // 已登入：不再每次跳去會員中心檢查（業主 2026-11-21）
+  if (hasSavedWebLogin()) return false; // 已登入：不再每次跳去會員中心檢查（杜杜龍 2026-11-21）
   return Date.now() - Number(ss()?.getItem(SSO_CHECKED) ?? 0) >= SSO_INTERVAL;
 }
 
@@ -461,7 +461,7 @@ export async function webSsoAdopt(next: string): Promise<boolean> {
 }
 
 /**
- * 開啟完整版會員中心（業主 2026-11-24；中央串接指令 2026-11-24.1 檢查清單 37）：已登入就不再要求選 Google 帳號。
+ * 開啟完整版會員中心（杜杜龍 2026-11-24；中央串接指令 2026-11-24.1 檢查清單 37）：已登入就不再要求選 Google 帳號。
  * 每次都先取新的 sso_token → web-code（單次、2 分鐘，不快取）→ 用 /auth/sso/adopt 開啟，return 固定 /my/edit；
  * 任何一步失敗（沒登入、連不上）才直接開 /my/edit。回傳要開啟的網址。
  */

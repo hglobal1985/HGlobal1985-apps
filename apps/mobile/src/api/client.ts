@@ -145,7 +145,7 @@ export class RequestError extends Error {
 }
 
 /** 上傳檔案並回報進度 0～100（網頁版用 XMLHttpRequest，fetch 拿不到上傳進度）。 */
-/** 伺服器暫時回不出正常結果（部署更新、系統忙碌…）時，全站統一顯示的白話提示（業主 2026-11-18；文字 2026-11-24 改，定義在 contract.ts 與後端共用）。 */
+/** 伺服器暫時回不出正常結果（部署更新、系統忙碌…）時，全站統一顯示的白話提示（杜杜龍 2026-11-18；文字 2026-11-24 改，定義在 contract.ts 與後端共用）。 */
 export { UPGRADING_MSG };
 
 export async function apiUpload<T>(method: "POST" | "PUT", path: string, body: Blob, onProgress: (pct: number) => void, retried = false): Promise<T> {
@@ -199,7 +199,7 @@ export async function api<T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
 }
 
 /**
- * 讀取資料的記憶體快取（業主 2026-11-17：載入變慢）：
+ * 讀取資料的記憶體快取（杜杜龍 2026-11-17：載入變慢）：
  * ① 同一時間同樣的 GET 只送一次（好幾個元件同時要同一份資料）；
  * ② 看過的資料先顯示、背景再更新（回到頁面不再從空白等起）；
  * ③ 登入／登出、換帳號時整份清掉，不會看到上一位的資料。

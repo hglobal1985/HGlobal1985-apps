@@ -12,10 +12,10 @@ const AVATAR = 48; // 大頭照尺寸；徽章在版面上只佔這個高度（�
  * 會員抬頭：大頭照＋姓名＋獎銜標籤。首頁與設定頁最上方共用，格式一致；要改外觀只改這個檔案。
  * 有傳 onPress 才可點（首頁：開啟資料編輯）。
  */
-export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { member: Member; onPress?: () => void; scale?: number; /** 姓名一列、獎銜＋獎章一列（至尊模式頁，業主 2026-11-24）。 */ stacked?: boolean }) {
+export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { member: Member; onPress?: () => void; scale?: number; /** 姓名一列、獎銜＋獎章一列（至尊模式頁，杜杜龍 2026-11-24）。 */ stacked?: boolean }) {
   const { c, scheme } = useTheme();
   const [failed, setFailed] = useState(false);
-  const av = Math.round(AVATAR * scale * (stacked ? 1.5 : 1)); // 至尊模式頁的頭像與獎章放大 1.5 倍（業主 2026-11-24）
+  const av = Math.round(AVATAR * scale * (stacked ? 1.5 : 1)); // 至尊模式頁的頭像與獎章放大 1.5 倍（杜杜龍 2026-11-24）
   const fs = (n: number) => Math.round(n * scale);
   const avatar =
     member.avatarUrl && !failed ? (
@@ -35,7 +35,7 @@ export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { 
     </View>
   ) : null;
   if (stacked) {
-    // 有獎章時（業主 2026-11-24）：姓名字體縮小一點，獎章放在右邊、高度與頭像一樣大。
+    // 有獎章時（杜杜龍 2026-11-24）：姓名字體縮小一點，獎章放在右邊、高度與頭像一樣大。
     const hasBadge = !!member.rankBadge;
     return (
       <Pressable onPress={onPress} disabled={!onPress} accessibilityRole={onPress ? "button" : undefined} accessibilityLabel={`${member.name}${member.rankLabel ? `，${member.rankLabel}` : ""}`} style={styles.stack}>
@@ -47,7 +47,7 @@ export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { 
           {rankTag ? <View style={styles.stackRank}>{rankTag}</View> : null}
         </View>
         {hasBadge ? (
-          // 獎章放大用 transform（不佔版面），列高只等於頭像高度，上下不留大片空白（業主 2026-11-24）。
+          // 獎章放大用 transform（不佔版面），列高只等於頭像高度，上下不留大片空白（杜杜龍 2026-11-24）。
           <View style={{ width: Math.round(BADGE_W * 1.4), height: av, alignItems: "center", justifyContent: "center" }}>
             <View style={{ transform: [{ scale: 1.4 }] }}>
               <RankBadge url={member.rankBadge!} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={BADGE_SIZE} />

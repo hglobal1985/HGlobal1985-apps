@@ -16,7 +16,7 @@ import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { RowShare } from "./lesson-list";
 import { ribbonsFor } from "./ribbons";
 
-/** 連在一起的清單列（業主 2026-11-19）：沒有外框、沒有圓角、列與列之間不留空，只有一條細分隔線（同教材清單、課程章節清單）；外層放進同一張 Card。 */
+/** 連在一起的清單列（杜杜龍 2026-11-19）：沒有外框、沒有圓角、列與列之間不留空，只有一條細分隔線（同教材清單、課程章節清單）；外層放進同一張 Card。 */
 const joined = { borderWidth: 0, borderBottomWidth: StyleSheet.hairlineWidth, borderRadius: 0, marginBottom: 0, paddingHorizontal: 0, paddingVertical: space.sm, backgroundColor: "transparent" } as const;
 
 /**

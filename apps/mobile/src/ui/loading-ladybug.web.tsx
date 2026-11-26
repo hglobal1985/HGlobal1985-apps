@@ -13,7 +13,7 @@ const CSS =
   "@media (prefers-reduced-motion:reduce){.hgll *{animation-duration:.01ms!important;animation-iteration-count:1!important}}";
 
 /**
- * 小範圍讀取動畫「小瓢蟲」（業主 2026-11-17 定稿）：按鈕送出中、播放鈕等待播放、小區塊／清單底部讀取用；
+ * 小範圍讀取動畫「小瓢蟲」（杜杜龍 2026-11-17 定稿）：按鈕送出中、播放鈕等待播放、小區塊／清單底部讀取用；
  * 紅色硬殼開闔、透明翅膀快速拍動、原地輕輕飛舞。整頁／整個區塊讀取用 LoadingSapling。網頁版；iOS／Android 在 loading-ladybug.tsx。
  * 要改動畫只改這個檔案。
  */

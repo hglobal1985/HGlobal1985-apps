@@ -9,7 +9,7 @@ import { AppText, ELDER_FIELD } from "@/ui";
 import { CoverAlbum } from "./album";
 
 /**
- * 相簿搜尋【共用模組】（業主 2026-11-25 永久指示：相簿與中心 EDM 的搜尋一律用這一份，不可另做）：
+ * 相簿搜尋【共用模組】（杜杜龍 2026-11-25 永久指示：相簿與中心 EDM 的搜尋一律用這一份，不可另做）：
  * 一個搜尋框，比對照片的「AI 場景標籤」（scene）與「照片裡的文字 OCR」（text），多個詞用空白分開、每個詞都要符合；中心 EDM 另外比對活動日期。
  * 用法：整本相簿＝`<SearchableAlbum {...CoverAlbum 的參數} />`（搜尋框＋照片格）；區塊相簿要自己排版（BlockAlbum）就用 `useAlbumSearch`＋`AlbumSearchBar`＋`matchAlbumItem`。
  * 沒有任何照片有場景或文字（還沒辨識）時不顯示搜尋框。至尊模式用 ELDER_FIELD 同款粗框。

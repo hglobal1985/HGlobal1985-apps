@@ -19,12 +19,12 @@ import { EditSheet } from "./edit-sheet";
 import { AppPlayerCheck, YoutubeImportSheet } from "./youtube-import";
 
 /**
- * 「其他教材」的新增與編輯面板（業主 2026-11-16 改版）：只有三個東西——
+ * 「其他教材」的新增與編輯面板（杜杜龍 2026-11-16 改版）：只有三個東西——
  * ① 外部連結（旁邊有「貼上」鈕）② 教材名稱（貼上連結後自動抓取網頁標題填入，可自行修改）③ 檔案類型（依連結自動判斷，顯示官方 Logo）。
  * 不再有影音上傳、音檔、附件等舊功能。「完整版課程影片」那一列另有影音設定（FullVersionSheet），不受影響。
  */
 export function NewMaterialSheet({ course, onClose, afterBlock }: { course: CourseDetail; onClose: () => void; /** 新增到某個區塊的最後面（區塊的編號）；沒傳＝加在整份清單最後。 */ afterBlock?: string }) {
-  // 連結區塊（品牌資訊卡的「新品特惠培訓直播」，業主 2026-11-18）：內容存在來源清單，新增教材直接加到來源清單的那個區塊，兩邊同步。
+  // 連結區塊（品牌資訊卡的「新品特惠培訓直播」，杜杜龍 2026-11-18）：內容存在來源清單，新增教材直接加到來源清單的那個區塊，兩邊同步。
   const sec = afterBlock ? course.lessons.find((l) => l.id === afterBlock) : undefined;
   const src = useApi<CourseDetail>(sec?.linkedCourseId ? `/courses/${sec.linkedCourseId}` : null);
   if (sec?.linkedCourseId) return src.data ? <LinkMaterialSheet course={src.data} onClose={onClose} afterBlock={sec.linkedBlockId} /> : <BottomSheet onClose={onClose}><LoadingView /></BottomSheet>;
@@ -79,7 +79,7 @@ function FileMaterialSheet({ lesson, onClose }: { lesson: Lesson; onClose: () =>
   );
 }
 
-/** 「主題」勾選（業主 2026-11-19）：每個區塊（沒有區塊就整份）只能有一個，勾新的會取代原本那個。 */
+/** 「主題」勾選（杜杜龍 2026-11-19）：每個區塊（沒有區塊就整份）只能有一個，勾新的會取代原本那個。 */
 function ThemeCheck({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
   return (
     <>
@@ -110,14 +110,14 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   // 清單卡的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
   const baseLink = lesson?.linkUrl ?? (lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
   const [url, setUrl] = useState(baseLink);
-  // 使用行動大學播放器（業主 2026-11-24，預設勾選）：新增一律先勾；編輯時，存成影片來源的＝勾、存成外部連結的＝不勾。
+  // 使用行動大學播放器（杜杜龍 2026-11-24，預設勾選）：新增一律先勾；編輯時，存成影片來源的＝勾、存成外部連結的＝不勾。
   const baseApp = lesson ? lesson.media?.type === "youtube" || !lesson.linkUrl : true;
   const [appPlayer, setAppPlayer] = useState(baseApp);
   const [title, setTitle] = useState(lesson?.title ?? "");
   const lastAuto = useRef<string>(lesson?.title ?? ""); // 最近一次自動填入的名稱：名稱還是這個（或空白）時，換連結才會自動換名稱；自己改過的不會被蓋掉
   const lastAutoDate = useRef<string>(lesson?.eventDate ?? "");
   const [fetching, setFetching] = useState<Fetch>("idle");
-  // 素材項目自己的日期（選填）與影片時間軸區間（只有清單裡的 YouTube 影片；業主 2026-11-17）。
+  // 素材項目自己的日期（選填）與影片時間軸區間（只有清單裡的 YouTube 影片；杜杜龍 2026-11-17）。
   const [evDate, setEvDate] = useState(lesson?.eventDate ?? "");
   const [theme, setTheme] = useState(!!lesson?.isSpeaker);
   const [trim, setTrim] = useState<{ start: Hms; end: Hms }>({ start: toHms(lesson?.start ?? null), end: toHms(lesson?.end ?? null) });
@@ -146,7 +146,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
             lastAuto.current = name;
             return name;
           });
-          // 教材日期直接讀連結的發布日期並顯示在日期欄位（業主 2026-11-18）；日期欄是空的或還是上次自動填的才會換，自己改過的不蓋掉。
+          // 教材日期直接讀連結的發布日期並顯示在日期欄位（杜杜龍 2026-11-18）；日期欄是空的或還是上次自動填的才會換，自己改過的不蓋掉。
           if (r.date) {
             setEvDate((cur) => {
               if (cur && cur !== lastAutoDate.current) return cur;
@@ -184,7 +184,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
       const rest = all.filter((l) => !fresh.some((f) => f.id === l.id));
       const at = rest.findIndex((l) => l.id === afterBlock);
       if (at >= 0) {
-        // 最新的在最上面（業主 2026-11-20）：放在區塊標題的正下方。
+        // 最新的在最上面（杜杜龍 2026-11-20）：放在區塊標題的正下方。
         await api("POST", `/admin/courses/${course.id}/lessons/order?lite=1`, { ids: [...rest.slice(0, at + 1), ...fresh, ...rest.slice(at + 1)].map((l) => l.id) }).catch(() => undefined);
       }
     }
@@ -214,7 +214,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
           }
         }
       }
-      // 主題（業主 2026-11-19）：每個區塊（沒有區塊就整份）只能有一個，勾新的伺服器會取消原本那個。
+      // 主題（杜杜龍 2026-11-19）：每個區塊（沒有區塊就整份）只能有一個，勾新的伺服器會取消原本那個。
       if (lesson && theme !== !!lesson.isSpeaker) await api("PATCH", `/admin/lessons/${lesson.id}`, { isSpeaker: theme });
       // 影片時間軸區間：連結換成別支影片時伺服器會清空區間，所以一律在儲存連結之後再寫入。
       if (ytId && appPlayer && lessonId && (secOf(trim.start) !== null || secOf(trim.end) !== null || lesson?.start != null || lesson?.end != null)) await api("PATCH", `/admin/lessons/${lessonId}`, { startSeconds: secOf(trim.start), endSeconds: secOf(trim.end) });

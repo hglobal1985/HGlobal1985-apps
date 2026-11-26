@@ -7,11 +7,11 @@ import { elderTextScale, getElder } from "./elder-mode";
  * 全站字體與圖示統一放大（倍數見 theme/ui-scale.ts）：在 Text、TextInput、Ionicons 這三個最底層元件上，
  * 把 fontSize、lineHeight、圖示 size 乘上倍數。這樣不論畫面是用 AppText 還是直接寫 Text，都一起放大，不會漏掉。
  * 圖片上的文字（例如緞帶）加 dataSet={{ noScale: "" }} 就不放大。手機倍數是 1，什麼都不做。要在根版面最早 import。
- * 至尊模式（業主 2026-11-24，lib/elder-mode.ts）：再乘上至尊模式的字體倍數（可自訂、可跟著手機系統字體）；
+ * 至尊模式（杜杜龍 2026-11-24，lib/elder-mode.ts）：再乘上至尊模式的字體倍數（可自訂、可跟著手機系統字體）；
  * 底部主選單這類固定版面的文字加 dataSet={{ uiOnly: "" }}、圖示加 uiOnly 屬性，只吃平板／電腦倍數、不吃至尊倍數。
  */
 type AnyFn = (...a: never[]) => unknown;
-// 不跟著手機系統的「字體放大／輔助使用」變大（業主 2026-11-24 永久指示）：App 版面一律照 App 自己的尺寸，系統設定不可影響。
+// 不跟著手機系統的「字體放大／輔助使用」變大（杜杜龍 2026-11-24 永久指示）：App 版面一律照 App 自己的尺寸，系統設定不可影響。
 for (const C of [Text, TextInput] as unknown as { defaultProps?: Record<string, unknown> }[]) C.defaultProps = { ...C.defaultProps, allowFontScaling: false, maxFontSizeMultiplier: 1 };
 {
   /** 全部倍數＝平板／電腦倍數 × 至尊模式倍數（每次畫字時讀，切換模式後重建畫面就會用新倍數）。 */
@@ -22,9 +22,9 @@ for (const C of [Text, TextInput] as unknown as { defaultProps?: Record<string, 
     if (!f || (f.fontSize == null && f.lineHeight == null)) return style;
     const o = { ...f };
     // 至尊模式「文字加粗」：一般（400～500）的字一律加到 700，原本就粗的不動。
-    // 加粗要明顯（業主 2026-11-24：效果不夠粗）：400～600 一律 900，原本 700 以上也提到 900。
+    // 加粗要明顯（杜杜龍 2026-11-24：效果不夠粗）：400～600 一律 900，原本 700 以上也提到 900。
     if (bold) o.fontWeight = "900";
-    // 至尊模式沒勾「文字加粗」：預設字重整體調細（業主 2026-11-24：預設已經很粗，勾加粗後差異不大）。
+    // 至尊模式沒勾「文字加粗」：預設字重整體調細（杜杜龍 2026-11-24：預設已經很粗，勾加粗後差異不大）。
     // 700 以上（含 bold）→ 500、600 → 500、500 → 400；400 以下不動。勾了加粗才是 900，差距明顯。
     else if (light) {
       const w = o.fontWeight === "bold" ? 700 : Number(o.fontWeight);

@@ -11,7 +11,7 @@ import { CoursePriceTag } from "./course-card";
 import { CourseLessonsSheet } from "./course-lessons-sheet";
 import { displayName } from "./sort";
 
-/** 首頁海報（EDM）完整顯示（業主 2026-11-22 選 A，取代「填滿裁切」）：整張圖等比縮到框裡放得下的最大尺寸、置中，不裁切；比例和框不同時兩側（或上下）留底色。 */
+/** 首頁海報（EDM）完整顯示（杜杜龍 2026-11-22 選 A，取代「填滿裁切」）：整張圖等比縮到框裡放得下的最大尺寸、置中，不裁切；比例和框不同時兩側（或上下）留底色。 */
 function TopFillImage({ uri, w, h }: { uri: string; w: number; h: number }) {
   const { c } = useTheme();
   const [ratio, setRatio] = useState<number | null>(null); // 寬 / 高
@@ -48,7 +48,7 @@ function Slide({ course, w, h }: { course: CourseSummary; w: number; h: number }
  * 首頁的一個區塊（左或右）：標題與備註置中；海報（EDM）區塊填滿剩下的高度，手指在區塊內左右滑動切換；
  * 下方顯示目前這門課的名稱、主辦單位、日期、金額，點圖或名稱進入課程。
  */
-export function HomeRail({ title, icon, tone, note, courses, empty, progress, autoSec = 0, pauseSec = 8, scale = 1, compact = false, hideInfo = false, onStageHeight }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean; /** 自動輪播間隔（秒；0＝不自動輪播）。 */ autoSec?: number; /** 手指滑過後暫停自動輪播的秒數。 */ pauseSec?: number; /** 首頁大螢幕放大倍數（標題、備註、資訊文字）。 */ scale?: number; /** 手機橫放等矮視窗：隱藏備註、資訊壓縮，海報才有空間。 */ compact?: boolean; /** 版面太擠時由首頁通知：先隱藏海報下方的資訊（主辦、日期、地點、金額、進度），空間夠了再恢復（業主 2026-11-19）。 */ hideInfo?: boolean; /** 回報海報區目前的高度（首頁用來判斷擠不擠）。 */ onStageHeight?: (h: number) => void }) {
+export function HomeRail({ title, icon, tone, note, courses, empty, progress, autoSec = 0, pauseSec = 8, scale = 1, compact = false, hideInfo = false, onStageHeight }: { title: string; icon: IconName; tone: "green" | "orange"; note?: string; courses: CourseSummary[]; empty: React.ReactNode; progress?: boolean; /** 自動輪播間隔（秒；0＝不自動輪播）。 */ autoSec?: number; /** 手指滑過後暫停自動輪播的秒數。 */ pauseSec?: number; /** 首頁大螢幕放大倍數（標題、備註、資訊文字）。 */ scale?: number; /** 手機橫放等矮視窗：隱藏備註、資訊壓縮，海報才有空間。 */ compact?: boolean; /** 版面太擠時由首頁通知：先隱藏海報下方的資訊（主辦、日期、地點、金額、進度），空間夠了再恢復（杜杜龍 2026-11-19）。 */ hideInfo?: boolean; /** 回報海報區目前的高度（首頁用來判斷擠不擠）。 */ onStageHeight?: (h: number) => void }) {
   useCenterNames();
   const { c } = useTheme();
   const [box, setBox] = useState({ w: 0, h: 0 });
@@ -142,7 +142,7 @@ export function HomeRail({ title, icon, tone, note, courses, empty, progress, au
           onStageHeight?.(h);
         }}
       >
-        {/* 海報放在絕對定位的層裡：不參與版面高度計算，區塊高度完全由 flex 分配，空間不夠時會自動縮小、騰出空間時自動恢復（業主 2026-11-22）。 */}
+        {/* 海報放在絕對定位的層裡：不參與版面高度計算，區塊高度完全由 flex 分配，空間不夠時會自動縮小、騰出空間時自動恢復（杜杜龍 2026-11-22）。 */}
         <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         {box.w > 0 && box.h > 0 ? (
           courses.length ? (

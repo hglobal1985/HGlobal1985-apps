@@ -17,7 +17,7 @@ export function switchToElder() {
   setTimeout(() => flashText(`已切換到${MODE_PROFILES.elder.name}模式`), 300);
 }
 
-/** 換回超派模式：不需確認，直接切換（業主 2026-11-24 更正，取代原本的確認面板）。 */
+/** 換回超派模式：不需確認，直接切換（杜杜龍 2026-11-24 更正，取代原本的確認面板）。 */
 export async function askSwitchToMaker() {
   setElder({ on: false });
   router.replace("/");
@@ -25,7 +25,7 @@ export async function askSwitchToMaker() {
 }
 
 /**
- * 字體與螢幕設定卡（至尊模式頁，業主 2026-11-24 改版）：設定一動就即時套用，沒有「套用」鈕。由上到下：
+ * 字體與螢幕設定卡（至尊模式頁，杜杜龍 2026-11-24 改版）：設定一動就即時套用，沒有「套用」鈕。由上到下：
  * 「跟著手機字體大小」（粗體字，勾選＝以手機的設定為準，下面的範例、＋／－、快速大小都刷淡不能用）→
  * 小的「－／＋」＋「字體大小 150%」同一列 → 範例字 → 快速大小（標準／大／特大）→「文字加粗」。
  */
@@ -35,7 +35,7 @@ let savedSize: number | null = null;
 export function FontSizeCard() {
   const bw = useBorderW(1);
   const elderOn = useElderOn();
-  // 改字體會重建畫面；改之前記住這張卡在螢幕上的位置，重建後捲回來讓它留在原處（業主 2026-11-24）。
+  // 改字體會重建畫面；改之前記住這張卡在螢幕上的位置，重建後捲回來讓它留在原處（杜杜龍 2026-11-24）。
   const setKeep = (patch: Parameters<typeof setElder>[0]) => (rememberAnchor(), setElder(patch));
   const { c } = useTheme();
   const prefs = useElder();
@@ -60,7 +60,7 @@ export function FontSizeCard() {
     <View nativeID={ANCHOR_ID} style={[styles.card, { backgroundColor: c.surface, borderColor: c.border, borderWidth: elderOn ? 0 : 1 }]}>
       {toggle("文字加粗", prefs.bold, (v) => setKeep({ bold: v }))}
       {toggle("跟著手機字體大小", follow, (v) => {
-        // 勾選＝字體設定立刻復原成預設（舊的自訂大小先記起來）；取消勾選＝還原剛才的自訂大小（業主 2026-11-24）。
+        // 勾選＝字體設定立刻復原成預設（舊的自訂大小先記起來）；取消勾選＝還原剛才的自訂大小（杜杜龍 2026-11-24）。
         if (v) {
           savedSize = prefs.size;
           setKeep({ followSystem: true, size: ELDER_DEFAULT });

@@ -17,7 +17,7 @@ export type AiModel = {
   neurons?: { perMinute?: number; perMInput?: number; perMOutput?: number };
   /** 外部模型（Claude）的美元牌價（每百萬 token）；longInput／longOutput 是單次輸入超過 10 萬 token 時的牌價（Haiku） */
   usd?: { perMInput: number; perMOutput: number; longInput?: number; longOutput?: number };
-  /** 需要另外申請金鑰（由業主在 Cloudflare 後台設定，不放程式裡） */
+  /** 需要另外申請金鑰（由杜杜龍在 Cloudflare 後台設定，不放程式裡） */
   needsKey: boolean;
 };
 export type AiJob = { key: string; label: string; desc: string; kind: AiKind; default: string };
@@ -54,7 +54,7 @@ export type AiSelection = Record<string, string>;
 export const FREE_DAILY_NEURONS = 10000;
 export const CAP_CHOICES = [5000, 7000, 9000] as const;
 export type AiSettings = { freeOnly: boolean; dailyCap: number; capEnabled: boolean; claudeMonthlyCapUsd: number };
-/** Claude 每月預算上限（美元）：業主規定不可超過 100，所以選項最高 100，且沒有關閉開關。 */
+/** Claude 每月預算上限（美元）：杜杜龍規定不可超過 100，所以選項最高 100，且沒有關閉開關。 */
 export const CLAUDE_CAP_CHOICES = [25, 50, 100] as const;
 export const DEFAULT_AI_SETTINGS: AiSettings = { freeOnly: true, dailyCap: 9000, capEnabled: true, claudeMonthlyCapUsd: 100 };
 

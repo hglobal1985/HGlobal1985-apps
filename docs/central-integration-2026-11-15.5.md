@@ -1,6 +1,6 @@
 # 串接指令 2026-11-15.5 檢查結果（2026-11-16）
 
-採用版本常數：`apps/launch/src/central.ts` `INTEGRATED_VERSION = "2026-11-15.5"`（原 2026-11-13.9）。回報標準 STANDARDS 仍是 webhook、delete_copy、no_email_copy、snapshot_reconcile；**least_scope 由業主在中央後台勾選，程式不宣稱**。
+採用版本常數：`apps/launch/src/central.ts` `INTEGRATED_VERSION = "2026-11-15.5"`（原 2026-11-13.9）。回報標準 STANDARDS 仍是 webhook、delete_copy、no_email_copy、snapshot_reconcile；**least_scope 由杜杜龍在中央後台勾選，程式不宣稱**。
 
 | # | 項目 | 結果 |
 |---|---|---|
@@ -16,7 +16,7 @@
 | 12 | 本名只在報名付費課程與對帳現讀 | 已符合（未動） |
 | 13 | 獎銜選項來自 field-definitions、null／none 視為無 | 已符合（未動） |
 | 14 | members/lookup | 不適用：本 App 沒有用 |
-| 15 | 深色模式 | 已符合（行動大學自己的配色，業主核准例外） |
+| 15 | 深色模式 | 已符合（行動大學自己的配色，杜杜龍核准例外） |
 | 16 | webhook 驗簽、去重、5 秒 2xx | 已符合（未動）；「後台送測試事件」本次未重測 |
 | 17 | member.deleted 刪副本 | 已符合（未動） |
 | 18 | 不保存聯絡信箱 | 已符合（未動） |
@@ -31,7 +31,7 @@
 | 27 | 新增職稱詞條 | 已符合（11-16 已補：400／403 不重送）；**尚未對真實中央送過一次** |
 | 28 | 回報 | 本文件 |
 
-## 還需要業主處理
+## 還需要杜杜龍處理
 1. 實際送一個新職稱（課程或章節儲存），再到中央後台「關聯詞」核可。
 2. least_scope：確認平台設定的勾選，並決定是否要我在 STANDARDS 加上。
 3. 手機共用登入 Keychain：決定何時做（需重新打包）。

@@ -5,7 +5,7 @@ import { Icon } from "./icon";
 import { AppText } from "./text";
 
 /**
- * 展開／收起按鈕（業主 2026-11-18：編輯模式的「設定」與各區塊預設收起，按鈕放標題右側；全站編輯模式一致）。
+ * 展開／收起按鈕（杜杜龍 2026-11-18：編輯模式的「設定」與各區塊預設收起，按鈕放標題右側；全站編輯模式一致）。
  * 深綠膠囊：收起時顯示「展開 ⌄」，展開時顯示「收起 ⌃」。
  */
 export function CollapseToggle({ open, onPress, label }: { open: boolean; onPress: () => void; label: string }) {

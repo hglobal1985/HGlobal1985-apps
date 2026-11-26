@@ -1,7 +1,7 @@
 import type { D1Database, Env } from "./d1.ts";
 
 /**
- * 區塊照片（業主 2026-11-24）：開放區塊照片的課程（courses.block_photos = 1），區塊裡「以教材檔案上傳的圖片」自動搬進相簿——
+ * 區塊照片（杜杜龍 2026-11-24）：開放區塊照片的課程（courses.block_photos = 1），區塊裡「以教材檔案上傳的圖片」自動搬進相簿——
  * 檔案複製到相簿專用位置（album/…，網頁才讀得到）、照片依原本順序排進該區塊的相簿，原本的教材列移除。可重複執行；每次最多處理 60 個；打開開放區塊照片的課程頁時也會立刻觸發（`kickFilePhotos`，同一個程序一分鐘最多一次）。
  */
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };

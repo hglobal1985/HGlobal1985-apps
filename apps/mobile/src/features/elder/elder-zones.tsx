@@ -14,7 +14,7 @@ import { space } from "@/theme/tokens";
 import { AppText } from "@/ui";
 
 /**
- * 至尊模式「課程」頁的四大分類（業主 2026-11-24，選定 D 款：一欄四張大卡）。
+ * 至尊模式「課程」頁的四大分類（杜杜龍 2026-11-24，選定 D 款：一欄四張大卡）。
  * 分類與超派模式課程頁的四個區塊一致、順序一致：寰宇課程活動、寰宇教育中心、安麗官方資源、安麗品牌館。
  * 歸類：教育中心＝centerCourse；其餘看課程的 zone（hglobal／amway_material／amway_brand）。
  * 顏色與 courses-view.tsx 的 ZONE_PALETTE 相同（綠、紅、黃、藍）；改那邊的顏色這裡要一起改。
@@ -29,7 +29,7 @@ export const ELDER_ZONES: ElderZoneDef[] = [
   { id: "amway_brand", label: "安麗品牌館", icon: "pricetag", unit: "項教材" },
 ];
 
-/** 第五大分類「相簿」（業主 2026-11-25）：不是課程分類，點開前往 /albums；數量＝全站相簿照片數。 */
+/** 第五大分類「相簿」（杜杜龍 2026-11-25）：不是課程分類，點開前往 /albums；數量＝全站相簿照片數。 */
 export const ELDER_ALBUM_ZONE: ElderZoneDef = { id: "album", label: "相簿", icon: "images", unit: "張照片" };
 
 export const elderZoneOf = (x: CourseSummary): ElderZone => (x.centerCourse ? "centers" : x.zone);
@@ -48,7 +48,7 @@ export function useZoneLook(zone: ElderZone) {
   return { bg: p?.bg ?? c.accentSoft, fg: p?.fg ?? c.accentText };
 }
 
-/** 標題強制單行、依容器寬度與字數自動縮字（業主 2026-11-24）：畫字時會再乘「平板倍數 × 至尊倍數」，所以在放大前的尺寸上算。 */
+/** 標題強制單行、依容器寬度與字數自動縮字（杜杜龍 2026-11-24）：畫字時會再乘「平板倍數 × 至尊倍數」，所以在放大前的尺寸上算。 */
 function FitTitle({ text, color }: { text: string; color: string }) {
   const [w, setW] = useState(0);
   const k = UI_SCALE * elderTextScale();
@@ -80,7 +80,7 @@ export function ElderZoneCard({ zone, count, onPress }: { zone: ElderZoneDef; co
 }
 
 /** 進入某一區之後的標題列：返回鍵＋分類名稱（同色帶）。 */
-export function ElderZoneHeader({ zone, sub, onBack, right }: { zone: ElderZoneDef; /** 再往下一層（系列／中心）的名稱。 */ sub?: string; onBack: () => void; /** 標題區右上角（中心卡、系列頁的「邀請」鈕，業主 2026-11-24）。 */ right?: ReactNode }) {
+export function ElderZoneHeader({ zone, sub, onBack, right }: { zone: ElderZoneDef; /** 再往下一層（系列／中心）的名稱。 */ sub?: string; onBack: () => void; /** 標題區右上角（中心卡、系列頁的「邀請」鈕，杜杜龍 2026-11-24）。 */ right?: ReactNode }) {
   const look = useZoneLook(zone.id);
   const bar = (
     <Pressable accessibilityRole="button" accessibilityLabel={`返回，${zone.label}`} onPress={onBack} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: space.sm, borderRadius: 20, padding: space.md, backgroundColor: right ? undefined : look.bg }}>
@@ -105,7 +105,7 @@ export function ElderZoneHeader({ zone, sub, onBack, right }: { zone: ElderZoneD
 }
 
 /**
- * 分類裡面的項目，內容與排序跟超派模式課程頁完全一致（業主 2026-11-24 回報：除了安麗品牌館，其餘三區點進去的內容不一致）：
+ * 分類裡面的項目，內容與排序跟超派模式課程頁完全一致（杜杜龍 2026-11-24 回報：除了安麗品牌館，其餘三區點進去的內容不一致）：
  * - 寰宇課程活動／安麗官方資源／安麗品牌館＝「系列」小卡（同系列合成一張，沒有系列的課自己一張；沿用 groupBySeries、系列顯示設定、手動排序）。
  * - 寰宇教育中心＝各「中心」（依教材總數多到少，「安麗公司」不列）。
  * 每個項目的數字＝教材總數（materialCount 加總）。點系列／中心再往下一層列出裡面的課程（只有一門課就直接進課程頁）。
@@ -135,7 +135,7 @@ export function useZoneItems(all: CourseSummary[]): (zone: ElderZone) => ZoneIte
           const sessions = cards.length ? cards : g.sessions;
           const rep = sessions.includes(g.nearest) ? g.nearest : sessions[0]!;
           const inSeries = !!rep.series && sessions.length >= 2;
-          return { key: g.key, title: inSeries ? settings.titleOf(rep.series) : rep.title, count: sum(sessions), rep, series: inSeries, children: inSeries ? seriesOrdered(sessions) : undefined }; // 系列裡的梯次排序與超派（系列選單／系列頁）同一個 seriesOrdered（業主 2026-11-25：銅章會議最新在上）
+          return { key: g.key, title: inSeries ? settings.titleOf(rep.series) : rep.title, count: sum(sessions), rep, series: inSeries, children: inSeries ? seriesOrdered(sessions) : undefined }; // 系列裡的梯次排序與超派（系列選單／系列頁）同一個 seriesOrdered（杜杜龍 2026-11-25：銅章會議最新在上）
         });
     const centerItems = (): ZoneItem[] =>
       (centers.data ?? [])

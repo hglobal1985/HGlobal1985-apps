@@ -119,7 +119,7 @@ test("播放與進度：付費課程需先開通；設定免費且符合資格�
   await call("PATCH", "/admin/courses/start", { token: admin, body: { priceTba: true } });
   assert.equal((await call("GET", "/courses/start/lessons/start-welcome/playback", { token })).status, 403);
   await call("PATCH", "/admin/courses/start", { token: admin, body: { priceTba: false } });
-  // 課程類一律手動報名（即使免費）：沒報名＝章節鎖住、不能播放；按「免費報名」立即開通（業主 2026-11-18）
+  // 課程類一律手動報名（即使免費）：沒報名＝章節鎖住、不能播放；按「免費報名」立即開通（杜杜龍 2026-11-18）
   const before = (await call<CourseDetail>("GET", "/courses/start", { token })).data;
   assert.deepEqual([before.watchFree, before.lessons.every((l) => l.locked), before.enrollment], [false, true, null]);
   assert.equal((await call("GET", "/courses/start/lessons/start-welcome/playback", { token })).status, 403);

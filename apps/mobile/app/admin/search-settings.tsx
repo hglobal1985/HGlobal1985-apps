@@ -18,7 +18,7 @@ type Test = { min: number; rows: { kind: string; title: string; score: number; b
 const fmt = (v: number, step = 1) => (step < 1 ? v.toFixed(step < 0.1 ? 2 : 2).replace(/0+$/, "").replace(/\.$/, "") || "0" : String(v));
 
 /**
- * 設定 › 搜尋與 AI 設定（業主 2026-11-25，超級管理員）：語意搜尋（AI 嵌入）、同音、模糊、排序、EDM 辨識的參數，
+ * 設定 › 搜尋與 AI 設定（杜杜龍 2026-11-25，超級管理員）：語意搜尋（AI 嵌入）、同音、模糊、排序、EDM 辨識的參數，
  * 每項附白話功能與建議值，改完按下方「儲存」；下方有「試搜尋」顯示相似度分數方便調門檻；最後是原本的「搜尋關聯詞」。
  */
 export default function SearchSettingsScreen() {
@@ -31,7 +31,7 @@ export default function SearchSettingsScreen() {
   const [test, setTest] = useState<Test | null>(null);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
-  // 整頁只有一個「儲存」（業主 2026-11-26）：各參數先改草稿，統一按儲存才寫入；離開前有未存的修改會主動詢問。
+  // 整頁只有一個「儲存」（杜杜龍 2026-11-26）：各參數先改草稿，統一按儲存才寫入；離開前有未存的修改會主動詢問。
   const syn = useSynonymsDraft();
   const valsDirty = !!vals && !!data && JSON.stringify(vals) !== JSON.stringify(data.values);
   const dirty = valsDirty || syn.dirty;

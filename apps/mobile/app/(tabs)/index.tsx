@@ -24,7 +24,7 @@ import { AppText, BrandTitle, ErrorView, InstallCard, LoginPrompt, LoadingView, 
  */
 // 每次登入只彈一次（登出後再登入會再提示）。
 
-/** 首頁：至尊模式（業主 2026-11-24）改成大搜尋框＋大麥克風（features/elder/elder-search.tsx）；超派模式照舊。 */
+/** 首頁：至尊模式（杜杜龍 2026-11-24）改成大搜尋框＋大麥克風（features/elder/elder-search.tsx）；超派模式照舊。 */
 export default function HomeRoute() {
   return useModeProfile().home === "voice" ? <ElderSearch mode="home" /> : <HomeScreen />;
 }
@@ -32,9 +32,9 @@ export default function HomeRoute() {
 function HomeScreen() {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
-  // 大螢幕（業主 2026-11-18）：內容放寬到 960、左右留白加大；海報區在 HomeRail 依欄寬保留足夠高度（橫放時頁面可往下捲，不把海報裁成扁條）。
+  // 大螢幕（杜杜龍 2026-11-18）：內容放寬到 960、左右留白加大；海報區在 HomeRail 依欄寬保留足夠高度（橫放時頁面可往下捲，不把海報裁成扁條）。
   const lay = useLayout();
-  // 首頁一律一頁顯示、不上下捲動（業主永久指示）：橫式（寬 > 高，平板、手機、電腦都一樣）標題與會員資料並排成一行；
+  // 首頁一律一頁顯示、不上下捲動（杜杜龍永久指示）：橫式（寬 > 高，平板、手機、電腦都一樣）標題與會員資料並排成一行；
   // 直式維持兩行，並依視窗比例放大（寬度越大放越大，上限 1.55 倍）。
   const landscape = lay.width > lay.height;
   const shortLand = landscape && lay.height < 500; // 手機橫放：空間很矮，隱藏安裝提醒與備註
@@ -43,7 +43,7 @@ function HomeScreen() {
   const { data, error, reload } = useApi<CourseSummary[]>("/courses");
   const [quote, setQuote] = useState<string | null>(null);
   const [noticeClosed, setNoticeClosed] = useState(false);
-  // 版面太擠（上面的安裝提醒、公告占掉空間）時，先隱藏左右海報下方的資訊；使用者關掉提醒騰出空間後自動恢復（業主 2026-11-19）。
+  // 版面太擠（上面的安裝提醒、公告占掉空間）時，先隱藏左右海報下方的資訊；使用者關掉提醒騰出空間後自動恢復（杜杜龍 2026-11-19）。
   // 判斷用「顯示資訊時海報還剩多高」：已隱藏時要扣掉資訊區的高度；加 12px 緩衝避免在邊界來回閃動。
   // 首頁一頁顯示：外層高度固定為「畫面可用高度」，裡面的海報區才會依剩餘空間自動縮放（沒有固定高度時，海報會把版面撐高、擠掉下方資訊）。
   const [viewH, setViewH] = useState(0);

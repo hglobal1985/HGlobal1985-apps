@@ -29,7 +29,7 @@ test("誰可以瀏覽：預設、六種範圍、私密連結、報名限制", as
   assert.equal(reg.viewScope, "all", "新課程預設「所有人含訪客」");
   await call("PATCH", `/admin/courses/${reg.id}`, { token: admin, body: { viewScope: "members", minRankCode: "gold" } });
   assert.equal((await call<CourseDetail>("GET", `/courses/${reg.id}`, { token: admin })).data.minRank.code, "gold");
-  // 改成「所有人含訪客」：獎銜限制照樣保留（訪客看得到介紹、不能報名；業主 2026-11-17 規則 B），但不算「完全公開」
+  // 改成「所有人含訪客」：獎銜限制照樣保留（訪客看得到介紹、不能報名；杜杜龍 2026-11-17 規則 B），但不算「完全公開」
   const toAll = (await call<CourseDetail>("PATCH", `/admin/courses/${reg.id}`, { token: admin, body: { viewScope: "all", minRankCode: "gold" } })).data;
   assert.equal(toAll.minRank.code, "gold");
   assert.equal(toAll.isPublic, false);

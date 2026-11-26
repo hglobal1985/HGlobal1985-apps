@@ -42,15 +42,15 @@ export function createWorker(staticFiles: StaticFiles) {
     /** 排程（每 10 分鐘）：開課前一天提醒（台灣時間 20:00 後）、補推還沒推播的通知。 */
     async scheduled(_event: unknown, env: Env, exec?: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
       const job = (async () => {
-        await revokeLegacyDriveLink(env.DB).catch((e) => console.error("legacy drive cleanup", e instanceof Error ? e.message : "error")); // 舊的「業主雲端硬碟上傳」授權：撤銷並刪除（業主 2026-11-18 取消該功能）
+        await revokeLegacyDriveLink(env.DB).catch((e) => console.error("legacy drive cleanup", e instanceof Error ? e.message : "error")); // 舊的「杜杜龍雲端硬碟上傳」授權：撤銷並刪除（杜杜龍 2026-11-18 取消該功能）
         await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));
         await processImportJobs(env).catch((e) => console.error("import jobs", e instanceof Error ? e.message : "error"));
         await processFirstSyncs(env).catch((e) => console.error("first syncs", e instanceof Error ? e.message : "error"));
         await ensureBrandCards(env).catch((e) => console.error("brand cards", e instanceof Error ? e.message : "error"));
-        await ensureTreasureLinks(env).catch((e) => console.error("treasure links", e instanceof Error ? e.message : "error")); // 成交百寶箱 ↔ 品牌館（業主 2026-11-24）
-        await migrateFilePhotos(env).catch((e) => console.error("block photos", e instanceof Error ? e.message : "error")); // 區塊裡以教材檔案上傳的圖片 → 相簿（業主 2026-11-24）
-        await runRecompress(env, env.DB).catch((e) => console.error("recompress", e instanceof Error ? e.message : "error")); // 舊照片重新壓縮（業主 2026-11-25，設定頁按「開始」才會跑）
-        await runAiBatch(env, env.DB).catch((e) => console.error("ai batch", e instanceof Error ? e.message : "error")); // AI 辨識批次排程：EDM 文字、相簿照片 OCR、場景（業主 2026-11-25）
+        await ensureTreasureLinks(env).catch((e) => console.error("treasure links", e instanceof Error ? e.message : "error")); // 成交百寶箱 ↔ 品牌館（杜杜龍 2026-11-24）
+        await migrateFilePhotos(env).catch((e) => console.error("block photos", e instanceof Error ? e.message : "error")); // 區塊裡以教材檔案上傳的圖片 → 相簿（杜杜龍 2026-11-24）
+        await runRecompress(env, env.DB).catch((e) => console.error("recompress", e instanceof Error ? e.message : "error")); // 舊照片重新壓縮（杜杜龍 2026-11-25，設定頁按「開始」才會跑）
+        await runAiBatch(env, env.DB).catch((e) => console.error("ai batch", e instanceof Error ? e.message : "error")); // AI 辨識批次排程：EDM 文字、相簿照片 OCR、場景（杜杜龍 2026-11-25）
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
         await indexSearchVectors(env).catch((e) => console.error("search vectors", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));

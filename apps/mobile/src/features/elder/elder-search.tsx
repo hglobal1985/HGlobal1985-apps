@@ -51,7 +51,7 @@ function lastCourse(courses: CourseSummary[]): CourseSummary | null {
 }
 
 /**
- * 至尊模式的找課畫面（業主 2026-11-24，B 方案）。
+ * 至尊模式的找課畫面（杜杜龍 2026-11-24，B 方案）。
  * home＝首頁：上方大搜尋框，中間一顆大麥克風（按一下用說的），下面「繼續上課」；打字或說完就原地列出結果。
  * browse＝「課程」分頁：同一個大搜尋框，沒打字時列出全部課程（大字、一列一堂課）。
  */
@@ -59,14 +59,14 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   const { c } = useTheme();
   const insets = useSafeAreaInsets();
   const { member } = useSession();
-  useProfileRedirect(member); // 會員資料沒填完：登入後自動帶到至尊模式頁、捲到沒填的欄位（業主 2026-11-24）
+  useProfileRedirect(member); // 會員資料沒填完：登入後自動帶到至尊模式頁、捲到沒填的欄位（杜杜龍 2026-11-24）
   const courses = useApi<CourseSummary[]>("/courses");
-  // 搜尋字只有首頁記住（返回時回到剛剛的搜尋結果）；課程分頁沒有搜尋，不套用記憶（業主 2026-11-25：搜尋結果不應出現在課程頁）。
+  // 搜尋字只有首頁記住（返回時回到剛剛的搜尋結果）；課程分頁沒有搜尋，不套用記憶（杜杜龍 2026-11-25：搜尋結果不應出現在課程頁）。
   const mem = useRememberedQuery("elder");
   const plain = useState("");
   const [q, setQ] = mode === "home" ? mem : plain;
   const [heard, setHeard] = useState<string | null>(null);
-  // 課程分頁的四大分類（業主 2026-11-24，D 款）：null＝顯示四張大卡；選了一區＝列出該區課程。
+  // 課程分頁的四大分類（杜杜龍 2026-11-24，D 款）：null＝顯示四張大卡；選了一區＝列出該區課程。
   const [zone, setZone] = useState<ElderZone | null>(null);
   const [sub, setSub] = useState<Row | null>(null); // 系列／中心再往下一層
   const input = useRef<{ focus: () => void } | null>(null);
@@ -74,12 +74,12 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     setHeard(text);
     if (final || text) setQ(text);
   });
-  // 搜尋引擎：與超派模式是同一個模組（features/search/use-search-engine.ts），業主 2026-11-25。
+  // 搜尋引擎：與超派模式是同一個模組（features/search/use-search-engine.ts），杜杜龍 2026-11-25。
   const eng = useSearchEngine(q, courses.data ?? []);
   const { key, all, chapters, semantic, phonetic } = eng;
   const scenes = useSceneSearch(q);
   const itemsOf = useZoneItems(all);
-  // 已經在首頁再按一次底部「首頁」＝清掉搜尋字與語音、回到預設畫面（業主 2026-11-25）。
+  // 已經在首頁再按一次底部「首頁」＝清掉搜尋字與語音、回到預設畫面（杜杜龍 2026-11-25）。
   useEffect(
     () =>
       onHomeReset(() => {
@@ -92,7 +92,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       }),
     [mode], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  // 從搜尋結果點「中心卡」會帶 ?center=中心名稱 來到課程分頁：直接打開該中心頁（業主 2026-11-25）。
+  // 從搜尋結果點「中心卡」會帶 ?center=中心名稱 來到課程分頁：直接打開該中心頁（杜杜龍 2026-11-25）。
   const { center: centerParam } = useLocalSearchParams<{ center?: string }>();
   const openedCenter = useRef("");
   useEffect(() => {
@@ -103,14 +103,14 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
     setZone("centers");
     setSub(row);
   }, [mode, centerParam, itemsOf]); // eslint-disable-line react-hooks/exhaustive-deps
-  // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（業主 2026-11-24：內容與數字與超派模式一致）。
+  // FlatList 的資料：搜尋結果／分類裡的項目／系列或中心裡的課程（杜杜龍 2026-11-24：內容與數字與超派模式一致）。
   const rows: Row[] = useMemo(() => {
     if (key) return chapters.map((x) => ({ key: x.lesson.id, title: x.lesson.title, rep: x.course, chapter: x }));
     if (mode !== "browse" || !zone) return [];
     if (sub) return (sub.children ?? []).map((x) => ({ key: x.id, title: x.title, count: x.materialCount, rep: x }));
     return itemsOf(zone);
   }, [key, chapters, mode, zone, sub, itemsOf]);
-  // 「繼續上課」只出現在至尊首頁的初始畫面：搜尋中、找不到課程、分類裡都不顯示（業主 2026-11-25）。
+  // 「繼續上課」只出現在至尊首頁的初始畫面：搜尋中、找不到課程、分類裡都不顯示（杜杜龍 2026-11-25）。
   const cont = mode === "home" && !q.trim() && !sub ? lastCourse(courses.data ?? []) : null;
   const searching = q.trim().length > 0;
   const mic = () => {
@@ -170,8 +170,8 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
         {voice.error ? <AppText tone="danger" style={{ textAlign: "center" }}>{voice.error}</AppText> : null}
       </View>
     ) : key && !chapters.length && !eng.extras.length && !eng.loading && !scenes.hits.length && !scenes.loading ? (
-      // 找不到課程：畫面中央放錄音鈕，按一下再說一次（業主 2026-11-25）。
-      // 訊息依字數自動縮字（長句不再爆框、不與上方文字重疊）；內容由上往下排，不置中擠壓（業主 2026-11-25）。
+      // 找不到課程：畫面中央放錄音鈕，按一下再說一次（杜杜龍 2026-11-25）。
+      // 訊息依字數自動縮字（長句不再爆框、不與上方文字重疊）；內容由上往下排，不置中擠壓（杜杜龍 2026-11-25）。
       <View style={[styles.center, { justifyContent: "flex-start" }]}>
         <HeardText budgetPx={150} text={`找不到「${q.trim()}」，再說一次試試看`} />
         <Pressable accessibilityRole="button" accessibilityLabel="再說一次" onPress={mic} style={({ pressed }) => [styles.micWrap, { backgroundColor: c.accentSoft, opacity: pressed ? 0.85 : 1 }]}>
@@ -184,15 +184,15 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
       </View>
     ) : null;
 
-  // 搜尋框固定在最上面、與下方內容分開（業主 2026-11-24 驗證回報：打一個字畫面就換成另一棵元件樹，輸入框被重建、鍵盤收起，只留得下第一個字）。
+  // 搜尋框固定在最上面、與下方內容分開（杜杜龍 2026-11-24 驗證回報：打一個字畫面就換成另一棵元件樹，輸入框被重建、鍵盤收起，只留得下第一個字）。
   // 不論有沒有結果、是否在聽，搜尋框永遠是同一個位置的同一個元件，才不會中斷輸入。
   const pad = { paddingHorizontal: space.md };
-  // 進入分類後：標題條固定在搜尋框下面（不隨清單捲走）、背景有該分類的浮水印大圖示（業主 2026-11-24，選 E 款）。
+  // 進入分類後：標題條固定在搜尋框下面（不隨清單捲走）、背景有該分類的浮水印大圖示（杜杜龍 2026-11-24，選 E 款）。
   const zoneDef = ELDER_ZONES.find((z) => z.id === zone);
   const inZone = mode === "browse" && !searching && !!zoneDef;
-  // 進入「中心」之後：四個分頁（EDM／課表／重播／列表）改成可展開的區塊（業主 2026-11-24）。
+  // 進入「中心」之後：四個分頁（EDM／課表／重播／列表）改成可展開的區塊（杜杜龍 2026-11-24）。
   const centerPage = inZone && zone === "centers" && !!sub;
-  // 進入「系列」之後（業主 2026-11-24：與中心卡統一）：上方封面＋訂閱＋點閱、公告，標題區右上角邀請。
+  // 進入「系列」之後（杜杜龍 2026-11-24：與中心卡統一）：上方封面＋訂閱＋點閱、公告，標題區右上角邀請。
   const seriesName = inZone && !centerPage && sub?.series ? sub.rep.series || null : null;
   const listMode = !body && !(!searching && mode === "home");
   const listHeader: ReactNode = seriesName ? (
@@ -205,14 +205,14 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
                 <ElderAlbumCard />
               </View>
             ) : key ? (
-              // 其他項目放進「可捲動」的清單裡（業主 2026-11-25：放在固定的上半部，項目一多就佔滿畫面、清單捲不動）。
+              // 其他項目放進「可捲動」的清單裡（杜杜龍 2026-11-25：放在固定的上半部，項目一多就佔滿畫面、清單捲不動）。
               <View style={{ gap: space.md }}>
                 {!voice.listening && (chapters.length || eng.loading || eng.extras.length) ? (
                   <AppText variant="headline">{chapters.length ? `找到 ${chapters.length} 個單元` : eng.loading ? "正在找相近的單元…" : eng.extras.length ? `找到 ${eng.extras.length} 個相近的項目` : ""}</AppText>
                 ) : null}
               </View>
             ) : undefined;
-  // 其他項目（EDM、相片、系列…）排在單元清單「後面」，字面符合的單元才是主角（業主 2026-11-25：想要的那筆被擠到最下面）。
+  // 其他項目（EDM、相片、系列…）排在單元清單「後面」，字面符合的單元才是主角（杜杜龍 2026-11-25：想要的那筆被擠到最下面）。
   const listFooter: ReactNode = key ? (
     <View style={{ gap: space.md }}>
       {!voice.listening ? <SceneHits q={q} big /> : null}
@@ -223,7 +223,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
 
   return (
     <View style={[styles.fill, { backgroundColor: c.background }]}>
-      {/* 課程分頁不再有搜尋框（業主 2026-11-24：移除置頂搜尋）；搜尋只在首頁。 */}
+      {/* 課程分頁不再有搜尋框（杜杜龍 2026-11-24：移除置頂搜尋）；搜尋只在首頁。 */}
       {mode === "home" ? <View style={[styles.inner, pad, { paddingTop: insets.top + space.md, paddingBottom: space.sm }]}>{header}</View> : <View style={{ height: insets.top + space.md }} />}
       {inZone ? (
         <View style={[styles.inner, pad, { paddingBottom: space.sm }]}>
@@ -257,7 +257,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
           />
         </ScrollView>
       ) : listMode ? (
-        // 網頁：不用會即時增減畫面項目的 FlatList，改成一般捲動清單（業主 2026-11-25：手機系統的長截圖拼接要整頁內容穩定；結果最多幾十筆，不需要虛擬化）。
+        // 網頁：不用會即時增減畫面項目的 FlatList，改成一般捲動清單（杜杜龍 2026-11-25：手機系統的長截圖拼接要整頁內容穩定；結果最多幾十筆，不需要虛擬化）。
         Platform.OS === "web" ? (
           <ScrollView style={styles.fill} contentContainerStyle={[styles.inner, pad, { paddingBottom: space.xxl }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             {listHeader}
@@ -300,12 +300,12 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   );
 }
 
-/** 搜尋提示文字（業主 2026-11-25）：首頁麥克風下方與「正在聽」畫面共用這一個，改這裡兩邊一起變；行距縮到最小。 */
+/** 搜尋提示文字（杜杜龍 2026-11-25）：首頁麥克風下方與「正在聽」畫面共用這一個，改這裡兩邊一起變；行距縮到最小。 */
 export const SEARCH_HINT = "例如：「王老師 表揚大會 淨水器 營養」"; // 空格一律半型
 export const TYPO_HINT = "說錯字不用改 都能找得到";
 /** 一行文字的估計寬度（以「字級」為單位）：半型空格 0.32、其他半型 0.6、中文與全型 1。 */
 const lineUnits = (t: string) => [...t].reduce((n, ch) => n + (ch === " " ? 0.32 : ch.charCodeAt(0) < 128 ? 0.6 : 1), 0);
-/** 強制一行、字級自動放到剛好塞滿可用寬度（業主 2026-11-25）：太長自動縮小，短的放大到 max 為止。首頁與「正在聽」共用。 */
+/** 強制一行、字級自動放到剛好塞滿可用寬度（杜杜龍 2026-11-25）：太長自動縮小，短的放大到 max 為止。首頁與「正在聽」共用。 */
 export function FitLine({ text, max = 30, min = 10, weight = "700", muted, tight }: { text: string; max?: number; min?: number; weight?: "400" | "700" | "800"; muted?: boolean; tight?: boolean }) {
   const [w, setW] = useState(0);
   const k = UI_SCALE * elderTextScale();
@@ -321,20 +321,20 @@ export function FitLine({ text, max = 30, min = 10, weight = "700", muted, tight
 export function SearchHint() {
   return <FitLine text={SEARCH_HINT} max={16} weight="400" muted />;
 }
-/** 中央黑色標題下方的黑字提示（業主 2026-11-25：強制一行、自動縮放到最大寬度）。 */
+/** 中央黑色標題下方的黑字提示（杜杜龍 2026-11-25：強制一行、自動縮放到最大寬度）。 */
 export function TypoHint() {
   return <FitLine text={TYPO_HINT} max={22} tight />;
 }
 
-/** 「正在聽…」：跟著聲音大小即時高低跳動的音波＋聽到的字＋停止鈕（業主 2026-11-24）。 */
+/** 「正在聽…」：跟著聲音大小即時高低跳動的音波＋聽到的字＋停止鈕（杜杜龍 2026-11-24）。 */
 function Listening({ heard, levels, onStop }: { heard: string | null; levels: number[]; onStop: () => void }) {
   const { c } = useTheme();
-  // 一切縮小、行距收緊（業主 2026-11-25）：音波、字體都再縮小；聽到的字太多時自動縮字，永遠塞得進畫面、不重疊。
+  // 一切縮小、行距收緊（杜杜龍 2026-11-25）：音波、字體都再縮小；聽到的字太多時自動縮字，永遠塞得進畫面、不重疊。
   const max = Math.round(64 * UI_SCALE);
   const min = Math.round(8 * UI_SCALE);
   return (
     <View style={styles.listen} accessibilityLiveRegion="polite">
-      {/* 上半部是固定高度的內容區（聽到的字、音波、提示）；「送出」鈕固定釘在最下面，不論內容怎麼變，位置永遠不動（業主 2026-11-25）。 */}
+      {/* 上半部是固定高度的內容區（聽到的字、音波、提示）；「送出」鈕固定釘在最下面，不論內容怎麼變，位置永遠不動（杜杜龍 2026-11-25）。 */}
       <View style={{ flex: 1, alignSelf: "stretch", alignItems: "center", gap: 4, overflow: "hidden" }}>
         <View style={{ height: Math.round(120 * UI_SCALE), alignSelf: "stretch", justifyContent: "center" }}>{heard ? <HeardText text={`聽到：「${heard}」`} /> : null}</View>
         <View style={[styles.wave, { height: max, gap: 5 }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -390,7 +390,7 @@ export type Row = { key: string; title: string; tag?: string; /** 搜尋結果�
 
 export function ElderCourseRow({ course, title, count, onPress, series, coverUrl, typeTag }: { course: CourseSummary; /** 搜尋結果：資料類別膠囊標籤（課程卡／教材卡）。 */ typeTag?: string; title?: string; /** 有給＝標籤顯示「N 項教材」（分類清單，與超派模式一致）；沒給＝顯示報名狀態。 */ count?: number; onPress?: () => void; /** true＝這列是系列（封面用系列封面）。 */ series?: boolean; /** 中心列：中心封面圖（與超派模式的中心卡一致）。 */ coverUrl?: string | null }) {
   const { c } = useTheme();
-  // 封面一律直式 4:3（寬 3：高 4），封面挑選與超派模式同一份程式（TileCover，業主 2026-11-24 永久指示）。
+  // 封面一律直式 4:3（寬 3：高 4），封面挑選與超派模式同一份程式（TileCover，杜杜龍 2026-11-24 永久指示）。
   const w = Math.round(96 * UI_SCALE);
   const h = Math.round((w * 4) / 3);
   const tag = count !== undefined ? `${count} 項教材` : course.isList ? "教材" : course.enrollment === "opened" ? "已報名" : course.enrollment === "pending" ? "審核中" : course.priceTba ? "費用未公布" : course.free || course.freeNow || course.watchFree ? "免費" : "付費";
@@ -413,13 +413,13 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
           </View>
         </View>
       </View>
-      {/* 不放右側箭頭（業主 2026-11-24：讓標題文字完整呈現），整列都可以點。 */}
+      {/* 不放右側箭頭（杜杜龍 2026-11-24：讓標題文字完整呈現），整列都可以點。 */}
     </Pressable>
   );
 }
 
 /**
- * 列上的課程標題（業主 2026-11-24）：標準字級 `TITLE_SIZE`，依剩餘寬度自然換行（不提早斷行）；
+ * 列上的課程標題（杜杜龍 2026-11-24）：標準字級 `TITLE_SIZE`，依剩餘寬度自然換行（不提早斷行）；
  * 資訊卡高度固定（＝封面高度），標題字數太多放不下時才**縮小字級**，一定完整顯示全部文字。
  * 斷行處由瀏覽器依寬度決定，不做任何字數對齊；網頁版用 data-plainwrap 排除至尊模式的 text-wrap: balance（會讓斷行提早）。
  * 畫字時會再乘「平板倍數 × 至尊倍數」，所以估算要在放大前的尺寸上算。
@@ -427,7 +427,7 @@ export function ElderCourseRow({ course, title, count, onPress, series, coverUrl
 const TITLE_SIZE = 22;
 /** 16:9 縮圖裡直式（9:16）影片佔的寬度比例＝(9/16)/(16/9)。 */
 const SHORTS_CONTENT = 81 / 256;
-/** 搜尋結果的「單元」列（跟超派 ChapterList 同內容同順序，業主 2026-11-25）：大縮圖、標題、日期與所屬教材卡、狀態；點下去能看就直接播放，不能看進課程頁。 */
+/** 搜尋結果的「單元」列（跟超派 ChapterList 同內容同順序，杜杜龍 2026-11-25）：大縮圖、標題、日期與所屬教材卡、狀態；點下去能看就直接播放，不能看進課程頁。 */
 function ElderChapterRow({ item }: { item: ChapterItem }) {
   const { c } = useTheme();
   const thumb = useThumb();
@@ -443,7 +443,7 @@ function ElderChapterRow({ item }: { item: ChapterItem }) {
     <Pressable accessibilityRole="button" accessibilityLabel={`${lesson.title}，${course.title}`} onPress={() => (locked && flashText(lockReason(course, !!member)), markFromSearch(), router.push((open ? lessonHref(course.id, lesson.id) : `/course/${course.id}`) as never))} style={({ pressed }) => [styles.row, { borderColor: c.border, opacity: pressed ? 0.85 : 1 }]}>
       <View style={[styles.thumb, { width: w, height: h, backgroundColor: c.surfaceMuted }]}>
         {cover ? (
-          // YouTube 短影音的縮圖是 16:9、直式影片兩側是黑邊：自動放大到「直式影片剛好填滿 3:4 的寬度」（業主 2026-11-25），上下多的部分裁掉。
+          // YouTube 短影音的縮圖是 16:9、直式影片兩側是黑邊：自動放大到「直式影片剛好填滿 3:4 的寬度」（杜杜龍 2026-11-25），上下多的部分裁掉。
           lesson.isShorts && !lesson.coverUrl?.includes("/media/pub") && /ytimg\.com/.test(cover) ? (
             <Image source={{ uri: resolveUrl(cover) }} style={{ position: "absolute", width: w / SHORTS_CONTENT, height: ((w / SHORTS_CONTENT) * 9) / 16, left: (w - w / SHORTS_CONTENT) / 2, top: (h - ((w / SHORTS_CONTENT) * 9) / 16) / 2 }} resizeMode="cover" />
           ) : (
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   tag: { alignSelf: "flex-start", borderRadius: radius.pill, paddingHorizontal: space.md, paddingVertical: 2 },
 });
 
-/** 第五大分類「相簿」卡（業主 2026-11-25）：與四個分類同款，點開前往相簿專區（/albums）。 */
+/** 第五大分類「相簿」卡（杜杜龍 2026-11-25）：與四個分類同款，點開前往相簿專區（/albums）。 */
 function ElderAlbumCard() {
   const { data } = useApi<AlbumsResponse>("/albums");
   const [open, setOpen] = useState(false);

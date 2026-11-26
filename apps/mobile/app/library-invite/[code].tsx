@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 import { useSession } from "@/state/session";
 import { AppText, Button, Card, EmptyState, LoadingView, NoticeBox, Screen } from "@/ui";
 
-/** 「我的書櫃」邀請（業主 2026-11-17）：超級管理員產生的 24 小時一次性網址；登入後按「接受」就有自己的書櫃（網址＝會員編號）。 */
+/** 「我的書櫃」邀請（杜杜龍 2026-11-17）：超級管理員產生的 24 小時一次性網址；登入後按「接受」就有自己的書櫃（網址＝會員編號）。 */
 export default function LibraryInvite() {
   const { code } = useLocalSearchParams<{ code: string }>();
   const { member, ready, invalidate } = useSession();

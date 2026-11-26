@@ -1,5 +1,5 @@
 /**
- * 「加入我的清單」（業主 2026-11-21）：會員自己建立的清單；課程卡、單一教材、系列卡、中心卡都能加入，同一個內容可加進多份清單。
+ * 「加入我的清單」（杜杜龍 2026-11-21）：會員自己建立的清單；課程卡、單一教材、系列卡、中心卡都能加入，同一個內容可加進多份清單。
  * 分享網址＝/會員編號/自訂名稱；點擊次數與人數用瀏覽器自己產生的匿名代碼計算（不記身分）。
  * 清單數量上限＝基本數量＋完成指定學習成就解鎖的數量（設定頁「清單解鎖設定」）。這裡只放資料庫與規則，路由在 api.ts。
  */
@@ -28,7 +28,7 @@ const rid = (n: number) => {
   return [...crypto.getRandomValues(new Uint8Array(n))].map((b) => a[b % a.length]).join("");
 };
 
-/** 自訂網址名稱：小寫英數與連字號、3～30 字。前面已有會員編號，不必避開網站保留字或短網址（業主 2026-11-21）。 */
+/** 自訂網址名稱：小寫英數與連字號、3～30 字。前面已有會員編號，不必避開網站保留字或短網址（杜杜龍 2026-11-21）。 */
 export function checkSlug(raw: unknown): string {
   const s = typeof raw === "string" ? raw.normalize("NFKC").trim().toLowerCase() : "";
   if (!/^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/.test(s)) return fail(400, "invalid_slug", "網址名稱要 3 到 30 個字，只能用英文、數字與連字號（-）");
@@ -85,14 +85,14 @@ async function coverBgMap(db: D1Database): Promise<Map<string, string>> {
   return new Map(results.map((r) => [r.id, pub(r.image_key, r.art_version)!]));
 }
 /**
- * 清單封面的輸出（業主 2026-11-22）：
+ * 清單封面的輸出（杜杜龍 2026-11-22）：
  * - 內容封面（item）＝項目圖，沒有文字；
  * - 自訂封面（text）＝背景（管理員的底圖 coverBgUrl，沒有就用單色 coverColor）＋可選的文字（coverText；自訂文字空＝用清單名稱，關閉＝null）。
  * 會員不能上傳封面圖，舊的 upload 類型一律當自訂封面（migration 0111 已轉換）。
  */
 function coverOut(l: { cover_mode?: string; cover_bg_id?: string | null; cover_text?: string | null; cover_text_on?: number; cover_color?: string | null; title?: string }, itemCover: string | null, bgs: Map<string, string>): { coverMode: CoverMode; coverUrl: string | null; coverBgUrl: string | null; coverText: string | null; coverColor: string | null } {
   const mode: CoverMode = l.cover_mode === "item" ? "item" : "text";
-  const text = mode !== "item" ? ((l.cover_text ?? "").trim() || l.title || "") : null; // 自訂封面一律顯示文字（業主 2026-11-22），cover_text_on 欄位已不使用
+  const text = mode !== "item" ? ((l.cover_text ?? "").trim() || l.title || "") : null; // 自訂封面一律顯示文字（杜杜龍 2026-11-22），cover_text_on 欄位已不使用
   return { coverMode: mode, coverUrl: mode === "item" ? itemCover : null, coverBgUrl: mode === "text" && l.cover_bg_id ? (bgs.get(l.cover_bg_id) ?? null) : null, coverText: text, coverColor: mode === "text" ? (l.cover_color ?? null) : null };
 }
 

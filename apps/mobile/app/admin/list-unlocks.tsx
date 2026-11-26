@@ -17,7 +17,7 @@ import { flashText } from "@/ui/flash-notice";
 type Rule = { achievementId: string; extra: number };
 
 /**
- * 設定 › 清單解鎖設定（業主 2026-11-21，超級管理員）：每位會員一開始能建立幾份「我的清單」，
+ * 設定 › 清單解鎖設定（杜杜龍 2026-11-21，超級管理員）：每位會員一開始能建立幾份「我的清單」，
  * 以及完成指定的學習成就後，各多解鎖幾份。點「新增解鎖條件」挑一個成就，再設定解鎖幾份。
  */
 export default function ListUnlocksScreen() {

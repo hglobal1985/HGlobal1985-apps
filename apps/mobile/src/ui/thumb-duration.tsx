@@ -6,7 +6,7 @@ import { AppText } from "./text";
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
 
 /**
- * 縮圖內部下方的影片長度（業主 2026-11-25）：白色文字加陰影、沒有膠囊底色。
+ * 縮圖內部下方的影片長度（杜杜龍 2026-11-25）：白色文字加陰影、沒有膠囊底色。
  * 強制單行、不可出現「…」：依縮圖寬度自動縮小字體（網頁不支援 adjustsFontSizeToFit，所以自己用字數估寬度算字級；App 另加 adjustsFontSizeToFit）。
  * 搜尋結果的單元列（超派 `ChapterList`、至尊 `ElderChapterRow`）共用；放在縮圖容器（relative、overflow hidden）裡，沒有長度（0）不顯示。
  */

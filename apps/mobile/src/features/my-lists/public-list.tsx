@@ -17,9 +17,9 @@ import { clickSource, visitorId } from "./links";
 type Pub = { sharer: { rankLabel: string; rankBadge: string | null; rankBadgeArt: { width: number; height: number; top: number; bottom: number } | null } | null; sharerError?: string; title: string; ownerSub: string; ownerName: string; ownerAvatar: string | null; number: string; slug: string; count: number; clicks: number; items: ListItem[] };
 
 /**
- * 別人分享的清單（/會員編號/網址名稱，所有清單都公開，訪客也能看；業主 2026-11-21）。
+ * 別人分享的清單（/會員編號/網址名稱，所有清單都公開，訪客也能看；杜杜龍 2026-11-21）。
  * 最上面是分享者名片：用首頁同一個 MemberHeader 元件（頭像、姓名；獎銜與徽章等 Amway 資料不保存，需要中央支援才能顯示，見 docs/central-request-list-sharer.md）。
- * 每次進入點擊 +1（自己看不算）；登入的人可以「複製到我的清單」（低調的小文字鈕）。清單名稱只放在上方工具列，頁面裡不重複；不放「尚未登入」提示鈕（業主 2026-11-21）。
+ * 每次進入點擊 +1（自己看不算）；登入的人可以「複製到我的清單」（低調的小文字鈕）。清單名稱只放在上方工具列，頁面裡不重複；不放「尚未登入」提示鈕（杜杜龍 2026-11-21）。
  */
 export function PublicListScreen({ number, slug }: { number: string; slug: string }) {
   const { c } = useTheme();

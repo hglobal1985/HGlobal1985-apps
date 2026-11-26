@@ -10,9 +10,9 @@ import { FRAME_GRADIENT, FRAME_KEYFRAMES, FRAME_PAD, FRAME_SHADOW } from "@/ui/g
  */
 export function installWebPullRefresh(): () => void {
   if (Platform.OS !== "web" || typeof document === "undefined") return () => undefined;
-  // 業主 2026-11-17：原本太靈敏。改成「要拉到完整距離（FULL）的一半以上」才觸發，並用小樹苗長成結綠色櫻桃的樹來顯示進度百分比。
+  // 杜杜龍 2026-11-17：原本太靈敏。改成「要拉到完整距離（FULL）的一半以上」才觸發，並用小樹苗長成結綠色櫻桃的樹來顯示進度百分比。
   const FULL = 280; // 拉到 100% 所需的手指位移（px）
-  const THRESHOLD = FULL * 0.8; // 超過 80% 才會重新整理（業主 2026-11-17 再加嚴）
+  const THRESHOLD = FULL * 0.8; // 超過 80% 才會重新整理（杜杜龍 2026-11-17 再加嚴）
   const MIN_GAP_MS = 2000; // 連續兩次觸發至少間隔 2 秒（中央有每分鐘 120 次的讀取限制）
   let startY = 0;
   let startX = 0;
@@ -95,7 +95,7 @@ export function installWebPullRefresh(): () => void {
     dim?.remove();
     dim = null;
   };
-  // ── 防「卡住」（業主 2026-11-17 回報：拉到一半卡在某個百分比，要重新整理才恢復）──
+  // ── 防「卡住」（杜杜龍 2026-11-17 回報：拉到一半卡在某個百分比，要重新整理才恢復）──
   // 原因 1：touchmove／touchend 只聽 document。手指按下的那個元素若在拉的途中被畫面更新移除（讀取完成換版面、動畫換元件），
   //         之後的 touchmove／touchend／touchcancel 只會送給那個已離開畫面的元素，document 收不到 → 結束動作永遠不執行，小卡與暗化一直停在畫面上。
   //         → 改成在「手指按下的元素」本身掛 move／end／cancel（元素被移除也照收），收尾時一定卸除。
@@ -127,7 +127,7 @@ export function installWebPullRefresh(): () => void {
     reset(); // 先清掉任何殘留（上一次沒收乾淨的小卡、監聽）
     if (e.touches.length !== 1) return;
     const t = e.target as Element | null;
-    // data-no-pull-refresh：自己有上下拖曳手勢的區塊（課程 EDM 封面、影片放大拖曳）不觸發下拉重新整理（業主 2026-11-17）。
+    // data-no-pull-refresh：自己有上下拖曳手勢的區塊（課程 EDM 封面、影片放大拖曳）不觸發下拉重新整理（杜杜龍 2026-11-17）。
     if (!t || t.closest('[role="dialog"],[aria-modal="true"],input,textarea,select,video:not([data-allow-pull]),iframe,[contenteditable="true"],[data-no-pull-refresh]')) return;
     if (!atTop(t)) return;
     startY = e.touches[0]!.clientY;

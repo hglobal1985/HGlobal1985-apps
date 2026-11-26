@@ -54,7 +54,7 @@ test("其他教材（外部連結）：新增＝名稱＋連結一次建立、�
     assert.equal((await call("POST", `/admin/courses/${made.id}/materials`, admin, { url: "http://insecure.com/x" })).status, 400, "只收 https");
     assert.equal((await call("POST", `/admin/courses/${made.id}/materials`, student, { url: "https://a.com/x" })).status, 403, "學員不能新增");
 
-    // 免費課程：已報名的會員看得到網址（課程類一律要先報名，業主 2026-11-22）
+    // 免費課程：已報名的會員看得到網址（課程類一律要先報名，杜杜龍 2026-11-22）
     await call("POST", "/orders", student, { courseIds: [made.id] });
     const asStudent = (await call<CourseDetail>("GET", `/courses/${made.id}`, student)).data.lessons.find((l) => l.id === m1.id)!;
     assert.deepEqual([asStudent.linkType, asStudent.linkUrl], ["canva", "https://www.canva.com/design/abc/view"]);

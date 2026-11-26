@@ -6,7 +6,7 @@ import { UI_SCALE } from "./ui-scale";
 export type ColorScheme = "light" | "dark";
 
 const palettes = {
-  // 這份色值就是《寰宇生態系統一設計規範 2.0》的正本（業主 2026-11-16：全生態系改用行動大學實際使用的設計；docs/hglobal-color-standard.md、docs/hglobal-tokens.json 與它一致）；不要自行新增色碼。
+  // 這份色值就是《寰宇生態系統一設計規範 2.0》的正本（杜杜龍 2026-11-16：全生態系改用行動大學實際使用的設計；docs/hglobal-color-standard.md、docs/hglobal-tokens.json 與它一致）；不要自行新增色碼。
   light: {
     background: "#F8F6EF",
     surface: "#FFFFFF",
@@ -25,7 +25,7 @@ const palettes = {
     success: "#1B7A43",
     successSoft: "#E7F1EA",
     tabBar: "#FFFFFF",
-    // 底部分頁列（業主 2026-11-20 方案 1）：深綠實心底、白字，目前分頁是黃色膠囊。
+    // 底部分頁列（杜杜龍 2026-11-20 方案 1）：深綠實心底、白字，目前分頁是黃色膠囊。
     navBar: "#0C603C",
     navPill: "#F5C842",
     navPillText: "#1F1A00",
@@ -70,7 +70,7 @@ export const courseThemes: Record<
   violet: { light: ["#E3DCF1", "#5A4389"], dark: ["#2C2540", "#C8B7EE"] },
 };
 
-/** 固定格式文字封面的咖啡色系（業主 2026-11-19，銅章會議）：[底色, 文字色]。不在 courseThemes 的隨機色裡。 */
+/** 固定格式文字封面的咖啡色系（杜杜龍 2026-11-19，銅章會議）：[底色, 文字色]。不在 courseThemes 的隨機色裡。 */
 export const coverBronze: { light: [string, string]; dark: [string, string] } = { light: ["#6B4226", "#F7E7C6"], dark: ["#4A2E1B", "#F0D9A8"] };
 
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;

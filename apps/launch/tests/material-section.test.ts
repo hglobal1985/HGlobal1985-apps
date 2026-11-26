@@ -14,13 +14,13 @@ test("素材的分類區域標題：只有清單能新增、不編號、不算�
   const admin = (await call<{ token: string }>("POST", "/auth/demo", { body: { sub: "demo-admin" } })).data.token;
   const list = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "素材", isList: true, status: "published" } })).data;
   const normal = (await call<CourseDetail>("POST", "/admin/courses", { token: admin, body: { title: "一般課", teacher: "王小明" } })).data;
-  // 一般課程也可以新增區塊（業主 2026-11-19）
+  // 一般課程也可以新增區塊（杜杜龍 2026-11-19）
   assert.equal((await call("POST", `/admin/courses/${normal.id}/lessons`, { token: admin, body: { kind: "section", title: "x" } })).status, 200);
   let d = (await call<CourseDetail>("POST", `/admin/courses/${list.id}/lessons`, { token: admin, body: { kind: "section", title: "簡報與文件" } })).data;
   d = (await call<CourseDetail>("POST", `/admin/courses/${list.id}/materials`, { token: admin, body: { url: "https://docs.google.com/presentation/d/abc/edit", title: "第一屆簡報" } })).data;
   d = (await call<CourseDetail>("POST", `/admin/courses/${list.id}/lessons`, { token: admin, body: { kind: "section", title: "影片精華" } })).data;
   assert.deepEqual(d.lessons.map((l) => [l.title, !!l.section, l.position]), [["第一屆簡報", false, 1], ["簡報與文件", true, 0], ["影片精華", true, 0]]);
-  assert.equal(d.lessons[1]!.material, true); // 新教材一律放最上面（業主 2026-11-20：最新的在最上面）
+  assert.equal(d.lessons[1]!.material, true); // 新教材一律放最上面（杜杜龍 2026-11-20：最新的在最上面）
   // 章節數不含分類標題
   const sum = (await call<{ id: string; lessonCount: number }[]>("GET", "/courses", { token: admin })).data.find((c) => c.id === list.id)!;
   assert.equal(sum.lessonCount, 0);

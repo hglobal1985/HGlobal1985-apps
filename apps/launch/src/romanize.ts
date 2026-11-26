@@ -139,7 +139,7 @@ export function urlNameVariants(name: string): string[] {
 }
 
 /**
- * 沒有主講人的課程（勾了「無」）：專屬網址用課程名稱的英譯（規則同主講人姓名；業主 2026-11-19）。
+ * 沒有主講人的課程（勾了「無」）：專屬網址用課程名稱的英譯（規則同主講人姓名；杜杜龍 2026-11-19）。
  * 名稱很長時只取前 40 個字元（在連字號處斷開），避免網址過長；轉不出英文字母就回空字串（＝不產生專屬網址）。
  */
 export function romanizeTitle(title: string): string {

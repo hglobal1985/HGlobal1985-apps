@@ -315,7 +315,7 @@ test("我的書櫃：獲得任意 100 枚徽章自動解鎖鑰匙（99 枚不行
   assert.equal(after.library?.number, "tw1234567");
 });
 
-test("審核紀錄：待審時不存申請內容，審核完成才寫入內容與姓名（業主 2026-11-22）", async () => {
+test("審核紀錄：待審時不存申請內容，審核完成才寫入內容與姓名（杜杜龍 2026-11-22）", async () => {
   const env: Env = { DB: createTestDb() };
   const call = async <T = unknown,>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
     const headers: Record<string, string> = { "content-type": "application/json" };

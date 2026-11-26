@@ -12,7 +12,7 @@ import { TextInput } from "react-native";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 通知頁「審核」分類：中央的「獎銜、教育中心」新申請（業主 2026-11-17）。
+ * 通知頁「審核」分類：中央的「獎銜、教育中心」新申請（杜杜龍 2026-11-17）。
  * 即時向中央讀取、不保存；誰能看、誰能審核（審核員只能處理自己中心的、超級管理員與秘書全部）完全由中央判斷，
  * 這裡沒有權限就不會顯示整個區塊。通過／不通過前先彈出確認面板。
  */
@@ -139,7 +139,7 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
         </Card>
       )}
       {editing ? <EditApproveSheet review={editing} onClose={() => setEditing(null)} onPick={(v, label) => (setEditing(null), void decide(editing, "approve", v, label))} /> : null}
-      {/* 已處理的申請紀錄（業主 2026-11-19；2026-11-22 改頭像清單、依日期分組）：審核完成後保留在這裡，不會消失。 */}
+      {/* 已處理的申請紀錄（杜杜龍 2026-11-19；2026-11-22 改頭像清單、依日期分組）：審核完成後保留在這裡，不會消失。 */}
       {history.data?.length
         ? [{ day: "已處理", rows: history.data }].map((g) => (
             <View key={g.day} style={{ gap: 6, marginTop: space.sm }}>
@@ -193,7 +193,7 @@ export function CentralReviewList({ data, onChanged }: { data: CentralReviews; o
   );
 }
 
-/** 審核者修改後通過（業主 2026-11-20）：獎銜、中心用清單選，系統用輸入；選好後回到確認面板讓審核者看到改了什麼。 */
+/** 審核者修改後通過（杜杜龍 2026-11-20）：獎銜、中心用清單選，系統用輸入；選好後回到確認面板讓審核者看到改了什麼。 */
 function EditApproveSheet({ review, onClose, onPick }: { review: CentralReview; onClose: () => void; onPick: (value: unknown, label: string) => void }) {
   const { c } = useTheme();
   const ranks = useApi<Rank[]>(review.field_key === "rank" ? "/ranks" : null);

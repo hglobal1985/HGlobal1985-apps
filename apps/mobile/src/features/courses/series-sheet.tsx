@@ -36,11 +36,11 @@ function StatusChip({ course }: { course: CourseSummary }) {
 }
 
 /**
- * 清單的區塊選單（業主 2026-11-18）：清單有勾「顯示在上拉選單」的區塊時，點寰宇大學的小卡彈出這個。
+ * 清單的區塊選單（杜杜龍 2026-11-18）：清單有勾「顯示在上拉選單」的區塊時，點寰宇大學的小卡彈出這個。
  * 每列＝封面（手動上傳 > 品牌 logo > 預設圖）＋區塊名稱＋灰色數字（只顯示數量）；點一列進清單頁、自動捲到該區塊並展開。
  */
 /**
- * 上拉選單的「0 教材」規則（業主 2026-11-24）：免費課程教材是 0 ＝ 隱藏、不列在上拉選單；付費課程就算教材是 0 也一律列出（讓人看得到有這門課）。
+ * 上拉選單的「0 教材」規則（杜杜龍 2026-11-24）：免費課程教材是 0 ＝ 隱藏、不列在上拉選單；付費課程就算教材是 0 也一律列出（讓人看得到有這門課）。
  * 管理員永遠看得到（淡化）。區塊（教材數加照片數）與卡片（教材數）同一條規則。
  */
 export const hideEmptyInSheet = (course: { paid: boolean }, count: number, admin: boolean) => !admin && !course.paid && count === 0;
@@ -90,7 +90,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
 }
 
 /**
- * 系列裡只有一張教材卡時的上拉選單（業主 2026-11-20）：內容＝這張卡自己的內容，順序「區塊 > 教材」二者則一——
+ * 系列裡只有一張教材卡時的上拉選單（杜杜龍 2026-11-20）：內容＝這張卡自己的內容，順序「區塊 > 教材」二者則一——
  * 有區塊就用 BlockSheet（呼叫端判斷），沒有區塊就列出教材；點一列進這張卡的頁面。
  */
 export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onClose: () => void }) {
@@ -162,7 +162,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
                 {x.brand ? <BrandCover brand={x.brand} fill /> : x.coverUrl || x.edmUrl ? <Image source={{ uri: thumb(resolveUrl((x.coverUrl || x.edmUrl) as string), 120) }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : <CardThumb kind="course" id={x.id} />}
               </SheetThumb>
             }
-            // 素材：清單卡名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（業主 2026-11-18）
+            // 素材：清單卡名稱＋素材數量（只顯示數字）；課程梯次：日期＋名稱＋狀態標籤（杜杜龍 2026-11-18）
             title={x.isList ? x.title : `${x.eventStart ? eventDays(x.eventStart, x.eventEnd) : "未設定日期"}${x.id === currentId ? "（目前顯示）" : ""}`}
             subtitle={x.isList ? undefined : x.title}
             count={x.isList ? x.materialCount : undefined}

@@ -1,7 +1,7 @@
 import type { D1Database, Env } from "./d1.ts";
 
 /**
- * 手機推播通知（Web Push，業主 2026-11-17）：
+ * 手機推播通知（Web Push，杜杜龍 2026-11-17）：
  * - 站內通知（notifications 表）新增後，背景把「還沒推播」的通知推到收件人已開啟推播的每個裝置。
  * - 金鑰：VAPID 私鑰（JWK）放在 Cloudflare Secret `VAPID_PRIVATE_JWK`；公鑰由私鑰算出，給瀏覽器訂閱用。沒設定就整個不推播（站內通知照常）。
  * - 內容依 RFC 8291（aes128gcm）加密；只用 Web Crypto，不靠外部套件。
@@ -140,7 +140,7 @@ export async function flushPushes(env: Env, fetcher: typeof fetch = fetch): Prom
 }
 
 /**
- * 開課前一天提醒（業主 2026-11-17）：台灣時間每天 20:00 之後第一次執行時，替「明天開課」的已上架課程（清單卡除外），
+ * 開課前一天提醒（杜杜龍 2026-11-17）：台灣時間每天 20:00 之後第一次執行時，替「明天開課」的已上架課程（清單卡除外），
  * 通知每位已報名（已開通）的學員。同一門課同一天只發一次（course_reminders）。回傳發出幾則。
  */
 export async function courseReminders(env: Env, now = Date.now()): Promise<number> {

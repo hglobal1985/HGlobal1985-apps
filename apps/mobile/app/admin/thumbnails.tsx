@@ -33,7 +33,7 @@ const KB_TARGET = 30;
 const pctVal = (v: number) => Math.round(v * 100);
 
 /**
- * 設定 › Cloudflare即時縮圖（超級管理員，業主 2026-11-20）：Cloudflare 圖片縮放（Images 綁定）所有可調選項集中在這一頁。
+ * 設定 › Cloudflare即時縮圖（超級管理員，杜杜龍 2026-11-20）：Cloudflare 圖片縮放（Images 綁定）所有可調選項集中在這一頁。
  * 免費方案每月 5,000 種「不重複縮圖」，超過只是不縮（回原圖）、不會收費；總開關預設關閉。
  */
 export default function ThumbnailsScreen() {

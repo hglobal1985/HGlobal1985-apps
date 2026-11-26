@@ -11,7 +11,7 @@ import { buildTrack } from "./engine.types";
 import { usePlayer } from "./use-player";
 
 /**
- * 課程頁「原地播放」的全部邏輯（原本在上課頁，業主 2026-11-16 改成不跳頁、原地播放，整段搬到這裡，行為不變）：
+ * 課程頁「原地播放」的全部邏輯（原本在上課頁，杜杜龍 2026-11-16 改成不跳頁、原地播放，整段搬到這裡，行為不變）：
  * - 向伺服器要播放授權、組成播放軌、交給全站單一播放器（同一堂直接接上；別堂正在播放就詢問是否中斷）。
  * - 手機 App 的 YouTube 仍用內嵌播放器（legacyYoutube）。
  * - 學習進度：記住最後學習的章節、播放 1% 回報「開始學習」、每前進 1% 且超過 10 秒回報進度、離開時補送、播到 95%／結尾自動標記完成。
@@ -28,7 +28,7 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
   const playback = pb && pb.courseId === c?.id && pb.lessonId === lessonId ? pb.data : null;
   const [playError, setPlayError] = useState<string | null>(null);
   const player = usePlayer();
-  // 只有「正在看的這一頁」可以開始播放（業主 2026-11-24 回報：切換至尊模式時迷你播放器自己跳出來、自動播放）。
+  // 只有「正在看的這一頁」可以開始播放（杜杜龍 2026-11-24 回報：切換至尊模式時迷你播放器自己跳出來、自動播放）。
   // 切換模式／改字體大小會重建所有頁面，連歷史裡（背景）的課程頁也重建；它網址上帶著某一堂，就會重新要求播放，播放器正空著就直接開播。
   // 背景的課程頁只能「接上」播放器裡已經是同一堂的內容（離開課程頁後迷你播放器照常播、照常記錄進度），不能自己開始新的播放。
   const focused = useIsFocused();
@@ -73,7 +73,7 @@ export function useLessonSession(c: CourseDetail | null | undefined, lessonId: s
       if (!alive) return;
       if (ok) {
         setClaimed(track.key);
-        // 續播記憶：告訴學員是從上次的位置接著播（業主 2026-11-17）。
+        // 續播記憶：告訴學員是從上次的位置接著播（杜杜龍 2026-11-17）。
         const r = track.playback.resumeAt;
         if (r != null && !already) flashText(`接續上次進度，從 ${clock(r - (track.playback.start ?? 0))} 繼續播放`);
         return;

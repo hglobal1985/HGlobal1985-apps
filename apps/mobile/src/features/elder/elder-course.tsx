@@ -23,7 +23,7 @@ export function elderItems(course: CourseDetail): Lesson[] {
 
 /**
  * 有章節時，課程頁最後面另外列「其他教材」：完整版影片＋其他教材（簡報、文件、外部連結、下載）。
- * 超派模式的課程頁都有這一區，至尊模式原本漏掉（業主 2026-11-24 要求對照超派模式補齊）。分類標題不列。
+ * 超派模式的課程頁都有這一區，至尊模式原本漏掉（杜杜龍 2026-11-24 要求對照超派模式補齊）。分類標題不列。
  */
 export function elderExtras(course: CourseDetail): Lesson[] {
   if (!course.lessons.some((l) => !l.material && !l.section && !l.full)) return [];
@@ -31,7 +31,7 @@ export function elderExtras(course: CourseDetail): Lesson[] {
 }
 
 type BlockGroup = { head: Lesson; items: Lesson[] };
-/** 切成：區塊前面沒歸區塊的教材＋各區塊（標題＋底下的教材）；沒內容（教材加照片是 0）的區塊不對外展示、直接隱藏（業主 2026-11-24，取代「淡化顯示」）。 */
+/** 切成：區塊前面沒歸區塊的教材＋各區塊（標題＋底下的教材）；沒內容（教材加照片是 0）的區塊不對外展示、直接隱藏（杜杜龍 2026-11-24，取代「淡化顯示」）。 */
 function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lead: Lesson[]; blocks: BlockGroup[] } {
   const lead: Lesson[] = [];
   const blocks: BlockGroup[] = [];
@@ -44,8 +44,8 @@ function splitBlocks(course: CourseDetail, shown: (l: Lesson) => boolean): { lea
   return { lead: lead.filter(shown), blocks: blocks.map((b) => ({ ...b, items: b.items.filter(shown) })).filter((b) => b.items.length > 0 || hasBlockPhotos(b.head)) };
 }
 
-/** 區塊標題大列（標題＋副標＋展開箭頭）：課程頁的區塊、中心頁的四個分類共用（業主 2026-11-24）。active＝綠底。 */
-export function ElderBlockHeader({ title, sub, on, active, onPress, tone, badge, subOneLine, titleFit }: { title: string; sub?: string; on: boolean; active?: boolean; onPress: () => void; /** yellow＝公告（與超派公告同一組黃色，業主 2026-11-24）。 */ tone?: "yellow"; /** 未讀數：大於 0 時用紅色數字氣球暫時取代右邊的箭頭，看過就恢復箭頭。 */ badge?: number; /** 副標只顯示一行，太長用「…」（公告預覽）。 */ subOneLine?: boolean; /** 標題強制一行、太長自動縮小字體（公告標題帶中心／系列名稱）。 */ titleFit?: boolean }) {
+/** 區塊標題大列（標題＋副標＋展開箭頭）：課程頁的區塊、中心頁的四個分類共用（杜杜龍 2026-11-24）。active＝綠底。 */
+export function ElderBlockHeader({ title, sub, on, active, onPress, tone, badge, subOneLine, titleFit }: { title: string; sub?: string; on: boolean; active?: boolean; onPress: () => void; /** yellow＝公告（與超派公告同一組黃色，杜杜龍 2026-11-24）。 */ tone?: "yellow"; /** 未讀數：大於 0 時用紅色數字氣球暫時取代右邊的箭頭，看過就恢復箭頭。 */ badge?: number; /** 副標只顯示一行，太長用「…」（公告預覽）。 */ subOneLine?: boolean; /** 標題強制一行、太長自動縮小字體（公告標題帶中心／系列名稱）。 */ titleFit?: boolean }) {
   const { c, scheme } = useTheme();
   const hot = on || !!active;
   const yellow = tone === "yellow" ? YELLOW[scheme] : null;
@@ -85,7 +85,7 @@ const YELLOW = {
 
 const ALBUM = "__album";
 
-/** 連結區塊的來源課程對你鎖住（業主 2026-11-24）：大鎖頭＋原因（至尊模式版，粗框、大字，不是照抄超派的半透明遮罩）。 */
+/** 連結區塊的來源課程對你鎖住（杜杜龍 2026-11-24）：大鎖頭＋原因（至尊模式版，粗框、大字，不是照抄超派的半透明遮罩）。 */
 function ElderLock({ lines }: { lines?: string[] }) {
   const { c } = useTheme();
   return (
@@ -106,7 +106,7 @@ function ElderLock({ lines }: { lines?: string[] }) {
 function BlockList({ lead, blocks, playingId, renderRow, albumFocus }: { albumFocus?: string; lead: Lesson[]; blocks: BlockGroup[]; playingId: string | null; renderRow: (l: Lesson) => ReactNode }) {
   const { c } = useTheme();
   const [open, setOpen] = useState<string | null>(albumFocus ? ALBUM : null);
-  const [albumOpen, setAlbumOpen] = useState<string | null>(albumFocus ?? null); // 相簿裡展開的區塊（業主 2026-11-24）
+  const [albumOpen, setAlbumOpen] = useState<string | null>(albumFocus ?? null); // 相簿裡展開的區塊（杜杜龍 2026-11-24）
   const albumGroups = blocks.filter((b) => !!b.head.photoKey && blockPhotoCount(b.head) > 0);
   const albumTotal = albumGroups.reduce((n, b) => n + blockPhotoCount(b.head), 0);
   useEffect(() => {
@@ -176,7 +176,7 @@ function openMaterial(l: Lesson): boolean {
 }
 
 /**
- * 至尊模式的課程頁（業主 2026-11-24，B 方案；課程頁採方案 2）：上方兩個大分頁「上課／介紹」。
+ * 至尊模式的課程頁（杜杜龍 2026-11-24，B 方案；課程頁採方案 2）：上方兩個大分頁「上課／介紹」。
  * 上課＝下一課排第一、最顯眼（正在播放的那一課優先），接著其他還沒上的，已上完的放最後（淡色）；整列都能點。
  * 介紹＝封面（EDM）、課程名稱、主講人、堂數與時間、費用、報名按鈕。沒有「唸給我聽」（教材本身都是影音）。
  * 播放中：播放器固定在分頁上方，兩頁都看得到。沒有編輯、留言板、加入我的清單。
@@ -199,12 +199,12 @@ export function ElderCourse({
 }: {
   /** 封面縮成圓球／小視窗時裡面顯示的畫面（超派模式同一個 CourseMiniCover）。 */
   miniCover?: ReactNode;
-  /** 從搜尋的「場景」結果進來：直接展開相簿的這個區塊（業主 2026-11-24）。 */
+  /** 從搜尋的「場景」結果進來：直接展開相簿的這個區塊（杜杜龍 2026-11-24）。 */
   albumFocus?: string;
   course: CourseDetail;
   /** 播放器（還沒播放為 null）。 */
   player: ReactNode;
-  /** 迷你播放器／小圓圖播放中：不顯示封面與封面圓球（業主 2026-11-25）。 */
+  /** 迷你播放器／小圓圖播放中：不顯示封面與封面圓球（杜杜龍 2026-11-25）。 */
   hideCover?: boolean;
   /** 介紹頁的封面（EDM）。 */
   cover: ReactNode;
@@ -230,7 +230,7 @@ export function ElderCourse({
   const next = current ?? items.find((l) => can(l) && !l.completed) ?? null;
   const rest = items.filter((l) => l !== next);
   const extras = elderExtras(course);
-  // 區塊（清單卡的「區塊 > 教材」，業主 2026-11-24：至尊模式也要顯示、預設收起）：區塊底下的教材＝排在它後面、下一個區塊之前；超派模式 `lesson-list.tsx` 同一規則。
+  // 區塊（清單卡的「區塊 > 教材」，杜杜龍 2026-11-24：至尊模式也要顯示、預設收起）：區塊底下的教材＝排在它後面、下一個區塊之前；超派模式 `lesson-list.tsx` 同一規則。
   const blockMode = course.lessons.some((l) => l.section);
   const blocks = splitBlocks(course, (l) => l.ready || !!l.linkUrl);
   const ordered = [...(next ? [next] : []), ...rest.filter((l) => !l.completed), ...rest.filter((l) => l.completed)];
@@ -242,10 +242,10 @@ export function ElderCourse({
   return (
     <View style={{ flex: 1 }}>
       {player}
-      {/* 封面釘在上方、往下滑縮小（業主 2026-11-25：與超派模式同一個元件 CollapseBand＋CoverMiniFloat，靜態封面縮到最後是圓球）。 */}
+      {/* 封面釘在上方、往下滑縮小（杜杜龍 2026-11-25：與超派模式同一個元件 CollapseBand＋CoverMiniFloat，靜態封面縮到最後是圓球）。 */}
       {player || hideCover ? null : <CollapseBand>{cover}</CollapseBand>}
       <Screen header={false} footer={tab === "intro" ? action : null}>
-        {/* 課程卡首頁（業主 2026-11-24：與中心卡統一）：最上面封面（含訂閱鈕、點閱數；正在播放時上方已是播放器，不再放封面）→ 公告黃色區塊 → 上課／介紹。 */}
+        {/* 課程卡首頁（杜杜龍 2026-11-24：與中心卡統一）：最上面封面（含訂閱鈕、點閱數；正在播放時上方已是播放器，不再放封面）→ 公告黃色區塊 → 上課／介紹。 */}
         {announce}
         <View style={[styles.tabs, { backgroundColor: c.surfaceMuted }]} accessibilityRole="tablist">
           {(
@@ -307,7 +307,7 @@ export function ElderCourse({
           </>
         ) : (
           <>
-            {/* 完整的教材卡名稱（業主 2026-11-25：上方標題列會被截成「逸新 atmosp…」，介紹頁要顯示完整名稱；不限行數、不縮略） */}
+            {/* 完整的教材卡名稱（杜杜龍 2026-11-25：上方標題列會被截成「逸新 atmosp…」，介紹頁要顯示完整名稱；不限行數、不縮略） */}
             <AppText variant="title" accessibilityRole="header">{course.title}</AppText>
             <View style={[styles.info, { backgroundColor: c.surface, borderColor: c.border, borderWidth: bw }]}>
               {teacher ? <InfoLine icon="person" text={`主講：${teacher}`} /> : null}
@@ -346,9 +346,9 @@ function InfoLine({ icon, text, strong }: { icon: "person" | "list" | "calendar"
 }
 
 /**
- * 一課一列（業主 2026-11-25：不再是圓角矩形卡，改成跟首頁搜尋結果一樣的清單列——底線分隔）：
+ * 一課一列（杜杜龍 2026-11-25：不再是圓角矩形卡，改成跟首頁搜尋結果一樣的清單列——底線分隔）：
  * 正在播放的整列換成綠底白字、右側播放圖示有動畫（NowPlayingIcon）；下一課淡綠底；已上完的淡色打勾；鎖住的顯示鎖頭。
- * 第二行：時間長度，右邊接日期（同一種文字格式，業主 2026-11-25）。
+ * 第二行：時間長度，右邊接日期（同一種文字格式，杜杜龍 2026-11-25）。
  */
 function LessonRow({ lesson: l, highlight, playing, onPress }: { lesson: Lesson; highlight: boolean; playing: boolean; onPress: () => void }) {
   const { c } = useTheme();

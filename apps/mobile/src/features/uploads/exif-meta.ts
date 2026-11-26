@@ -1,7 +1,7 @@
 import exifr from "exifr";
 
 /**
- * 上傳照片時讀出原始檔的 EXIF 與檔案資訊（業主 2026-11-24，給圖片「資訊」面板用；網頁版專用）。
+ * 上傳照片時讀出原始檔的 EXIF 與檔案資訊（杜杜龍 2026-11-24，給圖片「資訊」面板用；網頁版專用）。
  * 壓縮後的圖片不含 EXIF，所以要在壓縮前從原始檔讀；讀不到就回空物件，不影響上傳。
  */
 export type PhotoMeta = { exif: Record<string, unknown>; file: { name: string; type: string; bytes: number; width: number; height: number; lastModified: string } };

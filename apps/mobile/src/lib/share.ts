@@ -3,7 +3,7 @@ import { Platform, Share } from "react-native";
 import { DEFAULT_SHARE_SETTINGS, resolveUrl, reviewerInviteMessage, shareMessage, type UiConfig } from "@/api/client";
 
 /**
- * 分享、下載到手機的圖片一律是 JPEG（業主 2026-11-25）：相簿照片可能存成 AVIF／WebP（省空間），
+ * 分享、下載到手機的圖片一律是 JPEG（杜杜龍 2026-11-25）：相簿照片可能存成 AVIF／WebP（省空間），
  * 但存到手機相簿、傳給其他 App 時要最通用的 JPEG。網頁在瀏覽器內解碼再用畫布輸出 JPEG（不花伺服器額度；透明背景墊白色）。
  * 轉不成（舊瀏覽器）就維持原檔。
  */
@@ -11,7 +11,7 @@ async function asJpeg(blob: Blob): Promise<Blob> {
   if (blob.type === "image/jpeg" || typeof createImageBitmap !== "function") return blob;
   try {
     const bmp = await createImageBitmap(blob);
-    // 解析度維持原樣、絕不縮小（業主 2026-11-25）：畫布尺寸＝圖片原尺寸。超大圖（>6400 萬像素，部分手機畫布放不下會被系統偷偷縮小）不轉，原檔直接用。
+    // 解析度維持原樣、絕不縮小（杜杜龍 2026-11-25）：畫布尺寸＝圖片原尺寸。超大圖（>6400 萬像素，部分手機畫布放不下會被系統偷偷縮小）不轉，原檔直接用。
     if (bmp.width * bmp.height > 64_000_000) {
       bmp.close?.();
       return blob;
@@ -32,7 +32,7 @@ async function asJpeg(blob: Blob): Promise<Blob> {
 }
 const jpgName = (n: string) => n.replace(/\.(avif|webp|png|jpe?g)$/i, "") + ".jpg";
 
-/** 分享、下載一律用「原圖」網址：把即時縮圖的參數（w＝寬度、r＝版本）拿掉，絕不下載縮小版（業主 2026-11-25）。 */
+/** 分享、下載一律用「原圖」網址：把即時縮圖的參數（w＝寬度、r＝版本）拿掉，絕不下載縮小版（杜杜龍 2026-11-25）。 */
 const originalUrl = (url: string): string => {
   if (!url.includes("/media/pub")) return url;
   const [path = "", q = ""] = url.split("?");
@@ -146,7 +146,7 @@ export async function downloadImage(url: string, fileName: string): Promise<void
 }
 
 /**
- * 一次分享多張圖片（業主 2026-11-25，照片全螢幕「檢視全部」複選後分享）：
+ * 一次分享多張圖片（杜杜龍 2026-11-25，照片全螢幕「檢視全部」複選後分享）：
  * 網頁：Web Share 一次傳多個圖片檔；瀏覽器不能傳檔案就改分享所有連結，連分享選單都沒有（電腦）就複製連結。
  * App：系統分享選單一次只能傳一個檔案，所以改傳所有圖片連結（文字）。
  */

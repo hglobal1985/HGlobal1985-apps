@@ -1,10 +1,10 @@
-# 給中央會員 AI 的指令：開放「App 內直接刪除帳號」給所有串接的 App（業主 2026-11-23 指示，請貼給中央會員那邊的 AI）
+# 給中央會員 AI 的指令：開放「App 內直接刪除帳號」給所有串接的 App（杜杜龍 2026-11-23 指示，請貼給中央會員那邊的 AI）
 
-業主決定：**會員在任何串接中央會員的 App 內按「刪除帳號」，就直接刪除並清空所有資料（包含中央會員的資料），不用再被帶去中央會員網站重新按一次刪除。** 這是全生態系統的標準，請中央先改、更新串接指令（`https://id.hglobal1985.com/handoff/learn`）。
+杜杜龍決定：**會員在任何串接中央會員的 App 內按「刪除帳號」，就直接刪除並清空所有資料（包含中央會員的資料），不用再被帶去中央會員網站重新按一次刪除。** 這是全生態系統的標準，請中央先改、更新串接指令（`https://id.hglobal1985.com/handoff/learn`）。
 
 ## 現況（我們查到的）
 - `POST /v1/me/delete-account`：OpenAPI 寫明 **member site only; needs a sign-in within 10 minutes**，認證方式是會員網站的 `session`，App 的 Bearer Access Token 無法呼叫。
-- 串接指令三、9 目前規定：App 只放一個按鈕「用瀏覽器開啟 `https://id.hglobal1985.com/my/edit`」，會員要在那裡重新登入再按「刪除帳號」。業主要求取消這個二次跳轉。
+- 串接指令三、9 目前規定：App 只放一個按鈕「用瀏覽器開啟 `https://id.hglobal1985.com/my/edit`」，會員要在那裡重新登入再按「刪除帳號」。杜杜龍要求取消這個二次跳轉。
 - 其他可用的是 `POST /v1/admin/members/{member_id}/delete`，僅限總部管理員，不適用。
 
 ## 請中央做的事

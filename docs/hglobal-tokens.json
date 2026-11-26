@@ -1,5 +1,5 @@
 {
-  "$schema_note": "寰宇生態系統一配色（Design Tokens）版本 2.0（2026-11-16，業主指示）：以「寰宇行動大學」App 實際使用的色值為全生態系統一設計規範（取代 1.0）。來源：apps/mobile/src/theme/tokens.ts。所有 App 一律使用這份色值，不可自行新增或改色。",
+  "$schema_note": "寰宇生態系統一配色（Design Tokens）版本 2.0（2026-11-16，杜杜龍指示）：以「寰宇行動大學」App 實際使用的色值為全生態系統一設計規範（取代 1.0）。來源：apps/mobile/src/theme/tokens.ts。所有 App 一律使用這份色值，不可自行新增或改色。",
   "version": "2.0",
   "logoPalette": { "green": "#0c603c", "olive": "#486c48", "orange": "#cc6c0c", "yellow": "#f2dc27", "salmon": "#f0a884" },
   "brandFlow": {

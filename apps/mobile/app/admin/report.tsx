@@ -12,7 +12,7 @@ const monthStart = (d: string) => `${d.slice(0, 8)}01`;
 const monthEnd = (y: number, m: number) => tw(new Date(Date.UTC(y, m, 0, 0)));
 
 /**
- * 設定 > 報名與營收報表（業主 2026-11-17）：選期間（台灣日期）與統計方式（中心／課程／月份），看報名數、開通、待審核、免費報名與繳費金額，可匯出 Excel（CSV）。
+ * 設定 > 報名與營收報表（杜杜龍 2026-11-17）：選期間（台灣日期）與統計方式（中心／課程／月份），看報名數、開通、待審核、免費報名與繳費金額，可匯出 Excel（CSV）。
  * 看得到的範圍與「報名審核」相同：總部全部、會長自己中心學員、審核群組與課程指定的審核人員各自的範圍。
  */
 export default function ReportScreen() {

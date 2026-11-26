@@ -7,7 +7,7 @@ import { classifyLink, parseHttpsUrl } from "./links.ts";
  * YouTube 走官方 oEmbed（拿得到影片標題）；其他網站讀 og:title 或 <title>；需要登入才看得到的頁面（標題只是「登入」）視為抓不到。
  */
 const MAX_BYTES = 256 * 1024;
-/** YouTube 影片頁：發布日期（itemprop／JSON）在 </head> 之後，要多讀一些（業主 2026-11-18：貼 YouTube 連結沒有帶出日期）。 */
+/** YouTube 影片頁：發布日期（itemprop／JSON）在 </head> 之後，要多讀一些（杜杜龍 2026-11-18：貼 YouTube 連結沒有帶出日期）。 */
 const YT_MAX_BYTES = 2 * 1024 * 1024;
 const TIMEOUT_MS = 8000;
 const MAX_HOPS = 3;
@@ -37,7 +37,7 @@ export function extractTitle(html: string): string | null {
 }
 
 /**
- * 從網頁原始碼取「發布日期」（業主 2026-11-18：教材日期自動讀連結的日期）：依序找 datePublished／uploadDate／article:published_time 等標記；
+ * 從網頁原始碼取「發布日期」（杜杜龍 2026-11-18：教材日期自動讀連結的日期）：依序找 datePublished／uploadDate／article:published_time 等標記；
  * 回傳 YYYY-MM-DD，找不到或不合理（未來或太舊）回 null。
  */
 export function extractDate(html: string): string | null {

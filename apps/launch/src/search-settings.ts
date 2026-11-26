@@ -1,5 +1,5 @@
 /**
- * 搜尋與 AI 參數設定（業主 2026-11-25，超級管理員在「設定 → 搜尋與 AI 設定」自訂）。
+ * 搜尋與 AI 參數設定（杜杜龍 2026-11-25，超級管理員在「設定 → 搜尋與 AI 設定」自訂）。
  * 存在 ui_settings 的 search_settings 一筆 JSON；每個參數有預設值（＝建議值）、範圍與白話說明。
  * 伺服器（語意搜尋、同音搜尋、EDM 辨識）與前端（模糊、字元、排序）都讀這一份；讀不到或亂填一律退回預設。
  */
@@ -100,7 +100,7 @@ export const PARAMS: ParamDef[] = [
 ];
 
 
-/** 每一類資料的「加分」與「顯示順序」（業主 2026-11-25：測試「水機」時單一教材 0.53 全被門檻擋掉，要能自己調各類的優先順序）。 */
+/** 每一類資料的「加分」與「顯示順序」（杜杜龍 2026-11-25：測試「水機」時單一教材 0.53 全被門檻擋掉，要能自己調各類的優先順序）。 */
 const DEFAULT_PRIO: Record<string, number> = { series: 1, center: 2, lesson: 3, section: 4, intro: 5, edm: 6, photo: 7, course: 9 };
 for (const x of SOURCES) {
   const cap = x.kind.charAt(0).toUpperCase() + x.kind.slice(1);

@@ -21,7 +21,7 @@ function Bar({ done, total }: { done: number; total: number }) {
   );
 }
 
-/** 失敗張數一律用醒目的紅色粗體＋淺紅底標記（業主 2026-11-26）；0 張時用一般灰字，不搶眼。 */
+/** 失敗張數一律用醒目的紅色粗體＋淺紅底標記（杜杜龍 2026-11-26）；0 張時用一般灰字，不搶眼。 */
 function Failed({ n, lead = "" }: { n: number; lead?: string }) {
   const { c } = useTheme();
   if (!n) return <Text>{`${lead}失敗 0 張`}</Text>;
@@ -63,16 +63,16 @@ function PackCard({ title, rule, pack }: { title: string; rule: string; pack: Pa
 export const PRIO_KEY = { edm: "aiPrioEdm", photoOcr: "aiPrioPhotoOcr", scene: "aiPrioScene" } as const;
 export const ON_KEY = { edm: "aiOnEdm", photoOcr: "photoOcrEnabled", scene: "aiOnScene" } as const;
 
-/** 辨識來源設定（優先順序＋開關）轉成 search-settings 要存的值（業主 2026-11-26：隨頁面唯一的「儲存」一起存）。 */
+/** 辨識來源設定（優先順序＋開關）轉成 search-settings 要存的值（杜杜龍 2026-11-26：隨頁面唯一的「儲存」一起存）。 */
 export const jobsValues = (jobs: JobRow[]): Record<string, number | boolean> => ({
   ...Object.fromEntries(jobs.map((x, n) => [PRIO_KEY[x.key], n + 1])),
   ...Object.fromEntries(jobs.map((x) => [ON_KEY[x.key], x.on])),
 });
 
-/** 辨識來源的優先順序與開關（業主 2026-11-26）：排在上面的先辨識；關掉的來源排程不處理。▲▼ 調整順序、開關即時儲存。 */
+/** 辨識來源的優先順序與開關（杜杜龍 2026-11-26）：排在上面的先辨識；關掉的來源排程不處理。▲▼ 調整順序、開關即時儲存。 */
 function JobOrder({ jobs, setJobs, dirty, reload }: { jobs: JobRow[]; setJobs: (j: JobRow[]) => void; dirty: boolean; reload: () => void }) {
   const { c } = useTheme();
-  // 立即開始辨識（業主 2026-11-26）：連續呼叫伺服器各跑一輪（約 70 秒），直到這一輪一張都沒處理（做完了或額度用完）；可隨時停止。
+  // 立即開始辨識（杜杜龍 2026-11-26）：連續呼叫伺服器各跑一輪（約 70 秒），直到這一輪一張都沒處理（做完了或額度用完）；可隨時停止。
   const [running, setRunning] = useState(false);
   const [total, setTotal] = useState(0);
   const stop = useRef(false);
@@ -135,7 +135,7 @@ function JobOrder({ jobs, setJobs, dirty, reload }: { jobs: JobRow[]; setJobs: (
 }
 
 /**
- * AI 辨識進度與額度（設定 › AI 文字辨識，業主 2026-11-24）：中心 EDM 文字辨識、相簿場景辨識各自的完成張數與進度（依中心／依區塊），
+ * AI 辨識進度與額度（設定 › AI 文字辨識，杜杜龍 2026-11-24）：中心 EDM 文字辨識、相簿場景辨識各自的完成張數與進度（依中心／依區塊），
  * 以及今天的 AI 總額度、已用、剩餘（兩種辨識和其他 AI 工作共用每日免費額度，用完自動停、隔天續辨）。
  */
 export function AiProgressPanel({ data, reload, jobs, setJobs, dirty }: { data: Progress | undefined; reload: () => void; jobs: JobRow[] | null; setJobs: (j: JobRow[]) => void; dirty: boolean }) {

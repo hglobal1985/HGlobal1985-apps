@@ -26,4 +26,4 @@ Cloudflare → Workers → learn → Settings → Variables and Secrets，使用
 
 前兩項讓管理員直接瀏覽已上傳的 Mux 媒體庫、檢查資產；後兩項用來安全播放 Signed 影片。若尚未設定，可輸入 Asset ID 建立草稿，但不能發布 Mux 影片。
 
-Cloudflare 正式部署及機密設定變動須由業主另行核准；本 PR 未部署正式環境。iOS／Android 商店上架也尚未執行。
+Cloudflare 正式部署及機密設定變動須由杜杜龍另行核准；本 PR 未部署正式環境。iOS／Android 商店上架也尚未執行。

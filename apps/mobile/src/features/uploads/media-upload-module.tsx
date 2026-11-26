@@ -176,7 +176,7 @@ export function MediaUploadModule({
 }
 
 /**
- * 時間軸區間欄位（業主 2026-11-18 模組化）：拖曳時間軸（TimeRangePicker）＋手動輸入開始／結束時間＋「到影片結尾」勾選＋長度提示。
+ * 時間軸區間欄位（杜杜龍 2026-11-18 模組化）：拖曳時間軸（TimeRangePicker）＋手動輸入開始／結束時間＋「到影片結尾」勾選＋長度提示。
  * 章節、完整版課程影片（透過 MediaUploadModule）與「清單卡」的 YouTube 教材都用這一個元件，不可在別處另做。
  */
 export function TimeRangeFields({ draft, set, lesson, lengthLabel = "本段長度", showHint = true }: { draft: MediaDraft; set: (patch: Partial<MediaDraft>) => void; lesson?: Lesson; lengthLabel?: string; showHint?: boolean }) {
@@ -206,7 +206,7 @@ export function TimeRangeFields({ draft, set, lesson, lengthLabel = "本段長�
     };
   }, [draft.toEnd, draft.kind, draft.ref, draft.audio]); // eslint-disable-line react-hooks/exhaustive-deps
   // 拖曳設定時間軸（開啟時才偵測長度）。
-  const pickOpen = true; // 拖曳設定直接全部展開（業主 2026-11-17：取消「用拖曳設定開始與結束」按鈕）
+  const pickOpen = true; // 拖曳設定直接全部展開（杜杜龍 2026-11-17：取消「用拖曳設定開始與結束」按鈕）
   const [duration, setDuration] = useState<number | null>(null);
   useEffect(() => {
     if (!pickOpen) return;

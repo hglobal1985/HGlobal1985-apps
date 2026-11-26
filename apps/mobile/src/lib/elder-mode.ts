@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { PixelRatio, Platform } from "react-native";
 
 /**
- * 使用模式（業主 2026-11-24）：「至尊模式」＝給長輩用的簡易大字版；「超派模式」＝原本的完整版。
+ * 使用模式（杜杜龍 2026-11-24）：「至尊模式」＝給長輩用的簡易大字版；「超派模式」＝原本的完整版。
  * 只存在這支手機／這個瀏覽器（不上傳伺服器）。字體放大倍數可自訂，也可選擇跟著手機系統的字體大小。
  * 全站文字、圖示的放大由 lib/global-scale.ts 讀 elderTextScale() 統一處理。
  */
@@ -14,7 +14,7 @@ export type ElderPrefs = {
   size: number;
   /** 再乘上手機系統的字體大小設定（輔助使用）。 */
   followSystem: boolean;
-  /** 全站文字加粗（業主 2026-11-24 增加，長輩看得更清楚）。 */
+  /** 全站文字加粗（杜杜龍 2026-11-24 增加，長輩看得更清楚）。 */
   bold: boolean;
 };
 
@@ -66,7 +66,7 @@ if (Platform.OS !== "web") {
 }
 
 /**
- * 至尊模式的文字換行（業主 2026-11-24：換行後孤零零多出一兩個字很難看）：網頁在至尊模式時，所有多行文字用 text-wrap: balance
+ * 至尊模式的文字換行（杜杜龍 2026-11-24：換行後孤零零多出一兩個字很難看）：網頁在至尊模式時，所有多行文字用 text-wrap: balance
  * 讓每行長度平均（不會剩一兩個字掉到下一行）。只在至尊模式生效（html[data-elder]），超派模式不變。
  */
 function applyWrap() {
@@ -77,7 +77,7 @@ function applyWrap() {
   if (!document.getElementById("elder-wrap-3")) {
     const st = document.createElement("style");
     st.id = "elder-wrap-3";
-    st.textContent = ""; // 不再平均斷行（業主 2026-11-24：至尊模式所有頁面一律依寬度自然換行）
+    st.textContent = ""; // 不再平均斷行（杜杜龍 2026-11-24：至尊模式所有頁面一律依寬度自然換行）
     document.head.appendChild(st);
   }
 }
@@ -146,7 +146,7 @@ export const useElder = () => useSyncExternalStore(subscribe, getElder, getElder
 /** true＝至尊模式。 */
 export const useElderOn = () => useSyncExternalStore(subscribe, () => prefs.on, () => prefs.on);
 /**
- * 至尊模式所有框線的粗細（業主 2026-11-24 永久指示：一律跟首頁的深綠色粗框 4px 一樣，紅框、灰框、輸入框都算）。
+ * 至尊模式所有框線的粗細（杜杜龍 2026-11-24 永久指示：一律跟首頁的深綠色粗框 4px 一樣，紅框、灰框、輸入框都算）。
  * 元件一律用 `useBorderW(原本粗細)`：至尊模式回傳 4，其他模式維持原本粗細。顏色不變。
  */
 export const ELDER_BORDER = 4;

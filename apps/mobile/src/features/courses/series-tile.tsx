@@ -51,7 +51,7 @@ export function TopFill({ uri, w, h, viewY = 0, fillBlur = false }: { uri: strin
  * 緞帶仍然顯示，文字以日期最近的那一梯為準。不顯示任何課程資訊欄位。
  */
 /**
- * 卡片封面的挑選與繪製（唯一來源，業主 2026-11-24 永久指示：至尊模式的封面一律與超派模式一致）。
+ * 卡片封面的挑選與繪製（唯一來源，杜杜龍 2026-11-24 永久指示：至尊模式的封面一律與超派模式一致）。
  * flat＝中心頁／單門課（用課程自己的 EDM）；inSeries＝系列卡（用系列封面）。
  */
 export function tileCoverOf(rep: CourseSummary, flat: boolean, inSeries: boolean) {
@@ -78,7 +78,7 @@ export function SeriesTile({ group, width, flat = false, typeTag = false }: { gr
   const thumb = useThumb();
   const [sheet, setSheet] = useState(false);
   const settings = useSeriesSettings();
-  // 系列卡（業主 2026-11-19）：被系列頁隱藏的卡不算；系列裡只有一張卡時，第一層直接顯示那張卡的內容、點了直接進去。
+  // 系列卡（杜杜龍 2026-11-19）：被系列頁隱藏的卡不算；系列裡只有一張卡時，第一層直接顯示那張卡的內容、點了直接進去。
   const cards = group.sessions.filter((x) => !x.seriesHidden);
   const sessions = cards.length ? cards : group.sessions;
   const rep = group.nearest.series && !group.nearest.seriesHidden && sessions.includes(group.nearest) ? group.nearest : sessions.length === 1 ? sessions[0]! : nearestOf(sessions);
@@ -86,21 +86,21 @@ export function SeriesTile({ group, width, flat = false, typeTag = false }: { gr
   const height = flat ? Math.round((width * 4) / 3) : Math.round((width * 9) / 16);
   // flat＝平鋪：不看系列，這張卡就是這一門課（用課程自己的 EDM、點了直接進課程頁）。
   const inSeries = !flat && !!rep.series && sessions.length >= 2;
-  // 只要有系列（中心卡除外），不論裡面幾張卡，點了一律先彈上拉選單（業主 2026-11-20：單張卡的系列也要有）。封面顯示仍用 inSeries。
+  // 只要有系列（中心卡除外），不論裡面幾張卡，點了一律先彈上拉選單（杜杜龍 2026-11-20：單張卡的系列也要有）。封面顯示仍用 inSeries。
   const hasSeries = !flat && !!rep.series;
-  // 系列裡只有一張教材卡：上拉選單直接顯示這張卡的內容，「區塊 > 教材」二者則一（業主 2026-11-20）；兩張以上才是梯次／卡片清單。
+  // 系列裡只有一張教材卡：上拉選單直接顯示這張卡的內容，「區塊 > 教材」二者則一（杜杜龍 2026-11-20）；兩張以上才是梯次／卡片清單。
   const soloSeries = hasSeries && sessions.length === 1;
   // 平鋪（flat，中心頁）：統一用直式 4:3 卡片顯示直式 EDM（寬度填滿、從管理員設定的預設位置開始；圖太小／太矮就完整顯示，用同一張圖模糊填滿背景）；沒有 EDM 才退回封面。
-  // 第一層的卡（業主 2026-11-19 更正：指定的封面裁切位置沒生效）：
+  // 第一層的卡（杜杜龍 2026-11-19 更正：指定的封面裁切位置沒生效）：
   // 系列卡＝系列的封面（橫式裁切）；單張卡／獨立清單卡＝這張卡自己裁好的封面 > 系列封面 > EDM（照「預設顯示位置」從該處開始顯示）。中心頁（flat）照舊。
   // （封面挑選與繪製集中在上面的 tileCoverOf／TileCover，與至尊模式共用。）
-  // 系列小卡：有管理員裁切好的系列封面就用封面（16:9），沒有才用系列 EDM（業主 2026-11-17：新上傳的高 EDM 沒用裁切後的封面，字被切掉）。
+  // 系列小卡：有管理員裁切好的系列封面就用封面（16:9），沒有才用系列 EDM（杜杜龍 2026-11-17：新上傳的高 EDM 沒用裁切後的封面，字被切掉）。
   const { edm } = tileCoverOf(rep, flat, inSeries);
   const ribbons = ribbonsFor(rep, member, config);
   const count = sessions.reduce((n, x) => n + x.materialCount, 0);
   // flat（中心頁）：點課程彈出章節選單；其他模式：多梯次／系列彈出梯次選單，單一課程直接進課程頁。
-  // 系列卡（業主 2026-11-20 改回）：點了先彈出上拉選單（列出系列內的卡，右上「顯示全部」或繼續上拉才進系列頁）；單張卡直接進該卡；中心頁的課程卡照舊彈章節選單。
-  // 第一層任何卡（中心卡除外）點了都先彈上拉選單：系列＝卡片清單；單張卡／獨立卡＝區塊 > 教材 > 章節（業主 2026-11-20）。
+  // 系列卡（杜杜龍 2026-11-20 改回）：點了先彈出上拉選單（列出系列內的卡，右上「顯示全部」或繼續上拉才進系列頁）；單張卡直接進該卡；中心頁的課程卡照舊彈章節選單。
+  // 第一層任何卡（中心卡除外）點了都先彈上拉選單：系列＝卡片清單；單張卡／獨立卡＝區塊 > 教材 > 章節（杜杜龍 2026-11-20）。
   const open = () => {
     if (!flat) trackUsage(inSeries ? "card_series" : "card_course", inSeries ? rep.series : rep.id); // 首頁卡片點閱統計（中心頁的卡不算）
     setSheet(true);
@@ -117,7 +117,7 @@ export function SeriesTile({ group, width, flat = false, typeTag = false }: { gr
             <TagPill label={inSeries || hasSeries ? "系列卡" : "教材卡"} />
           </View>
         ) : null}
-        {/* 所有卡片右下角統一顯示教材數量（業主 2026-11-20，共用 CardCount；原本只有安麗品牌專區有）。中心頁（flat）是章節選單，不放。 */}
+        {/* 所有卡片右下角統一顯示教材數量（杜杜龍 2026-11-20，共用 CardCount；原本只有安麗品牌專區有）。中心頁（flat）是章節選單，不放。 */}
         {!flat ? <CardCount count={count} /> : null}
         {unlisted ? (
           <View style={[styles.draft, { backgroundColor: c.textMuted, left: undefined, right: 6, top: 6, bottom: undefined }]}>

@@ -22,14 +22,14 @@ import { flashText } from "@/ui/flash-notice";
 import { SpeakerMark } from "./speaker-mark";
 
 /**
- * 「教材列」模組包（業主 2026-11-20）：教材一列的呈現只有這一份——左側連結類型的官方圖示（YouTube 紅色圖示…）、
+ * 「教材列」模組包（杜杜龍 2026-11-20）：教材一列的呈現只有這一份——左側連結類型的官方圖示（YouTube 紅色圖示…）、
  * 日期膠囊接在標題最前面、標題最多 2 行、右側分享鈕、列高與字級統一。
  * 用在：教材卡頁的「其他教材」（`FullVersionList`）、寰宇大學系列頁點卡展開的內容（`SeriesCardPanel`）。
  * `MaterialRow`＝單列；`MaterialRows`＝把一份課程所有教材（不含區塊標題、完整版影片）排成一張卡；
  * `listStyle`（預設跟著 `course.isList`）＝清單樣式（日期膠囊、2 行標題、影片分享鈕）；要改教材列的樣子只改這個檔案。
  */
 
-/** 教材標了「主題」（業主 2026-11-19）：圖示右下角加學士帽小徽章；沒有自訂圖示時用預設播放圖示加徽章。 */
+/** 教材標了「主題」（杜杜龍 2026-11-19）：圖示右下角加學士帽小徽章；沒有自訂圖示時用預設播放圖示加徽章。 */
 function themeBadge(lesson: Lesson, icon: React.ReactElement | undefined, color: string): React.ReactElement | undefined {
   if (!lesson.isSpeaker || lesson.full) return icon;
   return (
@@ -42,7 +42,7 @@ function themeBadge(lesson: Lesson, icon: React.ReactElement | undefined, color:
   );
 }
 
-/** `onBlockedPress`：這一列沒有權限（鎖住、沒有連結）時點下去的動作；系列頁展開內容用它跳到該課程詳細頁（業主 2026-11-21）。 */
+/** `onBlockedPress`：這一列沒有權限（鎖住、沒有連結）時點下去的動作；系列頁展開內容用它跳到該課程詳細頁（杜杜龍 2026-11-21）。 */
 export function MaterialRow({ course, lesson, listStyle, playingId, onPlay, onBlockedPress }: { course: CourseDetail; lesson: Lesson; listStyle?: boolean; playingId?: string | null; onPlay?: (lessonId: string) => void; onBlockedPress?: () => void }) {
   const { c } = useTheme();
   const ls = listStyle ?? course.isList;
@@ -93,7 +93,7 @@ export function MaterialRows({ course, listStyle = true, playingId, onPlay, onBl
   );
 }
 
-/** 教材列最右側：「加入我的清單」圓鈕＋分享鈕（業主 2026-11-21 配方案 1）；鎖住或完整版影片不放加入鈕。 */
+/** 教材列最右側：「加入我的清單」圓鈕＋分享鈕（杜杜龍 2026-11-21 配方案 1）；鎖住或完整版影片不放加入鈕。 */
 export function RowActions({ course, lesson, children }: { course: CourseDetail; lesson: Lesson; children: ReactNode }) {
   const canAdd = !lesson.full && !lesson.locked && (lesson.linkUrl || lesson.ready);
   if (!canAdd && !children) return null;
@@ -129,7 +129,7 @@ function ListItemShare({ course, lesson }: { course: CourseDetail; lesson: Lesso
 }
 
 
-/** 區塊（或課程）標題列右側的兩顆鈕（業主 2026-11-21）：加入我的清單＋分享，和下方每列教材的鈕完全一樣；有 blockId＝整個區塊，沒有＝整門課。 */
+/** 區塊（或課程）標題列右側的兩顆鈕（杜杜龍 2026-11-21）：加入我的清單＋分享，和下方每列教材的鈕完全一樣；有 blockId＝整個區塊，沒有＝整門課。 */
 export function SectionActions({ courseId, blockId, title, path }: { courseId: string; blockId?: string | null; title: string; path?: string | null }) {
   const base = path ? `/${path}` : `/course/${courseId}`;
   return (

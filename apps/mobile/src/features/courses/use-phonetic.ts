@@ -3,7 +3,7 @@ import { api } from "@/api/client";
 import { memoryTtl } from "@/lib/search-memory";
 
 /**
- * 同音搜尋（業主 2026-11-24）：語音辨識常把「益之源」聽成「一支援」。完全比對沒有結果時，請伺服器用拼音（含近音）找同音的課程與章節編號。
+ * 同音搜尋（杜杜龍 2026-11-24）：語音辨識常把「益之源」聽成「一支援」。完全比對沒有結果時，請伺服器用拼音（含近音）找同音的課程與章節編號。
  * 不用 AI、訪客也能用；停止打字 0.3 秒才送出，失敗回空集合。結果依相似程度由高到低（Set 保留順序）。
  */
 const memo = new Map<string, { at: number; v: { q: string; courses: string[]; lessons: string[] } }>();

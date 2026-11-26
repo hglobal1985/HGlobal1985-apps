@@ -19,7 +19,7 @@ export function PlayerSlot({ trackKey }: { trackKey: string }) {
       return () => engine.clearSlot(trackKey);
     }, [trackKey]),
   );
-  // 頁面太短捲不到「縮完」時，縮矮舞台會讓可捲範圍變小、捲動位置被夾回去 → 又展開 → 又縮（影片一直抖動，業主 2026-11-25 錄影回報）。
+  // 頁面太短捲不到「縮完」時，縮矮舞台會讓可捲範圍變小、捲動位置被夾回去 → 又展開 → 又縮（影片一直抖動，杜杜龍 2026-11-25 錄影回報）。
   // 登記額外的捲動空間（同 CollapseBand），保證一定捲得夠、縮完之後穩定停住。
   useEffect(() => {
     const measure = () => {

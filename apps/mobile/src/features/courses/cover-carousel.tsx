@@ -8,7 +8,7 @@ import { buildSlides } from "./cover-media";
 
 
 /**
- * 封面輪播（業主 2026-11-21，中心、系列、課程封面共用）：照片依「設定 › 儲存空間管理 › 封面輪播」的秒數自動換張，
+ * 封面輪播（杜杜龍 2026-11-21，中心、系列、課程封面共用）：照片依「設定 › 儲存空間管理 › 封面輪播」的秒數自動換張，
  * 手指左右滑動快速換張，按住時暫停；短影音播完才換下一張（預設靜音，右下角喇叭鈕可開聲音）。
  * 連續的直式照片三張併成一張橫式畫面（buildSlides）。點一下回報 onOpen(第一張照片的編號) 讓外面開全螢幕看圖。
  * App（iOS／Android）版暫時只顯示影片的預覽圖，影片播放網頁版先做。
@@ -59,7 +59,7 @@ export function CoverCarousel({ items, width, height, onOpen, paused = false }: 
   ).current;
 
   if (!cur) return null;
-  // key 要加上位置：湊不滿三張時同一張照片會重複出現，編號相同的 key 會讓網頁換張時亂堆出多餘的小塊（業主 2026-11-23 回報封面輪播變成九條重複畫面）。
+  // key 要加上位置：湊不滿三張時同一張照片會重複出現，編號相同的 key 會讓網頁換張時亂堆出多餘的小塊（杜杜龍 2026-11-23 回報封面輪播變成九條重複畫面）。
   const imgOf = (x: CoverMediaItem, w: number, i: number) => <Image key={`${i}-${x.id}`} source={{ uri: thumb(resolveUrl(x.kind === "video" ? x.posterUrl ?? x.url : x.url), Math.max(320, Math.round(w))) }} style={{ flex: 1, height }} resizeMode="cover" accessibilityIgnoresInvertColors />;
   return (
     <View style={{ width, height, backgroundColor: "#000", overflow: "hidden" }} {...pan.panHandlers} {...(Platform.OS === "web" ? ({ style: { width, height, backgroundColor: "#000", overflow: "hidden", touchAction: "pan-y" } } as object) : {})}>

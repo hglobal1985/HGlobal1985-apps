@@ -4,7 +4,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch } from "@/theme/tokens";
 
 /**
- * 滑桿（業主 2026-11-18 起品牌 logo 底色的「變淡」「色彩飽和度」用）：value 0～1；手指按住左右拖曳或點一下就即時變化，不需要精準點小圓點。
+ * 滑桿（杜杜龍 2026-11-18 起品牌 logo 底色的「變淡」「色彩飽和度」用）：value 0～1；手指按住左右拖曳或點一下就即時變化，不需要精準點小圓點。
  * 觸控區高 minTouch、圓點直徑 26。要改滑桿外觀只改這個檔案。
  */
 export function Slider({ value, onChange, label, trackColor }: { value: number; onChange: (v: number) => void; label: string; trackColor?: string }) {

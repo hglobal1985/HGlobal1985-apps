@@ -9,13 +9,13 @@ import { useTheme } from "@/theme/theme";
 import { barHeight, minTouch } from "@/theme/tokens";
 
 /**
- * 全站「上方返回工具列」的唯一來源（業主 2026-11-15 永久指示：所有頁面的上方工具列一律一致）。
+ * 全站「上方返回工具列」的唯一來源（杜杜龍 2026-11-15 永久指示：所有頁面的上方工具列一律一致）。
  * 返回鍵（左）＋標題＋右側按鈕（編輯、分享…）；高度、字型、陰影都只在這裡定義。
  * 用法有兩種：①全站頁面堆疊（app/_layout.tsx 的 Stack header）自動套用；②頁面內的狀態頁（例如中心專屬頁）直接放這個元件。
  * safeTop＝畫面延伸到手機狀態列底下時，把安全區算進高度（頁面堆疊用 true；放在 Screen 裡的用 false，Screen 已經留了）。
  */
 /**
- * backTo（業主 2026-11-17）：沒有上一頁可回（直接從分享網址進來）時，返回鍵要去的「上一層」頁面，例如中心主辦的課程＝該中心專屬頁。
+ * backTo（杜杜龍 2026-11-17）：沒有上一頁可回（直接從分享網址進來）時，返回鍵要去的「上一層」頁面，例如中心主辦的課程＝該中心專屬頁。
  * 有上一頁就照常回上一頁；沒有傳 backTo 才用下面依網址判斷的預設。
  */
 export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTop, backTo, backAlways }: { title: string; onBack?: () => void; right?: ReactNode; safeTop?: boolean; shadow?: boolean; backTo?: string; /** 一律去 backTo（不管有沒有上一頁）：例如清單頁返回一定回到寰宇大學並定位到那張卡。 */ backAlways?: boolean }) {
@@ -24,7 +24,7 @@ export function TopBar({ title, onBack, right, safeTop = false, shadow = !safeTo
   const path = usePathname();
   const fallback = path.startsWith("/course") || path.startsWith("/learn") ? "/courses" : path.startsWith("/orders") || path.startsWith("/admin") || path.startsWith("/settings") || path.startsWith("/achievements") ? "/me" : "/";
   const back = onBack ?? (() => {
-    const fromSearch = consumeFromSearch(); // 從搜尋結果點進來：返回一定回到搜尋結果那一頁（業主 2026-11-25）
+    const fromSearch = consumeFromSearch(); // 從搜尋結果點進來：返回一定回到搜尋結果那一頁（杜杜龍 2026-11-25）
     if ((!backAlways || fromSearch) && router.canGoBack()) router.back();
     else router.replace((backTo ?? fallback) as never);
   });

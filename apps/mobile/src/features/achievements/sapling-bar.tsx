@@ -14,10 +14,10 @@ import { BadgeIcon } from "./badge-icon";
 import { conditionText } from "./text";
 
 /**
- * 「學習中」最上方（業主 2026-11-16）：小樹苗累計（每學完一堂課長一棵）與「學習成就」並排一列；
+ * 「學習中」最上方（杜杜龍 2026-11-16）：小樹苗累計（每學完一堂課長一棵）與「學習成就」並排一列；
  * 下面直接列出已解鎖的成就圖示，點一下以「全螢幕文字提醒」顯示該成就的達成條件。
  */
-/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（業主 2026-11-24）不顯示學習成就（小樹苗）。 */
+/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（杜杜龍 2026-11-24）不顯示學習成就（小樹苗）。 */
 export function SaplingBar(props: { saplings: number }) {
   return !useFeature("achievements") ? null : <SaplingBarInner {...props} />;
 }
@@ -26,7 +26,7 @@ function SaplingBarInner({ saplings }: { saplings: number }) {
   const { c } = useTheme();
   const { data } = useApi<Achievement[]>("/me/achievements");
   const earned = (data ?? []).filter((a) => a.earned).sort((a, b) => (b.earnedAt ?? "").localeCompare(a.earnedAt ?? ""));
-  // 只顯示最近取得的 4 枚，第 5 個圖示是「展開更多徽章」（業主 2026-11-17）；展開後最後一個變成「收合」。
+  // 只顯示最近取得的 4 枚，第 5 個圖示是「展開更多徽章」（杜杜龍 2026-11-17）；展開後最後一個變成「收合」。
   const [open, setOpen] = useState(false);
   const shown = open || earned.length <= 5 ? earned : earned.slice(0, 4);
   const needMore = earned.length > 5;

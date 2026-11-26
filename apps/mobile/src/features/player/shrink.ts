@@ -3,7 +3,7 @@ import { useWindowDimensions } from "react-native";
 import { usePlayer } from "./use-player";
 
 /**
- * App 版「往下滑影片縮成迷你播放器」的共用進度（業主 2026-11-24；網頁版在 player-layer.web.tsx 自己處理）。
+ * App 版「往下滑影片縮成迷你播放器」的共用進度（杜杜龍 2026-11-24；網頁版在 player-layer.web.tsx 自己處理）。
  * 頁面往下滑 SHRINK_PX 像素＝進度 1（完全縮成迷你）；PlayerSlot（舞台縮矮）與 PlayerLayer（浮動小視窗）都讀這一份。
  */
 export const SHRINK_PX = 140;

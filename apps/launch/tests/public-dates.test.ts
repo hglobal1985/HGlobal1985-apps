@@ -31,7 +31,7 @@ test("完全公開：訪客可看免費且已上架的公開課程與章節；�
   const id = made.data.id;
   const lessonId = made.data.lessons[0]!.id;
 
-  // 課程類即使免費、完全公開，也必須先登入並按報名才能收看（業主 2026-11-22）：訪客能看介紹，章節鎖住、不能播放
+  // 課程類即使免費、完全公開，也必須先登入並按報名才能收看（杜杜龍 2026-11-22）：訪客能看介紹，章節鎖住、不能播放
   const guest = await call<CourseDetail>("GET", `/courses/${id}`);
   assert.equal(guest.status, 200);
   assert.equal(guest.data.lessons[0]!.locked, true);

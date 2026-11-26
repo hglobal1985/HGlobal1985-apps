@@ -1,7 +1,7 @@
 /**
- * 使用統計（業主 2026-11-22）：匿名彙總「裝置、系統、時段、首頁卡片點閱」，管理員可交叉統計。
+ * 使用統計（杜杜龍 2026-11-22）：匿名彙總「裝置、系統、時段、首頁卡片點閱」，管理員可交叉統計。
  * 不存會員編號與 IP；只存彙總次數（`usage_stats`，migration 0113、0114）。
- * 業主本人的操作（管理員帳號、管理員用過的裝置、管理員用過的網路）記成 admin=1，統計預設不含，勾「包含管理員操作」才算（業主 2026-11-23）。
+ * 杜杜龍本人的操作（管理員帳號、管理員用過的裝置、管理員用過的網路）記成 admin=1，統計預設不含，勾「包含管理員操作」才算（杜杜龍 2026-11-23）。
  */
 import type { D1Database } from "./d1.ts";
 
@@ -32,7 +32,7 @@ export async function isOwnerNet(db: D1Database, ip: string): Promise<boolean> {
   return !!(await db.prepare("SELECT 1 AS x FROM usage_owner_nets WHERE hash = ? AND seen_at >= ?").bind(await netHash(ip), since).first());
 }
 
-/** 記一次（訪客也可以）；欄位不合格就忽略，不報錯、不影響使用。admin＝這次是業主本人的操作。 */
+/** 記一次（訪客也可以）；欄位不合格就忽略，不報錯、不影響使用。admin＝這次是杜杜龍本人的操作。 */
 export async function recordUsage(db: D1Database, b: { kind?: unknown; device?: unknown; os?: unknown; target?: unknown; mode?: unknown }, admin = false): Promise<void> {
   if (!USAGE_KINDS.includes(b.kind as never) || !DEVICES.includes(b.device as never) || !OSES.includes(b.os as never)) return;
   const kind = b.kind as string;
@@ -53,7 +53,7 @@ const KIND_LABEL: Record<string, string> = { visit: "開啟網站／App", card_c
 const SLOT_SQL = "CASE WHEN hour < 6 THEN 0 WHEN hour < 12 THEN 1 WHEN hour < 18 THEN 2 ELSE 3 END";
 const DIM_SQL: Record<UsageDim, string> = { device: "device", os: "os", slot: SLOT_SQL, hour: "hour", day: "day", kind: "kind", item: "kind || '|' || target", mode: "mode" };
 
-export type UsageQuery = { kinds: string[]; days: number; device: string; os: string; slot: string; mode: string; rows: UsageDim; cols: UsageDim | null; /** 包含管理員（業主本人）的操作；預設不含。 */ admin: boolean };
+export type UsageQuery = { kinds: string[]; days: number; device: string; os: string; slot: string; mode: string; rows: UsageDim; cols: UsageDim | null; /** 包含管理員（杜杜龍本人）的操作；預設不含。 */ admin: boolean };
 export type UsageTable = { since: string; kinds: string[]; rows: { label: string; cells: number[]; total: number }[]; cols: string[]; total: number; truncated: boolean };
 
 export function parseUsageQuery(u: URL): UsageQuery {

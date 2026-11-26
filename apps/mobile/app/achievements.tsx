@@ -17,7 +17,7 @@ import { GuestGate, AppText, EmptyState, ErrorView, LoadingView, Screen } from "
 export default function AchievementsScreen() {
   const { c } = useTheme();
   const { member } = useSession();
-  // 徽章卡一列幾張：手機 2 張、平板 3 張、寬螢幕 4～5 張（業主 2026-11-18 大螢幕版面）。
+  // 徽章卡一列幾張：手機 2 張、平板 3 張、寬螢幕 4～5 張（杜杜龍 2026-11-18 大螢幕版面）。
   const lay = useLayout();
   const perRow = lay.size === "compact" ? 2 : lay.size === "medium" ? 3 : lay.width >= 1180 ? 5 : 4;
   const [gridW, setGridW] = useState(0);

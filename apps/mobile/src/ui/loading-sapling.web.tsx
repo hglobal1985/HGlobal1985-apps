@@ -3,7 +3,7 @@ import { UI_SCALE } from "@/theme/ui-scale";
 import { useTheme } from "@/theme/theme";
 
 /**
- * 全站「讀取中」動畫：灌溉小樹苗（業主 2026-11-17 定稿）。網頁版；iOS／Android 版在 loading-sapling.tsx（先用系統轉圈圈）。
+ * 全站「讀取中」動畫：灌溉小樹苗（杜杜龍 2026-11-17 定稿）。網頁版；iOS／Android 版在 loading-sapling.tsx（先用系統轉圈圈）。
  * 五款隨機抽一款（每次顯示時抽，同一次讀取不換，且不連續抽到同一款）：蚯蚓、老鷹、貓頭鷹、蝙蝠、綿羊。
  * 五款的底都一樣：小樹苗從很小長到更大（1.2 秒一輪）、土壤、葉上來回爬的瓢蟲、最多 3 滴不規則落下的雨滴（沒有水壺、沒有太陽）。
  * compact＝小區塊用的縮小版（只有小樹苗和土壤，沒有主角與文字）。畫面內容由 apps/mobile 的設計預覽（scenes）轉成，要改動畫只改這個檔案。
@@ -29,7 +29,7 @@ function pick(): number {
 export function LoadingSapling({ compact = false }: { compact?: boolean }) {
   const { c } = useTheme();
   const [idx] = useState(pick);
-  // iPad 與電腦（UI_SCALE > 1）：大型讀取動畫放大三倍（業主 2026-11-18），但不超過畫面可容納的大小。
+  // iPad 與電腦（UI_SCALE > 1）：大型讀取動畫放大三倍（杜杜龍 2026-11-18），但不超過畫面可容納的大小。
   const big = !compact && UI_SCALE > 1;
   const fit = typeof window === "undefined" ? 660 : Math.max(220, Math.min(660, window.innerWidth - 48, window.innerHeight - 400));
   const size = compact ? 88 : big ? fit : 220;

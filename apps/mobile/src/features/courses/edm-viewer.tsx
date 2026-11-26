@@ -29,12 +29,12 @@ import { EdmInfoPanel } from "./edm-info";
 import { trackUsage } from "@/lib/usage";
 
 /**
- * 課程介紹頁與教材清單頁上方的封面（業主 2026-11-18：封面上不放任何提示文字，全部封面一致；左下角固定是封面統計模組的訂閱鈕＋點閱）。
+ * 課程介紹頁與教材清單頁上方的封面（杜杜龍 2026-11-18：封面上不放任何提示文字，全部封面一致；左下角固定是封面統計模組的訂閱鈕＋點閱）。
  * EDM：圖片寬度自動符合畫面最大寬度、停在管理員設定的預設位置，只有「點一下放大」，不能拖曳，
  * 點一下彈出小視窗可放大縮小、下載、分享。
  * 沒有 EDM 時顯示色塊。外框用 StageFrame，高度與上課頁的影片區完全相同。
  */
-/** 封面縮成迷你小視窗時裡面顯示的封面（業主 2026-11-24；選圖規則同 EdmStage：品牌 logo ＞ EDM／封面圖 ＞ 文字封面）。 */
+/** 封面縮成迷你小視窗時裡面顯示的封面（杜杜龍 2026-11-24；選圖規則同 EdmStage：品牌 logo ＞ EDM／封面圖 ＞ 文字封面）。 */
 export function CourseMiniCover({ course }: { course: CourseSummary }) {
   const thumb = useThumb();
   const uri = course.coverUrl || course.edmUrl;
@@ -51,7 +51,7 @@ export function EdmStage({ course, stats, canManageAlbum = false }: { course: Co
   const { member } = useSession();
   const { config } = useUiConfig();
   const ribbons = ribbonsFor(course, member, config);
-  // 封面輪播（業主 2026-11-21）：這門課上傳了照片或短影音就輪播（手動上傳 > 品牌 logo 的規則之外，輪播最優先）。
+  // 封面輪播（杜杜龍 2026-11-21）：這門課上傳了照片或短影音就輪播（手動上傳 > 品牌 logo 的規則之外，輪播最優先）。
   const cm = useCoverMedia("course", course.id);
   const [box, setBox] = useState({ w: 0, h: 0 });
   const [openId, setOpenId] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export function EdmStage({ course, stats, canManageAlbum = false }: { course: Co
           {box.w ? <CoverCarousel items={cm.items} width={box.w} height={box.h} paused={openId !== null || albumOpen} onOpen={setOpenId} /> : null}
         </View>
       ) : course.brand ? (
-        // 品牌 logo 封面點一下也能放大、下載、分享（業主 2026-11-18：與一般課程 EDM 同一個放大視窗）。
+        // 品牌 logo 封面點一下也能放大、下載、分享（杜杜龍 2026-11-18：與一般課程 EDM 同一個放大視窗）。
         <Pressable accessibilityRole="button" accessibilityLabel="放大封面" onPress={() => setOpen(true)} style={StyleSheet.absoluteFill}>
           <BrandCover brand={course.brand} fill />
         </Pressable>
@@ -101,15 +101,15 @@ export function EdmStage({ course, stats, canManageAlbum = false }: { course: Co
   );
 }
 
-/** 網頁：放大視窗裡拖曳圖片時，不觸發整頁的下拉重新整理（lib/web-pull-refresh.ts 認得 data-no-pull-refresh；業主 2026-11-17）。 */
+/** 網頁：放大視窗裡拖曳圖片時，不觸發整頁的下拉重新整理（lib/web-pull-refresh.ts 認得 data-no-pull-refresh；杜杜龍 2026-11-17）。 */
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
-/** 全螢幕看圖的上方工具列：圖示與文字只吃平板／電腦倍數、不吃至尊倍數，至尊模式與超派模式長得一樣（業主 2026-11-25）。 */
+/** 全螢幕看圖的上方工具列：圖示與文字只吃平板／電腦倍數、不吃至尊倍數，至尊模式與超派模式長得一樣（杜杜龍 2026-11-25）。 */
 const UI_ONLY = { uiOnly: true } as object;
 const UI_ONLY_TEXT = { dataSet: { uiOnly: "" } } as object;
 const NO_PULL = Platform.OS === "web" ? ({ dataSet: { noPullRefresh: "" } } as object) : {};
 
 /**
- * EDM 封面（業主 2026-11-18：所有封面都只有「點一下放大」，不能拖曳）：圖片寬度符合舞台寬度，停在管理員設定的預設位置（edmViewY），
+ * EDM 封面（杜杜龍 2026-11-18：所有封面都只有「點一下放大」，不能拖曳）：圖片寬度符合舞台寬度，停在管理員設定的預設位置（edmViewY），
  * 超出舞台的部分不顯示；要看完整圖點一下放大。圖比舞台矮（例如寬長條 logo）就置中、四周留安全距離。
  */
 function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onOpen: () => void }) {
@@ -128,7 +128,7 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
   return (
     <Pressable style={[StyleSheet.absoluteFill, { backgroundColor: "#fff" }]} onLayout={(e) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} onPress={onOpen} accessibilityRole="imagebutton" accessibilityLabel="課程封面，點一下放大">
       {imgH && imgH < box.h - 1 ? (
-        // 圖比舞台「矮」（例如寬長條的 logo）：置中、四周保留安全距離，不貼上緣（業主 2026-11-18）。
+        // 圖比舞台「矮」（例如寬長條的 logo）：置中、四周保留安全距離，不貼上緣（杜杜龍 2026-11-18）。
         (() => {
           const pad = Math.round(box.w * 0.08);
           const maxW = box.w - pad * 2;
@@ -150,12 +150,12 @@ function EdmCoverImage({ uri, viewY, onOpen }: { uri: string; viewY: number; onO
  */
 /** 操作說明縮成十字圖示後，這次開啟網站期間都記住（不用每張圖再按一次）。 */
 const viewedIds = new Set<string>(); // 這次開啟網站已回報過瀏覽的照片編號
-let helpHiddenMemory = true; // 預設縮成十字圖示，點圖示才展開（業主 2026-11-24）
-/** id＝相簿照片編號（有給、而且看的人有管理權限時，右上角多一顆「圖片資訊」驚嘆號鈕；業主 2026-11-24）。 */
+let helpHiddenMemory = true; // 預設縮成十字圖示，點圖示才展開（杜杜龍 2026-11-24）
+/** id＝相簿照片編號（有給、而且看的人有管理權限時，右上角多一顆「圖片資訊」驚嘆號鈕；杜杜龍 2026-11-24）。 */
 export type LightboxItem = { uri: string; title: string; bg?: string; id?: string; /** 上傳者暱稱與頭像（相簿照片）：單張看圖時顯示在「第幾張，共幾張」同一列最左邊。 */ uploader?: { name: string; avatar?: string } };
-/** 相簿照片 → 看圖項目（所有入口共用，確保上傳者資訊一致帶進看圖畫面；業主 2026-11-25）。 */
+/** 相簿照片 → 看圖項目（所有入口共用，確保上傳者資訊一致帶進看圖畫面；杜杜龍 2026-11-25）。 */
 export const lightboxItem = (x: { url: string; id: string; uploader?: string; uploaderAvatar?: string }, title: string): LightboxItem => ({ uri: x.url, title, id: x.id, ...(x.uploader ? { uploader: { name: x.uploader, ...(x.uploaderAvatar ? { avatar: x.uploaderAvatar } : {}) } } : {}) });
-export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, index = 0, library = false }: { /** 直接以「相簿」資料夾檢視開場（相簿專區入口：沒有照片、先選資料夾；業主 2026-11-25）。 */ library?: boolean; uri: string; title: string; onClose: () => void; /** 看的人有管理權限時才傳 true：顯示「圖片資訊」鈕（內容含上傳者與 EXIF）。 */ showInfo?: boolean; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
+export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, index = 0, library = false }: { /** 直接以「相簿」資料夾檢視開場（相簿專區入口：沒有照片、先選資料夾；杜杜龍 2026-11-25）。 */ library?: boolean; uri: string; title: string; onClose: () => void; /** 看的人有管理權限時才傳 true：顯示「圖片資訊」鈕（內容含上傳者與 EXIF）。 */ showInfo?: boolean; /** 透明背景的圖（品牌 logo）底色，預設白色。 */ bg?: string; /** 一組圖（例如歷年課表）：手機左右滑、電腦點兩側箭頭／鍵盤方向鍵切換上一張、下一張。 */ items?: LightboxItem[]; index?: number }) {
   useEffect(() => trackFeature("edm_zoom"), []);
   // 真正的全螢幕：進來時收起瀏覽器的網址列與按鈕，關閉時還原（lib/fullscreen.ts；不支援的瀏覽器略過）。
   useEffect(() => {
@@ -168,16 +168,16 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
     setHideHelp(hide);
   };
   useDimLayer();
-  // 「關閉」的行為（業主 2026-11-25）：從相簿資料夾打開某張照片時，按 ✕／返回＝退回相簿資料夾畫面，不是退出全螢幕；
+  // 「關閉」的行為（杜杜龍 2026-11-25）：從相簿資料夾打開某張照片時，按 ✕／返回＝退回相簿資料夾畫面，不是退出全螢幕；
   // 從課程教材中心等一般入口打開的照片，按 ✕ 才是退出全螢幕。
   const closeNow = useRef<() => void>(onClose);
-  useBackToClose(() => closeNow.current()); // 瀏覽器／手機「上一頁」同 ✕（業主 2026-11-24）
+  useBackToClose(() => closeNow.current()); // 瀏覽器／手機「上一頁」同 ✕（杜杜龍 2026-11-24）
   const [infoOpen, setInfoOpen] = useState(false);
-  const [grid, setGrid] = useState(false); // 「檢視全部」格狀畫面（業主 2026-11-25）
-  // 相簿專區入口：記住上次位置（業主 2026-11-25）。上次停在單張看圖＝直接開回那張照片；停在資料夾檢視＝開到那個資料夾。
+  const [grid, setGrid] = useState(false); // 「檢視全部」格狀畫面（杜杜龍 2026-11-25）
+  // 相簿專區入口：記住上次位置（杜杜龍 2026-11-25）。上次停在單張看圖＝直接開回那張照片；停在資料夾檢視＝開到那個資料夾。
   const [restore] = useState(() => (library ? loadAlbumPos() : null));
   const photoRestore = !!restore && restore.mode === "photo" && !!restore.folder && !!restore.photo;
-  const [libOpen, setLibOpen] = useState(library && !photoRestore); // 「相簿」資料夾檢視（業主 2026-11-25）
+  const [libOpen, setLibOpen] = useState(library && !photoRestore); // 「相簿」資料夾檢視（杜杜龍 2026-11-25）
   const [over, setOver] = useState<{ title: string; items: LightboxItem[]; folder: LibraryPick["folder"] } | null>(null); // 從相簿選了資料夾：整個看圖換成這個資料夾的照片
   const photoSaved = useRef(!photoRestore); // 單張位置還原完成前不記，免得蓋掉上次的位置
   useEffect(() => {
@@ -199,7 +199,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   closeNow.current = () => (over && !libOpen ? setLibOpen(true) : onClose());
-  // 全螢幕被系統收起（例如管理員按「上傳照片」開檔案選擇視窗）：下一次點一下畫面就自動再進全螢幕，停留在相簿裡操作（業主 2026-11-25）。
+  // 全螢幕被系統收起（例如管理員按「上傳照片」開檔案選擇視窗）：下一次點一下畫面就自動再進全螢幕，停留在相簿裡操作（杜杜龍 2026-11-25）。
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
     let lost = false;
@@ -244,7 +244,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   useEffect(() => {
     if (cur.uri) Image.getSize(full, (w, h) => h && setRatio(w / h), () => undefined);
   }, [full]); // eslint-disable-line react-hooks/exhaustive-deps
-  // 全螢幕（業主 2026-11-21）：圖片依整個螢幕等比貼合；放大後「整個螢幕」都是可看、可拖曳的範圍（不再被圖片原本的外框切掉）。
+  // 全螢幕（杜杜龍 2026-11-21）：圖片依整個螢幕等比貼合；放大後「整個螢幕」都是可看、可拖曳的範圍（不再被圖片原本的外框切掉）。
   const frameW = Math.min(win.width, win.height * ratio);
   const frameH = frameW / ratio;
 
@@ -359,7 +359,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
       flashText("下載失敗，請稍後再試");
     }
   };
-  // 工具列最多 7 顆圓鈕（說明、相簿、檢視全部、資訊、下載、分享、關閉）：窄螢幕自動縮小直徑，一定排得下（業主 2026-11-25）。
+  // 工具列最多 7 顆圓鈕（說明、相簿、檢視全部、資訊、下載、分享、關閉）：窄螢幕自動縮小直徑，一定排得下（杜杜龍 2026-11-25）。
   const toolSize = Math.min(50, Math.floor((win.width - 32 - 4 * 6) / 7));
   const tool = (label: string, onPress: () => void, child: React.ReactNode, disabled?: boolean) => (
     <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} disabled={disabled} style={[styles.tool, { width: toolSize, height: toolSize, borderRadius: toolSize / 2, opacity: disabled ? 0.45 : 1 }]}>
@@ -369,7 +369,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
   const many = list.length > 1;
   const land = win.width > win.height; // 橫放：說明與按鈕合併在同一列
   const hint = many ? "左右滑動換張、兩指放大縮小" : "可拖曳移動、兩指放大縮小";
-  const smallLand = win.width > win.height && win.height < 520; // 小螢幕手機橫放（業主 2026-11-25）
+  const smallLand = win.width > win.height && win.height < 520; // 小螢幕手機橫放（杜杜龍 2026-11-25）
   const topY = smallLand ? 10 : 30;
   const [helpW, setHelpW] = useState(0);
   // 單行自動縮小：中文每字約一個字寬；可用寬度＝長條寬度扣掉圖示與左右留白。
@@ -393,14 +393,14 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
       <AppText variant="caption" numberOfLines={1} {...NO_SCALE} style={{ color: "#fff", fontWeight: "800", fontSize: helpSize, lineHeight: helpSize + 8, flexShrink: 1, flexGrow: 1 }}>
         {hint}
       </AppText>
-      {/* 縮小：按了變成十字圖示，排在下載鈕左邊（業主 2026-11-21）。 */}
+      {/* 縮小：按了變成十字圖示，排在下載鈕左邊（杜杜龍 2026-11-21）。 */}
       {tool("縮小操作說明", () => setHelp(true), <Ionicons name="contract" size={24} color="#fff" {...UI_ONLY} />)}
     </View>
   );
-  // 電腦（有滑鼠）才顯示左右切換按鈕；手機、平板橫放用手指滑動（業主 2026-11-21）。
+  // 電腦（有滑鼠）才顯示左右切換按鈕；手機、平板橫放用手指滑動（杜杜龍 2026-11-21）。
   const desktop = Platform.OS === "web" && typeof window !== "undefined" && !!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
   const imgBg = cur.bg ?? bg;
-  // 圖片資訊開放給所有人、所有照片都有（業主 2026-11-25）：相簿照片用編號查；其他（課程封面、品牌 logo、課表…）用網址裡的儲存檔名查。showInfo 保留相容、不再限制。
+  // 圖片資訊開放給所有人、所有照片都有（杜杜龍 2026-11-25）：相簿照片用編號查；其他（課程封面、品牌 logo、課表…）用網址裡的儲存檔名查。showInfo 保留相容、不再限制。
   const imageKey = (() => {
     try {
       return /[?&]k=([^&]+)/.exec(cur.uri)?.[1] ? decodeURIComponent(/[?&]k=([^&]+)/.exec(cur.uri)![1]!) : undefined;
@@ -428,7 +428,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
               </View>
             </>
           ) : null}
-          {/* 工具列（業主 2026-11-21；2026-11-25 調整）：寰宇 logo 在最左邊（純標誌，點了沒有任何反應）；按鈕在右邊。
+          {/* 工具列（杜杜龍 2026-11-21；2026-11-25 調整）：寰宇 logo 在最左邊（純標誌，點了沒有任何反應）；按鈕在右邊。
               位置往下移一點；小螢幕手機橫放時，按鈕改成靠右由上到下一欄，不蓋住照片。所有看圖畫面（含不是從相簿進來的）都用這個。 */}
           <View style={{ position: "absolute", left: 16, top: topY, width: toolSize, height: toolSize, borderRadius: toolSize / 2, backgroundColor: "#fff", alignItems: "center", justifyContent: "center" }} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no">
             <Image source={require("../../../assets/logo.png")} style={{ width: toolSize - 10, height: toolSize - 10 }} resizeMode="contain" accessibilityIgnoresInvertColors />
@@ -444,7 +444,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
                 {list.length ? tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />) : null}
                 {tool("關閉", () => closeNow.current(), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
               </View>
-              {/* 上傳者（頭像＋暱稱）在最左、「第幾張，共幾張」在最右，同一列（業主 2026-11-25；小螢幕橫放時上傳者改放左上 logo 下方）。 */}
+              {/* 上傳者（頭像＋暱稱）在最左、「第幾張，共幾張」在最右，同一列（杜杜龍 2026-11-25；小螢幕橫放時上傳者改放左上 logo 下方）。 */}
               {many || (upl && !smallLand) ? (
                 <View style={{ alignSelf: "stretch", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }} pointerEvents="none">
                   {upl && !smallLand ? uploaderChip : <View />}
@@ -456,7 +456,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
                 </View>
               ) : null}
             </View>
-            {/* 操作說明：強制單行，字太多時自動縮小（業主 2026-11-21）。 */}
+            {/* 操作說明：強制單行，字太多時自動縮小（杜杜龍 2026-11-21）。 */}
             {!hideHelp && !smallLand ? helpBar : null}
           </View>
           {!hideHelp && smallLand ? <View style={{ position: "absolute", left: toolSize + 28, right: toolSize + 28, top: topY }} pointerEvents="box-none">{helpBar}</View> : null}
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
   help: { alignSelf: "stretch", flexDirection: "row", alignItems: "center", gap: 10, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, borderRadius: 30, backgroundColor: "rgba(0,0,0,0.5)" },
 });
 
-/** 相簿專區入口開的看圖畫面（第五大分類，業主 2026-11-25）：全黑的全螢幕看圖，直接以「相簿」資料夾檢視開場。超派、至尊共用。 */
+/** 相簿專區入口開的看圖畫面（第五大分類，杜杜龍 2026-11-25）：全黑的全螢幕看圖，直接以「相簿」資料夾檢視開場。超派、至尊共用。 */
 export function AlbumViewer({ onClose }: { onClose: () => void }) {
   return <EdmLightbox library uri="" title="相簿" onClose={onClose} />;
 }

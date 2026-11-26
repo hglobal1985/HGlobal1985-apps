@@ -15,7 +15,7 @@ type SyncList = { syncs: Sync[]; keyReady: boolean; formatHelp: string; sortLabe
 export const TITLE_ONLY = "{標題}";
 
 /**
- * 命名設定（業主 2026-11-23）：勾選「教材名稱＝YouTube 影片名稱」＝規則 {標題}；否則自訂命名規則；
+ * 命名設定（杜杜龍 2026-11-23）：勾選「教材名稱＝YouTube 影片名稱」＝規則 {標題}；否則自訂命名規則；
  * 另有「移除文字」（多段用逗號或換行分開，會從最後的名稱裡拿掉）與「預覽」（純文字列出匯入後的教材名稱，不寫入任何資料）。
  * 課程頁的匯入／修改規則與設定頁的新增／修改規則共用。
  */
@@ -56,7 +56,7 @@ export function SyncNamingFields({ url, courseId, prefix, format, setFormat, str
 }
 
 /**
- * 「使用行動大學播放器」勾選（業主 2026-11-24，全站同一個元件）：新增教材貼 YouTube 連結、匯入／同步 YouTube 清單都用它，預設勾選。
+ * 「使用行動大學播放器」勾選（杜杜龍 2026-11-24，全站同一個元件）：新增教材貼 YouTube 連結、匯入／同步 YouTube 清單都用它，預設勾選。
  * 勾選＝影片存成影片來源，在 App 內用行動大學播放器播放（沒有權限的人拿不到 YouTube 網址）；
  * 不勾＝存成外部連結，點教材會開新網頁到 YouTube 的網頁播放器。
  */
@@ -72,14 +72,14 @@ export function AppPlayerCheck({ value, onChange }: { value: boolean; onChange: 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { hour12: false }) : "還沒同步過");
 
 /**
- * 匯入 YouTube 播放清單（業主 2026-11-23，B：「新增教材」面板裡的入口）：貼播放清單網址，立刻把影片匯成這張教材卡的教材，
+ * 匯入 YouTube 播放清單（杜杜龍 2026-11-23，B：「新增教材」面板裡的入口）：貼播放清單網址，立刻把影片匯成這張教材卡的教材，
  * 同時建立一份同步設定——之後清單有新影片，在課程設定「YouTube 播放清單」或「設定 › 同步 YouTube 清單」按「同步」就會補進來。
  */
 export function YoutubeImportSheet({ course, onClose, onDone }: { course: CourseDetail; onClose: () => void; onDone?: () => void }) {
   const { invalidate } = useSession();
   const list = useApi<SyncList>(`/admin/courses/${course.id}/youtube-syncs`);
   const [url, setUrl] = useState("");
-  const [format, setFormat] = useState(TITLE_ONLY); // 預設勾選「教材名稱＝YouTube 影片名稱」（業主 2026-11-23）
+  const [format, setFormat] = useState(TITLE_ONLY); // 預設勾選「教材名稱＝YouTube 影片名稱」（杜杜龍 2026-11-23）
   const [strip, setStrip] = useState("");
   const [sortMode, setSortMode] = useState("date_desc");
   const [appPlayer, setAppPlayer] = useState(true);

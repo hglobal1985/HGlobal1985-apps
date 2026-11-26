@@ -3,7 +3,7 @@ import { brandCardId } from "./brand-cards.ts";
 import { loadConfig, saveConfig } from "./ui-config.ts";
 
 /**
- * 成交百寶箱 ↔ 安麗品牌館（業主 2026-11-24）：
+ * 成交百寶箱 ↔ 安麗品牌館（杜杜龍 2026-11-24）：
  * - 「成交百寶箱」課程卡裡，每個品牌一個區塊（名稱、logo＝品牌資料，內容只存這一份）。
  * - 每張品牌卡的最前面多一個「成交百寶箱」連結區塊，內容與封面＝成交百寶箱裡同品牌的區塊（沿用 lessons.link_block_id）。
  * - 13 個品牌的順序兩邊共用：品牌館的卡片順序（ui_config.seriesOrder 的 c:cb品牌編號）＝成交百寶箱的區塊順序，任一邊調整另一邊跟著變。

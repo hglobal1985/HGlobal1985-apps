@@ -124,7 +124,7 @@ function StatusBarCover() {
   const { c } = useTheme();
   const { large } = useLayout();
   if (Platform.OS !== "web" || insets.top <= 0) return null;
-  // 平板（業主 2026-11-20）：狀態列底下用頁面底色，不要一塊深綠壓在工具列上方。
+  // 平板（杜杜龍 2026-11-20）：狀態列底下用頁面底色，不要一塊深綠壓在工具列上方。
   return <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, height: insets.top, backgroundColor: large ? c.background : "#2F5D3A", zIndex: 1000 }} />;
 }
 
@@ -150,9 +150,9 @@ export default function RootLayout() {
   useEffect(() => installBottomGap(), []);
   useEffect(() => installWebPullRefresh(), []);
   useEffect(() => installStableScrollbar(), []);
-  // 網頁版：開站後稍等，把其他分頁的程式檔先載入（每個分頁是獨立檔案，手機網路慢時第一次點進去會空白一陣子，業主 2026-11-22 回報）。
+  // 網頁版：開站後稍等，把其他分頁的程式檔先載入（每個分頁是獨立檔案，手機網路慢時第一次點進去會空白一陣子，杜杜龍 2026-11-22 回報）。
   useEffect(() => warmTabChunks(), []);
-  // 至尊模式切換或改字體大小（lib/elder-mode.ts）：重建頁面，已經畫好的字才會換成新大小（業主 2026-11-24）。
+  // 至尊模式切換或改字體大小（lib/elder-mode.ts）：重建頁面，已經畫好的字才會換成新大小（杜杜龍 2026-11-24）。
   const elderV = useElderVersion();
   useEffect(() => trackScroll(), []);
   // 字體倍數改變、頁面重建後，捲回原本的位置（不要跳回頁首）。
@@ -171,7 +171,7 @@ export default function RootLayout() {
         <ThemeProvider value={navTheme}>
           <StatusBar style={scheme === "dark" ? "light" : "dark"} />
           <View style={{ flex: 1, backgroundColor: c.background }}>
-          {/* App 內建瀏覽器警示條：所有頁面最上方（業主 2026-11-17），只有這一處。 */}
+          {/* App 內建瀏覽器警示條：所有頁面最上方（杜杜龍 2026-11-17），只有這一處。 */}
           <InAppBrowserBanner />
           <View style={{ flex: 1 }} key={`elder-${elderV}`}>
           <AppStack />

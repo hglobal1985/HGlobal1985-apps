@@ -7,7 +7,7 @@ import { Icon } from "./icon";
 import { fadedStyle } from "./fade-style";
 
 /**
- * 上拉選單的「可點進去的列」（業主 2026-11-18 永久指示：所有上拉選單統一，改一次全站一起變）：
+ * 上拉選單的「可點進去的列」（杜杜龍 2026-11-18 永久指示：所有上拉選單統一，改一次全站一起變）：
  * 左邊縮圖（`SheetThumb`）→ 標題（最多 2 行，可加副標題）→ 右邊依序是：數量膠囊（`count`，**只顯示數字**）、自訂標籤（`right`）、
  * **放大的向右箭頭**（`chevron`，預設有；25 像素）。列與列之間用細線分隔、整列最小觸控高度一致。
  * 要改列高、箭頭大小、數量膠囊樣式只改這個檔案；新增任何上拉選單的點選列一律用它，不可再自己畫「›」或「有N個…」。
@@ -51,7 +51,7 @@ export function SheetThumb({ children }: { children: ReactNode }) {
   return <View style={styles.thumb}>{children}</View>;
 }
 
-/** 列左邊的「圖示框」：官方圖示（YouTube 等）、播放圖示沒有縮圖底，**不可用白底**（業主 2026-11-21：深色模式不該出現白色方塊）；寬度跟 `SheetThumb` 一樣，標題才對得齊。 */
+/** 列左邊的「圖示框」：官方圖示（YouTube 等）、播放圖示沒有縮圖底，**不可用白底**（杜杜龍 2026-11-21：深色模式不該出現白色方塊）；寬度跟 `SheetThumb` 一樣，標題才對得齊。 */
 export function SheetIconBox({ children }: { children: ReactNode }) {
   return <View style={styles.iconBox}>{children}</View>;
 }
@@ -59,7 +59,7 @@ export function SheetIconBox({ children }: { children: ReactNode }) {
 const styles = StyleSheet.create({
   iconBox: { width: 64, height: 36, alignItems: "center", justifyContent: "center" },
   row: { flexDirection: "row", alignItems: "center", gap: space.sm, minHeight: minTouch + 12, borderTopWidth: StyleSheet.hairlineWidth, borderRadius: radius.sm },
-  // 數量膠囊：小圓形徽章（業主 2026-11-20：原本在列裡被拉成又高又胖的橢圓），垂直置中、不隨列高拉長。
+  // 數量膠囊：小圓形徽章（杜杜龍 2026-11-20：原本在列裡被拉成又高又胖的橢圓），垂直置中、不隨列高拉長。
   pill: { alignSelf: "center", minWidth: 28, height: 28, paddingHorizontal: 8, borderRadius: radius.pill, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   thumb: { width: 64, height: 36, borderRadius: radius.sm, backgroundColor: "#fff", overflow: "hidden" },
 });

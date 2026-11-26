@@ -9,7 +9,7 @@ import { GradientFrame } from "./gradient-frame";
 import { AppText } from "./text";
 
 /**
- * 「全螢幕文字提醒」模組（業主 2026-11-16）：畫面上方浮出一張大卡片（大圖示＋大標題＋可選說明），淡入、停留、淡出，不擋操作。
+ * 「全螢幕文字提醒」模組（杜杜龍 2026-11-16）：畫面上方浮出一張大卡片（大圖示＋大標題＋可選說明），淡入、停留、淡出，不擋操作。
  * 切換「系列／單元／教育中心」、點學習成就、點小樹苗……所有全螢幕文字提醒一律呼叫 showFlash()，
  * 想改大小、位置、動畫、停留時間，只改這個檔案，全站一起變。FlashHost 放在根版面一次。
  */
@@ -24,12 +24,12 @@ export function showFlash(content: FlashContent): void {
 }
 
 /**
- * 一句話的操作回饋（原本底部黑色小字 toast 的替代品，業主 2026-11-17：全站統一用全螢幕提醒）：
+ * 一句話的操作回饋（原本底部黑色小字 toast 的替代品，杜杜龍 2026-11-17：全站統一用全螢幕提醒）：
  * 例如 flashText("已複製連結")。依文字自動挑圖示（失敗＝紅色驚嘆號、提醒＝資訊圖示、其他＝綠色勾勾）；
  * 太長的句子在第一個標點切成「標題＋說明」。新增任何一句話提示都用它，不要再做底部小字。
  */
 export function flashText(text: string): void {
-  // 冒號後面緊接數字（例如時間 7:00）不是分隔點，不能把時間切成兩半（業主 2026-11-22 回報「從上次看到的 7」「00 繼續播放」）。
+  // 冒號後面緊接數字（例如時間 7:00）不是分隔點，不能把時間切成兩半（杜杜龍 2026-11-22 回報「從上次看到的 7」「00 繼續播放」）。
   const m = /^(.{2,14}?)(?:[，,。；;：]|:(?!\d))\s*(.+)$/.exec(text);
   const title = m && text.length > 12 ? m[1]! : text;
   const body = m && text.length > 12 ? m[2] : undefined;
@@ -46,7 +46,7 @@ export function flashText(text: string): void {
 }
 
 /**
- * 所有提醒視窗固定同一個寬高（業主 2026-11-16：比原本 3 倍版再縮小 50％；之後再把整體縮成 80%：寬度不變、高度 230→184，圖示與文字一起縮成 80%）；
+ * 所有提醒視窗固定同一個寬高（杜杜龍 2026-11-16：比原本 3 倍版再縮小 50％；之後再把整體縮成 80%：寬度不變、高度 230→184，圖示與文字一起縮成 80%）；
  * 文字依字數自動換行、自動縮小；點一下立刻關閉。
  */
 export const FLASH_W = 190;
@@ -96,11 +96,11 @@ export function FlashHost() {
   const web = Platform.OS === "web" && typeof document !== "undefined";
   const node = (
     <View pointerEvents="box-none" style={[styles.wrap, { paddingTop: Math.round(height * 0.12) }, web && ({ position: "fixed", zIndex: 20000 } as object)]}>
-      {/* 提醒出現時整個頁面背景暗化（業主 2026-11-17）；跟著卡片一起淡入淡出，不擋住下面的操作。 */}
+      {/* 提醒出現時整個頁面背景暗化（杜杜龍 2026-11-17）；跟著卡片一起淡入淡出，不擋住下面的操作。 */}
       {dim ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, dimStyle, { opacity: op }]} /> : null}
       <Pressable accessibilityRole="button" accessibilityLabel={`${shown.title}${shown.body ? `，${shown.body}` : ""}，點一下關閉`} onPress={dismiss}>
         <Animated.View style={{ opacity: op }} accessibilityLiveRegion="polite">
-          {/* 邊框＝迷你播放器同款流光漸層邊框（共用模組 ui/gradient-frame，業主 2026-11-17） */}
+          {/* 邊框＝迷你播放器同款流光漸層邊框（共用模組 ui/gradient-frame，杜杜龍 2026-11-17） */}
           <GradientFrame width={Math.min(FLASH_W, width - space.lg * 2)} height={FLASH_H} radius={radius.lg}>
           {shown.icon ? <View style={styles.icon}>{shown.icon}</View> : null}
           <AppText numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.title, { color: c.text, fontSize: titleSize(shown.title), lineHeight: Math.round(titleSize(shown.title) * 1.25) }]}>

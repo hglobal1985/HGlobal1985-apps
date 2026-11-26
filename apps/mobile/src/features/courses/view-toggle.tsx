@@ -11,7 +11,7 @@ export type CourseViewMode = "series" | "chapter" | "center";
  * ▦ 系列＝一個系列一張封面；☰ 章節＝一堂課一列；🏢 中心＝依主辦中心分類（取代舊的中心下拉）。目前的模式反白（深綠底白圖示）。
  */
 /**
- * wide＝平板（直橫式）與手機橫放（業主 2026-11-18）：三顆各自獨立的按鈕＋文字，按鈕之間留間距；手機直式維持三顆圖示併成一組。
+ * wide＝平板（直橫式）與手機橫放（杜杜龍 2026-11-18）：三顆各自獨立的按鈕＋文字，按鈕之間留間距；手機直式維持三顆圖示併成一組。
  */
 export function ViewToggle({ value, onChange, wide = false }: { value: CourseViewMode; onChange: (v: CourseViewMode) => void; wide?: boolean }) {
   const { c } = useTheme();

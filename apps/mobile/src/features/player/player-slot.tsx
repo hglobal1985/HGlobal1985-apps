@@ -11,7 +11,7 @@ import { usePlayer } from "./use-player";
 
 /**
  * 課程頁的影片區塊（手機 App）：顯示全站同一個播放器的畫面；離開頁面後播放器由浮動小視窗接手。
- * 已移除雙指放大與拖曳（業主 2026-11-24）。
+ * 已移除雙指放大與拖曳（杜杜龍 2026-11-24）。
  */
 export function PlayerSlot({ trackKey }: { trackKey: string }) {
   const s = usePlayer();
@@ -26,7 +26,7 @@ export function PlayerSlot({ trackKey }: { trackKey: string }) {
       return () => (engine.clearSlot(trackKey), engine.setFullscreenTarget(null));
     }, [trackKey]),
   );
-  // 頁面太短捲不到「縮完」時，縮矮舞台會讓可捲範圍變小、捲動位置被瀏覽器夾回去 → 又展開 → 又縮（影片一直抖動，業主 2026-11-25 錄影回報）。
+  // 頁面太短捲不到「縮完」時，縮矮舞台會讓可捲範圍變小、捲動位置被瀏覽器夾回去 → 又展開 → 又縮（影片一直抖動，杜杜龍 2026-11-25 錄影回報）。
   // 登記額外的捲動空間（同 CollapseBand），保證一定捲得夠、縮完之後仍可穩定停住。
   useEffect(() => {
     if (!h0) return;

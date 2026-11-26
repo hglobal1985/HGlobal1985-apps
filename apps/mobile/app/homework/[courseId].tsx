@@ -9,7 +9,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, GuestGate, LoadingView, NoticeBox, Pill, Screen } from "@/ui";
 
-/** 一門課的作業（業主 2026-11-25）：學員看每份作業的狀態；老師另外可以出作業、看交了幾份、進分組。 */
+/** 一門課的作業（杜杜龍 2026-11-25）：學員看每份作業的狀態；老師另外可以出作業、看交了幾份、進分組。 */
 export default function CourseHomework() {
   const { courseId } = useLocalSearchParams<{ courseId: string }>();
   const { member } = useSession();

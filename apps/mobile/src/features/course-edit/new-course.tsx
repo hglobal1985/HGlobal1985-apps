@@ -13,9 +13,9 @@ import { EditSheet } from "./edit-sheet";
  * 直接進入該課程介紹頁的編輯模式，其餘欄位在頁面上一區一區補（手機不用一口氣填完一大張表）。
  * 總部可以選主辦中心；中心的會長、音控、小編固定是自己的中心。
  */
-export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: listProp = false }: { onClose: () => void; defaultCenter?: string; /** 從系列頁新增：系列預先填好（業主 2026-11-18）。 */ defaultSeries?: string; /** 新增「清單卡」：只有名稱、主辦、系列，沒有主講人。 */ list?: boolean }) {
+export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: listProp = false }: { onClose: () => void; defaultCenter?: string; /** 從系列頁新增：系列預先填好（杜杜龍 2026-11-18）。 */ defaultSeries?: string; /** 新增「清單卡」：只有名稱、主辦、系列，沒有主講人。 */ list?: boolean }) {
   const { member, invalidate } = useSession();
-  const list = listProp; // 業主 2026-11-20：新增只有一種「教材卡」，沒有右上角的切換（list 只剩內部舊流程使用）
+  const list = listProp; // 杜杜龍 2026-11-20：新增只有一種「教材卡」，沒有右上角的切換（list 只剩內部舊流程使用）
   const isHq = member?.role === "admin";
   const isSuper = isSuperAdmin(member);
   const [f, setF] = useState<BasicsForm>({ isShorts: false, title: "", noSpeaker: false, isPackage: false, teacher: "", teacherRank: "", teacherTitle: "", eventStart: "", eventEnd: "", category: "", series: defaultSeries ?? "", brandId: "", zone: listProp ? "amway_material" : "hglobal" });

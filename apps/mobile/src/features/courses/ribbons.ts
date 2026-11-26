@@ -48,13 +48,13 @@ export function dateState(c: CourseSummary): "upcoming" | "running" | "ended" | 
 export function ribbonsFor(course: CourseSummary, member: Member | null, cfg: UiConfig): { left: RibbonSpec | null; right: RibbonSpec | null } {
   const completed = course.lessonCount > 0 && course.completedLessons >= course.lessonCount;
   let left: RibbonSpec | null = null;
-  // 素材（清單類別）完全不使用緞帶：沒有「限時免費」、學習中、已完成、日期倒數等任何緞帶（業主 2026-11-17）。
+  // 素材（清單類別）完全不使用緞帶：沒有「限時免費」、學習中、已完成、日期倒數等任何緞帶（杜杜龍 2026-11-17）。
   if (course.isList) return { left: null, right: null };
   if (!member) left = course.isPublic ? spec(cfg, "public_free") : null;
   else if (course.enrollment === "opened") left = spec(cfg, completed ? "completed" : "learning");
   else if (course.enrollment === "pending") left = spec(cfg, "pending");
   else if (!course.eligible) left = spec(cfg, "ineligible");
-  // 公開免費的課程（登入後也一樣）顯示「公開免費」緞帶（業主 2026-11-17：改名「限時免費」後登入的人什麼緞帶都看不到，才發現登入後被省略了）；
+  // 公開免費的課程（登入後也一樣）顯示「公開免費」緞帶（杜杜龍 2026-11-17：改名「限時免費」後登入的人什麼緞帶都看不到，才發現登入後被省略了）；
   // 設定免費且符合資格（watchFree）的課程不用報名，不顯示。
   else if (course.isPublic) left = spec(cfg, "public_free");
   else if (course.watchFree) left = null;

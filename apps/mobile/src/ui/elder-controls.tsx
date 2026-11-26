@@ -5,7 +5,7 @@ import { UI_SCALE } from "@/theme/ui-scale";
 import { AppText } from "./text";
 
 /**
- * 【至尊模式專用控制項模組】（業主 2026-11-24 永久指示：至尊模式頁面上方的標籤、下拉、搜尋框一律同款，不可另做）。
+ * 【至尊模式專用控制項模組】（杜杜龍 2026-11-24 永久指示：至尊模式頁面上方的標籤、下拉、搜尋框一律同款，不可另做）。
  * 樣式＝首頁／課程搜尋框：粗 4px 綠框、大圓角、高度隨 UI_SCALE、字用 headline。
  * 用到的地方：`ElderTabs`（通知頁標籤）、`Dropdown big`（至尊模式的 Select，見 ui/dropdown.tsx）、搜尋框（features/elder/elder-search.tsx）。
  */

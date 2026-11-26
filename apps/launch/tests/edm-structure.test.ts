@@ -29,7 +29,7 @@ test("buildPrompt 含所有欄位與其他內容", () => {
   assert.ok(p.user.includes("講師資歷") && p.user.includes(OTHER) && p.user.includes("海報文字"));
 });
 
-test("cleanOcrText 去掉 AI 的開場白與猜測（業主 2026-11-24 回報）", () => {
+test("cleanOcrText 去掉 AI 的開場白與猜測（杜杜龍 2026-11-24 回報）", () => {
   const raw = '"天下第一餐"是一個健康飲食活動，圖片上有以下文字： 天下第一餐\\n宋莉鈴老師\\n超過三十年健康管理經驗 今天是 2026-11-23，活動舉辦日期應該是 2026-11-23。';
   const c = cleanOcrText(raw);
   assert.ok(!/今天是|應該|圖片上有/.test(c), c);

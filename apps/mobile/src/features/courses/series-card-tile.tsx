@@ -15,7 +15,7 @@ import { TopFill } from "./series-tile";
 import { displayName } from "./sort";
 
 /**
- * 系列頁裡的「課程卡」與「清單卡」小卡（業主 2026-11-19）：
+ * 系列頁裡的「課程卡」與「清單卡」小卡（杜杜龍 2026-11-19）：
  * 課程卡＝直式 3:4（一列至少 3 張）、清單卡＝橫式 4:3（一列至少 2 張）；點一下直接進該卡的詳細頁（不再展開細節）；
  * 右下角顯示教材數量，數量是 0 的卡灰色淡化（仍可點）。編輯模式下面多一排 ◀ ▶（跟相鄰的卡交換）與「隱藏／顯示」。
  */
@@ -60,7 +60,7 @@ export function SeriesCardTile({ course, width, editing, canBack, canForward, on
           </View>
         ) : null}
       </Pressable>
-      {/* 縮圖下方顯示課程標題，太長就「…」（業主 2026-11-21） */}
+      {/* 縮圖下方顯示課程標題，太長就「…」（杜杜龍 2026-11-21） */}
       <AppText variant="callout" numberOfLines={1} style={{ fontWeight: "700" }}>
         {course.title}
       </AppText>

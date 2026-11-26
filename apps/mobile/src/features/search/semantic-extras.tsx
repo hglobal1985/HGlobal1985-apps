@@ -13,7 +13,7 @@ import { EdmLightbox } from "@/features/courses/edm-viewer";
 import type { SemanticHit } from "@/features/courses/use-semantic";
 
 /**
- * 「意思相近的其他項目」（業主 2026-11-25）：語意搜尋命中的非教材卡資料——單一教材、區塊、系列卡、中心卡、課程介紹、EDM、相片。
+ * 「意思相近的其他項目」（杜杜龍 2026-11-25）：語意搜尋命中的非教材卡資料——單一教材、區塊、系列卡、中心卡、課程介紹、EDM、相片。
  * 每列：左邊縮圖；右邊第一行標題、第二行開頭是小的膠囊標籤（＝它屬於哪一類）再接說明。
  * 點下去直接看內容：單一教材＝直接播放、區塊＝直接開區塊、系列／中心／課程＝該頁、EDM／相片＝直接放大看圖（不跳頁）。超派、至尊共用，big＝至尊大字。
  */
@@ -53,7 +53,7 @@ export function SemanticExtras({ items, big }: { items: SemanticHit[]; big?: boo
   );
 }
 
-/** 依「教材卡的顯示順序」把其他項目分成：排在教材卡清單上方／下方（設定頁可調，業主 2026-11-25）。 */
+/** 依「教材卡的顯示順序」把其他項目分成：排在教材卡清單上方／下方（設定頁可調，杜杜龍 2026-11-25）。 */
 export function splitExtras(items: SemanticHit[], coursePrio: number): { above: SemanticHit[]; below: SemanticHit[] } {
   return { above: items.filter((h) => (h.prio ?? 0) < coursePrio), below: items.filter((h) => (h.prio ?? 0) >= coursePrio) };
 }
