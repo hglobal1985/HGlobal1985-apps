@@ -1,8 +1,0 @@
-node_modules/
-dist/
-.expo/
-.wrangler/
-apps/api/wrangler.local.jsonc
-*.log
-.env*
-.dev.vars
