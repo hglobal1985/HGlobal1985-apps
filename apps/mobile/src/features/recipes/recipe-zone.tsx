@@ -79,7 +79,7 @@ export function RecipeZone({ q, onBack, onOpenPhotos }: { /** 相簿上方共用
     );
   };
   const card = (r: RecipeCard) => (
-    <Pressable key={r.id} accessibilityRole="button" accessibilityLabel={`${r.title}，${r.photos} 張照片${r.videos ? "，有影片" : ""}${r.status === "pending" ? "，待審核" : ""}`} onPress={() => setOpenId(r.id)} style={({ pressed }) => ({ width: cardW, borderRadius: 14, backgroundColor: "#262629", padding: 6, opacity: pressed ? 0.75 : 1 })}>
+    <Pressable key={r.id} accessibilityRole="button" accessibilityLabel={`${r.title}${r.videos ? "，有影片" : ""}${r.status === "pending" ? "，待審核" : ""}`} onPress={() => setOpenId(r.id)} style={({ pressed }) => ({ width: cardW, borderRadius: 14, backgroundColor: "#262629", padding: 6, opacity: pressed ? 0.75 : 1 })}>
       <View style={{ width: cardW - 12, height: cardW - 12, borderRadius: 9, overflow: "hidden", backgroundColor: "#1a1a1c", alignItems: "center", justifyContent: "center" }}>
         {r.thumb ? <Image source={{ uri: thumb(resolveUrl(r.thumb), 360) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors /> : <Ionicons name="restaurant-outline" size={40} color="#6f6f75" {...UI_ONLY} />}
         {r.status === "pending" ? (
@@ -89,7 +89,8 @@ export function RecipeZone({ q, onBack, onOpenPhotos }: { /** 相簿上方共用
         ) : null}
       </View>
       <AppText numberOfLines={2} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16, marginTop: 8, marginHorizontal: 4 }}>{r.title}</AppText>
-      <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13, marginHorizontal: 4, marginTop: 2 }}>{[`${r.photos} 張`, r.videos ? `${r.videos} 影片` : ""].filter(Boolean).join("　")}</AppText>
+      {/* 總覽縮圖不顯示照片張數（杜杜龍 2026-11-26）；只在有影片時標示 */}
+      {r.videos ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13, marginHorizontal: 4, marginTop: 2 }}>{`${r.videos} 影片`}</AppText> : null}
       {/* 分類標籤右邊：上傳者所屬中心（自動抓取、不可變更；杜杜龍 2026-11-26） */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8, margin: 4 }}>
         {r.categoryName ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 13, flexShrink: 0, fontWeight: "700" }}>{r.categoryName}</AppText> : null}
