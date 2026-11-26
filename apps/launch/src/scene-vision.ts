@@ -81,10 +81,10 @@ export async function sceneImage(env: Env, db: D1Database, rowId: string): Promi
   await db.prepare("UPDATE cover_media SET scene_text = ?, scene_status = 'done', scene_model = ? WHERE id = ?").bind(scene, model, rowId).run();
 }
 
-/** 還沒辨識場景的相簿照片編號（區塊照片；批次排程 ai-batch.ts 用）。 */
+/** 還沒辨識場景的相簿照片編號（區塊照片＋食譜照片 `rcp:`——食譜照片只做場景、不做文字辨識，杜杜龍 2026-11-26；批次排程 ai-batch.ts 用）。 */
 export async function sceneIds(db: D1Database, limit: number): Promise<string[]> {
   const { results } = await db
-    .prepare("SELECT cm.id FROM cover_media cm WHERE cm.owner_kind = 'course' AND cm.kind = 'image' AND (cm.scene_status = '' OR (cm.scene_status = 'working' AND cm.scene_at < ?)) AND EXISTS (SELECT 1 FROM lessons l WHERE l.id = cm.owner_key AND l.kind = 'section') ORDER BY cm.created_at DESC LIMIT ?")
+    .prepare("SELECT cm.id FROM cover_media cm WHERE cm.owner_kind = 'course' AND cm.kind = 'image' AND (cm.scene_status = '' OR (cm.scene_status = 'working' AND cm.scene_at < ?)) AND (cm.owner_key LIKE 'rcp:%' OR EXISTS (SELECT 1 FROM lessons l WHERE l.id = cm.owner_key AND l.kind = 'section')) ORDER BY cm.created_at DESC LIMIT ?")
     .bind(new Date(Date.now() - 10 * 60_000).toISOString(), limit)
     .all<{ id: string }>();
   return results.map((r) => r.id);
@@ -94,7 +94,7 @@ export async function sceneIds(db: D1Database, limit: number): Promise<string[]>
 export async function scenePending(env: Env, db: D1Database, limit = 3): Promise<void> {
   if (!env.AI) return;
   const { results } = await db
-    .prepare("SELECT cm.id FROM cover_media cm WHERE cm.owner_kind = 'course' AND cm.kind = 'image' AND (cm.scene_status = '' OR (cm.scene_status = 'working' AND cm.scene_at < ?)) AND EXISTS (SELECT 1 FROM lessons l WHERE l.id = cm.owner_key AND l.kind = 'section') ORDER BY cm.created_at DESC LIMIT ?")
+    .prepare("SELECT cm.id FROM cover_media cm WHERE cm.owner_kind = 'course' AND cm.kind = 'image' AND (cm.scene_status = '' OR (cm.scene_status = 'working' AND cm.scene_at < ?)) AND (cm.owner_key LIKE 'rcp:%' OR EXISTS (SELECT 1 FROM lessons l WHERE l.id = cm.owner_key AND l.kind = 'section')) ORDER BY cm.created_at DESC LIMIT ?")
     .bind(new Date(Date.now() - 10 * 60_000).toISOString(), limit)
     .all<{ id: string }>();
   for (const r of results) {

@@ -82,7 +82,7 @@ export async function ocrPhoto(env: Env, db: D1Database, rowId: string): Promise
   await db.prepare("UPDATE cover_media SET ocr_text = ?, ocr_status = 'done', ocr_model = ? WHERE id = ?").bind(text, model, rowId).run();
 }
 
-/** 還沒辨識文字的相簿照片編號（區塊照片；批次排程 ai-batch.ts 用）。 */
+/** 還沒辨識文字的相簿照片編號（只有區塊照片；**食譜照片不做文字辨識**，杜杜龍 2026-11-26：它們的 ocr_status 固定 skip、這裡也不會撈到；批次排程 ai-batch.ts 用）。 */
 export async function photoOcrIds(db: D1Database, limit: number): Promise<string[]> {
   const { results } = await db
     .prepare("SELECT cm.id FROM cover_media cm WHERE cm.owner_kind = 'course' AND cm.kind = 'image' AND (cm.ocr_status = '' OR (cm.ocr_status = 'working' AND cm.ocr_at < ?)) AND EXISTS (SELECT 1 FROM lessons l WHERE l.id = cm.owner_key AND l.kind = 'section') ORDER BY cm.created_at DESC LIMIT ?")

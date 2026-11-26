@@ -3,6 +3,8 @@ import { test } from "node:test";
 import { handleApi } from "../src/api.ts";
 import type { Env } from "../src/d1.ts";
 import { resolveShareMeta } from "../src/og.ts";
+import { photoOcrIds } from "../src/photo-ocr.ts";
+import { sceneIds } from "../src/scene-vision.ts";
 import { youtubeIdOfLine, videoCount } from "../src/recipes.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
@@ -126,4 +128,16 @@ test("食譜：草稿 → 會員投稿待審核 → 管理者核准；權限與�
   assert.equal((await call("DELETE", `/recipes/${id}`, { token: admin })).status, 200);
   assert.equal((await call("GET", `/recipes/${id}`)).status, 404);
   assert.equal((await call("DELETE", `/recipes/categories/${cat}`, { token: a })).status, 403);
+});
+
+test("食譜照片：做場景辨識、不做文字辨識；食譜搜尋也比對場景標籤", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on" };
+  const db = env.DB;
+  await db.prepare("INSERT INTO recipes (id, title, status, author_sub, number) VALUES ('r1abc2def3', '烤雞', 'published', 'x', 1)").run();
+  await db.prepare("INSERT INTO cover_media (id, owner_kind, owner_key, kind, r2_key, ocr_status, scene_status) VALUES ('m1', 'course', 'rcp:r1abc2def3', 'image', 'album/a/b.jpg', 'skip', '')").run();
+  assert.deepEqual(await sceneIds(db, 10), ["m1"], "食譜照片排進場景辨識");
+  assert.deepEqual(await photoOcrIds(db, 10), [], "食譜照片不排進文字辨識");
+  await db.prepare("UPDATE cover_media SET scene_text = '烤箱,雞肉,餐盤', scene_status = 'done' WHERE id = 'm1'").run();
+  const res = await handleApi(new Request(`https://learn.test/api/v2/recipes?q=${encodeURIComponent("雞肉")}`), env);
+  assert.equal(((await res.json()) as { recipes: unknown[] }).recipes.length, 1, "用場景標籤找得到食譜");
 });

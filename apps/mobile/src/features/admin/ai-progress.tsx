@@ -150,8 +150,8 @@ export function AiProgressPanel({ data, reload, jobs, setJobs, dirty }: { data: 
       </Fold>
       {jobs ? <JobOrder jobs={jobs} setJobs={setJobs} dirty={dirty} reload={reload} /> : null}
       <PackCard title="中心 EDM 文字辨識" rule="只辨識中心 EDM；套用「欄位格式範本」，可被文字搜尋。" pack={data.ocr} />
-      <PackCard title="相簿場景辨識" rule="只辨識其他相簿（例如成交百寶箱）；認出行為、場景、物品，搜尋時分類標籤＝「場景」。" pack={data.scene} />
-      <PackCard title="相簿照片文字辨識（OCR）" rule="只辨識相簿（區塊）照片；讀出照片裡的文字（招牌、白板、包裝…），相簿搜尋與場景搜尋都能用文字找到。可在「搜尋與 AI 設定」開關。" pack={data.photoOcr ?? { total: 0, done: 0, failed: 0, pending: 0, groups: [] }} />
+      <PackCard title="相簿場景辨識" rule="辨識其他相簿（例如成交百寶箱）與「食譜」專區的照片；認出行為、場景、物品，搜尋時分類標籤＝「場景」，食譜搜尋也會比對這些標籤。" pack={data.scene} />
+      <PackCard title="相簿照片文字辨識（OCR）" rule="只辨識相簿（區塊）照片，不含食譜照片（食譜只做場景辨識、不做文字辨識）；讀出照片裡的文字（招牌、白板、包裝…），相簿搜尋與場景搜尋都能用文字找到。可在「搜尋與 AI 設定」開關。" pack={data.photoOcr ?? { total: 0, done: 0, failed: 0, pending: 0, groups: [] }} />
     </View>
   );
 }

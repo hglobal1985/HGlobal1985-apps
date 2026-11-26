@@ -72,7 +72,7 @@ export async function listRecipes(db: D1Database, o: { me: string | null; manage
           (SELECT COUNT(*) FROM cover_media m WHERE m.owner_kind = 'course' AND m.owner_key = 'rcp:' || r.id AND m.kind = 'image') AS photos
          FROM recipes r LEFT JOIN recipe_categories c ON c.id = r.category_id
          WHERE (r.status = 'published' OR (r.status = 'pending' AND (?1 = 1 OR r.author_sub = ?2)))
-           AND (?3 = '' OR r.title LIKE ?3 ESCAPE '\\' OR r.body LIKE ?3 ESCAPE '\\')
+           AND (?3 = '' OR r.title LIKE ?3 ESCAPE '\\' OR r.body LIKE ?3 ESCAPE '\\' OR EXISTS (SELECT 1 FROM cover_media sm WHERE sm.owner_kind = 'course' AND sm.owner_key = 'rcp:' || r.id AND sm.scene_text LIKE ?3 ESCAPE '\\'))
          ORDER BY (r.status = 'pending') DESC, r.updated_at DESC LIMIT 400`,
       )
       .bind(o.manager ? 1 : 0, o.me ?? "", like)
