@@ -32,6 +32,36 @@ export async function isOwnerNet(db: D1Database, ip: string): Promise<boolean> {
   return !!(await db.prepare("SELECT 1 AS x FROM usage_owner_nets WHERE hash = ? AND seen_at >= ?").bind(await netHash(ip), since).first());
 }
 
+/**
+ * 「本人裝置」登記（杜杜龍 2026-11-26：這台 iPad 的操作一律算本人，即使無痕、沒登入、換網路）：
+ * 依裝置的螢幕大小、像素比、系統與類型組成「裝置特徵」（例：820x1180@2:ios:tablet），超級管理員在那台裝置按「登記這台裝置」存起來；
+ * 之後任何請求帶來相同特徵就記成 admin=1（統計預設不含，勾「包含管理員操作」才算）。不存 IP、不存任何個人識別碼。
+ * 限制：特徵相同的同型號裝置（例如另一台 iPad Air）也會被當成本人——無痕模式沒有任何可持久的識別碼，這是能做到的最準方式。
+ */
+export type OwnerDevice = { fp: string; label: string; at: string };
+export const FP_RE = /^\d{3,4}x\d{3,4}@\d(\.\d{1,2})?:(ios|android|other):(mobile|tablet|desktop)$/;
+let ownerDevCache: { at: number; list: OwnerDevice[] } | null = null;
+export async function ownerDevices(db: D1Database): Promise<OwnerDevice[]> {
+  if (ownerDevCache && Date.now() - ownerDevCache.at < 60_000) return ownerDevCache.list;
+  const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'usage_owner_devices'").first<{ value: string }>();
+  let list: OwnerDevice[] = [];
+  try {
+    list = row ? (JSON.parse(row.value) as OwnerDevice[]).filter((d) => FP_RE.test(d.fp)) : [];
+  } catch {
+    list = [];
+  }
+  ownerDevCache = { at: Date.now(), list };
+  return list;
+}
+export async function saveOwnerDevices(db: D1Database, list: OwnerDevice[]): Promise<void> {
+  await db.prepare("INSERT INTO ui_settings (key, value) VALUES ('usage_owner_devices', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list.slice(0, 20))).run();
+  ownerDevCache = null;
+}
+export async function isOwnerDevice(db: D1Database, fp: unknown): Promise<boolean> {
+  if (typeof fp !== "string" || !FP_RE.test(fp)) return false;
+  return (await ownerDevices(db)).some((d) => d.fp === fp);
+}
+
 /** 記一次（訪客也可以）；欄位不合格就忽略，不報錯、不影響使用。admin＝這次是杜杜龍本人的操作。 */
 export async function recordUsage(db: D1Database, b: { kind?: unknown; device?: unknown; os?: unknown; target?: unknown; mode?: unknown }, admin = false): Promise<void> {
   if (!USAGE_KINDS.includes(b.kind as never) || !DEVICES.includes(b.device as never) || !OSES.includes(b.os as never)) return;

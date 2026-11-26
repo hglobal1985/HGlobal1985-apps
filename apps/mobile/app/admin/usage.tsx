@@ -1,10 +1,58 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { useApi } from "@/state/session";
+import { api } from "@/api/client";
+import { deviceFingerprint, deviceLabel } from "@/lib/usage";
+import { flashText } from "@/ui/flash-notice";
+import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Card, Check, ErrorView, LoadingView, Screen } from "@/ui";
+import { AppText, Button, Card, Check, ErrorView, LoadingView, Screen } from "@/ui";
 import Ionicons from "@expo/vector-icons/Ionicons";
+
+/** 本人裝置（杜杜龍 2026-11-26，只有超級管理員）：在要算成「本人」的裝置上按「登記這台裝置」，之後那種裝置的操作（含無痕、沒登入、換網路）都算管理員操作。 */
+function OwnerDevices() {
+  const { member } = useSession();
+  const isSuper = !!member?.titles.includes("超級管理員");
+  const list = useApi<{ devices: { fp: string; label: string; at: string }[] }>(isSuper ? "/admin/usage/devices" : null);
+  const [busy, setBusy] = useState(false);
+  if (!isSuper) return null;
+  const mine = deviceFingerprint();
+  const has = list.data?.devices.some((d) => d.fp === mine);
+  const add = async () => {
+    setBusy(true);
+    try {
+      await api("POST", "/admin/usage/devices", { fp: mine, label: deviceLabel() });
+      flashText("已登記這台裝置");
+      list.reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (fp: string) => {
+    try {
+      await api("POST", "/admin/usage/devices/remove", { fp });
+      list.reload();
+    } catch (e) {
+      flashText((e as Error).message);
+    }
+  };
+  return (
+    <Card style={{ gap: space.sm }}>
+      <AppText variant="headline">本人裝置</AppText>
+      <AppText variant="caption" tone="muted">登記後，這種裝置的所有操作（即使無痕模式、沒登入、換網路）都算管理員本人的操作，要勾上面的「包含管理員操作」才會列入統計。</AppText>
+      {(list.data?.devices ?? []).map((d) => (
+        <View key={d.fp} style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+          <AppText variant="callout" style={{ flex: 1 }}>{`${d.label}${d.fp === mine ? "（目前這台）" : ""}`}</AppText>
+          <Button variant="cancel" label="移除" onPress={() => void remove(d.fp)} />
+        </View>
+      ))}
+      <Button label={has ? "這台裝置已登記" : `登記這台裝置（${deviceLabel()}）`} icon="phone-portrait-outline" disabled={busy || !!has} loading={busy} onPress={() => void add()} fullWidth />
+      <AppText variant="caption" tone="muted">注意：無痕模式沒有可記住的識別碼，所以是用「裝置型號特徵」（螢幕大小、像素比、系統）辨識。同型號的其他裝置（例如別人的 iPad Air）也會被算成本人。</AppText>
+    </Card>
+  );
+}
 
 /**
  * 管理員 > 使用統計（杜杜龍 2026-11-22）：手機／電腦／平板、iOS／Android、一天中的時段、首頁卡片點閱，
@@ -379,6 +427,7 @@ export default function UsageScreen() {
           預設不勾：管理員本人（含用過的裝置與網路）的操作不列入統計。
         </AppText>
       </Card>
+      <OwnerDevices />
       {QUESTIONS.map((q) => (
         <Question key={q.title} q={q} admin={admin} open={openQ === q.title} onToggle={() => setOpenQ(openQ === q.title ? null : q.title)} />
       ))}
