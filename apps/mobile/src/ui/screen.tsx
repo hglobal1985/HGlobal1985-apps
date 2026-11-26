@@ -84,7 +84,7 @@ export function Screen({
   const [pinH, setPinH] = useState(0); // heroFooter 的高度
   const [areaH, setAreaH] = useState(0); // 捲動區的高度（撐出「下滑縮小」需要的捲動空間用）
   const bar = footer ?? slot;
-  // 大螢幕版面（業主 2026-11-18）：內容寬度與左右留白依畫面寬度（theme/layout.ts）。
+  // 大螢幕版面（杜杜龍 2026-11-18）：內容寬度與左右留白依畫面寬度（theme/layout.ts）。
   const lay = useLayout();
   const maxW = { maxWidth: wide ? lay.wideMax : lay.readMax };
   const gutter = { paddingHorizontal: gutterOverride ?? lay.gutter };
@@ -149,7 +149,7 @@ function Scroller({ scrollY, children, ...props }: { scrollY?: Animated.Value } 
   const rest = { ...props, ...({ dataSet: { stableGutter: "" } } as object) };
   const ref = useRef<{ getScrollableNode?: () => HTMLElement | null } | null>(null);
   // 網頁：內容高度改變（換中心、資料載入完）時，瀏覽器會自己把捲動位置夾回 0，卻不一定發出捲動事件，
-  // scrollY 就停在舊的數字，封面（hero）被誤縮成窄橫幅、下方留一大塊空白（業主 2026-11-21 回報）。這裡在內容與版面變動後主動對一次。
+  // scrollY 就停在舊的數字，封面（hero）被誤縮成窄橫幅、下方留一大塊空白（杜杜龍 2026-11-21 回報）。這裡在內容與版面變動後主動對一次。
   const resync = () => {
     if (!scrollY || Platform.OS !== "web") return;
     const el = ref.current?.getScrollableNode?.();

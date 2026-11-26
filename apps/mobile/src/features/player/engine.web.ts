@@ -235,7 +235,7 @@ function iosPresentation() {
   return (video as unknown as IosVideo | null)?.webkitPresentationMode;
 }
 /**
- * YouTube 內嵌影片縮小瀏覽器（業主 2026-11-25：要繼續在通知欄播放）：記下縮小前正在播放；縮小後若 YouTube 自己把影片暫停了，
+ * YouTube 內嵌影片縮小瀏覽器（杜杜龍 2026-11-25：要繼續在通知欄播放）：記下縮小前正在播放；縮小後若 YouTube 自己把影片暫停了，
  * 在 0.6、1.5、3 秒各補送一次「播放」指令，並維持通知欄的播放狀態。YouTube 對手機瀏覽器的背景播放有自己的限制，補送不一定會成功。
  */
 let ytWasPlayingOnHide = false;
@@ -256,7 +256,7 @@ function ytKeepPlaying() {
     }, ms);
   }
 }
-/** 縮小瀏覽器時，影片播放中就嘗試進入手機的浮動小視窗（業主 2026-11-25）；被拒絕（多半是手機沒開授權）就記下來，回來時教使用者開。 */
+/** 縮小瀏覽器時，影片播放中就嘗試進入手機的浮動小視窗（杜杜龍 2026-11-25）；被拒絕（多半是手機沒開授權）就記下來，回來時教使用者開。 */
 function tryAutoPip() {
   const t = snap.track;
   if (!t || t.mode !== "video" || !video || bg || !intent || video.paused || !document.pictureInPictureEnabled) return;
@@ -455,7 +455,7 @@ export const engine = {
       });
   },
   /**
-   * 換一支 YouTube 影片但沿用同一個 iframe（業主 2026-11-17）：LINE 等內建瀏覽器要使用者親手點過一次 YouTube 自己的播放鈕，
+   * 換一支 YouTube 影片但沿用同一個 iframe（杜杜龍 2026-11-17）：LINE 等內建瀏覽器要使用者親手點過一次 YouTube 自己的播放鈕，
    * 之後程式才能代按播放；重建 iframe 會讓這份許可歸零，所以換章節一律用 loadVideoById 在原 iframe 內切換。
    */
   loadYoutube(videoId: string, start: number, end?: number) {
@@ -495,12 +495,12 @@ export const engine = {
    * 另一堂正在播放：詢問是否中斷；選擇「關閉」回傳 false（呼叫端應回到原本那堂）。
    */
   /** 使用者在上課頁點了同一門課的另一堂：換好之前（最多 6 秒）不跳迷你播放器，也不再詢問。 */
-  /** 正在迷你播放器／小圓圖時，使用者點了別的影片：新的這支沿用目前的小視窗或小圓圖，不跳回整頁（業主 2026-11-25）。 */
+  /** 正在迷你播放器／小圓圖時，使用者點了別的影片：新的這支沿用目前的小視窗或小圓圖，不跳回整頁（杜杜龍 2026-11-25）。 */
   keepMiniOnce() {
     keepMini = snap.collapsed;
   },
   expectSwitch(stayMini = false) {
-    if (stayMini) return; // 迷你播放器原地換片：不隱藏小視窗，換片才絲滑（業主 2026-11-25）
+    if (stayMini) return; // 迷你播放器原地換片：不隱藏小視窗，換片才絲滑（杜杜龍 2026-11-25）
     if (switchTimer) clearTimeout(switchTimer);
     switchTimer = setTimeout(() => {
       switchTimer = null;
@@ -511,7 +511,7 @@ export const engine = {
   async request(t: Track): Promise<boolean> {
     // 同一堂而且內容也沒變才算「已經是這一堂」；key 相同但內容不同（章節改過起訖秒數、換了影片來源）要重新載入。
     if (snap.track?.key === t.key && snap.track.fp === t.fp) return true;
-    ++requestSeq; // 切換影片不再詢問（業主 2026-11-25），直接換
+    ++requestSeq; // 切換影片不再詢問（杜杜龍 2026-11-25），直接換
     engine.load(t);
     return true;
   },

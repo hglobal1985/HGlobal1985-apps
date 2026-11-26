@@ -11,7 +11,7 @@ export function SummaryLead() {
   );
 }
 
-/** 「總結與銷售課程」章節的特殊標記（電源圖示＝結束，業主 2026-11-16 選定）：章節清單、單元頁都用這一個，要改圖示只改這裡。 */
+/** 「總結與銷售課程」章節的特殊標記（電源圖示＝結束，杜杜龍 2026-11-16 選定）：章節清單、單元頁都用這一個，要改圖示只改這裡。 */
 export function SummaryMark({ size = 18 }: { size?: number }) {
   const { c } = useTheme();
   return <Ionicons name="power" size={size} color={c.accent} accessibilityLabel="總結與銷售課程" />;

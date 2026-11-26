@@ -12,7 +12,7 @@ import { compressVideo, probeVideo, videoCompressSupported } from "./video-compr
 import { UploadProgress } from "./upload-progress";
 
 /**
- * 相簿／封面照片上傳（網頁版，業主 2026-11-21）：一次可選多張照片與短影音。
+ * 相簿／封面照片上傳（網頁版，杜杜龍 2026-11-21）：一次可選多張照片與短影音。
  * 照片先在瀏覽器壓縮（中心封面的畫質設定）；影片依「設定 › 儲存空間管理 › 封面輪播與短影音」的規範在瀏覽器內壓縮後再上傳，並擷取第一格當預覽圖。
  * 中心「相簿」、系列封面、課程封面都用這一個元件。
  */

@@ -6,7 +6,7 @@ import { minTouch } from "@/theme/tokens";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 超派模式搜尋框的麥克風鈕（業主 2026-11-25）：按一下用說的找課程，與至尊模式同一個語音辨識模組（`useVoice`，中文台灣、連續聽、停頓 4 秒自動送出）。
+ * 超派模式搜尋框的麥克風鈕（杜杜龍 2026-11-25）：按一下用說的找課程，與至尊模式同一個語音辨識模組（`useVoice`，中文台灣、連續聽、停頓 4 秒自動送出）。
  * 聽到的字即時填進搜尋框；聽的時候鈕變紅色（再按一次＝停止）。瀏覽器不支援語音辨識時，提示用鍵盤上的麥克風。
  */
 export function VoiceMic({ onText, onUnsupported }: { onText: (t: string) => void; onUnsupported?: () => void }) {

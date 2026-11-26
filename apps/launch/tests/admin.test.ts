@@ -95,7 +95,7 @@ test("管理員新增、修改、刪除課程；新課程預設未上架；學�
   assert.equal(c.status, "draft");
   assert.equal(c.description, "介紹");
   assert.equal(c.minRank.code, "r15");
-  // 新增課程不再自動建立第 1 堂（業主 2026-11-16）：見 auto-cover.test.ts；這裡的測試資料由 createTestDb 的 firstLesson 捷徑補一堂。
+  // 新增課程不再自動建立第 1 堂（杜杜龍 2026-11-16）：見 auto-cover.test.ts；這裡的測試資料由 createTestDb 的 firstLesson 捷徑補一堂。
   assert.equal((await call("GET", `/courses/${c.id}`, { token: student })).status, 404, "未上架學員看不到");
   const patched = await call<CourseDetail>("PATCH", `/admin/courses/${c.id}`, { token: admin, body: { priceTwd: 0, status: "published", title: "銅章會議（新）" } });
   assert.equal(patched.data.title, "銅章會議（新）");

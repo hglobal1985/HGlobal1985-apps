@@ -70,7 +70,7 @@ test("加入我的清單：多份清單、額度與解鎖、自訂網址、備�
   const stats = (await call<{ clicks: number; people: number; bySource: Record<string, number>; days: { n: number }[] }>("GET", `/my-lists/${idA}/stats`, { token: me })).data;
   assert.deepEqual({ clicks: stats.clicks, people: stats.people, line: stats.bySource.line, today: stats.days[0]!.n }, { clicks: 3, people: 2, line: 3, today: 3 });
   assert.equal((await call("POST", "/my-lists/view/nobody/xxxxxx", { body: { vid: "x" } })).status, 404);
-  // 成效再加三項（業主 2026-11-22）：項目點開次數、分享次數、被複製次數；主人自己點、不屬於這份清單的項目不算。
+  // 成效再加三項（杜杜龍 2026-11-22）：項目點開次數、分享次數、被複製次數；主人自己點、不屬於這份清單的項目不算。
   const hitItem = (await env.DB.prepare("SELECT id FROM my_list_items WHERE list_id = ?").bind(idA).first<{ id: string }>())!.id;
   const hit = (token?: string, id = hitItem) => call("POST", `/my-lists/view/${number}/admin/item/${id}/hit`, { token });
   await hit();

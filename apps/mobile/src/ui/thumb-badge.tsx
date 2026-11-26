@@ -30,7 +30,7 @@ export function ThumbBadgeView({ symbol, fg, bg }: { symbol: string; fg: string;
 }
 
 /**
- * 小縮圖的預設樣子（業主 2026-11-23 取代「用標題文字當縮圖」）：這張卡有指定縮圖符號就顯示它，沒指定顯示綠色學士帽。
+ * 小縮圖的預設樣子（杜杜龍 2026-11-23 取代「用標題文字當縮圖」）：這張卡有指定縮圖符號就顯示它，沒指定顯示綠色學士帽。
  * 放進縮圖框裡會自動鋪滿。kind／id：課程＝課程編號、系列＝系列名稱、中心＝中心名稱。
  */
 export function CardThumb({ kind, id }: { kind: ThumbBadgeKind; id: string | null | undefined }) {

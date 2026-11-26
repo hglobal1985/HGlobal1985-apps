@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { useElderOn } from "./elder-mode";
 
 /**
- * 使用模式設定檔（業主 2026-11-24：為了長期修改維護穩定，兩種模式的差異全部集中在這一個檔案）。
+ * 使用模式設定檔（杜杜龍 2026-11-24：為了長期修改維護穩定，兩種模式的差異全部集中在這一個檔案）。
  *
  * 「至尊模式」（長輩大字簡易版）與「超派模式」（完整版）要顯示哪些分頁、哪些功能、用哪一種版面，
  * 一律寫在下面的 MODE_PROFILES，畫面只問「這個功能在目前模式開不開」（useFeature）或「目前用哪種版面」（useModeProfile），
@@ -29,9 +29,9 @@ export type FeatureKey =
   | "adminEdit"
   /** 右下角「＋新增」浮動鈕（新增教材、課程、公告…）。 */
   | "addButton"
-  /** 學習中頁的「系列」篩選（業主 2026-11-24：至尊模式拿掉）。 */
+  /** 學習中頁的「系列」篩選（杜杜龍 2026-11-24：至尊模式拿掉）。 */
   | "seriesFilter"
-  /** 設定頁的「刪除帳號」鈕（業主 2026-11-24：至尊模式移除，超派模式仍有——上架商店規定 App 內要有刪除帳號入口）。 */
+  /** 設定頁的「刪除帳號」鈕（杜杜龍 2026-11-24：至尊模式移除，超派模式仍有——上架商店規定 App 內要有刪除帳號入口）。 */
   | "deleteAccount";
 
 /** 底部主選單的分頁（模式鍵固定在最右邊，不在這裡）。 */
@@ -59,7 +59,7 @@ export type ModeProfile = {
   fontAdjustable: boolean;
   /** 離開這個模式前要先確認（防誤按）。 */
   confirmLeave: boolean;
-  /** 上拉選單的呈現方式：sheet＝從下方拉出的面板；page＝整頁顯示（至尊模式一律禁止上拉選單，業主 2026-11-24）。 */
+  /** 上拉選單的呈現方式：sheet＝從下方拉出的面板；page＝整頁顯示（至尊模式一律禁止上拉選單，杜杜龍 2026-11-24）。 */
   sheets: "sheet" | "page";
   /** 按模式鍵：page＝進入整頁的模式頁（/mode）；switch＝直接切到另一個模式。 */
   modeKey: "page" | "switch";
@@ -67,7 +67,7 @@ export type ModeProfile = {
 };
 
 export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
-  // 至尊模式（業主 2026-11-24，B 方案）：長輩大字簡易版。
+  // 至尊模式（杜杜龍 2026-11-24，B 方案）：長輩大字簡易版。
   elder: {
     key: "elder",
     name: "至尊",

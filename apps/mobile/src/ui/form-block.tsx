@@ -6,10 +6,10 @@ import { AppText } from "./text";
 import { CollapseToggle } from "./collapse-toggle";
 
 /**
- * 表單區塊（業主 2026-11-18：所有區塊的標題要明顯區隔）：淡綠標題列（左邊一條深綠粗線）＋框起來的內容。
+ * 表單區塊（杜杜龍 2026-11-18：所有區塊的標題要明顯區隔）：淡綠標題列（左邊一條深綠粗線）＋框起來的內容。
  * 編輯面板裡「分類、品牌、系列、建立單位…」每一組都用它，標題一眼可辨。
  */
-export function FormBlock({ title, hint, children, collapsible }: { title: string; hint?: string; children: ReactNode; /** 有傳＝預設收起，標題右側有展開／收起鈕（業主 2026-11-19）。 */ collapsible?: boolean }) {
+export function FormBlock({ title, hint, children, collapsible }: { title: string; hint?: string; children: ReactNode; /** 有傳＝預設收起，標題右側有展開／收起鈕（杜杜龍 2026-11-19）。 */ collapsible?: boolean }) {
   const { c } = useTheme();
   const [open, setOpen] = useState(!collapsible);
   return (

@@ -20,7 +20,7 @@ import { BrandIcon } from "@/ui/brand-icon";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 「我的書櫃」管理頁（設定 › 我的書櫃；業主 2026-11-17）：改名稱、設定整座書櫃的密碼（可設幾天後失效）、
+ * 「我的書櫃」管理頁（設定 › 我的書櫃；杜杜龍 2026-11-17）：改名稱、設定整座書櫃的密碼（可設幾天後失效）、
  * 新增書架（分類標題）與書（影片、簡報、PDF、連結），每本書可以單獨設密碼，調整順序、刪除。
  * 公開檢視在 /會員編號（features/library/library-view.tsx）。
  */

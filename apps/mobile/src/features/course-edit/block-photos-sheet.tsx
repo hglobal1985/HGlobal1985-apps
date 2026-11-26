@@ -8,7 +8,7 @@ import { AppText } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 
 /**
- * 區塊「新增照片」（業主 2026-11-24，先只有「成交百寶箱」）：與中心「新增教材 › 上傳EDM」同一套上傳元件（AlbumUploadButton）與相簿（CoverAlbum，可排序、刪除）。
+ * 區塊「新增照片」（杜杜龍 2026-11-24，先只有「成交百寶箱」）：與中心「新增教材 › 上傳EDM」同一套上傳元件（AlbumUploadButton）與相簿（CoverAlbum，可排序、刪除）。
  * 照片屬於這個區塊；連結區塊（品牌卡的「成交百寶箱」）傳進來的 photoKey 是來源區塊，所以兩邊是同一批照片。
  */
 export function BlockPhotosSheet({ head, onClose, onChanged }: { head: Lesson; onClose: () => void; onChanged: () => void }) {

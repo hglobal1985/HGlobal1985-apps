@@ -46,7 +46,7 @@ export function ListRow({
   playingLesson?: string;
   /** 標題最多幾行（超過「…」）；預設 compact＝1 行。清單（素材）頁用 2 行。 */
   titleLines?: number;
-  /** 日期膠囊：接在標題最前面，跟標題一起排版，整列最多 titleLines 行（業主 2026-11-18）。 */
+  /** 日期膠囊：接在標題最前面，跟標題一起排版，整列最多 titleLines 行（杜杜龍 2026-11-18）。 */
   dateChip?: string;
 }) {
   const { c } = useTheme();

@@ -15,7 +15,7 @@ import type { BroadcastItem } from "./use-broadcasts";
 type Items = BroadcastItem[];
 
 /**
- * 中心頁封面正下方的「廣播公告」黃色橫條（業主 2026-11-17；2026-11-21 改成緊貼封面、左右滿版、沒有圖示的樣式，只有文字與「更多」）：強制只顯示一行，太長就「… 更多」；
+ * 中心頁封面正下方的「廣播公告」黃色橫條（杜杜龍 2026-11-17；2026-11-21 改成緊貼封面、左右滿版、沒有圖示的樣式，只有文字與「更多」）：強制只顯示一行，太長就「… 更多」；
  * 依設定的秒數（預設 2 秒）自動輪播；手指上下左右滑動可切換；點一下彈出完整公告清單（日期＋內容）。顏色用網站標準亮黃色（同「已付費」標籤）。
  */
 export function BroadcastBand({ items, seconds, onOpen, labelOf, gutter: gutterOverride, flush = false }: { /** 釘在封面下方（Screen 的 heroFooter）時用：不往上、往左右外推（外推在釘住的容器裡會被切掉）。 */ flush?: boolean; items: Items; seconds: number; onOpen: () => void; /** 每則公告左邊的來源簡稱（中心／系列名稱）；橫條顯示「📢新竹公告：內容」。 */ labelOf?: (scope: Items[number]["scope"]) => string; /** 頁面左右留白（預設跟版面規則；頁面自訂留白時要傳同一個值，橫條才會左右滿版）。 */ gutter?: number }) {
@@ -80,7 +80,7 @@ export function BroadcastBand({ items, seconds, onOpen, labelOf, gutter: gutterO
   );
 }
 
-/** 全部公告：日期＋內容（用統一的上拉面板，高度依內容自動調整）；有權限的人每則下面有「修改」「刪除」（業主 2026-11-21：不必另外進設定頁）。 */
+/** 全部公告：日期＋內容（用統一的上拉面板，高度依內容自動調整）；有權限的人每則下面有「修改」「刪除」（杜杜龍 2026-11-21：不必另外進設定頁）。 */
 export function BroadcastSheet({ title, items, onClose, onChanged }: { title: string; items: Items; onClose: () => void; onChanged?: () => void }) {
   useEffect(() => trackFeature("broadcast_open"), []);
   return (
@@ -95,7 +95,7 @@ export function BroadcastSheet({ title, items, onClose, onChanged }: { title: st
 }
 
 /**
- * 公告清單本體（日期＋完整內容；有權限的人可修改、刪除）：超派模式的公告面板與至尊模式展開的公告區塊共用同一份（業主 2026-11-24）。
+ * 公告清單本體（日期＋完整內容；有權限的人可修改、刪除）：超派模式的公告面板與至尊模式展開的公告區塊共用同一份（杜杜龍 2026-11-24）。
  * 修改／刪除鈕要不要顯示由模式設定檔決定（至尊模式 adminEdit＝false 不顯示）。
  */
 export function BroadcastList({ items, onChanged }: { items: Items; onChanged?: () => void }) {
@@ -157,7 +157,7 @@ export function BroadcastList({ items, onChanged }: { items: Items; onChanged?: 
 }
 
 const styles = StyleSheet.create({
-  // 高度固定 50（業主 2026-11-25：加高黃色公告列）。
+  // 高度固定 50（杜杜龍 2026-11-25：加高黃色公告列）。
   band: { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.md, minHeight: 50, paddingVertical: 3, borderRadius: 0 },
   textWrap: { flex: 1, minWidth: 0 },
   row: { gap: 4, paddingVertical: space.md, borderTopWidth: StyleSheet.hairlineWidth },

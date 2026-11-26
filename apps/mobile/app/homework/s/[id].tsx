@@ -15,7 +15,7 @@ import { flashText } from "@/ui/flash-notice";
 type View_ = { submission: HwSubmission; assignment: HwAssignment; course: { id: string; title: string } };
 
 /**
- * 看一份繳交（業主 2026-11-25）：老師在這裡批改——分數（快速鈕＋微調）、5 顆星、或「通過」，寫評語；
+ * 看一份繳交（杜杜龍 2026-11-25）：老師在這裡批改——分數（快速鈕＋微調）、5 顆星、或「通過」，寫評語；
  * 下方固定「退回重交」（左）與「儲存並下一份」（右），批完自動跳到下一份待批改，手機單手一路批完。
  * 組長、同組組員看得到內容（組員看不到分數），組長可以留言。
  */

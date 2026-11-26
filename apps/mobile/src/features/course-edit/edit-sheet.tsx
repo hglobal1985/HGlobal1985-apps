@@ -5,7 +5,7 @@ import { space } from "@/theme/tokens";
 import { AppText, Button, NoticeBox } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
 
-/** 面板裡的內容（例如封面上傳）自己有「儲存」時，登記到面板下方那一列（業主 2026-11-17：儲存與關閉永遠同一列）。 */
+/** 面板裡的內容（例如封面上傳）自己有「儲存」時，登記到面板下方那一列（杜杜龍 2026-11-17：儲存與關閉永遠同一列）。 */
 export type SheetSave = { label: string; onPress: () => void; busy?: boolean; disabled?: boolean; dirty?: boolean };
 const SaveSlot = createContext<((s: SheetSave | null) => void) | null>(null);
 /** 在 EditSheet 裡面登記儲存鈕（傳 null＝沒有）；回傳 true＝真的在面板裡（呼叫端就不要再自己畫儲存鈕）。 */

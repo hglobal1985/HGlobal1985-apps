@@ -6,7 +6,7 @@ import { classify } from "./ribbons";
 export const startOf = (c: CourseSummary): string | null => c.eventStart;
 
 /**
- * 同一系列的梯次清單統一排序（業主 2026-11-17 永久規則）：日期離今天越近的在上面、越遠的在下面（不分已過或未來，用相差天數比）；
+ * 同一系列的梯次清單統一排序（杜杜龍 2026-11-17 永久規則）：日期離今天越近的在上面、越遠的在下面（不分已過或未來，用相差天數比）；
  * 相差一樣近時，還沒到的排前面；沒有日期的放最後。梯次選單、系列「顯示全部」頁、課程卡的「還有 N 個梯次」都用這一個。
  */
 export function nearestFirst<T extends CourseSummary>(items: T[]): T[] {
@@ -21,7 +21,7 @@ export function nearestFirst<T extends CourseSummary>(items: T[]): T[] {
 }
 
 /**
- * 系列頁／梯次選單的項目排序（業主 2026-11-19）：還沒手動排過＝日期最近優先（nearestFirst）；
+ * 系列頁／梯次選單的項目排序（杜杜龍 2026-11-19）：還沒手動排過＝日期最近優先（nearestFirst）；
  * 超級管理員手動排過之後＝依他排的順序，之後新增（還沒排過）的卡自動排最前面。課程卡與清單卡要分開各排各的（呼叫端各傳各的）。
  */
 export function seriesOrdered<T extends CourseSummary>(items: T[]): T[] {
@@ -79,8 +79,8 @@ export function collapseSeries(list: CourseSummary[], all: CourseSummary[]): Ser
     .map((c) => ({ course: c, siblings: c.series ? nearestFirst(all.filter((x) => x.series === c.series && x.id !== c.id)) : [] }));
 }
 
-/** 課程在卡片、封面、首頁上顯示的名稱：有系列就顯示系列名稱，沒有系列才顯示課程名稱（「未分類」不是真正的系列，一律顯示課程名稱，業主 2026-11-20）。 */
-export const displayName = (c: { series: string; title: string }): string => c.title; // 課程卡封面文字一律用課程標題，不用系列名稱（業主 2026-11-21）
+/** 課程在卡片、封面、首頁上顯示的名稱：有系列就顯示系列名稱，沒有系列才顯示課程名稱（「未分類」不是真正的系列，一律顯示課程名稱，杜杜龍 2026-11-20）。 */
+export const displayName = (c: { series: string; title: string }): string => c.title; // 課程卡封面文字一律用課程標題，不用系列名稱（杜杜龍 2026-11-21）
 
 /** 一群梯次裡「日期最近」的那一場：還沒結束的取最近的，都結束了取最近結束的；沒有日期的最後才用。緞帶文字以它為準。 */
 export function nearestOf(list: CourseSummary[]): CourseSummary {

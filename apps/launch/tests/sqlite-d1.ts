@@ -6,7 +6,7 @@ import type { D1Database, D1PreparedStatement, D1Result } from "../src/d1.ts";
 /**
  * 測試用資料庫（套用全部 migration）。
  * firstLesson（預設 true）＝測試資料捷徑：新建的一般課程自動帶一堂空白「第 1 堂」。
- * 正式程式自 2026-11-16 起新增課程不再自動建立章節（業主指示）；這個捷徑只是讓早期寫好、需要一堂章節的測試不必各自多建一堂。
+ * 正式程式自 2026-11-16 起新增課程不再自動建立章節（杜杜龍指示）；這個捷徑只是讓早期寫好、需要一堂章節的測試不必各自多建一堂。
  * 要驗證「新增課程沒有章節」的測試請傳 { firstLesson: false }。
  */
 export function createTestDb(opts: { firstLesson?: boolean } = {}): D1Database {

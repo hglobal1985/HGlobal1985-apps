@@ -4,7 +4,7 @@ import { useSession } from "@/state/session";
 import type { BroadcastItem } from "./use-broadcasts";
 
 /**
- * 公告「已讀」紀錄（業主 2026-11-24：公告未讀要顯示紅色數字氣球，看過就消失）。
+ * 公告「已讀」紀錄（杜杜龍 2026-11-24：公告未讀要顯示紅色數字氣球，看過就消失）。
  * 記在這支手機／瀏覽器（AsyncStorage，網頁＝localStorage），依帳號分開（沒登入＝訪客）；不上傳伺服器。
  * 只記最近 500 則，避免越存越大。展開公告區塊＝裡面每一則都算看過。
  */

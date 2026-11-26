@@ -7,7 +7,7 @@ import { AppText, Card, ListRow, Pill } from "@/ui";
 import { hwLeft, hwWhen, resultShort, STATUS_TEXT } from "./format";
 
 /**
- * 「學習中」最上面的「我的作業」卡（業主 2026-11-25）：有作業的學員才看得到；
+ * 「學習中」最上面的「我的作業」卡（杜杜龍 2026-11-25）：有作業的學員才看得到；
  * 被退回、還沒交的排最前面，最近截止與剩幾天一眼看得到；老師另外看到「待批改」。點一列直接進那份作業。
  */
 export function MyHomeworkCard() {

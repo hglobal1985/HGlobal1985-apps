@@ -17,14 +17,14 @@ export function useSharePath(kind: "center" | "series", value: string, fallback:
   return slug ? `/${slug}` : fallback;
 }
 
-/** 至尊模式標題區右上角的「邀請」鈕（業主 2026-11-24：和超派同一個 HeaderInvite，只放邀請、不放加入清單）。 */
+/** 至尊模式標題區右上角的「邀請」鈕（杜杜龍 2026-11-24：和超派同一個 HeaderInvite，只放邀請、不放加入清單）。 */
 export function ElderInvite({ kind, value, title, fallback }: { kind: "center" | "series"; value: string; title: string; fallback: string }) {
   const path = useSharePath(kind, value, fallback);
   return <HeaderInvite title={title} path={path} />;
 }
 
 /**
- * 至尊模式「系列」頁最上面（業主 2026-11-24：與中心卡統一）：封面輪播（含訂閱鈕、點閱數）→ 公告黃色區塊。
+ * 至尊模式「系列」頁最上面（杜杜龍 2026-11-24：與中心卡統一）：封面輪播（含訂閱鈕、點閱數）→ 公告黃色區塊。
  * 封面、訂閱、點閱與超派模式系列頁是同一套（CenterHero、useCoverMedia("series")、useCoverStats("series")）。
  */
 export function ElderSeriesHead({ series, title }: { series: string; title: string }) {

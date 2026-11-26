@@ -10,7 +10,7 @@ import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { EdmLightbox } from "./edm-viewer";
 
 /**
- * 中心每月課表（業主 2026-11-21 選方案 A）：中心頁封面與廣播公告下方的課表卡（沒有標題）——縮圖、最近幾個月的月份小鈕（同一列最右邊是「歷年課表」進入鈕）；
+ * 中心每月課表（杜杜龍 2026-11-21 選方案 A）：中心頁封面與廣播公告下方的課表卡（沒有標題）——縮圖、最近幾個月的月份小鈕（同一列最右邊是「歷年課表」進入鈕）；
  * 點圖用照片放大視窗（下載、分享、雙指縮放）。沒有任何課表時整張卡不顯示。資料公開（訪客也看得到）。
  * 上傳在中心頁「編輯」面板的「課表管理」（features/admin/center-schedule-editor.web.tsx）。
  */
@@ -40,7 +40,7 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
   return (
     <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
       {items.length > 1 ? (
-        // 月份小鈕在左、「歷年課表」在同一列最右邊（業主 2026-11-21）；上方不再有「本月課表」標題。
+        // 月份小鈕在左、「歷年課表」在同一列最右邊（杜杜龍 2026-11-21）；上方不再有「本月課表」標題。
         <View style={styles.chipRow}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={styles.chips}>
             {items.slice(0, 8).map((x) => {
@@ -61,7 +61,7 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
           </Pressable>
         </View>
       ) : null}
-      {/* 地址收在課表卡最下面（業主 2026-11-21 方案二）：細線分隔、小字地址、右邊「導航 ›」與「歷年課表 ›」同樣大小；點整列開啟 Google 地圖。 */}
+      {/* 地址收在課表卡最下面（杜杜龍 2026-11-21 方案二）：細線分隔、小字地址、右邊「導航 ›」與「歷年課表 ›」同樣大小；點整列開啟 Google 地圖。 */}
       {address ? (
         <Pressable accessibilityRole="link" accessibilityLabel={`中心地址：${address}，開啟導航`} onPress={() => Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`).catch(() => undefined)} style={[styles.addr, { borderTopColor: c.border }]}>
           <Icon name="location" size={14} color={c.accentText} />
@@ -73,7 +73,7 @@ export function ScheduleCard({ items, title, address }: { items: Schedules["item
           </AppText>
         </Pressable>
       ) : null}
-      {/* 課表圖放最下方（業主 2026-11-23）：月份、歷年課表、地址、導航都在圖上方。 */}
+      {/* 課表圖放最下方（杜杜龍 2026-11-23）：月份、歷年課表、地址、導航都在圖上方。 */}
       <Pressable accessibilityRole="button" accessibilityLabel={`放大${ymLabel(sel.ym)}課表`} onPress={() => setZoom(true)} style={styles.img}>
         <Image source={{ uri: thumb(resolveUrl(sel.url), Math.min(winW, 720)) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
       </Pressable>

@@ -105,12 +105,12 @@ export const engine = {
     if (snap.slotKey === key) emit({ slotKey: null });
   },
   /** 使用者在上課頁點了同一門課的另一堂：換好之前（最多 6 秒）不跳迷你播放器，也不再詢問。 */
-  /** 正在迷你播放器／小圓圖時，使用者點了別的影片：新的這支沿用目前的小視窗或小圓圖，不跳回整頁（業主 2026-11-25）。 */
+  /** 正在迷你播放器／小圓圖時，使用者點了別的影片：新的這支沿用目前的小視窗或小圓圖，不跳回整頁（杜杜龍 2026-11-25）。 */
   keepMiniOnce() {
     keepMini = snap.collapsed;
   },
   expectSwitch(stayMini = false) {
-    if (stayMini) return; // 迷你播放器原地換片：不隱藏小視窗，換片才絲滑（業主 2026-11-25）
+    if (stayMini) return; // 迷你播放器原地換片：不隱藏小視窗，換片才絲滑（杜杜龍 2026-11-25）
     if (switchTimer) clearTimeout(switchTimer);
     switchTimer = setTimeout(() => {
       switchTimer = null;
@@ -121,7 +121,7 @@ export const engine = {
   async request(t: Track): Promise<boolean> {
     // 同一堂而且內容也沒變才算「已經是這一堂」；key 相同但內容不同（章節改過起訖秒數、換了影片來源）要重新載入。
     if (snap.track?.key === t.key && snap.track.fp === t.fp) return true;
-    ++requestSeq; // 切換影片不再詢問（業主 2026-11-25），直接換
+    ++requestSeq; // 切換影片不再詢問（杜杜龍 2026-11-25），直接換
     engine.load(t);
     return true;
   },

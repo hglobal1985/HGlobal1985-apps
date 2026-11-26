@@ -20,12 +20,12 @@ import { useBorderW } from "@/lib/elder-mode";
 export default function NoticesScreen() {
   const elder = useModeProfile().bigLayout; // 大字版面（至尊模式）：一欄直排、內文展開、不顯示大標題
   const { c } = useTheme();
-  const pinBw = useBorderW(2); // 框線粗細統一用全站規範（至尊 4、超派 2；業主 2026-11-25），審核置頂框用紅色
+  const pinBw = useBorderW(2); // 框線粗細統一用全站規範（至尊 4、超派 2；杜杜龍 2026-11-25），審核置頂框用紅色
   const { member, invalidate } = useSession();
   const { data, error, loading, reload } = useApi<Notice[]>(member ? "/notifications" : null);
   const unread = (data ?? []).filter((n) => !n.read).length;
-  // 檢視模式（業主 2026-11-17）：全部、審核、訂閱、留言。審核裡另外會顯示中央的獎銜、中心新申請（沒有權限就不顯示）。
-  // 標籤順序與內容（業主 2026-11-25）：留言 > 審核 > 訂閱 > 成就，沒有「全部」；伺服器分類 other 歸到訂閱。預設停在第一個有未讀的標籤。
+  // 檢視模式（杜杜龍 2026-11-17）：全部、審核、訂閱、留言。審核裡另外會顯示中央的獎銜、中心新申請（沒有權限就不顯示）。
+  // 標籤順序與內容（杜杜龍 2026-11-25）：留言 > 審核 > 訂閱 > 成就，沒有「全部」；伺服器分類 other 歸到訂閱。預設停在第一個有未讀的標籤。
   type Tab = "comment" | "subscribe" | "review" | "achievement";
   const tabOf = (n: Notice): Tab => (n.category === "other" ? "subscribe" : n.category);
   const [picked, setPicked] = useState<Tab | null>(null);
@@ -38,7 +38,7 @@ export default function NoticesScreen() {
     { key: "subscribe", label: "訂閱" },
     { key: "achievement", label: "成就" },
   ];
-  // 預設分頁只在第一次有資料時決定一次並固定（之後資料重抓、已讀變動都不再自動換分頁；業主 2026-11-25 回報置頂審核只停留一秒就消失）。
+  // 預設分頁只在第一次有資料時決定一次並固定（之後資料重抓、已讀變動都不再自動換分頁；杜杜龍 2026-11-25 回報置頂審核只停留一秒就消失）。
   // 有等待處理的審核就優先停在「審核」，讓紅框置頂看得到。
   const autoTab = useRef<Tab | null>(null);
   if (data && !autoTab.current) autoTab.current = (data ?? []).some((n) => n.pending) ? "review" : MODES.find((m) => count(m.key) > 0)?.key ?? "comment";
@@ -48,7 +48,7 @@ export default function NoticesScreen() {
   // 審核相關而且還沒處理的置頂（伺服器標 pending）；其他分頁不需要。
   const pinned = mode === "review" ? list.filter((n) => n.pending) : [];
   const rest = pinned.length ? list.filter((n) => !n.pending) : list;
-  // 成就、訂閱分頁：畫面上看得到的通知自動標為已讀，不必逐則點開（業主 2026-11-24 成就；2026-11-25 訂閱同）。
+  // 成就、訂閱分頁：畫面上看得到的通知自動標為已讀，不必逐則點開（杜杜龍 2026-11-24 成就；2026-11-25 訂閱同）。
   const seen = useRef(new Set<string>());
   const flush = useRef<ReturnType<typeof setTimeout> | null>(null);
   const markSeen = (n: Notice) => {
@@ -147,7 +147,7 @@ export default function NoticesScreen() {
         })}
       </View>
       )}
-      {/* 審核相關而且還沒處理的一律置頂（業主 2026-11-23）：在「全部」與「審核」都放在最上面，處理完（或已讀）才回到下面依日期排列。 */}
+      {/* 審核相關而且還沒處理的一律置頂（杜杜龍 2026-11-23）：在「全部」與「審核」都放在最上面，處理完（或已讀）才回到下面依日期排列。 */}
       {pinned.length ? (
         <View style={{ gap: 6, marginTop: space.xs }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -159,7 +159,7 @@ export default function NoticesScreen() {
       ) : null}
       {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
       {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
-      {/* 已處理／已讀的通知整列刷淡，不分日期、全部相黏排成一張清單（業主 2026-11-25）。 */}
+      {/* 已處理／已讀的通知整列刷淡，不分日期、全部相黏排成一張清單（杜杜龍 2026-11-25）。 */}
       {rest.length ? (
         <Card style={{ paddingVertical: 4, marginTop: space.xs }}>{rest.map((n, i) => wrapSeen(n, renderRow(n, i)))}</Card>
       ) : null}

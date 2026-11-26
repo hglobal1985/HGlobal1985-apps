@@ -2,7 +2,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
-/** 書櫃自成一套咖啡色系（業主 2026-11-17）；底部主選單與瀏覽器工具列也跟著變色。 */
+/** 書櫃自成一套咖啡色系（杜杜龍 2026-11-17）；底部主選單與瀏覽器工具列也跟著變色。 */
 export const LIB = {
   bg: "#2A1D16",
   wood: "#7A4B2A",

@@ -1,6 +1,6 @@
 import { aiResponseText, prepareVisionImage } from "./ai-image.ts";
 /**
- * 相簿照片場景辨識（業主 2026-11-24）：只辨識「其他相簿」（區塊照片，例如成交百寶箱），不辨識封面、也不辨識中心 EDM（EDM 走文字辨識）。
+ * 相簿照片場景辨識（杜杜龍 2026-11-24）：只辨識「其他相簿」（區塊照片，例如成交百寶箱），不辨識封面、也不辨識中心 EDM（EDM 走文字辨識）。
  * 用 Workers AI 視覺模型（設定 → AI 模型 →「相簿照片場景辨識」）認出行為、場景、物品，存成逗號分隔的短標籤到 cover_media.scene_text。
  * 額度走 reserveAi（和其他 AI 工作共用每日免費額度），用完自動停、隔天續辨。
  */
@@ -65,7 +65,7 @@ export async function sceneImage(env: Env, db: D1Database, rowId: string): Promi
     }
     await refundAi(db, est);
     if (/5018|not allowed to access/i.test(msg)) {
-      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請業主到 設定 › AI 模型 換模型。
+      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請杜杜龍到 設定 › AI 模型 換模型。
       await release();
       throw new AiStopped("這個帳號不能使用所選的 AI 模型，請到「設定 › AI 模型」改選 Llama 4 Scout");
     }

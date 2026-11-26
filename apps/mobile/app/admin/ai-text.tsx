@@ -17,7 +17,7 @@ type Field = { name: string; hint: string };
 type View_ = { fields: Field[]; defaults: Field[]; other: string; stats: { total: number; done: number; pending: number }; model: { id: string; name: string; cost: string } | null };
 
 /**
- * AI 文字辨識（超級管理員，業主 2026-11-24）：自訂 EDM 辨識文字要整理成哪些欄位（日期、時間、主題…）。
+ * AI 文字辨識（超級管理員，杜杜龍 2026-11-24）：自訂 EDM 辨識文字要整理成哪些欄位（日期、時間、主題…）。
  * 存檔後，已辨識的舊 EDM 會在背景自動用新格式重新整理（只跑文字模型，不用再看圖）。歸不進任何欄位的內容固定放在「其他內容」。
  */
 export default function AiTextScreen() {
@@ -27,7 +27,7 @@ export default function AiTextScreen() {
   const { data, error, loading, reload } = useApi<View_>(isSuper ? "/admin/edm-fields" : null);
   const [rows, setRows] = useState<Field[] | null>(null);
   const [busy, setBusy] = useState(false);
-  // 辨識進度與「辨識優先順序與開關」（業主 2026-11-26：整頁只有一個儲存鈕，開關與順序也改成草稿，一起存）
+  // 辨識進度與「辨識優先順序與開關」（杜杜龍 2026-11-26：整頁只有一個儲存鈕，開關與順序也改成草稿，一起存）
   const progress = useApi<Progress>(isSuper ? "/admin/ai/progress" : null);
   const [jobs, setJobs] = useState<JobRow[] | null>(null);
   const savedJobs = progress.data?.jobs ?? null;

@@ -10,7 +10,7 @@ export default function AuthDone() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // 只執行一次：登入完成後 reloadMember 會換成新的函式，原本會讓這個 effect 再跑第二次，
-  // 第二次找不到「登入進行中」的暫存（第一次已經用掉），就跳出「登入狀態已失效」（業主 2026-11-21 回報）。
+  // 第二次找不到「登入進行中」的暫存（第一次已經用掉），就跳出「登入狀態已失效」（杜杜龍 2026-11-21 回報）。
   const started = useRef(false);
   useEffect(() => {
     if (started.current) return;

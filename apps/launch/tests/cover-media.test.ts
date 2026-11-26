@@ -4,7 +4,7 @@ import { handleApi } from "../src/api.ts";
 import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-// 業主 2026-11-21：封面輪播與相簿（照片、短影音）。
+// 杜杜龍 2026-11-21：封面輪播與相簿（照片、短影音）。
 type R2Bucket = NonNullable<Env["MEDIA"]>;
 function memR2(): R2Bucket {
   const m = new Map<string, { body: Uint8Array; httpMetadata?: { contentType?: string } }>();
@@ -82,7 +82,7 @@ test("封面輪播與相簿：上傳照片與影片、排序、Range 播放、�
   assert.equal((await call<Item[]>("GET", "/cover-media?kind=series&key=U40")).data.length, 1);
 });
 
-test("封面輪播照片與 EDM 分頁照片分開儲存：各自上限、各自排序、封面輪播是否顯示 EDM（業主 2026-11-23）", async () => {
+test("封面輪播照片與 EDM 分頁照片分開儲存：各自上限、各自排序、封面輪播是否顯示 EDM（杜杜龍 2026-11-23）", async () => {
   const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
   const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown; bytes?: Uint8Array } = {}) => {
     const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.bytes ? {} : { "content-type": "application/json" }), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.bytes ? (opts.bytes as unknown as BodyInit) : opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
@@ -122,7 +122,7 @@ test("封面輪播照片與 EDM 分頁照片分開儲存：各自上限、各自
   assert.deepEqual((await call("GET", `/cover-media/config?center=${C}`)).data, { showEdm: true });
 });
 
-test("課程 EDM 併入中心 EDM 空間：已上傳與未來上傳的自動綁定；綁定的不能刪只能更換；同步換圖、下架、改中心（業主 2026-11-23）", async () => {
+test("課程 EDM 併入中心 EDM 空間：已上傳與未來上傳的自動綁定；綁定的不能刪只能更換；同步換圖、下架、改中心（杜杜龍 2026-11-23）", async () => {
   const bucket = memR2();
   const db = createTestDb();
   const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: bucket };
@@ -181,7 +181,7 @@ test("課程 EDM 併入中心 EDM 空間：已上傳與未來上傳的自動綁�
   assert.ok(await bucket.head("edm/start/other.jpg"), "課程自己的檔案沒被刪");
 });
 
-test("相簿專區 GET /albums：全站相簿照片依來源分資料夾（業主 2026-11-25）", async () => {
+test("相簿專區 GET /albums：全站相簿照片依來源分資料夾（杜杜龍 2026-11-25）", async () => {
   const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
   const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array } = {}) => {
     const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.bytes as unknown as BodyInit | undefined }), env);
@@ -201,7 +201,7 @@ test("相簿專區 GET /albums：全站相簿照片依來源分資料夾（業�
   assert.ok(r.groups[1]!.folders[0]!.thumb, "有縮圖");
 });
 
-test("相簿專區：資料夾依張數多到少、大類別順序可調、單一資料夾與全部搜尋（業主 2026-11-25）", async () => {
+test("相簿專區：資料夾依張數多到少、大類別順序可調、單一資料夾與全部搜尋（杜杜龍 2026-11-25）", async () => {
   const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
   const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {
     const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.json ? { "content-type": "application/json" } : {}), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.json ? JSON.stringify(opts.json) : opts.bytes) as unknown as BodyInit | undefined }), env);
@@ -232,7 +232,7 @@ test("相簿專區：資料夾依張數多到少、大類別順序可調、單�
   assert.deepEqual((await call<{ items: unknown[] }>("GET", "/albums/search?q=a")).data.items, [], "太短不搜");
 });
 
-test("相簿權限：獎銜達標可上傳、資料夾設定優先於類別、資訊總覽與瀏覽數（業主 2026-11-25）", async () => {
+test("相簿權限：獎銜達標可上傳、資料夾設定優先於類別、資訊總覽與瀏覽數（杜杜龍 2026-11-25）", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: memR2() };
   const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {
@@ -279,7 +279,7 @@ test("相簿權限：獎銜達標可上傳、資料夾設定優先於類別、�
   assert.ok(perms.data.ranks.length > 3 && perms.data.groups.some((g) => g.id === "block"));
 });
 
-test("舊照片重新壓縮：只有超級管理員能開始／暫停／看進度，沒有圖片轉檔服務時不開始（業主 2026-11-25）", async () => {
+test("舊照片重新壓縮：只有超級管理員能開始／暫停／看進度，沒有圖片轉檔服務時不開始（杜杜龍 2026-11-25）", async () => {
   const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on", MEDIA: memR2() };
   const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {
     const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { ...(opts.json ? { "content-type": "application/json" } : {}), ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: (opts.json ? JSON.stringify(opts.json) : opts.bytes) as unknown as BodyInit | undefined }), env);
@@ -300,7 +300,7 @@ test("舊照片重新壓縮：只有超級管理員能開始／暫停／看進�
   assert.equal((await call("POST", "/admin/recompress/stop", { token: admin })).status, 200);
 });
 
-test("區塊相簿子資料夾：建立／重新命名／移動／刪除、名稱規則、權限、上傳進資料夾（業主 2026-11-26）", async () => {
+test("區塊相簿子資料夾：建立／重新命名／移動／刪除、名稱規則、權限、上傳進資料夾（杜杜龍 2026-11-26）", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, DEMO_LOGIN: "on", MEDIA: memR2() };
   const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; bytes?: Uint8Array; json?: unknown } = {}) => {

@@ -1,6 +1,6 @@
 import { aiResponseText, prepareVisionImage } from "./ai-image.ts";
 /**
- * EDM 圖片辨識（業主 2026-11-23）：用 Workers AI 的視覺模型（設定 → AI 模型 →「EDM 圖片辨識」選用）讀出海報上的文字與活動日期，
+ * EDM 圖片辨識（杜杜龍 2026-11-23）：用 Workers AI 的視覺模型（設定 → AI 模型 →「EDM 圖片辨識」選用）讀出海報上的文字與活動日期，
  * 存在 cover_media 的 ocr_text／event_date，用於搜尋與 EDM 依活動日期排序。額度走 reserveAi（和其他 AI 工作共用每日免費額度）。
  */
 import { loadSearchSettings } from "./search-settings.ts";
@@ -22,7 +22,7 @@ const validDate = (y: number, m: number, d: number): string | null => {
   return new Date(iso + "T00:00:00Z").toISOString().slice(0, 10) === iso ? iso : null;
 };
 /**
- * 從辨識出的文字推活動日期（業主 2026-11-26 規定）：EDM 上的日期通常沒寫年份，年份取「離上傳日最近」的那一年（台灣時間；
+ * 從辨識出的文字推活動日期（杜杜龍 2026-11-26 規定）：EDM 上的日期通常沒寫年份，年份取「離上傳日最近」的那一年（台灣時間；
  * 試上傳前一年、當年、後一年三種，挑與上傳日相差天數最少的，所以 1 月上傳 12 月的海報會是前一年、12 月上傳 1 月的活動會是隔年）。
  * 海報上明確寫了完整年份（YYYY-MM-DD／YYYY年M月D日／YYYY/M/D）就照海報。找不到回 null。
  * uploaded＝這張 EDM 上傳的時間（沒給就用現在）。
@@ -85,7 +85,7 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
     await release();
     throw e;
   }
-  // 注意：不可把「今天日期」放進提示——模型會把它當成海報內容寫進辨識文字（業主 2026-11-24 回報）。日期由程式從文字推（inferDate）。
+  // 注意：不可把「今天日期」放進提示——模型會把它當成海報內容寫進辨識文字（杜杜龍 2026-11-24 回報）。日期由程式從文字推（inferDate）。
   const prompt = `你是文字辨識（OCR）工具。請把這張活動海報（EDM）上「看得到的文字」逐字抄寫出來（中文為主），依畫面由上到下、由左到右，換行用 \\n。嚴格規定：只能寫圖片上實際出現的文字；不可以寫任何你自己的話、說明、開場白、判斷或猜測；不要使用 Markdown 符號（例如 ** ###）。event_date 只有在海報上明確寫出完整日期時才填（YYYY-MM-DD），沒寫就填 null，不可猜。只回傳 JSON，不要其他說明：{"text":"圖片上的全部文字","event_date":"YYYY-MM-DD 或 null"}`;
   let out = "";
   try {
@@ -101,7 +101,7 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
     }
     await refundAi(db, est);
     if (/5018|not allowed to access/i.test(msg)) {
-      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請業主到 設定 › AI 模型 換模型。
+      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請杜杜龍到 設定 › AI 模型 換模型。
       await release();
       throw new AiStopped("這個帳號不能使用所選的 AI 模型，請到「設定 › AI 模型」改選 Llama 4 Scout");
     }
@@ -121,7 +121,7 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
   }
   const { text, date } = parsed;
   await db.prepare("UPDATE cover_media SET ocr_text = ?, event_date = ?, ocr_status = 'done', ocr_model = ?, ocr_fields = '', ocr_fmt = '' WHERE id = ?").bind(text, date, model, rowId).run();
-  // 接著套入欄位格式（業主 2026-11-24）；額度用完或失敗不影響辨識結果，之後背景會補整理。
+  // 接著套入欄位格式（杜杜龍 2026-11-24）；額度用完或失敗不影響辨識結果，之後背景會補整理。
   await structureEdm(env, db, rowId).catch(() => undefined);
 }
 
@@ -148,7 +148,7 @@ export async function ocrPending(env: Env, db: D1Database, limit = 3): Promise<v
 
 /**
  * 只補「還沒有活動日期」的已辨識 EDM（用已存的文字依 `inferDate` 推，不用 AI）。已經有日期的不會被改動
- * （業主 2026-11-26：改成「最近年份」規則後，舊的不用重算）。
+ * （杜杜龍 2026-11-26：改成「最近年份」規則後，舊的不用重算）。
  */
 export async function fillMissingEdmDates(db: D1Database): Promise<number> {
   const { results } = await db.prepare("SELECT id, ocr_text, event_date, created_at FROM cover_media WHERE scope = 'edm' AND kind = 'image' AND ocr_status = 'done' AND ocr_text <> '' AND event_date IS NULL LIMIT 500").all<{ id: string; ocr_text: string; event_date: string | null; created_at: string | null }>();

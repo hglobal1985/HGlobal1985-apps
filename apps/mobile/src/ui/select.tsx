@@ -28,7 +28,7 @@ export type SelectProps = {
 export function Select({ label, value, options, onChange, placeholder = "請選擇", active = false, onClear }: SelectProps) {
   const { c } = useTheme();
   const [open, setOpen] = useState(false);
-  // 至尊模式：選項在框下方原地展開，不跳整頁（業主 2026-11-24）。
+  // 至尊模式：選項在框下方原地展開，不跳整頁（杜杜龍 2026-11-24）。
   const inline = useModeProfile().sheets === "page";
   const scroller = useRef<ElementRef<typeof ScrollView>>(null);
   const current = options.find((o) => o.key === value);

@@ -13,7 +13,7 @@ test("同步清單：網址判讀與教材名稱格式", () => {
   assert.equal(syncTitle(dflt, "2026年11月 會長翡翠鑽石會議 主持：王大明", "2026-11-20"), "2026年11月 會長翡翠鑽石會議（主持王大明）");
   assert.equal(syncTitle(dflt, "會議全程", "2026-10-03"), "2026年10月 會長翡翠鑽石會議");
   assert.equal(syncTitle(defaultSyncFormat("王老師小線對焦會"), "對焦會", null), "王老師小線對焦會");
-  // 自訂命名規則（業主 2026-11-20）：「2026年3月x日 王老師小線對焦」
+  // 自訂命名規則（杜杜龍 2026-11-20）：「2026年3月x日 王老師小線對焦」
   const wang = "{年}年{月}月{日}日 王老師小線對焦";
   assert.equal(syncTitle(wang, "對焦會", "2026-03-14"), "2026年3月14日 王老師小線對焦");
   assert.equal(syncTitle(wang, "2026年3月 對焦會", "2026-03-09"), "2026年3月9日 王老師小線對焦");
@@ -143,7 +143,7 @@ test("命名規則已含 {日} 時，同名也不再加（月/日）尾巴", asy
   assert.deepEqual(rows.map((r) => r.title), ["2026年5月4日 王老師小線對焦", "2026年5月4日 王老師小線對焦"]);
 });
 
-test("同步排序規則：放最後面、手動鎖定後不重排（業主 2026-11-20）", async () => {
+test("同步排序規則：放最後面、手動鎖定後不重排（杜杜龍 2026-11-20）", async () => {
   const run = async (mode: string, locked: number) => {
     const db = createTestDb();
     const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
@@ -194,7 +194,7 @@ test("手動調整教材順序後，這張卡的同步自動鎖定", async () =>
   assert.equal(st?.sort_mode, "top");
 });
 
-test("已手動排序（鎖定）的卡：新影片依日期插入正確位置，其餘順序完全不動（業主 2026-11-20）", async () => {
+test("已手動排序（鎖定）的卡：新影片依日期插入正確位置，其餘順序完全不動（杜杜龍 2026-11-20）", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
   const q = (sql: string, ...v: unknown[]) => db.prepare(sql).bind(...v).run();
@@ -230,7 +230,7 @@ test("命名規則：{標題}＝影片原標題；移除文字從最後的名稱
   assert.deepEqual(names, ["A 影片（3/14）", "A 影片（3/20）"]);
 });
 
-test("同步清單：沒勾「使用行動大學播放器」＝存成外部連結、再同步不重複（業主 2026-11-24）", async () => {
+test("同步清單：沒勾「使用行動大學播放器」＝存成外部連結、再同步不重複（杜杜龍 2026-11-24）", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, YOUTUBE_API_KEY: "k" };
   await db.prepare("INSERT INTO courses (id, title, status) VALUES ('c1', '外連', 'published')").run();

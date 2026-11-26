@@ -57,7 +57,7 @@ import { AppText, Card, SegmentTabs, EmptyState, LoginPrompt, ErrorView, ListRow
 
 const ALL = "";
 const MODE_KEY = "hglobal:learn:course-view-mode";
-// 各專區（含教育中心）的展開狀態（業主 2026-11-20）：預設全部收合；這次開啟 App／網頁期間記住使用者最後的操作（切換分頁回來還在），
+// 各專區（含教育中心）的展開狀態（杜杜龍 2026-11-20）：預設全部收合；這次開啟 App／網頁期間記住使用者最後的操作（切換分頁回來還在），
 // 重新開啟（重新整理網頁、重開 App）就忘記、回到全部收合。只放在記憶體裡，不存到裝置。
 let zoneOpenMemory: Record<string, boolean> = {};
 const UNIT_FILTER_KEY = "hglobal:learn:unit-filter";
@@ -81,7 +81,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [selCats, setSelCats] = useState<string[]>(initialCategory ? initialCategory.split("、").filter(Boolean) : []);
   const category = selCats.join("、");
   const [catOpen, setCatOpen] = useState(false);
-  // 品牌篩選（業主 2026-11-18：品牌與分類分開，單選）；null＝全部品牌。
+  // 品牌篩選（杜杜龍 2026-11-18：品牌與分類分開，單選）；null＝全部品牌。
   const brandList = useApi<{ id: string; name: string }[]>("/brands");
   const [brandSel, setBrandSel] = useState<string | null>(null);
   const [center, setCenter] = useState(initialCenter || ALL);
@@ -126,7 +126,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     }
     syncUrl(vs.join("、"), vs.length ? ALL : center);
   };
-  // 搜尋（業主 2026-11-20）：不論在哪一個模式（所有系列、教育中心）按搜尋，一律自動切到「單元」模式的搜尋介面；關掉搜尋就回到原本的模式（不改變記住的模式）。
+  // 搜尋（杜杜龍 2026-11-20）：不論在哪一個模式（所有系列、教育中心）按搜尋，一律自動切到「單元」模式的搜尋介面；關掉搜尋就回到原本的模式（不改變記住的模式）。
   const [modeBeforeSearch, setModeBeforeSearch] = useState<CourseViewMode | null>(null);
   const openSearch = () => {
     setWantIndex(true);
@@ -179,7 +179,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const [mode, setMode] = useState<CourseViewMode>("series");
   useEffect(() => {
     AsyncStorage.getItem(MODE_KEY)
-      // 「教育中心」模式不記住（業主 2026-11-18）：每次進入寰宇大學預設都是「系列」檢視。
+      // 「教育中心」模式不記住（杜杜龍 2026-11-18）：每次進入寰宇大學預設都是「系列」檢視。
       .then((v) => (v === "chapter" || v === "series") && !initialCenter && !initialCenters && !focusKey && setMode(v))
       .catch(() => undefined);
   }, []);
@@ -210,7 +210,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     }
     if (m !== "center") AsyncStorage.setItem(MODE_KEY, m).catch(() => undefined);
   };
-  // 每一次點底部選單的「課程」（業主 2026-11-21）：不論目前在哪一頁，一律回到寰宇大學「所有系列」檢視（模式、中心、搜尋、分類、品牌篩選全部還原）。
+  // 每一次點底部選單的「課程」（杜杜龍 2026-11-21）：不論目前在哪一頁，一律回到寰宇大學「所有系列」檢視（模式、中心、搜尋、分類、品牌篩選全部還原）。
   const resetAll = () => {
     setMode("series");
     setCenter(ALL);
@@ -234,11 +234,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   }); // eslint-disable-line react-hooks/exhaustive-deps
   const [rowW, setRowW] = useState(0);
   const [wantIndex, setWantIndex] = useState(false);
-  const chapterMode = mode === "chapter" && !q.trim(); // 有搜尋字時一律顯示引擎的教材卡結果（業主 2026-11-25）
+  const chapterMode = mode === "chapter" && !q.trim(); // 有搜尋字時一律顯示引擎的教材卡結果（杜杜龍 2026-11-25）
   const searchData = useApi<{ lessons: SearchLesson[] }>(chapterMode ? "/search-index" : null);
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
-  // 卡片排序模式（業主 2026-11-18：方案 2，◀ ▶ 與相鄰交換）：只有超級管理員、只在「所有系列」；課程系列與清單專區各排各的。
+  // 卡片排序模式（杜杜龍 2026-11-18：方案 2，◀ ▶ 與相鄰交換）：只有超級管理員、只在「所有系列」；課程系列與清單專區各排各的。
   const [sortMode, setSortMode] = useState(false);
   const [orderOverride, setOrderOverride] = useState<string[] | null>(null);
   // 公開清單只取「已上架」（學習中用的下架封存課程不放這裡）；管理者再加上自己能管的未上架課程。
@@ -249,17 +249,17 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     return [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))];
   }, [data, adminList.data]);
   const courses = useMemo(() => sortCourses(merged, member, config.sortGroups), [merged, member, config.sortGroups]);
-  // 兩頁內容互不重複（業主 2026-11-15）：「寰宇教育中心」頁只有「中心課程」，「相同系列」「單元」只有一般課程。
+  // 兩頁內容互不重複（杜杜龍 2026-11-15）：「寰宇教育中心」頁只有「中心課程」，「相同系列」「單元」只有一般課程。
   // 「寰宇教育中心」頁＝主辦單位含中心的課程；「相同系列」「單元」＝總部主辦的課程，加上所有有指定「系列」標籤的課程（不論主辦單位）。
   const pool = useMemo(() => courses.filter((x) => (mode === "center" ? !!x.centerCourse : !x.centerCourse || !!x.series?.trim())), [courses, mode]);
   // 分類下拉＝「關鍵字管理」的分類清單（同步，沒有課程使用的分類也要列出）；載入前先用課程上出現過的分類。
-  // 「地區教育中心」不放進下拉（業主 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
+  // 「地區教育中心」不放進下拉（杜杜龍 2026-11-15）；課程上的這個標籤仍保留，只是不當篩選項目。
   const categoryList = useApi<string[]>("/categories");
-  // 每個分類的統計（數字一律是章節＝堂數，不是課程數；業主 2026-11-15）：全部幾堂、我「學習中」（已開通）幾堂、未上架幾堂（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
+  // 每個分類的統計（數字一律是章節＝堂數，不是課程數；杜杜龍 2026-11-15）：全部幾堂、我「學習中」（已開通）幾堂、未上架幾堂（管理者才看得到未上架的課）、最近 7 天有沒有新增的課程。
   const catStats = useMemo(() => {
     const weekAgo = Date.now() - config.app.freshDays * 24 * 3600 * 1000; // 「新」標籤：幾天內建立（設定 > APP 數值設定）
     const stats = new Map<string, { n: number; learning: number; draft: number; fresh: boolean }>();
-    // 清單項目與順序在所有模式一致（業主 2026-11-15）：來源＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定列在最後；數字（堂數）也一律是全站總堂數，三個模式完全相同。
+    // 清單項目與順序在所有模式一致（杜杜龍 2026-11-15）：來源＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定列在最後；數字（堂數）也一律是全站總堂數，三個模式完全相同。
     const names = new Set([...(categoryList.data ?? []), ...courses.flatMap(cats), NONE]);
     for (const name of names) {
       if (!name) continue;
@@ -279,7 +279,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     const weight = new Map([...catStats.keys()].map((k) => [k, total(k)]));
     return [...catStats.keys()].sort((a, b) => Number(a === NONE) - Number(b === NONE) || weight.get(b)! - weight.get(a)! || a.localeCompare(b, "zh-Hant"));
   }, [catStats, courses]);
-  // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（業主 2026-11-15）；不混入本地資料。
+  // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（杜杜龍 2026-11-15）；不混入本地資料。
   const rights = member?.courseRights;
   const centerList = useApi<string[]>("/centers"); // 沒登入的訪客也讀得到（最近一次成功的副本）
   const centers = centerList.data ?? [];
@@ -287,11 +287,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   // 中心只在「中心模式」才篩選；其他模式一律看全部中心。
   const activeCenter = mode === "center" ? center : ALL;
   const inCategory = (x: CourseSummary) => matchesCats(x, selCats) && (!brandSel || x.brandId === brandSel);
-  // 中心清單的排序（業主 2026-11-16）：依「課程數」由多到少，但只計算「有上傳教材」的課程（影音來源或附件）；同數量依名稱。
+  // 中心清單的排序（杜杜龍 2026-11-16）：依「課程數」由多到少，但只計算「有上傳教材」的課程（影音來源或附件）；同數量依名稱。
   const centerCounts = useMemo(
     () =>
       centers
-        .filter((name) => !HIDDEN_FROM_CENTER_LIST.has(normCenter(name))) // 業主 2026-11-17：「安麗公司」不顯示在中心清單（仍可當主辦單位）
+        .filter((name) => !HIDDEN_FROM_CENTER_LIST.has(normCenter(name))) // 杜杜龍 2026-11-17：「安麗公司」不顯示在中心清單（仍可當主辦單位）
         .map((name) => {
           const mine = courses.filter((x) => x.centerCourse && x.hasMaterial && normCenter(x.hostCenter) === normCenter(name) && inCategory(x));
           return { name, count: mine.length, materials: mine.reduce((n, x) => n + x.materialCount, 0) }; // materials＝該中心所有課程內含的教材總數（專區標題列數字用）
@@ -303,7 +303,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const canEditArt = activeCenter !== ALL && canEditCenterArt(member, activeCenter);
   const archived = (adminList.data ?? []).filter((x) => x.status === "archived" && (activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter)));
   const inCenter = (x: CourseSummary) => activeCenter === ALL || normCenter(x.hostCenter) === normCenter(activeCenter);
-  // 搜尋引擎：與至尊模式是同一個模組（features/search/use-search-engine.ts，業主 2026-11-25：同樣的關鍵字兩邊結果要一樣）。
+  // 搜尋引擎：與至尊模式是同一個模組（features/search/use-search-engine.ts，杜杜龍 2026-11-25：同樣的關鍵字兩邊結果要一樣）。
   // 有搜尋字時，結果一律是引擎排好的教材卡（不受分類、中心限制）＋其他類別的相近項目；章節模式只在沒搜尋字時使用。
   const eng = useSearchEngine(q, courses);
   const { semantic, phonetic } = eng;
@@ -319,29 +319,29 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     setQ(next);
     setPicked(next);
   };
-  // 選了某個中心：該中心的課程一門一張平鋪，同系列也不合併（業主 2026-11-15）。
+  // 選了某個中心：該中心的課程一門一張平鋪，同系列也不合併（杜杜龍 2026-11-15）。
   const flat = mode === "center" && center !== ALL;
   const seriesSettings = useSeriesSettings();
   const groups = useMemo(() => {
     if (flat) return list.map((x) => ({ key: `c:${x.id}`, nearest: x, sessions: [x] }));
-    // 系列卡（業主 2026-11-19）：「未分類」與關掉「顯示在所有系列」的系列只有超級管理員看得到；系列裡的卡都被隱藏就整張系列卡不出現。
+    // 系列卡（杜杜龍 2026-11-19）：「未分類」與關掉「顯示在所有系列」的系列只有超級管理員看得到；系列裡的卡都被隱藏就整張系列卡不出現。
     // 搜尋時不受這些限制（搜得到所有課程）。
     const all = groupBySeries(list, pool);
     const shown = matched ? all : all.filter((g) => (!g.nearest.series || seriesSettings.listed(g.nearest.series)) && (seriesSettings.admin || g.sessions.some((x) => !x.seriesHidden)));
     return matched && !chapterMode ? shown : orderGroups(shown, orderOverride ?? config.seriesOrder ?? []);
   }, [flat, list, pool, config.seriesOrder, orderOverride, matched, chapterMode, seriesSettings]);
-  // 系列檢視分兩個區塊（業主 2026-11-17 方案 A）：課程系列、清單專區（整組都是清單類別的）。
+  // 系列檢視分兩個區塊（杜杜龍 2026-11-17 方案 A）：課程系列、清單專區（整組都是清單類別的）。
   const zoneSections = useMemo(() => ZONES.map((z) => ({ zone: z.id, items: flat ? [] : groups.filter((g) => g.nearest.zone === z.id) })), [flat, groups]);
-  // 中心頁的「課程｜清單」切換（業主 2026-11-21 方案 A）：兩種都有才顯示切換，只有一種就直接顯示那一種。
-  // 業主 2026-11-21：中心頁第一個分頁是「相簿」（與封面輪播同一份資料）；預設仍停在課程，課程與清單都沒有時預設相簿。
+  // 中心頁的「課程｜清單」切換（杜杜龍 2026-11-21 方案 A）：兩種都有才顯示切換，只有一種就直接顯示那一種。
+  // 杜杜龍 2026-11-21：中心頁第一個分頁是「相簿」（與封面輪播同一份資料）；預設仍停在課程，課程與清單都沒有時預設相簿。
   const [kindTab, setKindTab] = useState<"album" | "schedule" | "course" | "list">("course");
   const nList = flat ? groups.filter((g) => g.nearest.isList).length : 0;
   const nCourse = flat ? groups.length - nList : 0;
   const centerPage = flat && activeCenter !== ALL;
-  // 中心頁三個分頁一律都在（相簿、EDM、清單），不顯示數量（業主 2026-11-21）；沒點過時才依內容挑預設。
+  // 中心頁三個分頁一律都在（相簿、EDM、清單），不顯示數量（杜杜龍 2026-11-21）；沒點過時才依內容挑預設。
   const [tabPicked, setTabPicked] = useState(false);
-  // 業主 2026-11-21：EDM＝該中心所有卡片的縮圖格；清單＝同樣這批卡片改成清單列表（一列一張）；相簿＝照片。沒有任何卡片時預設相簿。
-  // 中心頁沒點過分頁時一律停在第一個「EDM」（照片；業主 2026-11-23），不再依有沒有卡片挑預設。
+  // 杜杜龍 2026-11-21：EDM＝該中心所有卡片的縮圖格；清單＝同樣這批卡片改成清單列表（一列一張）；相簿＝照片。沒有任何卡片時預設相簿。
+  // 中心頁沒點過分頁時一律停在第一個「EDM」（照片；杜杜龍 2026-11-23），不再依有沒有卡片挑預設。
   const autoTab: "album" | "schedule" | "course" | "list" = centerPage ? "album" : kindTab === "list" ? "list" : "course";
   const tab: "album" | "schedule" | "course" | "list" = centerPage && tabPicked ? kindTab : autoTab;
   const flatShown = groups;
@@ -357,7 +357,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const narrowing = !!matched || selCats.length > 0 || !!brandSel;
   const zoneOpen = (key: string) => narrowing || !!opened[key];
   // 從清單頁返回要定位到某張卡：那張卡所在的專區要先展開，否則卡片不會出現、定位不到。
-  // 每個 focusKey 只展開一次（業主 2026-11-21 回報專區按「收合」收不起來：groups 每次重算都會再執行一次，把剛收合的專區又打開）。
+  // 每個 focusKey 只展開一次（杜杜龍 2026-11-21 回報專區按「收合」收不起來：groups 每次重算都會再執行一次，把剛收合的專區又打開）。
   const focusDone = useRef<string | null>(null);
   useEffect(() => {
     if (!focusKey || focusDone.current === focusKey) return;
@@ -430,7 +430,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     return out.sort((a, b) => rand(a.lesson.id) - rand(b.lesson.id));
   }, [chapterMode, courses, searchData.data, searchIndex, q, category, brandSel, activeCenter, member, shuffleSeed, unitFilter]); // eslint-disable-line react-hooks/exhaustive-deps
   // 一排放幾張：手機 2 張，寬一點的畫面 3 張，同一頁容納更多。
-  // 一列幾張（業主 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
+  // 一列幾張（杜杜龍 2026-11-18 大螢幕版面，theme/layout.ts）：手機＝中心頁直式 EDM 三張、其他 2～3 張；平板、電腦依寬度增加。
   const cols = flat ? portraitColumns(boxW) : tileColumns(boxW);
   const tileW = boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0;
   // 從清單頁返回：捲到同一張卡（網頁版）。
@@ -446,7 +446,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     }, 300);
     return () => clearTimeout(t);
   }, [focusKey, tileW, groups.length]); // eslint-disable-line react-hooks/exhaustive-deps
-  // 相簿照片的場景搜尋結果（業主 2026-11-24）：有打字時才找。
+  // 相簿照片的場景搜尋結果（杜杜龍 2026-11-24）：有打字時才找。
   const sceneBox = q.trim() ? (
     <>
       <SceneHits q={q} />
@@ -459,7 +459,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           <Pressable key={`${t.kind}:${t.text}`} accessibilityRole="button" accessibilityLabel={`${t.kind} ${t.text}`} onPress={() => pickTerm(t.text)} style={[styles.term, { borderBottomColor: c.border }]}>
             <View style={[styles.kind, { backgroundColor: c.accentSoft }]}>
               <AppText variant="caption" style={{ color: c.accentText, fontWeight: "700" }}>
-                {t.kind === "課程" ? "EDM" : t.kind /* 課程＝EDM 教材卡，關聯詞的標籤統一叫 EDM（業主 2026-11-24） */}
+                {t.kind === "課程" ? "EDM" : t.kind /* 課程＝EDM 教材卡，關聯詞的標籤統一叫 EDM（杜杜龍 2026-11-24） */}
               </AppText>
             </View>
             <AppText variant="body" numberOfLines={1} style={{ flex: 1 }}>
@@ -469,7 +469,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
         ))}
       </View>
     ) : null;
-  // 寬版（平板直橫式、手機橫放；業主 2026-11-18）：搜尋框一直展開直接輸入、分類框縮窄、三個模式按鈕＋文字且保持間距。
+  // 寬版（平板直橫式、手機橫放；杜杜龍 2026-11-18）：搜尋框一直展開直接輸入、分類框縮窄、三個模式按鈕＋文字且保持間距。
   const wideBar = useLayout().large;
   const filterRow = wideBar ? (
     <View>
@@ -525,7 +525,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     if (activeCenter !== ALL && !pushedRef.current) {
       // 先把目前這一筆紀錄的網址還原成沒選中心的樣子，再另外記一筆「中心頁」：返回時才不會又被網址帶回中心頁。
       const here = window.location.href;
-      // 中心專屬頁的「上一頁」一律＝所有中心的清單（業主 2026-11-17：不論是中心短網址、/courses?center=，或從課程頁返回進來）。
+      // 中心專屬頁的「上一頁」一律＝所有中心的清單（杜杜龍 2026-11-17：不論是中心短網址、/courses?center=，或從課程頁返回進來）。
       window.history.replaceState(window.history.state, "", category === ALL ? "/courses?view=centers" : urlFor(category, ALL));
       window.history.pushState({ hgCenter: 1 }, "", here);
       centerUrlRef.current = new URL(here).pathname + new URL(here).search;
@@ -552,7 +552,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   }); // eslint-disable-line react-hooks/exhaustive-deps
   const backFromCenter = () => {
     if (Platform.OS === "web" && pushedRef.current && typeof window !== "undefined") window.history.back();
-    // 中心短網址（獨立頁面）直接從分享網址進來：返回「所有中心」清單（業主 2026-11-17）。
+    // 中心短網址（獨立頁面）直接從分享網址進來：返回「所有中心」清單（杜杜龍 2026-11-17）。
     else if (inStack) (router.canGoBack() ? router.back() : router.replace("/courses?view=centers"));
     else pickCenter(ALL);
   };
@@ -573,11 +573,11 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
   const stats = useCoverStats("center", activeCenter === ALL ? null : activeCenter, `/courses?center=${encodeURIComponent(activeCenter)}`);
   const sch = useCenterSchedules(activeCenter === ALL ? "" : activeCenter);
   const [bcTick, setBcTick] = useState(0); // 新增、修改公告後加一，公告橫條重新讀取
-  // 新增公告（業主 2026-11-21）：中心頁＝該中心的公告；其他頁面只有超級管理員（首頁公告）。
+  // 新增公告（杜杜龍 2026-11-21）：中心頁＝該中心的公告；其他頁面只有超級管理員（首頁公告）。
   const canAnnounce = activeCenter !== ALL ? canEditArt : isSuperAdmin(member);
   const announceTargets: BroadcastTarget[] = activeCenter !== ALL ? [{ scope: "center", name: activeCenter, label: `${centerTitle(activeCenter)}公告` }] : [{ scope: "home", label: "首頁公告" }];
   const cm = useCoverMedia("center", activeCenter === ALL ? null : activeCenter);
-  // 中心 EDM 搜尋（業主 2026-11-23）：上方搜尋框輸入的字，比對 AI 從海報辨識出的文字與活動日期。
+  // 中心 EDM 搜尋（杜杜龍 2026-11-23）：上方搜尋框輸入的字，比對 AI 從海報辨識出的文字與活動日期。
   const edmShown = useMemo(() => {
     const k = q.trim().toLowerCase();
     return k ? cm.edm.filter((x) => `${x.eventDate ?? ""} ${x.text ?? ""}`.toLowerCase().includes(k)) : cm.edm;
@@ -610,16 +610,16 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     <Screen wide header={!inStack && activeCenter === ALL} topBar={activeCenter !== ALL ? <TopBar safeTop shadow title={centerTitle(activeCenter)} onBack={backFromCenter} right={
             <>
               {canEditArt ? <TopBarButton label="編輯" accessibilityLabel="編輯中心首頁圖與公告" iconName="create-outline" onPress={() => setArtOpen(true)} /> : null}
-              {/* 分享收在「邀請」面板裡（業主 2026-11-21）；有設定短網址就用短網址，沒有就用這個中心的網址。 */}
+              {/* 分享收在「邀請」面板裡（杜杜龍 2026-11-21）；有設定短網址就用短網址，沒有就用這個中心的網址。 */}
               <HeaderAddToList target={{ kind: "center", ref: activeCenter }} title={centerTitle(activeCenter)} />
               <HeaderInvite title={centerTitle(activeCenter)} path={shortLink ? `/${shortLink.slug}` : `/courses?center=${encodeURIComponent(activeCenter)}`} />
             </>
           } /> : undefined} hero={centerHero} heroFooter={centerHero ? <BroadcastZone flush center={activeCenter} title={`${centerTitle(activeCenter)}公告`} reloadKey={bcTick} /> : undefined} heroHeight={centerHeroFull(winWidth, winHeight)} scrollY={centerHero ? scrollY : undefined} top={activeCenter === ALL ? filterRow : undefined}>
-      {/* 廣播公告緊貼封面正下方、左右滿版（業主 2026-11-21），所以放在第一個。 */}
+      {/* 廣播公告緊貼封面正下方、左右滿版（杜杜龍 2026-11-21），所以放在第一個。 */}
       <LoginPrompt />
-      {/* 中心頁順序（業主 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
-      {/* 有課表時，地址收進課表卡最下面（業主 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
-      {/* 課表改放進中心頁「課表」分頁（業主 2026-11-23）；非中心頁維持原樣。 */}
+      {/* 中心頁順序（杜杜龍 2026-11-21 方案 A）：封面 → 廣播公告（緊接在封面下方）→ 地址 → 本月課表 → 課程／清單。 */}
+      {/* 有課表時，地址收進課表卡最下面（杜杜龍 2026-11-21 方案二）；沒有課表才單獨顯示地址卡。 */}
+      {/* 課表改放進中心頁「課表」分頁（杜杜龍 2026-11-23）；非中心頁維持原樣。 */}
       {!centerPage && activeCenter !== ALL && sch.data?.items.length ? <ScheduleCard items={sch.data.items} title={centerTitle(activeCenter)} address={centerAddress} /> : !centerPage && centerAddress ? <CenterAddress address={centerAddress} /> : null}
       {centerPage ? (
         <SegmentTabs options={[{ key: "album", label: "EDM" }, { key: "schedule", label: "課表" }, { key: "course", label: "重播" }, { key: "list", label: "列表" }]} value={tab} onChange={(k) => { setKindTab(k); setTabPicked(true); }} />
@@ -638,12 +638,12 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
           </>
         )
       ) : chapterMode || eng.searching ? (
-        // 有搜尋字＝一律顯示引擎的「單元」清單（業主 2026-11-25：以超派原本的搜尋結果為準，至尊與它一致）。
+        // 有搜尋字＝一律顯示引擎的「單元」清單（杜杜龍 2026-11-25：以超派原本的搜尋結果為準，至尊與它一致）。
         <>
           {data && searchData.loading && !searchData.data ? <LoadingLadybug /> : null}
           {data && (eng.searching ? !eng.chapters.length : searchData.data && !chapterItems.length) ? <EmptyState icon="library-outline" title={eng.loading ? "正在找相近的結果…" : q.trim() ? (eng.extras.length ? "沒有符合的章節，請看下方其他項目" : "找不到符合的章節") : "沒有符合條件的章節"} /> : null}
           <ChapterList items={eng.searching ? eng.chapters : chapterItems} />
-          {/* 其他項目（場景相片、EDM…）接在單元結果的最後面，同一個捲動區（業主 2026-11-25：放在上方會變成兩個區塊、無法下拉）。 */}
+          {/* 其他項目（場景相片、EDM…）接在單元結果的最後面，同一個捲動區（杜杜龍 2026-11-25：放在上方會變成兩個區塊、無法下拉）。 */}
           {sceneBox}
         </>
       ) : (
@@ -675,18 +675,18 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
             {tileW && mode === "center" && center === ALL
               ? centerCounts.map(({ name, materials }) => <CenterTile key={name} name={name} count={materials} edmUrl={(() => { const a = centerArt.data?.find((x) => x.centerKey === centerKeyOf(name) || x.center === name); return a ? a.coverUrl ?? a.edmUrl : undefined; })()} width={tileW} onPress={() => pickCenter(name)} />)
               : null}
-            {/* 三個專區（業主 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
+            {/* 三個專區（杜杜龍 2026-11-18）：寰宇課程活動與清單專區／安麗清單專區／安麗品牌專區；專區由課程的「專區」欄位決定，超級管理員可用標題右邊的「移動」鈕批次搬。 */}
             {tileW && flat && !(centerPage && tab === "list") ? flatShown.map((g) => <SeriesTile key={g.key} group={g} width={tileW} flat />) : null}
             {tileW && !(mode === "center" && center === ALL) && !flat
               ? zoneSections.map(({ zone, items }, zi) => (
                   <Fragment key={zone}>
-                    {items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，業主 2026-11-18）
+                    {items.length || canMove || zone === "amway_brand" ? ( // 安麗品牌專區一律顯示（訪客也看得到，杜杜龍 2026-11-18）
                       <>
                         <ZoneBand zone={zone} count={items.reduce((n, g) => n + g.sessions.reduce((m, x) => m + x.materialCount, 0), 0)} onMove={canMove ? () => setMoveTo(zone) : undefined} folded={!zoneOpen(zone)} onFold={() => toggleFold(zone)} />
                         {!zoneOpen(zone) ? null : items.map((g, i) => (sortMode && canSort ? <SortableTile key={g.key} group={g} width={tileW} index={i} count={items.length} onSwap={(d) => swapCard(items, i, d)} /> : <SeriesTile key={g.key} group={g} width={tileW} typeTag={!!q.trim()} />))}
                       </>
                     ) : null}
-                    {/* 教育中心固定排在第二個區塊（業主 2026-11-21，原本在最下面）；排序＝各中心教材總數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
+                    {/* 教育中心固定排在第二個區塊（杜杜龍 2026-11-21，原本在最下面）；排序＝各中心教材總數由多到少，「安麗公司」不列出（centerCounts 已處理）。 */}
                     {zi === 0 && mode === "series" && !matched && centerCounts.length ? (
                       <>
                         <ZoneBand text="寰宇教育中心" count={centerCounts.reduce((n, x) => n + x.materials, 0)} red folded={!opened.centers} onFold={() => toggleFold("centers")} />
@@ -696,7 +696,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
                   </Fragment>
                 ))
               : null}
-            {/* 第五大分類「相簿」（業主 2026-11-25）：自動彙整全站相簿照片的資料夾檢視，點開前往 /albums。 */}
+            {/* 第五大分類「相簿」（杜杜龍 2026-11-25）：自動彙整全站相簿照片的資料夾檢視，點開前往 /albums。 */}
             {tileW && mode === "series" && !matched && !flat ? <AlbumZoneBand /> : null}
           </View>
         </>
@@ -704,7 +704,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
       {archivedBlock}
       {canCreateCourse(member) || canEditArt || canAnnounce ? <View style={{ height: 64 }} /> : null}
     </Screen>
-    {/* 中心封面往下滑縮成迷你小視窗（業主 2026-11-24；與影片迷你小視窗同規格，共用 ui/mini-window）。 */}
+    {/* 中心封面往下滑縮成迷你小視窗（杜杜龍 2026-11-24；與影片迷你小視窗同規格，共用 ui/mini-window）。 */}
     {activeCenter !== ALL ? <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.carousel} title={centerTitle(activeCenter)} />} label={centerTitle(activeCenter)} range={centerHeroFull(winWidth, winHeight)} /> : null}
     {canCreateCourse(member) || canEditArt || canAnnounce ? (
       <AddMaterialFab onPick={setNewOpen} kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(canEditArt ? (["photos", "schedule"] as const) : []), ...(canAnnounce ? (["announce"] as const) : [])]} />
@@ -774,15 +774,15 @@ const ZONE_PALETTE: Record<string, Record<"light" | "dark", { bg: string; fg: st
 };
 
 /** 系列檢視的專區標題色帶：寰宇＝深綠淡底、安麗素材＝亮黃淡底、安麗品牌＝淡藍底、教育中心＝紅色淡底；右邊可放「移動」鈕（超級管理員）。 */
-function ZoneBand({ zone, text, icon, count, red, album, onMove, folded, onFold }: { /** 第五大分類「相簿」（業主 2026-11-25）：紫色，點整列前往相簿專區（onFold 當成前往）。 */ album?: boolean; zone?: Zone; text?: string; icon?: "library" | "folder-open" | "business" | "pricetag" | "images"; count: number; red?: boolean; onMove?: () => void; folded?: boolean; onFold?: () => void }) {
+function ZoneBand({ zone, text, icon, count, red, album, onMove, folded, onFold }: { /** 第五大分類「相簿」（杜杜龍 2026-11-25）：紫色，點整列前往相簿專區（onFold 當成前往）。 */ album?: boolean; zone?: Zone; text?: string; icon?: "library" | "folder-open" | "business" | "pricetag" | "images"; count: number; red?: boolean; onMove?: () => void; folded?: boolean; onFold?: () => void }) {
   const { c, scheme } = useTheme();
-  // 專區色帶顏色（業主 2026-11-18：深色模式的色帶也要變暗色）：每個專區一組「淺色／深色」，深色模式底色暗、文字與按鈕用亮色，全部集中在這裡。
+  // 專區色帶顏色（杜杜龍 2026-11-18：深色模式的色帶也要變暗色）：每個專區一組「淺色／深色」，深色模式底色暗、文字與按鈕用亮色，全部集中在這裡。
   const pal = ZONE_PALETTE[album ? "album" : red ? "centers" : zone === "amway_material" ? "material" : zone === "amway_brand" ? "brand" : "hglobal"];
   const look = pal ? { ...pal[scheme], icon: album ? ("images" as const) : red ? ("business" as const) : zone === "amway_material" ? ("folder-open" as const) : ("pricetag" as const) } : { bg: c.accentSoft, fg: c.accentText, icon: "library" as const };
   const label = text ?? (zone ? zoneLabel(zone) : "");
   return (
-    // 點標題列任意處都能收合／展開（業主 2026-11-18）；裡面的「移動」「收合」鈕各自處理自己的點擊。
-    // 方案 4（業主 2026-11-20）：極簡標題＋專區色底線（無底色）；數量用方案 1 的淡色圓形徽章靠右；右邊「收合／展開」文字加小箭頭。
+    // 點標題列任意處都能收合／展開（杜杜龍 2026-11-18）；裡面的「移動」「收合」鈕各自處理自己的點擊。
+    // 方案 4（杜杜龍 2026-11-20）：極簡標題＋專區色底線（無底色）；數量用方案 1 的淡色圓形徽章靠右；右邊「收合／展開」文字加小箭頭。
     <Pressable onPress={onFold} disabled={!onFold} accessibilityRole="header" accessibilityState={{ expanded: onFold ? !folded : undefined }} accessibilityLabel={`${label}，${count}`} style={[styles.zone, { borderBottomColor: look.fg }]}>
       <Ionicons name={icon ?? look.icon} size={24} color={look.fg} />
       <AppText variant="headline" style={{ fontWeight: "800", color: look.fg, flex: 1, fontSize: 19 }} numberOfLines={2}>

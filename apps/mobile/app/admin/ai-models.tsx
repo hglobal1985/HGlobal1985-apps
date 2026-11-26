@@ -35,7 +35,7 @@ export default function AiModelsScreen() {
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [testing, setTesting] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
-  // 整頁只有一個「儲存」（業主 2026-11-26）：選模型、額度上限、只用免費模型、Claude 預算都先改草稿，統一按儲存才寫入。
+  // 整頁只有一個「儲存」（杜杜龍 2026-11-26）：選模型、額度上限、只用免費模型、Claude 預算都先改草稿，統一按儲存才寫入。
   type SettingsDraft = Partial<Pick<Usage, "freeOnly" | "dailyCap" | "capEnabled" | "claudeMonthlyCapUsd">>;
   const [sdraft, setSdraft] = useState<SettingsDraft>({});
   const [saving, setSaving] = useState(false);

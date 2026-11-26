@@ -17,15 +17,15 @@ export const albumBlocks = (course: CourseDetail): Lesson[] => course.lessons.fi
 export const albumTotal = (course: CourseDetail) => albumBlocks(course).reduce((n, l) => n + blockPhotoCount(l), 0);
 
 /**
- * 相簿分頁（業主 2026-11-24）：不論照片存在哪個區塊，全部彙整在這裡，用區塊名稱當簡易分類標題，預設全部收起；一次展開一個。
+ * 相簿分頁（杜杜龍 2026-11-24）：不論照片存在哪個區塊，全部彙整在這裡，用區塊名稱當簡易分類標題，預設全部收起；一次展開一個。
  * 「瀏覽本區照片」（區塊第一列）跳到這裡：openId＝要自動展開並捲到的區塊。照片格與中心 EDM 相簿同一個元件（CoverAlbum）。
  */
 export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail; openId?: string | null; onChanged?: () => void }) {
   const { c } = useTheme();
   const all = albumBlocks(course);
   const [open, setOpen] = useState<string | null>(openId ?? null);
-  // 場景搜尋（業主 2026-11-24）：AI 辨識出的行為、場景、物品標籤；有搜尋時只列出符合的照片，符合的區塊自動展開。
-  // 搜尋改用共用模組 album-search.tsx（場景標籤＋照片裡的文字 OCR；業主 2026-11-25，與中心 EDM 一致）。
+  // 場景搜尋（杜杜龍 2026-11-24）：AI 辨識出的行為、場景、物品標籤；有搜尋時只列出符合的照片，符合的區塊自動展開。
+  // 搜尋改用共用模組 album-search.tsx（場景標籤＋照片裡的文字 OCR；杜杜龍 2026-11-25，與中心 EDM 一致）。
   const { q, setQ, key } = useAlbumSearch();
   const hasScene = all.some((g) => albumSearchable(g.photos!));
   const groups = key ? all.map((g) => ({ ...g, photos: g.photos!.filter((p) => matchAlbumItem(p, key)) })).filter((g) => g.photos.length) : all;
@@ -58,7 +58,7 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
               </Pressable>
               {on ? (
                 <View style={{ paddingBottom: space.sm, gap: space.sm, ...(g.blockLocked ? { position: "relative", minHeight: 200, overflow: "hidden", borderRadius: radius.md } : {}) }}>
-                  {/* 沒有權限：照樣顯示全部預覽縮圖，上面蓋鎖頭遮罩＋原因（LockMask，與課程沒報名同一個模組；業主 2026-11-24）。 */}
+                  {/* 沒有權限：照樣顯示全部預覽縮圖，上面蓋鎖頭遮罩＋原因（LockMask，與課程沒報名同一個模組；杜杜龍 2026-11-24）。 */}
                   {sceneTags(g.photos!).length ? <AppText variant="caption" tone="muted">{`場景：${sceneTags(g.photos!).join("、")}`}</AppText> : null}
                   <BlockBody group={g} canEdit={!!course.can?.edit && !key} searching={!!key} onChanged={onChanged ?? (() => undefined)} />
                   {/* 遮罩一定要放在最後一個子元素才蓋得住上面的縮圖（LockMask 的用法）。 */}
@@ -74,7 +74,7 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
 }
 
 /**
- * 區塊相簿的內容（業主 2026-11-26，與相簿瀏覽器共用子資料夾資料與面板 `album-subfolders.tsx`）：
+ * 區塊相簿的內容（杜杜龍 2026-11-26，與相簿瀏覽器共用子資料夾資料與面板 `album-subfolders.tsx`）：
  * 有子資料夾時，照片上方多一排標籤「全部／各資料夾（按張數多到少）／未分類」；有權限者多「＋新增」「管理」，每張照片可「移到資料夾」。
  * 只有「全部」標籤可排序／刪除（排序是整本的順序）。
  */

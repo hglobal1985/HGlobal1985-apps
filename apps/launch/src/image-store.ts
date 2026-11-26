@@ -2,7 +2,7 @@ import type { Env } from "./d1.ts";
 import { loadConfig } from "./ui-config.ts";
 
 /**
- * 圖片存進 R2 之前一律先壓縮（業主 2026-11-20）：設定在「設定 › 儲存空間管理 › 圖片壓縮」。
+ * 圖片存進 R2 之前一律先壓縮（杜杜龍 2026-11-20）：設定在「設定 › 儲存空間管理 › 圖片壓縮」。
  * 瀏覽器上傳前已先壓縮；這裡是伺服器端的最後關卡，涵蓋所有走伺服器存圖的地方（雲端硬碟匯入、匯入工作、舊版／其他管道）。
  * 不保留原圖：存的就是壓縮後的版本，使用者下載到的也是它。任何失敗都照原樣存（不擋上傳）。
  */
@@ -28,7 +28,7 @@ export async function shrinkImage(env: Env, data: ArrayBuffer, type: string, cls
     const app = (await loadConfig(env.DB)).app;
     const side = cls === "center" ? app.centerMaxSide : cls === "edm" ? app.edmMaxSide : app.imageMaxSide;
     const quality = override?.quality ?? (cls === "center" ? app.centerQuality : cls === "edm" ? app.edmQuality : app.imageQuality);
-    // 全站圖片的存檔格式不再有獨立設定（業主 2026-11-25）：一般圖片固定 JPEG；相簿照片與教材圖片用「相簿存檔格式」（override）；品牌 logo 保留原格式。
+    // 全站圖片的存檔格式不再有獨立設定（杜杜龍 2026-11-25）：一般圖片固定 JPEG；相簿照片與教材圖片用「相簿存檔格式」（override）；品牌 logo 保留原格式。
     const target = override?.format ?? (keepFormat ? fmt : "jpeg");
     const info = await env.IMAGES.info(new Response(data).body!);
     const longSide = Math.max(info.width ?? 0, info.height ?? 0);

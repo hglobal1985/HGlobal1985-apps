@@ -2,7 +2,7 @@ import Svg, { Ellipse, Path } from "react-native-svg";
 import { useTheme } from "@/theme/theme";
 
 /**
- * 小樹苗圖示（業主 2026-11-16 選定第 12 號：幼苗＋土堆）。「已完成」的章節與學習成就一律用它；
+ * 小樹苗圖示（杜杜龍 2026-11-16 選定第 12 號：幼苗＋土堆）。「已完成」的章節與學習成就一律用它；
  * 每學完一堂課（播放超過完成門檻）就累積一棵小樹苗。
  */
 export function SaplingIcon({ size = 36 }: { size?: number }) {

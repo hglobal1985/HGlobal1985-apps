@@ -1,4 +1,4 @@
-// 安全部署（業主 2026-11-20）：多個 AI 對話輪流或同時開發時，避免後部署的人蓋掉先部署的成果。
+// 安全部署（杜杜龍 2026-11-20）：多個 AI 對話輪流或同時開發時，避免後部署的人蓋掉先部署的成果。
 // 規則：只有「乾淨的 main、而且已經包含線上版本」才准部署；部署時把 git 提交編號寫進 Worker（GET /api/v2/version）。
 // 用法：npm run deploy -w @learn/launch（先把自己的修改合併進 main 再執行）。緊急情況才用 --force（會警告）。
 import { execSync } from "node:child_process";
@@ -48,7 +48,7 @@ if (!force) {
   console.warn("⚠️ 使用 --force：略過所有保護檢查，可能蓋掉別人的成果！");
 }
 
-// 套件齊全檢查（業主 2026-11-21：邀請按鈕壞掉，因為雲端環境沒裝到新加的 qrcode-generator，打包照樣成功、到使用者手機才當掉）。
+// 套件齊全檢查（杜杜龍 2026-11-21：邀請按鈕壞掉，因為雲端環境沒裝到新加的 qrcode-generator，打包照樣成功、到使用者手機才當掉）。
 // package.json 列的每個套件都要真的裝在 node_modules；缺了就先自動 npm install，還缺就停下來，不可以帶著缺的套件部署。
 import { existsSync, readFileSync } from "node:fs";
 const missingDeps = () => {
@@ -72,7 +72,7 @@ if (missingDeps().length) {
   if (still.length) die(`套件還是缺：${still.join("、")}。不可以帶著缺的套件部署，請檢查 package.json 與網路。`);
 }
 
-// 至尊／超派模式同步檢查（業主 2026-11-24）：至尊模式寫死權限、畫面自己判斷模式＝擋下不部署（apps/mobile/scripts/check-mode-parity.mjs）。
+// 至尊／超派模式同步檢查（杜杜龍 2026-11-24）：至尊模式寫死權限、畫面自己判斷模式＝擋下不部署（apps/mobile/scripts/check-mode-parity.mjs）。
 run(`node ${new URL("../../mobile/scripts/check-mode-parity.mjs", import.meta.url).pathname}`);
 run("npm run build:web -w @learn/mobile");
 run("npm run embed");

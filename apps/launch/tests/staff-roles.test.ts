@@ -6,7 +6,7 @@ import { setCentralFetch } from "../src/central.ts";
 import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-// 業主 2026-11-21：App 內指派職務（中央串接指令 2026-11-21.1）。
+// 杜杜龍 2026-11-21：App 內指派職務（中央串接指令 2026-11-21.1）。
 const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const jwk = { ...publicKey.export({ format: "jwk" }), kid: "k1", use: "sig", alg: "RS256" };
 const ISS = "https://id.hglobal1985.com";

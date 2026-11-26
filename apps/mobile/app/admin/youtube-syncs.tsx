@@ -14,7 +14,7 @@ type Sync = { appPlayer?: number; stripText?: string; id: string; label: string;
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("zh-TW", { hour12: false }) : "還沒同步過");
 
 /**
- * 設定 › 同步 YouTube 清單（業主 2026-11-20，超級管理員）：貼上播放清單網址、選要放進哪一張教材卡（或直接新建一張），
+ * 設定 › 同步 YouTube 清單（杜杜龍 2026-11-20，超級管理員）：貼上播放清單網址、選要放進哪一張教材卡（或直接新建一張），
  * 之後清單有新影片，按該列的「同步」就會把新影片匯成教材（已經同步過的不重複）。每份清單各自有「命名規則」與「排序規則」，可在清單卡上修改；你手動調整過順序的卡會自動鎖定，同步不會重排。
  */
 export default function YoutubeSyncsScreen() {
@@ -161,7 +161,7 @@ function AddSheet({ help, sortLabels, onClose, onDone }: { help: string; sortLab
   const [newTitle, setNewTitle] = useState("");
   const [courseId, setCourseId] = useState("");
   const [prefix, setPrefix] = useState("");
-  const [format, setFormat] = useState(TITLE_ONLY); // 預設勾選「教材名稱＝YouTube 影片名稱」（業主 2026-11-23）
+  const [format, setFormat] = useState(TITLE_ONLY); // 預設勾選「教材名稱＝YouTube 影片名稱」（杜杜龍 2026-11-23）
   const [strip, setStrip] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

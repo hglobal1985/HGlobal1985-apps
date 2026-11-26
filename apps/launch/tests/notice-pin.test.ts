@@ -4,7 +4,7 @@ import { handleApi } from "../src/api.ts";
 import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-test("通知：審核相關而且還沒處理的標 pending（待審報名看報名狀態、其他審核通知看有沒有讀）（業主 2026-11-23）", async () => {
+test("通知：審核相關而且還沒處理的標 pending（待審報名看報名狀態、其他審核通知看有沒有讀）（杜杜龍 2026-11-23）", async () => {
   const db = createTestDb();
   const env: Env = { DB: db, DEMO_LOGIN: "on" };
   const call = async (method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {

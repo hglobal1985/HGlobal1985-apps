@@ -43,7 +43,7 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
   const [preview, setPreview] = useState<{ cover?: string; poster?: string }>({});
   const [frames, setFrames] = useState(false);
   const media = lesson.media;
-  const canFrames = media?.type === "mux"; // YouTube 不再提供抓畫面當封面（業主 2026-11-22）
+  const canFrames = media?.type === "mux"; // YouTube 不再提供抓畫面當封面（杜杜龍 2026-11-22）
 
   const start = (img: HTMLImageElement, consumeKey?: string) => setJob({ img, cover: defaultRect(img, 16 / 9), poster: defaultRect(img, POSTER_ASPECT), step: "cover", usePoster: true, consumeKey });
   const fromLibrary = ({ img, consumeKey }: PickedCover) => start(img, consumeKey);

@@ -8,7 +8,7 @@ import { AppText } from "./text";
 import { Icon } from "./icon";
 
 /**
- * 【全站統一的下拉選單模組】（業主 2026-11-24 永久指示：獎銜／中心／系統的下拉樣式就是標準，所有「原地展開」的下拉都用這個，不可另做）。
+ * 【全站統一的下拉選單模組】（杜杜龍 2026-11-24 永久指示：獎銜／中心／系統的下拉樣式就是標準，所有「原地展開」的下拉都用這個，不可另做）。
  * 原本寫在 features/profile-prompt.tsx，現搬到這裡共用；會員資料表單、至尊模式的 Select 都從這裡來。
  * 樣式：深綠 2px 框、白底、選中項淡綠底、再按一次收起。
  */
@@ -16,7 +16,7 @@ const FIELD_H = 40;
 /**
  * 自訂下拉選單（不用系統原生選單）：依螢幕剩餘空間自動往下或往上展開；選項超過 12 個時上方有搜尋框。
  */
-export function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth, flow, big }: { /** 至尊模式大尺寸：跟首頁／課程的搜尋框同款（粗綠框、高 80）。 */ big?: boolean; /** 一欄堆疊版面（至尊模式頁）：選項直接展開在欄位下方、把後面的內容往下推，不浮在畫面上被別的元件蓋住。 */ flow?: boolean; pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（業主 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
+export function Dropdown({ options, value, label, disabled, onPick, open, onOpenChange, pop, keepWidth, flow, big }: { /** 至尊模式大尺寸：跟首頁／課程的搜尋框同款（粗綠框、高 80）。 */ big?: boolean; /** 一欄堆疊版面（至尊模式頁）：選項直接展開在欄位下方、把後面的內容往下推，不浮在畫面上被別的元件蓋住。 */ flow?: boolean; pop?: "left" | "center" | "right"; /** 勾了「無」等狀態：欄位寬度鎖在勾選前的寬度（杜杜龍 2026-11-23），不隨文字縮短。 */ keepWidth?: boolean; options: { value: string; label: string }[]; value: string; label: string; disabled?: boolean; onPick: (v: string) => void; open: boolean; onOpenChange: (o: boolean) => void }) {
   const { c } = useTheme();
   const bw = useBorderW(1);
   const bw2 = useBorderW(2);

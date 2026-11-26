@@ -1,5 +1,5 @@
 /**
- * 語意搜尋的資料來源（業主 2026-11-25）：每一種來源＝哪張資料表的哪個欄位、搜尋結果的膠囊標籤叫什麼、點下去去哪。
+ * 語意搜尋的資料來源（杜杜龍 2026-11-25）：每一種來源＝哪張資料表的哪個欄位、搜尋結果的膠囊標籤叫什麼、點下去去哪。
  * 在「設定 → 搜尋與 AI 設定」可個別開關（search-settings.ts 的 semSrc* 參數）；新增來源只加這一處＋一個開關參數。
  * 只收公開的文字（已上架、非「只限網址」的課程；中心／系列／相簿／EDM 本來就公開），不含會員或 Amway 資料。
  */
@@ -47,7 +47,7 @@ export async function candidates(db: D1Database, on: (kind: SourceKind) => boole
 const enc = encodeURIComponent;
 const pub = (key: string | null | undefined, v = 0) => (key ? `/api/v2/media/pub?k=${enc(key)}&v=${v}` : null);
 /** 把「非課程／非章節」的命中補上標題、縮圖與去向（只處理分數最高的幾筆）。看不到的（下架、只限網址）直接略過。
- *  去向（業主 2026-11-25）：單一教材＝直接播放、區塊＝直接開該區塊、教材卡／課程介紹＝課程頁、系列卡＝系列頁、中心卡＝中心頁、EDM／相片＝直接放大看圖。 */
+ *  去向（杜杜龍 2026-11-25）：單一教材＝直接播放、區塊＝直接開該區塊、教材卡／課程介紹＝課程頁、系列卡＝系列頁、中心卡＝中心頁、EDM／相片＝直接放大看圖。 */
 export async function resolveHits(db: D1Database, hits: { kind: SourceKind; ref: string; txt: string; score: number }[]): Promise<Hit[]> {
   // 每筆各自查，改成同時查（以前一筆一筆等，100 筆要好幾秒）；順序維持原樣。
   const all: Hit[][] = [];

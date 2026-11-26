@@ -5,9 +5,9 @@ import { choiceSheet } from "@/features/confirm";
 import { setUnsavedGuard } from "./unsaved-guard";
 
 /**
- * 設定頁「有改動沒存檔就要離開」的攔截（業主 2026-11-26 永久指示）：
+ * 設定頁「有改動沒存檔就要離開」的攔截（杜杜龍 2026-11-26 永久指示）：
  * 有未存的修改時，按返回、底部主選單、頁面上的跳轉（走 `runGuarded` 的都算）、或關閉／重新整理網頁，都會先跳出
- * 「儲存／放棄修改／繼續編輯」讓業主決定；沒有改動就直接離開。
+ * 「儲存／放棄修改／繼續編輯」讓杜杜龍決定；沒有改動就直接離開。
  * save 要回傳是否成功（失敗就留在原頁）；discard 把畫面改回已儲存的內容（放棄時呼叫）。
  */
 export function useUnsavedPrompt({ dirty, save, discard }: { dirty: boolean; save: () => Promise<boolean> | boolean; discard: () => void }): void {

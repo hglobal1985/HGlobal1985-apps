@@ -9,7 +9,7 @@ import { flashText } from "@/ui/flash-notice";
 const RED = "#B3261E";
 
 /**
- * App 內建瀏覽器警示條（業主 2026-11-17 定稿）：全站在「上方返回工具列」正下方（五個主分頁在最上方）固定顯示，全寬、固定大小，
+ * App 內建瀏覽器警示條（杜杜龍 2026-11-17 定稿）：全站在「上方返回工具列」正下方（五個主分頁在最上方）固定顯示，全寬、固定大小，
  * 紅框淡粉紅底；標題強制兩行、按鈕置中「按此改用Chrome／Safari瀏覽器開啟」。不是 App 內建瀏覽器就不顯示。
  * 偵測與開啟方式只在 lib/in-app-browser.ts；要改畫面只改這個檔案。
  */
@@ -39,7 +39,7 @@ export function InAppBrowserBanner() {
         <Text style={styles.btnText}>👉按這裡開啟 寰宇行動大學👈</Text>
       </Pressable>
     </View>
-    {/* 警示條下方整個 App 蓋一層 60% 暗化（業主 2026-11-17）；只是視覺提醒，不擋操作。 */}
+    {/* 警示條下方整個 App 蓋一層 60% 暗化（杜杜龍 2026-11-17）；只是視覺提醒，不擋操作。 */}
     {h > 0 ? <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: h, backgroundColor: DIM_COLOR, zIndex: 50 }} /> : null}
     </>
   );

@@ -15,7 +15,7 @@ import { flashText } from "./flash-notice";
 /** 與 App 內建瀏覽器警示條同一組紅色（in-app-banner.tsx）。 */
 const RED = "#B3261E";
 /**
- * 「加入主畫面」邀請卡（業主 2026-11-18，全站唯一來源）：只在手機與平板網頁（含 iPad）、還沒安裝時顯示。
+ * 「加入主畫面」邀請卡（杜杜龍 2026-11-18，全站唯一來源）：只在手機與平板網頁（含 iPad）、還沒安裝時顯示。
  * 好處：手機推播的來源會顯示「寰宇行動大學」、開啟更快。Android 一鍵安裝；iPhone、iPad 顯示「分享 → 加入主畫面」教學。
  * dismissible＝可按 ✕ 先關掉這一次（首頁用）；通知設定頁不可關。
  */
@@ -25,7 +25,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
   const { suggest, native } = useInstallState();
   const [hidden, setHidden] = useState(false);
   const [steps, setSteps] = useState(false);
-  // ✕ 只是這一次先關掉：重新進入首頁（回到畫面、重新開啟網站）會再出現，直到安裝為止（業主 2026-11-18）。
+  // ✕ 只是這一次先關掉：重新進入首頁（回到畫面、重新開啟網站）會再出現，直到安裝為止（杜杜龍 2026-11-18）。
   useFocusEffect(
     useCallback(() => {
       setHidden(false);
@@ -45,7 +45,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
     <>
       <View style={[styles.card, { backgroundColor: c.dangerSoft, borderColor: RED, borderWidth: bw }]}>
         <PhoneAppIcon size={34} color={RED} />
-        {/* 一行文字，空間不夠時自動換行（業主 2026-11-18） */}
+        {/* 一行文字，空間不夠時自動換行（杜杜龍 2026-11-18） */}
         <View style={{ flex: 1, minWidth: 0 }}>
           <AppText style={styles.title}>安裝至手機主畫面變成app</AppText>
         </View>
@@ -89,7 +89,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
   );
 }
 
-/** 手機輪廓＋桌面上排好的 App 小點點（業主 2026-11-18）：示意「裝到手機主畫面」。 */
+/** 手機輪廓＋桌面上排好的 App 小點點（杜杜龍 2026-11-18）：示意「裝到手機主畫面」。 */
 function PhoneAppIcon({ size, color }: { size: number; color: string }) {
   const dots = [0, 1, 2].flatMap((r) => [0, 1, 2].map((c) => ({ x: 8.5 + c * 5, y: 8.5 + r * 5.5 })));
   return (

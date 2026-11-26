@@ -19,7 +19,7 @@ type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mo
 function defaultCover(img: HTMLImageElement): Rect {
   const w = Math.min(img.naturalWidth, (img.naturalHeight * 16) / 9);
   const h = (w * 9) / 16;
-  // 垂直置中：一般照片與海報的主角多半在中間（業主 2026-11-15）。
+  // 垂直置中：一般照片與海報的主角多半在中間（杜杜龍 2026-11-15）。
   return { x: Math.round((img.naturalWidth - w) / 2), y: Math.max(0, Math.round((img.naturalHeight - h) / 2)), w: Math.round(w), h: Math.round(h) };
 }
 /** 以封面框（占 EDM 寬高的比例）還原成像素。 */
@@ -33,14 +33,14 @@ function rectFrom(img: HTMLImageElement, r: { x: number; y: number; w: number })
 export type ArtInfo = { edmUrl: string; coverUrl?: string | null; coverRect?: { x: number; y: number; w: number } | null; edmViewY: number };
 
 /**
- * 封面上傳模組（網頁版；業主 2026-11-16：中心、系列……所有「上傳 EDM 並裁切 16:9 封面」一律用這一個）：
+ * 封面上傳模組（網頁版；杜杜龍 2026-11-16：中心、系列……所有「上傳 EDM 並裁切 16:9 封面」一律用這一個）：
  * 上傳整張海報後，自己拖曳裁切一個 16:9 的「封面」（或選「完整顯示」）。這個框同時決定兩處：清單卡片縮圖，以及進入頁面時 EDM 一開始停留的位置（＝框的上緣）；
  * 做法與課程 EDM 相同。圖片在瀏覽器內壓縮，不保留原始檔案。
  * endpoints.edm＝上傳 EDM（PUT）／調整框（PATCH）／移除（DELETE）共用的網址；endpoints.cover＝上傳封面（PUT）的網址。想改裁切流程或加功能，只改這個檔案。
  */
-export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", center = false }: { /** 中心封面照片：壓縮用「中心封面照片」設定（比一般高畫質；設定 › 儲存空間管理）。 */ center?: boolean; /** 這張圖的名稱：中心叫「首頁圖」、系列叫「EDM」（業主 2026-11-17）。 */ noun?: string; label: string; art?: ArtInfo | null; endpoints: { edm: string; cover: string }; onChanged: () => void }) {
+export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", center = false }: { /** 中心封面照片：壓縮用「中心封面照片」設定（比一般高畫質；設定 › 儲存空間管理）。 */ center?: boolean; /** 這張圖的名稱：中心叫「首頁圖」、系列叫「EDM」（杜杜龍 2026-11-17）。 */ noun?: string; label: string; art?: ArtInfo | null; endpoints: { edm: string; cover: string }; onChanged: () => void }) {
   const { config } = useUiConfig();
-  // 壓縮規格兩類（業主 2026-11-18）：中心封面照片＝高畫質；其餘＝一般。
+  // 壓縮規格兩類（杜杜龍 2026-11-18）：中心封面照片＝高畫質；其餘＝一般。
   const coverSide = center ? config.app.centerMaxSide : config.app.imageMaxSide;
   const quality = (center ? config.app.centerQuality : config.app.imageQuality) / 100;
   const input = useRef<HTMLInputElement | null>(null);
@@ -48,7 +48,7 @@ export function ArtUploader({ label, art, endpoints, onChanged, noun = "EDM", ce
   const [preview, setPreview] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  // 在編輯面板裡：「儲存封面」登記到面板下方與「取消」同一列（業主 2026-11-17），不再在內文裡另放按鈕。
+  // 在編輯面板裡：「儲存封面」登記到面板下方與「取消」同一列（杜杜龍 2026-11-17），不再在內文裡另放按鈕。
   const inSheet = useSheetSave(job ? { label: "儲存封面", onPress: () => void save(), busy, dirty: true } : null);
 
   useEffect(() => {

@@ -67,7 +67,7 @@ async function recipients(db: Env["DB"], n: Pending): Promise<string[]> {
   const { results } = await stmt.all<{ member_sub: string }>();
   const subs = results.map((r) => r.member_sub);
   if (!subs.length) return [];
-  // 依通知情境過濾（業主 2026-11-18）：會員改過的用他的設定，沒改過的用預設（只有付費課程審核通知預設寄）。
+  // 依通知情境過濾（杜杜龍 2026-11-18）：會員改過的用他的設定，沒改過的用預設（只有付費課程審核通知預設寄）。
   const kind = noticeKindOf(n.title, n.link);
   const def = NOTICE_KINDS.find((k) => k.key === kind)?.emailDefault ?? false;
   const saved = new Map<string, string | null>();

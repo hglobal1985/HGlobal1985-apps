@@ -2,7 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { useTheme } from "@/theme/theme";
 
 /**
- * 「流光漸層邊框」模組（業主 2026-11-17）：迷你播放器那圈網站色系（深綠、橄欖、金）的高級反光漸層邊框，緩慢流動；
+ * 「流光漸層邊框」模組（杜杜龍 2026-11-17）：迷你播放器那圈網站色系（深綠、橄欖、金）的高級反光漸層邊框，緩慢流動；
  * 全螢幕文字提醒（flash-notice）與迷你播放器（player-layer.web）共用這一組定義，以後要改粗細、顏色、動畫、陰影，只改這個檔案，兩邊一起變，
  * 之後新增任何要用這種邊框的地方也用 GradientFrame（或 frameBoxStyle），不要另寫。iOS／Android 在 gradient-frame.tsx（先用單色邊框）。
  */

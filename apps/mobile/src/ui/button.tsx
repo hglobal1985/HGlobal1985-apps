@@ -32,7 +32,7 @@ export function Button({
     secondary: { bg: c.surface, fg: c.text, border: c.border },
     ghost: { bg: "transparent", fg: c.accentText, border: "transparent" },
     danger: { bg: c.dangerSoft, fg: c.danger, border: c.dangerSoft },
-    // 取消／關閉／放棄：紅色外框＋紅字＋不填色（業主 2026-11-19 全站統一）；儲存／確定一律用 primary（深綠）。
+    // 取消／關閉／放棄：紅色外框＋紅字＋不填色（杜杜龍 2026-11-19 全站統一）；儲存／確定一律用 primary（深綠）。
     cancel: { bg: "transparent", fg: c.danger, border: c.danger },
     // 危險動作的確認（刪除、移除…）：實心紅底白字。
     dangerSolid: { bg: c.danger, fg: "#fff", border: c.danger },

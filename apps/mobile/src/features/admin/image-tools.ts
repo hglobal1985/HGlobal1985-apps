@@ -70,7 +70,7 @@ export async function cropCompress(img: HTMLImageElement, crop: Rect | null, max
   return toBlob(c, quality);
 }
 
-/** 背景模糊強度：把照片縮到 1/N 再放大回來（N 越大越模糊）。數字越大越模糊：6＝輕度、12＝中度、18＝偏重（業主 2026-11-15 指定 18）。不依賴 ctx.filter，iOS Safari 也能用。 */
+/** 背景模糊強度：把照片縮到 1/N 再放大回來（N 越大越模糊）。數字越大越模糊：6＝輕度、12＝中度、18＝偏重（杜杜龍 2026-11-15 指定 18）。不依賴 ctx.filter，iOS Safari 也能用。 */
 let bgBlurDownscale = 18;
 /** 由「設定 > APP 數值設定」帶入（UiConfigProvider 載入設定時呼叫）。 */
 export const setBgBlurDownscale = (n: number) => void (bgBlurDownscale = n);

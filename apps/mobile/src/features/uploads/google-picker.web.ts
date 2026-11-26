@@ -1,5 +1,5 @@
 /**
- * 「從我的 Google 雲端硬碟選擇」（業主 2026-11-18，只有網頁版）：使用者用自己的 Google 帳號授權一次性的存取權杖（只有 drive.file 權限＝只能讀他親手挑的檔案），
+ * 「從我的 Google 雲端硬碟選擇」（杜杜龍 2026-11-18，只有網頁版）：使用者用自己的 Google 帳號授權一次性的存取權杖（只有 drive.file 權限＝只能讀他親手挑的檔案），
  * 在 Google 自己的檔案挑選視窗（Picker）選檔案；之後由行動大學伺服器用這個權杖把檔案轉存到自己的儲存空間。權杖只在記憶體裡，不保存。
  */
 type PickerConfig = { clientId: string; apiKey: string; appId: string };

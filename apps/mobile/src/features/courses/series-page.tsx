@@ -35,7 +35,7 @@ type View_ = "list" | "edm";
 const GAP = space.md;
 
 /**
- * 系列單頁（業主 2026-11-19 改版）：照片區（封面圖＋訂閱鈕＋點閱次數）→ 切換「EDM／清單」→
+ * 系列單頁（杜杜龍 2026-11-19 改版）：照片區（封面圖＋訂閱鈕＋點閱次數）→ 切換「EDM／清單」→
  * 系列裡的「課程卡」與「清單卡」（兩種都有就分兩區）；內容是自動收集的，這裡不能手動新增教材或區塊，點卡片直接進該卡的詳細頁。
  * 超級管理員右上角「編輯」＝編輯模式：系列標題（只改顯示）、是否顯示在「所有系列」、封面圖（直式＋橫式）、
  * 每張卡的 ◀ ▶ 排序與隱藏（隱藏只是不在這個系列頁顯示）。
@@ -48,7 +48,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const { data, error, loading, reload } = useApi<CourseSummary[]>("/courses");
   const artList = useApi<SeriesArt[]>("/series-art");
   const adminList = useApi<CourseSummary[]>(member?.courseRights ? "/admin/courses" : null);
-  const [view, setView] = useState<View_>("edm"); // 每次進入系列頁一律從「縮圖」開始，不記住上次選擇（業主 2026-11-21）
+  const [view, setView] = useState<View_>("edm"); // 每次進入系列頁一律從「縮圖」開始，不記住上次選擇（杜杜龍 2026-11-21）
   const [editing, setEditing] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
@@ -71,7 +71,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     const ids = new Set(pub.map((x) => x.id));
     return [...pub, ...(adminList.data ?? []).filter((x) => x.status === "draft" && !ids.has(x.id))].filter((x) => x.series === series);
   }, [data, adminList.data, series]);
-  // 排序與隱藏：先直接換畫面、背景存檔，失敗還原（業主 2026-11-17 永久指示：編輯動作要瞬間反應）。
+  // 排序與隱藏：先直接換畫面、背景存檔，失敗還原（杜杜龍 2026-11-17 永久指示：編輯動作要瞬間反應）。
   const [localOrder, setLocalOrder] = useState<string[] | null>(null);
   const [hiddenOver, setHiddenOver] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -130,7 +130,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
     }
   };
   const stats = useCoverStats("series", series, path); // 封面的訂閱鈕與點閱次數（封面統計模組，全站同一套）
-  // 分享網址一律用系列短網址（/Beauty-Starry），沒設定才用 /series/名稱（業主 2026-11-17）；網頁版網址列也換成短網址。
+  // 分享網址一律用系列短網址（/Beauty-Starry），沒設定才用 /series/名稱（杜杜龍 2026-11-17）；網頁版網址列也換成短網址。
   const links = useApi<{ kind: string; value: string; slug: string }[]>("/short-links");
   const slug = links.data?.find((l) => l.kind === "series" && l.value === series)?.slug;
   const sharePath = slug ? `/${slug}` : path;
@@ -144,7 +144,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
   const listCols = colsOf(tileColumns(boxW)); // 清單卡：橫式 4:3，手機一列兩張，大螢幕依寬度增加
   const tileW = (cols: number) => (boxW ? Math.floor((boxW - GAP * (cols - 1)) / cols) : 0);
   const hiddenFromMember = series === UNCATEGORIZED && !admin; // 「未分類」只有超級管理員看得到
-  const section = (_title: string, _n: number) => null; // 業主 2026-11-20：只剩「教材卡」一種，不再分「課程卡／清單卡」兩區標題（版型仍依內容自動排）
+  const section = (_title: string, _n: number) => null; // 杜杜龍 2026-11-20：只剩「教材卡」一種，不再分「課程卡／清單卡」兩區標題（版型仍依內容自動排）
   const ctrl = (items: CourseSummary[], x: CourseSummary, i: number) => (
     <View style={styles.arrows}>
       <Pressable accessibilityRole="button" accessibilityLabel={`上移 ${x.title}`} disabled={i === 0} onPress={() => move(items, i, -1)} style={[styles.arrow, { borderColor: c.border, backgroundColor: c.surface, opacity: i === 0 ? 0.3 : 1 }]}>
@@ -158,7 +158,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
       </Pressable>
     </View>
   );
-  // 「清單」＝與中心頁「清單」同一個模組 CenterListCard（業主 2026-11-21）；編輯模式右側換成排序／隱藏鈕。
+  // 「清單」＝與中心頁「清單」同一個模組 CenterListCard（杜杜龍 2026-11-21）；編輯模式右側換成排序／隱藏鈕。
   const listBlock = (_title: string, items: CourseSummary[]) => (items.length ? <CenterListCard courses={items} trailing={editing ? (x, i) => ctrl(items, x, i) : undefined} /> : null);
   const gridBlock = (title: string, items: CourseSummary[], cols: number) =>
     items.length ? (
@@ -172,7 +172,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
               : null}
           </View>
         ) : (
-          // 一般檢視：點一張卡，在那一列下方原地展開它的教材，其他卡淡化（共用 ExpandGrid，業主 2026-11-20）
+          // 一般檢視：點一張卡，在那一列下方原地展開它的教材，其他卡淡化（共用 ExpandGrid，杜杜龍 2026-11-20）
           <ExpandGrid
             items={items}
             keyOf={(x) => x.id}
@@ -193,7 +193,7 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         extra={admin ? <TopBarButton label={editing ? "完成" : "編輯"} accessibilityLabel={editing ? "完成編輯系列" : "編輯系列"} iconName={editing ? "checkmark-circle-outline" : "create-outline"} onPress={() => setEditing((v) => !v)} /> : undefined}
       />
       <Screen wide header={false} hero={<CenterHero art={art} media={cm.items} scrollY={scrollY} stats={stats} title={shownTitle} onEditCover={admin && series !== UNCATEGORIZED ? () => setCoverOpen(true) : undefined} />} heroFooter={<BroadcastZone flush series={series} title={`${shownTitle}公告`} reloadKey={bcTick} />} heroHeight={centerHeroFull(winW, winHeight)} scrollY={scrollY}>
-        {/* 系列公告緊貼封面下方（業主 2026-11-21）；課程頁、各中心頁各有自己的公告橫條。 */}
+        {/* 系列公告緊貼封面下方（杜杜龍 2026-11-21）；課程頁、各中心頁各有自己的公告橫條。 */}
         <LoginPrompt />
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {loading && !data ? <LoadingView /> : null}
@@ -246,9 +246,9 @@ export function SeriesPage({ series, path }: { series: string; path: string }) {
         ) : null}
         {admin || canCreateCourse(member) ? <View style={{ height: 64 }} /> : null}
       </Screen>
-      {/* 系列封面往下滑縮成迷你小視窗（業主 2026-11-24；與影片迷你小視窗同規格）。 */}
+      {/* 系列封面往下滑縮成迷你小視窗（杜杜龍 2026-11-24；與影片迷你小視窗同規格）。 */}
       <CoverMiniFloat cover={<HeroMiniCover art={art} media={cm.items} title={shownTitle} />} label={shownTitle} range={centerHeroFull(winW, winHeight)} />
-      {/* 右下角「＋」（業主 2026-11-23：除了中心卡，每個頁面都要有新增鈕）：有新增權限的人可新增教材卡（系列預先選好目前這個系列）；超級管理員另可新增公告（目前這個系列，或首頁公告）。 */}
+      {/* 右下角「＋」（杜杜龍 2026-11-23：除了中心卡，每個頁面都要有新增鈕）：有新增權限的人可新增教材卡（系列預先選好目前這個系列）；超級管理員另可新增公告（目前這個系列，或首頁公告）。 */}
       {admin || canCreateCourse(member) ? <AddMaterialFab kinds={[...(canCreateCourse(member) ? (["course"] as const) : []), ...(admin ? (["announce"] as const) : [])]} onPick={(k) => (k === "announce" ? setComposeOpen(true) : setNewOpen(true))} /> : null}
       {newOpen ? <NewCourseSheet onClose={() => setNewOpen(false)} defaultSeries={series !== UNCATEGORIZED ? series : undefined} /> : null}
       {composeOpen ? (

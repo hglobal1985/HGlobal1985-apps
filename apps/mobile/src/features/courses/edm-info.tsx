@@ -85,7 +85,7 @@ const EXIF_LABEL: [string, string][] = [
 const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "boolean" ? (v ? "是" : "否") : typeof v === "number" ? String(Math.round(v * 10000) / 10000) : String(v));
 
 /**
- * 圖片資訊面板（業主 2026-11-24）：半透明黑底視窗，三大類——EXIF 詳細資訊、行動大學站內資訊、辨識後的圖片文字（可選取、可複製）。
+ * 圖片資訊面板（杜杜龍 2026-11-24）：半透明黑底視窗，三大類——EXIF 詳細資訊、行動大學站內資訊、辨識後的圖片文字（可選取、可複製）。
  * 在全螢幕看圖（EdmLightbox）右上角的驚嘆號按鈕開關；視窗右上角也有 X。
  */
 export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string; /** 沒有相簿照片編號時，用圖片網址裡的儲存檔名查（課程封面、品牌 logo、課表…）。 */ imageKey?: string; top?: number; onClose: () => void }) {
@@ -93,7 +93,7 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
   const info = r.data;
   const isEdm = info?.ownerKind === "center" && info?.scope === "edm"; // 中心 EDM 只有文字辨識，沒有場景辨識
   const [showRaw, setShowRaw] = useState(false);
-  // 每個區塊預設收起，點標題才展開（業主 2026-11-25）。
+  // 每個區塊預設收起，點標題才展開（杜杜龍 2026-11-25）。
   const [open, setOpen] = useState<Set<string>>(new Set());
   const sec = (id: string, title: string, body: React.ReactNode, color?: string) => {
     const on = open.has(id);

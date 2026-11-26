@@ -10,16 +10,16 @@ export type ListCoverMode = "item" | "text";
 /** 文字封面的純色底（沒有選底圖時用，網站深綠）。 */
 const SOLID = "#0C603C";
 
-/** 色票（起始色代號）對應的底：網頁版是 135 度漸層，App 版暫用起始色單色（業主 2026-11-22）。 */
+/** 色票（起始色代號）對應的底：網頁版是 135 度漸層，App 版暫用起始色單色（杜杜龍 2026-11-22）。 */
 export function coverFill(hex: string | null | undefined): object {
   const sw = LIST_COVER_COLORS.find((x) => x.hex === (hex ?? "").toUpperCase()) ?? LIST_COVER_COLORS[0]!;
   return Platform.OS === "web" ? { backgroundColor: sw.hex, backgroundImage: `linear-gradient(135deg, ${sw.hex}, ${sw.to})` } : { backgroundColor: sw.hex };
 }
 
 /**
- * 我的清單封面（業主 2026-11-22，全站清單封面唯一來源）：
+ * 我的清單封面（杜杜龍 2026-11-22，全站清單封面唯一來源）：
  * - item＝清單內容的圖，沒有圖就是綠色學士帽；
- * - 自訂封面（text，業主 2026-11-22；會員不能上傳封面圖）＝底（管理員的清單專用底圖 `bgUrl`，或 10 種單色 `color`，沒選＝森林綠）＋可選的文字 `text`（預設清單名稱，可自訂，null＝不顯示）疊在底上。
+ * - 自訂封面（text，杜杜龍 2026-11-22；會員不能上傳封面圖）＝底（管理員的清單專用底圖 `bgUrl`，或 10 種單色 `color`，沒選＝森林綠）＋可選的文字 `text`（預設清單名稱，可自訂，null＝不顯示）疊在底上。
  * 文字封面要在各種複雜底圖上都清楚，所以：字級自動放到框裡的適中大小（`fitFontSize`，最大約框高 42%）、白字粗體，
  * 底圖先蓋一層暗化，再加「緊貼的陰影＋光暈」（沒有描邊，網頁版；App 版用單層陰影），字級已算好、不吃全站字體放大。
  * children 疊在封面上（例如下緣的名稱列、右上角按鈕）。
@@ -46,7 +46,7 @@ export function ListCover({ mode, imageUrl, bgUrl, color, title, text, height = 
                   { color: "#fff", fontSize: fs, lineHeight: Math.round(fs * 1.2), fontWeight: "900", textAlign: "center", maxWidth: "92%" },
                   web
                     ? ({
-                        // 只保留陰影（業主 2026-11-22：取消黑邊框）：緊貼陰影＋光暈，疊在圖片上仍清楚。
+                        // 只保留陰影（杜杜龍 2026-11-22：取消黑邊框）：緊貼陰影＋光暈，疊在圖片上仍清楚。
                         textShadow: "0 2px 4px rgba(0,0,0,0.8), 0 0 16px rgba(0,0,0,0.75)",
                       } as object)
                     : { textShadowColor: "rgba(0,0,0,0.85)", textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 10 },

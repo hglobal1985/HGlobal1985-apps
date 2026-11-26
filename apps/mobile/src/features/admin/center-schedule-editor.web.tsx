@@ -11,7 +11,7 @@ import { cropCompress, loadImage } from "./image-tools";
 import { PickImageButton } from "./pick-image";
 
 /**
- * 中心頁「編輯」裡的課表管理（業主 2026-11-21）：選年月、選圖片就上傳（同一個月重傳＝更換），可刪除。每個動作按下就儲存；
+ * 中心頁「編輯」裡的課表管理（杜杜龍 2026-11-21）：選年月、選圖片就上傳（同一個月重傳＝更換），可刪除。每個動作按下就儲存；
  * 新月份上架時，訂閱這個中心的人會收到通知。圖片在瀏覽器先壓縮（用「EDM 海報」那組畫質設定，課表小字才清楚）。
  */
 export function CenterScheduleEditor({ center, onChanged }: { center: string; onChanged: () => void }) {

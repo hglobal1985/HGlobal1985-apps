@@ -9,23 +9,23 @@ import { AppText, dimStyle } from "@/ui";
 export type AddKind = "course" | "list" | "schedule" | "announce" | "photos" | "material";
 
 const OPTIONS: { key: AddKind; label: string; sub?: string; icon: React.ComponentProps<typeof Ionicons>["name"] }[] = [
-  // 業主 2026-11-20：只剩一種「教材卡」（不再分清單卡／課程卡）。
+  // 杜杜龍 2026-11-20：只剩一種「教材卡」（不再分清單卡／課程卡）。
   { key: "course", label: "新增教材卡", icon: "school-outline" },
-  // 教材卡頁面（編輯模式，業主 2026-11-23）：在這張卡裡新增教材（連結、檔案、YouTube 播放清單）。
+  // 教材卡頁面（編輯模式，杜杜龍 2026-11-23）：在這張卡裡新增教材（連結、檔案、YouTube 播放清單）。
   { key: "material", label: "新增本卡教材", icon: "add-circle-outline" },
-  // 中心頁才有（業主 2026-11-21）：有權限的人在相簿、課程、清單任何一個分頁都能直接上傳照片與短影音（成為封面輪播與相簿）。
+  // 中心頁才有（杜杜龍 2026-11-21）：有權限的人在相簿、課程、清單任何一個分頁都能直接上傳照片與短影音（成為封面輪播與相簿）。
   { key: "photos", label: "上傳EDM", icon: "images-outline" },
-  // 中心頁才有（業主 2026-11-21）：有權限的人直接上傳這個中心的月課表。
+  // 中心頁才有（杜杜龍 2026-11-21）：有權限的人直接上傳這個中心的月課表。
   { key: "schedule", label: "上傳課表", icon: "calendar-outline" },
-  // 新增公告（業主 2026-11-21）：中心頁＝該中心；其他頁面由超級管理員選「目前的系列／中心」或「首頁公告」。
+  // 新增公告（杜杜龍 2026-11-21）：中心頁＝該中心；其他頁面由超級管理員選「目前的系列／中心」或「首頁公告」。
   { key: "announce", label: "新增公告", icon: "megaphone-outline" },
 ];
 
 /**
- * 全部課程右下角的「＋新增教材」（業主 2026-11-16）：按一下往上展開兩個選項——「新增課程」與「新增清單（影片／檔案）」；
+ * 全部課程右下角的「＋新增教材」（杜杜龍 2026-11-16）：按一下往上展開兩個選項——「新增課程」與「新增清單（影片／檔案）」；
  * 點選項、點背景或再按一次按鈕都會收起。選項是大膠囊（高 52），單手拇指就按得到。
  */
-/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（業主 2026-11-24）不顯示管理用的「＋新增」鈕。 */
+/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（杜杜龍 2026-11-24）不顯示管理用的「＋新增」鈕。 */
 export function AddMaterialFab(props: { onPick: (k: AddKind) => void; /** 要顯示哪些選項（預設只有新增教材卡；中心頁有權限時加上 schedule）。 */ kinds?: AddKind[] }) {
   return !useFeature("addButton") ? null : <AddMaterialFabInner {...props} />;
 }

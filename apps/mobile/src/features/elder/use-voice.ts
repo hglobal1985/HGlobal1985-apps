@@ -32,8 +32,8 @@ const QUIET = Array.from({ length: WAVE_BARS }, () => 0.08);
 const canMeter = () => Platform.OS === "web" && typeof navigator !== "undefined" && !/android/i.test(navigator.userAgent) && !!navigator.mediaDevices?.getUserMedia && typeof window !== "undefined" && !!((window as unknown as { AudioContext?: unknown }).AudioContext ?? (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext);
 
 /**
- * 用說的找課程（至尊模式，業主 2026-11-24）：網頁版用瀏覽器內建的語音辨識（中文・台灣）。
- * 說話時 levels＝每條音波的高度（0～1），跟著麥克風的聲音大小即時跳動（業主 2026-11-24：偵測到聲音要有音波高低動態）。
+ * 用說的找課程（至尊模式，杜杜龍 2026-11-24）：網頁版用瀏覽器內建的語音辨識（中文・台灣）。
+ * 說話時 levels＝每條音波的高度（0～1），跟著麥克風的聲音大小即時跳動（杜杜龍 2026-11-24：偵測到聲音要有音波高低動態）。
  * 不支援的瀏覽器（或 App）回傳 supported=false，畫面改成提示「按鍵盤上的麥克風說話」。
  */
 export function useVoice(onText: (text: string, final: boolean) => void) {
@@ -118,7 +118,7 @@ export function useVoice(onText: (text: string, final: boolean) => void) {
 
   useEffect(() => () => (rec.current?.abort(), meter.current?.stop()), []);
 
-  /** 說完停多久才自動結束（業主 2026-11-25：不要太快偵測結束就送出）：開始說話後停 4 秒；一直沒開口則等 12 秒。 */
+  /** 說完停多久才自動結束（杜杜龍 2026-11-25：不要太快偵測結束就送出）：開始說話後停 4 秒；一直沒開口則等 12 秒。 */
   const SILENCE_MS = 4000;
   const NO_SPEECH_MS = 12000;
   const idle = useRef<ReturnType<typeof setTimeout> | null>(null);

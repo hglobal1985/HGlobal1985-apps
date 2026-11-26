@@ -8,7 +8,7 @@ import { handleApi } from "../src/api.ts";
 import type { Env } from "../src/d1.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
-// 業主 2026-11-21：封面輪播與相簿（照片、短影音）。
+// 杜杜龍 2026-11-21：封面輪播與相簿（照片、短影音）。
 type R2Bucket = NonNullable<Env["MEDIA"]>;
 function memR2(): R2Bucket {
   const m = new Map<string, { body: Uint8Array; httpMetadata?: { contentType?: string } }>();
@@ -66,7 +66,7 @@ test("區塊新增照片：只有開放的課程可以、照片屬於區塊、�
   assert.equal(head.photoKey, blk);
   assert.equal(head.photos?.length, 1);
   assert.equal(course.blockPhotos, true);
-  // 照片也算教材數（業主 2026-11-24）：上拉選單的區塊數字、卡片的教材數量都含照片
+  // 照片也算教材數（杜杜龍 2026-11-24）：上拉選單的區塊數字、卡片的教材數量都含照片
   const list = (await call<{ id: string; materialCount: number; hasMaterial: boolean; blocks: { id: string; count: number }[] }[]>("GET", "/courses", { token: adm })).data;
   const box = list.find((c) => c.id === "cqqxw4z2")!;
   assert.equal(box.blocks.find((b) => b.id === blk)!.count, 1, "區塊數字含照片");

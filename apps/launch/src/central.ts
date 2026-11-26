@@ -106,7 +106,7 @@ const memo = new Map<string, { value: unknown; until: number }>();
 const inflight = new Map<string, Promise<unknown>>();
 /**
  * 查詢結果短暫放記憶體；同一時間同樣的查詢只送一次；查不到（undefined）不快取。
- * staleMs＞0＝「先給舊的、背景更新」（業主 2026-11-20）：過期後在 staleMs 內，這次先立刻回舊資料、背景去問中央換新的；
+ * staleMs＞0＝「先給舊的、背景更新」（杜杜龍 2026-11-20）：過期後在 staleMs 內，這次先立刻回舊資料、背景去問中央換新的；
  * 超過 staleMs 才會站著等。權限相關（職務、資格）舊資料最長可用 5 分鐘（ttl＋staleMs）。
  */
 export async function cached<T>(key: string, ttlMs: number, load: () => Promise<T>, staleMs = 0): Promise<T> {
@@ -180,7 +180,7 @@ export async function profileSummary(sub: string, token: string): Promise<{ name
   return { name: typeof v === "string" && v.trim() ? v.trim().slice(0, 50) : "會員", avatarUrl };
 }
 
-/** 會員在會員中心的獎銜（只放記憶體快取供首頁顯示，不寫入資料庫；業主 2026-11-12 授權讀取）。查不到回 undefined。 */
+/** 會員在會員中心的獎銜（只放記憶體快取供首頁顯示，不寫入資料庫；杜杜龍 2026-11-12 授權讀取）。查不到回 undefined。 */
 type AmwayMe = { enabled?: boolean; hglobal_systems?: string[]; fields?: Record<string, { value?: unknown; pending_value?: unknown }> };
 /** GET /v1/me/amway 只打一次（獎銜顯示與資料補填提醒共用；放記憶體 2 分鐘）。 */
 export async function amwayMe(sub: string, token: string): Promise<AmwayMe | undefined> {
@@ -215,12 +215,12 @@ export async function profileGaps(sub: string, token: string, email: string | nu
   // 會員中心暫時查不到（例如剛註冊、資料還沒建好）時回 undefined：不快取，下次進來再問，才不會把「沒有缺漏」記住。
   return cached(`gaps:${sub}:${email ? 1 : 0}`, 60_000, async (): Promise<string[] | undefined> => {
     const gaps: string[] = [];
-    // Email 不列入提醒（業主 2026-11-23：Email 自動帶入 Google 信箱、非必填）：會員用 Google 登入，信箱由會員中心預設帶入。
+    // Email 不列入提醒（杜杜龍 2026-11-23：Email 自動帶入 Google 信箱、非必填）：會員用 Google 登入，信箱由會員中心預設帶入。
     void email;
     {
       const [b, doc] = await Promise.all([amwayMe(sub, token), profileDoc(sub, token)]);
       if (!b) return undefined;
-      // 本名必填（業主 2026-11-23）：沒填也要提醒（暫時讀不到個人資料時不誤報）。
+      // 本名必填（杜杜龍 2026-11-23）：沒填也要提醒（暫時讀不到個人資料時不誤報）。
       if (doc) {
         const ln = doc.fields?.legal_name?.value;
         if (typeof ln !== "string" || !ln.trim()) gaps.push("本名");
@@ -228,7 +228,7 @@ export async function profileGaps(sub: string, token: string, email: string | nu
       // 新會員還沒勾選「我是 Amway 會員」也要提醒（視窗會引導到會員中心勾選並填寫）。
       if (b.enabled !== true) gaps.push("Amway 會員資料");
       else {
-        // 檢查獎銜、系統、中心與上手白金、上手鑽石（業主 2026-11-23：上手兩欄也必填，沒填就自動彈出面板）；推薦人不列入。
+        // 檢查獎銜、系統、中心與上手白金、上手鑽石（杜杜龍 2026-11-23：上手兩欄也必填，沒填就自動彈出面板）；推薦人不列入。
         const core = ["education_system", "education_center", "rank", "upline_platinum", "upline_diamond"];
         const empty = core.some((k) => {
           const f = b.fields?.[k];
@@ -242,7 +242,7 @@ export async function profileGaps(sub: string, token: string, email: string | nu
 }
 
 /**
- * GET /v1/amway/field-definitions 全站只問這一次（獎銜名稱、獎銜選項、獎銜徽章共用；業主 2026-11-20：以前三個函式各問一次）。
+ * GET /v1/amway/field-definitions 全站只問這一次（獎銜名稱、獎銜選項、獎銜徽章共用；杜杜龍 2026-11-20：以前三個函式各問一次）。
  * 快取最長 5 分鐘（串接指令 2026-11-15.5 標準 13）、只放記憶體；讀不到回 undefined（不快取）。
  */
 async function fieldDefinitions(token: string): Promise<unknown | undefined> {
@@ -313,7 +313,7 @@ export async function rankEligibility(sub: string, token: string, minRanks: stri
   const need = [...new Set(minRanks.filter((r) => r !== "none"))];
   for (const r of minRanks) if (r === "none") out.set(r, true);
   if (!need.length) return out;
-  // 快取過期後 5 分鐘內：這次先用舊結果、背景更新（業主 2026-11-20；權限舊資料最長可用 5 分鐘）。
+  // 快取過期後 5 分鐘內：這次先用舊結果、背景更新（杜杜龍 2026-11-20；權限舊資料最長可用 5 分鐘）。
   const now = Date.now();
   const missing: string[] = [];
   const stale: string[] = [];
@@ -340,7 +340,7 @@ export async function rankEligibility(sub: string, token: string, minRanks: stri
 }
 
 /**
- * 中央的「獎銜、中心」新申請審核佇列（GET /v1/eligibility/reviews，業主 2026-11-17）：用會員本人的 Token 即時讀取，
+ * 中央的「獎銜、中心」新申請審核佇列（GET /v1/eligibility/reviews，杜杜龍 2026-11-17）：用會員本人的 Token 即時讀取，
  * 權限與中心範圍全由中央判斷（超級管理員、秘書看全部；審核員只看自己的中心）；這裡不判斷、不保存、不寫日誌。
  * 任何失敗（沒有權限、中央尚未開放、逾時）都回 available=false，畫面就不顯示審核區。
  */
@@ -361,7 +361,7 @@ export async function centralDecide(token: string, id: string, decision: "approv
 }
 
 /**
- * App 內指派職務（業主 2026-11-21；中央串接指令 2026-11-21.1，第三章 17、檢查清單 31）：
+ * App 內指派職務（杜杜龍 2026-11-21；中央串接指令 2026-11-21.1，第三章 17、檢查清單 31）：
  * - 查人 GET /v1/eligibility/staff：不帶 q 回「有職務的人」；q 要 2～30 字。
  * - 指派 PUT /v1/eligibility/staff/{member_id}，body {"roles":[...]} 是「事後完整清單」。
  * - 一律用呼叫者本人的 App 會員 Token（不可用服務 Token）；任何非 200 都當沒有權限。
@@ -434,7 +434,7 @@ export const centerKey = (label: string) => label.normalize("NFKC").trim().repla
 const lastGoodContext = new Map<string, MemberContext>();
 export async function memberContext(sub: string, token: string): Promise<MemberContext> {
   // 查詢失敗（會員中心暫時連不上、逾時、5xx）時，不可把「沒有任何職務」記起來：
-  // 否則超級管理員會被當成一般學員 60 秒（2026-11-19 業主回報：點通知「前往查看」顯示沒權限）。
+  // 否則超級管理員會被當成一般學員 60 秒（2026-11-19 杜杜龍回報：點通知「前往查看」顯示沒權限）。
   // 失敗時回「最近一次成功的結果」（沒有就暫時視為沒有職務），而且這次失敗不進快取，下個請求馬上重試。
   const fresh = await cached<MemberContext | undefined>(`ctx:${sub}`, 60_000, async () => {
     const res = await callCentral(token, "/v1/eligibility/context");
@@ -619,7 +619,7 @@ export async function centralSuggest(token: string, pool: "education_system" | "
 
 /**
  * 把新職稱送到中央的職稱詞庫（服務對服務憑證，不用會員個人登入）：POST /v1/vocab/suggestions {pool:"job_title", value}。
- * 中央已開放（串接指令版本 2026-11-15.5）：200 回 {pool, value, created}；新詞是「待核可」，業主在中央後台核可後才出現在別人的建議；
+ * 中央已開放（串接指令版本 2026-11-15.5）：200 回 {pool, value, created}；新詞是「待核可」，杜杜龍在中央後台核可後才出現在別人的建議；
  * 只開放 job_title（其他詞庫 403）；value 去空白、最長 50 字；每個 App 每分鐘 30 次、待核可上限 200（429）。
  * 回傳：「ok」＝中央已收下（含已存在）；「rejected」＝400／403，內容本身有問題，不重送；
  * 「retry」＝401／429／5xx／逾時，暫存稍後重送；「unsupported」＝404／405／501（中央沒有這支 API），之後再補送。永遠不丟例外。
@@ -646,7 +646,7 @@ export async function centralAddJobTitle(secret: string | undefined, value: stri
 
 // ---------- 中央新標準（2026-11-12.10）：webhook 驗簽、服務金鑰查信箱、版本回報 ----------
 
-/** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由業主在中央後台勾選，不在程式內宣稱）。 */
+/** 這份程式採用的中央串接指令版本，以及已做到的平台標準（least_scope 由杜杜龍在中央後台勾選，不在程式內宣稱）。 */
 export const INTEGRATED_VERSION = "2026-11-24.3";
 export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile", "in_app_delete"];
 export const SIGNATURE_TOLERANCE_SECONDS = 300;
@@ -728,7 +728,7 @@ export async function reportIntegration(token: string): Promise<void> {
 }
 
 /**
- * 報名名單的「上手白金、上手鑽石」（Amway 資料，業主 2026-11-20；串接指令 2026-11-20.2）：
+ * 報名名單的「上手白金、上手鑽石」（Amway 資料，杜杜龍 2026-11-20；串接指令 2026-11-20.2）：
  * 用服務 Token 呼叫 POST /v1/apps/learn/members/lookup（fields＝upline_platinum、upline_diamond，use＝display），一次最多 100 個會員。
  * **不寫資料庫、不寫日誌**；只放記憶體短暫快取 10 分鐘（含「沒填」的結果）。失敗、403、422、429、逾時一律當作沒有資料（畫面顯示「未提供」，不快取）。
  * 回傳 undefined＝這次中央沒有回應（整批「未提供」）。
@@ -817,8 +817,8 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
 }
 
 /**
- * 審核通知用：申請人的本名（業主 2026-11-23：通知裡的審核申請要顯示本名與上手白金／鑽石）。
- * 與上手分開查（欄位 legal_name 要業主在中央「平台設定」勾選，沒勾回 403 就整批當作沒有，不影響上手查詢）；
+ * 審核通知用：申請人的本名（杜杜龍 2026-11-23：通知裡的審核申請要顯示本名與上手白金／鑽石）。
+ * 與上手分開查（欄位 legal_name 要杜杜龍在中央「平台設定」勾選，沒勾回 403 就整批當作沒有，不影響上手查詢）；
  * 只放記憶體 10 分鐘、不寫資料庫與日誌，失敗不快取。
  */
 export async function lookupLegalNames(secret: string | undefined, subs: string[]): Promise<Map<string, string>> {
@@ -860,7 +860,7 @@ export async function lookupLegalNames(secret: string | undefined, subs: string[
 }
 
 /**
- * 清單分享者名片的獎銜與獎章圖（業主 2026-11-21；Amway 資料，**不寫資料庫、不寫日誌**，只放記憶體短暫快取 10 分鐘）：
+ * 清單分享者名片的獎銜與獎章圖（杜杜龍 2026-11-21；Amway 資料，**不寫資料庫、不寫日誌**，只放記憶體短暫快取 10 分鐘）：
  * 串接指令 2026-11-22.1：用服務 Token 呼叫 `POST /v1/apps/learn/members/lookup`（fields＝rank，use＝display），
  * 中央直接回 `rank_label`（獎銜中文名稱）與 `rank_badge`（`badge_url`＋`badge:{width,height,art_top,art_bottom}`）；
  * 服務 Token 讀不了 field-definitions，所以不再自己對照。沒開 Amway 或獎銜未審核＝全是 null，只顯示頭像與姓名。

@@ -9,7 +9,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 上方工具列「＋邀請」（業主 2026-11-20；在分享鈕的左邊，全站可分享的內容頁都放）：
+ * 上方工具列「＋邀請」（杜杜龍 2026-11-20；在分享鈕的左邊，全站可分享的內容頁都放）：
  * 按下去從下方彈出面板：這一頁的 QR Code、網址文字、複製、分享（系統分享選單）。
  * QR Code 在手機上自己產生（不連外部服務、不洩漏網址）。要改外觀只改這個檔案；新增可分享的頁面，在它的上方工具列放 HeaderInvite。
  */
@@ -26,7 +26,7 @@ export function HeaderInvite({ title, path, course, list }: { title: string; pat
 }
 
 /**
- * QR Code 示意圖示（業主 2026-11-21：邀請鈕不再用「＋」，避免和「加入我的清單」混淆）：
+ * QR Code 示意圖示（杜杜龍 2026-11-21：邀請鈕不再用「＋」，避免和「加入我的清單」混淆）：
  * 三個角落的定位方塊加幾顆小點，只是示意、不是真的 QR Code。
  */
 export function QrGlyph({ size = 22, color }: { size?: number; color: string }) {

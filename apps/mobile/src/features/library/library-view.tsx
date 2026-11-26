@@ -14,7 +14,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 「我的書櫃」公開檢視（業主 2026-11-17，版面＝方案 1 木質書架）：網址 /會員編號，不出現在行動大學任何清單與搜尋。
+ * 「我的書櫃」公開檢視（杜杜龍 2026-11-17，版面＝方案 1 木質書架）：網址 /會員編號，不出現在行動大學任何清單與搜尋。
  * 深色木質底、黃銅名牌、每個書架（分類標題，點一下收合）上一排書脊；整座書櫃或單獨一本書都可以有密碼（可設幾天後失效）。
  * 這一頁自成一套配色，故意跟行動大學標準頁面不同；不計學習進度。
  */
@@ -82,7 +82,7 @@ export function LibraryScreen({ number }: { number: string }) {
 
 function Page({ children, gear }: { children: React.ReactNode; gear?: () => void }) {
   // 書櫃自成一套深色木質版面，不用行動大學的標準上方工具列；自己放一個返回鍵（沒有上一頁就回首頁）。
-  // 大螢幕（業主 2026-11-18）：書架放寬，一排看得到更多書。
+  // 大螢幕（杜杜龍 2026-11-18）：書架放寬，一排看得到更多書。
   const lay = useLayout();
   return (
     <ScrollView style={{ flex: 1, backgroundColor: LIB.bg }} contentContainerStyle={[styles.page, lay.large ? { maxWidth: lay.wideMax, paddingHorizontal: lay.gutter } : null]}>

@@ -16,7 +16,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
  * 課程頁（預設）：每則留言只顯示前幾行，點一則先從下方彈出完整內容與操作；按住面板往上拉（或按右上角「完整留言板」）進入完整留言頁。
  * 完整留言頁（full）：全文直接顯示、操作鈕直接放在每則留言下方；focusId 是從彈出面板帶進來的那一則（加上強調框）。
  */
-/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（業主 2026-11-24）不顯示留言板。 */
+/** 依使用模式設定檔（lib/app-mode.tsx）決定顯不顯示；至尊模式（杜杜龍 2026-11-24）不顯示留言板。 */
 export function CommentBoard(props: { courseId: string; full?: boolean; focusId?: string }) {
   return !useFeature("comments") ? null : <CommentBoardInner {...props} />;
 }

@@ -41,7 +41,7 @@ export default function NotificationSettingsScreen() {
   return (
     <Screen header={false}>
       <Section title="通知方式">
-        {/* 手機推播放最前面（業主 2026-11-18）；推播一律全收，不能逐項關閉 */}
+        {/* 手機推播放最前面（杜杜龍 2026-11-18）；推播一律全收，不能逐項關閉 */}
         <PushCard />
         <InstallCard />
         <Card>
@@ -113,7 +113,7 @@ export default function NotificationSettingsScreen() {
   );
 }
 
-/** 手機推播（業主 2026-11-17）：這個裝置的開關＋傳一則測試通知。每個裝置各自開啟。 */
+/** 手機推播（杜杜龍 2026-11-17）：這個裝置的開關＋傳一則測試通知。每個裝置各自開啟。 */
 function PushCard() {
   const { c } = useTheme();
   const [state, setState] = useState<PushState | null>(null);

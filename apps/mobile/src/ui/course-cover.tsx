@@ -43,7 +43,7 @@ function splitFixed(lines: string[]): string[] {
 
 /** 固定分行的字級：每一行都塞得進寬度，總高度也塞得進方框。 */
 function fitLines(lines: string[], w: number, h: number, max = 72, min = 14): number {
-  // 每一行都不可換行（業主 2026-11-19：日期 X年X月 強制同一行）：寬度估算多留 15% 安全邊界，字寧可小一點。
+  // 每一行都不可換行（杜杜龍 2026-11-19：日期 X年X月 強制同一行）：寬度估算多留 15% 安全邊界，字寧可小一點。
   const widest = Math.max(...lines.map(textUnits), 1) * 1.15;
   for (let fs = max; fs > min; fs -= 2) if (widest * fs <= w && lines.length * fs * 1.25 <= h) return fs;
   return min;
@@ -51,7 +51,7 @@ function fitLines(lines: string[], w: number, h: number, max = 72, min = 14): nu
 
 /**
  * 課程封面（課程清單縮圖）：有 16:9 封面圖就顯示圖片（管理員從 EDM 裁切出來的）；
- * 沒有上傳封面就一律用「課程標題」當文字封面（業主 2026-11-22，不是清單封面 ListCover；也不用 YouTube 縮圖）：由系統自動產生（字級已依封面大小算好，不吃全站字體放大 noScale，否則平板／電腦會爆版，業主 2026-11-18）：在主題色底上放大大的標題文字（程式排版，不是 AI 生成）；不顯示系列與分類標籤（業主 2026-11-14 指示）。
+ * 沒有上傳封面就一律用「課程標題」當文字封面（杜杜龍 2026-11-22，不是清單封面 ListCover；也不用 YouTube 縮圖）：由系統自動產生（字級已依封面大小算好，不吃全站字體放大 noScale，否則平板／電腦會爆版，杜杜龍 2026-11-18）：在主題色底上放大大的標題文字（程式排版，不是 AI 生成）；不顯示系列與分類標籤（杜杜龍 2026-11-14 指示）。
  * fill＝填滿父層（課程介紹頁上方沒有 EDM 時用）。
  */
 export function CourseCover({ theme, label, title, height, imageUrl, fill }: { theme: string; label: string; title?: string; height?: number; imageUrl?: string | null; fill?: boolean }) {
@@ -61,12 +61,12 @@ export function CourseCover({ theme, label, title, height, imageUrl, fill }: { t
   if (imageUrl) {
     return <Image source={{ uri: thumb(resolveUrl(imageUrl), 360) }} style={{ width: "100%", aspectRatio: 16 / 9, borderRadius: radius.md }} resizeMode="cover" accessibilityLabel={`${label}課程封面`} />;
   }
-  // 固定格式文字封面的顏色與排版：（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（業主 2026-11-18）。
+  // 固定格式文字封面的顏色與排版：（依名稱固定挑一款，同一個名稱每次都同色），不再提供手動指定（杜杜龍 2026-11-18）。
   const names = Object.keys(courseThemes);
   const seed = [...(title || label || theme || "")].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7);
   // 固定格式文字封面（銅章會議等，見 contract 的 textCoverLines）：咖啡色系底、固定「名稱（換行）X年X月」兩行。
   const fixed0 = textCoverLines(title);
-  // 縮圖（直式或方形的小卡）改成四行：「銅章／會議／2026年／10月」（業主 2026-11-20）；橫式大封面維持兩行。
+  // 縮圖（直式或方形的小卡）改成四行：「銅章／會議／2026年／10月」（杜杜龍 2026-11-20）；橫式大封面維持兩行。
   const portrait = box.w > 0 && box.h >= box.w * 0.9;
   const fixed = fixed0 && portrait ? splitFixed(fixed0) : fixed0;
   const [bg, fg] = fixed ? coverBronze[scheme] : courseThemes[names[seed % names.length]!]![scheme];

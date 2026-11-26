@@ -41,7 +41,7 @@ export default function LearningScreen() {
   /** 免費課程可以隱藏；沒報名紀錄、只是播放過的課程（管理員或公開課程）也可以隱藏。 */
   const canHide = (c: CourseSummary) => (c.enrollment === "opened" && (c.watchFree || c.isPublic)) || (c.enrollment !== "opened" && c.started);
   // 學習中＝已開通的課程，或播放超過 1% 的課程（含免費、沒有報名紀錄的）；等待審核的另外顯示。
-  // 清單類別（清單卡）不列入學習中（業主 2026-11-16）。
+  // 清單類別（清單卡）不列入學習中（杜杜龍 2026-11-16）。
   const inLearning = (c: CourseSummary) => !c.isList && (c.enrollment === "opened" || c.started) && !c.hiddenFromLearning;
   const [kind, setKind] = useState("");
   const [seriesSel, setSeriesSel] = useState("");
@@ -75,7 +75,7 @@ export default function LearningScreen() {
       }
     >
       <SaplingBar saplings={(data ?? []).reduce((n, x) => n + x.completedLessons, 0)} />
-      {/* 我的作業（業主 2026-11-25）：有作業的學員、要批改的老師才看得到 */}
+      {/* 我的作業（杜杜龍 2026-11-25）：有作業的學員、要批改的老師才看得到 */}
       <MyHomeworkCard />
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
       {loading && !data ? <LoadingView /> : null}
@@ -96,7 +96,7 @@ export default function LearningScreen() {
           <Button label="回到剛才的學習" icon="play-circle-outline" onPress={() => router.push(lessonHref(resume.courseId, resume.lessonId) as never)} fullWidth />
         </Card>
       ) : null}
-      {/* 至尊模式：清單展示跟首頁搜尋結果一樣（ElderCourseRow，業主 2026-11-25） */}
+      {/* 至尊模式：清單展示跟首頁搜尋結果一樣（ElderCourseRow，杜杜龍 2026-11-25） */}
       {elder && inProgress.length ? <View>{inProgress.map((course) => <ElderCourseRow key={course.id} course={course} />)}</View> : null}
       {!elder && inProgress.length ? (
         <CardGrid>

@@ -109,14 +109,14 @@ function Label({ children }: { children: ReactNode }) {
 const same = (a: Record<string, unknown>, b: Record<string, unknown>) => JSON.stringify(a) === JSON.stringify(b);
 
 // ---------- 基本資料：名稱、主講人、分類、系列（封面顏色已刪除，無 EDM 時文字封面顏色自動隨機） ----------
-/** 基本資料欄位（業主 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
-export type BasicsForm = { isShorts: boolean; title: string; /** 勾了「無」：沒有主講人、獎銜、職稱（業主 2026-11-19）。 */ noSpeaker: boolean; /** 套裝課程（業主 2026-11-19）：只是分類篩選用途；日期區間 7 天以上自動勾選，可手動取消。 */ isPackage: boolean; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
+/** 基本資料欄位（杜杜龍 2026-11-17）：編輯面板「基本資料」與「新增課程」是同一組欄位，只在這裡維護。 */
+export type BasicsForm = { isShorts: boolean; title: string; /** 勾了「無」：沒有主講人、獎銜、職稱（杜杜龍 2026-11-19）。 */ noSpeaker: boolean; /** 套裝課程（杜杜龍 2026-11-19）：只是分類篩選用途；日期區間 7 天以上自動勾選，可手動取消。 */ isPackage: boolean; teacher: string; teacherRank: string; teacherTitle: string; eventStart: string; eventEnd: string; category: string; series: string; brandId: string; /** 專區（只有超級管理員能改）。 */ zone: string };
 const DAY_MS = 86_400_000;
 /** 開始到結束相差幾天（沒有結束日期＝0）。 */
 const spanDays = (start: string, end: string) => (start && end ? Math.round((Date.parse(end) - Date.parse(start)) / DAY_MS) : 0);
 
 /**
- * 課程日期（業主 2026-11-19）：勾「修改日期」才顯示開始日期欄位；填了開始日期才出現「＋輸入結束日期」；有日期就有「清除日期」；
+ * 課程日期（杜杜龍 2026-11-19）：勾「修改日期」才顯示開始日期欄位；填了開始日期才出現「＋輸入結束日期」；有日期就有「清除日期」；
  * 取消勾選只收起欄位、日期保留；已經讀到日期（影片或素材系統帶入）時，日期以純文字顯示在勾選框右邊，勾了「修改日期」才能改。
  * 日期區間從不到 7 天變成 7 天以上時，自動勾選「套裝課程」（之後可手動取消）。
  */
@@ -168,10 +168,10 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
   return (
     <>
       <Field label={"教材卡名稱（必填）"} value={f.title} onChange={set("title")} placeholder={isList ? "例如：美力之星精彩回顧" : "例如：翡翠達標班"} />
-      {/* 教材卡只剩一種（業主 2026-11-20）：主講人、日期、套裝課程欄位一律都有。 */}
+      {/* 教材卡只剩一種（杜杜龍 2026-11-20）：主講人、日期、套裝課程欄位一律都有。 */}
       {(
         <>
-          {/* 沒有主講人（業主 2026-11-19）：勾「無」＝主講人、獎銜、職稱三個欄位隱藏並清空，專屬網址改用課程名稱的英譯＋編號。 */}
+          {/* 沒有主講人（杜杜龍 2026-11-19）：勾「無」＝主講人、獎銜、職稱三個欄位隱藏並清空，專屬網址改用課程名稱的英譯＋編號。 */}
           <Check label="無（這門課沒有主講人、獎銜、職稱）" value={f.noSpeaker} onChange={(v) => setF((x) => ({ ...x, noSpeaker: v, ...(v ? { teacher: "", teacherRank: "", teacherTitle: "" } : {}) }))} />
           {f.noSpeaker ? (
             <AppText variant="caption" tone="muted">
@@ -187,7 +187,7 @@ export function BasicsFields({ isList, f, setF }: { isList: boolean; f: BasicsFo
           <Check label="套裝課程（分類用途，不影響版面與功能）" value={f.isPackage} onChange={set("isPackage")} />
         </>
       )}
-      {/* 「短影音專輯」勾選已併入「素材」（業主 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
+      {/* 「短影音專輯」勾選已併入「素材」（杜杜龍 2026-11-17）：素材的項目在「單元」頁一律歸類為短影音。 */}
       {isSuper ? (
         <>
           <FormBlock collapsible title="系列卡（顯示在課程首頁）" hint="同系列合併成一張系列卡；必須設定系列才會顯示在課程首頁，沒設定就暫時放入「未分類」（只有超級管理員看得到）">
@@ -207,7 +207,7 @@ function BasicsSheet({ course, onClose, onSaved }: SheetProps) {
   const isSuper = isSuperAdmin(member);
   const init: BasicsForm = { isShorts: course.isShorts, title: course.title, noSpeaker: course.noSpeaker ?? false, isPackage: course.isPackage ?? false, teacher: course.teacher ?? "", teacherRank: course.teacherRank ?? "", teacherTitle: course.teacherTitle ?? "", eventStart: course.eventStart ?? "", eventEnd: course.eventEnd ?? "", category: course.category, series: course.series ?? "", brandId: course.brandId ?? "", zone: course.zone };
   const [f, setF] = useState(init);
-  // 素材第二層短網址（業主 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
+  // 素材第二層短網址（杜杜龍 2026-11-17）：只有素材、只有超級管理員；系列那一層仍在「設定 > 短網址設定」集中管理。
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");
   const links = useApi<{ kind: string; value: string; slug: string }[]>(course.isList && isSuper ? "/short-links" : null);
   const seriesSlug = links.data?.find((l) => l.kind === "series" && l.value === (course.series || f.series))?.slug;
@@ -289,7 +289,7 @@ function PriceSheet({ course, onClose, onSaved }: SheetProps) {
     earlyBird: !!course.earlyBird,
     earlyPriceTwd: course.earlyBird?.priceTwd != null ? String(course.earlyBird.priceTwd) : "",
     earlyUntil: course.earlyBird?.until ?? "",
-    freeFrom: toLocal(course.admin?.freeFrom).slice(0, 10), // 只選日期；開始＝當天 00:00、結束＝當天 23:59（業主 2026-11-18：日期一律用日期選單）
+    freeFrom: toLocal(course.admin?.freeFrom).slice(0, 10), // 只選日期；開始＝當天 00:00、結束＝當天 23:59（杜杜龍 2026-11-18：日期一律用日期選單）
     freeUntil: toLocal(course.admin?.freeUntil).slice(0, 10),
   };
   const [f, setF] = useState(init);
@@ -354,7 +354,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
   const invite = useApi<InviteInfo>(`/admin/courses/${course.id}/invite`);
   const init = { minRankCode: course.minRank.code, allowPresident: course.allowPresident, viewScope: course.viewScope, inviteOnly: course.inviteOnly };
   const [f, setF] = useState(init);
-  // 邀請碼（明碼）：另外讀取，讀回來才填入；付費課程只有超級管理員能設定（業主 2026-11-20）。
+  // 邀請碼（明碼）：另外讀取，讀回來才填入；付費課程只有超級管理員能設定（杜杜龍 2026-11-20）。
   const [code, setCode] = useState("");
   const [codeOn, setCodeOn] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -370,7 +370,7 @@ function EnrollSheet({ course, onClose, onSaved }: SheetProps) {
   const paid = (course.priceTwd ?? 0) > 0 || course.priceTba;
   const codeLocked = paid && !isSuper;
   const [rankOpen, setRankOpen] = useState(false);
-  // 業主 2026-11-17 規則 B：「所有人含訪客」只代表任何人都看得到介紹，獎銜限制照樣可以設定（沒有獎銜的人看得到、不能報名）。
+  // 杜杜龍 2026-11-17 規則 B：「所有人含訪客」只代表任何人都看得到介紹，獎銜限制照樣可以設定（沒有獎銜的人看得到、不能報名）。
   const ranks = useApi<Rank[]>("/ranks");
   const { save, busy, error } = useCourseSave(course, onSaved);
   const finalCode = f.inviteOnly && codeOn ? code.trim() : "";
@@ -454,7 +454,7 @@ function AdvancedSheet({ course, onClose, onSaved }: SheetProps) {
     <EditSheet title="進階設定" onClose={onClose} onSave={submit} dirty={!same(init, f)} busy={busy} error={error}>
       <HostField title="主辦單位" value={f.hostUnit} fixed={course.hostUnit || member?.center || ""} onChange={(v) => setF((x) => ({ ...x, hostUnit: v }))} />
       <Check label="章節各自設定封面" value={f.chapterCovers} onChange={(v) => setF((x) => ({ ...x, chapterCovers: v }))} />
-      {/* 區塊可新增照片（業主 2026-11-24 試行：先只有成交百寶箱；只有超級管理員可以開關）。 */}
+      {/* 區塊可新增照片（杜杜龍 2026-11-24 試行：先只有成交百寶箱；只有超級管理員可以開關）。 */}
       {member?.role === "admin" ? <Check label="區塊可新增照片（試行中）" value={f.blockPhotos} onChange={(v) => setF((x) => ({ ...x, blockPhotos: v }))} /> : null}
       <AppText variant="caption" tone="muted">
         {course.admin?.editedAt ? `最後修改：${course.admin.editedByName || "（未記錄）"}　${dateTime(course.admin.editedAt)}` : "最後修改：（還沒有紀錄）"}
@@ -586,7 +586,7 @@ export function SectionList({ course, onOpen }: { course: CourseDetail; onOpen: 
       <ListRow icon="eye-outline" title="上架與刪除" subtitle={statusText} onPress={() => onOpen("status")} />
       <ListRow icon="list-outline" title="報名名單" subtitle="查看報名學員、匯出 CSV、移除資格" onPress={() => onOpen("roster")} />
       <ListRow icon="logo-youtube" title="YouTube 播放清單" subtitle="匯入播放清單、同步新影片" onPress={() => onOpen("youtube")} />
-      {/* 作業（業主 2026-11-25）：出作業、批改評分、學員分組，開新頁面操作 */}
+      {/* 作業（杜杜龍 2026-11-25）：出作業、批改評分、學員分組，開新頁面操作 */}
       {course.isList ? null : <ListRow icon="document-text-outline" title="作業與批改" subtitle="出作業、看誰交了、評分與評語" onPress={() => router.push(`/homework/${course.id}`)} />}
       {course.isList ? null : <ListRow icon="people-outline" title="學員分組" subtitle="排組、指定組長（組長可看同組作業）" onPress={() => router.push(`/homework/groups/${course.id}`)} />}
     </Card>

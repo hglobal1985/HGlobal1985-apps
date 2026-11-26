@@ -14,7 +14,7 @@ test("續播記憶：記住最後播放到的秒數，下次從那裡接著播�
   const login = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", undefined, { sub })).data.token;
   const [admin, student] = await Promise.all(["demo-admin", "demo-student"].map(login));
   const c = (await call<CourseDetail>("POST", "/admin/courses", admin, { title: "續播課", teacher: "王", status: "published", isPublic: true, priceTwd: 0 })).data;
-  await call("POST", "/orders", student, { courseIds: [c.id] }); // 課程類即使免費也要先報名（業主 2026-11-22）
+  await call("POST", "/orders", student, { courseIds: [c.id] }); // 課程類即使免費也要先報名（杜杜龍 2026-11-22）
   const l = c.lessons[0]!;
   await call("PATCH", `/admin/lessons/${l.id}`, admin, { mediaType: "youtube", mediaRef: "dQw4w9WgXcQ", startSeconds: 60, endSeconds: 600 });
   const pb = () => call<{ resumeAt?: number; start: number | null }>("GET", `/courses/${c.id}/lessons/${l.id}/playback`, student);

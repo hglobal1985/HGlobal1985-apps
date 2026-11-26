@@ -21,7 +21,7 @@ export function BrandIcon({ type, fallback, size = 30 }: { type: string; fallbac
         </SvgText>
       </Svg>
     );
-  // YouTube 一律用章節列「播放」同款的綠色實心圓＋白色三角形（業主 2026-11-22：全網不再出現紅色 YouTube 標誌）。
+  // YouTube 一律用章節列「播放」同款的綠色實心圓＋白色三角形（杜杜龍 2026-11-22：全網不再出現紅色 YouTube 標誌）。
   if (type === "youtube") return <Ionicons name="play-circle" size={Math.round(size * 1.2)} color={c.accent} accessibilityElementsHidden />;
   if (!brand) return <Ionicons name={fallback} size={size} color={c.accent} />;
   // 黑色的品牌（Notion）在深色模式改用文字色，才看得到。

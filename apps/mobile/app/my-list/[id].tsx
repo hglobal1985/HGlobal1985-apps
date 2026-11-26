@@ -22,7 +22,7 @@ import { flashText } from "@/ui/flash-notice";
 type Detail = { id: string; title: string; slug: string; url: string; coverItemId: string | null; coverMode: ListCoverMode; coverUrl: string | null; coverBgUrl: string | null; coverBgId: string | null; coverColor: string | null; coverText: string | null; coverTextRaw: string; itemCoverUrl: string | null; coverBgChoiceUrl: string | null; clicks: number; items: ListItem[]; stats: { clicks: number; people: number; bySource: Record<string, number>; days: { day: string; n: number }[]; shares: number; copies: number; items: { id: string; title: string; n: number; missing: boolean }[] } };
 
 /**
- * 我的清單內頁（業主 2026-11-22 改版：大圖封面首頁＋三個分頁）：上方是清單封面大圖（名稱、點閱數疊在圖上）與「分享／複製網址」，
+ * 我的清單內頁（杜杜龍 2026-11-22 改版：大圖封面首頁＋三個分頁）：上方是清單封面大圖（名稱、點閱數疊在圖上）與「分享／複製網址」，
  * 下面「內容｜成效｜設定」三個分頁一次只看一件事：內容只有項目列（右邊「⋯」才有備註、設為封面、移除）、成效是點閱統計、設定是名稱、網址與刪除。
  */
 export default function MyListScreen() {
@@ -352,7 +352,7 @@ export default function MyListScreen() {
 }
 
 /**
- * 清單封面設定（業主 2026-11-22）：兩種——
+ * 清單封面設定（杜杜龍 2026-11-22）：兩種——
  * ① 內容封面（用清單內容的圖）；
  * ② 自訂封面＝「背景」（管理員提供的底圖，或 10 種單色，會員不能上傳圖片）＋「文字」（預設清單名稱、可自訂、可關閉），文字疊在背景上。
  * 上面有即時預覽；「儲存」才套用。

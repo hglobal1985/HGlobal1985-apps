@@ -5,7 +5,7 @@
  * - 一次只轉「一段」（每次呼叫處理第 N 段），由前端依序呼叫；中途額度用完就停，隔天（台灣 08:00 後）可從斷掉的那段接著做。
  * - 每一段送出前都先經過 reserveAi（每日免費額度閘門）；失敗會把預扣還回去，Cloudflare 回報額度用完時當天直接停。
  * - Worker 無法解碼影音，所以只能「依檔案位元組」切段：單段 ≤ 4MB 的整個檔案直接送；較大的檔案只支援 MP3（依 MP3 影格邊界切），
- *   其他格式（M4A 等）過大時請業主改傳 MP3。Mux／YouTube 的章節目前不支援（Worker 取不到純音訊）。
+ *   其他格式（M4A 等）過大時請杜杜龍改傳 MP3。Mux／YouTube 的章節目前不支援（Worker 取不到純音訊）。
  */
 import { AiStopped, loadSelection, markExhausted, refundAi, reserveAi } from "./ai-models.ts";
 import type { D1Database, Env, R2Bucket } from "./d1.ts";

@@ -16,11 +16,11 @@ import { useLayout } from "@/theme/layout";
 import { useTheme } from "@/theme/theme";
 import { UI_SCALE } from "@/theme/ui-scale";
 
-/** 底部分頁列高度（業主 2026-11-20：比一般工具列矮一點）。 */
+/** 底部分頁列高度（杜杜龍 2026-11-20：比一般工具列矮一點）。 */
 const navHeight = Math.round((UI_SCALE > 1 ? 58 : 50) * UI_SCALE);
-/** 至尊模式（業主 2026-11-24）：底部選單加高、字與圖示加大（固定大小，不跟著至尊字體倍數再放大，否則四個分頁會擠不下）。 */
+/** 至尊模式（杜杜龍 2026-11-24）：底部選單加高、字與圖示加大（固定大小，不跟著至尊字體倍數再放大，否則四個分頁會擠不下）。 */
 const elderNavHeight = Math.round((UI_SCALE > 1 ? 80 : 72) * UI_SCALE);
-/** 超派模式的模式鍵圖示（業主 2026-11-24 從五個方案挑選：方案 3 火箭）。 */
+/** 超派模式的模式鍵圖示（杜杜龍 2026-11-24 從五個方案挑選：方案 3 火箭）。 */
 const MAKER_ICON: IconName = "rocket-outline";
 /** 只吃平板／電腦倍數、不吃至尊模式倍數（lib/global-scale.ts）。 */
 const UI_ONLY = { dataSet: { uiOnly: "" } } as object;
@@ -40,17 +40,17 @@ const tabs: { key: TabKey; href: Href; title: string; icon: IconName; active: Ic
 ];
 
 /**
- * 課程分頁最後停留的頁面（業主 2026-11-23）：在課程分頁裡（寰宇大學、系列、課程內頁、短網址…）看到哪一頁，就記住；
+ * 課程分頁最後停留的頁面（杜杜龍 2026-11-23）：在課程分頁裡（寰宇大學、系列、課程內頁、短網址…）看到哪一頁，就記住；
  * 切到其他分頁再按「課程」會回到那一頁；人已經在課程分頁裡再按一次「課程」，才回到課程首頁（所有系列）。
  * 只記在這次開啟期間（記憶體），不存裝置。
  */
 let lastCoursesHref: string | null = null;
 
 /**
- * 超派模式的模式鍵「偷看」動畫（業主 2026-11-24）：平常顯示「超派＋火箭」，每隔 3 秒換成「至尊＋皇冠」閃爍幾下，再換回「超派＋火箭」，
+ * 超派模式的模式鍵「偷看」動畫（杜杜龍 2026-11-24）：平常顯示「超派＋火箭」，每隔 3 秒換成「至尊＋皇冠」閃爍幾下，再換回「超派＋火箭」，
  * 提醒使用者這裡可以切換到至尊模式。只在超派模式執行（至尊模式固定顯示「至尊＋皇冠」）。
  */
-/** 網頁：最近有捲動（含系統「滾動截圖」自動捲動）就暫停模式鍵動畫（業主 2026-11-25：手機系統提示「此頁面有影響拼接效果的功能」，畫面一直在變動會讓長截圖拼接失敗）。 */
+/** 網頁：最近有捲動（含系統「滾動截圖」自動捲動）就暫停模式鍵動畫（杜杜龍 2026-11-25：手機系統提示「此頁面有影響拼接效果的功能」，畫面一直在變動會讓長截圖拼接失敗）。 */
 let lastScrollAt = 0;
 if (Platform.OS === "web" && typeof window !== "undefined") window.addEventListener("scroll", () => (lastScrollAt = Date.now()), { capture: true, passive: true });
 const recentlyScrolled = () => Platform.OS === "web" && Date.now() - lastScrollAt < 10_000;
@@ -92,7 +92,7 @@ function useModePeek(enabled: boolean) {
       }, 3000);
     };
     cycle();
-    // 保險（業主 2026-11-25 回報：右下角模式鍵有時整個消失＝透明度卡在 0，例如分頁在背景時動畫被暫停）：
+    // 保險（杜杜龍 2026-11-25 回報：右下角模式鍵有時整個消失＝透明度卡在 0，例如分頁在背景時動畫被暫停）：
     // 動畫超過 3 秒還沒走完，或沒在動畫卻不是完全不透明，就強制還原成完全顯示並重新排程。
     const watchdog = setInterval(() => {
       if (!alive) return;
@@ -136,9 +136,9 @@ export function BottomBar() {
   // 加到主畫面的 App 底部多出的一塊（lib/bottom-gap.ts）：它本身就是底部安全距離，選單不再額外留白；一般瀏覽器分頁沒有這一塊，才自己留一點。
   const [edge, setEdge] = useState(getBottomGap());
   useEffect(() => onBottomGap(setEdge), []);
-  // 大螢幕（業主 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
+  // 大螢幕（杜杜龍 2026-11-18）：五個分頁集中在中間（不要散在整條寬螢幕兩端），圖示與文字放大一點。
   const { large } = useLayout();
-  const iconSize = elder ? (UI_SCALE > 1 ? 36 : 30) : UI_SCALE > 1 ? 30 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（業主 2026-11-20）
+  const iconSize = elder ? (UI_SCALE > 1 ? 36 : 30) : UI_SCALE > 1 ? 30 : 24; // 平板放大由 lib/global-scale.ts 統一處理；平板再加大（杜杜龍 2026-11-20）
   const iconBox = Math.round((iconSize + 4) * UI_SCALE); // 圖示本身會被全站放大，外框也要跟著放大，否則圖示會壓到下面的文字
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -149,7 +149,7 @@ export function BottomBar() {
   // 網頁（加到主畫面的 App）：選單下方若有沒被畫面蓋到的區塊，底色與選單同色，不會露出白色。
   const barBg = lib ? LIB.card : c.navBar;
   const hidden = pathname.startsWith("/auth") || keyboard;
-  // 記住課程分頁最後停留的頁面：只記導覽套件的路徑（不用網址列：課程頁自己會把網址列改成中心短網址等，拿去導覽會卡住，業主 2026-11-23 回報再點「課程」沒反應）。
+  // 記住課程分頁最後停留的頁面：只記導覽套件的路徑（不用網址列：課程頁自己會把網址列改成中心短網址等，拿去導覽會卡住，杜杜龍 2026-11-23 回報再點「課程」沒反應）。
   // 寰宇大學（/courses）的篩選與中心頁狀態本來就留在畫面上，回 /courses 即可還原。
   useEffect(() => {
     if (tabs[1]!.match(pathname)) lastCoursesHref = pathname;
@@ -177,19 +177,19 @@ export function BottomBar() {
       <View style={[styles.row, large && styles.rowLarge]}>
       {shown.map((t) => {
         const on = !lib && t.match(pathname);
-        // 方案 1（業主 2026-11-20）：整條深綠實心、白字白圖示；目前所在分頁是黃色膠囊＋深色字。書櫃模式維持咖啡色舊樣式。
+        // 方案 1（杜杜龍 2026-11-20）：整條深綠實心、白字白圖示；目前所在分頁是黃色膠囊＋深色字。書櫃模式維持咖啡色舊樣式。
         const color = lib ? LIB.muted : on ? c.navPillText : "#FFFFFF";
         return (
           <Pressable key={t.title} style={tabStyle} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={t.title === "課程" ? "課程（寰宇大學）" : t.title} onPress={() => runGuarded(() => {
             if (t.title === "課程") {
-              // 已經在課程分頁裡再按一次＝回課程首頁（所有系列）；從別的分頁回來＝回到上次停留的那一頁（業主 2026-11-23）。
+              // 已經在課程分頁裡再按一次＝回課程首頁（所有系列）；從別的分頁回來＝回到上次停留的那一頁（杜杜龍 2026-11-23）。
               if (t.match(pathname)) {
                 requestCoursesReset();
                 router.navigate(t.href);
               } else router.navigate((lastCoursesHref ?? t.href) as Href);
               return;
             }
-            // 已經在首頁再按一次首頁＝清掉首頁狀態、回到預設值（業主 2026-11-25）。
+            // 已經在首頁再按一次首頁＝清掉首頁狀態、回到預設值（杜杜龍 2026-11-25）。
             if (t.title === "首頁" && t.match(pathname)) requestHomeReset();
             router.navigate(t.href);
           })}>
@@ -211,7 +211,7 @@ export function BottomBar() {
           </Pressable>
         );
       })}
-      {/* 模式鍵（業主 2026-11-24）：放在「設定」右邊，樣式跟其他分頁一樣（不加黃色底框）；文字與圖示顯示「目前的模式」：
+      {/* 模式鍵（杜杜龍 2026-11-24）：放在「設定」右邊，樣式跟其他分頁一樣（不加黃色底框）；文字與圖示顯示「目前的模式」：
           超派模式＝「超派」＋MAKER_ICON，按下直接切到至尊模式；至尊模式＝「至尊」＋皇冠，按下打開面板（字體大小、訂單紀錄、帳號、換回超派模式）。書櫃頁面不顯示。 */}
       {lib ? null : (
         <Pressable

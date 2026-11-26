@@ -15,7 +15,7 @@ import { usePlayer } from "./use-player";
  * 位置在影片的外面下方（不在影片裡面）。播放／暫停、可拖曳的時間軸、時間、（影片才有）全螢幕。
  * 以後要改時間軸的外觀或位置，只改這個檔案（與 seek-bar.tsx），三種模式會自動一起變。
  */
-export function PlayerControls({ overlay = false }: { /** 全螢幕疊在影片上：黑色半透明底、白色圖示（業主 2026-11-24）。 */ overlay?: boolean } = {}) {
+export function PlayerControls({ overlay = false }: { /** 全螢幕疊在影片上：黑色半透明底、白色圖示（杜杜龍 2026-11-24）。 */ overlay?: boolean } = {}) {
   const theme = useTheme();
   const c = overlay ? { ...theme.c, text: "#fff", textMuted: "rgba(255,255,255,0.85)", accentText: "#fff", surface: "rgba(0,0,0,0.55)", border: "transparent" } : theme.c;
   const s = usePlayer();

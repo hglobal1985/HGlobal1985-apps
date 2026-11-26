@@ -10,7 +10,7 @@ import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, S
 type Invite = { courseId: string; courseTitle: string; expiresAt: string; state: "open" | "mine" | "used" | "expired" };
 
 /**
- * 審核人員邀請（業主 2026-11-16）：課程「費用與審核 > 審核窗口」產生的 24 小時一次性網址。
+ * 審核人員邀請（杜杜龍 2026-11-16）：課程「費用與審核 > 審核窗口」產生的 24 小時一次性網址。
  * 對方登入後打開，按「接受」就成為這門課的報名審核人員（之後在「設定 > 報名審核」處理報名）。
  */
 export default function ReviewInviteScreen() {

@@ -1,6 +1,6 @@
 /**
  * 從圖片檔頭讀寬高（JPEG／PNG／WebP；不解碼整張圖）。讀不出來回 null。
- * 用途：把課程 EDM 併進中心 EDM 空間時，舊的圖沒有記寬高，封面輪播需要寬高判斷橫式／直式（業主 2026-11-23）。
+ * 用途：把課程 EDM 併進中心 EDM 空間時，舊的圖沒有記寬高，封面輪播需要寬高判斷橫式／直式（杜杜龍 2026-11-23）。
  */
 export function imageSize(b: Uint8Array): { width: number; height: number } | null {
   // PNG：IHDR 在 16 位元組開始

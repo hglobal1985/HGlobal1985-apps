@@ -4,7 +4,7 @@ import { radius } from "@/theme/tokens";
 import { AppText } from "./text";
 
 /**
- * 兩段（或多段）切換鈕（業主 2026-11-21 統一：中心頁「課程｜清單」、系列頁與課程頁「詳細列表｜縮圖」都用這一款）：
+ * 兩段（或多段）切換鈕（杜杜龍 2026-11-21 統一：中心頁「課程｜清單」、系列頁與課程頁「詳細列表｜縮圖」都用這一款）：
  * 全寬、淡灰底軌道、目前選的是深綠實心白字。要改外觀只改這個檔案；新增任何全寬的分類切換一律用它。
  */
 export function SegmentTabs<T extends string>({ options, value, onChange }: { options: { key: T; label: string }[]; value: T; onChange: (key: T) => void }) {

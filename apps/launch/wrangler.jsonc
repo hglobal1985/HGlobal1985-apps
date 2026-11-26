@@ -12,12 +12,12 @@
   // Workers AI 綁定（逐字稿、關鍵字、語意搜尋）；用量由程式依「AI 模型」頁設定的每日上限控管。
   "ai": { "binding": "AI" },
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "learn" }],
-  // Cloudflare Images 綁定：封面縮圖即時縮小（免費方案每月 5,000 次不重複縮圖，超過不收費、改回傳原圖；業主 2026-11-20）。
+  // Cloudflare Images 綁定：封面縮圖即時縮小（免費方案每月 5,000 次不重複縮圖，超過不收費、改回傳原圖；杜杜龍 2026-11-20）。
   "images": { "binding": "IMAGES" },
   // Cloudflare Email Service（網域 learn.hglobal1985.com 已開通寄信）；只用來寄通知，不需要金鑰。
   "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@learn.hglobal1985.com"] }],
   "vars": { "DEMO_LOGIN": "off", "EMAIL_FROM": "noreply@learn.hglobal1985.com", "CF_ACCOUNT_ID": "650a3b03d439a5f517b4f8a28244f9fe", "CF_ZONE_ID": "1c9558ed07ec981a87ff0f9a005ec9c4" },
-  // MUX_SIGNING_KEY_ID 由業主在 Cloudflare 後台設定；部署時保留後台的變數，避免被清掉。
+  // MUX_SIGNING_KEY_ID 由杜杜龍在 Cloudflare 後台設定；部署時保留後台的變數，避免被清掉。
   "keep_vars": true,
   // 排程：每 10 分鐘補推還沒推播的通知；台灣時間 20:00 後發「明天開課提醒」（src/push.ts）。
   "triggers": { "crons": ["*/10 * * * *"] },

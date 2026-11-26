@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 import { currentModeKey } from "./elder-mode";
 
 /**
- * 使用統計回報（業主 2026-11-22，管理員 > 設定 > 使用統計）：匿名回報裝置（手機／平板／電腦）、系統（iOS／Android／其他）、
+ * 使用統計回報（杜杜龍 2026-11-22，管理員 > 設定 > 使用統計）：匿名回報裝置（手機／平板／電腦）、系統（iOS／Android／其他）、
  * 開啟網站，以及首頁卡片被點開。不送會員編號；失敗靜默略過，不影響操作。伺服器依收到的時間記台灣時段。
  */
 type Kind = "visit" | "card_course" | "card_series" | "card_center" | "album_open" | "album_folder" | "album_photo" | "album_search" | "album_sort" | "album_info" | "album_share" | "album_download" | "album_move";
@@ -24,7 +24,7 @@ function detect(): { device: "mobile" | "tablet" | "desktop"; os: "ios" | "andro
   return { device: "desktop", os: "other" };
 }
 
-/** 「這是業主本人的裝置」記號（業主 2026-11-23）：管理員在這個瀏覽器／手機登入過就留下，之後未登入、換測試帳號也不列入統計。 */
+/** 「這是杜杜龍本人的裝置」記號（杜杜龍 2026-11-23）：管理員在這個瀏覽器／手機登入過就留下，之後未登入、換測試帳號也不列入統計。 */
 const OWNER_KEY = "learn.usage.owner";
 let ownerDevice = false;
 const ownerReady = AsyncStorage.getItem(OWNER_KEY).then((v) => void (ownerDevice = v === "1")).catch(() => undefined);

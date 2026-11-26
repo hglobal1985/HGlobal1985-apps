@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import { inAppBrowser } from "./in-app-browser";
 
 /**
- * 「加入主畫面」（業主 2026-11-18）：安裝成 App 後，手機推播的來源會顯示「寰宇行動大學」而不是網址，也開啟得更快。
+ * 「加入主畫面」（杜杜龍 2026-11-18）：安裝成 App 後，手機推播的來源會顯示「寰宇行動大學」而不是網址，也開啟得更快。
  * Android Chrome 會送出 beforeinstallprompt，我們存起來，按鈕一按就跳出系統的安裝視窗；iPhone Safari 沒有這個事件，只能教使用者用「分享 → 加入主畫面」。
  * 這個檔案要在根版面最早 import（事件只會送一次）。
  */
@@ -19,7 +19,7 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
     deferred = e as unknown as Deferred;
     emit();
   });
-  // 這支手機已經把本站安裝成 App（例如從超派模式裝過）：Chrome 不會再送安裝許可事件，所以先問瀏覽器，已安裝就不再顯示安裝邀請（業主 2026-11-24 回報按了沒反應）。
+  // 這支手機已經把本站安裝成 App（例如從超派模式裝過）：Chrome 不會再送安裝許可事件，所以先問瀏覽器，已安裝就不再顯示安裝邀請（杜杜龍 2026-11-24 回報按了沒反應）。
   (navigator as unknown as { getInstalledRelatedApps?: () => Promise<unknown[]> }).getInstalledRelatedApps?.()
     .then((apps) => {
       if (apps.length) {
@@ -37,7 +37,7 @@ if (Platform.OS === "web" && typeof window !== "undefined") {
 
 export const isStandalone = () => typeof window !== "undefined" && (window.matchMedia?.("(display-mode: standalone)").matches || (navigator as { standalone?: boolean }).standalone === true);
 /**
- * iPad 的 Safari 預設「以電腦版網站瀏覽」，瀏覽器身分會寫成 Mac 電腦（Macintosh），只能從「有觸控螢幕」分辨出是 iPad（業主 2026-11-18：iPad 也要顯示安裝提醒）。
+ * iPad 的 Safari 預設「以電腦版網站瀏覽」，瀏覽器身分會寫成 Mac 電腦（Macintosh），只能從「有觸控螢幕」分辨出是 iPad（杜杜龍 2026-11-18：iPad 也要顯示安裝提醒）。
  */
 export const isIpad = () =>
   typeof navigator !== "undefined" && (/iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && (navigator.maxTouchPoints ?? 0) > 1));
@@ -52,7 +52,7 @@ export function canSuggestInstall(): boolean {
 
 /** Android：跳出系統安裝視窗；回傳 true＝使用者同意。沒有事件（iPhone 等）回傳 null，呼叫端改顯示教學。 */
 export async function installNative(): Promise<boolean | null> {
-  // Android 的安裝許可事件有時要等幾秒才送來（業主 2026-11-24：至尊頁按了卻變成要手動操作）：還沒收到就先等最多 3 秒，收到就直接跳出系統安裝視窗。
+  // Android 的安裝許可事件有時要等幾秒才送來（杜杜龍 2026-11-24：至尊頁按了卻變成要手動操作）：還沒收到就先等最多 3 秒，收到就直接跳出系統安裝視窗。
   if (!deferred && !isIos() && isMobile()) {
     await new Promise<void>((resolve) => {
       const done = () => {

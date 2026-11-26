@@ -29,9 +29,9 @@ export function withShareMeta(html: string, m: { title: string; description: str
   return stripped.replace(/<title>[^<]*<\/title>/, `<title>${t}</title>`).replace("</head>", `${tags}</head>`);
 }
 
-/** 中心的分享標題名稱：去掉數字代碼，結尾補「中心」（已以「中心」或「教育中心」結尾的先去掉，避免重複；業主 2026-11-15 指定預設為 XX中心）。「南京 062」→「南京中心」、「美國洛杉磯」→「美國洛杉磯中心」、「台北中心」→「台北中心」。 */
+/** 中心的分享標題名稱：去掉數字代碼，結尾補「中心」（已以「中心」或「教育中心」結尾的先去掉，避免重複；杜杜龍 2026-11-15 指定預設為 XX中心）。「南京 062」→「南京中心」、「美國洛杉磯」→「美國洛杉磯中心」、「台北中心」→「台北中心」。 */
 export function centerShareName(label: string): string {
-  // 業主 2026-11-17：取消「自動在後面加中心二個字」，中央的名稱怎麼寫就怎麼顯示（只拿掉尾巴的數字代碼）。
+  // 杜杜龍 2026-11-17：取消「自動在後面加中心二個字」，中央的名稱怎麼寫就怎麼顯示（只拿掉尾巴的數字代碼）。
   return label.replace(/\s*\d+\s*$/, "").trim() || label;
 }
 
@@ -41,7 +41,7 @@ export async function centerDisplayName(db: D1Database, label: string): Promise<
   return r?.n?.trim() || centerShareName(label);
 }
 
-/** 中心的分享內容（業主 2026-11-16）：名稱與地址。 */
+/** 中心的分享內容（杜杜龍 2026-11-16）：名稱與地址。 */
 export async function centerShareParts(db: D1Database, label: string): Promise<{ name: string; address: string }> {
   const name = await centerDisplayName(db, label);
   const a = await db.prepare("SELECT address AS a FROM center_info WHERE center_key = ?").bind(centerKey(label)).first<{ a: string }>().catch(() => null);
@@ -77,7 +77,7 @@ export async function shortLinkMeta(db: D1Database, slug: string, origin: string
   const row = await db.prepare("SELECT slug, kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ slug: string; kind: string; value: string }>();
   if (!row) return null;
   const S = await shareCfg(db);
-  // 預覽圖：系列有上傳 EDM 就用 EDM；中心優先用「裁切好的 16:9 封面」（業主指定的位置），沒有封面才用整張 EDM；都沒有用網站圖示。
+  // 預覽圖：系列有上傳 EDM 就用 EDM；中心優先用「裁切好的 16:9 封面」（杜杜龍指定的位置），沒有封面才用整張 EDM；都沒有用網站圖示。
   const art =
     row.kind === "series"
       ? await db.prepare("SELECT edm_key AS k, art_version AS v FROM series_art WHERE series = ?").bind(row.value).first<{ k: string; v: number }>().catch(() => null)

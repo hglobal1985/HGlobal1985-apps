@@ -4,7 +4,7 @@ import { readPhotoMeta } from "./exif-meta";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 更換 EDM 照片（網頁版，業主 2026-11-23）：選一張新圖 → 瀏覽器先壓縮 → 換掉這張照片；綁定課程的 EDM 會同時換掉那堂課的 EDM。
+ * 更換 EDM 照片（網頁版，杜杜龍 2026-11-23）：選一張新圖 → 瀏覽器先壓縮 → 換掉這張照片；綁定課程的 EDM 會同時換掉那堂課的 EDM。
  * maxSide／quality 用「設定 › 儲存空間管理」的中心封面畫質（與上傳 EDM 同一組）。
  */
 export function replaceAlbumPhoto(id: string, opts: { maxSide: number; quality: number }, onDone: () => void): void {

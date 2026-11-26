@@ -4,7 +4,7 @@ import { useLayout } from "@/theme/layout";
 import { space } from "@/theme/tokens";
 
 /**
- * 卡片格狀排列（業主 2026-11-18 大螢幕版面）：手機一列一張（跟原本一樣），平板兩張、寬螢幕三張（theme/layout.ts 的 cardCols）。
+ * 卡片格狀排列（杜杜龍 2026-11-18 大螢幕版面）：手機一列一張（跟原本一樣），平板兩張、寬螢幕三張（theme/layout.ts 的 cardCols）。
  * 「學習中」、系列「顯示全部」等 CourseCard 清單都用它；最後一列不足時用空白補齊，卡片寬度永遠一致。
  */
 export function CardGrid({ children, cols, gap = space.md }: { children: ReactNode; cols?: number; gap?: number }) {

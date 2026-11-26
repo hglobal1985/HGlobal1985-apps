@@ -1,5 +1,5 @@
 /**
- * 語意搜尋（業主 2026-11-23，與前端「模糊比對」並用）：用 AI 模型清單裡的「語意搜尋」模型（預設 BGE-M3）把課程名稱、章節標題轉成向量，
+ * 語意搜尋（杜杜龍 2026-11-23，與前端「模糊比對」並用）：用 AI 模型清單裡的「語意搜尋」模型（預設 BGE-M3）把課程名稱、章節標題轉成向量，
  * 搜尋時把查詢文字也轉成向量，找出意思最接近的課程與章節。只回編號——能不能看到由前端依自己已取得的（有權限的）索引過濾。
  * 向量存在 D1 `search_vectors`（int8 量化＋base64），排程每 10 分鐘補一批；額度走 AI 點數預扣（用完就停，不影響其他搜尋）。
  */
@@ -95,7 +95,7 @@ async function allVectors(db: D1Database): Promise<Row[]> {
 }
 
 /**
- * 字面相關度（業主 2026-11-25：搜「晚安修護面膜」，出來一堆完全不相干的 EDM）：AI 相似度之外，再看查詢字的「相鄰兩字」有幾成出現在這筆文字裡。
+ * 字面相關度（杜杜龍 2026-11-25：搜「晚安修護面膜」，出來一堆完全不相干的 EDM）：AI 相似度之外，再看查詢字的「相鄰兩字」有幾成出現在這筆文字裡。
  * 加分＝0.3 × 命中比例；EDM、相片、課程介紹這類長文字最容易被 AI 誤判，完全沒有任何相鄰兩字命中的直接扣 0.5（等於不列）。後台「試搜尋」與實際搜尋共用。
  */
 export function lexAdjust(query: string, txt: string, kind: string, bonus = 0.3, penalty = 0.5, penaltyAll = 0.08): number {
@@ -141,7 +141,7 @@ export async function semanticSearch(env: Env, db: D1Database, q: string, limitA
   return { courses: scored.filter((x) => x.r.kind === "course").slice(0, limit).map((x) => x.r.id), lessons: scored.filter((x) => x.r.kind === "lesson").slice(0, limit).map((x) => x.r.id), extras: [...extras, ...lessonHits].map((h) => ({ ...h, prio: prio(h.kind) })).sort((a, b) => a.prio - b.prio || b.score - a.score), coursePrio: prio("course") };
 }
 
-/** 試搜尋（設定頁用，超級管理員）：跟實際搜尋同一套規則——只列「已開啟」的來源、分數含加分、依「顯示順序」再依分數排序、標出過不過門檻。業主 2026-11-25：以這裡的結果為最終樣式。 */
+/** 試搜尋（設定頁用，超級管理員）：跟實際搜尋同一套規則——只列「已開啟」的來源、分數含加分、依「顯示順序」再依分數排序、標出過不過門檻。杜杜龍 2026-11-25：以這裡的結果為最終樣式。 */
 export async function semanticDebug(env: Env, db: D1Database, q: string, n = 20): Promise<{ min: number; rows: { kind: string; title: string; score: number; boost: number; pass: boolean }[]; note?: string }> {
   const st = await loadSearchSettings(db);
   const min = st.semanticMin as number;

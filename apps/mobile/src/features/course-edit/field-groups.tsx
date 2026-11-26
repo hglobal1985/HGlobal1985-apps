@@ -7,7 +7,7 @@ import { MultiChips } from "./course-sections"; // 函式只在畫面繪製時�
 import { AppText } from "@/ui";
 
 /**
- * 編輯面板共用的欄位組（業主 2026-11-18：同類的編輯功能一律用共用模板，不各自重畫）。
+ * 編輯面板共用的欄位組（杜杜龍 2026-11-18：同類的編輯功能一律用共用模板，不各自重畫）。
  * 課程基本資料、新增課程／清單、區塊編輯，凡是要選「品牌」「分類」都用這裡的元件；要改版面只改這個檔案。
  */
 
@@ -41,7 +41,7 @@ export function hostCountsOf(list: { hostUnit: string }[]): Record<string, numbe
 }
 
 /**
- * 主辦單位／建立單位（可複選，值是用「、」分隔的字串）：新增課程／清單與「進階設定」共用，不再有展開／收起（業主 2026-11-18）。
+ * 主辦單位／建立單位（可複選，值是用「、」分隔的字串）：新增課程／清單與「進階設定」共用，不再有展開／收起（杜杜龍 2026-11-18）。
  * 只有總部管理員能選；中心的會長、音控、小編固定是自己的中心。含某個中心＝中心課程（出現在該中心頁）；只有寰宇總部＝一般課程。
  */
 export function HostField({ title, value, fixed, onChange }: { title: string; value: string; fixed: string; onChange: (v: string) => void }) {

@@ -151,7 +151,7 @@ type Ctx = { env: Env; db: D1Database; req: Request; url: URL; platform: ClientP
 
 type BrandRow = { id: string; name: string; logo_key: string | null; bg_key: string | null; bg_color: string | null; bg_color_dark: string | null; categories: string; art_version: number };
 const loadBrands = async (db: D1Database): Promise<BrandRow[]> => (await db.prepare("SELECT id, name, logo_key, bg_key, bg_color, bg_color_dark, categories, art_version FROM brand_logos WHERE logo_key IS NOT NULL ORDER BY sort_order, created_at").all<BrandRow>()).results;
-/** 課程的品牌封面（業主 2026-11-18）：選了品牌、而且沒有手動上傳封面／EDM 才用品牌 logo（手動上傳 > 品牌 logo > 文字封面）。 */
+/** 課程的品牌封面（杜杜龍 2026-11-18）：選了品牌、而且沒有手動上傳封面／EDM 才用品牌 logo（手動上傳 > 品牌 logo > 文字封面）。 */
 function brandFor(ctx: Ctx, row: { brand_id?: string | null; edm_key?: string | null; cover_key?: string | null }): BrandCover | null {
   if (!row.brand_id || row.edm_key || row.cover_key) return null;
   const b = ctx.brands?.find((x) => x.id === row.brand_id);
@@ -192,7 +192,7 @@ async function loadBlocks(db: D1Database): Promise<Map<string, SheetBlock[]>> {
     } else if (r.has && any) counts.set(any, (counts.get(any) ?? 0) + 1);
     if (r.kind !== "section" && cur && r.has) cur.count++;
   }
-  // 區塊照片也算內容（業主 2026-11-24：沒內容的區塊不對外展示，有照片就不是空的）。
+  // 區塊照片也算內容（杜杜龍 2026-11-24：沒內容的區塊不對外展示，有照片就不是空的）。
   const photoCounts = new Map<string, number>(
     (await db.prepare("SELECT owner_key, COUNT(*) AS n FROM cover_media WHERE owner_kind = 'course' AND scope = 'cover' GROUP BY owner_key").all<{ owner_key: string; n: number }>()).results.map((r) => [r.owner_key, r.n]),
   );
@@ -272,7 +272,7 @@ function requireAdmin(ctx: Ctx): Session {
 
 const demoEnabled = (env: Env) => env.DEMO_LOGIN === "on";
 
-/** 會員最新暱稱與頭像（migration 0135 member_profiles）：登入使用時只有「變動」才寫入，相簿上傳者標記永遠顯示最新版本（業主 2026-11-25）。 */
+/** 會員最新暱稱與頭像（migration 0135 member_profiles）：登入使用時只有「變動」才寫入，相簿上傳者標記永遠顯示最新版本（杜杜龍 2026-11-25）。 */
 const profMemo = new Map<string, string>();
 async function touchProfile(db: D1Database, sub: string, name: string, avatar: string | null): Promise<void> {
   if (!name || name === "會員") return;
@@ -369,7 +369,7 @@ function notify(db: D1Database, to: { sub: string } | { role: "admin" } | { role
     .bind(crypto.randomUUID(), "sub" in to ? to.sub : null, "role" in to ? to.role : null, "centerKey" in to ? to.centerKey : null, title, body, link);
 }
 
-/** 通知分類（業主 2026-11-17）：留言、訂閱（中心／系列有新課程、章節、教材、公告）、審核（報名審核與結果、審核人員指派），其餘＝其他（只在「全部」看到）。 */
+/** 通知分類（杜杜龍 2026-11-17）：留言、訂閱（中心／系列有新課程、章節、教材、公告）、審核（報名審核與結果、審核人員指派），其餘＝其他（只在「全部」看到）。 */
 function noticeCategory(title: string, link: string): NoticeCategory {
   if (/獲得學習徽章/.test(title)) return "achievement";
   if (/留言|回覆/.test(title)) return "comment";
@@ -379,7 +379,7 @@ function noticeCategory(title: string, link: string): NoticeCategory {
 }
 
 /**
- * 中央的獎銜／中心申請有結果時，通知申請人（站內通知＋手機推播；業主 2026-11-19 回報申請人沒收到通知）。
+ * 中央的獎銜／中心申請有結果時，通知申請人（站內通知＋手機推播；杜杜龍 2026-11-19 回報申請人沒收到通知）。
  * 中央自己的「已通知會員」只在會員中心，不會到行動大學，所以行動大學要自己發。兩個來源（審核回應、webhook）可能重複，2 分鐘內同一人只發一則。
  */
 async function notifyReviewResult(db: D1Database, sub: string, what: string): Promise<void> {
@@ -392,7 +392,7 @@ async function notifyReviewResult(db: D1Database, sub: string, what: string): Pr
 const reviewText = (v: unknown): string => (v == null || v === "" ? "" : typeof v === "string" ? v : typeof v === "object" && "option" in (v as object) ? String((v as { option: unknown }).option ?? "") : String(v)).slice(0, 80);
 const REVIEW_FIELD_LABEL: Record<string, string> = { rank: "獎銜", education_center: "中心", education_system: "系統" };
 
-/** 業主本人（管理員帳號或超級管理員）；使用統計用來排除本人的操作。 */
+/** 杜杜龍本人（管理員帳號或超級管理員）；使用統計用來排除本人的操作。 */
 const isOwnerSession = (s: Session | null): boolean => !!s && (s.role === "admin" || s.roles.includes("super_admin"));
 
 /** 統計分析：超級管理員、總部秘書一定可以；其他職務要被超級管理員指定。 */
@@ -593,11 +593,11 @@ type CourseRow = {
 };
 
 /**
- * 「純教材」判斷（業主 2026-11-20：教材卡只剩一種）：舊的清單型卡片（is_list=1），或是「沒有章節、免費、沒有日期」的教材卡。
+ * 「純教材」判斷（杜杜龍 2026-11-20：教材卡只剩一種）：舊的清單型卡片（is_list=1），或是「沒有章節、免費、沒有日期」的教材卡。
  * 純教材卡沿用清單的規則：不需要報名、不顯示緞帶與費用、不列入學習中；一加上章節、日期或費用，就自動變成一般課程的規則。
  */
 const materialLike = (r: { invite_only: number; is_list: number; chapter_n: number; price_twd: number; price_tba: number; event_start: string | null; event_end: string | null }): boolean =>
-  r.invite_only !== 1 && (r.is_list === 1 || (r.chapter_n === 0 && r.price_twd === 0 && r.price_tba !== 1 && !r.event_start && !r.event_end)); // 指定邀請制一定是要報名的一般課程（業主 2026-11-20）
+  r.invite_only !== 1 && (r.is_list === 1 || (r.chapter_n === 0 && r.price_twd === 0 && r.price_tba !== 1 && !r.event_start && !r.event_end)); // 指定邀請制一定是要報名的一般課程（杜杜龍 2026-11-20）
 /** 同一個判斷的 SQL 版（FROM courses 的查詢用）。 */
 const MATERIAL_LIKE_SQL = `(invite_only = 0 AND (is_list = 1 OR (NOT EXISTS (SELECT 1 FROM lessons ch WHERE ch.course_id = courses.id AND ch.kind = 'chapter') AND price_twd = 0 AND price_tba <> 1 AND COALESCE(event_start, '') = '' AND COALESCE(event_end, '') = '')))`;
 
@@ -631,7 +631,7 @@ async function memberCourseState(db: D1Database, sub: string | undefined) {
 }
 type MemberState = Awaited<ReturnType<typeof memberCourseState>>;
 /**
- * 已報名／審核中／學習過的人，在「誰能瀏覽」改嚴之後是否仍保有存取（業主 2026-11-18）：
+ * 已報名／審核中／學習過的人，在「誰能瀏覽」改嚴之後是否仍保有存取（杜杜龍 2026-11-18）：
  * 付費課程的報名是繳費換來的，照常保留；免費課程的報名與「學習過」都是第一次打開時自動完成的，不算資格，要照現在的瀏覽範圍。
  */
 function keepsAccess(state: MemberState, r: { id: string; price_twd: number; price_tba: number }): boolean {
@@ -652,7 +652,7 @@ const byPresident = (s: Session | null, c: { allow_president: number }) => c.all
 const inFreeWindow = (row: { free_from: string | null; free_until: string | null }, now = iso()) =>
   !!(row.free_from || row.free_until) && (!row.free_from || row.free_from <= now) && (!row.free_until || now < row.free_until);
 
-/** 課程的 EDM／封面網址（只有手動上傳的；沒有就由畫面用課程標題產生文字封面，不再用 YouTube 縮圖，業主 2026-11-22）。 */
+/** 課程的 EDM／封面網址（只有手動上傳的；沒有就由畫面用課程標題產生文字封面，不再用 YouTube 縮圖，杜杜龍 2026-11-22）。 */
 function courseArt(row: CourseRow) {
   return {
     edmUrl: row.edm_key ? pubUrl(row.edm_key, row.art_version) : null,
@@ -723,7 +723,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
     hiddenFromLearning: state.enrolled.has(row.id) ? state.hidden.has(row.id) : state.startedHidden.has(row.id),
     lastLearnedAt: state.lastLearned.get(row.id) ?? null,
     started: state.started.has(row.id) || (state.done.get(row.id) ?? 0) > 0,
-    // 只有清單／素材類「符合獎銜就能直接使用」；課程類一律要手動報名（業主 2026-11-18）。
+    // 只有清單／素材類「符合獎銜就能直接使用」；課程類一律要手動報名（杜杜龍 2026-11-18）。
     watchFree: !!ctx.session && materialLike(row) && row.status === "published" && row.price_twd === 0 && row.price_tba !== 1 && (eligibility.get(row.min_rank_code) === true || byPresident(ctx.session, row)),
     diamondFree: row.diamond_free === 1,
     diamondFreeNow: diamondNow,
@@ -763,7 +763,7 @@ function summarize(row: CourseRow, ctx: Ctx, rankMap: Map<string, Rank>, state: 
 const scopeOf = (v: string): ViewScope => (VIEW_SCOPES as string[]).includes(v) ? (v as ViewScope) : "all";
 /** 私密連結：不顯示在任何清單與搜尋，只有拿到網址的人能開。 */
 const isPrivate = (scope: string) => scope === "link_login" || scope === "link_guest";
-/** 誰可以瀏覽（業主 2026-11-17）：這位使用者依課程的設定看不看得到。 */
+/** 誰可以瀏覽（杜杜龍 2026-11-17）：這位使用者依課程的設定看不看得到。 */
 function scopeAllows(scope: string, s: Session | null): boolean {
   if (scope === "members" || scope === "link_login") return !!s;
   if (scope === "hglobal") return !!s?.hglobal;
@@ -960,7 +960,7 @@ function inviteState(inv: InviteRow, sub: string): "open" | "mine" | "used" | "e
 async function ensureCourseUrl(ctx: Ctx, courseId: string): Promise<void> {
   try {
     const c = await ctx.db.prepare("SELECT teacher, title, no_speaker, host_center_key, url_name FROM courses WHERE id = ?").bind(courseId).first<{ teacher: string | null; title: string; no_speaker: number; host_center_key: string | null; url_name: string | null }>();
-    // 專屬網址的名字：有主講人＝主講人英譯；勾了「無」＝課程名稱英譯（業主 2026-11-19）。
+    // 專屬網址的名字：有主講人＝主講人英譯；勾了「無」＝課程名稱英譯（杜杜龍 2026-11-19）。
     if (!c || c.url_name || (c.no_speaker !== 1 && !c.teacher?.trim())) return;
     // 有主辦中心：要用中心的縮寫（中心還沒設定縮寫就先不產生）；沒有主辦中心（總部）：用保留縮寫 hq。
     if (c.host_center_key && !(await centerSlugMap(ctx.db)).has(c.host_center_key)) return;
@@ -1024,7 +1024,7 @@ function linkRowsOf(db: D1Database, courseIds: string[]) {
 const LINKED_ITEMS_SQL = `SELECT id, position, title, sharer, sharer_rank, sharer_title, duration_minutes, media_type, media_ref, start_seconds, end_seconds, event_date, cover_key, poster_key, art_version, auto_cover, kind, is_full, is_speaker, is_summary, brand_id, categories, in_sheet, link_block_id FROM lessons WHERE course_id = ? AND position > ? AND position < COALESCE((SELECT MIN(position) FROM lessons WHERE course_id = ? AND kind = 'section' AND position > ?), 1000000000) AND kind <> 'section' AND is_full = 0 ORDER BY position`;
 
 /**
- * 某門課程對目前使用者的鎖定狀態（與課程頁 lockedAll 同一條規則）。連結區塊（品牌卡的「成交百寶箱」）與區塊照片，一律用「來源課程最新的報名資格設定」判斷（業主 2026-11-24）：
+ * 某門課程對目前使用者的鎖定狀態（與課程頁 lockedAll 同一條規則）。連結區塊（品牌卡的「成交百寶箱」）與區塊照片，一律用「來源課程最新的報名資格設定」判斷（杜杜龍 2026-11-24）：
  * 例如成交百寶箱設「12% 以上（會長也可）、不用報名」，符合的人直接瀏覽，不符合的人看到鎖頭遮罩與原因。lines＝遮罩上的文字。
  */
 type LockState = { locked: boolean; manages: boolean; lines: string[] };
@@ -1098,13 +1098,13 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   // 誰可以瀏覽：不在範圍內的登入者（管理者、已報名／審核中／學習過的除外）看不到這門課。
   if (!manages && !scopeAllows(row.view_scope, s) && !keepsAccess(state, row)) return fail(404, "not_found", "找不到這門課程");
   const completed = new Set(done.results.map((r) => r.lesson_id));
-  // 連結區塊（品牌資訊卡，業主 2026-11-18）：這個區塊的內容與封面來自另一份清單的區塊——把來源區塊底下的項目接在區塊標題後面，編輯、排序、播放都回到來源清單。
+  // 連結區塊（品牌資訊卡，杜杜龍 2026-11-18）：這個區塊的內容與封面來自另一份清單的區塊——把來源區塊底下的項目接在區塊標題後面，編輯、排序、播放都回到來源清單。
   type LRow = (typeof lessons.results)[number] & { src?: string };
   const lessonRows: LRow[] = [];
   const linkCover = new Map<string, string>();
   const sourceCourses: string[] = [];
   const sourceCourseOf = new Map<string, string>();
-  const photoKeyOf = new Map<string, string>(); // 區塊 → 放照片的區塊編號（課程開放區塊照片時才有；業主 2026-11-24）
+  const photoKeyOf = new Map<string, string>(); // 區塊 → 放照片的區塊編號（課程開放區塊照片時才有；杜杜龍 2026-11-24）
   if (row.block_photos === 1) for (const l of lessons.results) if (l.kind === "section" && !l.link_block_id) photoKeyOf.set(l.id, l.id);
   // 連結區塊（只有品牌卡有）：每個連結區塊各自的來源一起查，再依原本順序接回去。
   const linked = await Promise.all(
@@ -1134,7 +1134,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
     // 封面＝來源清單的系列封面（上傳的封面優先，沒有再用首頁圖）；之後來源修改，這裡自動一致。
     const key = art?.cover_key || art?.edm_key;
     if (key) linkCover.set(l.id, pubUrl(key, art!.art_version));
-    else if (sec.ckey) linkCover.set(l.id, pubUrl(sec.ckey, sec.cver)); // 系列沒有封面時用來源課程自己的封面（成交百寶箱，業主 2026-11-24）
+    else if (sec.ckey) linkCover.set(l.id, pubUrl(sec.ckey, sec.cver)); // 系列沒有封面時用來源課程自己的封面（成交百寶箱，杜杜龍 2026-11-24）
   });
   // 其他教材的外部連結（每個教材一條）：類型給所有人（畫面顯示官方 Logo），網址只給有權限看的人。
   const linkRows = { results: sourceCourses.length ? [...ownLinks, ...(await linkRowsOf(ctx.db, sourceCourses))] : ownLinks };
@@ -1150,7 +1150,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   ctx.seriesSlugs = seriesSlugs;
   ctx.brands = brands;
   ctx.blocks = blocks;
-  // 區塊照片（業主 2026-11-24）：開放的課程，每個區塊帶出自己的照片（cover_media，owner_key＝區塊編號；連結區塊用來源區塊）。
+  // 區塊照片（杜杜龍 2026-11-24）：開放的課程，每個區塊帶出自己的照片（cover_media，owner_key＝區塊編號；連結區塊用來源區塊）。
   if (row.block_photos === 1 && ctx.defer) kickFilePhotos(ctx.env, ctx.defer);
   const photosOf = new Map<string, CoverMediaItem[]>();
   const photoKeys = [...new Set(photoKeyOf.values())];
@@ -1165,10 +1165,10 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
   const summaryNow = summarize(row, ctx, rankMap, state, eligibility);
   const watchFree = summaryNow.watchFree;
   const admin = manages;
-  // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（業主 2026-11-18）。
+  // 免費課程後來才加上獎銜限制：先前自動完成的報名不算資格，不符合的人看不到章節內容（杜杜龍 2026-11-18）。
   const rankLocked = !admin && row.is_public !== 1 && row.price_twd === 0 && row.price_tba !== 1 && row.invite_only !== 1 && row.min_rank_code !== "none" && !summaryNow.eligible;
   const lockedAll = (!admin || !materialLike(row)) && (rankLocked || !(state.enrolled.has(id) || (row.is_public === 1 && materialLike(row)) || watchFree));
-  // 連結區塊的來源課程各自的鎖定狀態（業主 2026-11-24）：連結過來的教材與照片，用來源課程最新的報名資格設定判斷。
+  // 連結區塊的來源課程各自的鎖定狀態（杜杜龍 2026-11-24）：連結過來的教材與照片，用來源課程最新的報名資格設定判斷。
   const srcLock = new Map<string, LockState>();
   const srcIds = [...new Set(sourceCourses)];
   if (srcIds.length) {
@@ -1214,7 +1214,7 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
       ready: (l.media_type !== "demo" && !!l.media_ref) || l.duration_minutes > 0 || (l.kind === "material" && linkOf.has(l.id)),
       // 完全公開的課程：任何人（含訪客與會員）都可以看章節，不需要報名。
       locked: l.kind === "section" ? lockedAll : (lockOf(l)?.locked ?? lockedAll),
-      // 清單項目的圖示類型（連結類型，或清單裡的 YouTube 影片）；規則在 link-rules.ts（業主 2026-11-18）。
+      // 清單項目的圖示類型（連結類型，或清單裡的 YouTube 影片）；規則在 link-rules.ts（杜杜龍 2026-11-18）。
       ...(l.kind === "material" && !l.is_full && itemIconType(linkOf.get(l.id)?.type, l.media_type, true) ? { iconType: itemIconType(linkOf.get(l.id)?.type, l.media_type, true) } : {}),
       ...(l.kind === "material" && linkOf.get(l.id) ? { linkType: linkOf.get(l.id)!.type, ...((lockOf(l)?.locked ?? lockedAll) && !(lockOf(l)?.manages ?? admin) ? {} : { linkUrl: linkOf.get(l.id)!.url }) } : {}),
       // 影片來源只給管理員（編輯用）；學員一律透過 playback API 取得授權後的播放資訊。
@@ -1244,14 +1244,14 @@ async function courseDetail(ctx: Ctx, id: string): Promise<CourseDetail> {
 async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) {
-    // 訪客：只有完全公開、已上架的「清單／教材類」可以看；課程類一律要登入並手動報名（業主 2026-11-22）。
+    // 訪客：只有完全公開、已上架的「清單／教材類」可以看；課程類一律要登入並手動報名（杜杜龍 2026-11-22）。
     const pub = await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published' AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first();
     return !!pub;
   }
-  // 管理員與課程管理者也一樣：課程類要先報名才能播放（業主 2026-11-22）；只有清單／教材類可以不報名直接預覽。
+  // 管理員與課程管理者也一樣：課程類要先報名才能播放（杜杜龍 2026-11-22）；只有清單／教材類可以不報名直接預覽。
   const isMaterial = !!(await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first());
   if (isMaterial && s.role === "admin") return true;
-  if ((await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published' AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first())) return true; // 完全公開的清單／教材類，會員也不必報名（課程類即使免費也要報名，業主 2026-11-22）
+  if ((await ctx.db.prepare(`SELECT 1 AS ok FROM courses WHERE id = ? AND is_public = 1 AND invite_only = 0 AND status = 'published' AND ${MATERIAL_LIKE_SQL}`).bind(courseId).first())) return true; // 完全公開的清單／教材類，會員也不必報名（課程類即使免費也要報名，杜杜龍 2026-11-22）
   const rights = await rightsOf(ctx);
   if (isMaterial && rights.any) {
     const c = await ctx.db.prepare("SELECT host_center_key, created_by_sub FROM courses WHERE id = ?").bind(courseId).first<{ host_center_key: string | null; created_by_sub: string }>();
@@ -1265,7 +1265,7 @@ async function canWatch(ctx: Ctx, courseId: string): Promise<boolean> {
   return freeWatchable(ctx, courseId); // 設定免費的課程：符合資格就能直接看，不用報名
 }
 
-/** 免費（費用 0）、有獎銜限制、而這位會員不符合（會長例外只在勾選時）：即使先前自動報名過也不能看（業主 2026-11-18）。付費課程的報名是繳費換來的，不受影響。 */
+/** 免費（費用 0）、有獎銜限制、而這位會員不符合（會長例外只在勾選時）：即使先前自動報名過也不能看（杜杜龍 2026-11-18）。付費課程的報名是繳費換來的，不受影響。 */
 async function freeRankBlocked(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s || s.role === "admin") return false; // 管理員不受獎銜與瀏覽範圍限制（仍要先報名）
@@ -1276,7 +1276,7 @@ async function freeRankBlocked(ctx: Ctx, courseId: string): Promise<boolean> {
   return (await eligibilityFor(s, await ranks(ctx.db), [c.min_rank_code])).get(c.min_rank_code) !== true;
 }
 
-/** 清單／素材類：免費、已上架、而且這位會員符合資格（獎銜）就能直接使用，不用報名；課程類一律要手動報名（業主 2026-11-18）。 */
+/** 清單／素材類：免費、已上架、而且這位會員符合資格（獎銜）就能直接使用，不用報名；課程類一律要手動報名（杜杜龍 2026-11-18）。 */
 async function freeWatchable(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;
   if (!s) return false;
@@ -1322,13 +1322,13 @@ async function courseDeleteImpact(db: D1Database, id: string): Promise<CourseDel
 }
 
 /** 公開圖片（封面、EDM）的網址；版本號讓更新後瀏覽器改抓新圖。 */
-/** 頁面瀏覽次數 +1 並回傳累計（中心頁、系列頁共用；業主 2026-11-16：每進入一次就算一次，不分是否同一人）。 */
-const VIEW_BASE = 688; // 所有封面（中心、系列、課程、教材清單）顯示的點閱數都加 688（業主 2026-11-17 中心、2026-11-18 擴大到全部封面，只影響顯示）
-const SUBSCRIBER_BASE = 688; // 每個中心顯示的訂閱人數從 688 開始算（業主 2026-11-17）
+/** 頁面瀏覽次數 +1 並回傳累計（中心頁、系列頁共用；杜杜龍 2026-11-16：每進入一次就算一次，不分是否同一人）。 */
+const VIEW_BASE = 688; // 所有封面（中心、系列、課程、教材清單）顯示的點閱數都加 688（杜杜龍 2026-11-17 中心、2026-11-18 擴大到全部封面，只影響顯示）
+const SUBSCRIBER_BASE = 688; // 每個中心顯示的訂閱人數從 688 開始算（杜杜龍 2026-11-17）
 
 /** 系列的訂閱沿用中心訂閱表，用「series:」開頭的鍵區分。 */
 const seriesSubKey = (name: string) => `series:${name.trim()}`;
-/** 課程／清單頁的訂閱（業主 2026-11-18：所有課程與教材清單的封面都有訂閱鈕）：同一張表，用「course:」開頭的鍵。 */
+/** 課程／清單頁的訂閱（杜杜龍 2026-11-18：所有課程與教材清單的封面都有訂閱鈕）：同一張表，用「course:」開頭的鍵。 */
 const courseSubKey = (id: string) => `course:${id}`;
 
 async function subscriptionState(ctx: Ctx, key: string): Promise<{ count: number; subscribed: boolean }> {
@@ -1351,7 +1351,7 @@ async function schedulesOf(db: D1Database, key: string): Promise<{ items: { ym: 
 }
 
 /**
- * 公告（業主 2026-11-21 模組化）：中心、系列、首頁共用同一張表，用 center_key 欄位存範圍鍵——中心＝中心鍵、系列＝`series:名稱`、首頁＝`home`。
+ * 公告（杜杜龍 2026-11-21 模組化）：中心、系列、首頁共用同一張表，用 center_key 欄位存範圍鍵——中心＝中心鍵、系列＝`series:名稱`、首頁＝`home`。
  * 誰能新增／修改／刪除：中心＝能編輯該中心封面的人；系列與首頁＝只有超級管理員。
  */
 const HOME_BC_KEY = "home";
@@ -1409,10 +1409,10 @@ async function notifyNewCourse(ctx: Ctx, id: string): Promise<void> {
     // 私密連結不通知訂閱者；其餘（課程與清單卡）通知所在中心與系列的訂閱者。
     if (!isPrivate(c.view_scope)) {
       if (c.hk) sent += await notifySubscribers(ctx.db, c.hk, `${hostCenterOf(c.host_unit) || c.hk}有新${kind}上架`, title80, `/course/${id}`, me);
-      // 系列訂閱者（業主 2026-11-17）：系列有新課程上架也通知。
+      // 系列訂閱者（杜杜龍 2026-11-17）：系列有新課程上架也通知。
       if (c.series) sent += await notifySubscribers(ctx.db, seriesSubKey(c.series), `${c.series}有新${kind}上架`, title80, `/course/${id}`, me);
     }
-    // 業主 2026-11-17：上架的人自己也會收到一則（不論有沒有訂閱者、是不是私密連結），用來確認通知有送出去。
+    // 杜杜龍 2026-11-17：上架的人自己也會收到一則（不論有沒有訂閱者、是不是私密連結），用來確認通知有送出去。
     if (me) await notify(ctx.db, { sub: me }, `已送出「新${kind}上架」通知`, `${title80}（通知了 ${sent} 位訂閱者）`, `/course/${id}`).run();
   } catch {
     /* 通知失敗不影響上架 */
@@ -1420,7 +1420,7 @@ async function notifyNewCourse(ctx: Ctx, id: string): Promise<void> {
 }
 
 /**
- * 系列裡的課程或清單新增章節／教材：通知這個系列的訂閱者（業主 2026-11-17）。已上架且非私密連結才通知訂閱者；
+ * 系列裡的課程或清單新增章節／教材：通知這個系列的訂閱者（杜杜龍 2026-11-17）。已上架且非私密連結才通知訂閱者；
  * 同一門課同一類型 30 分鐘內只通知一次（連續新增很多章節不會一直洗版）；新增的人自己一定收到一則確認（含通知人數或「已合併」）。
  */
 async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "教材"): Promise<void> {
@@ -1437,11 +1437,11 @@ async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "�
       if (recent) merged = true;
       else sent = await notifySubscribers(ctx.db, seriesSubKey(c.series), title, `${c.title.slice(0, 80)}（${c.is_list === 1 ? "清單" : "課程"}）`, link, me);
     }
-    // 課程類：報名＝訂閱，已報名的學員（已開通、審核中不算）也收到更新通知；系列訂閱者不重複通知（業主 2026-11-18）。
+    // 課程類：報名＝訂閱，已報名的學員（已開通、審核中不算）也收到更新通知；系列訂閱者不重複通知（杜杜龍 2026-11-18）。
     let enrolledSent = 0;
     if (c.is_list !== 1 && !merged) enrolledSent = await notifyEnrolled(ctx.db, courseId, `${c.title.slice(0, 40)}有新${what}`, "你已報名這門課程，有新內容可以看了", link, me, c.series && !isPrivate(c.view_scope) ? seriesSubKey(c.series) : null);
     sent += enrolledSent;
-    // 這門課程／清單自己的訂閱者（業主 2026-11-18）：已經以系列訂閱者或已報名學員身分收過通知的人不重複；30 分鐘內同一類型只通知一次。
+    // 這門課程／清單自己的訂閱者（杜杜龍 2026-11-18）：已經以系列訂閱者或已報名學員身分收過通知的人不重複；30 分鐘內同一類型只通知一次。
     if (!merged && !isPrivate(c.view_scope)) {
       const ctitle = `${c.title.slice(0, 40)}有新${what}`;
       const recent = await ctx.db.prepare("SELECT 1 AS ok FROM notifications WHERE link = ? AND title = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') LIMIT 1").bind(link, ctitle).first();
@@ -1456,7 +1456,7 @@ async function notifyNewContent(ctx: Ctx, courseId: string, what: "章節" | "�
       }
     }
     if (me) {
-      // 給操作者自己的「已送出」回報也合併（業主 2026-11-24：一次傳 40 張照片＝40 則通知）：30 分鐘內同一份課程只留一則，更新次數並重新標為未讀。
+      // 給操作者自己的「已送出」回報也合併（杜杜龍 2026-11-24：一次傳 40 張照片＝40 則通知）：30 分鐘內同一份課程只留一則，更新次數並重新標為未讀。
       const selfTitle = `已送出「新${what}」通知`;
       const prev = await ctx.db.prepare("SELECT id, body FROM notifications WHERE recipient_sub = ? AND title = ? AND link = ? AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes') ORDER BY created_at DESC LIMIT 1").bind(me, selfTitle, link).first<{ id: string; body: string }>();
       if (prev) {
@@ -1492,7 +1492,7 @@ async function bumpView(db: D1Database, kind: "center" | "series" | "course", ke
   return row?.total ?? 0;
 }
 /** 即時縮圖：輸出格式、設定簽名（改設定後舊快取自然失效）、送給 Cloudflare 的參數（只送非預設值）。 */
-// 格式不再依瀏覽器 Accept 變化（業主 2026-11-20 回報 Android 長按下載圖片後該圖變空白）：同一個網址永遠同一種格式，不用 Vary: Accept，瀏覽器快取才不會被不同請求搞混。auto＝JPEG（相容性最好；業主 2026-11-20 Android 手機顯示 WebP 縮圖會整片空白）。
+// 格式不再依瀏覽器 Accept 變化（杜杜龍 2026-11-20 回報 Android 長按下載圖片後該圖變空白）：同一個網址永遠同一種格式，不用 Vary: Accept，瀏覽器快取才不會被不同請求搞混。auto＝JPEG（相容性最好；杜杜龍 2026-11-20 Android 手機顯示 WebP 縮圖會整片空白）。
 const thumbFormat = (f: ThumbSettings["format"]): "avif" | "webp" | "jpeg" | "png" => (f === "auto" ? "jpeg" : f);
 const thumbSig = (t: ThumbSettings): string => {
   let h = 5381;
@@ -1517,7 +1517,7 @@ function thumbTransform(t: ThumbSettings, w: number): Record<string, unknown> {
   return o;
 }
 const thumbOutput = (t: ThumbSettings): Record<string, unknown> => ({ quality: t.qualityLevel || t.quality, ...(t.anim ? {} : { anim: false }), ...(t.metadata !== "none" ? { metadata: t.metadata } : {}) });
-/** YouTube 教材沒有指定封面時的預設縮圖（業主 2026-11-25 全網新規則，取代 2026-11-22「完全移除 YouTube 抓封面」）：用 YouTube 自己的 16:9 縮圖。 */
+/** YouTube 教材沒有指定封面時的預設縮圖（杜杜龍 2026-11-25 全網新規則，取代 2026-11-22「完全移除 YouTube 抓封面」）：用 YouTube 自己的 16:9 縮圖。 */
 const ytThumbOf = (type: string | null | undefined, ref: string | null | undefined) => (type === "youtube" && ref ? `https://i.ytimg.com/vi/${encodeURIComponent(ref)}/mqdefault.jpg` : null);
 const pubUrl = (key: string, v: number) => `/api/v2/media/pub?k=${encodeURIComponent(key)}&v=${v}`;
 const cleanAnnouncement = (v: unknown) => (typeof v === "string" ? v.replace(/[\u0000-\u001f]+/g, " ").trim().slice(0, 120) : "");
@@ -1550,7 +1550,7 @@ async function managerVia(ctx: Ctx, sql: string, id: string, what: string): Prom
   if (!row) return fail(404, "not_found", `找不到這個${what}`);
   return requireCourseManager(ctx, row.course_id);
 }
-/** 同步設定的管理權：超級管理員，或有該設定所屬課程修改權限的人（業主 2026-11-23：課程頁也能匯入、管理 YouTube 播放清單）。 */
+/** 同步設定的管理權：超級管理員，或有該設定所屬課程修改權限的人（杜杜龍 2026-11-23：課程頁也能匯入、管理 YouTube 播放清單）。 */
 async function requireSyncManager(ctx: Ctx, syncId: string): Promise<Session> {
   const s = requireMember(ctx);
   if (s.roles.includes("super_admin")) return s;
@@ -1584,7 +1584,7 @@ async function attachmentKeys(db: D1Database, where: "lesson_id" | "course_id", 
 }
 
 
-// ---------- 教材檔案（業主 2026-11-18：一律存在行動大學的儲存空間 R2；來源可以是手機／電腦，或使用者自己的 Google 雲端硬碟） ----------
+// ---------- 教材檔案（杜杜龍 2026-11-18：一律存在行動大學的儲存空間 R2；來源可以是手機／電腦，或使用者自己的 Google 雲端硬碟） ----------
 const MB = 1024 * 1024;
 /** 徹底刪除 R2 檔案：失敗重試一次，仍失敗記在日誌（不影響刪除教材本身）。 */
 async function deleteR2Files(env: Env, keys: (string | null | undefined)[]): Promise<void> {
@@ -1604,7 +1604,7 @@ async function deleteR2Files(env: Env, keys: (string | null | undefined)[]): Pro
 }
 
 /**
- * 新教材放哪裡（業主 2026-11-20：最新的在最上面）：放在這份清單「第一個教材／區塊」的位置，原本的往後挪一格；
+ * 新教材放哪裡（杜杜龍 2026-11-20：最新的在最上面）：放在這份清單「第一個教材／區塊」的位置，原本的往後挪一格；
  * 還沒有任何教材就放最後（完整版課程影片永遠在最後）。回傳要放的順序位置與要先執行的搬移指令。
  */
 async function materialSlot(db: D1Database, courseId: string): Promise<{ at: number; pre: D1PreparedStatement[] }> {
@@ -1854,7 +1854,7 @@ async function cancelOrder(ctx: Ctx, orderId: string): Promise<{ ok: true }> {
 }
 
 
-// ---------- 報名名單（業主 2026-11-20）：課程設定第七項；有審核權限的人都能看、都能移除學員 ----------
+// ---------- 報名名單（杜杜龍 2026-11-20）：課程設定第七項；有審核權限的人都能看、都能移除學員 ----------
 type RosterAccess = { s: Session; w: { sql: string; args: unknown[] } };
 /** 能看報名名單的人：超級管理員與有課程編輯權的人看全部；其他有審核權限的人只看自己審核範圍內的報名。 */
 async function rosterAccess(ctx: Ctx, courseId: string): Promise<RosterAccess> {
@@ -1925,7 +1925,7 @@ async function rosterCsv(ctx: Ctx, courseId: string): Promise<Response> {
   void title;
 }
 
-/** 移除資格：已開通的取消開通、待審核的退回；通知學員；審核人員也可以做（業主 2026-11-20）。 */
+/** 移除資格：已開通的取消開通、待審核的退回；通知學員；審核人員也可以做（杜杜龍 2026-11-20）。 */
 async function rosterRemove(ctx: Ctx, courseId: string, orderId: string): Promise<{ ok: true }> {
   const a = await rosterAccess(ctx, courseId);
   const row = await ctx.db
@@ -1955,7 +1955,7 @@ async function canSeeRoster(ctx: Ctx, s: Session | null, row: { id: string; revi
 }
 
 
-// ---------- 系列「套用到全系列課程」（業主 2026-11-20）：系列只是設定範本，沒有報名鈕；只有超級管理員 ----------
+// ---------- 系列「套用到全系列課程」（杜杜龍 2026-11-20）：系列只是設定範本，沒有報名鈕；只有超級管理員 ----------
 type SeriesCourseRow = { id: string; title: string; status: string; is_list: number };
 async function seriesCourses(ctx: Ctx, series: string, only?: unknown): Promise<SeriesCourseRow[]> {
   const { results } = await ctx.db.prepare("SELECT id, title, status, is_list FROM courses WHERE series = ? ORDER BY created_at").bind(series).all<SeriesCourseRow>();
@@ -2147,7 +2147,7 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
   for (const item of items) {
     const c = courses.find((x) => x.id === item.courseId)!;
     const key = c.id;
-    // 指定邀請制（業主 2026-11-20）：輸入正確邀請碼＝免審核直接開通（金額 0）；沒有邀請碼＝一律人工審核（免費課程也要）。
+    // 指定邀請制（杜杜龍 2026-11-20）：輸入正確邀請碼＝免審核直接開通（金額 0）；沒有邀請碼＝一律人工審核（免費課程也要）。
     let joinMethod: Order["joinMethod"] = "";
     if (c.invite_only === 1) {
       if (code) {
@@ -2185,7 +2185,7 @@ async function createOrders(ctx: Ctx, body: { courseIds?: unknown; items?: unkno
       statements.push(
         ctx.db.prepare("INSERT INTO enrollments (member_sub, course_id, source_order_id) VALUES (?, ?, ?)").bind(s.sub, c.id, id),
         ...(quiet ? [] : [notify(ctx.db, { sub: s.sub }, viaInvite ? "已透過邀請碼加入課程" : "課程已開通", title, "/learning")]),
-        // 管理員（課程的審核窗口、會長、總部）收到「有人使用邀請碼加入」（業主 2026-11-20）。
+        // 管理員（課程的審核窗口、會長、總部）收到「有人使用邀請碼加入」（杜杜龍 2026-11-20）。
         ...(viaInvite ? await reviewerNotices(ctx, { id, centerKey: s.center?.key ?? null, hglobal: s.hglobal, groupId: c.review_group_id, courseId: c.id }, "有人使用邀請碼加入課程", `${s.name}${s.center ? `（${s.center.label}）` : ""}｜${title}`) : []),
       );
     } else {
@@ -2431,7 +2431,7 @@ async function reviewCsv(ctx: Ctx): Promise<Response> {
 }
 
 /**
- * 報名與營收報表（業主 2026-11-17）：指定期間（台灣日期，含頭尾）的報名，依中心／課程／月份加總；看得到的範圍與報名審核相同（總部全部、會長自己中心…）。
+ * 報名與營收報表（杜杜龍 2026-11-17）：指定期間（台灣日期，含頭尾）的報名，依中心／課程／月份加總；看得到的範圍與報名審核相同（總部全部、會長自己中心…）。
  * 免費報名也算在報名數裡；「繳費金額」＝已開通（未撤銷）的付費報名，有實收金額用實收，沒有用應繳。
  */
 async function registrationReport(ctx: Ctx): Promise<RegistrationReport> {
@@ -2557,7 +2557,7 @@ async function listEditors(ctx: Ctx, only?: { key: string; label: string }): Pro
 type CoverRow = { owner_kind: string; center_key: string | null; owner_key: string; scope?: string; kind?: string; poster_key?: string | null };
 const coverKindOf = (v: string | null): CoverMediaKind => (v === "series" || v === "course" ? v : "center");
 const dim = (v: string | null) => Math.min(20000, Math.max(0, Math.round(Number(v) || 0)));
-/** 相簿專區的資料夾彙整（業主 2026-11-25）：大類別順序＝設定的 albumOrder，資料夾一律按張數多到少；每個資料夾帶鎖定狀態與可否上傳。 */
+/** 相簿專區的資料夾彙整（杜杜龍 2026-11-25）：大類別順序＝設定的 albumOrder，資料夾一律按張數多到少；每個資料夾帶鎖定狀態與可否上傳。 */
 async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
   type G = { ok: string; scope: CoverScope; ck: string | null; k: string; n: number; thumbs: string | null };
   const [rows, arts, courses, blocks, cfg, treasure, perms] = await Promise.all([
@@ -2595,7 +2595,7 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
       const b = block.get(r.k);
       if (ct) groups.course!.push({ id: `course:${r.k}`, kind: "course", key: r.k, title: ct, groupId: "course", ...base, courseId: r.k, ...lockOf(r.k), canEdit: !!rights?.admin });
       else if (b) {
-        // 成交百寶箱的區塊相簿單獨一個類別，不混在「課程區塊相簿」裡（業主 2026-11-25）。
+        // 成交百寶箱的區塊相簿單獨一個類別，不混在「課程區塊相簿」裡（杜杜龍 2026-11-25）。
         const gid = b.course_id === treasure ? "treasure" : "block";
         groups[gid]!.push({ id: `block:${r.k}`, kind: "block", key: r.k, title: b.title, subtitle: gid === "treasure" ? undefined : b.course_title, groupId: gid, ...base, courseId: b.course_id, ...lockOf(b.course_id), canEdit: !!rights?.admin });
       }
@@ -2621,9 +2621,9 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
     .sort((a, b) => pos(a.id) - pos(b.id));
   return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out };
 }
-/** 全站 AI 辨識（文字 OCR、場景）還沒處理的張數與預估完成時間（圖片資訊「藍字」區給所有人看；業主 2026-11-26）。速度取最近 3 小時實際完成的張數。 */
+/** 全站 AI 辨識（文字 OCR、場景）還沒處理的張數與預估完成時間（圖片資訊「藍字」區給所有人看；杜杜龍 2026-11-26）。速度取最近 3 小時實際完成的張數。 */
 async function aiQueueInfo(db: D1Database, edm: boolean): Promise<{ pending: number; perHour: number; etaMin: number | null; quotaOut: boolean; sceneOn: boolean; ocrOn: boolean }> {
-  // 只算「這張圖所屬那一類」的待辨識張數：中心 EDM 只有文字辨識；相簿（區塊）照片有文字＋場景（業主 2026-11-26）。
+  // 只算「這張圖所屬那一類」的待辨識張數：中心 EDM 只有文字辨識；相簿（區塊）照片有文字＋場景（杜杜龍 2026-11-26）。
   const since = new Date(Date.now() - 3 * 3600_000).toISOString();
   const [q, st, used, ss] = await Promise.all([
     db
@@ -2667,7 +2667,7 @@ function coverItem(r: { id: string; scope: CoverScope; folder_id?: string | null
     ...(r.uploader_name ? { uploader: r.uploader_name, ...(r.uploader_avatar ? { uploaderAvatar: r.uploader_avatar } : {}) } : {}),
   };
 }
-/** 儲存區（業主 2026-11-23）：只有中心有「EDM」分頁；系列、課程一律只有 cover。沒帶或不認得時，中心當 edm（舊版 App 的相簿上傳）。 */
+/** 儲存區（杜杜龍 2026-11-23）：只有中心有「EDM」分頁；系列、課程一律只有 cover。沒帶或不認得時，中心當 edm（舊版 App 的相簿上傳）。 */
 const coverScopeOf = (kind: CoverMediaKind, v: unknown): CoverScope => (kind !== "center" ? "cover" : v === "cover" ? "cover" : "edm");
 /** lookup：center＝中心鑰匙（centerKey）；series＝系列名稱；course＝課程編號。scope 有給就只取那一區，沒給＝兩區都取（公開讀取用）。 */
 async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, scope?: CoverScope): Promise<CoverMediaItem[]> {
@@ -2679,7 +2679,7 @@ async function coverItems(db: D1Database, kind: CoverMediaKind, lookup: string, 
   return results.map(coverItem);
 }
 /**
- * 課程 EDM 併入中心 EDM 空間（業主 2026-11-23）：中心主辦、已發佈、有 EDM 的課程，其 EDM 圖自動成為該中心 EDM 空間（scope = edm）的一張，用 course_id 綁定；
+ * 課程 EDM 併入中心 EDM 空間（杜杜龍 2026-11-23）：中心主辦、已發佈、有 EDM 的課程，其 EDM 圖自動成為該中心 EDM 空間（scope = edm）的一張，用 course_id 綁定；
  * 課程換圖、改主辦中心、下架、刪除，這裡跟著同步。每次讀中心先用一個便宜的查詢檢查，有差異才寫入（所以已上傳和未來上傳的都會自動併入）。
  */
 async function reconcileCenterEdm(db: D1Database, key: string): Promise<void> {
@@ -2727,7 +2727,7 @@ async function fillImageDims(env: Env, db: D1Database, kind: CoverMediaKind, loo
   }
 }
 /**
- * 相簿「誰可以上傳」的獎銜設定（業主 2026-11-25，超級管理員在相簿齒輪設定；成交百寶箱預設白金以上）：
+ * 相簿「誰可以上傳」的獎銜設定（杜杜龍 2026-11-25，超級管理員在相簿齒輪設定；成交百寶箱預設白金以上）：
  * 資料夾自己的設定優先於類別；有設定而且會員獎銜達標，就算有上傳權（只限上傳與補預覽圖、資訊，不能刪除、排序別人的照片）。
  */
 async function albumPermMap(db: D1Database): Promise<Map<string, string>> {
@@ -2753,14 +2753,14 @@ async function albumRankAllows(ctx: Ctx, ref: { folderId: string; groupId: strin
   const elig = await eligibilityFor(ctx.session, await ranks(ctx.db), [eff]);
   return elig.get(eff) === true;
 }
-/** 教材圖片（上傳檔案當教材、雲端硬碟匯入）的壓縮：格式與畫質直接套用「相簿存檔格式」（業主 2026-11-25）；套用範圍跟著相簿的範圍設定（試行期只有成交百寶箱的課程）。 */
+/** 教材圖片（上傳檔案當教材、雲端硬碟匯入）的壓縮：格式與畫質直接套用「相簿存檔格式」（杜杜龍 2026-11-25）；套用範圍跟著相簿的範圍設定（試行期只有成交百寶箱的課程）。 */
 async function materialImageOverride(ctx: Ctx, courseId: string | null | undefined): Promise<{ format: "jpeg" | "webp" | "avif"; quality: number } | undefined> {
   const app = (await loadConfig(ctx.db)).app;
   if (app.albumScope === "off") return undefined;
   if (app.albumScope === "treasure" && courseId !== (await treasureCourseId(ctx.db).catch(() => null))) return undefined;
   return { format: app.albumFormat, quality: app.albumQuality };
 }
-/** 區塊相簿子資料夾（業主 2026-11-26）：只有區塊相簿（cover_media 的 course 類、owner_key 是區塊編號）有；最多一層；名稱最多 20 字、同一區塊不可重複。 */
+/** 區塊相簿子資料夾（杜杜龍 2026-11-26）：只有區塊相簿（cover_media 的 course 類、owner_key 是區塊編號）有；最多一層；名稱最多 20 字、同一區塊不可重複。 */
 const FOLDER_NAME_MAX = 20;
 async function requireFolderManage(ctx: Ctx, key: string): Promise<Session> {
   const s = requireMember(ctx);
@@ -2888,7 +2888,7 @@ async function storedInfo(env: Env, key: string, fallbackBytes: number): Promise
   return { type: head?.httpMetadata?.contentType ?? "", ext: (/\.([A-Za-z0-9]{2,5})$/.exec(key)?.[1] ?? "").toLowerCase(), bytes: head?.size ?? fallbackBytes };
 }
 async function coverMediaInfo(ctx: Ctx, id: string) {
-  // 圖片資訊面板（業主 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
+  // 圖片資訊面板（杜杜龍 2026-11-24；2026-11-25 開放給所有人含訪客）：管理這個相簿的人看完整內容；
   // 其他人看到同樣的面板，但 EXIF 的 GPS 位置（緯度、經度、海拔）與上傳者帳號編號會拿掉，沒權限看的課程照片也不給。
   const r = await ctx.db
     .prepare("SELECT cm.id, cm.owner_kind, cm.center_key, cm.owner_key, cm.scope, cm.kind, cm.width, cm.height, cm.duration_sec, cm.bytes, cm.position, cm.created_by, cm.created_at, cm.uploader_name, cm.meta, cm.r2_key, cm.course_id, cm.ocr_text, cm.ocr_fields, cm.ocr_fmt, cm.ocr_status, cm.ocr_model, cm.ocr_at, cm.scene_status, cm.scene_text, cm.event_date, c.title AS course_title, (SELECT display_name FROM sessions WHERE member_sub = cm.created_by ORDER BY expires_at DESC LIMIT 1) AS session_name, (SELECT name FROM member_profiles WHERE sub = cm.created_by) AS profile_name FROM cover_media cm LEFT JOIN courses c ON c.id = cm.course_id WHERE cm.id = ?")
@@ -2942,7 +2942,7 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
     eventDate: r.event_date,
     ocrText: cleanOcrText(String(r.ocr_text ?? "")),
     structured: (() => {
-      // 套入「AI 文字辨識」欄位格式後的內容（業主 2026-11-24）：沒整理好時 fields 是 null，畫面改顯示清理過的原文。
+      // 套入「AI 文字辨識」欄位格式後的內容（杜杜龍 2026-11-24）：沒整理好時 fields 是 null，畫面改顯示清理過的原文。
       try {
         const st = r.ocr_fields ? (JSON.parse(String(r.ocr_fields)) as Structured) : null;
         return { fields: st?.f ?? null, other: st?.o ?? "", stale: r.ocr_fmt !== fmtOf(fieldsNow) };
@@ -2950,7 +2950,7 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
         return { fields: null, other: "", stale: true };
       }
     })(),
-    // 目前存在 R2 的檔案格式（業主 2026-11-25，所有人都看得到）：以 R2 實際的檔案類型為準，查不到就看檔名副檔名。
+    // 目前存在 R2 的檔案格式（杜杜龍 2026-11-25，所有人都看得到）：以 R2 實際的檔案類型為準，查不到就看檔名副檔名。
     stored: await storedInfo(ctx.env, String(r.r2_key ?? ""), Number(r.bytes) || 0),
     file: meta.file ?? {},
     exif: manager ? meta.exif ?? {} : Object.fromEntries(Object.entries(meta.exif ?? {}).filter(([k]) => !/^(latitude|longitude|GPS)/i.test(k))),
@@ -2958,7 +2958,7 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
 }
 
 /**
- * 任何圖片都有「圖片資訊」（業主 2026-11-25：所有的照片都要有驚嘆號）：用儲存檔名（網址的 k）查。
+ * 任何圖片都有「圖片資訊」（杜杜龍 2026-11-25：所有的照片都要有驚嘆號）：用儲存檔名（網址的 k）查。
  * 是相簿照片 → 走 coverMediaInfo；否則（課程封面、EDM、系列／中心封面、品牌 logo、課表…）回基本資訊：儲存空間裡的檔案大小、類型、上傳時間與所屬項目。
  */
 async function imageInfoByKey(ctx: Ctx) {
@@ -3012,7 +3012,7 @@ async function imageInfoByKey(ctx: Ctx) {
 }
 
 /**
- * 區塊照片（業主 2026-11-24）：cover_media 的 course 類，owner_key 除了課程編號，也可以是「區塊編號」（該區塊底下的照片，與中心 EDM 共用上傳模組）。
+ * 區塊照片（杜杜龍 2026-11-24）：cover_media 的 course 類，owner_key 除了課程編號，也可以是「區塊編號」（該區塊底下的照片，與中心 EDM 共用上傳模組）。
  * 回傳要檢查權限的課程編號；區塊所屬課程沒有開放（courses.block_photos）就擋下。連結區塊要傳來源區塊編號（照片只存來源一份）。
  */
 async function courseOfCoverKey(db: D1Database, key: string): Promise<string> {
@@ -3022,7 +3022,7 @@ async function courseOfCoverKey(db: D1Database, key: string): Promise<string> {
   if (blk.block_photos !== 1) fail(403, "block_photos_off", "這門課程還沒有開放區塊新增照片");
   return blk.course_id;
 }
-// 照片張數不設上限（業主 2026-11-25）。
+// 照片張數不設上限（杜杜龍 2026-11-25）。
 async function coverRoom(_db: D1Database, _o: { kind: CoverMediaKind; lookup: string; scope: CoverScope }): Promise<void> {}
 async function addCoverRow(db: D1Database, o: { s: Session; kind: CoverMediaKind; centerKey: string | null; ownerKey: string; scope: CoverScope }, x: { kind: "image" | "video"; r2Key: string; posterKey: string | null; width: number; height: number; durationSec: number; bytes: number; by: string }): Promise<string> {
   const id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
@@ -3077,7 +3077,7 @@ function randomId(n: number): string {
   return [...crypto.getRandomValues(new Uint8Array(n))].map((b) => a[b % a.length]).join("");
 }
 /** 活動日期：YYYY-MM-DD 或 null（清除）。 */
-// ---------- 我的書櫃（業主 2026-11-17） ----------
+// ---------- 我的書櫃（杜杜龍 2026-11-17） ----------
 type LibRow = { member_sub: string; number: string; owner_name: string; title: string; pw_hash: string | null; pw_salt: string | null; pw_expires_at: string | null; views: number };
 type LibItemRow = { id: string; kind: "shelf" | "book"; title: string; url: string | null; att_type: AttachmentType | null; event_date: string | null; start_seconds: number | null; end_seconds: number | null; pw_hash: string | null; pw_salt: string | null; pw_expires_at: string | null; position: number };
 const libOf = (db: D1Database, sub: string) => db.prepare("SELECT member_sub, number, owner_name, title, pw_hash, pw_salt, pw_expires_at, views FROM libraries WHERE member_sub = ?").bind(sub).first<LibRow>();
@@ -3105,7 +3105,7 @@ async function libraryMine(ctx: Ctx, sub: string): Promise<LibraryMine> {
   let lib = await libOf(ctx.db, sub);
   let keys: LibraryMine["keys"];
   if (!lib && ctx.session?.kind === "central") {
-    // 獲得任意 100 枚徽章就自動解鎖書櫃鑰匙（業主 2026-11-17）；會員編號等問題留在 blocked 讓畫面提示。
+    // 獲得任意 100 枚徽章就自動解鎖書櫃鑰匙（杜杜龍 2026-11-17）；會員編號等問題留在 blocked 讓畫面提示。
     const have = (await grantAchievements(ctx, sub)).filter((a) => a.earned).length;
     const need = (await loadConfig(ctx.db)).app.libraryKeyBadges ?? LIBRARY_KEY_BADGES;
     keys = { have, need };
@@ -3193,7 +3193,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     await assertCentralRank(ctx, teacherRank);
     sets.push(["teacher_rank", teacherRank]);
   }
-  // 勾了「無」（沒有主講人、獎銜、職稱；業主 2026-11-19）：三個欄位一律清空；取消勾選就回到可以填。
+  // 勾了「無」（沒有主講人、獎銜、職稱；杜杜龍 2026-11-19）：三個欄位一律清空；取消勾選就回到可以填。
   if (body.isPackage !== undefined && !(creating && body.isList === true)) sets.push(["is_package", body.isPackage === true ? 1 : 0]);
   if (body.noSpeaker !== undefined) {
     const no = body.noSpeaker === true;
@@ -3257,12 +3257,12 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
   }
   const series = text(body.series, 60);
   if (series !== undefined) {
-    // 設定「系列」只限超級管理員（業主 2026-11-16）。
+    // 設定「系列」只限超級管理員（杜杜龍 2026-11-16）。
     if (!who.roles.includes("super_admin")) fail(403, "series_super_admin_only", "只有超級管理員可以設定系列");
     sets.push(["series", series]);
   }
   if (body.zone !== undefined) {
-    // 專區只限超級管理員設定（業主 2026-11-18）；空字串＝依類型預設。
+    // 專區只限超級管理員設定（杜杜龍 2026-11-18）；空字串＝依類型預設。
     if (!who.roles.includes("super_admin")) fail(403, "zone_super_admin_only", "只有超級管理員可以設定專區");
     const z = typeof body.zone === "string" ? body.zone : "";
     if (z && !ZONES.some((x) => x.id === z)) fail(400, "invalid_zone", "專區不正確");
@@ -3314,7 +3314,7 @@ async function courseFields(ctx: Ctx, body: Record<string, unknown>, creating: b
     const start = day(body.eventStart);
     const end = day(body.eventEnd);
     if (end && !start) fail(400, "invalid_date", "請先填活動開始日期");
-    if (start && end && end < start) fail(400, "invalid_date", "活動結束日不能早於開始日"); // 連續天數不設上限（業主 2026-11-19）
+    if (start && end && end < start) fail(400, "invalid_date", "活動結束日不能早於開始日"); // 連續天數不設上限（杜杜龍 2026-11-19）
     sets.push(["event_start", start], ["event_end", end && end !== start ? end : null]);
   }
   for (const [k, col] of [["freeFrom", "free_from"], ["freeUntil", "free_until"]] as const) {
@@ -3346,7 +3346,7 @@ function checkPublicFree(price: number, isPublic: boolean, tba = false) {
   if (isPublic && price > 0) fail(400, "public_must_be_free", "「完全公開」只能用在免費課程；請先把費用改成 0");
 }
 
-/** is_public＝訪客也能看、免費、費用已公布、而且沒有獎銜限制（有獎銜限制＝訪客只能看介紹，不能直接看內容也不能報名；業主 2026-11-17 規則 B）。 */
+/** is_public＝訪客也能看、免費、費用已公布、而且沒有獎銜限制（有獎銜限制＝訪客只能看介紹，不能直接看內容也不能報名；杜杜龍 2026-11-17 規則 B）。 */
 function deriveIsPublic(sets: [string, unknown][], cur: { view_scope: string; price_twd: number; price_tba: number; min_rank_code?: string; invite_only?: number } | null) {
   if (!sets.some(([c]) => ["view_scope", "price_twd", "price_tba", "min_rank_code", "invite_only"].includes(c))) return;
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
@@ -3362,9 +3362,9 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const sets = await courseFields(ctx, body, true, admin);
   checkPublicFree(Number(sets.find(([c]) => c === "price_twd")?.[1] ?? 0), sets.find(([c]) => c === "is_public")?.[1] === 1, sets.find(([c]) => c === "price_tba")?.[1] === 1);
   if (!sets.some(([c]) => c === "allow_president")) sets.push(["allow_president", 1]); // 新課程預設「會長不受獎銜限制也可報名」
-  if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", "all"]); // 新課程（含清單）預設「所有人含訪客」（業主 2026-11-17）
+  if (!sets.some(([c]) => c === "view_scope")) sets.push(["view_scope", "all"]); // 新課程（含清單）預設「所有人含訪客」（杜杜龍 2026-11-17）
   deriveIsPublic(sets, null);
-  // 沒有系列的教材卡一律放進「未分類」系列（只有超級管理員看得到；業主 2026-11-20：必須設定系列才會顯示在課程首頁）。
+  // 沒有系列的教材卡一律放進「未分類」系列（只有超級管理員看得到；杜杜龍 2026-11-20：必須設定系列才會顯示在課程首頁）。
   if (!String(sets.find(([c]) => c === "series")?.[1] ?? "").trim()) {
     const at = sets.findIndex(([c]) => c === "series");
     if (at >= 0) sets[at] = ["series", UNCATEGORIZED];
@@ -3374,13 +3374,13 @@ async function createCourse(ctx: Ctx, admin: Session) {
   const id = `c${randomId(7)}`;
   const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM courses").first<{ m: number }>();
   // 新課程一律先是草稿（小編也一樣，自己再決定上架）；記下建立者。
-  // 新增「清單卡」＝自動直接上架（業主 2026-11-18）；課程仍先是草稿。
+  // 新增「清單卡」＝自動直接上架（杜杜龍 2026-11-18）；課程仍先是草稿。
   const isListNew = sets.some(([c, v]) => c === "is_list" && (v === 1 || v === true));
   const status = isListNew || sets.find(([c]) => c === "status")?.[1] === "published" ? "published" : "draft";
   const rest = sets.filter(([c]) => c !== "status");
   const cols = ["id", "sort_order", "status", "created_by_sub", "edited_by_name", "edited_at", ...rest.map(([c]) => c)];
   const vals = [id, (max?.m ?? 0) + 1, status, admin.sub, admin.name.slice(0, 60), iso(), ...rest.map(([, v]) => v)];
-  // 新增課程不預設建立第一堂章節（業主 2026-11-16），章節一律在課程頁按「新增章節」。
+  // 新增課程不預設建立第一堂章節（杜杜龍 2026-11-16），章節一律在課程頁按「新增章節」。
   await ctx.db.batch([
     ctx.db.prepare(`INSERT INTO courses (${cols.join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`).bind(...vals),
     audit(ctx.db, admin.sub, "course.create", "course", id, String(body.title ?? "")),
@@ -3400,7 +3400,7 @@ async function assertCentralRank(ctx: Ctx, code: string): Promise<void> {
 }
 
 /**
- * 新職稱同步到中央（業主 2026-11-15）：儲存課程主講人／章節分享者的職稱時，若中央詞庫還沒有這個詞，就放進待送清單並嘗試送出。
+ * 新職稱同步到中央（杜杜龍 2026-11-15）：儲存課程主講人／章節分享者的職稱時，若中央詞庫還沒有這個詞，就放進待送清單並嘗試送出。
  * 失敗、中央還沒開放「新增職稱」都不影響課程儲存，之後再儲存時自動補送。
  */
 async function noteJobTitle(ctx: Ctx, value: string | undefined): Promise<void> {
@@ -3588,7 +3588,7 @@ async function updateCourseWith(ctx: Ctx, id: string, body: Record<string, unkno
     }
   }
   const pick = (col: string, old: unknown) => (sets.find(([c]) => c === col) ?? [col, old])[1];
-  // 付費課程的邀請碼：目前只有超級管理員能設定（業主 2026-11-20）；免費課程由有編輯權的人設定。
+  // 付費課程的邀請碼：目前只有超級管理員能設定（杜杜龍 2026-11-20）；免費課程由有編輯權的人設定。
   if (sets.some(([c]) => c === "invite_code") && (Number(pick("price_twd", cur.price_twd)) > 0 || pick("price_tba", cur.price_tba) === 1) && !admin.roles.includes("super_admin")) fail(403, "invite_code_super_admin", "付費課程的邀請碼只有超級管理員可以設定");
   const legacyPublic = body.isPublic !== undefined && body.viewScope === undefined;
   if (legacyPublic) {
@@ -3628,7 +3628,7 @@ async function updateCourseWith(ctx: Ctx, id: string, body: Record<string, unkno
   if (zoneSet && serNow && serNow !== UNCATEGORIZED) await ctx.db.prepare("UPDATE courses SET zone = ? WHERE series = ?").bind(zoneSet[1], serNow).run();
   await ensureCourseUrl(ctx, id);
   if (pick("status", cur.status) === "published" && cur.status !== "published") await notifyNewCourse(ctx, id);
-  // 上課日期或地點改了：已報名的學員收到更新通知（報名＝訂閱，業主 2026-11-18）。
+  // 上課日期或地點改了：已報名的學員收到更新通知（報名＝訂閱，杜杜龍 2026-11-18）。
   const changed = (col: "event_start" | "event_end" | "location") => sets.some(([c, v]) => c === col && v !== cur[col]);
   if (cur.is_list !== 1 && cur.status === "published" && (changed("event_start") || changed("event_end") || changed("location"))) {
     await notifyEnrolled(ctx.db, id, `${cur.title.slice(0, 40)}時間或地點有更新`, "請打開課程頁確認最新的日期與地點", `/course/${id}`, admin.sub, null).catch(() => undefined);
@@ -3749,7 +3749,7 @@ async function updateLesson(ctx: Ctx, id: string, admin: Session) {
   else if (minutes !== undefined) sets.push(["duration_minutes", minutes]);
   if (!sets.length) fail(400, "nothing_to_update", "沒有要更新的欄位");
   // 主講人章節的名稱、分享者、獎銜、職稱一律等於課程基本資料（不接受另外填的值）。
-  // 「總結」章節的名稱固定就是「總結」（業主 2026-11-16）：勾選當下與之後的每次修改，伺服器都強制。
+  // 「總結」章節的名稱固定就是「總結」（杜杜龍 2026-11-16）：勾選當下與之後的每次修改，伺服器都強制。
   const nowSummary = body.isSummary === undefined ? cur.is_summary === 1 && body.isSpeaker !== true : body.isSummary === true;
   const speakerSets = sets;
   const finalSets: [string, unknown][] = nowSummary ? [...speakerSets.filter(([c]) => c !== "title"), ["title", SUMMARY_TITLE]] : speakerSets;
@@ -3862,7 +3862,7 @@ async function listComments(ctx: Ctx, courseId: string): Promise<CourseComment[]
 // ---------- router ----------
 
 
-// ---------- 加入我的清單（業主 2026-11-21；邏輯在 my-lists.ts） ----------
+// ---------- 加入我的清單（杜杜龍 2026-11-21；邏輯在 my-lists.ts） ----------
 /** 清單網址前綴＝安麗會員編號（取自會員中心）；模擬會員用代號。沒有編號就請會員先到會員中心填寫。 */
 async function listNumber(s: Session): Promise<string> {
   const raw = s.kind === "central" ? await memberNumberOf(s.sub, s.token) : `demo9${s.sub.replace(/[^a-z0-9]/gi, "")}`;
@@ -4031,7 +4031,7 @@ const routes: [string, RegExp, Handler][] = [
     return ownDetail(ctx.db, l);
   })],
   ["GET", /^\/my-lists\/(l[\w]{4,20})\/stats$/, (ctx, [id]) => listGuard(async () => listStats(ctx.db, (await ownedList(ctx.db, requireMember(ctx).sub, id!)).id))],
-  // 清單主人按「分享」「複製連結」時記一次；訪客點開某個項目時該項目 +1（成效頁的分享成效、最受歡迎項目；業主 2026-11-22）。
+  // 清單主人按「分享」「複製連結」時記一次；訪客點開某個項目時該項目 +1（成效頁的分享成效、最受歡迎項目；杜杜龍 2026-11-22）。
   ["POST", /^\/my-lists\/(l[\w]{4,20})\/share$/, (ctx, [id]) => listGuard(async () => {
     const l = await ownedList(ctx.db, requireMember(ctx).sub, id!);
     await recordEvent(ctx.db, l.id, "share");
@@ -4059,7 +4059,7 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/config$/, async (ctx) => ({ demoLogin: demoEnabled(ctx.env) })],
   // 正式站目前的程式版本（多個 AI 接手開發時，部署前用它確認自己的程式包含線上版本，才不會蓋掉別人的成果）。
   ["GET", /^\/version$/, async (ctx) => ({ sha: ctx.env.GIT_SHA ?? null })],
-  // 前台錯誤回報（業主 2026-11-21）：使用者畫面出錯時 App 自動送來，只寫進 Cloudflare 錯誤紀錄（不存資料庫、不記會員身分），每週自動檢查會看。
+  // 前台錯誤回報（杜杜龍 2026-11-21）：使用者畫面出錯時 App 自動送來，只寫進 Cloudflare 錯誤紀錄（不存資料庫、不記會員身分），每週自動檢查會看。
   ["POST", /^\/client-errors$/, async (ctx) => {
     const ip = ctx.req.headers.get("cf-connecting-ip") ?? "";
     const now = Date.now();
@@ -4227,7 +4227,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/me\/delete-account$/,
     async (ctx) => {
-      // App 內直接刪除帳號（業主 2026-11-23；中央串接指令 2026-11-23.3 三、9）：App 先讓會員重新登入一次拿到 reauth_token，
+      // App 內直接刪除帳號（杜杜龍 2026-11-23；中央串接指令 2026-11-23.3 三、9）：App 先讓會員重新登入一次拿到 reauth_token，
       // 這裡用會員自己的 Token 呼叫中央刪除；中央成功才清掉本 App 的所有資料，失敗就完全不動並把中央的白話原因帶回。
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(400, "central_only", "只有中央會員可以使用");
@@ -4370,7 +4370,7 @@ const routes: [string, RegExp, Handler][] = [
       const lesson = await lessonOf(ctx, courseId, lessonId);
       courseId = lesson.course_id;
       if (!(await canWatch(ctx, courseId))) fail(ctx.session ? 403 : 401, ctx.session ? "not_enrolled" : "unauthenticated", ctx.session ? "請先報名並通過審核" : "請先登入");
-      // 續播記憶（業主 2026-11-17）：還沒看完的這一堂，從上次播放到的秒數接著播（離起點不到 5 秒、離結尾不到 10 秒就從頭）。
+      // 續播記憶（杜杜龍 2026-11-17）：還沒看完的這一堂，從上次播放到的秒數接著播（離起點不到 5 秒、離結尾不到 10 秒就從頭）。
       const resumeAt = await resumePoint(ctx, lessonId, lesson.start_seconds ?? 0, lesson.end_seconds);
       const seg = { start: lesson.start_seconds, end: lesson.end_seconds, ...(resumeAt != null ? { resumeAt } : {}) };
       if (lesson.media_type === "youtube" && lesson.media_ref) return { kind: "youtube", videoId: lesson.media_ref, ...seg };
@@ -4397,7 +4397,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/center-subscription$/,
     async (ctx) => {
-      // 中心訂閱：全部中心的顯示人數都從 688 開始算（業主 2026-11-17）；訪客也看得到人數。
+      // 中心訂閱：全部中心的顯示人數都從 688 開始算（杜杜龍 2026-11-17）；訪客也看得到人數。
       const label = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 60);
       if (!label) fail(400, "invalid_center", "請指定中心");
       return subscriptionState(ctx, centerKey(label));
@@ -4423,7 +4423,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/series-subscription$/,
     async (ctx) => {
-      // 中心訂閱：全部中心的顯示人數都從 688 開始算（業主 2026-11-17）；訪客也看得到人數。
+      // 中心訂閱：全部中心的顯示人數都從 688 開始算（杜杜龍 2026-11-17）；訪客也看得到人數。
       const label = (ctx.url.searchParams.get("series") ?? "").trim().slice(0, 60);
       if (!label) fail(400, "invalid_series", "請指定系列");
       return subscriptionState(ctx, seriesSubKey(label));
@@ -4471,7 +4471,7 @@ const routes: [string, RegExp, Handler][] = [
       return subscriptionState(ctx, key);
     },
   ],
-  // ---------- 封面輪播與相簿（業主 2026-11-21）：中心、系列、課程共用 cover_media ----------
+  // ---------- 封面輪播與相簿（杜杜龍 2026-11-21）：中心、系列、課程共用 cover_media ----------
   [
     "GET",
     /^\/cover-media$/,
@@ -4480,7 +4480,7 @@ const routes: [string, RegExp, Handler][] = [
       const kind = coverKindOf(ctx.url.searchParams.get("kind"));
       const key = (ctx.url.searchParams.get("key") ?? "").trim().slice(0, 100);
       if (!key) return [];
-      // 區塊照片（業主 2026-11-24）：沒有權限的人也看得到全部預覽縮圖，畫面蓋鎖頭遮罩（LockMask）與原因，所以這裡不再擋清單。
+      // 區塊照片（杜杜龍 2026-11-24）：沒有權限的人也看得到全部預覽縮圖，畫面蓋鎖頭遮罩（LockMask）與原因，所以這裡不再擋清單。
       const lookup = kind === "center" ? centerKey(key) : key;
       if (kind === "center") await reconcileCenterEdm(ctx.db, lookup).catch(() => undefined); // 課程 EDM 自動併入中心 EDM 空間
       await fillImageDims(ctx.env, ctx.db, kind, lookup);
@@ -4498,7 +4498,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/admin\/albums\/permissions$/,
     async (ctx) => {
-      // 相簿「誰可以上傳」總覽（業主 2026-11-25，只有超級管理員）：各大類別與各資料夾目前的最低獎銜設定。
+      // 相簿「誰可以上傳」總覽（杜杜龍 2026-11-25，只有超級管理員）：各大類別與各資料夾目前的最低獎銜設定。
       requireSuperAdmin(ctx);
       const [idx, perms, rk] = await Promise.all([albumsIndex(ctx), albumPermMap(ctx.db), ranks(ctx.db)]);
       return {
@@ -4532,7 +4532,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/admin\/albums\/info$/,
     async (ctx) => {
-      // 相簿資訊總覽（業主 2026-11-25，只有超級管理員）：R2 佔用、上傳者姓名數量與排名、最近一次上傳、檔案大小排序、瀏覽數排序，以及上傳權限。
+      // 相簿資訊總覽（杜杜龍 2026-11-25，只有超級管理員）：R2 佔用、上傳者姓名數量與排名、最近一次上傳、檔案大小排序、瀏覽數排序，以及上傳權限。
       requireSuperAdmin(ctx);
       const id = (ctx.url.searchParams.get("id") ?? "").slice(0, 200);
       const f = (await albumsIndex(ctx)).groups.flatMap((g) => g.folders).find((x) => x.id === id);
@@ -4577,7 +4577,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/albums\/subfolders$/,
     async (ctx) => {
-      // 區塊相簿的子資料夾（業主 2026-11-26）：?key＝區塊相簿的照片鍵。
+      // 區塊相簿的子資料夾（杜杜龍 2026-11-26）：?key＝區塊相簿的照片鍵。
       const key = (ctx.url.searchParams.get("key") ?? "").slice(0, 60);
       if (!key || !(await isBlockKey(ctx.db, key))) return { folders: [], uncat: { count: 0, thumbs: [] }, canManage: false } satisfies AlbumSubfolders;
       return subfoldersOf(ctx, key);
@@ -4648,7 +4648,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/albums\/folder$/,
     async (ctx) => {
-      // 相簿專區的一個資料夾（業主 2026-11-25）：沒有權限的人禁止進入（鎖定的課程、區塊相簿回 403 與原因）。
+      // 相簿專區的一個資料夾（杜杜龍 2026-11-25）：沒有權限的人禁止進入（鎖定的課程、區塊相簿回 403 與原因）。
       const id = (ctx.url.searchParams.get("id") ?? "").slice(0, 200);
       const f = (await albumsIndex(ctx)).groups.flatMap((g) => g.folders).find((x) => x.id === id);
       if (!f) return fail(404, "not_found", "找不到這個相簿");
@@ -4662,7 +4662,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/albums\/search$/,
     async (ctx) => {
-      // 搜尋「全部相簿」（業主 2026-11-25）：比對照片的場景標籤、照片文字（OCR）、EDM 活動日期；沒有權限（鎖定）的相簿不列。
+      // 搜尋「全部相簿」（杜杜龍 2026-11-25）：比對照片的場景標籤、照片文字（OCR）、EDM 活動日期；沒有權限（鎖定）的相簿不列。
       const tokens = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 4);
       if (!tokens.length || tokens.join("").length < 2) return { items: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
@@ -4692,7 +4692,7 @@ const routes: [string, RegExp, Handler][] = [
       if (!data.byteLength || data.byteLength > 8 * 1024 * 1024) fail(413, "invalid_size", "圖片大小需在 8MB 以內（上傳時會自動壓縮）");
       const img = sniffImage(data) ?? fail(400, "invalid_image", "請上傳 JPG、PNG 或 WebP 圖片");
       await coverRoom(ctx.db, o);
-      // 相簿照片獨立的存檔格式與畫質（業主 2026-11-25；先只套用成交百寶箱，確認沒問題才全站）。
+      // 相簿照片獨立的存檔格式與畫質（杜杜龍 2026-11-25；先只套用成交百寶箱，確認沒問題才全站）。
       const app = (await loadConfig(ctx.db)).app;
       const ref = await albumRefOf(ctx.db, o.kind, o.lookup, o.scope);
       const albumOn = app.albumScope === "all" || (app.albumScope === "treasure" && ref.groupId === "treasure");
@@ -4703,7 +4703,7 @@ const routes: [string, RegExp, Handler][] = [
       await putInFolder(ctx, o, id); // 區塊相簿：上傳預設進目前所在的子資料夾（?folder=）
       // 中心 EDM：上傳後在背景用視覺模型辨識文字與活動日期（搜尋與依日期排序用）；失敗不影響上傳。
       if (o.kind === "center" && o.scope === "edm" && ctx.defer) ctx.defer(ocrEdmImage(ctx.env, ctx.db, id).catch(() => undefined));
-      if (o.kind === "course" && ctx.defer) ctx.defer(Promise.all([scenePending(ctx.env, ctx.db, 2), photoOcrPending(ctx.env, ctx.db, 2)]).catch(() => undefined)); // 區塊照片：上傳後背景辨識場景（業主 2026-11-24）
+      if (o.kind === "course" && ctx.defer) ctx.defer(Promise.all([scenePending(ctx.env, ctx.db, 2), photoOcrPending(ctx.env, ctx.db, 2)]).catch(() => undefined)); // 區塊照片：上傳後背景辨識場景（杜杜龍 2026-11-24）
       return { id, items: await coverItems(ctx.db, o.kind, o.lookup) };
     },
   ],
@@ -4734,7 +4734,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/admin\/recompress\/status$/,
     async (ctx) => {
-      // 舊照片重新壓縮的進度（業主 2026-11-25，只有超級管理員）。
+      // 舊照片重新壓縮的進度（杜杜龍 2026-11-25，只有超級管理員）。
       requireSuperAdmin(ctx);
       return recompressStatus(ctx.db);
     },
@@ -4779,7 +4779,7 @@ const routes: [string, RegExp, Handler][] = [
     "PUT",
     /^\/admin\/cover-media\/([\w-]{1,40})\/meta$/,
     async (ctx, [id]) => {
-      // 上傳時瀏覽器讀出的原始檔資訊與 EXIF（業主 2026-11-24）：存成 JSON，給圖片「資訊」面板顯示。
+      // 上傳時瀏覽器讀出的原始檔資訊與 EXIF（杜杜龍 2026-11-24）：存成 JSON，給圖片「資訊」面板顯示。
       const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, scope, kind FROM cover_media WHERE id = ?").bind(id).first<CoverRow>();
       if (!row) return fail(404, "not_found", "找不到這張照片");
       await requireCoverRowOwner(ctx, row);
@@ -4818,7 +4818,7 @@ const routes: [string, RegExp, Handler][] = [
     "PUT",
     /^\/admin\/cover-media\/([\w-]{1,40})\/replace$/,
     async (ctx, [id]) => {
-      // 更換照片（業主 2026-11-23）：內文是新的圖片檔（瀏覽器已壓縮）。綁定課程的 EDM 同時換掉那堂課的 EDM。?w&h
+      // 更換照片（杜杜龍 2026-11-23）：內文是新的圖片檔（瀏覽器已壓縮）。綁定課程的 EDM 同時換掉那堂課的 EDM。?w&h
       const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, kind, r2_key, course_id FROM cover_media WHERE id = ?").bind(id).first<CoverRow & { r2_key: string; course_id: string | null }>();
       if (!row) return fail(404, "not_found", "找不到這個項目");
       if (row.kind !== "image") return fail(400, "image_only", "只能更換照片");
@@ -4847,7 +4847,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/cover-media\/config$/,
     async (ctx) => {
-      // 中心封面「是否輪播 EDM」（業主 2026-11-23）：公開讀取；沒有設定＝預設打勾（true）。?center=中心名稱
+      // 中心封面「是否輪播 EDM」（杜杜龍 2026-11-23）：公開讀取；沒有設定＝預設打勾（true）。?center=中心名稱
       const key = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 100);
       if (!key) return { showEdm: true };
       const row = await ctx.db.prepare("SELECT show_edm FROM center_cover_cfg WHERE center_key = ?").bind(centerKey(key)).first<{ show_edm: number }>();
@@ -4877,7 +4877,7 @@ const routes: [string, RegExp, Handler][] = [
       const row = await ctx.db.prepare("SELECT owner_kind, center_key, owner_key, r2_key, poster_key, course_id FROM cover_media WHERE id = ?").bind(id).first<CoverRow & { r2_key: string; course_id: string | null }>();
       if (!row) return fail(404, "not_found", "找不到這個項目");
       const s = await requireCoverRowOwner(ctx, row);
-      // 綁定課程的 EDM 不能刪（業主 2026-11-23），只能更換照片。
+      // 綁定課程的 EDM 不能刪（杜杜龍 2026-11-23），只能更換照片。
       if (row.course_id) return fail(409, "bound_to_course", "這張 EDM 已經綁定課程，無法刪除，只能更換照片");
       await ctx.db.batch([ctx.db.prepare("DELETE FROM cover_media WHERE id = ?").bind(id), audit(ctx.db, s.sub, "cover_media.delete", row.owner_kind, row.center_key ?? row.owner_key, id)]);
       // 檔案徹底刪除；中心原本的首頁圖（相簿第一張）還被中心首頁圖設定用著時不刪。
@@ -5046,7 +5046,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/center-views$/,
     async (ctx) => {
-      // 中心專屬頁點閱計數：每進入一次就 +1（業主 2026-11-16：不分是否同一人；2026-11-17：訪客也算、重新整理也算）；回傳累計次數。
+      // 中心專屬頁點閱計數：每進入一次就 +1（杜杜龍 2026-11-16：不分是否同一人；2026-11-17：訪客也算、重新整理也算）；回傳累計次數。
       const body = await readJson<{ center?: unknown }>(ctx.req);
       const label = typeof body.center === "string" ? body.center.trim().slice(0, 60) : "";
       if (!label) fail(400, "invalid_center", "請指定中心");
@@ -5103,7 +5103,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/search\/scenes$/,
     async (ctx) => {
-      // 相簿照片的「場景」搜尋（業主 2026-11-24）：比對 AI 辨識出的場景、行為、物品標籤；依區塊分組。鎖住的課程（獎銜、瀏覽範圍）不回結果。
+      // 相簿照片的「場景」搜尋（杜杜龍 2026-11-24）：比對 AI 辨識出的場景、行為、物品標籤；依區塊分組。鎖住的課程（獎銜、瀏覽範圍）不回結果。
       const tokens = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase().split(/\s+/).filter((t) => t.length >= 1).slice(0, 3);
       if (!tokens.length || tokens.join("").length < 2) return { hits: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
@@ -5113,7 +5113,7 @@ const routes: [string, RegExp, Handler][] = [
         .prepare(`${base} AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 300`)
         .bind(...tokens.map(like))
         .all<SceneRow>();
-      // 反向比對（業主 2026-11-25：說了一長句「洗蔬菜水果清潔劑…」卻找不到蔬菜水果的照片）：整句塞不進標籤時，
+      // 反向比對（杜杜龍 2026-11-25：說了一長句「洗蔬菜水果清潔劑…」卻找不到蔬菜水果的照片）：整句塞不進標籤時，
       // 改成「照片的某個標籤（至少 2 字、不是『室內』這類泛稱）出現在查詢句子裡」就算符合，命中標籤越多的照片越前面。
       let tagsOf: ((r: SceneRow) => string[]) | null = null;
       const { loadSearchSettings } = await import("./search-settings.ts");
@@ -5144,11 +5144,11 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/search\/semantic$/,
     async (ctx) => {
-      // 語意搜尋（業主 2026-11-23）：只回「意思相近的課程與章節編號」；前端只顯示自己（依權限）已取得索引裡有的，所以這裡不洩漏任何內容。
+      // 語意搜尋（杜杜龍 2026-11-23）：只回「意思相近的課程與章節編號」；前端只顯示自己（依權限）已取得索引裡有的，所以這裡不洩漏任何內容。
       requireMember(ctx);
       const { semanticSearch } = await import("./semantic-search.ts");
       const r = await semanticSearch(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "");
-      // 沒有權限的內容也找得到（業主 2026-11-25）：標上 locked＋原因，畫面在縮圖中央蓋鎖頭；鎖住的圖片不給放大用的圖址。
+      // 沒有權限的內容也找得到（杜杜龍 2026-11-25）：標上 locked＋原因，畫面在縮圖中央蓋鎖頭；鎖住的圖片不給放大用的圖址。
       const locks = await lockStatesOf(ctx, r.extras.flatMap((h) => (h.courseId ? [h.courseId] : [])));
       const showLocked = (await (await import("./search-settings.ts")).loadSearchSettings(ctx.db)).showLocked !== false;
       const extras = [];
@@ -5167,7 +5167,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/search\/phonetic$/,
     async (ctx) => {
-      // 同音搜尋（業主 2026-11-24）：語音辨識錯字（一支援＝益之源）；不用 AI、訪客也能用，只回編號。
+      // 同音搜尋（杜杜龍 2026-11-24）：語音辨識錯字（一支援＝益之源）；不用 AI、訪客也能用，只回編號。
       const { phoneticSearch } = await import("./phonetic-search.ts");
       return phoneticSearch(ctx.db, ctx.url.searchParams.get("q") ?? "");
     },
@@ -5208,7 +5208,7 @@ const routes: [string, RegExp, Handler][] = [
           isShorts: r.isShorts === 1,
           isMaterial: r.lessonKind === "material",
           minutes: r.minutes,
-          // 上傳的封面優先；沒有且是 YouTube 影片＝YouTube 縮圖（業主 2026-11-25）；其餘留空，畫面改用課程封面。
+          // 上傳的封面優先；沒有且是 YouTube 影片＝YouTube 縮圖（杜杜龍 2026-11-25）；其餘留空，畫面改用課程封面。
           coverUrl: r.coverKey ? pubUrl(r.coverKey, r.artVersion) : ytThumbOf(r.mediaType, r.mediaRef),
           ready: (r.mediaType !== "demo" && !!r.mediaRef) || r.minutes > 0,
           completed: r.done === 1,
@@ -5220,7 +5220,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/center-materials$/,
     async (ctx) => {
-      // 中心頁「清單」分頁（業主 2026-11-21）：把指定這批課程裡「所有教材」（章節與其他教材，不含區塊標題與完整版影片）攤平成一份清單。
+      // 中心頁「清單」分頁（杜杜龍 2026-11-21）：把指定這批課程裡「所有教材」（章節與其他教材，不含區塊標題與完整版影片）攤平成一份清單。
       // 只回標題、日期、分享者與類型圖示（公開資料）；連結與檔案網址不在這裡，點下去進該課程頁，由課程頁依權限處理。
       const ids = [...new Set((ctx.url.searchParams.get("ids") ?? "").split(",").map((x) => x.trim()).filter((x) => /^[A-Za-z0-9_-]{1,40}$/.test(x)))].slice(0, 300);
       if (!ids.length) return { items: [] };
@@ -5280,7 +5280,7 @@ const routes: [string, RegExp, Handler][] = [
   ],
   // 全部課程的「分類」下拉：與「關鍵字管理」的分類清單同步（含目前沒有課程使用的分類）。
   ["GET", /^\/categories$/, async (ctx) => keywordChoices(ctx, "category", null)],
-  // 品牌清單（業主 2026-11-18）：選品牌與篩選用，只回有上傳 logo 的品牌。
+  // 品牌清單（杜杜龍 2026-11-18）：選品牌與篩選用，只回有上傳 logo 的品牌。
   ["GET", /^\/brands$/, async (ctx) => (await loadBrands(ctx.db)).map((b) => ({ id: b.id, name: b.name }))],
   ["GET", /^\/ui-config$/, async (ctx) => loadConfig(ctx.db)],
   [
@@ -5308,7 +5308,7 @@ const routes: [string, RegExp, Handler][] = [
       return collectMuxStats(ctx.env);
     },
   ],
-  // 使用統計（業主 2026-11-22）：App 匿名回報裝置、系統、時段與首頁卡片點閱（訪客也可；格式不對就略過）；管理員交叉查詢。
+  // 使用統計（杜杜龍 2026-11-22）：App 匿名回報裝置、系統、時段與首頁卡片點閱（訪客也可；格式不對就略過）；管理員交叉查詢。
   ["POST", /^\/usage$/, async (ctx) => {
     const ip = ctx.req.headers.get("cf-connecting-ip") ?? "";
     const now = Date.now();
@@ -5317,7 +5317,7 @@ const routes: [string, RegExp, Handler][] = [
     usageHits.set(ip, hit && hit.t > now - 60_000 ? { t: hit.t, n: hit.n + 1 } : { t: now, n: 1 });
     if (usageHits.size > 2000) usageHits.clear();
     const body = await readJson<Record<string, unknown>>(ctx.req).catch(() => ({}) as Record<string, unknown>);
-    // 業主本人的操作不列入統計（2026-11-23）：管理員帳號、管理員用過的裝置（App 帶 owner=1）、管理員用過的網路（無痕／未登入也認得）。
+    // 杜杜龍本人的操作不列入統計（2026-11-23）：管理員帳號、管理員用過的裝置（App 帶 owner=1）、管理員用過的網路（無痕／未登入也認得）。
     const adminNow = isOwnerSession(ctx.session);
     if (adminNow) await markOwnerNet(ctx.db, ip).catch(() => undefined);
     const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false));
@@ -5360,7 +5360,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/youtube-syncs\/preview$/,
     async (ctx) => {
-      // 預覽匯入後的教材名稱（業主 2026-11-23）：純文字清單、不寫入任何資料；命名邏輯與匯入共用（syncNamesFor）。
+      // 預覽匯入後的教材名稱（杜杜龍 2026-11-23）：純文字清單、不寫入任何資料；命名邏輯與匯入共用（syncNamesFor）。
       const body = await readJson<{ url?: unknown; courseId?: unknown; titleFormat?: unknown; stripText?: unknown; titlePrefix?: unknown }>(ctx.req);
       if (typeof body.courseId === "string" && body.courseId) await requireCourseManager(ctx, body.courseId);
       else requireSuperAdmin(ctx);
@@ -5401,8 +5401,8 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/youtube-syncs$/,
     async (ctx) => {
-      // 新增一份同步設定（業主 2026-11-20，超級管理員）：貼播放清單網址，選「放進哪一張教材卡」（或直接新建一張）與教材名稱前綴。
-      // 課程頁的「匯入 YouTube 播放清單」（業主 2026-11-23）：有該課程修改權限的人也能為「這張卡」新增並立刻匯入（syncNow）；新建教材卡仍只有超級管理員。
+      // 新增一份同步設定（杜杜龍 2026-11-20，超級管理員）：貼播放清單網址，選「放進哪一張教材卡」（或直接新建一張）與教材名稱前綴。
+      // 課程頁的「匯入 YouTube 播放清單」（杜杜龍 2026-11-23）：有該課程修改權限的人也能為「這張卡」新增並立刻匯入（syncNow）；新建教材卡仍只有超級管理員。
       const body = await readJson<{ url?: unknown; courseId?: unknown; newCardTitle?: unknown; titlePrefix?: unknown; titleFormat?: unknown; stripText?: unknown; sortMode?: unknown; label?: unknown; syncNow?: unknown; appPlayer?: unknown }>(ctx.req);
       const s = typeof body.courseId === "string" && body.courseId ? await requireCourseManager(ctx, body.courseId) : requireSuperAdmin(ctx);
       const { playlistIdOf, defaultSyncFormat, asSortMode } = await import("./imports.ts");
@@ -5448,7 +5448,7 @@ const routes: [string, RegExp, Handler][] = [
     "PATCH",
     /^\/admin\/youtube-syncs\/([\w-]+)$/,
     async (ctx, [id]) => {
-      // 修改這份同步的規則：命名規則、排序規則、解除手動排序鎖定（業主 2026-11-20）。命名只影響之後匯入的；已匯入的要按「依規則重新命名」。
+      // 修改這份同步的規則：命名規則、排序規則、解除手動排序鎖定（杜杜龍 2026-11-20）。命名只影響之後匯入的；已匯入的要按「依規則重新命名」。
       const s = await requireSyncManager(ctx, id!);
       const body = await readJson<{ titleFormat?: unknown; stripText?: unknown; sortMode?: unknown; unlock?: unknown; appPlayer?: unknown }>(ctx.req);
       if (typeof body.appPlayer === "boolean") await ctx.db.prepare("UPDATE youtube_syncs SET use_app_player = ? WHERE id = ?").bind(body.appPlayer ? 1 : 0, id).run();
@@ -5476,7 +5476,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/youtube-syncs\/([\w-]+)\/delete-with-materials$/,
     async (ctx, [id]) => {
-      // 刪除清單與關聯教材（業主 2026-11-23）：重新讀播放清單，這張卡裡來源是清單內影片的 YouTube 教材全部刪除，再刪同步設定。
+      // 刪除清單與關聯教材（杜杜龍 2026-11-23）：重新讀播放清單，這張卡裡來源是清單內影片的 YouTube 教材全部刪除，再刪同步設定。
       // 讀不到播放清單就整個不動（避免只刪一半）；教材沒有記錄「是哪份同步匯入的」，所以以影片編號比對。
       const s = await requireSyncManager(ctx, id!);
       const sync = await ctx.db.prepare("SELECT course_id, playlist_id FROM youtube_syncs WHERE id = ?").bind(id).first<{ course_id: string; playlist_id: string }>();
@@ -5663,7 +5663,7 @@ const routes: [string, RegExp, Handler][] = [
       const s = requireMember(ctx);
       const n = noticeScope(s);
       const { results } = await ctx.db
-        // order_status：「有新的報名待審核」這類通知連到 /admin/orders/<報名編號>，用那筆報名現在的狀態判斷有沒有處理過（業主 2026-11-23）。
+        // order_status：「有新的報名待審核」這類通知連到 /admin/orders/<報名編號>，用那筆報名現在的狀態判斷有沒有處理過（杜杜龍 2026-11-23）。
         .prepare(`SELECT id, title, body, link, read_at, created_at, (SELECT o.status FROM orders o WHERE notifications.link LIKE '/admin/orders/%' AND o.id = substr(notifications.link, 15)) AS order_status FROM notifications WHERE ${n.sql} ORDER BY created_at DESC LIMIT 100`)
         .bind(...n.args)
         .all<{ id: string; title: string; body: string; link: string; read_at: string | null; created_at: string; order_status: string | null }>();
@@ -5844,7 +5844,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/staff-roles\/center-members$/,
     async (ctx) => {
-      // 依中心列出會員（業主 2026-11-21）：用本人 Token 向中央讀同中心名單（權限與範圍全由中央判斷）；名單不保存、搜尋字不寫日誌。
+      // 依中心列出會員（杜杜龍 2026-11-21）：用本人 Token 向中央讀同中心名單（權限與範圍全由中央判斷）；名單不保存、搜尋字不寫日誌。
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以使用");
       const center = (ctx.url.searchParams.get("center") ?? "").trim().slice(0, 100);
@@ -5865,7 +5865,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/staff-roles$/,
     async (ctx) => {
-      // 查人（業主 2026-11-21）：不帶 q＝有職務的人；q 要 2～30 字。用本人 Token、不保存名單與搜尋字、不寫日誌。
+      // 查人（杜杜龍 2026-11-21）：不帶 q＝有職務的人；q 要 2～30 字。用本人 Token、不保存名單與搜尋字、不寫日誌。
       const s = requireMember(ctx);
       if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以使用");
       const q = (ctx.url.searchParams.get("q") ?? "").trim();
@@ -5936,7 +5936,7 @@ const routes: [string, RegExp, Handler][] = [
       if (s.kind !== "central") return fail(403, "forbidden", "只有中央會員可以審核");
       const body = await readJson<{ decision?: unknown; value?: unknown; item?: { display_name?: unknown; field_key?: unknown; field_label?: unknown; current_value?: unknown; requested_value?: unknown } }>(ctx.req);
       if (body.decision !== "approve" && body.decision !== "reject") return fail(400, "invalid_decision", "請選擇通過或不通過");
-      // 「修改後通過」（業主 2026-11-20，中央串接指令 2026-11-20.1）：只有通過能帶修改後的值（文字，或 {option, custom_text}）。
+      // 「修改後通過」（杜杜龍 2026-11-20，中央串接指令 2026-11-20.1）：只有通過能帶修改後的值（文字，或 {option, custom_text}）。
       const val = body.value;
       const validVal = typeof val === "string" ? val.trim().length > 0 && val.length <= 200 : !!val && typeof val === "object" && typeof (val as { option?: unknown }).option === "string";
       if (val !== undefined && (body.decision !== "approve" || !validVal)) return fail(422, "invalid_value", "修改後的內容格式不正確，只有「通過」可以修改內容");
@@ -6010,7 +6010,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/centers$/,
     async (ctx) => {
       // 只用會員中心的清單（正本）。不混入本地資料；中央暫時查不到時，用最近一次成功的清單（存在 central_snapshots），還是沒有就回報錯誤。
-      // 沒登入的訪客（只能看公開課程）讀的是最近一次成功的副本，所以「所有中心」清單不會是空白（業主 2026-11-17）。
+      // 沒登入的訪客（只能看公開課程）讀的是最近一次成功的副本，所以「所有中心」清單不會是空白（杜杜龍 2026-11-17）。
       const s = ctx.session;
       if (s && s.kind !== "central") return ["台北中心", "台中中心", "高雄中心"];
       const snap = await ctx.db.prepare("SELECT value FROM central_snapshots WHERE key = 'centers'").first<{ value: string }>();
@@ -6037,7 +6037,7 @@ const routes: [string, RegExp, Handler][] = [
         if (JSON.stringify(list) !== JSON.stringify(saved)) await ctx.db.prepare("INSERT INTO central_snapshots (key, value) VALUES ('centers', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list)).run();
         return list;
       };
-      // 速度（業主 2026-11-20：寰宇大學「教育中心」區塊比其他區塊晚約 2 秒才出現）：已有最近一次成功的副本就立刻回傳，
+      // 速度（杜杜龍 2026-11-20：寰宇大學「教育中心」區塊比其他區塊晚約 2 秒才出現）：已有最近一次成功的副本就立刻回傳，
       // 向中央確認最新清單、同步改名等工作放到背景（下次進來就是新的）；還沒有副本（第一次）才等中央。
       if (saved.length && ctx.defer) {
         ctx.defer(refresh().catch((e) => console.error("centers refresh", e instanceof Error ? e.message : "error")));
@@ -6341,12 +6341,12 @@ const routes: [string, RegExp, Handler][] = [
       const u = parseHttpsUrl(body.url);
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
-      const itemDate = body.eventDate === undefined ? null : dayOrNull(body.eventDate); // 項目自己的日期（業主 2026-11-17：素材可單獨設定日期）
+      const itemDate = body.eventDate === undefined ? null : dayOrNull(body.eventDate); // 項目自己的日期（杜杜龍 2026-11-17：素材可單獨設定日期）
       const course = await ctx.db.prepare("SELECT c.is_list, (SELECT COALESCE(MAX(position), 0) FROM lessons WHERE course_id = c.id) AS maxpos FROM courses c WHERE c.id = ?").bind(courseId).first<{ maxpos: number; is_list: number }>();
       if (!course) return fail(404, "not_found", "找不到這門課程");
       const id = `${courseId}-${randomId(6)}`;
       // 清單卡貼 YouTube 影片：存成影片來源，在 App 內原地播放（計入學習進度）；其他連結照常開外部網頁。
-      // 「使用行動大學播放器」（業主 2026-11-24，預設勾選）：沒勾＝存成外部連結，點了開新網頁到 YouTube。
+      // 「使用行動大學播放器」（杜杜龍 2026-11-24，預設勾選）：沒勾＝存成外部連結，點了開新網頁到 YouTube。
       const yt = body.appPlayer === false ? null : youtubeId(u.toString());
       // 「完整版課程影片」永遠是教材的最後一列：新教材插在它前面，它往後挪一格。
       const slot = await materialSlot(ctx.db, courseId);
@@ -6375,7 +6375,7 @@ const routes: [string, RegExp, Handler][] = [
       if (!u) return fail(400, "invalid_url", "請輸入 https 開頭的有效網址");
       const title = cleanTitle(body.title) || cleanTitle(await fetchLinkTitle(u)) || LINK_DEFAULT_TITLE[classifyLink(u)];
       // 清單卡：YouTube 影片存成影片來源（App 內播放；同一支影片保留原本的分鐘數與區間），其他連結存成外部連結。
-      const yt = body.appPlayer === false ? null : youtubeId(u.toString()); // 沒勾「使用行動大學播放器」＝存成外部連結（業主 2026-11-24）
+      const yt = body.appPlayer === false ? null : youtubeId(u.toString()); // 沒勾「使用行動大學播放器」＝存成外部連結（杜杜龍 2026-11-24）
       const sameVideo = !!yt && lesson.media_type === "youtube" && lesson.media_ref === yt;
       await ctx.db.batch([
         ctx.db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(title, id),
@@ -6424,7 +6424,7 @@ const routes: [string, RegExp, Handler][] = [
       const errors: string[] = [];
       let systemNotice: string | null = null; // 中央擋下「自訂系統含寰宇中心名稱」(use_hglobal_center)：原文回給畫面顯示在系統欄下方，不當一般錯誤
       let pending = false;
-      // 勾選「我是 Amway 會員」（業主 2026-11-19：資料視窗內直接勾）：先開啟，後面的系統、中心、獎銜才寫得進去。
+      // 勾選「我是 Amway 會員」（杜杜龍 2026-11-19：資料視窗內直接勾）：先開啟，後面的系統、中心、獎銜才寫得進去。
       if (enable) {
         const msg = await centralEnableAmway(s.token);
         if (msg) errors.push(msg);
@@ -6449,7 +6449,7 @@ const routes: [string, RegExp, Handler][] = [
         const rank = changes.find((c) => c.key === "rank");
         if (rank) await write(rank);
       }
-      // 送出申請的紀錄（業主 2026-11-19）：每個需要審核的欄位留一筆，申請人的通知頁也留一則「已送出」。
+      // 送出申請的紀錄（杜杜龍 2026-11-19）：每個需要審核的欄位留一筆，申請人的通知頁也留一則「已送出」。
       for (const c of pendingKeys) {
         const label = REVIEW_FIELD_LABEL[c.key];
         if (!label || !c.value) continue;
@@ -6538,7 +6538,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/courses\/([\w-]+)\/material-file$/,
     async (ctx, [courseId]) => {
-      // 上傳檔案當教材（業主 2026-11-18）：圖片、照片、文件；不能是影片；單檔 30MB 內（圖片在瀏覽器已先壓縮）。
+      // 上傳檔案當教材（杜杜龍 2026-11-18）：圖片、照片、文件；不能是影片；單檔 30MB 內（圖片在瀏覽器已先壓縮）。
       const admin = await requireCourseManager(ctx, courseId);
       const name = (ctx.url.searchParams.get("name") ?? "").trim().slice(0, 120);
       if (!name) return fail(400, "name_required", "找不到檔案名稱");
@@ -6594,7 +6594,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/courses\/([\w-]+)\/drive-import$/,
     async (ctx, [courseId]) => {
-      // 從使用者自己的 Google 雲端硬碟匯入教材（業主 2026-11-18）：使用者在瀏覽器用 Google Picker 挑檔案並授權一次性的存取權杖，
+      // 從使用者自己的 Google 雲端硬碟匯入教材（杜杜龍 2026-11-18）：使用者在瀏覽器用 Google Picker 挑檔案並授權一次性的存取權杖，
       // 伺服器用它把那個檔案讀出來、轉存進行動大學的儲存空間（R2）並建立教材。權杖只用這一次，不保存、不寫日誌。
       const admin = await requireCourseManager(ctx, courseId);
       const b = await readJson<{ fileId?: unknown; token?: unknown; progressId?: unknown }>(ctx.req);
@@ -6793,7 +6793,7 @@ const routes: [string, RegExp, Handler][] = [
         put(b.logo_key, HQ, "image");
         put(b.bg_key, HQ, "image");
       }
-      for (const x of await homeworkStorageOwners(ctx.db)) put(x.key, centerOf.get(x.courseId) ?? HQ, "other"); // 作業檔案（業主 2026-11-25）
+      for (const x of await homeworkStorageOwners(ctx.db)) put(x.key, centerOf.get(x.courseId) ?? HQ, "other"); // 作業檔案（杜杜龍 2026-11-25）
       const rows = new Map<string, { center: string; total: number; image: number; doc: number; audio: number; other: number }>();
       const totals = { image: 0, doc: 0, audio: 0, other: 0 };
       let total = 0;
@@ -6813,7 +6813,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/admin\/cover-library$/,
     async (ctx) => {
-      // 封面庫（業主 2026-11-19，超級管理員）：未使用的封面檔＋正在使用中的系列卡／課程卡／清單卡封面（三種分開）。
+      // 封面庫（杜杜龍 2026-11-19，超級管理員）：未使用的封面檔＋正在使用中的系列卡／課程卡／清單卡封面（三種分開）。
       requireSuperAdmin(ctx);
       const bucket = ctx.env.MEDIA ?? fail(503, "storage_not_ready", "圖片儲存空間尚未啟用");
       const [unused, cards] = await Promise.all([listUnusedCovers(ctx.db, bucket), listInUseCards(ctx.db)]);
@@ -6859,7 +6859,7 @@ const routes: [string, RegExp, Handler][] = [
       const used = (await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM series_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM center_art WHERE edm_key = ? OR cover_key = ? UNION SELECT 1 FROM lessons WHERE cover_key = ? OR poster_key = ? UNION SELECT 1 FROM brand_logos WHERE logo_key = ? OR bg_key = ?").bind(key, key, key, key, key, key, key, key, key, key).first()) ?? (key.startsWith("schedule/") ? await ctx.db.prepare("SELECT 1 AS ok FROM center_schedules WHERE image_key = ?").bind(key).first() : key.startsWith("album/") ? await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first() : key.startsWith("listbg/") ? await ctx.db.prepare("SELECT 1 AS ok FROM list_cover_bgs WHERE image_key = ?").bind(key).first() : key.startsWith("listcover/") ? await ctx.db.prepare("SELECT 1 AS ok FROM my_lists WHERE cover_key = ?").bind(key).first() : null) ?? (await ctx.db.prepare("SELECT 1 AS ok FROM cover_media WHERE r2_key = ? OR poster_key = ?").bind(key, key).first()); // D1 一個查詢最多串 5 個 UNION，課表另外查
       const obj = used ? await bucket.get(key) : null;
       if (!obj) return new Response("Not found", { status: 404 });
-      // 即時縮圖（業主 2026-11-20 小範圍試用）：?w=寬度（只接受設定頁勾選的幾種，避免縮圖次數暴增）。
+      // 即時縮圖（杜杜龍 2026-11-20 小範圍試用）：?w=寬度（只接受設定頁勾選的幾種，避免縮圖次數暴增）。
       // 縮不了、超過免費額度或設定有問題，一律回原圖，網站不會壞；錯誤原因記下來給「設定 › Cloudflare即時縮圖」顯示。
       const w = Number(ctx.url.searchParams.get("w"));
       const type = obj.httpMetadata?.contentType ?? "image/jpeg";
@@ -6881,7 +6881,7 @@ const routes: [string, RegExp, Handler][] = [
             console.log("thumb_cache_failed", e instanceof Error ? e.message : String(e));
             cache = null;
           }
-          // 縮圖額度（業主 2026-11-24）：封面 > 中心 EDM > 其他相簿；這一級到上限就不縮、回原圖（短快取，之後額度恢復或調整再縮）。
+          // 縮圖額度（杜杜龍 2026-11-24）：封面 > 中心 EDM > 其他相簿；這一級到上限就不縮、回原圖（短快取，之後額度恢復或調整再縮）。
           if (!(await reserveThumb(ctx.db, t.quota, key, w).catch(() => true))) {
             return new Response(obj.body, { headers: { "content-type": type, "cache-control": "public, max-age=600", "x-content-type-options": "nosniff", "x-thumb": "quota" } });
           }
@@ -6919,7 +6919,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/ai\/run-now$/,
     async (ctx) => {
-      // 設定 › AI 文字辨識「立即開始辨識」（業主 2026-11-26）：不等每 10 分鐘的排程，馬上在這個請求裡跑一輪（最多約 70 秒（Cloudflare 連線上限約 100 秒），依「辨識優先順序與開關」）；
+      // 設定 › AI 文字辨識「立即開始辨識」（杜杜龍 2026-11-26）：不等每 10 分鐘的排程，馬上在這個請求裡跑一輪（最多約 70 秒（Cloudflare 連線上限約 100 秒），依「辨識優先順序與開關」）；
       // 前端會連續呼叫直到沒有待辨識或額度用完。
       const s = requireSuperAdmin(ctx);
       const { runAiBatch } = await import("./ai-batch.ts");
@@ -7269,7 +7269,7 @@ const routes: [string, RegExp, Handler][] = [
       return listEditors(ctx, center);
     },
   ],
-  // ---------- 縮圖符號（業主 2026-11-23）：系列卡、課程卡、中心卡的小縮圖符號與顏色 ----------
+  // ---------- 縮圖符號（杜杜龍 2026-11-23）：系列卡、課程卡、中心卡的小縮圖符號與顏色 ----------
   [
     "GET",
     /^\/thumb-badges$/,
@@ -7332,7 +7332,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/center-art$/,
     async (ctx): Promise<CenterArt[]> => {
-      // 中心封面（業主 2026-11-23）：每次讀取，從該中心「封面上傳庫」（cover_media 的封面區照片）隨機挑一張；沒有任何封面照片才退回舊的單張首頁圖。
+      // 中心封面（杜杜龍 2026-11-23）：每次讀取，從該中心「封面上傳庫」（cover_media 的封面區照片）隨機挑一張；沒有任何封面照片才退回舊的單張首頁圖。
       const [arts, pics] = await Promise.all([
         ctx.db
           .prepare("SELECT center_key, center_label, edm_key, art_version, cover_key, cover_rect, edm_view_y FROM center_art ORDER BY center_label")
@@ -7527,7 +7527,7 @@ const routes: [string, RegExp, Handler][] = [
       const id = `b${randomId(7)}`;
       const max = await ctx.db.prepare("SELECT COALESCE(MAX(sort_order), 0) AS m FROM brand_logos").first<{ m: number }>();
       await ctx.db.batch([ctx.db.prepare("INSERT INTO brand_logos (id, name, sort_order) VALUES (?, ?, ?)").bind(id, name, (max?.m ?? 0) + 1), audit(ctx.db, s.sub, "brand.create", "brand", id, name)]);
-      await ensureBrandCards(ctx.env, id).catch(() => undefined); // 新品牌自動有一張資訊卡（業主 2026-11-18）
+      await ensureBrandCards(ctx.env, id).catch(() => undefined); // 新品牌自動有一張資訊卡（杜杜龍 2026-11-18）
       await ensureTreasureLinks(ctx.env, id).catch(() => undefined); // 成交百寶箱也補一個該品牌的區塊與品牌卡最前面的連結區塊
       return { id };
     },
@@ -7551,7 +7551,7 @@ const routes: [string, RegExp, Handler][] = [
         else return fail(400, "invalid_color", "底色請用 #RRGGBB 格式");
       }
       if (body.bgColorDark !== undefined) {
-        // 深色模式底色（業主 2026-11-18）：空白＝不設定（深色模式照原本的底色或底圖）。
+        // 深色模式底色（杜杜龍 2026-11-18）：空白＝不設定（深色模式照原本的底色或底圖）。
         if (body.bgColorDark === null || body.bgColorDark === "") sets.push(["bg_color_dark", null]);
         else if (typeof body.bgColorDark === "string" && /^#[0-9a-fA-F]{6}$/.test(body.bgColorDark)) sets.push(["bg_color_dark", body.bgColorDark.toUpperCase()]);
         else return fail(400, "invalid_color", "深色模式底色請用 #RRGGBB 格式");
@@ -7619,7 +7619,7 @@ const routes: [string, RegExp, Handler][] = [
     "PUT",
     /^\/admin\/series-settings$/,
     async (ctx) => {
-      // 系列的標題（只改顯示）與是否顯示在「所有系列」：只有超級管理員（業主 2026-11-19）。
+      // 系列的標題（只改顯示）與是否顯示在「所有系列」：只有超級管理員（杜杜龍 2026-11-19）。
       const s = requireSuperAdmin(ctx);
       const body = await readJson<{ series?: unknown; title?: unknown; showInAll?: unknown }>(ctx.req);
       const series = typeof body.series === "string" ? body.series.trim().slice(0, 60) : "";
@@ -7669,7 +7669,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/zone-move$/,
     async (ctx) => {
-      // 跨專區移動（業主 2026-11-18）：ids＝要搬的課程或清單；同系列的一起搬。只有超級管理員。
+      // 跨專區移動（杜杜龍 2026-11-18）：ids＝要搬的課程或清單；同系列的一起搬。只有超級管理員。
       const s = requireSuperAdmin(ctx);
       const body = await readJson<{ zone?: unknown; ids?: unknown }>(ctx.req);
       const zone = typeof body.zone === "string" ? body.zone : "";
@@ -7697,7 +7697,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/admin\/edm-fields$/,
     async (ctx) => {
-      // AI 文字辨識的欄位格式（業主 2026-11-24）：超級管理員自訂；EDM 辨識文字會照這個格式整理。
+      // AI 文字辨識的欄位格式（杜杜龍 2026-11-24）：超級管理員自訂；EDM 辨識文字會照這個格式整理。
       requireSuperAdmin(ctx);
       const sel = await loadSelection(ctx.db);
       const model = AI_MODELS.find((m) => m.id === sel.edm_structure);
@@ -7844,7 +7844,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/search-settings$/,
     async (ctx) => {
-      // 搜尋參數（公開，前端的模糊、字元、排序、語意開關用；業主 2026-11-25）。
+      // 搜尋參數（公開，前端的模糊、字元、排序、語意開關用；杜杜龍 2026-11-25）。
       const { loadSearchSettings } = await import("./search-settings.ts");
       return loadSearchSettings(ctx.db);
     },
@@ -7883,7 +7883,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/search-synonyms$/,
     async (ctx) => {
-      // 自訂關聯詞（公開，給搜尋用；業主 2026-11-25）。
+      // 自訂關聯詞（公開，給搜尋用；杜杜龍 2026-11-25）。
       const { results } = await ctx.db.prepare("SELECT terms FROM search_synonyms ORDER BY id").all<{ terms: string }>();
       return { groups: results.map((r) => JSON.parse(r.terms) as string[]) };
     },
@@ -8213,14 +8213,14 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/course-views$/,
     async (ctx) => {
-      // 從課程連結直接進入課程頁，也算進「該課程主辦中心封面」與「所屬系列封面」的點閱（業主 2026-11-17：不分訪客、可重複、重新整理就 +1）。
+      // 從課程連結直接進入課程頁，也算進「該課程主辦中心封面」與「所屬系列封面」的點閱（杜杜龍 2026-11-17：不分訪客、可重複、重新整理就 +1）。
       const body = await readJson<{ courseId?: unknown }>(ctx.req);
       const id = typeof body.courseId === "string" ? body.courseId.slice(0, 40) : "";
       const row = id ? await ctx.db.prepare("SELECT host_center_key AS hk, series FROM courses WHERE id = ? AND status = 'published'").bind(id).first<{ hk: string | null; series: string }>() : null;
       if (!row) return { ok: false };
       if (row.hk) await bumpView(ctx.db, "center", row.hk);
       if (row.series?.trim()) await bumpView(ctx.db, "series", row.series.trim());
-      // 課程／清單自己頁面的點閱（封面統一顯示；業主 2026-11-18）。
+      // 課程／清單自己頁面的點閱（封面統一顯示；杜杜龍 2026-11-18）。
       return { ok: true, total: VIEW_BASE + (await bumpView(ctx.db, "course", id)) };
     },
   ],
@@ -8276,7 +8276,7 @@ const routes: [string, RegExp, Handler][] = [
       const { s: admin, can } = await courseRightsFor(ctx, id);
       if (!can.remove) fail(403, "forbidden", "沒有刪除這門課程的權限");
       const impact = await courseDeleteImpact(ctx.db, id);
-      // 業主規定：已有人報名（已開通、免費報名、待審核）的課程不能永久刪除，只能「下架封存」。完全沒人報名才真的刪除。
+      // 杜杜龍規定：已有人報名（已開通、免費報名、待審核）的課程不能永久刪除，只能「下架封存」。完全沒人報名才真的刪除。
       const active = await registrationCount(ctx.db, id);
       if (active > 0) fail(409, "has_registrations", `這門課程已有 ${active} 筆報名，不能永久刪除；請改用「下架封存」`);
       const audio = await ctx.db.prepare("SELECT media_ref FROM lessons WHERE course_id = ? AND media_type = 'audio' AND media_ref IS NOT NULL").bind(id).all<{ media_ref: string }>();
@@ -8432,7 +8432,7 @@ const routes: [string, RegExp, Handler][] = [
         }
       }
       if (ids.length) {
-        // 套裝課程（業主 2026-11-19）：章節也可以放進區塊，所以傳進全部項目（章節、區塊、教材）時當成同一組一起排序。
+        // 套裝課程（杜杜龍 2026-11-19）：章節也可以放進區塊，所以傳進全部項目（章節、區塊、教材）時當成同一組一起排序。
         const mixed = ids.length === current.results.length;
         // 分類區域標題（section）和教材（material）同一組一起排序。
         const grp = (k: string | undefined) => (mixed ? "all" : k === "chapter" || k === undefined ? "chapter" : "material");
@@ -8450,7 +8450,7 @@ const routes: [string, RegExp, Handler][] = [
       } else if (foreignStmts.length) await ctx.db.batch([...foreignStmts, audit(ctx.db, admin.sub, "lesson.reorder", "course", courseId)]);
       else fail(400, "invalid_order", "順序不正確，請重新整理後再試");
       if (courseId === (await treasureCourseId(ctx.db).catch(() => null))) await syncSeriesOrderFromTreasure(ctx.db).catch(() => undefined); // 成交百寶箱區塊順序 → 品牌館卡片順序
-      // 使用者手動調整過順序：這張卡的「同步 YouTube 清單」從此不再自動重排，只把新影片放進去（業主 2026-11-20）。
+      // 使用者手動調整過順序：這張卡的「同步 YouTube 清單」從此不再自動重排，只把新影片放進去（杜杜龍 2026-11-20）。
       await ctx.db.prepare("UPDATE youtube_syncs SET sort_locked = 1 WHERE course_id = ?").bind(courseId).run();
       if (ctx.url.searchParams.get("lite") === "1") return { ok: true };
       return courseDetail(ctx, courseId);
@@ -8461,7 +8461,7 @@ const routes: [string, RegExp, Handler][] = [
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 /** 處理 /api/v2/*；其他路徑交給靜態網站。 */
-// ---------- 作業（業主 2026-11-25）：路由與邏輯在 homework.ts，這裡只接上登入、權限與通知 ----------
+// ---------- 作業（杜杜龍 2026-11-25）：路由與邏輯在 homework.ts，這裡只接上登入、權限與通知 ----------
 /** 作業的「老師」（可以出作業、評分）：管理員、有這門課修改權的人、這門課「費用與審核」的審核窗口（群組成員、指定身份、指定的會員）。 */
 async function hwIsTeacher(ctx: Ctx, courseId: string): Promise<boolean> {
   const s = ctx.session;

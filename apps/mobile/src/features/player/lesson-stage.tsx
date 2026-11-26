@@ -11,7 +11,7 @@ import { PlayerControls } from "./player-controls";
 import { PlayerSlot } from "./player-slot";
 
 /**
- * 課程頁「播放區」模版（業主 2026-11-24：至尊模式與超派模式的播放器必須同一份，改一邊兩邊一起變）。
+ * 課程頁「播放區」模版（杜杜龍 2026-11-24：至尊模式與超派模式的播放器必須同一份，改一邊兩邊一起變）。
  * 超派模式（app/course/[id].tsx）與至尊模式（app/course/[id].tsx 的 elder 分支）都只用這個元件：
  * 影片＝播放舞台（PlayerSlot）＋控制列（PlayerControls）；純音檔＝InlineAudio；舊版 YouTube＝LessonPlayer；
  * 還沒開始播放＝idle（封面）＋待機控制列（idleBar，沒給就不顯示）。
@@ -26,7 +26,7 @@ export function LessonStage({
   idleBar,
   collapseIdle = true,
 }: {
-  /** 還沒播放時，封面隨頁面下滑縮成窄橫幅（業主 2026-11-24，共用 ui/collapse-band；大螢幕左右分欄傳 false）。 */
+  /** 還沒播放時，封面隨頁面下滑縮成窄橫幅（杜杜龍 2026-11-24，共用 ui/collapse-band；大螢幕左右分欄傳 false）。 */
   collapseIdle?: boolean;
   /** 目前釘住的播放軌（沒有＝還沒播放）。 */
   stage: { key: string; audio: boolean } | null;

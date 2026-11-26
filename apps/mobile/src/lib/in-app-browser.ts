@@ -1,7 +1,7 @@
 import { Platform } from "react-native";
 
 /**
- * App 內建瀏覽器（業主 2026-11-17 統一稱呼）：LINE、Facebook、Instagram、微信…點連結時在自己視窗裡開的網頁，功能常被限制
+ * App 內建瀏覽器（杜杜龍 2026-11-17 統一稱呼）：LINE、Facebook、Instagram、微信…點連結時在自己視窗裡開的網頁，功能常被限制
  * （例如不准程式代按播放）。對照：手機自己的 Chrome、Safari 叫「系統瀏覽器」。
  * 偵測靠瀏覽器識別字串；要新增 App 只改下面 APPS 清單一處。
  */
@@ -35,7 +35,7 @@ export function inAppBrowser(): InAppInfo | null {
  */
 export function openInSystemBrowser(info: InAppInfo): "copied" | undefined {
   const u = new URL(window.location.href);
-  // 業主 2026-11-17：從內建瀏覽器改開時，主分頁（學習中、通知、設定、全部課程清單）一律改進首頁；課程頁、系列頁、中心頁這類可分享的內容頁維持原頁面。
+  // 杜杜龍 2026-11-17：從內建瀏覽器改開時，主分頁（學習中、通知、設定、全部課程清單）一律改進首頁；課程頁、系列頁、中心頁這類可分享的內容頁維持原頁面。
   if (["/learning", "/notices", "/me"].includes(u.pathname) || (u.pathname === "/courses" && !u.search)) {
     u.pathname = "/";
     u.search = "";

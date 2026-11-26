@@ -38,11 +38,11 @@ function StackBar({ parts, total }: { parts: { color: string; value: number }[];
 }
 
 /**
- * 設定 > 儲存空間管理（超級管理員，業主 2026-11-18）：整個網站雲端儲存已使用的容量、
+ * 設定 > 儲存空間管理（超級管理員，杜杜龍 2026-11-18）：整個網站雲端儲存已使用的容量、
  * 各類型檔案的佔比，以及各中心（含寰宇總部）各自佔用多少、裡面各類型各多少。大小是雲端的實際大小。
  */
 
-/** 圖片格式簡易比較表（業主 2026-11-20）：選存檔格式時的參考。 */
+/** 圖片格式簡易比較表（杜杜龍 2026-11-20）：選存檔格式時的參考。 */
 const FORMAT_ROWS: { name: string; size: string; compat: string; alpha: string; pro: string; con: string }[] = [
   { name: "JPEG", size: "中", compat: "★★★ 所有裝置", alpha: "不支援（白底）", pro: "相容性最好、任何手機電腦都能顯示與下載", con: "同畫質檔案比 WebP、AVIF 大" },
   { name: "WebP", size: "小（約省 25～35%）", compat: "★★ 新手機皆可，少數舊裝置失敗", alpha: "支援", pro: "檔案小、載入快", con: "曾有 Android 手機顯示空白；部分舊軟體開不了" },
@@ -77,7 +77,7 @@ function FormatTable() {
 
 type RecompressStatus = { job: { running: boolean; startedAt: string | null; stoppedAt: string | null }; total: number; pending: number; done: number; skip: number; fail: number; bytes: number; saved: number; target: { format: string; quality: number } };
 
-/** 舊照片重新壓縮（業主 2026-11-25）：把相簿裡所有舊照片依上面「相簿照片」的格式與畫質重壓、覆蓋原檔（不可復原）。按「開始」才會跑，排程每 10 分鐘分批處理，這裡每 10 秒更新進度。 */
+/** 舊照片重新壓縮（杜杜龍 2026-11-25）：把相簿裡所有舊照片依上面「相簿照片」的格式與畫質重壓、覆蓋原檔（不可復原）。按「開始」才會跑，排程每 10 分鐘分批處理，這裡每 10 秒更新進度。 */
 function RecompressSection() {
   const { c } = useTheme();
   const { data, reload } = useApi<RecompressStatus>("/admin/recompress/status");
@@ -125,7 +125,7 @@ export default function StorageScreen() {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const dirty = lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality || lim.centerMaxSide !== config.app.centerMaxSide || lim.centerQuality !== config.app.centerQuality || lim.edmMaxSide !== config.app.edmMaxSide || lim.edmQuality !== config.app.edmQuality || lim.albumFormat !== config.app.albumFormat || lim.albumQuality !== config.app.albumQuality || lim.albumScope !== config.app.albumScope;
-  // 封面輪播與短影音（業主 2026-11-21）：輪播秒數與影片壓縮規範放在一起，一次儲存。
+  // 封面輪播與短影音（杜杜龍 2026-11-21）：輪播秒數與影片壓縮規範放在一起，一次儲存。
   const cvKeys = ["coverSec", "videoMaxHeight", "videoKbps", "videoFps", "videoMaxMb", "videoMaxSec"] as const;
   const cvOf = () => Object.fromEntries(cvKeys.map((k) => [k, config.app[k]])) as Record<(typeof cvKeys)[number], number>;
   const [cv, setCv] = useState(cvOf);
@@ -138,7 +138,7 @@ export default function StorageScreen() {
   useEffect(() => {
     if (data) setFs(data.fileSettings);
   }, [data]);
-  // 整頁只有一個「儲存」（業主 2026-11-26）：上傳／壓縮設定、封面輪播與短影音、教材檔案設定一起存。
+  // 整頁只有一個「儲存」（杜杜龍 2026-11-26）：上傳／壓縮設定、封面輪播與短影音、教材檔案設定一起存。
   const fsDirty = !!fs && !!data && JSON.stringify(fs) !== JSON.stringify(data.fileSettings);
   const allDirty = dirty || cvDirty || fsDirty;
   const saveAll = async (): Promise<boolean> => {

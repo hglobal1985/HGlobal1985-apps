@@ -38,7 +38,7 @@ const randomIcon = (not: string) => {
 };
 
 /**
- * 設定 › 徽章任務設定（業主 2026-11-18）：超級管理員自由調整所有徽章任務。
+ * 設定 › 徽章任務設定（杜杜龍 2026-11-18）：超級管理員自由調整所有徽章任務。
  * ① 上方總覽＋書櫃鑰匙門檻 ② 依「任務分類」篩選／分組列出所有任務（點一下修改）③ 新增任務：先選分類、再選任務種類（每種都有白話說明）、設定達成數量與名稱、圖示。
  */
 export default function AdminAchievementsScreen() {
@@ -53,7 +53,7 @@ export default function AdminAchievementsScreen() {
   const [over, setOver] = useState<Record<string, Diff>>({});
   const [form, setForm] = useState<Form | null>(null);
   const [busy, setBusy] = useState(false);
-  // 書櫃鑰匙門檻（業主 2026-11-26：設定值一律草稿＋唯一的「儲存」；徽章任務本身是逐筆資料，維持各自編輯）
+  // 書櫃鑰匙門檻（杜杜龍 2026-11-26：設定值一律草稿＋唯一的「儲存」；徽章任務本身是逐筆資料，維持各自編輯）
   const [needDraft, setNeedDraft] = useState<number | null>(null);
   const savedNeed = config.app.libraryKeyBadges ?? 100;
   const needDirty = needDraft !== null && needDraft !== savedNeed;

@@ -2,7 +2,7 @@ import { cutPercentFor16x9 } from "./image-tools";
 
 export type CoverMode = "crop" | "contain";
 
-/** 照片比 16:9 窄到會切掉 15% 以上時，預設「完整顯示」（業主 2026-11-15）。 */
+/** 照片比 16:9 窄到會切掉 15% 以上時，預設「完整顯示」（杜杜龍 2026-11-15）。 */
 export const defaultCoverMode = (img: { naturalWidth: number; naturalHeight: number }): CoverMode => (cutPercentFor16x9(img) >= 15 ? "contain" : "crop");
 
 /**

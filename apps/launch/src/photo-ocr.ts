@@ -1,6 +1,6 @@
 import { aiResponseText, prepareVisionImage } from "./ai-image.ts";
 /**
- * 相簿照片文字辨識 OCR（業主 2026-11-25）：讀出照片裡看得到的文字（招牌、白板、產品包裝、投影片…），存到 cover_media.ocr_text，
+ * 相簿照片文字辨識 OCR（杜杜龍 2026-11-25）：讀出照片裡看得到的文字（招牌、白板、產品包裝、投影片…），存到 cover_media.ocr_text，
  * 和「場景標籤」一起用於相簿搜尋（BlockAlbum／中心 EDM 共用的 AlbumSearch 模組）與全站場景搜尋。
  * 只處理區塊照片（中心 EDM 走 edm-vision.ts 的海報辨識；封面不辨識）。用 Workers AI 視覺模型（設定 → AI 模型 →「相簿照片文字辨識」），
  * 額度走 reserveAi（和其他 AI 共用每日免費額度）。「設定 → 搜尋與 AI 設定」可開關（photoOcrEnabled）與調最大輸出長度（photoOcrMaxTokens）。
@@ -60,7 +60,7 @@ export async function ocrPhoto(env: Env, db: D1Database, rowId: string): Promise
     }
     await refundAi(db, est);
     if (/5018|not allowed to access/i.test(msg)) {
-      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請業主到 設定 › AI 模型 換模型。
+      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請杜杜龍到 設定 › AI 模型 換模型。
       await release();
       throw new AiStopped("這個帳號不能使用所選的 AI 模型，請到「設定 › AI 模型」改選 Llama 4 Scout");
     }

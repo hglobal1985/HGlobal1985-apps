@@ -17,7 +17,7 @@ const SWATCHES = ["#FFFFFF", "#F6F5F0", "#111111", "#1F4D3A", "#B3261E", "#F0B32
 const DARK_SWATCHES = ["#000000", "#111111", "#1B1F1E", "#23302B", "#2A2A2E", "#1A2540", "#3A2A24", "#FFFFFF"];
 
 /**
- * 設定 › 品牌 Logo（業主 2026-11-18，超級管理員）：上傳／更換 logo，每個 logo 可選底色或底圖（透明背景、長寬不合時用），
+ * 設定 › 品牌 Logo（杜杜龍 2026-11-18，超級管理員）：上傳／更換 logo，每個 logo 可選底色或底圖（透明背景、長寬不合時用），
  * 並指定對應的分類標籤。課程與素材勾選「使用品牌 logo 作為封面」且分類對得到時，封面就用這個 logo（置中、四周留安全距離）。
  */
 export default function BrandLogosScreen() {
@@ -71,7 +71,7 @@ export default function BrandLogosScreen() {
 type Tab = "light" | "dark" | "image";
 
 /**
- * 顏色選擇（業主 2026-11-18）：先點常用色塊（或 logo 常用色）當基底，再用兩條滑桿微調——「變淡」（往右越淡）與「色彩飽和度」（往右越鮮豔）。
+ * 顏色選擇（杜杜龍 2026-11-18）：先點常用色塊（或 logo 常用色）當基底，再用兩條滑桿微調——「變淡」（往右越淡）與「色彩飽和度」（往右越鮮豔）。
  * 沒有手動輸入色碼。淺色、深色底色共用同一個。
  */
 function ColorPicker({ value, onChange, swatches, picks }: { value: string; onChange: (hex: string) => void; swatches: string[]; picks: string[] }) {
@@ -157,7 +157,7 @@ function LogoSheet({ logo, onClose, onChanged }: { logo: BrandLogo; onClose: () 
   const preview = { logoUrl: logo.logoUrl ?? "", bgColor: hasImage ? null : lightColor, bgColorDark: darkColor, bgUrl: logo.bgUrl };
   return (
     <EditSheet title="品牌 Logo" onClose={onClose} onSave={save} dirty busy={busy} error={error}>
-      {/* 品牌名稱欄位的右邊就是 logo 上傳／更換鈕（業主 2026-11-18）。 */}
+      {/* 品牌名稱欄位的右邊就是 logo 上傳／更換鈕（杜杜龍 2026-11-18）。 */}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: space.sm }}>
         <View style={{ flex: 1 }}>
           <Field label="品牌標籤名稱" value={name} onChange={setName} />

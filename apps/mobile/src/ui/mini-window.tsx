@@ -8,7 +8,7 @@ import { MINI_BAR, MINI_BAR_BG, MINI_BTN, MINI_BTN_COLORS, MINI_BTN_GLYPH_COLOR,
 type Pos = { x: number; y: number };
 
 /**
- * 全站「永遠只有一個」迷你小視窗／圓球（業主 2026-11-25：頁面疊著好幾層時，每層的封面圓球與影片迷你播放器同時出現，大亂）。
+ * 全站「永遠只有一個」迷你小視窗／圓球（杜杜龍 2026-11-25：頁面疊著好幾層時，每層的封面圓球與影片迷你播放器同時出現，大亂）。
  * 每個 MiniWindow 登記自己是否想顯示與優先權（影片／音檔播放器 2 > 封面 1）；只有「優先權最高、同優先權最後才出現」的那一個真的畫出來。
  */
 const reg = new Map<string, { prio: number; seq: number }>();
@@ -34,7 +34,7 @@ function defaultBottomEdge(h: number): number {
 }
 
 /**
- * 封面迷你小視窗（業主 2026-11-24 永久指示：與影片迷你小視窗一模一樣的參數與功能）：
+ * 封面迷你小視窗（杜杜龍 2026-11-24 永久指示：與影片迷你小視窗一模一樣的參數與功能）：
  * 右下角浮動小視窗（16:9、同樣寬度、流光漸層邊框），上方一條按鈕列——黃＝最小化（縮成小圓圖）、綠＝最大化（onMaximize）、紅＝關閉（onClose）；
  * 三顆按鈕永遠顯示；手指按住可任意拖曳位置，位置記在本機（與影片迷你播放器共用同一個位置）；小圓圖也能拖曳、點一下恢復小視窗。
  * 尺寸、顏色、時間都來自 ui/mini-spec.ts（影片迷你播放器用同一份）。放在頁面最外層（滿版透明層，只有小視窗本身會接觸摸）。
@@ -84,7 +84,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
     onCollapsedChange?.(v);
   };
   const [saved, setSaved] = useState<Pos | null>(null);
-  const wake = () => undefined; // 三顆按鈕永遠顯示（業主 2026-11-25，不再自動隱藏）
+  const wake = () => undefined; // 三顆按鈕永遠顯示（杜杜龍 2026-11-25，不再自動隱藏）
   useEffect(() => {
     AsyncStorage.getItem(MINI_POS_KEY)
       .then((raw) => raw && setSaved(JSON.parse(raw) as Pos))
@@ -199,7 +199,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
       ) : null}
     </View>
   );
-  // 網頁版：放在整個視窗最上層的固定層（業主 2026-11-25：小視窗／圓球可以拖到上方標題列的位置，不被頁面內容區裁住）。
+  // 網頁版：放在整個視窗最上層的固定層（杜杜龍 2026-11-25：小視窗／圓球可以拖到上方標題列的位置，不被頁面內容區裁住）。
   if (Platform.OS !== "web" || typeof document === "undefined") return tree;
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createPortal } = require("react-dom") as typeof import("react-dom");

@@ -1,8 +1,8 @@
 # 寰宇行動大學 V2 交接文件（2026-11-11）
 
-分支：`claude/kind-dirac-3shqqo`（repo：hglobal1985/learn）。請從這份文件接手，不需要重問業主已決定的事。
+分支：`claude/kind-dirac-3shqqo`（repo：hglobal1985/learn）。請從這份文件接手，不需要重問杜杜龍已決定的事。
 
-## 業主已決定（不要再問）
+## 杜杜龍已決定（不要再問）
 - 使用者是程式小白，技術決定全部交給開發者；回覆使用台灣繁體中文，用白話說明。
 - 目前是內部測試，`learn.hglobal1985.com` 可任意修改，不必保留測試站。
 - **技術：Expo + React Native + Expo Router + TypeScript（strict），iOS / Android / Web 共用一套程式。首要目標是 App 上架後流暢。** 不強制仿 Shifu 網頁，只取用其好用的動線（找課、領課、我的課程、播放、通知）。
@@ -11,12 +11,12 @@
 - 0 元課程免審核，領取即開通。付費課程：不接金流，結帳後建立「待審核訂單」，站內通知管理員，管理員人工確認收款後開通。
 - 主選單要有「站內通知」。
 - **Apple/Google 規定：付費購買與人工審核流程只放 Web 版。iOS/Android 不顯示價格、購買按鈕或外部付款連結，只讓已開通的學員觀看；0 元課程三平台都可領。**
-- 中央會員、Mux 簽名播放、YouTube：UI 完成後再重做串接。業主同意舊的串接可以刪（程式碼已保留在 git 歷史，Cloudflare 上目前沒有 learn 的 Secrets 與 D1）。
+- 中央會員、Mux 簽名播放、YouTube：UI 完成後再重做串接。杜杜龍同意舊的串接可以刪（程式碼已保留在 git 歷史，Cloudflare 上目前沒有 learn 的 Secrets 與 D1）。
 - 資料表要依標準規範重新設計；不要碰中央會員系統（`id.hglobal1985.com`、D1 `hglobal-id*`）。
 - Google Play 為個人帳號，建立於 2023-11-13 之後：上架前需 12 位測試者連續封閉測試 14 天，須盡早出 Android 測試版。Apple 帳號也已有。
 
 ## 已完成
-- 客服信箱：`service@hglobal1985.com` 轉寄到 `hglobal1985@gmail.com`（Cloudflare Email Routing），並已用 Gmail 設定可以該地址寄信，名稱「寰宇全球」。業主需自己在 Gmail 建篩選器避免轉寄信進垃圾匣。
+- 客服信箱：`service@hglobal1985.com` 轉寄到 `hglobal1985@gmail.com`（Cloudflare Email Routing），並已用 Gmail 設定可以該地址寄信，名稱「寰宇全球」。杜杜龍需自己在 Gmail 建篩選器避免轉寄信進垃圾匣。
 - 隱私政策：https://learn.hglobal1985.com/privacy（獨立 Worker `learn-legal`，原始碼 `apps/legal/`，路由 `learn.hglobal1985.com/privacy*`）。內文中「帳號刪除導向中央會員官方流程」尚未實作，上架前必須完成。
 - V2 領課／訂單／通知／獎銜邏輯與測試已搬到 `apps/mobile/src/domain/`（來源：`feat/web-v2-mobile` 分支的 `apps/web-v2/src/domain.ts`，PR #10 草稿）。
 - 舊畫面已移到 `apps/mobile/legacy-app/`（保留不刪）；`apps/mobile/app/` 目前是空的，已執行 `npm install`。
@@ -63,27 +63,27 @@
 - 尚未驗證：iOS/Android 實機或模擬器（此環境沒有）。
 
 ## 第 5 步完成紀錄（2026-11-11）
-- **中央會員登入**：`apps/mobile/src/api/central.ts`（依會員中心串接說明：nonce→登入中繼→`/v1/auth/google`；換發加鎖；App 用 SecureStore、Web refresh 用 sessionStorage）。Web 回傳頁 `/auth/done`、App 深層連結 `learn://auth/google`，兩者已確認會員中心接受（會導到 Google 登入頁）。業主已用 Google 帳號實測登入成功（2026-11-11）。
+- **中央會員登入**：`apps/mobile/src/api/central.ts`（依會員中心串接說明：nonce→登入中繼→`/v1/auth/google`；換發加鎖；App 用 SecureStore、Web refresh 用 sessionStorage）。Web 回傳頁 `/auth/done`、App 深層連結 `learn://auth/google`，兩者已確認會員中心接受（會導到 Google 登入頁）。杜杜龍已用 Google 帳號實測登入成功（2026-11-11）。
 - **後端驗證**：`apps/launch/src/central.ts` 驗 RS256／typ／iss／aud／app_id=learn／exp，只用 `sub`。顯示名稱取自 `/v1/me/profile`；管理員＝中央「超級管理員」（以 `GET /v1/apps/learn/handoff` 確認：中央 `/v1/admin/*` 只接受會員中心網站本身的 Cookie 登入，App token 一律被拒），或 Worker 變數 `LEARN_ADMIN_SUBS` 列出的會員 ID（逗號分隔；「我的」頁會顯示自己的會員 ID）；獎銜資格用 `/v1/eligibility/check-batch`，失敗一律不符合，只做 10 分鐘記憶體快取，**不存資料庫、不寫日誌**。中央會員的 `Member.rank` 一律為 null。
 - **獎銜代碼**：migration `0003_central_rank_ladder.sql` 改成中央的 33 階代碼（none 顯示為「不限獎銜」）。中央若新增獎銜，要再加 migration。
 - **模擬登入開關**：`wrangler.jsonc` `vars.DEMO_LOGIN`（目前 "on"）。改 "off" 後模擬帳號 API 回 404，舊模擬 token 失效。上架前必須關閉。
-- **影片**：管理員在「我的→課程設定→各堂影片」設定每堂 `demo`／`youtube`（貼網址或 ID）／`mux`（Playback ID）。學員端：YouTube 用 youtube-nocookie 內嵌（App 用 WebView）；Mux 由後端簽 6 小時 JWT 回傳 HLS 網址（expo-video 播放）。Mux 金鑰已由業主設定：`MUX_SIGNING_KEY_ID` 是 Cloudflare 後台的一般變數（`wrangler.jsonc` 設了 `keep_vars: true`，部署時不會被清掉），`MUX_SIGNING_PRIVATE_KEY` 是 Secret；私鑰支援 Mux 後台的 Base64(PKCS#1 PEM) 等格式（`src/mux.ts` `parsePrivateKey`）。正式站已確認能簽出播放網址；用真實 Mux 影片播放尚待業主測試。未設定或金鑰無效時回 503 且不洩漏 Playback ID。Chrome 桌機對 HLS 的支援要實測。
+- **影片**：管理員在「我的→課程設定→各堂影片」設定每堂 `demo`／`youtube`（貼網址或 ID）／`mux`（Playback ID）。學員端：YouTube 用 youtube-nocookie 內嵌（App 用 WebView）；Mux 由後端簽 6 小時 JWT 回傳 HLS 網址（expo-video 播放）。Mux 金鑰已由杜杜龍設定：`MUX_SIGNING_KEY_ID` 是 Cloudflare 後台的一般變數（`wrangler.jsonc` 設了 `keep_vars: true`，部署時不會被清掉），`MUX_SIGNING_PRIVATE_KEY` 是 Secret；私鑰支援 Mux 後台的 Base64(PKCS#1 PEM) 等格式（`src/mux.ts` `parsePrivateKey`）。正式站已確認能簽出播放網址；用真實 Mux 影片播放尚待杜杜龍測試。未設定或金鑰無效時回 503 且不洩漏 Playback ID。Chrome 桌機對 HLS 的支援要實測。
 - **App 狀態**：`src/features/app-gate.tsx` 啟動與回前景查 `/v1/apps/learn/config`（paused 維護中、killed 停止、min_version 要求更新）。
 - **刪除帳號**：「我的→會員中心」開 `https://id.hglobal1985.com/my/edit`（官方刪除流程）；「我的→刪除學習資料」刪本 App 資料並登出。隱私權政策與新的客服頁 `/support`（含 `#delete`）已更新部署（Worker `learn-legal`，設定檔 `apps/legal/wrangler.jsonc`）。
 - **上架準備**：`apps/mobile/app.json`（版本 0.2.0、圖示、啟動畫面、加密聲明）、`apps/mobile/eas.json`（preview＝APK、production＝自動遞增）、原創圖示 `apps/mobile/assets/`。`expo prebuild` 已驗證可產生 iOS/Android 原生專案。商店文字、隱私問卷、送審備註、Google Play 12 人 14 天封閉測試步驟見 `docs/store-listing.md`。
-- **品牌字樣（業主已確認）**：只有會員中心本身的畫面不顯示「寰宇」；其他 App（包含本 App）可以顯示，「寰宇行動大學」名稱維持。
+- **品牌字樣（杜杜龍已確認）**：只有會員中心本身的畫面不顯示「寰宇」；其他 App（包含本 App）可以顯示，「寰宇行動大學」名稱維持。
 - **共用登入（SSO，串接說明 3.5）**：尚未實作（選做）。
 
 ## 目前狀態與之後的工作（2026-11-11）
-- 業主確認：Google 登入成功、App 名稱維持、Mux 金鑰已設定。
-- 之後再做（業主指示）：iOS/Android 打包上架與 Google Play 12 人 14 天封閉測試；正式上架時關閉 `DEMO_LOGIN`、移除首頁「內部測試版」標示、換上正式課程。
+- 杜杜龍確認：Google 登入成功、App 名稱維持、Mux 金鑰已設定。
+- 之後再做（杜杜龍指示）：iOS/Android 打包上架與 Google Play 12 人 14 天封閉測試；正式上架時關閉 `DEMO_LOGIN`、移除首頁「內部測試版」標示、換上正式課程。
 - 選做：會員中心串接說明 3.5 的共用登入（SSO）。
 
 ## Mux 影片匯入（2026-11-11）
 - 管理員在「各堂影片」選 Mux → 「從 Mux 選擇影片」，系統讀取 Mux 帳號內所有影片（`GET /api/v2/admin/mux/assets`，每頁 50 支、可載入更多、可搜尋），點一下就把該影片的 Signed Playback ID 與長度（分鐘無條件進位）帶入該堂。不再需要手動貼 ID。
 - 只有 Signed 播放 ID、狀態 ready 的影片可以匯入；只有公開播放 ID 的影片會標示「請先在 Mux 加上 Signed 播放 ID」。縮圖用簽名金鑰簽 aud "t" 的 1 小時 token。
 - 需要 Mux API 存取權杖：Cloudflare Worker `learn` 設定 `MUX_TOKEN_ID`（一般變數即可）與 `MUX_TOKEN_SECRET`（Secret）。權杖只需 Mux Video「Read」權限。未設定時清單頁會顯示設定說明，API 回 503 `mux_api_not_configured`。
-- 2026-11-11 業主已設定 `MUX_TOKEN_ID`／`MUX_TOKEN_SECRET`，正式站已讀到 Mux 帳號的影片清單。
+- 2026-11-11 杜杜龍已設定 `MUX_TOKEN_ID`／`MUX_TOKEN_SECRET`，正式站已讀到 Mux 帳號的影片清單。
 - **注意**：在 Cloudflare 後台修改變數會以「當時頁面上的版本」建立新部署；若頁面是在最近一次 `wrangler deploy` 之前開啟的，會把程式退回舊版（2026-11-11 發生過一次，已重新部署修正）。後台改完變數後，請確認 `/api/v2/admin/mux/assets` 等新功能仍正常，必要時重新 `wrangler deploy`（`keep_vars: true` 會保留後台變數，Secrets 不受影響）。
 
 ## 2026-11-12：課程管理、時間軸分段、音檔、共用登入、用語
@@ -91,14 +91,14 @@
 - **課程管理**：管理員「我的 → 課程設定」可新增（預設未上架）／編輯（名稱、副標題、講師、分類、費用、介紹、最低獎銜、封面色）／上下架／刪除課程。已有人報名的課程不能刪，只能下架。章節可新增、改名、上下移、刪除（自動重新編號）。API：`POST/PATCH/DELETE /api/v2/admin/courses[/:id]`、`POST /admin/courses/:id/lessons`、`POST /admin/courses/:id/lessons/order`、`PATCH/DELETE /admin/lessons/:id`。
 - **時間軸分段**：每堂可設定開始／結束（時分秒），長度自動計算；同一支影片可切多堂。播放器自動跳到開始、播到結束自動停止並提示（Mux／示範／音檔用自家播放器；YouTube 用內嵌 start/end 參數）。migration `0004`（重建 lessons 表時已備份並還原學習進度）。
 - **Mux 播放修正**：伺服器檢查（`GET /api/v2/admin/lessons/:id/check`，畫面「播放檢查」）確認 Mux 接受簽名；問題在網頁播放器，改為網頁一律用 hls.js 播 HLS。
-- **音檔（R2）**：章節可上傳音檔，分段上傳到 R2 bucket `learn`，學員以 6 小時簽名網址播放（`/api/v2/media/audio`，支援 Range）。**R2 尚未在 Cloudflare 啟用**：業主啟用後要（1）建立 bucket `learn`、（2）在 `wrangler.jsonc` 加 `r2_buckets: [{ binding: "MEDIA", bucket_name: "learn" }]`、（3）設定 Secret `MEDIA_URL_SECRET`（隨機字串）、（4）重新部署。未設定前上傳會顯示「音檔儲存空間尚未啟用」。
+- **音檔（R2）**：章節可上傳音檔，分段上傳到 R2 bucket `learn`，學員以 6 小時簽名網址播放（`/api/v2/media/audio`，支援 Range）。**R2 尚未在 Cloudflare 啟用**：杜杜龍啟用後要（1）建立 bucket `learn`、（2）在 `wrangler.jsonc` 加 `r2_buckets: [{ binding: "MEDIA", bucket_name: "learn" }]`、（3）設定 Secret `MEDIA_URL_SECRET`（隨機字串）、（4）重新部署。未設定前上傳會顯示「音檔儲存空間尚未啟用」。
 - **共用登入（網頁版）**：登入後通知會員中心記住此瀏覽器（adopt）；每次載入頁面（每分頁 5 分鐘節流）向會員中心詢問（check → `/auth/sso`），沒有本機登入時自動用 web-exchange 登入；登出走會員中心 `/auth/sso/logout`（登出此瀏覽器所有 App）。手機版共用 Keychain 尚未做（需要 Apple Team ID，待打包時處理）。
 - **登入後回原頁**：未登入點「登入後報名」會帶 `next`，登入後回到該課程。
 - **五門系列課程已上架（測試用）**：會長翡翠鑽石會議（0 元，暫以翡翠以上判斷，會長身分待定案）、銅章會議（50 元，15% 以上，已放 Mux 影片）、翡翠達標班（100 元，金章以上，已放 Mux 影片）、海外旅遊特攻營（3500 元）、寰宇全球菁英會（3500 元）。
 
 ## 2026-11-12（二）：第一批——場次、審核流程、審核群組、指導／主辦單位、報表
 - **正式站關閉測試登入**（`DEMO_LOGIN: off`）。正式站只能用 Google 登入；自動化測試改在本機。
-- **會員中心新增** `GET /v1/eligibility/context`（[hglobal1985/id#59](https://github.com/hglobal1985/id/pull/59)，業主授權，已部署正式）：登入者自己的職務、是否已驗證寰宇、已核准的中心。行動大學據此判斷：管理員＝超級管理員／總部秘書（或 `LEARN_ADMIN_SUBS`）；會長可審核自己中心；音控／會長可管理自己中心的審核群組。
+- **會員中心新增** `GET /v1/eligibility/context`（[hglobal1985/id#59](https://github.com/hglobal1985/id/pull/59)，杜杜龍授權，已部署正式）：登入者自己的職務、是否已驗證寰宇、已核准的中心。行動大學據此判斷：管理員＝超級管理員／總部秘書（或 `LEARN_ADMIN_SUBS`）；會長可審核自己中心；音控／會長可管理自己中心的審核群組。
 - **資料表** migration `0005`：`course_runs`（場次）、`review_groups`／`review_group_members`（審核群組，成員依中心分列，`center_key=''` 為總窗口）、`order_events`（操作紀錄、留言、私人備註）、orders 新增中心／寰宇／延後／實收／繳費方式／撤銷欄位（預留金流：`pay_method` 已含 `online`）、courses 新增指導單位／主辦單位／限時免費／審核群組、enrollments 改為每場一筆、notifications 可寄給「某中心的會長」。
 - **報名**：每門課（或每場）一筆報名紀錄。有場次的課程必須選場次（名額、截止、每場費用）。限時免費期間報名＝免費自動開通。章節可指定屬於某場（只有該場學員可看）。未登入只能看課程清單，介紹頁需登入。購物車（報名清單）已移除，改為直接報名。
 - **審核**：`POST /api/v2/admin/orders/:id/review` `{action: paid|vip|reject|defer|revoke, reasonCode, message, note, paidTwd, payMethod}`。退回／延後／撤銷需選原因（款項未入帳、金額不正確、獎銜不符合、查無此人、其他）。撤銷限管理員。不能審核自己的報名。留言（雙方可見並通知）與私人備註（只有審核人員可見）：`POST /api/v2/orders/:id/events`。
@@ -107,40 +107,40 @@
 - **報表**：`GET /api/v2/admin/orders.csv`（含 BOM，Excel 可開），範圍同審核權限：窗口＝負責的課程與中心、會長＝自己中心、管理員＝全站。
 - **畫面**：我的→報名審核／審核群組／課程設定；課程編輯頁新增單位、限時免費、審核群組；章節頁新增場次管理與「屬於哪一場」。
 - **修正**：連線瞬斷不再把登入清掉；「不限獎銜」不再顯示成獎銜限制標籤。
-- **測試**：後端 35 項；本機瀏覽器跑完整流程（建群組→指派窗口→設定課程→加場次→學員報名→留言→窗口延後→開通→匯出）。正式站因關閉測試登入，只做了公開 API 與頁面檢查，**審核流程在正式站尚待業主以真實帳號驗證**。
+- **測試**：後端 35 項；本機瀏覽器跑完整流程（建群組→指派窗口→設定課程→加場次→學員報名→留言→窗口延後→開通→匯出）。正式站因關閉測試登入，只做了公開 API 與頁面檢查，**審核流程在正式站尚待杜杜龍以真實帳號驗證**。
 - **尚未做（第二批以後）**：留言板（含檢舉）、附件教材、Email 通知與通知管道勾選、R2 音檔啟用、各中心自行上架課程（B）、手機推播、金流、手機版共用登入、App 內會員資料頁。「會長翡翠鑽石會議」目前只以翡翠以上判斷，尚未加入「會長」身分條件。
 
 ## 2026-11-12（三）：會長條件、留言板
 - **會長也可報名**：課程新增 `allow_president`（課程編輯頁「報名資格」）；開啟後會長不受獎銜限制。「會長翡翠鑽石會議」已開啟（翡翠以上或會長）。
 - **課程留言板**（migration `0006`）：登入會員可在課程介紹頁留言（10 分鐘內最多 5 則）、刪除自己的留言、檢舉、封鎖對方；被檢舉時通知總部一次；管理員在「我的→留言檢舉」隱藏留言或清除檢舉。刪除學習資料時一併刪除留言。
 - 後端測試 37 項；本機瀏覽器測過留言→檢舉→隱藏。
-- **等業主**：啟用 R2（音檔、附件教材）；選定寄信服務（Email 通知）。
+- **等杜杜龍**：啟用 R2（音檔、附件教材）；選定寄信服務（Email 通知）。
 
 ## 2026-11-12（四）：R2、自己審核、Email 通知
-- **R2 已綁定**：bucket `learn`、綁定 `MEDIA`（已部署）。`MEDIA_URL_SECRET` 業主已設定，音檔上傳與播放已由業主實測 OK（2026-11-12）。
+- **R2 已綁定**：bucket `learn`、綁定 `MEDIA`（已部署）。`MEDIA_URL_SECRET` 杜杜龍已設定，音檔上傳與播放已由杜杜龍實測 OK（2026-11-12）。
 - **管理員（超級管理員、總部秘書）可審核自己的報名**；會長、窗口、審核員仍不行（`reviewOrder`、`canReview`）。
-- **寄信網域**：Cloudflare Email Service 子網域 `learn.hglobal1985.com` 已開通（SPF／DKIM／DMARC／退信 MX 都在 `cf-bounce.learn…`、`_dmarc.learn…` 底下，不動網站本身與主網域的 service@ 轉寄、Gmail 寄信，因為主網域會被加上 `p=reject`）。2026-11-12 由 `mail.hglobal1985.com` 改為此網域；業主確認新網域收信正常後，已刪除舊的 `mail.hglobal1985.com` 寄信子網域。寄件人 `noreply@learn.hglobal1985.com`，Worker 綁定 `EMAIL`、變數 `EMAIL_FROM`，不需任何金鑰。
+- **寄信網域**：Cloudflare Email Service 子網域 `learn.hglobal1985.com` 已開通（SPF／DKIM／DMARC／退信 MX 都在 `cf-bounce.learn…`、`_dmarc.learn…` 底下，不動網站本身與主網域的 service@ 轉寄、Gmail 寄信，因為主網域會被加上 `p=reject`）。2026-11-12 由 `mail.hglobal1985.com` 改為此網域；杜杜龍確認新網域收信正常後，已刪除舊的 `mail.hglobal1985.com` 寄信子網域。寄件人 `noreply@learn.hglobal1985.com`，Worker 綁定 `EMAIL`、變數 `EMAIL_FROM`，不需任何金鑰。
 - **Email 通知設計**：
   - 收件信箱＝會員中心個人資料「聯絡信箱」`contact_email`（正本在中央；行動大學已有權限，**未修改會員中心**）。
   - 登入時（`GET /me`、通知設定頁）把它同步成副本，存在 D1 `member_contacts`（migration `0007`），因為通知常寄給不在線上的人。學員在「我的 → 通知設定」改信箱時，先 `PUT /v1/me/profile/fields/contact_email` 寫回中央，成功才更新副本。刪除學習資料時整列刪除。信箱不寫稽核紀錄與日誌。
   - 寄信方式：每個寫入類 API 成功後，`flushEmails`（`src/email.ts`）把最近 30 分鐘內 `notifications.emailed_at` 為空的站內通知寄出；先標記再寄，寧可漏寄不重複寄。角色型通知（總部、某中心會長）依 `member_contacts.is_admin／president_center_key` 找收件人，這兩欄在登入時更新。站內通知永遠保留；學員可關閉 Email。
   - API：`GET／PUT /api/v2/me/notification-settings`；畫面 `app/settings/notifications.tsx`。手機推播尚未做（畫面顯示「即將推出」）。
 - 後端測試 41 項（新增 `tests/email.test.ts`）。
-- **業主已實測（2026-11-12）**：真實帳號填信箱後，會員中心的聯絡信箱有同步改；另一個帳號報名付費課程後，有收到通知信。尚未驗證：信是否進垃圾信匣、各種通知（審核結果、留言、會長通知）的信件內容。沒登入過新版的人還沒有信箱副本，暫時收不到 Email。
+- **杜杜龍已實測（2026-11-12）**：真實帳號填信箱後，會員中心的聯絡信箱有同步改；另一個帳號報名付費課程後，有收到通知信。尚未驗證：信是否進垃圾信匣、各種通知（審核結果、留言、會長通知）的信件內容。沒登入過新版的人還沒有信箱副本，暫時收不到 Email。
 
-- **待中央確認（2026-11-12）**：行動大學保存的個人資料副本（聯絡信箱、顯示名稱、報名時的中心名稱）尚未取得會員中心端對《隱私同意文字》的書面確認，也還沒有「會員在會員中心刪帳號時通知行動大學刪副本」的機制；業主將轉請中央會員 AI 評估。
+- **待中央確認（2026-11-12）**：行動大學保存的個人資料副本（聯絡信箱、顯示名稱、報名時的中心名稱）尚未取得會員中心端對《隱私同意文字》的書面確認，也還沒有「會員在會員中心刪帳號時通知行動大學刪副本」的機制；杜杜龍將轉請中央會員 AI 評估。
 
 ## 2026-11-12（五）：附件教材
 - 管理員在「課程設定 → 章節」每堂可上傳多個附件（PDF、Word、PowerPoint、Excel、CSV、文字、ZIP、PNG、JPG；單檔 50MB、每章 20 個）；學員在上課頁「附件教材」下載。
 - 檔案放 R2（鍵 `files/<章節>/<uuid>.<副檔名>`），清單在 D1 `lesson_attachments`（migration `0008`）。下載用 1 小時有效的簽名網址（`GET /api/v2/media/file`，簽章用 `MEDIA_URL_SECRET`），只有已開通該場／該課的學員與管理員拿得到；一律以附件下載、`nosniff`。刪除附件、章節、課程時一併刪 R2 檔。
 - API：`GET /courses/:cid/lessons/:lid/attachments`、`GET／PUT /admin/lessons/:id/attachments?name=`、`DELETE /admin/attachments/:id`。
-- 後端測試 42 項；已部署。**待業主實測**：上傳附件、用已開通帳號下載、未開通帳號看不到。
-- **網址附件（同日）**：附件除了上傳檔案，也可新增 https 網址（migration `0009`，`lesson_attachments` 重建，新增 `kind`／`link_url`／`att_type`）。伺服器依網域／副檔名自動判斷類型（`src/links.ts`）：YouTube、Vimeo、Canva、Google 簡報／文件／試算表／表單／雲端硬碟、Notion、PDF、一般網頁；上傳檔案依副檔名（PDF／Word／PowerPoint／Excel／壓縮檔／圖片／文字）。畫面依類型顯示圖示（`src/features/attachments.tsx`）。標題可自訂（空白＝依類型自動命名；上傳檔案空白＝檔名），可修改標題與網址。API：`POST /admin/lessons/:id/links`、`PATCH /admin/attachments/:id`；上傳檔案可加 `&title=`。只收 https、不收帶帳密的網址；網址附件只有已開通學員與管理員拿得到。後端測試 43 項。待業主實測。
+- 後端測試 42 項；已部署。**待杜杜龍實測**：上傳附件、用已開通帳號下載、未開通帳號看不到。
+- **網址附件（同日）**：附件除了上傳檔案，也可新增 https 網址（migration `0009`，`lesson_attachments` 重建，新增 `kind`／`link_url`／`att_type`）。伺服器依網域／副檔名自動判斷類型（`src/links.ts`）：YouTube、Vimeo、Canva、Google 簡報／文件／試算表／表單／雲端硬碟、Notion、PDF、一般網頁；上傳檔案依副檔名（PDF／Word／PowerPoint／Excel／壓縮檔／圖片／文字）。畫面依類型顯示圖示（`src/features/attachments.tsx`）。標題可自訂（空白＝依類型自動命名；上傳檔案空白＝檔名），可修改標題與網址。API：`POST /admin/lessons/:id/links`、`PATCH /admin/attachments/:id`；上傳檔案可加 `&title=`。只收 https、不收帶帳密的網址；網址附件只有已開通學員與管理員拿得到。後端測試 43 項。待杜杜龍實測。
 
 ## 2026-11-12（六）：刪除已有人報名的課程
 - 課程編輯頁「刪除課程」：沒有人報名照舊（一般確認即可）；**已有報名紀錄時**先顯示影響（報名筆數、待審核／已開通、學員數、已確認收款合計），管理員必須**手動輸入大寫 `YES`** 才能刪除。伺服器同樣強制：`DELETE /api/v2/admin/courses/:id` 需帶 `{"confirm":"YES"}`，否則回 409 `confirm_required`；`GET /api/v2/admin/courses/:id/delete-impact` 提供統計。
 - 刪除內容：該課程的章節、附件與音檔（R2 一併刪）、場次、留言、學習進度、開通紀錄；只含這門課的報名紀錄整筆刪除（含處理紀錄與指向它的通知）；同一筆報名還有別門課時，只移除這門課並扣掉金額。**報名與繳費審核紀錄刪除後無法復原**，畫面建議先匯出 CSV 對帳報表。稽核紀錄 `course.delete` 保留刪除統計（課名、筆數、人數、收款合計），不含個資。
-- 後端測試 44 項；已部署，待業主實測。
+- 後端測試 44 項；已部署，待杜杜龍實測。
 
 ## 2026-11-12（七）：底部分頁列永遠顯示
 - 底部分頁列（首頁／課程／我的課程／通知／我的）改成根版面的 `BottomBar`（`apps/mobile/src/ui/bottom-bar.tsx`），**所有頁面都顯示**：課程介紹、上課、我的報名、報名審核、課程設定、通知設定等推入的頁面不再蓋掉它。點分頁會回到該分頁；目前頁面所屬分頁會標示（課程介紹→課程、上課→我的課程、報名／管理／設定→我的）。登入中繼頁（`/auth/*`）與手機鍵盤開啟時隱藏。
@@ -150,12 +150,12 @@
 ## 2026-11-12（八）：刪除已有人報名的場次
 - 課程設定 → 章節與影片 → 「場次」的「刪除」：沒人報名照舊直接刪；**已有報名紀錄時**顯示影響（報名筆數、待審核／已開通、學員數、已確認收款合計、只屬於這個場次的章節數），必須手動輸入大寫 `YES`。API：`GET /admin/runs/:id/delete-impact`、`DELETE /admin/runs/:id`（有報名需帶 `{"confirm":"YES"}`，否則 409 `confirm_required`）。
 - 一併刪除：這個場次的報名紀錄（含處理紀錄與相關通知）、開通紀錄、學習進度、**只屬於這個場次的章節**（含附件、音檔）；同一筆報名還有別場或別課時只移除這個場次並扣金額。別的場次不受影響。稽核紀錄 `run.delete` 保留統計。
-- 先前（七）的「刪除課程」流程不變。後端測試 45 項；順手修正兩個簽名竄改測試偶發失敗（隨機簽章第一碼剛好等於 X）。待業主實測。
+- 先前（七）的「刪除課程」流程不變。後端測試 45 項；順手修正兩個簽名竄改測試偶發失敗（隨機簽章第一碼剛好等於 X）。待杜杜龍實測。
 
 ## 2026-11-12（九）：「我的」頁面頁尾
 - 移除「我的」頁面「其他」分類的三個項目（隱私權政策、客服與說明、聯絡客服）。公開頁 `/privacy`、`/support` 仍由 Worker `learn-legal` 提供（商店上架填的隱私權政策網址與客服網址不變）。
 - 改為與寰宇中央會員網站相同的頁尾（`id` repo `src/web/layout.ts` 的 `footer.foot`）：左邊「隱私權政策」連結、右邊「系統設計 杜杜龍」署名；14px，連結色 `#5d6b62`、署名色 `#cfd2c9`（深色模式用等比例的淡化色）。**只放在「我的」頁面最下方**（`app/(tabs)/me.tsx` 的 `SiteFooter`），其他頁面不顯示。已用正式站瀏覽器量測顏色與字級相符。
-- **待業主決定**：隱私權政策內文（`apps/legal/privacy.html`）尚未提到「聯絡信箱副本」與「Email 通知」；需補寫並更新日期，內文由業主核准。
+- **待杜杜龍決定**：隱私權政策內文（`apps/legal/privacy.html`）尚未提到「聯絡信箱副本」與「Email 通知」；需補寫並更新日期，內文由杜杜龍核准。
 
 ## 2026-11-12（十）：課程海報（EDM）與封面圖（第一批）、隱私權政策補充
 - **修正**：課程編輯頁（`admin/course-edit.tsx`）的「刪除確認」Hook 放在提前 `return` 之後，載入課程後會當掉（React error #310）。已移到最上方；這個錯誤從「刪除已有人報名的課程」那次部署起存在，本次一併修正。**之後新增 `useState`／`useEffect` 一律放在元件最上方、所有提前 return 之前。**
@@ -170,45 +170,45 @@
 - **隱私權政策**（`apps/legal/privacy.html`，已部署 `learn-legal`）：補寫「聯絡信箱副本與 Email 通知」「管理人員上傳素材的上傳者資訊」，更新日期為 2026-11-12；版面不變。
 
 ## 2026-11-12（十一）：底部選單改名、首頁改版、跑馬燈公告
-- **手機優先**：已寫入 `CLAUDE.md`（業主永久指示）。新畫面一律先以手機寬度（約 390px）設計與驗證。
+- **手機優先**：已寫入 `CLAUDE.md`（杜杜龍永久指示）。新畫面一律先以手機寬度（約 390px）設計與驗證。
 - **底部選單改名**：課程→「全部課程」、我的課程→「已報名」、我的→「設定」（路由仍是 `/courses`、`/learning`、`/me`）。頁面標題、隱私權政策與客服頁、商店文案、Email 頁尾的路徑文字一併改為「設定」。
 - **首頁改版**（`app/(tabs)/index.tsx`）：固定一頁、不上下捲動。上方標題與跑馬燈，下方左右兩個區塊——左「繼續學習」（已報名課程）、右「推薦課程」（只顯示符合會員獎銜〔含會長〕、已上架且尚未報名的課程）。每個區塊是 16:9 的橫向輪播（`features/courses/home-rail.tsx`），在區塊內左右滑動切換；圖用課程封面（EDM 合成的 16:9 圖），沒有封面就用課程名稱當封面；圖下方顯示課程名稱與講師／進度，點圖或名稱進入課程。沒登入時兩區塊顯示登入提示。
-- **跑馬燈公告**（migration `0011`，`announcements` 資料表）：取代首頁「內部測試版」提示。多則公告每 4 秒自動上下輪播（`src/ui/ticker.tsx`），手指上下滑動可快速查看（滑動後暫停自動輪播 8 秒）；沒有啟用中的公告時首頁不顯示。公開 `GET /api/v2/announcements`；管理 `GET／POST／PATCH／DELETE /api/v2/admin/announcements`、`POST /admin/announcements/order`（僅超級管理員與總部秘書）。**（2026-11-21 起）管理畫面已移除，公告改併入統一公告模組（`/broadcasts`、`/admin/broadcasts`，見 CLAUDE.md「公告模組化」）；`announcements` 資料表不再使用。****目前沒有任何公告**（舊的「內部測試版」文字不再適用），請業主新增。
+- **跑馬燈公告**（migration `0011`，`announcements` 資料表）：取代首頁「內部測試版」提示。多則公告每 4 秒自動上下輪播（`src/ui/ticker.tsx`），手指上下滑動可快速查看（滑動後暫停自動輪播 8 秒）；沒有啟用中的公告時首頁不顯示。公開 `GET /api/v2/announcements`；管理 `GET／POST／PATCH／DELETE /api/v2/admin/announcements`、`POST /admin/announcements/order`（僅超級管理員與總部秘書）。**（2026-11-21 起）管理畫面已移除，公告改併入統一公告模組（`/broadcasts`、`/admin/broadcasts`，見 CLAUDE.md「公告模組化」）；`announcements` 資料表不再使用。****目前沒有任何公告**（舊的「內部測試版」文字不再適用），請杜杜龍新增。
 - 後端測試 47 項；本機以手機寬度瀏覽器驗證：首頁無捲動、跑馬燈自動輪播與上下滑動、區塊左右滑動、管理畫面。**iOS／Android 實機的手勢尚未測。**
 - **首頁微調（同日）**：左右兩欄改直式，只顯示 EDM 本身（5:7 直式框，最高 340px；沒有 EDM 就用課程名稱當封面，不再用橫式底圖）。大標題「寰宇行動大學」與其他頁面標題同大（display）並置中；第二行置中顯示會員頭像＋姓名（放大），點擊開啟中央會員個人中心的基本資料編輯頁（模擬會員不可點）。頭像網址來自會員中心 `/v1/me/profile` 的 `avatar.url`（公開頭像，只放記憶體快取、不存資料庫）。跑馬燈改用與「已報名」頁淡黃色提示相同的顏色（`warningSoft`／`warning`）。
-- **獎銜未顯示**：業主要求在姓名旁顯示獎銜，但獎銜屬 Amway 資料，隱私權政策與 `CLAUDE.md` 規定 App 不取得、不保存、不顯示；需業主與中央會員評估後才能做（見交接對話）。
-- **首頁（十二）**：標題旁放寰宇 Global 標誌（`assets/logo.png`）；姓名旁顯示獎銜（`Member.rankLabel`，取自會員中心 `GET /v1/me/amway` 的 `rank`，業主 2026-11-12 永久授權讀取；只放記憶體快取，不存資料庫；獎銜為「無」或沒填顯示「安麗寶寶」；框色同中央會員 `.rank`：底 #fdf0e3、框 #e6c48c、字 #cc6c0c 粗體），姓名不加粗。兩區塊標題右側的「已報名／全部課程」連結已刪除；左區塊標題下方顯示隨機學習金句（`GET /quotes/random`，每次進入首頁換一則；管理：設定→管理→「編輯學習金句」，**僅超級管理員**，秘書沒有權限；migration `0012`），右區塊標題下方顯示「只顯示符合獎銜資格的課程」。EDM 下方課程名稱後增加：主辦單位（指導單位不顯示，依「、，;」拆成多個）、日期（最近一場的開課日，`nextRunAt`）、金額（遵守商店規範：iOS／Android 不顯示價格）。
-- **待確認**：（1）會員中心 `rank` 的值格式未驗證（程式依「獎銜代碼對照本 App 的獎銜階梯名稱，對不到就顯示原值」處理）；（2）隱私權政策目前仍寫「不取得獎銜」，需業主改寫（獎銜只在首頁顯示、不保存）；（3）iOS／Android 實機未測。
+- **獎銜未顯示**：杜杜龍要求在姓名旁顯示獎銜，但獎銜屬 Amway 資料，隱私權政策與 `CLAUDE.md` 規定 App 不取得、不保存、不顯示；需杜杜龍與中央會員評估後才能做（見交接對話）。
+- **首頁（十二）**：標題旁放寰宇 Global 標誌（`assets/logo.png`）；姓名旁顯示獎銜（`Member.rankLabel`，取自會員中心 `GET /v1/me/amway` 的 `rank`，杜杜龍 2026-11-12 永久授權讀取；只放記憶體快取，不存資料庫；獎銜為「無」或沒填顯示「安麗寶寶」；框色同中央會員 `.rank`：底 #fdf0e3、框 #e6c48c、字 #cc6c0c 粗體），姓名不加粗。兩區塊標題右側的「已報名／全部課程」連結已刪除；左區塊標題下方顯示隨機學習金句（`GET /quotes/random`，每次進入首頁換一則；管理：設定→管理→「編輯學習金句」，**僅超級管理員**，秘書沒有權限；migration `0012`），右區塊標題下方顯示「只顯示符合獎銜資格的課程」。EDM 下方課程名稱後增加：主辦單位（指導單位不顯示，依「、，;」拆成多個）、日期（最近一場的開課日，`nextRunAt`）、金額（遵守商店規範：iOS／Android 不顯示價格）。
+- **待確認**：（1）會員中心 `rank` 的值格式未驗證（程式依「獎銜代碼對照本 App 的獎銜階梯名稱，對不到就顯示原值」處理）；（2）隱私權政策目前仍寫「不取得獎銜」，需杜杜龍改寫（獎銜只在首頁顯示、不保存）；（3）iOS／Android 實機未測。
 - **（十三）課程畫面與首頁**：課程新增「活動日期」（migration `0013`：`event_start`／`event_end`，最多連續 3 天；課程編輯頁「活動日期」欄位，格式 2026-12-01），顯示在課程介紹頁分鐘數旁與首頁課程資訊。移除課程介紹頁「課程海報（EDM）」區塊與小字備註，改為**點封面橫幅開啟 EDM 原圖**。首頁：大標題 `BrandTitle`（logo 色系逐字色彩流動＋彈跳動畫、logo 呼吸）；跑馬燈右上角大 X 可關閉，每次進入首頁會再顯示；左右兩欄標題置中、加色彩膠囊與圖示，備註置中；EDM 填滿框、靠上對齊（只裁下方與左右，不裁上方）。
 - **未做、待討論**：（1）會員資料補填彈窗（真實姓名、Email、Amway 完整欄位）；（2）中央會員網站跟隨系統深色模式（要改 `hglobal1985/id`，需轉給中央會員 AI）。
-- **（十四）會員資料補填彈窗**：登入後，若會員中心資料有空白（聯絡信箱；勾選「我是 Amway 會員」時 Amway 欄位有空白），首頁彈出視窗（`features/profile-prompt.tsx`，約 70%×70%、可捲動、右上大 X），一律引導到中央會員編輯頁填寫，**不在行動大學收集任何資料**（業主決定）。每次登入彈一次；`GET /me` 回傳 `member.profileMissing`（只有「缺什麼」，不保存內容）。**真實姓名**：業主決定要恢復（付費課程對帳金流用途），需中央會員先恢復欄位後，才能把「真實姓名」加入缺漏檢查與對帳；Amway 欄位判斷是「任一欄位值與待審值皆空白」，實際必填規則待與中央對照。
+- **（十四）會員資料補填彈窗**：登入後，若會員中心資料有空白（聯絡信箱；勾選「我是 Amway 會員」時 Amway 欄位有空白），首頁彈出視窗（`features/profile-prompt.tsx`，約 70%×70%、可捲動、右上大 X），一律引導到中央會員編輯頁填寫，**不在行動大學收集任何資料**（杜杜龍決定）。每次登入彈一次；`GET /me` 回傳 `member.profileMissing`（只有「缺什麼」，不保存內容）。**真實姓名**：杜杜龍決定要恢復（付費課程對帳金流用途），需中央會員先恢復欄位後，才能把「真實姓名」加入缺漏檢查與對帳；Amway 欄位判斷是「任一欄位值與待審值皆空白」，實際必填規則待與中央對照。
 
 ## 2026-11-13：串接指令 2026-11-12.8 差異（中央會員回覆）
-- **中央 staging**：`https://hglobal-id-staging.hglobal1985-static.workers.dev`（JWKS `/oauth/jwks`）；`app_id=learn` 已登記，web_origins `https://learn.hglobal1985.com`、return_urls `learn://auth/google`，**不含 localhost**（網頁測試要提供 https 預覽網址由中央補登記；手機測試用 `learn://`）。staging 沒有會員，需業主先登入一次並由中央加超級管理員，才能測 `handoff?integrated=`。**在中央 production 部署前，行動大學只能用 staging 測試版本回報。**
+- **中央 staging**：`https://hglobal-id-staging.hglobal1985-static.workers.dev`（JWKS `/oauth/jwks`）；`app_id=learn` 已登記，web_origins `https://learn.hglobal1985.com`、return_urls `learn://auth/google`，**不含 localhost**（網頁測試要提供 https 預覽網址由中央補登記；手機測試用 `learn://`）。staging 沒有會員，需杜杜龍先登入一次並由中央加超級管理員，才能測 `handoff?integrated=`。**在中央 production 部署前，行動大學只能用 staging 測試版本回報。**
 - **已做（本日）**：（B）獎銜名稱改向中央 `GET /v1/amway/field-definitions`（key=rank 的 options）讀取，快取 1 天、只放記憶體；讀不到時退回本地階梯名稱；值為 `null` 或 `"none"` 一律顯示「安麗寶寶」。（C）隱私權政策更正：登入時讀取本人獎銜只暫存記憶體供首頁顯示，不保存、不顯示給其他會員（中央確認不需新增同意文字）。
-- **未做、等業主決定**：（A）版本回報 `handoff?integrated=2026-11-12.8`（需 staging 測試帳號與可設定的中央網址環境變數）；`legal_name`（真實姓名，`GET /v1/me/profile` 的 `fields.legal_name.value`）要用於付費課程對帳——中央規定「不存進 App 資料庫」，但審核人員無法用自己的 token 讀別人的姓名，**對帳要不要在報名紀錄保存姓名快照需業主明確核准**；共用 Keychain（需同一 Apple 開發者帳號；群組 `$(AppIdentifierPrefix)com.hglobal1985.shared`、鍵名 `hglobal.sso`，測試版建議 `hglobal.sso.staging`）。
-- **（2026-11-13 業主核准）真實姓名快照**（migration `0014`，`orders.legal_name`）：**付費課程**報名當下讀取會員本人在中央的 `legal_name`（`GET /v1/me/profile`），存成快照供對帳；免費課程不存；沒填真實姓名時付費報名會被擋下（409 `legal_name_required`，提示到會員中心填寫）。顯示：本人的報名紀錄、審核清單／明細（`Order.legalName`）、CSV 對帳報表「真實姓名（對帳）」欄；刪除學習資料時隨報名紀錄刪除。首頁資料補填彈窗的缺漏檢查加入「真實姓名」。不寫進日誌。
-- **獎銜是公開資料（業主決定）**：隱私權政策已改為「獎銜在會員中心屬公開資料；本服務只暫存本人獎銜於記憶體供首頁顯示」。目前只顯示本人；若日後要顯示其他會員的獎銜，須讀取對方的公開資料並遵守中央的公開設定（中央欄位另有 public／private 可選），需另行討論。
+- **未做、等杜杜龍決定**：（A）版本回報 `handoff?integrated=2026-11-12.8`（需 staging 測試帳號與可設定的中央網址環境變數）；`legal_name`（真實姓名，`GET /v1/me/profile` 的 `fields.legal_name.value`）要用於付費課程對帳——中央規定「不存進 App 資料庫」，但審核人員無法用自己的 token 讀別人的姓名，**對帳要不要在報名紀錄保存姓名快照需杜杜龍明確核准**；共用 Keychain（需同一 Apple 開發者帳號；群組 `$(AppIdentifierPrefix)com.hglobal1985.shared`、鍵名 `hglobal.sso`，測試版建議 `hglobal.sso.staging`）。
+- **（2026-11-13 杜杜龍核准）真實姓名快照**（migration `0014`，`orders.legal_name`）：**付費課程**報名當下讀取會員本人在中央的 `legal_name`（`GET /v1/me/profile`），存成快照供對帳；免費課程不存；沒填真實姓名時付費報名會被擋下（409 `legal_name_required`，提示到會員中心填寫）。顯示：本人的報名紀錄、審核清單／明細（`Order.legalName`）、CSV 對帳報表「真實姓名（對帳）」欄；刪除學習資料時隨報名紀錄刪除。首頁資料補填彈窗的缺漏檢查加入「真實姓名」。不寫進日誌。
+- **獎銜是公開資料（杜杜龍決定）**：隱私權政策已改為「獎銜在會員中心屬公開資料；本服務只暫存本人獎銜於記憶體供首頁顯示」。目前只顯示本人；若日後要顯示其他會員的獎銜，須讀取對方的公開資料並遵守中央的公開設定（中央欄位另有 public／private 可選），需另行討論。
 
 ## 2026-11-13：對帳標準化（付款代碼、會員 ID、查看紀錄）
 - **付款代碼**（migration `0015`，`orders.pay_ref`）：每筆付費報名一組唯一代碼 `P`＋8 碼；學員的待審核報名顯示「匯款備註請填付款代碼」；審核清單、明細、搜尋（可輸入代碼或會員 ID）、CSV 報表都有「付款代碼」與「會員 ID」欄。**對帳以付款代碼為準，姓名只是輔助。** 既有付費報名已補代碼。
 - **查看紀錄**：審核人員（非本人）開啟有真實姓名的報名明細，會寫入稽核紀錄 `order.view_legal_name`（只記誰、哪一筆，不記姓名內容）。
-- **與中央配合、待中央實作**：事件通知（會員改名／改信箱／刪帳號 webhook）、App 對 App 受限查詢聯絡信箱（取代信箱副本）、依 App 分配最小權限。指令已交給業主轉中央會員 AI；中央完成後行動大學再接。
-- **學習金句詞庫（2026-11-13）**：migration `0016` 寫入業主提供的 11 句初始金句（業主說 20 句，實際貼了 11 句，其餘待補）；超級管理員可在「設定→管理→編輯學習金句」新增、**修改**（新增 `PATCH /admin/quotes/:id`）、刪除；首頁每次進入隨機顯示一則。
-- **學習金句（更新）**：改為業主提供的 20 句（migration `0017`，移除先前內建的 11 句；業主自己新增的不動）。
+- **與中央配合、待中央實作**：事件通知（會員改名／改信箱／刪帳號 webhook）、App 對 App 受限查詢聯絡信箱（取代信箱副本）、依 App 分配最小權限。指令已交給杜杜龍轉中央會員 AI；中央完成後行動大學再接。
+- **學習金句詞庫（2026-11-13）**：migration `0016` 寫入杜杜龍提供的 11 句初始金句（杜杜龍說 20 句，實際貼了 11 句，其餘待補）；超級管理員可在「設定→管理→編輯學習金句」新增、**修改**（新增 `PATCH /admin/quotes/:id`）、刪除；首頁每次進入隨機顯示一則。
+- **學習金句（更新）**：改為杜杜龍提供的 20 句（migration `0017`，移除先前內建的 11 句；杜杜龍自己新增的不動）。
 - **（2026-11-13 更正）真實姓名改為非必填**：不再列入首頁資料補填提醒，付費報名也不再因為沒填而被擋（有填就存快照，沒填則為空；對帳以付款代碼為準）。資料補填提醒的 Amway 檢查改為只看核心三欄（培訓系統、地區教育中心、獎銜）；推薦人與上手欄位因人而異，不列入。Email 有填就不會提醒。
 - **（2026-11-13）Email 不再列入資料補填提醒**：會員用 Google 登入，信箱應由中央預設帶入 Google 信箱（行動大學讀不到 Google 信箱：`/oauth/userinfo` 沒有 email）。已請中央實作預設帶入與備援查詢；完成前，沒填聯絡信箱的會員收不到 Email 通知（站內通知照常）。
 
 ## 2026-11-13：App 圖示與標題反光
 - **App 圖示**：以寰宇 logo 為固定圖案。網頁：`/favicon.ico`、`/favicon-32.png`、`/apple-touch-icon.png`（180）、`/icon-192.png`、`/icon-512.png`、`/icon-maskable-512.png`、`/manifest.webmanifest`（名稱「寰宇行動大學」、主題色 #2F5D3A、standalone），加到主畫面時使用同一圖案；`<link>` 標籤由 `apps/launch/scripts/embed-static.mjs` 在打包時補進 `index.html`。原生 App 圖示（`assets/icon.png`、`adaptive-icon.png`，Android 背景改白）與商店圖示同步。**中央會員的 App 捷徑要顯示相同圖示：圖示網址固定為 `https://learn.hglobal1985.com/icon-512.png`（需要中央登記 App 時提供圖示欄位）。**
 - **首頁標題**：移除逐字跳動，改為「反光」——文字顏色沿 logo 色系流動，並週期性（4.2 秒）掃過一道由左到右的亮光（淺色模式亮金、深色模式白光，含光暈），logo 同步呼吸；沒有位移。
-- **（2026-11-13 業主決定）封測階段不建立 staging**：行動大學直接本機測試＋正式部署；正式上架 App Store／Google Play 後，才改成「每次修改先 staging 再 production」。中央串接新標準（webhook、聯絡查詢）因此改為：本機以模擬中央測試，業主在中央後台建立 production 金鑰後再接真實事件。
+- **（2026-11-13 杜杜龍決定）封測階段不建立 staging**：行動大學直接本機測試＋正式部署；正式上架 App Store／Google Play 後，才改成「每次修改先 staging 再 production」。中央串接新標準（webhook、聯絡查詢）因此改為：本機以模擬中央測試，杜杜龍在中央後台建立 production 金鑰後再接真實事件。
 - **（更正）App 專屬圖示＝學士帽**：不再使用寰宇 logo。設計：深綠漸層圓角方形底、奶油色學士帽（橘色帽身）、金黃流蘇、一圈金→橘→鮭粉的環繞軌道弧線（呼應寰宇 logo 的環），配色取自寰宇 logo 與網站主色。由 `apps/mobile/scripts/make-icon.py`（Pillow）產生並覆蓋 `assets/`（icon、adaptive-icon、favicon、首頁標題旁的 `logo.png`）與 `public/`（網頁圖示、遮罩圖示）；要改設計只需改這支腳本重跑。Android 自適應圖示背景 #14663F。圖示網址不變：`https://learn.hglobal1985.com/icon-512.png`。
-- **（2026-11-13 業主決定）全生態系統一固定配色**：行動大學不再有配色例外，`tokens.ts` 淺色改用與中央相同色值（深色本來就相同）；規範寫在 `docs/hglobal-color-standard.md` 與 `docs/hglobal-tokens.json`，已請中央採用為平台標準（所有現在與未來的 App 一致）。課程封面主題色與報名課程的底圖不受限（不屬於介面色）。
+- **（2026-11-13 杜杜龍決定）全生態系統一固定配色**：行動大學不再有配色例外，`tokens.ts` 淺色改用與中央相同色值（深色本來就相同）；規範寫在 `docs/hglobal-color-standard.md` 與 `docs/hglobal-tokens.json`，已請中央採用為平台標準（所有現在與未來的 App 一致）。課程封面主題色與報名課程的底圖不受限（不屬於介面色）。
 - **（2026-11-13 更正）**首頁標題旁恢復使用寰宇 logo（`assets/logo.png`）；學士帽圖示只用於 App 圖示（桌面、分頁、商店）。`make-icon.py` 不再覆蓋 `logo.png`。
 - **首頁載入優化（2026-11-13）**：（1）公開路徑（公告、金句、設定、圖片）不再向會員中心查詢身分；（2）獎銜與 Amway 查詢從「每個請求」移到只在 `GET /me`，且 `/v1/me/amway` 共用一次查詢；（3）`GET /me` 內的多個中央查詢改為同時送出（原本一個接一個）；（4）首頁公告不等登入狀態載入完成就先抓。靜態檔本來就有 brotli 壓縮與永久快取（入口 JS 約 295KB），沒有改。若仍覺得慢，下一步可考慮：把中央查詢結果放 Cloudflare Cache（跨實例共用）、首頁骨架畫面、拆分入口 JS。
 - **首頁骨架畫面**：課程資料回來之前，左右兩欄先顯示灰色骨架（緩慢明暗閃動），取代空白與轉圈（`src/ui/skeleton.tsx`）。
-- **資料補填視窗改為直接填寫（2026-11-13）**：視窗內直接顯示並可儲存「真實姓名（報名課程對帳用）、培訓系統、地區教育中心、獎銜」，用會員本人的 Token 即時寫回中央，行動大學不保存、不寫日誌。API：`GET／PUT /api/v2/me/central-profile`（只允許 `legal_name`、`education_system`、`education_center`、`rank`；寫入走中央 `PUT /v1/me/profile/fields/legal_name`、`PUT /v1/me/amway/fields/{key}`）、`GET /api/v2/me/vocab?pool=education_system|education_center&q=`（轉接中央 `/v1/vocab/suggestions` 的關聯詞）。獎銜選項來自中央 field-definitions；需審核的欄位（寰宇＋中心）顯示「審核中」。**未勾選「我是 Amway 會員」的會員不代為勾選**（同意說明在會員中心），視窗提示到會員中心勾選。需要的中央 scope：`profile.basic.write`（真實姓名）、`amway.write`、`amway.read`——**與中央建議的最小 scope 不同，業主要求這個功能，所以收緊權限時須保留這兩個寫入 scope**。視窗仍然只在 Amway 核心欄位有空白時自動彈出。
+- **資料補填視窗改為直接填寫（2026-11-13）**：視窗內直接顯示並可儲存「真實姓名（報名課程對帳用）、培訓系統、地區教育中心、獎銜」，用會員本人的 Token 即時寫回中央，行動大學不保存、不寫日誌。API：`GET／PUT /api/v2/me/central-profile`（只允許 `legal_name`、`education_system`、`education_center`、`rank`；寫入走中央 `PUT /v1/me/profile/fields/legal_name`、`PUT /v1/me/amway/fields/{key}`）、`GET /api/v2/me/vocab?pool=education_system|education_center&q=`（轉接中央 `/v1/vocab/suggestions` 的關聯詞）。獎銜選項來自中央 field-definitions；需審核的欄位（寰宇＋中心）顯示「審核中」。**未勾選「我是 Amway 會員」的會員不代為勾選**（同意說明在會員中心），視窗提示到會員中心勾選。需要的中央 scope：`profile.basic.write`（真實姓名）、`amway.write`、`amway.read`——**與中央建議的最小 scope 不同，杜杜龍要求這個功能，所以收緊權限時須保留這兩個寫入 scope**。視窗仍然只在 Amway 核心欄位有空白時自動彈出。
 - **資料補填視窗版面（2026-11-13）**：移除上方說明文字與各欄位提示；最上方置中並排兩顆同樣式按鈕「儲存」（一次儲存所有改過的欄位）與「暫時不要」；獎銜改為選擇後由「儲存」一起送出。
 - **資料補填視窗（再更新）**：標題改為「完善資料審核開通權限」；移除右上角 X（「暫時不要」即關閉）。依中央最新規則（串接指令 2026-11-12.6，中央 PR #60）：勾選 Amway 會員後 **系統、中心、獎銜必填**；系統與中心可勾選「無」（值為字串 `無`，算已填、不是真實中心、不審核）；**獎銜需先有系統與中心**（未填時獎銜選單停用並提示）。欄位標籤用簡稱「系統」「中心」。獎銜選項、關聯詞、欄位值都是即時向中央讀取（獎銜選項快取 1 天），行動大學沒有自己的副本。
 - **資料補填視窗**：標題改「先完善資料才能開通權限」；寬度縮小 15%（約螢幕 73%、最寬 442px）；「暫時不要」按鈕加 ✕ 圖示（讓看不懂中文的使用者也知道是關閉）。
@@ -233,9 +233,9 @@
 - 資料補填視窗：**已通過審核的中心、獎銜被改動**時，標籤旁顯示純文字「變更需再重新審核」（無外框，顏色同標籤文字）；改回原值或儲存後就不再顯示。
 
 ## 2026-11-13（三）：中央新標準接入、各中心自行上架課程
-- **中央新標準**：`POST /api/v2/central/webhook`（驗 `X-HG-Signature`、5 分鐘時間窗、依事件編號去重 `central_events`；`member.deleted` 刪除該會員在本 App 的所有資料、`member.profile_changed` 清快取）。Secret：`CENTRAL_WEBHOOK_SECRET`、`CENTRAL_SERVICE_SECRET`（業主已在 Cloudflare 設定；中央後台已設網址並測試 `delivered`）。
-- **不再保存聯絡信箱**：寄 Email 時才用服務金鑰（`/v1/service/token`）呼叫 `contacts/lookup` 查信箱（用途：繳費相關通知 `payment_notice`、其餘 `course_notice`），用完即丟；migration `0018` 已清空既有副本。「通知設定」顯示的信箱即時向中央讀；只有模擬會員（測試）仍寫本地欄位。沒有 `CENTRAL_SERVICE_SECRET` 時不寄信（站內通知照常）。**真實寄信尚待業主用兩個帳號實測**。
-- **版本回報**：超級管理員登入時（背景、每小時一次）呼叫 `handoff?integrated=2026-11-13.9&standards=webhook,delete_copy,no_email_copy,snapshot_reconcile`；`least_scope` 由業主在中央後台勾選，程式不宣稱。
+- **中央新標準**：`POST /api/v2/central/webhook`（驗 `X-HG-Signature`、5 分鐘時間窗、依事件編號去重 `central_events`；`member.deleted` 刪除該會員在本 App 的所有資料、`member.profile_changed` 清快取）。Secret：`CENTRAL_WEBHOOK_SECRET`、`CENTRAL_SERVICE_SECRET`（杜杜龍已在 Cloudflare 設定；中央後台已設網址並測試 `delivered`）。
+- **不再保存聯絡信箱**：寄 Email 時才用服務金鑰（`/v1/service/token`）呼叫 `contacts/lookup` 查信箱（用途：繳費相關通知 `payment_notice`、其餘 `course_notice`），用完即丟；migration `0018` 已清空既有副本。「通知設定」顯示的信箱即時向中央讀；只有模擬會員（測試）仍寫本地欄位。沒有 `CENTRAL_SERVICE_SECRET` 時不寄信（站內通知照常）。**真實寄信尚待杜杜龍用兩個帳號實測**。
+- **版本回報**：超級管理員登入時（背景、每小時一次）呼叫 `handoff?integrated=2026-11-13.9&standards=webhook,delete_copy,no_email_copy,snapshot_reconcile`；`least_scope` 由杜杜龍在中央後台勾選，程式不宣稱。
 - **各中心自行上架課程**：會長、音控（需有所屬中心）可在「設定 → 課程設定」新增並管理**主辦單位是自己中心**的課程（含章節、場次、附件、音檔、封面）。限制：主辦單位固定為自己的中心；指導單位不能是「寰宇總部」；審核群組只能用自己中心的；不能用 Mux 影片；已有人報名的課程／場次不能刪（只能下架），刪除限總部管理員。管理清單只列自己中心的課程。後端以 `requireCourseManager`（`api.ts`）統一把關；App 以 `canManageCourses`（`src/lib/roles.ts`）決定是否顯示入口。測試 `tests/center-courses.test.ts`（後端共 53 項）。
 - 手機寬度（390px）已用瀏覽器實際看過課程設定清單、編輯頁；順手修正清單按鈕在窄螢幕被切掉。**尚未用真實會長帳號實測**。
 
@@ -250,7 +250,7 @@
 - **限制**：YouTube 在通知欄沒有連動（YouTube 自己的播放器不開放）；手機 App 內 YouTube 仍只在課程頁內嵌播放（WebView 無法跨頁保留）。**手機 App 的迷你播放與通知欄尚未用實機驗證**（要打包後測）；網頁版已用 390px 手機寬度的瀏覽器完整測過：播放→離開頁面仍播放且時間前進→浮動視窗拖曳→點一下回課程頁時間接續、永遠只有一個 `<video>`、切換詢問、音檔迷你列拖曳進度。
 - **背景播放（切到別的 App／鎖螢幕）**：手機瀏覽器會暫停有畫面的 `<video>`，但不會暫停 `<audio>`。所以 `engine.web.ts` 在 `visibilitychange`／`pagehide` 時，把同一支影片的聲音交給隱藏的 `<audio>`（從同一秒接著播，HLS 另開一個 hls.js），回到瀏覽器再把影像接回去；`intent` 旗標區分「使用者自己暫停」與「瀏覽器因背景而自動暫停」，只有後者會被接手。純音檔本來就不會被暫停。（桌機瀏覽器模擬切換驗證過：背景時間持續前進、回前景影像接上；**Android／iPhone 實機尚未驗證**。）
 - **通知欄圖片**：影片用課程 EDM（沒有就用封面、再沒有用 App 圖示）；純音檔優先用音檔內嵌的專輯封面（`audio-cover.ts`：MP3 的 ID3 APIC、M4A 的 covr，只用 Range 讀檔頭／moov），沒有內嵌就退回 EDM。手機 App（expo-video）目前只用 EDM／封面，音檔內嵌封面只有網頁版。
-- **YouTube 精簡畫面**（業主選「方案 1＋字幕 A」）：iframe 網址帶 `controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0`，官方控制列與註解全關；載入後與開始播放時再用 postMessage 對 `captions`／`cc` 模組下 `unloadModule`（預設關閉字幕；若使用者的 YouTube 帳號強制開字幕，仍可能被蓋過）。課程頁內嵌時影片下方有自家控制列（`youtube-controls.tsx`：播放／暫停、可拖曳時間軸、時間、全螢幕〔iPhone Safari 不支援，自動隱藏〕）；浮動小視窗只留播放／暫停與關閉。YouTube 自己的標題列在暫停／剛載入時仍可能短暫出現（官方無法關閉）。已用假的 YouTube 頁驗證參數、指令、拖曳進度；**尚未用真的 YouTube 影片實測**。
+- **YouTube 精簡畫面**（杜杜龍選「方案 1＋字幕 A」）：iframe 網址帶 `controls=0&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0`，官方控制列與註解全關；載入後與開始播放時再用 postMessage 對 `captions`／`cc` 模組下 `unloadModule`（預設關閉字幕；若使用者的 YouTube 帳號強制開字幕，仍可能被蓋過）。課程頁內嵌時影片下方有自家控制列（`youtube-controls.tsx`：播放／暫停、可拖曳時間軸、時間、全螢幕〔iPhone Safari 不支援，自動隱藏〕）；浮動小視窗只留播放／暫停與關閉。YouTube 自己的標題列在暫停／剛載入時仍可能短暫出現（官方無法關閉）。已用假的 YouTube 頁驗證參數、指令、拖曳進度；**尚未用真的 YouTube 影片實測**。
 
 ## 2026-11-13（五）：活動日期下拉、完全公開、課程排序與下拉篩選、迷你播放器縮小
 - **活動日期**：課程與每一則章節都有。輸入方式是年／月／日三個獨立下拉（`src/ui/date-select.tsx`，月份加英文縮寫如「11 月 Nov」，不用日曆）；新增課程、新增章節預設自動選當天，舊資料沒有日期時顯示「設定日期（預設今天）」按鈕（不會偷偷寫入）；課程另有「結束日期」（連續 2～3 天，預設與開始日同一天）。課程新增時，自動建立的「第 1 堂」沿用課程開始日。migration `0019`：`lessons.event_date`、`courses.is_public`。API：`eventDate`（章節 PATCH／新增）、`isPublic`（課程）。章節日期顯示在課程介紹頁、上課頁與進度清單。
@@ -268,7 +268,7 @@
 - **橫幅改由 EDM 自動產生**：移除課程封面上傳與底圖圖庫的全部程式（API `/admin/cover-backgrounds`、`/admin/courses/:id/cover`、`/media/img`、`cover-manager`、合成封面；`coverUrl` 欄位）。橫幅＝EDM 模糊放大當底圖＋EDM 清楚置中（`CourseCover`）。管理員只需上傳 EDM（`edm-manager.web.tsx`，可裁切）。資料庫舊欄位 `cover_key`、`cover_bg_id` 與 R2 內舊的 `cover/`、`bg/` 檔案保留未刪（刪課程時會順手清掉該課的舊封面檔）。
 - **首頁**：EDM 輪播圓點放大並可點選（電腦版滑鼠可用）；改為一次最多翻一張（snapToInterval＋停用慣性＋scroll-snap-stop），輕滑不再連跳；訪客的推薦課程顯示「完全公開」的課程；備註改「顯示您可報名的課程」。
 - 後端測試 58 項。手機寬度（390px）已看過：課程編輯（尚未公布勾選）、全部課程、課程介紹（EDM 橫幅）、設定、學習成就、徽章設定、通知設定開關、學習中頁；**手機 App（iOS／Android）未用實機驗證**。
-- **課程卡片左上角斜緞帶**（業主選方案 1）：尚未開始的課程顯示橘色「剩餘 X 天」（以今天對照活動日期，沒有活動日期用最近一場開課日；今天或已開始、已結束、沒有日期都不顯示）；未登入的訪客看到「完全公開」課程時，改顯示綠色「免費公開」（優先於倒數）。元件 `src/ui/corner-ribbon.tsx`，判斷在 `course-card.tsx`／`features/courses/sort.ts`。
+- **課程卡片左上角斜緞帶**（杜杜龍選方案 1）：尚未開始的課程顯示橘色「剩餘 X 天」（以今天對照活動日期，沒有活動日期用最近一場開課日；今天或已開始、已結束、沒有日期都不顯示）；未登入的訪客看到「完全公開」課程時，改顯示綠色「免費公開」（優先於倒數）。元件 `src/ui/corner-ribbon.tsx`，判斷在 `course-card.tsx`／`features/courses/sort.ts`。
 
 ## 2026-11-13（七）：播放控制列統一、課程介紹頁改版、底部確認面板、迷你播放器升級
 - **播放控制列統一**：Mux 影片、YouTube、純音檔三種模式的時間軸一律在影片外面下方，共用同一個元件 `PlayerControls`（`features/player/player-controls.tsx`；時間軸是 `seek-bar.tsx`）。瀏覽器內建控制列已關閉（只有全螢幕時才用內建的）。以後改設計只改這兩個檔案。手機 App 的 `VideoView` 也改為 `nativeControls={false}`，全螢幕鈕走 `VideoView.enterFullscreen()`（未實機驗證）。
@@ -281,7 +281,7 @@
 
 ## 2026-11-13（八）：圖片分享、章節上鎖遮罩、本名＋暱稱、影片放大、獎銜不符緞帶
 - **EDM 放大小視窗**（`edm-viewer.tsx`）：沒有標題，視窗大小剛好貼合圖片、沒有多餘留白；放大／縮小／下載／分享按鈕疊在圖片上。**分享直接傳送圖片檔**（`shareImage`：網頁用 Web Share 的檔案分享，瀏覽器不支援檔案就分享連結、電腦沒有分享選單就複製連結；手機 App 先下載到暫存再用 `expo-sharing` 叫出系統分享選單）。新增套件 `expo-sharing`（SDK 58 版）。
-- **章節上鎖遮罩**（業主選方案 2）：課程介紹頁在尚未報名／不符資格／費用尚未公布，且所有章節都不能看時，章節卡片疊半透明灰色遮罩＋大鎖頭＋「報名後才能觀看」（獎銜不符顯示「獎銜不符，目前無法報名」、費用未公布顯示「費用尚未公布，暫不開放」），章節完全不能點。
+- **章節上鎖遮罩**（杜杜龍選方案 2）：課程介紹頁在尚未報名／不符資格／費用尚未公布，且所有章節都不能看時，章節卡片疊半透明灰色遮罩＋大鎖頭＋「報名後才能觀看」（獎銜不符顯示「獎銜不符，目前無法報名」、費用未公布顯示「費用尚未公布，暫不開放」），章節完全不能點。
 - **審核員看到「本名（暱稱）」同時顯示**：共用函式 `applicantLabel`（`contract.ts`），用在報名審核卡片與「有新的報名待審核」通知（付費報名才有本名快照；兩者相同或缺一時只顯示一個）。
 - **Mux／示範影片可放大縮小**（`zoom-math.ts`）：雙指（手機）或滾輪（電腦）放大縮小，**縮小不低於 100%**，放大後按住拖曳查看其他區域；換堂或離開課程頁自動還原。網頁版在 `player-layer.web.tsx`（pointer events＋滾輪）；手機 App 在 `player-slot.tsx`（PanResponder，未實機驗證）。YouTube 不支援（iframe 無法）。
 - **課程卡片緞帶**：登入會員、獎銜不符且尚未報名的課程，右上角另外顯示紅色「獎銜不符」（左上角仍是倒數或免費公開，兩條並存）。`CornerRibbon` 新增 `side`、`danger`。
@@ -300,7 +300,7 @@
 - **迷你播放器**：外框加粗 1.5 倍（4.5px）；暫停播放時外框反光動畫一起暫停。
 - **登入後預設進首頁**；**「登出所有 App」改呼叫中央 `POST /v1/auth/logout-all`**（結束所有 App、所有裝置與會員中心網站的登入；過期會先換發 token 再登出），再導向瀏覽器共用登入登出。
 - 全部課程卡片：章節 0 堂不顯示堂數。
-- **YouTube 影片中央的播放／暫停大按鈕**：YouTube 沒有任何參數可以關閉，只能用遮蓋的方式；尚未處理，等業主決定。
+- **YouTube 影片中央的播放／暫停大按鈕**：YouTube 沒有任何參數可以關閉，只能用遮蓋的方式；尚未處理，等杜杜龍決定。
 
 ## 2026-11-13（十一）
 - 影片／YouTube：點一下畫面恢復播放／暫停（延遲 300ms 判斷，點兩下仍是還原大小）。
@@ -310,12 +310,12 @@
 - 「學習中」第一張卡「回到剛才的學習」（以 AsyncStorage 記在本機，key `last-lesson:<sub>`）。
 - 尚未驗證：標題列高度與輪播手勢未在實機／含後端的瀏覽器實測（只通過型別檢查與後端測試）。
 - 課程新增「地點」與「無」勾選（migration 0025 `location`、`location_none`）；全部課程卡與首頁輪播顯示「地點：…」，勾「無」則不顯示。
-- 緞帶尺寸／位置已復原成 2026-11-13（十）的設定（業主說上一版調整不是他要的意思；「更往上靠近＋50%」的真正意思待釐清，勿再自行縮小）。
-- 緞帶：大小不變，band top 24→12（離上邊框縮短 50%，業主選項 2）。
+- 緞帶尺寸／位置已復原成 2026-11-13（十）的設定（杜杜龍說上一版調整不是他要的意思；「更往上靠近＋50%」的真正意思待釐清，勿再自行縮小）。
+- 緞帶：大小不變，band top 24→12（離上邊框縮短 50%，杜杜龍選項 2）。
 - Mux delivery-usage：結束時間須在 12 小時前（HTTP 400 invalid timeframe），已改為現在−13 小時。
-- 緞帶再次復原為 bafea86 版本（top 24、框 128）。業主兩次否決調整方案，除非業主提供圖示，勿再改緞帶。
+- 緞帶再次復原為 bafea86 版本（top 24、框 128）。杜杜龍兩次否決調整方案，除非杜杜龍提供圖示，勿再改緞帶。
 - Mux delivery-usage 時間須為整點，已取整。
-- 緞帶（業主說明：更靠近角落、三角形範圍小、減少遮擋 EDM）：框 104、band left -50/top 12、字 13px、padding 5；5 字標籤剛好容納。
+- 緞帶（杜杜龍說明：更靠近角落、三角形範圍小、減少遮擋 EDM）：框 104、band left -50/top 12、字 13px、padding 5；5 字標籤剛好容納。
 - 統計「各影片本月傳輸量」改顯示影片名稱（meta.title／passthrough），404＝已刪除的影片。
 - 緞帶：band 中心對齊角落對角線（文字置中）；框 90、left/right -60、top 15、字 11px。
 - 統計分析頁拆成兩個互不混合、預設收起的來源區塊：① Mux（/admin/stats/mux）② App 資料庫 D1（/admin/stats/app，app-stats.ts）。Cloudflare 流量統計尚未串接（Worker 沒有 Cloudflare API 權杖）。
@@ -326,10 +326,10 @@
 - EDM 放大檢視：移除 ＋／－／百分比；改兩指捏合縮放（以中心為基準，兩指移動也可平移）與滑鼠滾輪；其餘按鈕縮為 44px。
 - 工具列「分享」字體 17（與標題同大）。
 - EDM 放大檢視：按鈕 88px 實心黑（不透明）、距邊 16px、下方新增常駐提示「十字 icon＋可拖曳移動、兩指放大縮小」（按著圖片時一起隱藏）。
-- 業主決定（2026-11-14）：YouTube 影片縮放／覆蓋層功能**先保留**，上架時若被退件再改（風險：YouTube API 政策禁止修改播放器／蓋在播放器上，見對話記錄）。舊 Mux 金鑰 HGlobal Learn Video Read 已撤銷。
-- EDM 放大檢視按鈕改 64px（業主指定）。
+- 杜杜龍決定（2026-11-14）：YouTube 影片縮放／覆蓋層功能**先保留**，上架時若被退件再改（風險：YouTube API 政策禁止修改播放器／蓋在播放器上，見對話記錄）。舊 Mux 金鑰 HGlobal Learn Video Read 已撤銷。
+- EDM 放大檢視按鈕改 64px（杜杜龍指定）。
 - EDM 放大檢視：按鈕 50px；提示文字與下載／分享同一排（左提示、右按鈕），太擠自動換行。
-- **移除「場次」功能**（業主 2026-11-14）：刪除場次編輯器（runs-editor）、場次 API（/admin/courses/:id/runs、/admin/runs/*）、報名選場次、章節綁場次、「報名已截止」緞帶、「分場次報名」標籤、nextRunAt／hasRuns／registrationOpen 欄位；報名與開通改為只以課程為單位。正式站 course_runs 沒有任何資料。資料庫的 course_runs 資料表與 lessons／order_items／enrollments 的 run_id 欄位**刻意保留不刪**（D1 難以改 PK／外鍵，刪表會讓 lessons.run_id 的外鍵出錯；欄位預設空字串，程式已完全不用）。
+- **移除「場次」功能**（杜杜龍 2026-11-14）：刪除場次編輯器（runs-editor）、場次 API（/admin/courses/:id/runs、/admin/runs/*）、報名選場次、章節綁場次、「報名已截止」緞帶、「分場次報名」標籤、nextRunAt／hasRuns／registrationOpen 欄位；報名與開通改為只以課程為單位。正式站 course_runs 沒有任何資料。資料庫的 course_runs 資料表與 lessons／order_items／enrollments 的 run_id 欄位**刻意保留不刪**（D1 難以改 PK／外鍵，刪表會讓 lessons.run_id 的外鍵出錯；欄位預設空字串，程式已完全不用）。
 - 編輯課程：「費用尚未公布」勾選與費用輸入框同一列（勾選時輸入框變灰不可輸入）。
 - 沒有 EDM／封面的課程：CourseCover 由程式依「課程名稱＋分類」自動排版（主題色底、分類標籤、大標題，字級依長度自動縮放 fitFontSize，非 AI）；用於課程介紹頁上方、課程卡、首頁輪播、編輯課程預覽。
 - 自動標題封面：分類標籤與標題置中（避免被左上角緞帶遮住）。
@@ -351,7 +351,7 @@
 - 課程卡／首頁輪播：不再顯示系列名稱與課程標題文字；單位改為單一標籤「寰宇總部指導、台中主辦」（unitLine），單位名稱結尾的教育中心數字代碼不顯示（cleanUnit，含篩選選單）。
 - 下拉選單統一：移除 select.web.tsx（瀏覽器原生 <select>），所有 Select（篩選、日期、表單）改用底部彈出面板（BottomSheet），目前項目打勾並自動捲到該項。
 - **中心清單與中央不一致（2026-11-14 修復）**：原因是 `/centers` 把中央清單與本地 `orders.center_label`、`review_group_members.center_label` 聯集（當初為了保險），本地舊資料裡出現「新竹」「民權」（沒有代碼的舊寫法）就被當成新中心。已改為只用中央清單；儲存主辦單位、審核群組負責／成員中心時驗證必須在中央清單內；`centerList` 失敗不快取並沿用最近一次成功清單。規則寫入 CLAUDE.md「資料正本規則」。正式站 `orders` 內的歷史快照「新竹」「民權」保留（報名當下的中心名稱快照），只是不再出現在選單。
-- 正式站 orders 歷史快照中心名稱已改成中央正式名稱：新竹→新竹 122（3 筆）、民權→民權 018（2 筆；center_key 同步），2026-11-14 業主指示。
+- 正式站 orders 歷史快照中心名稱已改成中央正式名稱：新竹→新竹 122（3 筆）、民權→民權 018（2 筆；center_key 同步），2026-11-14 杜杜龍指示。
 - **全部課程改版（2026-11-14）**：改為 2 欄（寬畫面 3 欄）小卡片 `SeriesTile`，只有 EDM＋「選擇梯次」下拉（底部面板列所有梯次，點進該梯課程頁）；有系列＝系列專屬 EDM（沒上傳就用系列名稱當大標題），沒系列＝課程自己的 EDM（沒有就課程名稱）；緞帶保留，文字以日期最近的梯次為準（`nearestOf`／`groupBySeries`）。課程詳細頁 EDM 也加緞帶。新增系列專屬 EDM：series_art（migration 0030）、PUT/DELETE `/admin/series/edm?series=`（僅超級管理員）、「關鍵字管理」頁系列列上傳（網頁版）。
 - 全部課程與管理員課程清單的單位篩選改為只比對「主辦單位」（不含指導單位），標題「主辦單位」。
 - 全部課程／學習中／站內通知／設定：移除大標題（Screen 無 title 時仍保留右側按鈕與副標）；課程卡刪除「N 堂・約 N 分鐘」統計文字；課程卡與系列小卡封面一律 16:9。
@@ -411,7 +411,7 @@
 - 2026-11-14 網頁：影片進入系統浮動視窗（PiP）時，頁面內的迷你播放器隱藏（player-layer.web.tsx，tick 內判斷 engine.isPip()），避免兩個小視窗；PiP 結束後自動恢復。Android Chrome 實測：全螢幕＋回桌面可浮出（Chrome 自己會跳全螢幕退出提示，網頁無法關閉）；縮小後通知欄播放控制正常。
 - 2026-11-14 修正：在系統浮動視窗按 ✕ 關閉後，不再改由通知欄音訊接手（engine.web.ts pipActive／pipLeftAt，intent=false）。未實機驗證。
 
-## 程式清理（2026-11-14，業主睡覺時授權）
+## 程式清理（2026-11-14，杜杜龍睡覺時授權）
 - 移除 V1 舊程式（git 歷史可找回）：`apps/api`、`apps/preview`、`packages/shared`、`apps/mobile/legacy-app`、`apps/mobile/src/components`、`src/platform`、`src/lib/{api,session,demo,central-auth,theme}.ts`。這些沒有任何地方引用。根目錄 `package.json` workspaces 只剩 `apps/launch`、`apps/mobile`；CI（`.github/workflows/checks.yml`）移除對應步驟。
 - 清掉未使用的 import／變數／函式（`tsc --noUnusedLocals` 零錯誤；`image-tools.compress` 刪除；api.ts 未使用變數）。
 - ESLint 重新可用（`npm run lint`）：補一個空的 react-hooks 規則定義、關閉對本專案刻意寫法的幾條規則；目前 0 錯誤 0 警告。
@@ -419,7 +419,7 @@
 - 驗證：型別檢查、後端 76 項測試、ESLint 都通過；網頁用模擬手機載入 5 個頁面無錯誤。
 - 2026-11-14 章節設定：活動日期右側新增「同上」勾選（第二堂起、上一堂有日期才顯示；勾選＝複製上一堂日期並隱藏日期下拉，取消勾選＝清空重選；存的仍是實際日期，之後上一堂改日期不會自動連動）。
 - 2026-11-14 梯次選單縮圖改用裁切後的 16:9 封面（coverUrl，沒有才退回 EDM 原圖）。
-- 2026-11-14 短網址：分類／系列可自訂英文縮寫（migration 0035 short_links；超級管理員 GET/PUT /admin/short-links、POST /admin/short-links/remove；設定→管理→短網址）。**（2026-11-14 業主改）網址直接是 `網域/縮寫`（不加 /c、/s 前綴；分類與系列共用同一縮寫空間，不可重複；與網站頁面同名的縮寫被擋，名單在 src/short-links.ts RESERVED_SLUGS）。** 前端 `app/[slug].tsx` 呼叫公開 `GET /short-links/:slug` 取得種類與名稱後顯示對應課程清單（網址列不轉址，維持短網址）；`GET /short-links` 公開列出已設定的縮寫。全部課程頁選分類時（網頁）以 history.replaceState 把網址列同步成該分類短網址，選「全部分類」回 /courses；系列篩選時有「系列：xxx ✕」可清除。關鍵字改名縮寫跟著走、刪除時一併刪。已用正式站驗證轉址；管理頁畫面未實機驗證。
+- 2026-11-14 短網址：分類／系列可自訂英文縮寫（migration 0035 short_links；超級管理員 GET/PUT /admin/short-links、POST /admin/short-links/remove；設定→管理→短網址）。**（2026-11-14 杜杜龍改）網址直接是 `網域/縮寫`（不加 /c、/s 前綴；分類與系列共用同一縮寫空間，不可重複；與網站頁面同名的縮寫被擋，名單在 src/short-links.ts RESERVED_SLUGS）。** 前端 `app/[slug].tsx` 呼叫公開 `GET /short-links/:slug` 取得種類與名稱後顯示對應課程清單（網址列不轉址，維持短網址）；`GET /short-links` 公開列出已設定的縮寫。全部課程頁選分類時（網頁）以 history.replaceState 把網址列同步成該分類短網址，選「全部分類」回 /courses；系列篩選時有「系列：xxx ✕」可清除。關鍵字改名縮寫跟著走、刪除時一併刪。已用正式站驗證轉址；管理頁畫面未實機驗證。
 - 2026-11-14 梯次選單（SeriesSheet）右上角新增「顯示全部」綠色按鈕（僅有系列的小卡）：導到該系列單頁（有設定短網址用 /縮寫，沒有用 /courses?series=）。系列單頁（CoursesView series 模式）只列該系列，每一梯都展開成 CourseCard（byNearest 由近到遠），上方「系列：xxx ✕」回全部課程；此模式不顯示分類下拉。
 - 2026-11-14 分享預覽（LINE 等）：短網址由 Worker 在送出 index.html 時替換標題與分享標籤（src/og.ts、worker.ts）——標題「{系列或分類名稱} | 寰宇行動大學」，說明＝設定頁學習金句隨機一句（沒有金句退回網站名稱），og:image＝/icon-512.png；一般網址預設預覽由 embed-static.mjs 補預設標籤（原本會顯示 noscript 英文字）。LINE 會快取預覽，舊連結要等一段時間或改網址（加 ?v=2）才會更新。測試 tests/share-meta.test.ts。
 - 2026-11-14 ①系列單頁（顯示全部）上方綠色系列標籤移除，改放與全部課程相同的「分類」下拉（顯示該系列所屬分類，有多個分類顯示「全部分類」；改選就離開系列頁，有分類短網址就用短網址）。②課程卡標籤（主辦單位、費用、獎銜、狀態）合併成同一列（UnitTags 元件刪除）。③課程設定表單最上方新增「主講人」（courses.teacher，後端原本就有）。④章節新增「分享者」：lessons.sharer（migration 0036）；章節名稱與分享者拆成兩欄（新增章節與每堂編輯都是）；學員的章節清單副標顯示「分享者：xxx · N 分鐘」；複製課程會帶。測試 tests/lesson-sharer.test.ts。
@@ -440,65 +440,65 @@
 - 2026-11-14 主講人／分享者新增「獎銜」「職稱」：courses.teacher_rank／teacher_title、lessons.sharer_rank／sharer_title（migration 0039）。獎銜＝下拉，選單來自會員中心（GET /admin/central-options 轉接 rankOptionList，存中央獎銜代碼，後端 assertCentralRank 驗證；測試帳號用本地階梯）；職稱＝文字，輸入時呼叫 GET /me/vocab?pool=job_title（centralSuggest 轉接中央 /v1/vocab/suggestions?pool=job_title，只是建議可自己打；職稱欄位是中央『職稱』詞庫，不在行動大學另建）。共用元件 features/admin/person-extra.tsx（RankTitleRow、useRankOptions）：課程資料表單與章節新增／編輯都用；「同主講人」勾選會連獎銜與職稱一起帶入。學員端章節清單副標顯示『分享者：姓名 獎銜 職稱』（sharerLine）；課程卡的主講人標籤仍只顯示姓名（卡片格式規則不變）。注意：中央『職稱』是會員個人基本資料欄位（job_title），這裡的職稱是『課程上主講人／分享者的職稱』，只使用中央詞庫建議，沒有讀寫任何會員的個人職稱資料。
 - 2026-11-14 課程卡價格位置：已開通的付費課程改顯示亮黃色「已付費」（Pill 新增 bright 色調），免費顯示「免費」（accent，與主辦標籤同色）。
 - 2026-11-14 播放控制列：時間只顯示目前播放時間（不顯示總長度）；新增倍數播放鈕（PlayerControls，加速圖示 speedometer-outline；每按一次 1→1.2→1.5→1.8→2→1；非 1 倍時圖示換成『1.5×』文字）。engine.cycleRate()＋snapshot.rate（engine.ts／engine.web.ts／engine.types.ts RATES、nextRate、rateText）；倍數記在瀏覽器（localStorage hglobal:learn:rate），換課沿用；Mux／音檔用 playbackRate，YouTube 用內嵌播放器 setPlaybackRate（只支援 1.25、1.75 等固定檔位，1.2→1.25、1.8→1.75）；App 版用 expo-video player.playbackRate（換課沿用，重開 App 回到 1 倍；未實機驗證）。網頁以本機瀏覽器驗證循環與實際倍數。
-- 2026-11-14 全部課程小卡（SeriesTile）：拿掉封面下方的『瀏覽細節』框，改為封面下緣暗色漸層（react-native-svg LinearGradient，高度 45%）＋白字『瀏覽細節 ›』靠右（業主選方案 E）；整張封面可點，不佔額外高度。
+- 2026-11-14 全部課程小卡（SeriesTile）：拿掉封面下方的『瀏覽細節』框，改為封面下緣暗色漸層（react-native-svg LinearGradient，高度 45%）＋白字『瀏覽細節 ›』靠右（杜杜龍選方案 E）；整張封面可點，不佔額外高度。
 - 2026-11-14 **iPhone 安全區修正**（網頁以『加到主畫面』App 方式開啟時，畫面會延伸到狀態列底下，上方工具列被時間／訊號蓋住、分享鈕按不到）：①index.html 由 embed-static.mjs 補 `viewport-fit=cover`、`apple-mobile-web-app-status-bar-style=black-translucent`、`100dvh` 高度；②`app/_layout.tsx` 抽出 `AppStack`，標題列高度＝barHeight＋安全區上緣（原本固定 barHeight 把安全區吃掉）；③新增 `StatusBarCover`（網頁，狀態列底下塗品牌深綠 #2F5D3A，白色時間訊號清楚）；④`CoursesView` 在堆疊頁（系列頁、短網址頁）用 `inStack`→Screen header={false}，避免安全區被重複加。驗證：Chromium 用 Emulation.setSafeAreaInsetsOverride 模擬 375×667（上 20）、375×812（上 50 下 34）、430×932（上 59 下 34）、360×640（Android，0）四種尺寸，分享鈕都在狀態列下方、底部選單貼底。**尚未用真正 iPhone 驗證。**
 - 2026-11-14 **新會員補填視窗與獎銜即時同步**：①原因一＝新會員沒勾「我是 Amway 會員」時 enabled=false，過去判斷為『沒缺漏』所以不彈視窗；現在 enabled≠true 也算缺漏（視窗引導到會員中心勾選並填寫）。②原因二＝profileGaps 在會員中心暫時查不到時把『沒有缺漏』快取 60 秒；現在查不到回 undefined 不快取。③獎銜不更新：伺服器對會員中心資料有記憶體快取（amway 2 分鐘、資格 10 分鐘→改 2 分鐘），重新整理仍讀快取；現在 GET /me?fresh=1 會先丟掉該會員的快取（forgetMember），前端每次開啟／重新整理／登入／回到前景（網頁切回分頁、App 回到前景，30 秒節流）都帶 fresh=1 並更新會員資料與清單（session.tsx）。測試 tests/me-fresh.test.ts（共 82 項）。
-- 2026-11-14 調整（業主質疑頻率太高）：課程資格快取 TTL 改回 10 分鐘；回到前景自動更新會員資料的間隔由 30 秒改為 10 分鐘（開啟／重新整理仍一律 fresh=1 立刻更新；會員中心 member.profile_changed webhook 會清該會員快取）。
+- 2026-11-14 調整（杜杜龍質疑頻率太高）：課程資格快取 TTL 改回 10 分鐘；回到前景自動更新會員資料的間隔由 30 秒改為 10 分鐘（開啟／重新整理仍一律 fresh=1 立刻更新；會員中心 member.profile_changed webhook 會清該會員快取）。
 - 2026-11-14 App 版沒有重新整理鈕：①所有捲動頁（Screen）加下拉重新整理（RefreshControl，登入後才有）＝refreshMember(0)＋invalidate，立刻向會員中心拿最新獎銜並重載清單；②進入設定頁自動 refreshMember(1 分鐘)；③回前景 10 分鐘；④開啟 App 一律 fresh。session.tsx 新增 refreshMember(minGapMs)。首頁是固定一頁不能捲動，沒有下拉（請到設定頁或下拉其他頁）。未在實機驗證。
 - 2026-11-14 首頁也能下拉重新整理（首頁外層改 ScrollView＋refreshControl，內容仍固定一頁）；下拉邏輯抽成共用 hook usePullRefresh（src/ui/pull-refresh.tsx），Screen 與首頁共用。
 - 2026-11-14 **固定底部操作列**：Screen 新增 footer 參數與 useScreenFooter(node) hook（src/ui/screen.tsx；固定在底部主選單上方、內容捲動不跟著跑，有上緣陰影）。①課程頁：『按此報名＋審核繳費／免費報名／登入後報名』與『付款審核中（點擊查看）＋取消』固定在底部（只是說明文字的 NoticeBox 如費用未公布、獎銜不符仍在內容區）；②報名明細：『取消報名（左）／送出（右）』固定在底部（PaymentForm 內用 useScreenFooter）。以本機瀏覽器 390×700 驗證捲到底按鈕位置不變（y=600）。
-- 2026-11-14 全部課程小卡：移除封面上的「瀏覽細節 ›」文字與漸層（業主指示），整張封面仍可點、彈出梯次選單（無障礙說明文字保留）。
+- 2026-11-14 全部課程小卡：移除封面上的「瀏覽細節 ›」文字與漸層（杜杜龍指示），整張封面仍可點、彈出梯次選單（無障礙說明文字保留）。
 - 2026-11-14 **全部課程搜尋**：第一排最左邊放大鏡圖示（SearchBox，src/features/courses/search-box.tsx），點一下輸入框從左向右動畫伸展到整列寬度並叫出鍵盤，右側 ✕ 清除並收起；每輸入一個字即時過濾清單（搜尋時不受分類限制，空白＝不過濾；多個詞用空白隔開需全部符合），並即時列出關聯詞（種類標籤＋詞：系列／課程／主講人／獎銜／職稱／章節／日期，最多 8 個，點選帶入輸入框）。搜尋範圍＝主講人（姓名、獎銜、職稱）、系列、課程名稱、章節標題、分享者、日期（課程日與每堂日，支援 11/3、2026/11/3、11月3日、20261103 等寫法）。純函式在 course-search.ts；章節資料來自新的公開 API GET /search-index（已上架課程每堂的標題、分享者、獎銜名、職稱、日期）；第一次點開放大鏡才下載。後端測試共 83 項。僅在『全部課程』頁（系列單頁沒有）。
-- 2026-11-14 全部課程：分類下拉上方的「分類」小標籤刪除（業主指示）。
+- 2026-11-14 全部課程：分類下拉上方的「分類」小標籤刪除（杜杜龍指示）。
 - 2026-11-14 全部課程：分類下拉右邊新增「☐ 免費」勾選（勾選只列免費課程，course.free；搜尋時也套用）；管理員齒輪移除（課程設定入口仍在 設定→管理→課程設定）。
-- 2026-11-14 **課程清單兩種顯示模式**（業主選方案②）：分類下拉右邊（原『免費』勾選位置）改為兩顆圖示切換鈕 ▦系列／☰章節（view-toggle.tsx，反白＝目前模式，記在 AsyncStorage hglobal:learn:course-view-mode）；『免費』勾選已移除。章節模式（chapter-list.tsx）：一堂一列、依系列分組（無系列的以課程名稱為組；組序＝課程清單排序、組內課程由近到遠、章節照順序），列內＝課程封面縮圖＋章節標題＋分享者（獎銜 職稱）＋日期／長度＋所屬課程（與組名相同不重複）＋狀態（已完成／敬請期待／🔒報名後觀看）；點一列：能看且內容就緒→/learn/課程/章節，否則→課程介紹頁。分類下拉與放大鏡搜尋在章節模式也有效（搜尋以章節為單位：課程層欄位＋章節自己的標題／分享者／日期）。後端 GET /search-index 補 id、position、minutes、ready、completed（登入時）。系列單頁（顯示全部）不受模式影響。
+- 2026-11-14 **課程清單兩種顯示模式**（杜杜龍選方案②）：分類下拉右邊（原『免費』勾選位置）改為兩顆圖示切換鈕 ▦系列／☰章節（view-toggle.tsx，反白＝目前模式，記在 AsyncStorage hglobal:learn:course-view-mode）；『免費』勾選已移除。章節模式（chapter-list.tsx）：一堂一列、依系列分組（無系列的以課程名稱為組；組序＝課程清單排序、組內課程由近到遠、章節照順序），列內＝課程封面縮圖＋章節標題＋分享者（獎銜 職稱）＋日期／長度＋所屬課程（與組名相同不重複）＋狀態（已完成／敬請期待／🔒報名後觀看）；點一列：能看且內容就緒→/learn/課程/章節，否則→課程介紹頁。分類下拉與放大鏡搜尋在章節模式也有效（搜尋以章節為單位：課程層欄位＋章節自己的標題／分享者／日期）。後端 GET /search-index 補 id、position、minutes、ready、completed（登入時）。系列單頁（顯示全部）不受模式影響。
 - 2026-11-14 **章節各自設定封面**：課程資料新增勾選「章節各自設定封面」（courses.chapter_covers，migration 0040；複製課程會帶勾選但不帶圖）。勾選後章節編輯（網頁版）多「章節封面」區：橫式 16:9（章節清單縮圖）＋直式 3:4，各自可移除；來源①上傳圖片（瀏覽器內裁切壓縮）②『從影片選畫面』：Mux＝指定秒數，伺服器簽名縮圖代理 GET /admin/lessons/:id/mux-frame?time=（muxThumbnail，aud t）；YouTube＝內嵌播放器拖時間軸（限章節起訖）＋『擷取這個畫面』用瀏覽器 getDisplayMedia（preferCurrentTab）截下播放框（只有電腦版 Chrome／Edge；YouTube 無法由伺服器抓畫面）。API：PUT／DELETE /admin/lessons/:id/art?part=cover|poster（R2 key lesson/<章節id>/…，公開 /media/pub 可讀；刪章節／刪課程一併清除）；章節 Lesson.coverUrl／posterUrl、search-index coverUrl。顯示：章節模式縮圖優先用章節橫式封面（無則課程封面）；上課頁播放器／鎖定畫面的專輯圖優先用章節直式或橫式封面。YouTube 截圖功能沒有在真實瀏覽器＋真實 YouTube 驗證（只驗證面板、播放框、上傳裁切與儲存）。測試 tests/lesson-art.test.ts（後端共 84 項）。
 - 2026-11-14 修正章節封面『從 YouTube 影片選畫面』播放器黑畫面：改為靜音自動播放→收到 playerState=1 後 seekTo 並暫停（原本載入後立刻 pauseVideo，播放器未啟動）；補 allow／referrerPolicy、listening 握手；時間軸移動＝seekTo＋play＋450ms 後 pause；加『重新載入播放器』與黑畫面排除說明（影片需允許嵌入）。此環境連不到 YouTube，未能實測。
 - 2026-11-14 課程清單『章節』模式改為：不分組、不顯示系列標題，順序隨機（ChapterList 改收 items；以 shuffleSeed 偽隨機排序，打開頁面與切到章節模式時重新洗牌；同次瀏覽中搜尋、換分類時相對順序不變）。取代先前『依系列分組』的設計。
 - 2026-11-14 修正梯次排序方向：梯次選單與系列『顯示全部』頁共用 farToNear（series-sheet.tsx）＝開始日期由遠到近單一方向（最晚在上，已開過的在最下，沒日期最後）；原本把『已結束』固定排最前造成 2026→2027/11→倒數到 2027/2 的亂序。byNearest 刪除。顯示全部頁順序改為與選單相同（原為由近到遠）。
-- 2026-11-14 **業主回覆四項待辦**：①職稱寫入中央＝選 A，已寫好給中央的需求說明 `docs/central-request-job-title.md`（待業主轉交中央；中央完成前行動大學不動）。②**設定→AI 模型**（超級管理員，app/admin/ai-models.tsx、src/ai-models.ts）：三項工作（逐字稿／關鍵字與 hashtag／語意搜尋）各自選模型，點一下即存（ui_settings 的 ai_models，GET／PUT /admin/ai-models，只接受種類相符的已知模型）；下方附各模型花費、特性、適合用途總表（手機可左右滑動）。**目前只有選擇與總表，尚未真的呼叫 AI**：逐字稿／關鍵字／語意搜尋流程（Workers AI 的 Whisper、Vectorize、需綁定 AI／Vectorize）還沒做，下一步先做逐字稿試做。總表價格為約略估計（Workers AI 牌價憑記憶、Claude 沒寫金額），上線前後請對照官方牌價。測試 tests/ai-models.test.ts（後端共 85 項）。③學員刪除繳費回報＝審核端不保留：現行 DELETE /orders/:id/payments/:pid 本來就是真刪除，審核端讀同一張表，所以已符合，不需改。④課程頁（學員端）章節上方新增一行「主講人：姓名 獎銜 職稱」（format.ts teacherLine，沒填就不顯示）。
-- 2026-11-14 **AI 每日免費額度自動停止／隔天恢復**（業主指示）：Cloudflare Workers AI 每天免費 10,000 點（neuron），UTC 00:00＝台灣 08:00 重置（官方文件查證）。新表 ai_usage（migration 0041，用 UTC 日期記帳，隔天自然歸零＝自動恢復）；`src/ai-models.ts` 的 `reserveAi(db, 模型, {minutes|inputTokens|outputTokens})` 是**所有 AI 呼叫必經的閘門**（之後做逐字稿／關鍵字／語意搜尋都要先呼叫它，失敗用 `refundAi` 還額度；Cloudflare 回 3036「額度用完」用 `markExhausted` 當天直接停）。預扣為原子操作，今天已用＋這次估算超過上限就丟 `AiStopped`。設定（存 ui_settings 的 ai_settings）：每天上限 5,000／7,000／9,000（預設 9,000，留緩衝；同帳號其他用途也共用這 10,000）、「只用免費額度」預設開（開啟時沒有免費額度的 Claude 不能選、閘門也拒絕）。設定→AI 模型頁最上方顯示今日用量條、上限、開關。點數換算：Whisper turbo 46.63／分鐘、Whisper 41.14／分鐘、Llama 3.3 70B 26668／204805（每百萬字進／出）、Llama 3.1 8B 快速版 4119／34868、BGE-M3 約 1073（依官方牌價換算）。**修正總表**：先前憑記憶寫的價格有誤已更正；Llama 3.1 8B（fp8）官方預告 11/20 停用，改列「快速版」；移除 BGE Base 英文版。用量是程式估計，正確數字以 Cloudflare 後台 Workers AI 頁面為準。尚未有任何功能真的呼叫 AI。後端測試 87 項。
+- 2026-11-14 **杜杜龍回覆四項待辦**：①職稱寫入中央＝選 A，已寫好給中央的需求說明 `docs/central-request-job-title.md`（待杜杜龍轉交中央；中央完成前行動大學不動）。②**設定→AI 模型**（超級管理員，app/admin/ai-models.tsx、src/ai-models.ts）：三項工作（逐字稿／關鍵字與 hashtag／語意搜尋）各自選模型，點一下即存（ui_settings 的 ai_models，GET／PUT /admin/ai-models，只接受種類相符的已知模型）；下方附各模型花費、特性、適合用途總表（手機可左右滑動）。**目前只有選擇與總表，尚未真的呼叫 AI**：逐字稿／關鍵字／語意搜尋流程（Workers AI 的 Whisper、Vectorize、需綁定 AI／Vectorize）還沒做，下一步先做逐字稿試做。總表價格為約略估計（Workers AI 牌價憑記憶、Claude 沒寫金額），上線前後請對照官方牌價。測試 tests/ai-models.test.ts（後端共 85 項）。③學員刪除繳費回報＝審核端不保留：現行 DELETE /orders/:id/payments/:pid 本來就是真刪除，審核端讀同一張表，所以已符合，不需改。④課程頁（學員端）章節上方新增一行「主講人：姓名 獎銜 職稱」（format.ts teacherLine，沒填就不顯示）。
+- 2026-11-14 **AI 每日免費額度自動停止／隔天恢復**（杜杜龍指示）：Cloudflare Workers AI 每天免費 10,000 點（neuron），UTC 00:00＝台灣 08:00 重置（官方文件查證）。新表 ai_usage（migration 0041，用 UTC 日期記帳，隔天自然歸零＝自動恢復）；`src/ai-models.ts` 的 `reserveAi(db, 模型, {minutes|inputTokens|outputTokens})` 是**所有 AI 呼叫必經的閘門**（之後做逐字稿／關鍵字／語意搜尋都要先呼叫它，失敗用 `refundAi` 還額度；Cloudflare 回 3036「額度用完」用 `markExhausted` 當天直接停）。預扣為原子操作，今天已用＋這次估算超過上限就丟 `AiStopped`。設定（存 ui_settings 的 ai_settings）：每天上限 5,000／7,000／9,000（預設 9,000，留緩衝；同帳號其他用途也共用這 10,000）、「只用免費額度」預設開（開啟時沒有免費額度的 Claude 不能選、閘門也拒絕）。設定→AI 模型頁最上方顯示今日用量條、上限、開關。點數換算：Whisper turbo 46.63／分鐘、Whisper 41.14／分鐘、Llama 3.3 70B 26668／204805（每百萬字進／出）、Llama 3.1 8B 快速版 4119／34868、BGE-M3 約 1073（依官方牌價換算）。**修正總表**：先前憑記憶寫的價格有誤已更正；Llama 3.1 8B（fp8）官方預告 11/20 停用，改列「快速版」；移除 BGE Base 英文版。用量是程式估計，正確數字以 Cloudflare 後台 Workers AI 頁面為準。尚未有任何功能真的呼叫 AI。後端測試 87 項。
 - 2026-11-14 AI 模型頁新增「限制在免費額度內（用完自動停止）」開關（ai_settings.capEnabled，預設開）：關閉時 `reserveAi` 仍記錄用量但不擋（免費方案由 Cloudflare 直接拒絕、付費方案開始計費，頁面以紅字警告）；關閉時每天上限選項變灰。原「只用免費額度」改名「只用免費模型（不用 Claude）」避免混淆。測試涵蓋開／關（後端 87 項）。
-- 2026-11-14 **AI 金鑰設定**：金鑰規則不變——一律由業主在 Cloudflare 後台設定，App／程式／repo 不存、不顯示。設定→AI 模型頁新增「AI 金鑰與連線」：每個供應商顯示「已設定／尚未設定」（只回報有無，測試確認不會回傳金鑰內容）、設定步驟（可展開）、「測試連線」（極小請求，照樣經過每日額度閘門與「只用免費模型」；POST /admin/ai-models/test）。①Workers AI：不需金鑰，wrangler.jsonc 新增 `"ai": {"binding": "AI"}`（本機 wrangler.local.jsonc 沒綁，所以本機顯示未設定）。②Claude：Worker Secret `ANTHROPIC_API_KEY`（業主在後台 Workers 和 Pages → learn → 設定 → 變數和密碼 新增 Secret）；測試連線需先把「只用免費模型」關掉。Claude 連線與 Workers AI 實際呼叫**尚未用真實金鑰／正式站驗證**。後端測試 88 項。
-- 2026-11-14 **Claude 每月 US$100 預算（硬上限，不可超過）**（業主指示）：新表 ai_spend（migration 0042，微美元整數記帳、UTC 月份，每月 1 日台灣 08:00 自動換月歸零）。**所有用到 Claude 的功能一律走 `callClaude()`**（src/ai-models.ts，不可直接 fetch）：①「只用免費模型」檢查 ②`reserveUsd` 用「輸入估算＋max_tokens」最壞情況原子預扣，超過本月上限就丟 BudgetStopped、完全不送出 ③依回應 `usage.input_tokens／output_tokens`（快取 token 當一般輸入，保守）結算，連線失敗／被拒（非 2xx）還清預扣。牌價（官方，2026-11-03 查）：Haiku 5.5 每百萬 token $0.10 進／$0.50 出（單次輸入 >10 萬 token 為 $0.50／$2.50）；Sonnet 5.5 $2／$10。上限選項 25／50／100（最高 100，沒有關閉開關；ai_settings.claudeMonthlyCapUsd）。AI 模型頁新增「Claude 本月預算」（用量條＋上限選項）。總表 Claude 價格已補。限制：金額是程式換算的估計，雙重保險請業主同時在 Anthropic 後台設定支出上限 US$100；Claude 實際呼叫尚未用真實金鑰驗證（測試以模擬回應驗證預扣／結算／還款／換月）。後端測試 91 項。
-- 2026-11-14 **逐字稿試做**（業主「開始」）：`src/transcribe.ts`＋migration 0043（lesson_transcripts／lesson_transcript_parts）。章節編輯（媒體類型＝音檔且已有音檔）多「逐字稿（試做）」區塊（features/admin/lesson-transcript.tsx）：開始／繼續／暫停／重新轉；API：GET /admin/lessons/:id/transcript、POST /admin/lessons/:id/transcript/next {restart?}（一次只轉一段，前端迴圈呼叫，轉完一段存一段）。流程：用 AI 模型頁選的「逐字稿」模型（預設 Whisper large-v3-turbo，language=zh）；每段送出前先 `reserveAi`（每日免費額度閘門）；超過今日額度回 429 並停，隔天（台灣 08:00 後）按「繼續」從斷掉那段接著做；AI 失敗還回預扣、Cloudflare 回 3036 當天直接停。切段：Worker 無法解碼影音，所以依位元組切——檔案 ≤4MB 整檔送；較大且是 MP3 依 MP3 影格同步字切成每段約 3MB（128kbps 約 3 分鐘）；**較大的 M4A 等其他格式會直接提示請改傳 MP3**。每段分鐘數用章節長度推估（沒有長度假設 128kbps）。**限制／尚未做**：只支援「上傳音檔」章節；Mux 與 YouTube 章節尚未支援（Worker 取不到純音訊，YouTube 無法由伺服器取音訊；Mux 需開靜態音訊檔，下一步評估）；逐字稿目前只存在後台、尚未做 hashtag／關鍵字整理與語意搜尋、學員端不顯示。後端測試 97 項（分段不重疊且加總等於整檔、斷點續做、隔天恢復、失敗還額度、額度用完停止）。**尚未用真實 Workers AI 與真實音檔驗證**（本機沒有 AI 綁定）。
+- 2026-11-14 **AI 金鑰設定**：金鑰規則不變——一律由杜杜龍在 Cloudflare 後台設定，App／程式／repo 不存、不顯示。設定→AI 模型頁新增「AI 金鑰與連線」：每個供應商顯示「已設定／尚未設定」（只回報有無，測試確認不會回傳金鑰內容）、設定步驟（可展開）、「測試連線」（極小請求，照樣經過每日額度閘門與「只用免費模型」；POST /admin/ai-models/test）。①Workers AI：不需金鑰，wrangler.jsonc 新增 `"ai": {"binding": "AI"}`（本機 wrangler.local.jsonc 沒綁，所以本機顯示未設定）。②Claude：Worker Secret `ANTHROPIC_API_KEY`（杜杜龍在後台 Workers 和 Pages → learn → 設定 → 變數和密碼 新增 Secret）；測試連線需先把「只用免費模型」關掉。Claude 連線與 Workers AI 實際呼叫**尚未用真實金鑰／正式站驗證**。後端測試 88 項。
+- 2026-11-14 **Claude 每月 US$100 預算（硬上限，不可超過）**（杜杜龍指示）：新表 ai_spend（migration 0042，微美元整數記帳、UTC 月份，每月 1 日台灣 08:00 自動換月歸零）。**所有用到 Claude 的功能一律走 `callClaude()`**（src/ai-models.ts，不可直接 fetch）：①「只用免費模型」檢查 ②`reserveUsd` 用「輸入估算＋max_tokens」最壞情況原子預扣，超過本月上限就丟 BudgetStopped、完全不送出 ③依回應 `usage.input_tokens／output_tokens`（快取 token 當一般輸入，保守）結算，連線失敗／被拒（非 2xx）還清預扣。牌價（官方，2026-11-03 查）：Haiku 5.5 每百萬 token $0.10 進／$0.50 出（單次輸入 >10 萬 token 為 $0.50／$2.50）；Sonnet 5.5 $2／$10。上限選項 25／50／100（最高 100，沒有關閉開關；ai_settings.claudeMonthlyCapUsd）。AI 模型頁新增「Claude 本月預算」（用量條＋上限選項）。總表 Claude 價格已補。限制：金額是程式換算的估計，雙重保險請杜杜龍同時在 Anthropic 後台設定支出上限 US$100；Claude 實際呼叫尚未用真實金鑰驗證（測試以模擬回應驗證預扣／結算／還款／換月）。後端測試 91 項。
+- 2026-11-14 **逐字稿試做**（杜杜龍「開始」）：`src/transcribe.ts`＋migration 0043（lesson_transcripts／lesson_transcript_parts）。章節編輯（媒體類型＝音檔且已有音檔）多「逐字稿（試做）」區塊（features/admin/lesson-transcript.tsx）：開始／繼續／暫停／重新轉；API：GET /admin/lessons/:id/transcript、POST /admin/lessons/:id/transcript/next {restart?}（一次只轉一段，前端迴圈呼叫，轉完一段存一段）。流程：用 AI 模型頁選的「逐字稿」模型（預設 Whisper large-v3-turbo，language=zh）；每段送出前先 `reserveAi`（每日免費額度閘門）；超過今日額度回 429 並停，隔天（台灣 08:00 後）按「繼續」從斷掉那段接著做；AI 失敗還回預扣、Cloudflare 回 3036 當天直接停。切段：Worker 無法解碼影音，所以依位元組切——檔案 ≤4MB 整檔送；較大且是 MP3 依 MP3 影格同步字切成每段約 3MB（128kbps 約 3 分鐘）；**較大的 M4A 等其他格式會直接提示請改傳 MP3**。每段分鐘數用章節長度推估（沒有長度假設 128kbps）。**限制／尚未做**：只支援「上傳音檔」章節；Mux 與 YouTube 章節尚未支援（Worker 取不到純音訊，YouTube 無法由伺服器取音訊；Mux 需開靜態音訊檔，下一步評估）；逐字稿目前只存在後台、尚未做 hashtag／關鍵字整理與語意搜尋、學員端不顯示。後端測試 97 項（分段不重疊且加總等於整檔、斷點續做、隔天恢復、失敗還額度、額度用完停止）。**尚未用真實 Workers AI 與真實音檔驗證**（本機沒有 AI 綁定）。
 - 2026-11-14 提示文字統一：『只用免費額度』→『只用免費模型』，Claude 被擋時說明要到 AI 模型頁把開關改成『關』。
-- 2026-11-14 **會員抬頭加獎銜徽章**（業主指示，首頁與設定頁共用 features/member-header.tsx）：徽章在最右邊、高度與頭像一致（48，圖是 380×720 直式，各獎銜同畫布，獎銜越高圖案越長），元件 features/rank-badge.tsx 含反光閃爍（每約 3.5 秒一道亮帶由左掃到右，只照在徽章圖案上，掃過後整體微閃；系統開「減少動態效果」時只顯示靜態圖）。圖檔在 R2（learn）`Pin-Level/NN-English-Name.png`（24 張，業主 2026-11-14 從 echo-starry 複製；中文改英文名，英文是我翻的非官方用語）。後端：src/rank-badges.ts（獎銜代碼→圖檔，也能用中文名稱對；3%～21%、無 沒有徽章不顯示）；Member 新增 rankBadge（只在記憶體算出，不存資料庫）；公開 GET /media/badge?f=NN-Name（白名單檔名）。注意：中央會員的獎銜代碼是否與本地階梯相同未在正式站驗證（對不到時用獎銜中文名稱備援）；只用模擬會員在本機驗證。測試 tests/rank-badges.test.ts（後端共 99 項）。
+- 2026-11-14 **會員抬頭加獎銜徽章**（杜杜龍指示，首頁與設定頁共用 features/member-header.tsx）：徽章在最右邊、高度與頭像一致（48，圖是 380×720 直式，各獎銜同畫布，獎銜越高圖案越長），元件 features/rank-badge.tsx 含反光閃爍（每約 3.5 秒一道亮帶由左掃到右，只照在徽章圖案上，掃過後整體微閃；系統開「減少動態效果」時只顯示靜態圖）。圖檔在 R2（learn）`Pin-Level/NN-English-Name.png`（24 張，杜杜龍 2026-11-14 從 echo-starry 複製；中文改英文名，英文是我翻的非官方用語）。後端：src/rank-badges.ts（獎銜代碼→圖檔，也能用中文名稱對；3%～21%、無 沒有徽章不顯示）；Member 新增 rankBadge（只在記憶體算出，不存資料庫）；公開 GET /media/badge?f=NN-Name（白名單檔名）。注意：中央會員的獎銜代碼是否與本地階梯相同未在正式站驗證（對不到時用獎銜中文名稱備援）；只用模擬會員在本機驗證。測試 tests/rank-badges.test.ts（後端共 99 項）。
 - 2026-11-14 **網站標題「寰宇行動大學」改極細字、字距靠近**（ui/brand-title.tsx）：內建 Noto Sans TC Thin 子集字型（assets/fonts/NotoSansTC-Thin-brand.ttf，只含標題 6 字，約 3KB，SIL OFL 授權），用 expo-font 載入（新增依賴 expo-font），字級 32、字距 -2、字與字不留間隙；字型載入前標題先隱藏避免閃一下粗體。原有色彩流動與反光動畫保留。要改標題字不同的字，需重新產生子集字型（Google Fonts CSS API 的 text= 參數可下載）。App（iOS／Android）端未實機驗證。
-- 2026-11-14 **播放控制列：時間軸拉到最長、時間改倒數**（業主指示，Mux／YouTube／純音檔共用 PlayerControls，改一處全站一致）：按鈕寬 44→36（高仍 44）、圖示略縮（22／20）、左右外距 2，圖示之間幾乎貼在一起，時間軸占剩餘全部寬度；時間改顯示「倒數剩餘」`-12:34`（engine.types.ts `remainingText`，向上取整，播完剛好 0:00；寬度依整堂長度固定＋tabular-nums，時間軸不會隨數字抖動）。離開課程頁後的底部迷你音檔列（audio-bar.tsx）時間也同步改倒數。本機 390 寬截圖驗證；iOS／Android App 未實機驗證。
-- 2026-11-14 **會員抬頭調整（業主指示）**：①標題「寰宇行動大學」字距改大（letterSpacing 2，原 -2）。②徽章移到「緊貼獎銜標籤右邊」（不再在最右邊），尺寸放大 1.5 倍＝高 72（寬依 380:720 比例約 38）。③**取消原本的掃光，改為星星般閃爍的閃光球**（features/rank-badge.tsx）：4 顆星形光球（中心亮點＋十字與斜十字光芒＋金色光暈）在徽章圖案上錯開時間此起彼落地亮起、旋轉、淡出（位置依各徽章圖案上下範圍 ART_Y，確保落在圖案上；要調位置／顆數／速度改 SPARKS）；系統開「減少動態效果」時只顯示靜態徽章。本機 390 寬截圖驗證；正式站真實會員未驗證。
+- 2026-11-14 **播放控制列：時間軸拉到最長、時間改倒數**（杜杜龍指示，Mux／YouTube／純音檔共用 PlayerControls，改一處全站一致）：按鈕寬 44→36（高仍 44）、圖示略縮（22／20）、左右外距 2，圖示之間幾乎貼在一起，時間軸占剩餘全部寬度；時間改顯示「倒數剩餘」`-12:34`（engine.types.ts `remainingText`，向上取整，播完剛好 0:00；寬度依整堂長度固定＋tabular-nums，時間軸不會隨數字抖動）。離開課程頁後的底部迷你音檔列（audio-bar.tsx）時間也同步改倒數。本機 390 寬截圖驗證；iOS／Android App 未實機驗證。
+- 2026-11-14 **會員抬頭調整（杜杜龍指示）**：①標題「寰宇行動大學」字距改大（letterSpacing 2，原 -2）。②徽章移到「緊貼獎銜標籤右邊」（不再在最右邊），尺寸放大 1.5 倍＝高 72（寬依 380:720 比例約 38）。③**取消原本的掃光，改為星星般閃爍的閃光球**（features/rank-badge.tsx）：4 顆星形光球（中心亮點＋十字與斜十字光芒＋金色光暈）在徽章圖案上錯開時間此起彼落地亮起、旋轉、淡出（位置依各徽章圖案上下範圍 ART_Y，確保落在圖案上；要調位置／顆數／速度改 SPARKS）；系統開「減少動態效果」時只顯示靜態徽章。本機 390 寬截圖驗證；正式站真實會員未驗證。
 - 2026-11-14 徽章再放大 1.5 倍：高 72→108（BADGE_SIZE，閃光球大小隨 K=BADGE_SIZE/72 等比縮放）。
 - 2026-11-14 徽章：①上下間距恢復為徽章放大前（member-header 傳 layoutHeight=頭像高 48，徽章本體 108 高置中、transform 縮放不佔位，上下溢出到外面）；徽章尺寸維持 108。②徽章整體（含閃光球）加『呼吸』效果：慢慢放大到 1.1 倍再縮回（週期約 2.6 秒），只改大小、不變透明；系統開『減少動態效果』時靜止。本機量測縮放 108→118、opacity 維持 1。
 - 2026-11-14 給中央 AI 的指令已寫好：docs/central-request-rank-badges.md（徽章圖庫搬到中央 R2、獎銜選項加 badge_url、徽章顯示標準寫進串接指令包）。中央完成前行動大學照常用現有的 R2 徽章；完成後改讀 badge_url 再刪本地圖庫與 rank-badges.ts。
 - 2026-11-14 徽章再縮小 15%：高 108→92（BADGE_SIZE；版面間距不變、閃光球等比縮放）；給中央的文件同步改為 92。
-- 2026-11-14 **『課程排序與條件』頁改版（業主指示：舊的 8 組報名狀態優先順位已不適用）**：①區塊改為『系列排序』，給『全部課程 › 系列』小卡專用：超級管理員手動排序（每張小卡 ↑↓ 與『置頂』，按儲存生效）；小卡＝一個系列（代碼 s:系列名稱）或沒有系列的單一課程（c:課程編號）。設定存在 UiConfig.seriesOrder（contract／ui-config.ts 驗證：只收 s:／c: 開頭、去重、最多 1000 筆；PUT 沒傳就保留）；沒列到的小卡（新增的系列／課程）維持原順序接在最後面。前端 sort.ts orderGroups、courses-view 套用。②緞帶設定（左／右上角）原樣保留。③舊的 sortGroups 仍留在設定裡（admin 課程清單與預設排序仍用它，但頁面不再顯示、不再由頁面修改）。本機驗證：置頂後小卡順序即時改變。後端測試 99 項。
-- 2026-11-15 **徽章改讀會員中心（串接指令 2026-11-15.2，ADR 0027）**：後端 central.ts `rankBadges()` 讀 GET /v1/amway/field-definitions 的 rank 選項 badge_url（https 完整網址）與 badge{width,height,art_top,art_bottom}（快取 1 天、只放記憶體、讀不到不快取）；/me 的 Member 新增 rankBadgeArt，rankBadge＝中央給的完整網址（中央說 null＝不顯示；不拼網址、不寫死、不存副本）。前端 RankBadge 用 art 範圍定位閃光球。**暫時備援（待業主用真實帳號確認顯示正確後刪除）**：中央讀不到時才用本地 R2 `Pin-Level/` 與 src/rank-badges.ts、/media/badge、RankBadge 的 ART_Y 表；刪除時一併移除這四處與 R2 的 24 張舊檔。測試 tests/rank-badges.test.ts（解析、/me 用中央網址與範圍、中央說沒有就 null；後端共 101 項）。本機用模擬的 /me 回應驗證可載入中央圖片並正確顯示皇冠大使；真實 field-definitions 回應需登入才能取得，未直接驗證。
-- 2026-11-15 **封面框與課程頁預設停留位置永遠同步（修正邏輯，業主指出課程頁顯示範圍不是自己指定的）**：原因＝後台有兩個各自獨立的設定（①預設停留位置 edm_view_y、②封面裁切框），而且封面裁切框沒有存起來（重開『調整』會重置），所以兩者容易不一致。現在只有『一個』設定＝封面裁切框：課程清單縮圖與課程頁一進來看到的位置（＝框的上緣）同源。①後端：migration 0044 courses.cover_rect（占 EDM 寬高比例 JSON {x,y,w}）；PATCH coverRect 時 edm_view_y 由它算出（不接受另外指定）；只改 edmViewY（舊用法）則 cover_rect 作廢；換 EDM 圖時 cover_rect 清空；CourseSummary 新增 coverRect。②後台 edm-manager.web.tsx：拿掉『① 預設停留位置』卡片與『重新裁切』勾選，只剩『封面與預設停留位置』一個裁切框，起始框＝已記錄的封面框 → 舊課程用圖片比對找回（features/admin/cover-match.web.ts）→ 最後才用舊預設位置當上緣；儲存時一併存 coverRect。③**一次性同步工具**：設定→課程設定頁最上方（超級管理員、網頁版）『封面與預設位置同步』按鈕（cover-sync.web.tsx），逐一把『有 EDM 與封面但沒記錄封面框』的課程用圖片比對找出封面框並寫回；比對不出來的列出課程名稱，請到該課程『調整封面與預設位置』手動重設一次。本機用模擬海報驗證滿版與放大兩種裁切都找回（誤差 <0.1%）。view-window-picker.web.tsx 已刪除。後端測試 101 項。
-- 2026-11-15 **『全部課程』與『學習中』上方功能列固定置頂**（業主指示：往下捲動時永遠留在最上面）：Screen 新增 `top` 參數（src/ui/screen.tsx）＝固定在捲動區『上方』的功能列（不在 ScrollView 內，有底線與淡陰影；有 top 時內容區上方留白縮小）。全部課程（含搜尋展開與關聯詞清單，courses-view 的 filterRow，系列單頁也一併）與學習中（費用／系列下拉）都改用 top。之後新頁面有篩選列，一律用 Screen 的 top。本機 390 寬驗證兩頁：內容捲動後功能列位置不變。
-- 2026-11-14 **本地徽章備援已清除**（業主確認真實帳號徽章正常）：刪除 apps/launch/src/rank-badges.ts、`/media/badge` 路由、RankBadge 的 ART_Y 表，R2 的 Pin-Level/ 24 張舊圖已刪除；`/me` 的徽章只讀會員中心，中央讀不到就不顯示。後端測試 99 項、型別檢查、ESLint 全過；已部署。
-- 2026-11-15 **課程頁原地編輯＋小編＋中心（業主指示，討論紀錄 docs/plan-inline-edit.md）**：
+- 2026-11-14 **『課程排序與條件』頁改版（杜杜龍指示：舊的 8 組報名狀態優先順位已不適用）**：①區塊改為『系列排序』，給『全部課程 › 系列』小卡專用：超級管理員手動排序（每張小卡 ↑↓ 與『置頂』，按儲存生效）；小卡＝一個系列（代碼 s:系列名稱）或沒有系列的單一課程（c:課程編號）。設定存在 UiConfig.seriesOrder（contract／ui-config.ts 驗證：只收 s:／c: 開頭、去重、最多 1000 筆；PUT 沒傳就保留）；沒列到的小卡（新增的系列／課程）維持原順序接在最後面。前端 sort.ts orderGroups、courses-view 套用。②緞帶設定（左／右上角）原樣保留。③舊的 sortGroups 仍留在設定裡（admin 課程清單與預設排序仍用它，但頁面不再顯示、不再由頁面修改）。本機驗證：置頂後小卡順序即時改變。後端測試 99 項。
+- 2026-11-15 **徽章改讀會員中心（串接指令 2026-11-15.2，ADR 0027）**：後端 central.ts `rankBadges()` 讀 GET /v1/amway/field-definitions 的 rank 選項 badge_url（https 完整網址）與 badge{width,height,art_top,art_bottom}（快取 1 天、只放記憶體、讀不到不快取）；/me 的 Member 新增 rankBadgeArt，rankBadge＝中央給的完整網址（中央說 null＝不顯示；不拼網址、不寫死、不存副本）。前端 RankBadge 用 art 範圍定位閃光球。**暫時備援（待杜杜龍用真實帳號確認顯示正確後刪除）**：中央讀不到時才用本地 R2 `Pin-Level/` 與 src/rank-badges.ts、/media/badge、RankBadge 的 ART_Y 表；刪除時一併移除這四處與 R2 的 24 張舊檔。測試 tests/rank-badges.test.ts（解析、/me 用中央網址與範圍、中央說沒有就 null；後端共 101 項）。本機用模擬的 /me 回應驗證可載入中央圖片並正確顯示皇冠大使；真實 field-definitions 回應需登入才能取得，未直接驗證。
+- 2026-11-15 **封面框與課程頁預設停留位置永遠同步（修正邏輯，杜杜龍指出課程頁顯示範圍不是自己指定的）**：原因＝後台有兩個各自獨立的設定（①預設停留位置 edm_view_y、②封面裁切框），而且封面裁切框沒有存起來（重開『調整』會重置），所以兩者容易不一致。現在只有『一個』設定＝封面裁切框：課程清單縮圖與課程頁一進來看到的位置（＝框的上緣）同源。①後端：migration 0044 courses.cover_rect（占 EDM 寬高比例 JSON {x,y,w}）；PATCH coverRect 時 edm_view_y 由它算出（不接受另外指定）；只改 edmViewY（舊用法）則 cover_rect 作廢；換 EDM 圖時 cover_rect 清空；CourseSummary 新增 coverRect。②後台 edm-manager.web.tsx：拿掉『① 預設停留位置』卡片與『重新裁切』勾選，只剩『封面與預設停留位置』一個裁切框，起始框＝已記錄的封面框 → 舊課程用圖片比對找回（features/admin/cover-match.web.ts）→ 最後才用舊預設位置當上緣；儲存時一併存 coverRect。③**一次性同步工具**：設定→課程設定頁最上方（超級管理員、網頁版）『封面與預設位置同步』按鈕（cover-sync.web.tsx），逐一把『有 EDM 與封面但沒記錄封面框』的課程用圖片比對找出封面框並寫回；比對不出來的列出課程名稱，請到該課程『調整封面與預設位置』手動重設一次。本機用模擬海報驗證滿版與放大兩種裁切都找回（誤差 <0.1%）。view-window-picker.web.tsx 已刪除。後端測試 101 項。
+- 2026-11-15 **『全部課程』與『學習中』上方功能列固定置頂**（杜杜龍指示：往下捲動時永遠留在最上面）：Screen 新增 `top` 參數（src/ui/screen.tsx）＝固定在捲動區『上方』的功能列（不在 ScrollView 內，有底線與淡陰影；有 top 時內容區上方留白縮小）。全部課程（含搜尋展開與關聯詞清單，courses-view 的 filterRow，系列單頁也一併）與學習中（費用／系列下拉）都改用 top。之後新頁面有篩選列，一律用 Screen 的 top。本機 390 寬驗證兩頁：內容捲動後功能列位置不變。
+- 2026-11-14 **本地徽章備援已清除**（杜杜龍確認真實帳號徽章正常）：刪除 apps/launch/src/rank-badges.ts、`/media/badge` 路由、RankBadge 的 ART_Y 表，R2 的 Pin-Level/ 24 張舊圖已刪除；`/me` 的徽章只讀會員中心，中央讀不到就不顯示。後端測試 99 項、型別檢查、ESLint 全過；已部署。
+- 2026-11-15 **課程頁原地編輯＋小編＋中心（杜杜龍指示，討論紀錄 docs/plan-inline-edit.md）**：
   - 刪除「設定→課程設定」整組頁面（admin/courses、course-edit、admin/course/[id]、封面同步工具）與「短網址」頁。所有欄位搬到課程介紹頁：有權限的人工具列多「編輯」→ 上方綠色提示條「編輯模式中」（預覽／完成）；EDM 右下「EDM 與封面」；「課程設定」清單（基本資料、時間與地點、費用、報名與資格、進階設定、上架與刪除），每一列從下方彈出 EditSheet（src/features/course-edit/edit-sheet.tsx，左取消右儲存、未儲存離開會確認）；章節清單每堂上移／下移／鉛筆／刪除，鉛筆彈出 LessonSheet（原章節編輯器搬到 src/features/course-edit/lessons.tsx）；「新增章節」。公開佈局不變。
   - 每一區只送自己的欄位，帶 ifUpdatedAt；別人剛改過回 409 edit_conflict →「重新載入／仍要覆蓋（force）」。已有人報名時改費用、日期、地點先確認。進階設定最下方顯示最後修改者（courses.edited_by_name／edited_at，章節與圖片修改也會更新）。
   - 新增課程：全部課程右下「新增課程」→ 底部面板（名稱、主辦中心〔總部可選〕、系列）→ 建立草稿後直接進課程頁編輯模式（/course/:id?edit=1）。
   - **刪除規則**：有效報名（已開通、免費報名、待審核；不含已退回）> 0 → 按鈕是「下架封存」（status=archived，不是刪除）；= 0 才「刪除課程」永久刪除（DELETE 有報名一律 409，總部也一樣）。封存後：學員照常上課（/courses 對有報名、審核中、學習過的人仍回傳 archived，學習中照常；全部課程不顯示、不能報名）；還原只有總部、會長、音控。全部課程最下方管理者可展開「已封存（N）」。
   - **小編**（migration 0045 course_editors；只存行動大學）：總部、會長、音控在「設定→小編管理」（app/admin/editors.tsx）從會員中心同中心名單點選（GET /v1/eligibility/center-members，串接指令 2026-11-15.4；後端轉接 /admin/editors/candidates，用呼叫者本人 Token，名單不保存），三權限開關：新增（自己新增的課程完整權限，courses.created_by_sub）、修改別人（含上下架、價格、資格、審核群組、中心 EDM）、刪除別人（含下架封存）。指派／取消發站內通知＋Email（email.ts：個人通知沒有 member_contacts 也照寄）。小編登入時以本人 eligibility/context 的中心比對，換中心自動失效。權限核心：api.ts rightsOf／courseCan。
   - **中心**：全部課程「分類」旁加「中心」下拉（課程的主辦中心，CourseSummary.hostCenter/hostCenterKey）；選了中心先顯示中心 EDM（center_art 表；GET /center-art，PUT/DELETE /admin/center-art?center=；總部任何中心、會長音控與有「修改別人」的小編改自己中心）；網址同步成中心短網址（short_links 新增 kind=center，只有超級管理員能設，在中心 EDM 編輯面板）。分類＋中心同時選用 /courses?center=…&category=…。課程卡「XX主辦」可點，跳到全部課程並選好該中心。分享預覽：系列、中心有 EDM 就用 EDM。
-  - 測試：後端 102 項（新增 tests/editors.test.ts；封存規則改寫 admin.test、center-courses.test）。本機 390px 截圖檢查：全部課程（中心下拉、未上架標示、新增課程）、課程頁編輯模式與各面板、章節面板、小編管理與名單、設定頁。**正式站實測（洛杉磯中心音控、業主本人當小編）與 App 實機尚未驗證。**
+  - 測試：後端 102 項（新增 tests/editors.test.ts；封存規則改寫 admin.test、center-courses.test）。本機 390px 截圖檢查：全部課程（中心下拉、未上架標示、新增課程）、課程頁編輯模式與各面板、章節面板、小編管理與名單、設定頁。**正式站實測（洛杉磯中心音控、杜杜龍本人當小編）與 App 實機尚未驗證。**
   - 部署前資料庫還原點（D1 Time Travel，2026-11-15）：000001b6-00000002-00005124-46aebaa0d24e019b794604667e83678c
 
 - 2026-11-15（夜）章節與教材、職稱關連詞、教育中心名稱：
   - **其他教材**：`lessons.kind`（chapter／material，migration 0049）。教材與章節同款操作（新增、編輯、移動、複製、刪除），但**不計入**章節堂數、學習進度、成就、單元模式、搜尋索引；顯示序號章節與教材各自從 1 起（API 回傳的 `position` 是各組序號，資料庫的 position 仍是整門課共用且不重複）。學員端「其他教材」區塊＝系統自動產生的完整版（最前面）＋有內容的教材。`POST /admin/lessons/:id/duplicate` 複製一堂（音檔不共用）；排序 API 一次只排一組。
-  - **職稱**：`features/admin/suggest-input.tsx`（輸入一個字就跳出下拉關連詞，最多 50 筆）取代膠囊。新增職稱同步中央：`central.ts` 的 `centralAddJobTitle`＋待送清單 `job_title_outbox`（migration 0050）；**中央的 `POST /v1/vocab/suggestions` 尚未提供**（需求說明 `docs/central-request-job-title.md` 待業主轉交），目前只會累積待送、不報錯，中央完成後儲存課程／章節時自動補送。
+  - **職稱**：`features/admin/suggest-input.tsx`（輸入一個字就跳出下拉關連詞，最多 50 筆）取代膠囊。新增職稱同步中央：`central.ts` 的 `centralAddJobTitle`＋待送清單 `job_title_outbox`（migration 0050）；**中央的 `POST /v1/vocab/suggestions` 尚未提供**（需求說明 `docs/central-request-job-title.md` 待杜杜龍轉交），目前只會累積待送、不報錯，中央完成後儲存課程／章節時自動補送。
   - **教育中心名稱**：`center_names` 表（migration 0051）、`GET /center-names`、`PUT /admin/center-name`；前端 `features/format.ts` 的 `centerTitle()` 是全站唯一來源（自訂名稱優先，預設「去掉數字代碼＋中心」），`state/center-names.tsx` 載入。只是顯示別名，不改中央中心清單與代碼。英文縮寫網址在中心編輯面板所有人看得到、只有超級管理員能改。
 
-- 2026-11-15 **影音／檔案上傳模組＋其他教材改版**（業主指示）：①新模組 `src/features/uploads/`（影音上傳模組＝來源（示範／YouTube／Mux／音檔）＋時間軸區間；檔案上傳模組＝網址附件＋上傳檔案；新增匯入管道只改 `MEDIA_CHANNELS`／`FILE_CHANNELS`）；支援「暫存模式」＝新增教材時先暫存，按新增才建立並上傳（新增時不提供 Mux，因需已建立的教材，編輯時才有）。章節編輯改用模組，畫面行為不變。②「新增／編輯其他教材」獨立面板 `material-sheet.tsx`：教材名稱、分享者下拉（課程主講人＋各章節分享者，選到時連獎銜職稱一起存但不顯示）、兩個模組；無獎銜／職稱／YouTube 封面勾選／說明文字。③**完整版課程影片**改為真實一列：migration 0052 `lessons.is_full`；教材區塊『新增教材』上方勾選＝`POST /admin/courses/:id/full-version`（章節都用同一支影片時自動帶入、秒數空白）、取消勾選＝刪除（底部確認）；永遠排教材最後、無上下移與複製、可編輯設定來源與起訖秒數、不計入進度。舊的自動虛擬完整版與 `courses.show_full` 已停用（欄位保留），既有開啟的課程由 migration 轉成真實一列。刪除章節／教材時，音檔若仍被別列使用則不刪檔。測試 tests/review.test.ts、tests/full-version-migration.test.ts（後端共 110 項）。本機手機寬度驗證；iOS／Android 實機未驗證。
-- 2026-11-15 **教育中心清單卡片改版（業主選方案 A）**：`courses/center-tile.tsx` 整張 16:10 圖，中心名稱白字壓在左下暗色漸層上（只出現一次、16px 半粗）；有 EDM 用照片，沒有就用品牌綠漸層底，兩種長得一樣。漸層用 react-native-svg（網頁與 App 共用）。本機手機寬度驗證；iOS／Android 實機未驗證。
-- 2026-11-15 **分類清單統一來源**（業主指示）：分類下拉／分類面板的項目與順序在『相同系列／單元／寰宇教育中心』三個模式完全一致——項目＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定最後且一律列出；順序＝全部課程的堂數由多到少（同數量依名稱）；只有每個分類後面的堂數數字隨目前模式變動（0 堂的灰色虛線不能點）。courses-view.tsx catStats／categories。
+- 2026-11-15 **影音／檔案上傳模組＋其他教材改版**（杜杜龍指示）：①新模組 `src/features/uploads/`（影音上傳模組＝來源（示範／YouTube／Mux／音檔）＋時間軸區間；檔案上傳模組＝網址附件＋上傳檔案；新增匯入管道只改 `MEDIA_CHANNELS`／`FILE_CHANNELS`）；支援「暫存模式」＝新增教材時先暫存，按新增才建立並上傳（新增時不提供 Mux，因需已建立的教材，編輯時才有）。章節編輯改用模組，畫面行為不變。②「新增／編輯其他教材」獨立面板 `material-sheet.tsx`：教材名稱、分享者下拉（課程主講人＋各章節分享者，選到時連獎銜職稱一起存但不顯示）、兩個模組；無獎銜／職稱／YouTube 封面勾選／說明文字。③**完整版課程影片**改為真實一列：migration 0052 `lessons.is_full`；教材區塊『新增教材』上方勾選＝`POST /admin/courses/:id/full-version`（章節都用同一支影片時自動帶入、秒數空白）、取消勾選＝刪除（底部確認）；永遠排教材最後、無上下移與複製、可編輯設定來源與起訖秒數、不計入進度。舊的自動虛擬完整版與 `courses.show_full` 已停用（欄位保留），既有開啟的課程由 migration 轉成真實一列。刪除章節／教材時，音檔若仍被別列使用則不刪檔。測試 tests/review.test.ts、tests/full-version-migration.test.ts（後端共 110 項）。本機手機寬度驗證；iOS／Android 實機未驗證。
+- 2026-11-15 **教育中心清單卡片改版（杜杜龍選方案 A）**：`courses/center-tile.tsx` 整張 16:10 圖，中心名稱白字壓在左下暗色漸層上（只出現一次、16px 半粗）；有 EDM 用照片，沒有就用品牌綠漸層底，兩種長得一樣。漸層用 react-native-svg（網頁與 App 共用）。本機手機寬度驗證；iOS／Android 實機未驗證。
+- 2026-11-15 **分類清單統一來源**（杜杜龍指示）：分類下拉／分類面板的項目與順序在『相同系列／單元／寰宇教育中心』三個模式完全一致——項目＝關鍵字管理的分類清單＋所有課程用過的分類，「未分類」固定最後且一律列出；順序＝全部課程的堂數由多到少（同數量依名稱）；只有每個分類後面的堂數數字隨目前模式變動（0 堂的灰色虛線不能點）。courses-view.tsx catStats／categories。
 - 2026-11-15 **分類下拉的數字一律是章節（堂）**：系列頁分類下拉每項的『N 堂』『學習中 N』『未上架 N』與『全部分類』的『學習中』，原本後兩者是課程數，改成與『N 堂』同為章節數（lessonsOf）；分類面板、分類框本來就是堂數。courses-view.tsx catStats／allOption。
-- 2026-11-15 **分類數字改為全站總堂數**（業主指示，取代前面『數字隨模式變動』的說法）：分類面板、分類框『N堂』、系列頁分類下拉的『N 堂／學習中／未上架』與『全部分類』，三個模式一律以全站所有課程的章節（堂）數計算（courses-view.tsx catStats／allOption／CategorySheet 傳全部 courses）。清單本身仍只列目前頁面的課程，所以在中心頁選到全站數字較大的分類時，清單可能很短。
-- 2026-11-15 **章節主講人＋章節日期跟著課程日期**（業主指示）：①migration 0053 `lessons.is_speaker`＋唯一索引（每門課最多一堂）；章節編輯與新增章節多「主講人（每門課只能有一堂）」勾選，已有別堂時勾這一堂＝自動轉移（面板提示）；PATCH `isSpeaker`、POST lessons `isSpeaker`，教材不能勾（400）；search-index 帶 `isSpeaker`。②「全部課程 > 單元」工具列下方多「只顯示主講人」勾選（`courses/speaker-toggle.tsx`，只在單元模式出現、記在 localStorage `hglobal:learn:speaker-only`），打開後只列主講人章節。③章節日期空白＝跟著課程日期：API 的章節 `eventDate` 已是算好的實際日期、`dateFollows` 表示沒自己設定；新增章節／教材不再帶入日期（課程沒日期才用今天）、新課程的第 1 堂也留空；編輯面板的「同課程日期」勾選＝跟著；清除自訂日期＝改回跟著；migration 順便把原本剛好等於課程日期的章節改成跟著。測試 tests/speaker.test.ts、public-dates.test.ts（後端共 112 項）。本機手機寬度驗證；iOS／Android 實機未驗證。
-- 2026-11-15 **勾主講人＝套用課程基本資料**（業主指示）：章節勾選「主講人」後，編輯／新增章節面板隱藏「章節名稱、分享者、獎銜、職稱」，改顯示套用結果；伺服器強制：該章節的 title／sharer／sharer_rank／sharer_title 一律等於課程的名稱／主講人／獎銜／職稱（updateLesson、POST lessons 以及課程基本資料改動時 `speakerSync` 一起同步，另外填的值不採用）。取消勾選後欄位恢復可填，內容保留目前值。測試 tests/speaker.test.ts（後端共 113 項）。
-- 2026-11-16 **短網址集中、短影音、課程設定整理、課程專屬網址、首頁推薦**（業主指示）：
+- 2026-11-15 **分類數字改為全站總堂數**（杜杜龍指示，取代前面『數字隨模式變動』的說法）：分類面板、分類框『N堂』、系列頁分類下拉的『N 堂／學習中／未上架』與『全部分類』，三個模式一律以全站所有課程的章節（堂）數計算（courses-view.tsx catStats／allOption／CategorySheet 傳全部 courses）。清單本身仍只列目前頁面的課程，所以在中心頁選到全站數字較大的分類時，清單可能很短。
+- 2026-11-15 **章節主講人＋章節日期跟著課程日期**（杜杜龍指示）：①migration 0053 `lessons.is_speaker`＋唯一索引（每門課最多一堂）；章節編輯與新增章節多「主講人（每門課只能有一堂）」勾選，已有別堂時勾這一堂＝自動轉移（面板提示）；PATCH `isSpeaker`、POST lessons `isSpeaker`，教材不能勾（400）；search-index 帶 `isSpeaker`。②「全部課程 > 單元」工具列下方多「只顯示主講人」勾選（`courses/speaker-toggle.tsx`，只在單元模式出現、記在 localStorage `hglobal:learn:speaker-only`），打開後只列主講人章節。③章節日期空白＝跟著課程日期：API 的章節 `eventDate` 已是算好的實際日期、`dateFollows` 表示沒自己設定；新增章節／教材不再帶入日期（課程沒日期才用今天）、新課程的第 1 堂也留空；編輯面板的「同課程日期」勾選＝跟著；清除自訂日期＝改回跟著；migration 順便把原本剛好等於課程日期的章節改成跟著。測試 tests/speaker.test.ts、public-dates.test.ts（後端共 112 項）。本機手機寬度驗證；iOS／Android 實機未驗證。
+- 2026-11-15 **勾主講人＝套用課程基本資料**（杜杜龍指示）：章節勾選「主講人」後，編輯／新增章節面板隱藏「章節名稱、分享者、獎銜、職稱」，改顯示套用結果；伺服器強制：該章節的 title／sharer／sharer_rank／sharer_title 一律等於課程的名稱／主講人／獎銜／職稱（updateLesson、POST lessons 以及課程基本資料改動時 `speakerSync` 一起同步，另外填的值不採用）。取消勾選後欄位恢復可填，內容保留目前值。測試 tests/speaker.test.ts（後端共 113 項）。
+- 2026-11-16 **短網址集中、短影音、課程設定整理、課程專屬網址、首頁推薦**（杜杜龍指示）：
   ①設定 > 短網址（`app/admin/short-links.tsx`，超管）集中分類／系列／中心短網址；課程進階設定與中心編輯面板的短網址已移除；頁面另有「為舊課程補上專屬網址」按鈕（POST /admin/course-urls/backfill）。
   ②**中心課程改由主辦單位自動決定**：`centerCourse = host_center_key 不為空`（含任一中心＝中心課程，只出現在該中心頁；只有寰宇總部＝一般課程，出現在『相同系列』頁）；「中心課程」勾選已刪（欄位 center_course 保留不用、PATCH centerCourse 無效）；單元頁顯示全部課程。
   ③單元頁三選一篩選（features/courses/unit-filter.tsx）：只看主講／隱藏短影音／只看短影音（互斥，再點取消）；短影音＝課程基本資料的『短影音專輯』（courses.is_shorts，migration 0054）勾選，專輯的章節＋有影音的其他教材都進單元索引（search-index 多 isShorts／isMaterial）。localStorage `hglobal:learn:unit-filter`（舊 `speaker-only` 轉成只看主講）。
@@ -506,22 +506,22 @@
   ⑤**課程專屬網址** `/中心縮寫/英譯姓名-001`：courses.url_name（唯一索引 host_center_key＋url_name）；src/romanize.ts（中文 pinyin-pro、韓文 RR、日文假名 Hepburn；日文漢字用中文讀音）；編號三位數、同中心同姓名依序、一旦產生固定、換主辦中心才重新產生；課程存檔／中心縮寫設定時自動產生；摘要 `shortPath`；路由 `app/[slug]/[name].tsx`（GET /short-links/:slug/:name）；分享預覽 og.ts courseUrlMeta。缺主講人或中心沒縮寫＝沒有（用 /course/編號）。
   ⑥首頁推薦只列『我的中心』（總部主辦的人人算）。測試 tests/center-course.test.ts（後端共 116 項）。本機手機寬度驗證；iOS／Android 實機未驗證。
 - 2026-11-16 **修正：中心短網址重新整理後出現兩條上方工具列**：`short-link-screen.tsx` 在中心短網址（kind=center）不再放 PageHeader（改 `headerShown:false`），因為中心頁（CoursesView）自己有 TopBar（返回／標題／編輯／分享）；分類、系列短網址仍用 PageHeader。
-- 2026-11-16 **中心頁照片改版（方案 A→上滑變 D）、瀏覽計數、找回「相同系列」課程、主講人標記**（業主指示）：
+- 2026-11-16 **中心頁照片改版（方案 A→上滑變 D）、瀏覽計數、找回「相同系列」課程、主講人標記**（杜杜龍指示）：
   ①`courses/center-hero.tsx`：中心頁上方照片＝滿版 16:10、不放名稱（上方工具列已有）、左下透明標籤『N 門課・N 章節・N 瀏覽』、右上放大鈕；往上滑時依捲動位移內插縮成窄橫幅（高 112、左右 16、圓角 16），回頂端再展開；沒照片用品牌綠漸層。`Screen` 新增 `hero`、`scrollY`（Animated.Value）參數。
   ②瀏覽計數：migration 0055 `center_views`（同人同天同中心只算一次，台灣時間）；POST／GET `/center-views`；進中心頁時記一次，上線後從 0 起算；會員刪除時一併清除。
-  ③**修正『相同系列』頁消失課程**：11-16 我把中心課程一律排除，與業主說的『有指定系列標籤就顯示在系列分頁』不一致。現在 pool＝中心頁：主辦含中心的課程；相同系列／單元：總部主辦的課程＋所有有系列標籤的課程（不論主辦）。待業主決定：美國洛杉磯中心 3 門課的系列欄位預設帶入『美國洛杉磯中心』（假系列），會在系列頁多一張卡，建議清空。
+  ③**修正『相同系列』頁消失課程**：11-16 我把中心課程一律排除，與杜杜龍說的『有指定系列標籤就顯示在系列分頁』不一致。現在 pool＝中心頁：主辦含中心的課程；相同系列／單元：總部主辦的課程＋所有有系列標籤的課程（不論主辦）。待杜杜龍決定：美國洛杉磯中心 3 門課的系列欄位預設帶入『美國洛杉磯中心』（假系列），會在系列頁多一張卡，建議清空。
   ④章節編輯／新增章節拿掉分享者下方的『同主講人』勾選（SharerField 只剩姓名輸入）；主講人章節在章節清單（課程頁、上課頁章節、單元頁）標麥克風圖示（`courses/speaker-mark.tsx`）。測試後端共 117 項。
-- 2026-11-16 主講人章節標記圖示改為學士帽（`courses/speaker-mark.tsx`，Ionicons `school`，只有圖示、不帶文字標籤；業主從 10 款挑選）。
-- 2026-11-16 **設定 > APP 數值設定**（業主指示，超管；`app/admin/app-settings.tsx`，存在 ui_config 的 `app` 欄位，`contract.ts` AppSettings／DEFAULT_APP_SETTINGS，`ui-config.ts` normalizeApp 夾範圍；PUT /admin/ui-config 可只傳部分欄位）：①首頁『推薦課程』規則（範圍：我的中心／不分中心、是否納入總部主辦、只推符合獎銜、不推已結束、同系列只推最近一場、排序：照全部課程／日期最近／最新建立、最多幾門）；②首頁自動輪播：左『繼續學習』、右『推薦課程』各自的秒數（0＝關閉，預設 5 秒）、手指滑過後暫停秒數、公告跑馬燈間隔與暫停；③其他全站數值：『新』標籤天數（7）、改播另一堂倒數秒數（15）、圖片『完整顯示』背景模糊強度（18）。HomeRail 新增自動輪播（autoSec／pauseSec），Ticker 改吃設定。**日後新增任何全站數值，一律加到 AppSettings 並放進這一頁。** 後端測試 119 項。
-- 2026-11-16 **單元頁篩選改為兩顆眼睛按鈕**（業主定案，取代先前三選一；features/courses/unit-filter.tsx）：『只看短影音』『只看主講』；開＝眼睛張開深綠底、關＝眼睛劃斜線灰色；開『只看短影音』時『只看主講』強制關閉、變淡灰色不能按；關閉『只看短影音』不影響，可單獨開『只看主講』（不自動恢復原本開著的主講）。原『隱藏短影音』取消；localStorage `hglobal:learn:unit-filter` 值為 all／speaker／shorts（舊的 noshorts 視為 all）。
-- 2026-11-16 **中央已開放『新增職稱詞條』API（串接指令版本 2026-11-15.5）**：`centralAddJobTitle` 依中央規格處理回應——200＝收下（新詞待業主在中央後台『關聯詞』核可）、400／403＝被退回不重送（新增 "rejected"，從待送清單刪除）、401／429／5xx／逾時＝暫存重送、404／405／501＝尚未開放。待送清單在下次儲存課程或章節時補送（每次最多 5 筆）。**INTEGRATED_VERSION 仍是 2026-11-13.9，尚未改成 2026-11-15.5**（該版其他標準未逐項確認，待業主確認要不要一併採用再改）。docs/central-request-job-title.md 的需求已完成。
-- 2026-11-16 **單元頁眼睛按鈕改版**（業主指示，取代上一筆的兩態設計；unit-filter.tsx）：『短影音』按鈕每按一下循環三態——灰色眼睛（不劃線）『短影音開關』＝沒篩選 → 綠色『只看短影音』→ 眼睛劃斜線『不看短影音』→ 回灰色；『主講』按鈕兩態——灰色眼睛『全部顯示』↔ 綠色『只看主講』。開『只看短影音』時主講強制關閉、變淡灰色不能按；其他狀態不受影響（主講被強制關閉後不自動恢復）。localStorage 值：all／speaker／shorts／noshorts／speaker_noshorts。（『隱藏短影音』因此又恢復，以『不看短影音』狀態呈現。）
+- 2026-11-16 主講人章節標記圖示改為學士帽（`courses/speaker-mark.tsx`，Ionicons `school`，只有圖示、不帶文字標籤；杜杜龍從 10 款挑選）。
+- 2026-11-16 **設定 > APP 數值設定**（杜杜龍指示，超管；`app/admin/app-settings.tsx`，存在 ui_config 的 `app` 欄位，`contract.ts` AppSettings／DEFAULT_APP_SETTINGS，`ui-config.ts` normalizeApp 夾範圍；PUT /admin/ui-config 可只傳部分欄位）：①首頁『推薦課程』規則（範圍：我的中心／不分中心、是否納入總部主辦、只推符合獎銜、不推已結束、同系列只推最近一場、排序：照全部課程／日期最近／最新建立、最多幾門）；②首頁自動輪播：左『繼續學習』、右『推薦課程』各自的秒數（0＝關閉，預設 5 秒）、手指滑過後暫停秒數、公告跑馬燈間隔與暫停；③其他全站數值：『新』標籤天數（7）、改播另一堂倒數秒數（15）、圖片『完整顯示』背景模糊強度（18）。HomeRail 新增自動輪播（autoSec／pauseSec），Ticker 改吃設定。**日後新增任何全站數值，一律加到 AppSettings 並放進這一頁。** 後端測試 119 項。
+- 2026-11-16 **單元頁篩選改為兩顆眼睛按鈕**（杜杜龍定案，取代先前三選一；features/courses/unit-filter.tsx）：『只看短影音』『只看主講』；開＝眼睛張開深綠底、關＝眼睛劃斜線灰色；開『只看短影音』時『只看主講』強制關閉、變淡灰色不能按；關閉『只看短影音』不影響，可單獨開『只看主講』（不自動恢復原本開著的主講）。原『隱藏短影音』取消；localStorage `hglobal:learn:unit-filter` 值為 all／speaker／shorts（舊的 noshorts 視為 all）。
+- 2026-11-16 **中央已開放『新增職稱詞條』API（串接指令版本 2026-11-15.5）**：`centralAddJobTitle` 依中央規格處理回應——200＝收下（新詞待杜杜龍在中央後台『關聯詞』核可）、400／403＝被退回不重送（新增 "rejected"，從待送清單刪除）、401／429／5xx／逾時＝暫存重送、404／405／501＝尚未開放。待送清單在下次儲存課程或章節時補送（每次最多 5 筆）。**INTEGRATED_VERSION 仍是 2026-11-13.9，尚未改成 2026-11-15.5**（該版其他標準未逐項確認，待杜杜龍確認要不要一併採用再改）。docs/central-request-job-title.md 的需求已完成。
+- 2026-11-16 **單元頁眼睛按鈕改版**（杜杜龍指示，取代上一筆的兩態設計；unit-filter.tsx）：『短影音』按鈕每按一下循環三態——灰色眼睛（不劃線）『短影音開關』＝沒篩選 → 綠色『只看短影音』→ 眼睛劃斜線『不看短影音』→ 回灰色；『主講』按鈕兩態——灰色眼睛『全部顯示』↔ 綠色『只看主講』。開『只看短影音』時主講強制關閉、變淡灰色不能按；其他狀態不受影響（主講被強制關閉後不自動恢復）。localStorage 值：all／speaker／shorts／noshorts／speaker_noshorts。（『隱藏短影音』因此又恢復，以『不看短影音』狀態呈現。）
 - 2026-11-16 **修正：沒設短網址的中心分享預覽缺標題（彰化中心）——分享預覽統一入口**：原本只有短網址 `/縮寫` 與課程專屬網址有預覽處理，其他分享網址（`/courses?center=…`、`?category=…`、`/series/名稱`、`/course/編號`、`/learn/課程/章節`）都退回預設『寰宇行動大學』。現在 `og.ts` 的 `resolveShareMeta` 是唯一入口（worker.ts 只呼叫它）：中心＝自訂名稱或『XX中心』、分類、中心＋分類、系列、課程、章節；課程與章節只處理已上架的（草稿不洩漏）。新增會被分享的網址形狀時，一律加在這個函式。LINE 會快取舊預覽，已分享的連結要重新分享（或網址加 ?v=2）才更新。測試 tests/share-meta.test.ts（後端共 120 項）。
-- 2026-11-16 **上拉選單：右上角統一膠囊＋上拉進入內頁**（業主指示）：新元件 `ui/sheet-action.tsx`（SheetAction，深綠膠囊）；『查看詳細介紹』改名『完整介紹』，系列選單『顯示全部』共用同一元件。`BottomSheet` 新增 `onExpand`／`expandLabel`：按住面板任何位置往上拉，面板跟著手指長高（下方用同色補滿、上方浮出提示），拉過約一半距離放開或拉到最高處就觸發右上角按鈕的動作，沒拉夠彈回；網頁上若按在『還能往下捲的清單』裡不攔截（讓清單自己捲）。已套用：中心頁課程章節選單（course-lessons-sheet.tsx）、系列梯次選單（series-sheet.tsx，有 showAllSeries 時）。CLAUDE.md 已寫入規則。
-- 2026-11-16 **上拉進入『先看摘要、再看全部』擴大到三處**（業主指示；皆用 `BottomSheet` onExpand＋`SheetAction` 膠囊）：①首頁『繼續學習』『推薦課程』點圖或名稱，先彈出該課的章節摘要（沿用 `CourseLessonsSheet`，右上角『完整介紹』，上拉進入課程介紹頁）；②通知（`features/notices/notice-sheet.tsx`）點一則先標已讀並彈出完整內容，有連結的右上角『前往查看』，上拉進入對應頁面；③報名紀錄（`features/orders/order-sheet.tsx`）點一筆先彈出報名摘要，右上角『完整明細』，上拉進入報名明細頁。本機手機寬度＋滑鼠模擬上拉驗證；iOS／Android 實機手勢未驗證。
+- 2026-11-16 **上拉選單：右上角統一膠囊＋上拉進入內頁**（杜杜龍指示）：新元件 `ui/sheet-action.tsx`（SheetAction，深綠膠囊）；『查看詳細介紹』改名『完整介紹』，系列選單『顯示全部』共用同一元件。`BottomSheet` 新增 `onExpand`／`expandLabel`：按住面板任何位置往上拉，面板跟著手指長高（下方用同色補滿、上方浮出提示），拉過約一半距離放開或拉到最高處就觸發右上角按鈕的動作，沒拉夠彈回；網頁上若按在『還能往下捲的清單』裡不攔截（讓清單自己捲）。已套用：中心頁課程章節選單（course-lessons-sheet.tsx）、系列梯次選單（series-sheet.tsx，有 showAllSeries 時）。CLAUDE.md 已寫入規則。
+- 2026-11-16 **上拉進入『先看摘要、再看全部』擴大到三處**（杜杜龍指示；皆用 `BottomSheet` onExpand＋`SheetAction` 膠囊）：①首頁『繼續學習』『推薦課程』點圖或名稱，先彈出該課的章節摘要（沿用 `CourseLessonsSheet`，右上角『完整介紹』，上拉進入課程介紹頁）；②通知（`features/notices/notice-sheet.tsx`）點一則先標已讀並彈出完整內容，有連結的右上角『前往查看』，上拉進入對應頁面；③報名紀錄（`features/orders/order-sheet.tsx`）點一筆先彈出報名摘要，右上角『完整明細』，上拉進入報名明細頁。本機手機寬度＋滑鼠模擬上拉驗證；iOS／Android 實機手勢未驗證。
 - 2026-11-16 主辦文字：`hostLine()`（format.ts，首頁區塊與課程資訊卡『XX主辦』共用）主辦中心 2 個以上時改為去掉『中心』、用『/』連接（台中/彰化/員林主辦）；單一主辦維持『XX中心主辦』。
 - 2026-11-16 **串接指令 2026-11-15.5 對照檢查**：結果見 docs/central-integration-2026-11-15.5.md。補上：隱私權政策連結改中央網址、獎銜選項／徽章快取 1 天→5 分鐘、網頁下拉門檻 90→70 px 與 2 秒間隔；INTEGRATED_VERSION 改為 2026-11-15.5。仍未做：手機 iPhone Keychain 共用登入。
-- 2026-11-16 **中心頁沒有課程時的提示文字＋中心地址欄位**（業主指示）：中心頁完全沒有課程（沒搜尋、沒選分類）時顯示『線上課程準備中／線下課程週週精彩／地址：xxx／請洽中心負責人』（沒設地址就不顯示地址那行）；搜尋或分類篩選沒結果仍用原本的『沒有符合條件的課程』。新增 migration 0056 `center_info`（center_key、center_label、address）、GET `/center-info`（登入會員）、PUT `/admin/center-info?center=`（權限同中心 EDM、最多 120 字、空白＝清除）；地址欄位放在中心編輯面板『教育中心名稱』之下、EDM 之上（`features/admin/center-address-field.tsx`）。測試 tests/center-names.test.ts（後端共 121 項）。
+- 2026-11-16 **中心頁沒有課程時的提示文字＋中心地址欄位**（杜杜龍指示）：中心頁完全沒有課程（沒搜尋、沒選分類）時顯示『線上課程準備中／線下課程週週精彩／地址：xxx／請洽中心負責人』（沒設地址就不顯示地址那行）；搜尋或分類篩選沒結果仍用原本的『沒有符合條件的課程』。新增 migration 0056 `center_info`（center_key、center_label、address）、GET `/center-info`（登入會員）、PUT `/admin/center-info?center=`（權限同中心 EDM、最多 120 字、空白＝清除）；地址欄位放在中心編輯面板『教育中心名稱』之下、EDM 之上（`features/admin/center-address-field.tsx`）。測試 tests/center-names.test.ts（後端共 121 項）。
 - 2026-11-16 **中心地址顯示在中心頁照片下方**（center-hero.tsx）：有設地址的中心，照片正下方多一條淺綠圓角地址列（深綠圓形定位圖示＋地址＋箭頭，點了開 Google 地圖搜尋該地址）；往上滑時高度與透明度一起縮到 0，比照片更早消失、不佔位。沒設地址就不顯示。
 - 2026-11-16 **修正：從課程頁／上課頁按工具列返回，要回到該中心的課程清單（原本回中心全部清單）**：原因＝`courses-view.tsx` 手工的瀏覽器歷史紀錄＋`popstate` 監聽，把『從課程頁退回中心頁那一筆紀錄』也當成『離開中心頁』而重設中心。修法：onPop 改用『落腳紀錄的網址是否是中心頁網址（centerUrlRef）』判斷（不用 history.state，導覽套件會改寫），退回中心頁就維持中心並在 120ms 後把網址還原；Android 實體返回鍵的 BackHandler 改成只在畫面是焦點時才註冊（useFocusEffect），課程頁蓋在上面時不攔。本機瀏覽器驗證：點中心（有／無短網址）、/courses?center= 直接進入、短網址直接進入、上課頁，返回都回到該中心；再返回回中心清單。iOS／Android 實機與 Android 實體返回鍵未測。
 - 2026-11-16 **中心分享預覽標題含地址**：`og.ts` `centerShareTitle`——「彰化中心（地址） | 寰宇行動大學」，沒設地址就省略（短網址與 /courses?center= 都一致；中心＋分類為「彰化中心（地址）・分類」）；說明小字仍是隨機學習金句。測試 tests/share-meta.test.ts（後端共 122 項）。LINE 會快取舊預覽，已分享的連結要重新分享。
@@ -535,19 +535,19 @@
 - **單元頁三顆眼睛篩選**（`unit-filter.tsx`）：短影音／主講／總結與銷售；值改成用「+」連接的字串（speaker、shorts、noshorts、summary、nosummary，都沒有＝all），舊的五個值仍讀得懂。互斥：只看短影音或只看總結與銷售時主講強制關閉並變灰；主講開著時，總結按鈕跳過「只看」直接到「不看」。
 - **分享者顯示全站統一**：`sharerLine` 不再有「分享者：」標題，姓名、獎銜、職稱改用「﹒」連接（例：賴宗廷﹒創辦人白金﹒建築師）。
 - **主講章節清單**：學士帽放大（`SpeakerLead`，36px）放在最前面，取代播放圖示（課程介紹頁、上課頁章節清單）；已完成／鎖定／敬請期待的列仍顯示狀態圖示。主講章節的名字、獎銜、職稱來自課程「基本資料」的主講人欄位；欄位空白時章節面板會用紅字提醒去填。
-- **章節分鐘數**（業主 2026-11-16）：顯示在每列播放圖示正下方，格式「12分鐘」（`minutesText`，超過 60 分鐘也用分鐘、不加「約」、不顯示小時）；`ListRow` 新增 `note` 屬性（傳空字串仍保留同寬欄位讓各列文字對齊）。套用在課程介紹頁與上課頁的章節／教材清單；單元頁、章節編輯列的文字格式同步改成「12分鐘」。
-- **章節清單圖示與日期**（業主 2026-11-16）：播放圖示與主講學士帽同為 36；章節清單右側不再顯示日期（課程介紹頁、上課頁）。
-- **章節清單精簡版**（業主 2026-11-16）：`ListRow` 的 `compact`——不顯示右側「>」、標題只佔一行（太長用「…」）、文字更靠近邊框（外層 Card 左右內距改 `space.sm`）。套用在課程介紹頁／中心選單（`lesson-list.tsx`）與上課頁的章節、教材清單。
-- **短網址大小寫與總部課程網址**（業主 2026-11-16）：縮寫照設定的大小寫保存與顯示（網址、分享預覽 og:url 都用設定的樣子），輸入時不分大小寫（所有比對用 `COLLATE NOCASE`；縮寫重複判斷也不分大小寫）。總部（沒有主辦中心）課程的專屬網址前綴用保留縮寫 `hq`：`/hq/英譯姓名-001`（`short-links.ts` 的 `HQ_SLUG`，不能被中心使用；migration `0058_hq_course_url.sql` 補唯一索引）。專屬網址仍需要「主講人」才產生；**新增課程時主講人姓名改為必填**（`new-course.tsx`；後端不強制，既有課程沒填的要手動補）。既有課程要在「設定 → 短網址 → 為舊課程補上專屬網址」按一次才會補齊（含總部課程）。
+- **章節分鐘數**（杜杜龍 2026-11-16）：顯示在每列播放圖示正下方，格式「12分鐘」（`minutesText`，超過 60 分鐘也用分鐘、不加「約」、不顯示小時）；`ListRow` 新增 `note` 屬性（傳空字串仍保留同寬欄位讓各列文字對齊）。套用在課程介紹頁與上課頁的章節／教材清單；單元頁、章節編輯列的文字格式同步改成「12分鐘」。
+- **章節清單圖示與日期**（杜杜龍 2026-11-16）：播放圖示與主講學士帽同為 36；章節清單右側不再顯示日期（課程介紹頁、上課頁）。
+- **章節清單精簡版**（杜杜龍 2026-11-16）：`ListRow` 的 `compact`——不顯示右側「>」、標題只佔一行（太長用「…」）、文字更靠近邊框（外層 Card 左右內距改 `space.sm`）。套用在課程介紹頁／中心選單（`lesson-list.tsx`）與上課頁的章節、教材清單。
+- **短網址大小寫與總部課程網址**（杜杜龍 2026-11-16）：縮寫照設定的大小寫保存與顯示（網址、分享預覽 og:url 都用設定的樣子），輸入時不分大小寫（所有比對用 `COLLATE NOCASE`；縮寫重複判斷也不分大小寫）。總部（沒有主辦中心）課程的專屬網址前綴用保留縮寫 `hq`：`/hq/英譯姓名-001`（`short-links.ts` 的 `HQ_SLUG`，不能被中心使用；migration `0058_hq_course_url.sql` 補唯一索引）。專屬網址仍需要「主講人」才產生；**新增課程時主講人姓名改為必填**（`new-course.tsx`；後端不強制，既有課程沒填的要手動補）。既有課程要在「設定 → 短網址 → 為舊課程補上專屬網址」按一次才會補齊（含總部課程）。
 
 ## 2026-11-16（續）：單元三個勾選、單堂課程分享文字、分享預設值
-- **單元頁篩選改成三個勾選**（`unit-filter.tsx`，取代三顆眼睛）：主講人、短影音、總結，強制同一排不換行。主講人與總結可同時勾（兩種章節都顯示，聯集）；短影音不能與另外兩個並存（互相取消）；都沒勾＝全部。存值改為 `speaker+summary+shorts`，舊值讀得懂。**註：業主原文「總結：只會顯示主講人」判斷為筆誤，實作為「只顯示總結與銷售課程」。**
+- **單元頁篩選改成三個勾選**（`unit-filter.tsx`，取代三顆眼睛）：主講人、短影音、總結，強制同一排不換行。主講人與總結可同時勾（兩種章節都顯示，聯集）；短影音不能與另外兩個並存（互相取消）；都沒勾＝全部。存值改為 `speaker+summary+shorts`，舊值讀得懂。**註：杜杜龍原文「總結：只會顯示主講人」判斷為筆誤，實作為「只顯示總結與銷售課程」。**
 - **單堂課程的分享文字**：「我剛聽完這場 {主講人}的這場精彩演講 {課程名稱} 我就立刻想到要分享給你！」＋換行＋「按此開啟網址 👉」＋網址；課程頁與上課頁的分享按鈕都用（`PageHeader` 的 `course`）。主講人空白時顯示「老師」。
 - **LINE 預覽卡片**：單堂課程（`/course/…`、`/learn/…`、課程專屬網址）的標題與備註與「主辦中心」一致（取主辦單位第一個非總部的中心；總部主辦用設定的 `hqName`＝「寰宇總部」，沒有地址）；圖仍用課程封面。章節網址不再帶章節名稱。
 - **設定 > 分享預設值**（`app/admin/share-defaults.tsx`，超級管理員）：一般分享文字、單堂課程範本、網址前引導文字、站名、標題分隔符號、地址前圖示、備註是否顯示地址／金句、總部名稱、備用文字；頁面下方有即時預覽。後端 `normalizeShare`（空白欄位退回預設，分隔符號保留前後空白）、`PUT /admin/ui-config` 的 `share`。
 - **分享選單不再帶 title（網頁版）**：`navigator.share` 同時帶 title 時，LINE 會把它另外貼成第一行（課程名稱重複兩次）；現在只送文字（`lib/share.ts`）。
 - 單元頁三個勾選的順序：主講人、總結、短影音（短影音在最右）。短影音篩選涵蓋「短影音專輯」課程的章節，以及該專輯「其他教材」裡已設定影音來源（YouTube／Mux／音檔）的教材；只有附件的教材、一般課程的其他教材不在單元索引內。
-- **章節清單播放中**（業主 2026-11-16）：上課頁目前播放的那一列，前置圖示固定是會呼吸的實心三角形（`src/ui/now-playing-icon.tsx`，`ListRow` 的 `playing`；用 JS 驅動動畫，網頁上 `useNativeDriver: true` 實測不會動）；主講章節播放中也是三角形，沒播放時才是學士帽；文字刪除「正在觀看」，副標題維持分享者格式。`compact` 列高縮窄（上下內距 3、無最小高度、分鐘小字行高 12）。
+- **章節清單播放中**（杜杜龍 2026-11-16）：上課頁目前播放的那一列，前置圖示固定是會呼吸的實心三角形（`src/ui/now-playing-icon.tsx`，`ListRow` 的 `playing`；用 JS 驅動動畫，網頁上 `useNativeDriver: true` 實測不會動）；主講章節播放中也是三角形，沒播放時才是學士帽；文字刪除「正在觀看」，副標題維持分享者格式。`compact` 列高縮窄（上下內距 3、無最小高度、分鐘小字行高 12）。
 - **單元頁三個勾選**：內距 4、間距 4、勾選框 24，文字一律完整顯示（不縮小、不用「…」），各項依內容寬度再平均分配剩餘空間。
 
 ## 2026-11-16（續）：章節原地播放
@@ -557,13 +557,13 @@
 - 本機瀏覽器驗證：點章節網址不換頁（只加 ?lesson=）、換章節只重要新的播放授權、舊網址轉址、播放進度 /started /watch 照常送出。**iOS／Android 實機與原生 YouTube 內嵌未測。**
 
 ## 2026-11-16（續）：中心頁照片閃動修正、中心清單排序
-- **中心頁照片不再閃動**：原因是照片放在捲動區上方、縮小時捲動區變高，課程少時內容變得不夠長、捲動位置被夾回 0、照片又展開，形成回饋迴圈（業主錄影證實）。改成標準的可收合標題寫法：`Screen` 的 `hero` 是蓋在捲動區上的浮動層（`heroLayer`，不改變捲動區大小），捲動內容最上方墊出 `heroHeight`；`CenterHero` 的縮放範圍調成「照片下緣＝展開高度 − 捲動量」；地址卡拆成 `CenterAddress`，放在捲動內容最上方、跟著內容往上捲被照片蓋住。本機以 4 種視窗高度連續取樣驗證，不再來回跳。
-- **中心清單排序**（業主 2026-11-16）：依「課程數」由多到少，**只計算有上傳教材的課程**（`CourseSummary.hasMaterial`＝任何一堂章節或教材設了影音來源，或有附件）；同數量依名稱。原本是照章節數排序，已改成課程數。
-- **單堂課程分享文字加職稱**（業主 2026-11-16）：新增代碼 `{職稱}`（課程「基本資料」的主講人職稱）。有職稱＝姓名後自動空一格接職稱（「蕭仕榮 講師」），沒填＝整個省略。預設範本改為「我剛聽完這場 {主講人}{職稱}的這場精彩演講 {課程名稱} …」；`normalizeShare` 會把沒改過的舊預設範本自動升級成新預設，業主自己改過的文字不動。設定頁「分享預設值」的說明與預覽同步。
-- **學習紀錄的三個數字可在後台調整**（業主 2026-11-16）：「設定 > APP 數值設定 > ④ 學習紀錄」——開始學習的播放比例（預設 1%，1～50）、自動完成的播放比例（預設 95%，50～100，一定大於開始比例）、進度回報最短間隔（預設 10 秒，5～120）。`use-lesson-session.ts` 讀 `config.app`；只影響之後的播放。列入「學習中」的條件（已開通，或播放超過開始比例）本身不變。本機實測：預設 1% 約 2.8 秒就送「開始學習」，改 40% 後延到 7.6 秒才送。
+- **中心頁照片不再閃動**：原因是照片放在捲動區上方、縮小時捲動區變高，課程少時內容變得不夠長、捲動位置被夾回 0、照片又展開，形成回饋迴圈（杜杜龍錄影證實）。改成標準的可收合標題寫法：`Screen` 的 `hero` 是蓋在捲動區上的浮動層（`heroLayer`，不改變捲動區大小），捲動內容最上方墊出 `heroHeight`；`CenterHero` 的縮放範圍調成「照片下緣＝展開高度 − 捲動量」；地址卡拆成 `CenterAddress`，放在捲動內容最上方、跟著內容往上捲被照片蓋住。本機以 4 種視窗高度連續取樣驗證，不再來回跳。
+- **中心清單排序**（杜杜龍 2026-11-16）：依「課程數」由多到少，**只計算有上傳教材的課程**（`CourseSummary.hasMaterial`＝任何一堂章節或教材設了影音來源，或有附件）；同數量依名稱。原本是照章節數排序，已改成課程數。
+- **單堂課程分享文字加職稱**（杜杜龍 2026-11-16）：新增代碼 `{職稱}`（課程「基本資料」的主講人職稱）。有職稱＝姓名後自動空一格接職稱（「蕭仕榮 講師」），沒填＝整個省略。預設範本改為「我剛聽完這場 {主講人}{職稱}的這場精彩演講 {課程名稱} …」；`normalizeShare` 會把沒改過的舊預設範本自動升級成新預設，杜杜龍自己改過的文字不動。設定頁「分享預設值」的說明與預覽同步。
+- **學習紀錄的三個數字可在後台調整**（杜杜龍 2026-11-16）：「設定 > APP 數值設定 > ④ 學習紀錄」——開始學習的播放比例（預設 1%，1～50）、自動完成的播放比例（預設 95%，50～100，一定大於開始比例）、進度回報最短間隔（預設 10 秒，5～120）。`use-lesson-session.ts` 讀 `config.app`；只影響之後的播放。列入「學習中」的條件（已開通，或播放超過開始比例）本身不變。本機實測：預設 1% 約 2.8 秒就送「開始學習」，改 40% 後延到 7.6 秒才送。
 
 ## 2026-11-16（續）：播放系統「點 2 卻播 3 的內容」的修正（架構層級）
-- **現象**：同一支影片切成多個時間段章節，交替點 2、3 幾次後，高亮的是 2，畫面與倒數時間卻是 3（業主錄影）。本機以「示範影片 A/B（同一支 mp4、不同起點）＋ YouTube 甲/乙（同影片編號、不同起訖）」交替連點重現：25 次錯 24 次。
+- **現象**：同一支影片切成多個時間段章節，交替點 2、3 幾次後，高亮的是 2，畫面與倒數時間卻是 3（杜杜龍錄影）。本機以「示範影片 A/B（同一支 mp4、不同起點）＋ YouTube 甲/乙（同影片編號、不同起訖）」交替連點重現：25 次錯 24 次。
 - **主因**：`useLessonSession` 換章節的那一個畫面，用「上一堂的播放授權」＋「這一堂的編號」組出混合播放軌交給 engine；之後正確的授權回來，engine 的 `request()` 看到 key 相同就不重載，錯誤永遠留著。以前上課頁換章節是整頁重建所以沒暴露，改成原地播放後才爆。
 - **修正（三層一起）**：①`use-lesson-session.ts`：播放授權連同所屬章節存（`pb`），不屬於目前章節就視為沒有播放軌；換章節清掉 `claimed`；開始／完成／回報進度的起訖秒數改用播放軌自己的 `playback.start/end`（單一來源）。②engine（Web `engine.web.ts` 與 App `engine.ts` 兩份）：`Track.fp` 內容指紋（key 相同但內容不同要重載；Mux 簽章網址只看路徑）、`request()` 序號（詢問期間又有新請求，舊的作廢）、`Snapshot.loadId`（每次載入或關閉 +1，只增不減）。③Web 畫面層：`attach()` 換來源前移除上一堂還沒觸發的 `canplay` 監聽（否則會跳到上一堂的起點）、HLS 動態載入用 `loadId` 確認；YouTube 訊息只接受目前 iframe 送的（`e.source`）；iframe 的 key 加上 `loadId`。
 - **驗證**：修正後同樣測試 105 次（3 組亂數、含 1～3 次快速連點）錯亂 0 次。**App（expo-video）的 `engine.ts` 同樣修改但無實機可測**；之後新增任何「依 key 判斷是不是同一堂」的地方，都要連內容指紋一起看。
@@ -572,32 +572,32 @@
 - **新增／編輯面板**只剩三項：外部連結（含「貼上」鈕，用 `expo-clipboard`）、教材名稱（貼上後 0.6 秒由 `GET /admin/link-title` 讓伺服器代抓網頁標題自動填入；名稱還是自動填入的值或空白時，換連結才會換名稱，自己改過的不蓋掉）、檔案類型（`classifyLink` 判斷，`BrandIcon` 官方 Logo）。新增 `POST /admin/courses/:id/materials`（教材與連結一次建立，名稱空白自動抓、抓不到用類型預設名）與 `PUT /admin/lessons/:id/material`（改名稱／換連結，取代舊連結）。教材仍是 `lessons.kind='material'`，連結存在 `lesson_attachments`（`kind='link'`）；舊教材的影音、音檔、附件資料保留但不再編輯。
 - **名稱抓取的安全做法**（`src/link-title.ts`）：只連公開 https 網站、擋 IP 與內網網域、最多跟隨 3 次轉址（每次重新檢查）、5 秒逾時、最多讀 256KB；YouTube 走官方 oEmbed；標題只是「登入」之類視為抓不到；只有課程管理者能呼叫。
 - **課程頁其他教材清單**（`FullVersionList`）：最左側＝類型官方 Logo（取代播放鈕）、點一下開啟外部連結、最右側「分享」鈕。課程資料 `Lesson` 新增 `linkType`（所有人，供顯示 Logo）與 `linkUrl`（只給有權限看的人；鎖定的課程不給）。沒有連結的列（完整版課程影片）維持原樣。
-- **分享預設值**新增 `materialText`（預設「我推薦你看這份教材：{教材名稱}（{課程名稱}）」，可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}），設定頁有輸入框與預覽；分享出去的網址是外部連結本身（業主選擇），所以教材的存取控管不套用在被分享出去的連結上。
+- **分享預設值**新增 `materialText`（預設「我推薦你看這份教材：{教材名稱}（{課程名稱}）」，可用 {教材名稱}、{課程名稱}、{主講人}、{職稱}），設定頁有輸入框與預覽；分享出去的網址是外部連結本身（杜杜龍選擇），所以教材的存取控管不套用在被分享出去的連結上。
 - 驗證：後端測試 132 項；本機手機寬度瀏覽器：貼上→自動判斷類型與名稱→新增→清單顯示 Google 簡報官方 Logo 與分享鈕→分享送出範本文字。本機無法對外連線，所以「抓到真實網頁標題」只用注入的假網路測試過，正式站請實測。
 
 ## 2026-11-16（續）：章節分享鈕
 - 課程有**兩堂以上章節**時，課程頁章節清單每列最右側有「分享」鈕（`ChapterShare`，只有章節列、鎖定與「敬請期待」以外的列；單章節的課程沒有）。分享網址＝課程專屬網址（沒有就 `/course/編號`）加 `?lesson=章節編號`（`lessonShareHref`），點開直接停在那一堂；LINE 預覽卡片仍是主辦中心的（`og.ts` 查詢字串不影響）。
 - 分享文字用「設定 > 分享預設值」新增的 **章節分享的文字**（`ShareSettings.chapterText`，預設「我剛聽完這場 {主講人}{職稱}的這場精彩演講 {章節名稱} 我就立刻想到要分享給你！」）。**姓名、職稱、主題一律取章節自己的設定**（章節的分享者、分享者職稱、章節名稱），不借用課程的：章節沒填分享者顯示「老師」、沒填職稱就省略；`{課程名稱}` 取所屬課程。主講人章節的分享者本來就會同步成課程主講人。
 - 後端測試 133 項；本機手機寬度：多章節 4 個分享鈕、單章節 0 個，分享第二堂送出「李華 白金經理…第二堂：溝通」（不是課程主講與課程職稱）。
-- **播放列與控制列微調**（業主 2026-11-16）：播放中那列的底色有圓角（`ListRow` highlight）；暫停時動畫停止、圖示換成暫停（`NowPlayingIcon` 讀播放器狀態，播放過又暫停才顯示）；正在播放的列再點一下＝暫停／繼續（`ChapterList`／`FullVersionList` 呼叫 `engine.toggle()`）；章節清單左側圖示欄 42、列內間距 4、分享鈕寬 34；時間軸圓點 18→26、觸控區高 48，倍速與全螢幕鈕寬壓到 30，讓時間軸更長。
-- **留言板接上「按住上拉進入完整內容」**（業主 2026-11-16）：課程頁每則留言只顯示前 3 行，點一則從下方彈出完整內容與操作（刪除／檢舉／封鎖／隱藏，在 `comment-board.tsx` 的 `actions`），右上角 `SheetAction`「完整留言板」與往上拉都進入新頁 `/comments/課程編號`（`app/comments/[courseId].tsx`，`CommentBoard full`：全文與操作直接顯示，帶進來的那一則用 focus 加強調框）。留言本身沒有回覆串，所以「完整」＝這門課所有留言的整頁。本機以滑鼠拖曳模擬上拉，實際手指與 iOS／Android 手感未測。
-- **「總結」章節專屬圖示＝電源（Ionicons power，業主 2026-11-16 選定）**：`summary-mark.tsx`（`SummaryMark`／`SummaryLead`）；課程頁／中心選單章節清單最左側（36 大，取代播放圖示，已完成／鎖定／敬請期待除外）與單元頁標題前（16），與學士帽（主講人）同位置同大小，兩者互斥。
+- **播放列與控制列微調**（杜杜龍 2026-11-16）：播放中那列的底色有圓角（`ListRow` highlight）；暫停時動畫停止、圖示換成暫停（`NowPlayingIcon` 讀播放器狀態，播放過又暫停才顯示）；正在播放的列再點一下＝暫停／繼續（`ChapterList`／`FullVersionList` 呼叫 `engine.toggle()`）；章節清單左側圖示欄 42、列內間距 4、分享鈕寬 34；時間軸圓點 18→26、觸控區高 48，倍速與全螢幕鈕寬壓到 30，讓時間軸更長。
+- **留言板接上「按住上拉進入完整內容」**（杜杜龍 2026-11-16）：課程頁每則留言只顯示前 3 行，點一則從下方彈出完整內容與操作（刪除／檢舉／封鎖／隱藏，在 `comment-board.tsx` 的 `actions`），右上角 `SheetAction`「完整留言板」與往上拉都進入新頁 `/comments/課程編號`（`app/comments/[courseId].tsx`，`CommentBoard full`：全文與操作直接顯示，帶進來的那一則用 focus 加強調框）。留言本身沒有回覆串，所以「完整」＝這門課所有留言的整頁。本機以滑鼠拖曳模擬上拉，實際手指與 iOS／Android 手感未測。
+- **「總結」章節專屬圖示＝電源（Ionicons power，杜杜龍 2026-11-16 選定）**：`summary-mark.tsx`（`SummaryMark`／`SummaryLead`）；課程頁／中心選單章節清單最左側（36 大，取代播放圖示，已完成／鎖定／敬請期待除外）與單元頁標題前（16），與學士帽（主講人）同位置同大小，兩者互斥。
 - **播放狀態與清單圖示同步**：`NowPlayingIcon` 改成以播放器實際狀態為準（`lessonId` 比對播放器目前章節、「播放過」只在同一次載入 `loadId` 內有效）：真的在播＝動畫三角形；播放過又暫停＝暫停圖示；還沒開始（載入中、手機擋掉自動播放、播放器還在換上一堂）＝靜止三角形。原本換章節時會把上一堂的播放狀態帶進來，導致影片沒播卻顯示暫停圖示。注意：清單圖示顯示「狀態」（暫停中＝暫停圖示），下方播放控制列的按鈕顯示「動作」（暫停中＝▶）。本機連續換章節取樣 122 次，兩者狀態一致。
 
 ## 2026-11-16（續）：章節編輯面板整理、附件功能全部移除
 - **章節面板**：「主講」「總結」勾選同一列；勾總結＝章節名稱鎖住、固定「總結」（`PATCH/POST lessons` 伺服器強制，之後每次修改也是）；刪除「目前內容」列；分享者（左）與章節名稱（右）對調；日期預設「同課程日期」、**「同上」整個移除**；移除「示範短片」按鈕；結束欄加「到影片結尾」勾選（YouTube 網頁版偵測長度、選好的音檔量長度、已上傳音檔／Mux 用章節分鐘數估算，抓不到會提示並取消勾選）；分享者姓名打字建議＝`GET /admin/sharer-names?q=`（本系統用過的分享者與主講人姓名），職稱照舊（中央詞庫建議＋自動送中央）。
 - **附件教材功能全部移除**：App（`FileUploadModule`、`AttachmentList`、`features/attachments.tsx`）與後端路由（學員附件清單、管理者附件清單／上傳、網址附件新增、附件修改／刪除、`/media/file` 下載、`fileUrl`／`verifyFileUrl`）、相關測試。**保留** `lesson_attachments` 資料表（其他教材用它存外部連結）與刪除章節／課程時清除舊附件檔的程式；舊章節上的附件檔不再顯示、不能下載。`TYPE_INFO` 搬到 `features/link-types.ts`。
 - **討論共識（尚未開發）**：講師名單日後建在行動大學（講師資料表，一人一筆、可有別名、可綁會員編號 sub；中央只負責職稱詞庫與會員搜尋，姓名不寫進中央）；超級管理員手動把講師配對到註冊會員；會員在自己的設定頁看到「我講過的課程」（依 sub 從講師資料表彙整）；舊資料一次倒入未配對講師。配對需要中央提供只給超級管理員的會員搜尋（待寫需求）。
-- **討論中**：影片預覽拖曳設定開始／結束，已給 5 種模擬圖，等業主挑選後再開發。
+- **討論中**：影片預覽拖曳設定開始／結束，已給 5 種模擬圖，等杜杜龍挑選後再開發。
 
 ## 2026-11-16（再續）：分享網址整理
 - **課程右上角分享**：一律只分享課程網址，不再帶 `?lesson=章節編號`（原本播放章節時會帶一長串）；播放章節也不再改網址列。
 - **課程專屬網址編號**：從 1 開始、不補零（`wang-xiaoming-1`，滿 10 自然變兩位）。舊的 `-001` 網址仍可開（`urlNameVariants`，`/short-links` 與分享預覽都相容）；按「設定→短網址→為舊課程補上專屬網址」時會把已存在的 `-001` 改成 `-1`。
 - **章節分享鈕**：網址一律 `課程網址?N`（N＝章節清單前面顯示的編號 `position`）；開啟時自動播放第 N 章（`chapterFromParams`）。`?lesson=章節編號` 仍支援（舊連結）。注意：章節重新排序後，已分享的 `?N` 會指向新的第 N 章。
-- **已決定（待開發）**：影片拖曳設定開始／結束秒數＝業主挑「方案 3＋4 綜合」（影格膠卷＋固定中線，加預覽與微調按鈕）。
+- **已決定（待開發）**：影片拖曳設定開始／結束秒數＝杜杜龍挑「方案 3＋4 綜合」（影格膠卷＋固定中線，加預覽與微調按鈕）。
 
 ## 2026-11-16（再續）：小樹苗、全螢幕文字提醒模組、Mux 限超級管理員
-- **小樹苗**（業主選定第 12 號圖）：`SaplingIcon`（`ui/sapling-icon.tsx`）。章節播放超過完成門檻（預設 95%）＝已完成，清單左側改顯示小樹苗（取代灰色打勾）。「學習中」最上方 `SaplingBar`（`features/achievements/sapling-bar.tsx`）：小樹苗累計（所有課程已完成章節數加總）與「學習成就」並排一列，下方列出已解鎖成就圖示，點一下以全螢幕文字提醒顯示達成條件；設定頁的「學習成就」入口已移除（成就完整頁 `/achievements` 仍在，從學習中的成就卡進入）。
+- **小樹苗**（杜杜龍選定第 12 號圖）：`SaplingIcon`（`ui/sapling-icon.tsx`）。章節播放超過完成門檻（預設 95%）＝已完成，清單左側改顯示小樹苗（取代灰色打勾）。「學習中」最上方 `SaplingBar`（`features/achievements/sapling-bar.tsx`）：小樹苗累計（所有課程已完成章節數加總）與「學習成就」並排一列，下方列出已解鎖成就圖示，點一下以全螢幕文字提醒顯示達成條件；設定頁的「學習成就」入口已移除（成就完整頁 `/achievements` 仍在，從學習中的成就卡進入）。
 - **全螢幕文字提醒模組** `ui/flash-notice.tsx`：`showFlash({icon, title, body, holdMs})`＋根版面的 `FlashHost`。位置靠上（螢幕高 12% 處）、尺寸為原本 3 倍（圖示 120、標題 51、說明 39）、淡入停留淡出、不擋操作。切換相同系列／單元／寰宇教育中心（`features/courses/mode-flash.tsx` 的 `flashMode`）、小樹苗、成就一律用它；要改格式只改這個檔案。
 - **Mux 匯入只有超級管理員**：前端章節與教材面板 `allowMux = isSuperAdmin(member)`；後端 `GET /admin/mux/assets` 改 `requireSuperAdmin`，章節設定 `mediaType: mux` 需要 `super_admin` 角色（總部秘書也不行）。已用 Mux 的舊章節仍可播放。
 
@@ -607,13 +607,13 @@
 - **後端**：migration 0059（`series_art` 加 `cover_key／cover_rect／edm_view_y`、新表 `series_views`）；`GET /series-art`、`PUT /admin/series/cover`、`PATCH /admin/series/edm`（裁切框）、`POST /series-views`（同人同日只算一次）。刪除系列／移除 EDM 一併清封面檔。
 - **全螢幕文字提醒（`ui/flash-notice.tsx`）**：改為比 3 倍版再縮小 50％，所有視窗固定同一個寬高（190×230），文字依字數自動挑字級、超過自動換行，點一下立即關閉。模式名稱改為「系列／單元／教育中心」。
 
-## 2026-11-16（再續）：影片時間軸拖曳設定（業主選定「方案 3＋4 綜合」）
+## 2026-11-16（再續）：影片時間軸拖曳設定（杜杜龍選定「方案 3＋4 綜合」）
 - `features/uploads/time-range-picker.tsx`（`TimeRangePicker`）：影音上傳模組的「用拖曳設定開始與結束」。畫面中央固定紅線，左右拖曳膠卷刻度移動時間；網頁版上方預覽視窗（`range-preview.web.tsx`）停在紅線那一秒（YouTube）或可試聽音檔；按「設為開始／設為結束」填入欄位；−5／−1／+1／+5 秒微調、放大縮小刻度；綠旗＝開始、橘旗＝結束、中間區段有底色。YouTube／音檔／Mux 都能用，影片長度抓不到時以 3 小時為範圍（手機 App 與 Mux 無預覽）。
 - 章節編輯與其他教材共用（只改這個模組，全站同步）。
 
 ## 2026-11-16（再續）：設計系統與統一設計規範 2.0
-- **設計系統頁面**「寰宇行動大學設計系統」（https://claude.ai/artifact/RjQ7W2sAfARSkhgjKF5RRU）：從正式版程式碼整理出色票（淺色／深色、課程封面六主題、緞帶、儲存按鈕）、字級、間距、圓角、尺寸、陰影、品牌細字型、logo／App 圖示／小樹苗，以及 21 個共用元件的說明與網頁靜態預覽。另一個帳號的舊設計系統頁面（11-11 版，中央與行動大學混合、深色值自行配色）業主指示不再參照。
-- **業主指示：所有設計改用行動大學程式實際使用的設計作為統一規範**：`docs/hglobal-color-standard.md`、`docs/hglobal-tokens.json` 升級為 2.0（鍵名改成與 tokens.ts 一致、深色主綠 #cee49f → #2f8a5b 等，差異與 1.0 鍵名對照寫在檔案內）；CLAUDE.md 新增「統一設計規範」一節。App 畫面本身沒有改（本來就是這組色），只改了程式註解，所以沒有重新部署。
+- **設計系統頁面**「寰宇行動大學設計系統」（https://claude.ai/artifact/RjQ7W2sAfARSkhgjKF5RRU）：從正式版程式碼整理出色票（淺色／深色、課程封面六主題、緞帶、儲存按鈕）、字級、間距、圓角、尺寸、陰影、品牌細字型、logo／App 圖示／小樹苗，以及 21 個共用元件的說明與網頁靜態預覽。另一個帳號的舊設計系統頁面（11-11 版，中央與行動大學混合、深色值自行配色）杜杜龍指示不再參照。
+- **杜杜龍指示：所有設計改用行動大學程式實際使用的設計作為統一規範**：`docs/hglobal-color-standard.md`、`docs/hglobal-tokens.json` 升級為 2.0（鍵名改成與 tokens.ts 一致、深色主綠 #cee49f → #2f8a5b 等，差異與 1.0 鍵名對照寫在檔案內）；CLAUDE.md 新增「統一設計規範」一節。App 畫面本身沒有改（本來就是這組色），只改了程式註解，所以沒有重新部署。
 - 中央會員系統要跟進 2.0 時，把 `docs/central-request-design-standard-2.md` 的內容貼給中央會員 AI。
 
 ## 2026-11-16（再續）：系列封面修正、瀏覽次數、新增教材兩種模式、素材清單
@@ -626,7 +626,7 @@
 ## 2026-11-16（再續）：課程與教材的分享文字分開設定
 - `ShareSettings` 新增 `listText`（{清單名稱}）與 `listItemText`（{影片名稱}、{清單名稱}）；`shareMessage` 第 6 個參數 `list`。清單頁右上角、課程列分享用清單範本；清單每段影片右側新增分享鈕（`ListItemShare`，網址 `?N`，開啟直接播放第 N 段）；清單裡已看完的影片顯示小樹苗。
 - 設定 > 分享預設值改成四區：一般、課程、教材、LINE 預覽卡片；預覽新增清單與清單影片的範例。後端 135 項測試。
-- **清單類別不列入學習紀錄**（業主 2026-11-16，取代前面「計入進度、小樹苗」的做法）：後端學習進度與成就只算 kind='chapter'（素材清單的影片是 material，自然不算）；`learning.tsx`、首頁繼續學習排除 `isList`；`ribbonsFor` 對清單只給「免費公開」、不給學習中／已完成／日期緞帶；`classify` 把清單歸在 public_free；清單列不顯示小樹苗。播放與「已看過」紀錄照常寫入資料庫（之後要改回計入也不會遺失）。
+- **清單類別不列入學習紀錄**（杜杜龍 2026-11-16，取代前面「計入進度、小樹苗」的做法）：後端學習進度與成就只算 kind='chapter'（素材清單的影片是 material，自然不算）；`learning.tsx`、首頁繼續學習排除 `isList`；`ribbonsFor` 對清單只給「免費公開」、不給學習中／已完成／日期緞帶；`classify` 把清單歸在 public_free；清單列不顯示小樹苗。播放與「已看過」紀錄照常寫入資料庫（之後要改回計入也不會遺失）。
 
 ## 2026-11-16（再續）：費用與審核、封面規則、新增課程、日期
 - migration 0062：清掉所有 `auto_cover`；`courses.review_roles`；新表 `course_reviewers`、`review_invites`（只存代碼的 SHA-256）。
@@ -635,7 +635,7 @@
 - 測試：tests/review-desk.test.ts（邀請、通知、刪除、過期、指定身份、系列權限）；後端共 137 項。
 
 ## 2026-11-17：電腦版卡片閃爍重影、日期選單帶星期
-- 現象（業主錄影）：電腦版視窗在某些尺寸，中心頁 EDM 卡片一直在一列 3 張與 2 張之間跳動。原因＝捲軸出現／消失改變可用寬度的回饋循環。修正＝`lib/stable-scrollbar.ts` 全站 `scrollbar-gutter: stable`（根版面安裝）。本機以 Playwright 開啟捲軸、掃 300～700 寬 × 4 種高度：修正前 6 種尺寸閃爍，修正後 0。
+- 現象（杜杜龍錄影）：電腦版視窗在某些尺寸，中心頁 EDM 卡片一直在一列 3 張與 2 張之間跳動。原因＝捲軸出現／消失改變可用寬度的回饋循環。修正＝`lib/stable-scrollbar.ts` 全站 `scrollbar-gutter: stable`（根版面安裝）。本機以 Playwright 開啟捲軸、掃 300～700 寬 × 4 種高度：修正前 6 種尺寸閃爍，修正後 0。
 - `DateSelect` 的「日」：展開「23日（一）」、收起「23（一）」，週六日紅字；`Select` 新增選項屬性 `danger`。
 - 2026-11-17 修正：「單元」檢視章節縮圖被 YouTube 縮圖蓋掉課程手動上傳的封面（上一輪刪除自動抓封面勾選時，`/search-index` 誤把 YouTube 縮圖放進 coverUrl）。改回 coverUrl 只給章節自己的封面；測試 auto-cover.test.ts 已加檢查。
 - 2026-11-17：迷你播放器按鈕改實心黑底（player-layer.web.tsx `btn`）；影片「可拖曳或放大縮小」提示 3.5 秒→1 秒；下拉重新整理排除帶 `data-no-pull-refresh` 的區塊（課程 EDM 拖曳 `EdmPan`、EDM 放大視窗、影片放大拖曳層、迷你播放器），本機以觸控模擬驗證：EDM 上拖曳不重新整理、其他地方照常。
@@ -654,10 +654,10 @@
 - 前端：`public/sw.js`（只處理 push 與點通知，不快取）、`lib/web-push.ts`、`settings/notifications.tsx` 的 `PushCard`（開關、狀態說明、測試通知；iPhone 未加入主畫面時顯示教學）。
 - 金鑰：Secret `VAPID_PRIVATE_JWK`（JWK 字串，由開發者在部署時以 wrangler 直接寫入 Cloudflare，未出現在對話或 repo）。換金鑰會讓所有裝置需要重新開啟推播。
 - 測試 tests/push.test.ts：以接收端演算法解密驗證內容、驗證 VAPID 簽章、失效裝置刪除、開課提醒時間與防重複。後端共 140 項。
-- 2026-11-17：業主授權後，已產生正式站推播金鑰並以 `wrangler secret put VAPID_PRIVATE_JWK` 寫入 Cloudflare（金鑰未出現在對話或 repo）；`GET /push/key` 已回傳公鑰，推播正式啟用。
+- 2026-11-17：杜杜龍授權後，已產生正式站推播金鑰並以 `wrangler secret put VAPID_PRIVATE_JWK` 寫入 Cloudflare（金鑰未出現在對話或 repo）；`GET /push/key` 已回傳公鑰，推播正式啟用。
 - 2026-11-17：分享網址進來的返回鍵：`TopBar` 新增 `backTo`（`PageHeader` 經 Stack options 傳入；沒有上一頁才用）；課程頁 backTo＝主辦中心頁或 /courses；中心頁打開時墊的「上一頁」改成 `/courses?view=centers`（`CoursesView` 新增 `initialCenters`）；中心短網址頁沒有上一頁時 replace 到所有中心清單。本機以全新分頁開分享網址逐一驗證 4 種入口＋連續返回，以及 App 內正常點擊的返回不受影響。
 - 2026-11-17：修正「所有中心」清單對沒登入訪客一片空白（`/centers` 原本要求登入）：migration 0064 `central_snapshots` 存「最近一次成功」的中央中心清單副本（仍以會員中心為正本），登入者讀取時自動更新副本，訪客讀副本；沒有副本時畫面顯示「暫時看不到中心清單」而不是空白。副本要等第一位登入者打開過中心清單才會建立。測試 tests/centers-visitor.test.ts。
 - 2026-11-17：時間軸區間設定（`time-range-picker.tsx`）改版：原本「放大」按鈕（四段切換）換成獨立的放大鏡滑桿（對數連續縮放，預設最左＝完整顯示總覽）；總覽模式紅線跟著手指／點擊，放大後維持膠卷捲動（紅線固定中間）並新增「點一下膠卷跳到該位置」；修正膠卷刻度的時間文字因被 1px 寬的父層限制而看不見。本機以 Playwright 驗證點擊定位、滑桿縮放、−／＋、設為開始。
 
 - 2026-11-17 **誰可以瀏覽**：migration 0065（`view_scope`、`hide_guests`；一般且非公開的 35 門課轉為「所有會員」）。後端 `scopeAllows` 套用於課程清單、`/search-index`、課程詳情、報名、分享預覽。**時間軸**：試播鈕、黑畫面修正、音檔音波、時間同列。測試 142 項；本機 390px 驗證音波與試播，YouTube 實際播放與 iOS／Android 實機未測。
-- 2026-11-18 **大螢幕（平板、電腦）版面全面優化＋iPad 安裝提醒**（業主提供 iPad Air 5 直／橫向截圖）：①`lib/tablet-scale.ts`：觸控平板用 viewport 整體放大（直式 1.2、橫式 1.12；轉向重算；分割畫面窄於 600 維持 1 倍）。②`theme/layout.ts`：三級寬度與 readMax／wideMax／gutter／sheetMax／cardCols／split／textScale；`Screen` 新增 `wide`、`gutter`；`BottomSheet` 大螢幕置中最寬 680；`BottomBar` 分頁集中 720；`StageFrame`／`PlayerControls` 用 `useStageMax()`；課程頁橫向 ≥900 左右兩欄；寰宇大學 16:9 小卡 2～5 欄、中心頁／系列頁直式 EDM 3～6 欄；學習中、系列清單用 `CardGrid`（1～3 欄）；成就徽章 2～5 欄；首頁大螢幕寬 960、海報至少欄寬 ×1.25（橫向 ×1）；首頁圓點太多時只顯示放得下的一段（手機也受益，不再超出欄寬）；中心／系列首頁圖高度最多 42%；書櫃放寬；電腦寬螢幕 `AppText` ×1.1。③iPad 判斷 `isIpad()`（Macintosh＋maxTouchPoints>1），首頁與通知設定的安裝卡片在 iPad 出現（iPad 沒有一鍵安裝，按「安裝」顯示分享→加入主畫面教學）。④設計文件（`hglobal-color-standard.md`、`hglobal-tokens.json` 的 `responsive`）與設計系統頁面已同步。驗證：本機以 Playwright（Chromium 模擬 iPad 820×1100、1180×740、電腦 1440×900、手機 390×844，連正式 API 的公開資料＋模擬登入資料）截圖首頁、寰宇大學、課程頁（含播放中兩欄定位）、中心頁、系列頁、學習中、通知、設定、成就、上拉面板；手機版面確認不變。**iPad 實機 Safari 的 viewport 放大與轉向尚未實機驗證**（Chromium 模擬會套用 viewport；Safari 行為需業主實機確認）。
+- 2026-11-18 **大螢幕（平板、電腦）版面全面優化＋iPad 安裝提醒**（杜杜龍提供 iPad Air 5 直／橫向截圖）：①`lib/tablet-scale.ts`：觸控平板用 viewport 整體放大（直式 1.2、橫式 1.12；轉向重算；分割畫面窄於 600 維持 1 倍）。②`theme/layout.ts`：三級寬度與 readMax／wideMax／gutter／sheetMax／cardCols／split／textScale；`Screen` 新增 `wide`、`gutter`；`BottomSheet` 大螢幕置中最寬 680；`BottomBar` 分頁集中 720；`StageFrame`／`PlayerControls` 用 `useStageMax()`；課程頁橫向 ≥900 左右兩欄；寰宇大學 16:9 小卡 2～5 欄、中心頁／系列頁直式 EDM 3～6 欄；學習中、系列清單用 `CardGrid`（1～3 欄）；成就徽章 2～5 欄；首頁大螢幕寬 960、海報至少欄寬 ×1.25（橫向 ×1）；首頁圓點太多時只顯示放得下的一段（手機也受益，不再超出欄寬）；中心／系列首頁圖高度最多 42%；書櫃放寬；電腦寬螢幕 `AppText` ×1.1。③iPad 判斷 `isIpad()`（Macintosh＋maxTouchPoints>1），首頁與通知設定的安裝卡片在 iPad 出現（iPad 沒有一鍵安裝，按「安裝」顯示分享→加入主畫面教學）。④設計文件（`hglobal-color-standard.md`、`hglobal-tokens.json` 的 `responsive`）與設計系統頁面已同步。驗證：本機以 Playwright（Chromium 模擬 iPad 820×1100、1180×740、電腦 1440×900、手機 390×844，連正式 API 的公開資料＋模擬登入資料）截圖首頁、寰宇大學、課程頁（含播放中兩欄定位）、中心頁、系列頁、學習中、通知、設定、成就、上拉面板；手機版面確認不變。**iPad 實機 Safari 的 viewport 放大與轉向尚未實機驗證**（Chromium 模擬會套用 viewport；Safari 行為需杜杜龍實機確認）。

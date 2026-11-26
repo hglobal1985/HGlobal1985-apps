@@ -17,7 +17,7 @@ const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic
 function defaultCover(img: HTMLImageElement): Rect {
   const w = Math.min(img.naturalWidth, (img.naturalHeight * 16) / 9);
   const h = (w * 9) / 16;
-  // 垂直置中：一般照片與海報的主角多半在中間（業主 2026-11-15）。
+  // 垂直置中：一般照片與海報的主角多半在中間（杜杜龍 2026-11-15）。
   return { x: Math.round((img.naturalWidth - w) / 2), y: Math.max(0, Math.round((img.naturalHeight - h) / 2)), w: Math.round(w), h: Math.round(h) };
 }
 
@@ -41,7 +41,7 @@ export function EdmManager({ course, onChanged }: { course: CourseDetail; onChan
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger" | "info"; text: string } | null>(null);
   const input = useRef<HTMLInputElement | null>(null);
-  // 在編輯面板裡：儲存登記到面板下方與「取消」同一列（業主 2026-11-17）。
+  // 在編輯面板裡：儲存登記到面板下方與「取消」同一列（杜杜龍 2026-11-17）。
   const inSheet = useSheetSave(job ? { label: "儲存", onPress: () => void save(), busy, dirty: true } : null);
 
   // 封面預覽（裁切後 0.2 秒更新）。

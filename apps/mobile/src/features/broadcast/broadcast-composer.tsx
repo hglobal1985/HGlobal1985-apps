@@ -12,7 +12,7 @@ import type { BroadcastScope } from "./use-broadcasts";
 export type BroadcastTarget = { scope: BroadcastScope; name?: string; label: string };
 
 /**
- * 「新增公告」面板（業主 2026-11-21）：中心頁只有該中心一個選項；其他頁面（系列頁、寰宇大學…）由超級管理員選「目前的系列／中心」或「首頁公告」。
+ * 「新增公告」面板（杜杜龍 2026-11-21）：中心頁只有該中心一個選項；其他頁面（系列頁、寰宇大學…）由超級管理員選「目前的系列／中心」或「首頁公告」。
  * 只有一個選項就不顯示選擇列。新增中心／系列公告時，後端會通知訂閱者。
  */
 export function BroadcastComposer({ targets, onClose, onDone }: { targets: BroadcastTarget[]; onClose: () => void; onDone: () => void }) {

@@ -48,7 +48,7 @@ export function normalizeShare(raw: unknown): ShareSettings {
   };
   return {
     inviteText: str(r.inviteText, d.inviteText, 200),
-    // 舊預設範本（沒有 {職稱}，代表業主沒自己改過）自動升級成新預設；業主自己改過的文字不動。
+    // 舊預設範本（沒有 {職稱}，代表杜杜龍沒自己改過）自動升級成新預設；杜杜龍自己改過的文字不動。
     courseText: (() => {
       const t = str(r.courseText, d.courseText, 300);
       return t === OLD_COURSE_TEXT ? d.courseText : t;
@@ -161,7 +161,7 @@ export function normalizeApp(raw: unknown): AppSettings {
     libraryKeyBadges: num(r.libraryKeyBadges, d.libraryKeyBadges, 1, 1000),
     listBaseQuota: num(r.listBaseQuota, d.listBaseQuota, 0, 50),
     listUnlocks: normalizeListUnlocks(r.listUnlocks),
-    fileMaxMb: 95, // 教材檔案單檔上限固定最高 95MB、不可調（業主 2026-11-25；舊設定存的值一律忽略）
+    fileMaxMb: 95, // 教材檔案單檔上限固定最高 95MB、不可調（杜杜龍 2026-11-25；舊設定存的值一律忽略）
     imageMaxSide: num(r.imageMaxSide, d.imageMaxSide, 400, 4096),
     imageQuality: num(r.imageQuality, d.imageQuality, 30, 100),
     centerMaxSide: num(r.centerMaxSide, d.centerMaxSide, 800, 4096),

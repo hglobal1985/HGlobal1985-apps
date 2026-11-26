@@ -51,7 +51,7 @@ const isWeb = Platform.OS === "web";
 /**
  * 課程介紹頁：上方只有 EDM（可上下拖曳、點一下放大），下面不再放任何課程說明文字，
  * 只有報名按鈕（依狀態）與課程章節。標題在上方導覽列。
- * 點章節＝原地播放（業主 2026-11-16）：上方的 EDM 換成播放器（同一個位置），章節清單不動；網址的 ?lesson=章節編號 記住播放哪一堂，舊的 /learn/… 網址會轉到這裡。
+ * 點章節＝原地播放（杜杜龍 2026-11-16）：上方的 EDM 換成播放器（同一個位置），章節清單不動；網址的 ?lesson=章節編號 記住播放哪一堂，舊的 /learn/… 網址會轉到這裡。
  */
 export default function CourseRoute() {
   const params = useLocalSearchParams<{ id: string; edit?: string; lesson?: string; block?: string; album?: string }>();
@@ -68,7 +68,7 @@ export function chapterFromParams(params: Record<string, unknown>): number | und
 export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: { id: string; edit?: string; lesson?: string; chapter?: number; block?: string; album?: string }) {
   const { member, ready, invalidate } = useSession();
   const { c } = useTheme();
-  // 至尊模式（業主 2026-11-24）：沒有管理員編輯模式，版面改成 ElderCourse（上課／介紹兩頁）。
+  // 至尊模式（杜杜龍 2026-11-24）：沒有管理員編輯模式，版面改成 ElderCourse（上課／介紹兩頁）。
   const profile = useModeProfile();
   const elder = profile.coursePage === "twoTabs";
   const seriesSettings = useSeriesSettings();
@@ -77,14 +77,14 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   // 剛儲存回來的最新資料（重新載入完成前先用它，避免下一次儲存誤判「別人剛改過」）。
   const [saved, setSaved] = useState<CourseDetail | null>(null);
   const base = saved && saved.id === data?.id && (saved.admin?.updatedAt ?? "") > (data?.admin?.updatedAt ?? "") ? saved : data;
-  // 章節排序、複製要「瞬間」有反應（業主 2026-11-17）：先在畫面上直接改，伺服器在背景處理，處理完再用正式資料換回來。
-  // 點閱（業主 2026-11-17）：每進入／重新整理一次課程頁就 +1，算進主辦中心與所屬系列的封面點閱（訪客也算）。
-  // 封面的訂閱鈕與點閱次數只放在中心卡、清單卡、系列卡（業主 2026-11-19：課程卡不顯示）；課程頁載入仍照舊把點閱算進主辦中心與所屬系列。
+  // 章節排序、複製要「瞬間」有反應（杜杜龍 2026-11-17）：先在畫面上直接改，伺服器在背景處理，處理完再用正式資料換回來。
+  // 點閱（杜杜龍 2026-11-17）：每進入／重新整理一次課程頁就 +1，算進主辦中心與所屬系列的封面點閱（訪客也算）。
+  // 封面的訂閱鈕與點閱次數只放在中心卡、清單卡、系列卡（杜杜龍 2026-11-19：課程卡不顯示）；課程頁載入仍照舊把點閱算進主辦中心與所屬系列。
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（進入頁面時點閱 +1，算進主辦中心、所屬系列與這門課自己的封面）。
   const stats = useCoverStats("course", data?.id ?? null, `/course/${id}`, data?.isList ? "清單" : "課程");
-  // 教材區右上角「縮圖／詳細列表」切換：每次進入課程卡頁一律從「縮圖」開始（業主 2026-11-21，不再記住上次的選擇）；區塊預設全部收起。
-  const [listLayout, setListLayout] = useState<"thumb" | "detail" | "album">(album ? "album" : "thumb"); // 從搜尋的「場景」結果進來＝直接開相簿（業主 2026-11-24）
-  const [albumOpen, setAlbumOpen] = useState<string | null>(album ?? null); // 相簿分頁自動展開的區塊（「瀏覽本區照片」跳過來，業主 2026-11-24）
+  // 教材區右上角「縮圖／詳細列表」切換：每次進入課程卡頁一律從「縮圖」開始（杜杜龍 2026-11-21，不再記住上次的選擇）；區塊預設全部收起。
+  const [listLayout, setListLayout] = useState<"thumb" | "detail" | "album">(album ? "album" : "thumb"); // 從搜尋的「場景」結果進來＝直接開相簿（杜杜龍 2026-11-24）
+  const [albumOpen, setAlbumOpen] = useState<string | null>(album ?? null); // 相簿分頁自動展開的區塊（「瀏覽本區照片」跳過來，杜杜龍 2026-11-24）
   const pickLayout = (v: "thumb" | "detail" | "album") => (setListLayout(v), v !== "album" && setAlbumOpen(null));
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
@@ -102,7 +102,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
     if (edit === "1" && manages) setMode("edit");
   }, [edit, manages]);
   const editing = manages && mode === "edit";
-  // 網址列＝分享選單給的規則網址（業主 2026-11-17）：有專屬網址的課程，網頁版把瀏覽器網址換成「/中心縮寫/英譯主講人-1」（重新整理仍回到這一頁）。
+  // 網址列＝分享選單給的規則網址（杜杜龍 2026-11-17）：有專屬網址的課程，網頁版把瀏覽器網址換成「/中心縮寫/英譯主講人-1」（重新整理仍回到這一頁）。
   const shortPath = course?.shortPath;
   useEffect(() => {
     if (Platform.OS !== "web" || !shortPath || typeof window === "undefined") return;
@@ -118,7 +118,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
     if (!editing) setSettingsOpen(false);
   }, [editing]);
   const [pickBlock, setPickBlock] = useState<string | null>(null); // 「移動教材」要移進哪個區塊
-  const [photoBlock, setPhotoBlock] = useState<Lesson | null>(null); // 「新增照片」的區塊（業主 2026-11-24）
+  const [photoBlock, setPhotoBlock] = useState<Lesson | null>(null); // 「新增照片」的區塊（杜杜龍 2026-11-24）
   const [newCardOpen, setNewCardOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [materialBlock, setMaterialBlock] = useState<string | undefined>(undefined); // 新增教材要加到哪個區塊
@@ -145,12 +145,12 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   if (session.pinned && session.track) lastStage.current = { key: session.track.key, audio: session.track.mode === "audio" };
   if (!playingId || editing) lastStage.current = null;
   const playLesson = playingId && !editing ? course?.lessons.find((l) => l.id === playingId) : undefined;
-  const stayMini = useStayMini(); // 迷你播放器／小圓圖正在播時點別的影片：就在迷你播放器播，不長出整頁播放器（業主 2026-11-25）
+  const stayMini = useStayMini(); // 迷你播放器／小圓圖正在播時點別的影片：就在迷你播放器播，不長出整頁播放器（杜杜龍 2026-11-25）
   const stage = playLesson && !stayMini ? (session.pinned && session.track ? { key: session.track.key, audio: session.track.mode === "audio" } : lastStage.current) : null;
   const playLegacy = !!playLesson && session.legacyYoutube && !!session.playback;
   const playChapters = course ? course.lessons.filter((l) => !l.material && !l.section) : [];
   const playNext = playLesson && !playLesson.material ? playChapters[playChapters.findIndex((l) => l.id === playLesson.id) + 1] : undefined;
-  // 進入課程頁就是「播放器版面」（業主 2026-11-17）：還沒按播放時，舞台是 EDM 加大播放鈕、下方是待機的控制列；按下去才開始載入並播放第一堂。
+  // 進入課程頁就是「播放器版面」（杜杜龍 2026-11-17）：還沒按播放時，舞台是 EDM 加大播放鈕、下方是待機的控制列；按下去才開始載入並播放第一堂。
   const firstPlayable = course && !editing ? course.lessons.find((l) => !l.locked && !l.full && !l.section && (course.isList ? l.material : !l.material)) : undefined;
   const bandY = useBandScroll();
   const playLesson_ = (lid: string) => {
@@ -172,7 +172,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
     setStayMini(true);
   }, [lesson]);
   const playerTrack = usePlayer().track;
-  // 只有「正在播放的這一門課」的頁面隱藏封面與時間軸；切到別的課程頁，那一頁自己的封面照常顯示（業主 2026-11-25）。
+  // 只有「正在播放的這一門課」的頁面隱藏封面與時間軸；切到別的課程頁，那一頁自己的封面照常顯示（杜杜龍 2026-11-25）。
   const hideTop = stayMini && (!!playLesson || playerTrack?.courseId === course?.id);
   useEffect(() => {
     if (!playerTrack) setStayMini(false); // 迷你播放器被關掉：下次回到整頁播放
@@ -249,18 +249,18 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   // 還不能看（尚未報名、不符資格…）：整個章節區蓋一層灰色遮罩加大鎖頭，章節完全不能點。
   const noAccess = course.lessons.length === 0 ? course.enrollment !== "opened" && !(course.isPublic && course.isList) && !(course.admin && course.isList) : course.lessons.every((l) => l.locked);
   const allLocked = noAccess;
-  // 清單／素材類沒有報名：符合獎銜就能直接使用，不符合＝鎖頭（業主 2026-11-18）。
+  // 清單／素材類沒有報名：符合獎銜就能直接使用，不符合＝鎖頭（杜杜龍 2026-11-18）。
   const lockedText = course.isList ? (member ? "獎銜不符，目前無法使用" : "登入並符合獎銜才能使用") : course.priceTba ? "費用尚未公布，暫不開放" : member && !course.eligible ? "獎銜不符，目前無法報名" : "報名後才能觀看";
   // 報名／審核中的操作固定在頁面下方（底部選單上方），往下看章節、留言時仍然按得到；只是說明文字的（費用未公布、獎銜不符…）留在內容區。
-  // 課程類一律手動報名（即使免費或完全公開，登入後都有報名鈕；報名＝訂閱，有更新會通知）；清單／素材類永遠沒有報名鈕（業主 2026-11-18）。
-  const canRegister = course.enrollment === null && !course.isList; // 訪客也顯示（按下去先登入）；課程類即使免費、完全公開都要先報名（業主 2026-11-22）
+  // 課程類一律手動報名（即使免費或完全公開，登入後都有報名鈕；報名＝訂閱，有更新會通知）；清單／素材類永遠沒有報名鈕（杜杜龍 2026-11-18）。
+  const canRegister = course.enrollment === null && !course.isList; // 訪客也顯示（按下去先登入）；課程類即使免費、完全公開都要先報名（杜杜龍 2026-11-22）
   const registerNode = canRegister ? registerButton(course.free, "course") : null;
   const registerIsAction = !!registerNode && ((registerNode as { type?: unknown }).type === Button || (registerNode as { type?: unknown }).type === InviteJoin);
   const stickyAction = course.enrollment === "pending" ? pendingRow() : registerIsAction ? registerNode : null;
   const stickyNotice = registerNode && !registerIsAction ? registerNode : null;
-  const needRank = !course.eligible && course.minRank.code !== "none" ? `限${course.minRank.name}獎銜以上${course.isList ? "使用" : "報名"}${course.allowPresident ? `（會長也可${course.isList ? "使用" : "報名"}）` : ""}` : null; // 不符合的原因（遮罩上顯示；訪客也看得到門檻，業主 2026-11-24）
+  const needRank = !course.eligible && course.minRank.code !== "none" ? `限${course.minRank.name}獎銜以上${course.isList ? "使用" : "報名"}${course.allowPresident ? `（會長也可${course.isList ? "使用" : "報名"}）` : ""}` : null; // 不符合的原因（遮罩上顯示；訪客也看得到門檻，杜杜龍 2026-11-24）
 
-  // 套裝課程（業主 2026-11-19）：第一個區塊之前的章節仍在「課程章節」；從第一個區塊起（含放進區塊的章節）都歸區塊管理。
+  // 套裝課程（杜杜龍 2026-11-19）：第一個區塊之前的章節仍在「課程章節」；從第一個區塊起（含放進區塊的章節）都歸區塊管理。
   const nonFull = course.lessons.filter((l) => !l.full);
   const firstSec = !course.isList ? nonFull.findIndex((l) => l.section) : -1;
   const pkgBlocks = firstSec >= 0;
@@ -272,7 +272,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   const inBlockChapters = new Set(pkgBlocks ? nonFull.slice(firstSec).filter((l) => !l.material).map((l) => l.id) : []);
   const blockView: CourseDetail = pkgBlocks ? { ...course, lessons: course.lessons.filter((l) => l.material || inBlockChapters.has(l.id)).map((l) => (inBlockChapters.has(l.id) ? { ...l, material: true } : l)) } : course;
   const materialItems = blockView.lessons.filter((l) => l.material && !l.section);
-  // 沒有教材列、只有區塊照片的課程（成交百寶箱）：改看區塊本身有沒有被鎖（業主 2026-11-24 回報相簿沒出現鎖頭遮罩）。
+  // 沒有教材列、只有區塊照片的課程（成交百寶箱）：改看區塊本身有沒有被鎖（杜杜龍 2026-11-24 回報相簿沒出現鎖頭遮罩）。
   const blockHeads = blockView.lessons.filter((l) => l.material && l.section);
   const materialsLocked = materialItems.length > 0 ? materialItems.every((l) => l.locked) : blockHeads.length > 0 && blockHeads.every((l) => l.locked);
   const chapterView: CourseDetail = pkgBlocks ? { ...course, lessons: lessons } : course;
@@ -396,11 +396,11 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
           course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
           list={course.isList ? { title: course.title } : undefined}
-          // 返回＝回到「實際所屬的上一層」（業主 2026-11-24）：中心主辦的課程回該中心首頁、清單卡回卡片清單，不管是從哪裡點進來（例如首頁的繼續播放）。
+          // 返回＝回到「實際所屬的上一層」（杜杜龍 2026-11-24）：中心主辦的課程回該中心首頁、清單卡回卡片清單，不管是從哪裡點進來（例如首頁的繼續播放）。
           backTo={course.isList ? `/courses?focus=${encodeURIComponent(course.series ? `s:${course.series}` : `c:${course.id}`)}` : course.hostCenter ? `/courses?center=${encodeURIComponent(course.hostCenter)}` : "/courses"}
           backAlways
         />
-        {/* 課程頁封面只留點閱數、不放訂閱鈕（業主 2026-11-24：報名＝自動訂閱）。 */}
+        {/* 課程頁封面只留點閱數、不放訂閱鈕（杜杜龍 2026-11-24：報名＝自動訂閱）。 */}
         <ElderCourse
           course={course}
           player={player}
@@ -437,9 +437,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
         path={course.shortPath ? `/${course.shortPath}` : `/course/${course.id}`}
         course={course.isList ? undefined : { teacher: course.teacher ?? "", teacherTitle: course.teacherTitle ?? "", title: course.title }}
         list={course.isList ? { title: course.title } : undefined}
-        // 直接從分享網址進來時，返回鍵回到「上一層」：中心主辦的課程＝該中心專屬頁；總部課程＝全部課程（業主 2026-11-17）。
+        // 直接從分享網址進來時，返回鍵回到「上一層」：中心主辦的課程＝該中心專屬頁；總部課程＝全部課程（杜杜龍 2026-11-17）。
         backTo={course.isList ? `/courses?focus=${encodeURIComponent(course.series ? `s:${course.series}` : `c:${course.id}`)}` : course.hostCenter ? `/courses?center=${encodeURIComponent(course.hostCenter)}` : "/courses"}
-        // 清單卡：返回一律回到寰宇大學的卡片清單並定位到這張卡（業主 2026-11-18），不會跑到主辦中心頁。
+        // 清單卡：返回一律回到寰宇大學的卡片清單並定位到這張卡（杜杜龍 2026-11-18），不會跑到主辦中心頁。
         backAlways={course.isList}
         extra={
           manages && mode === "view" ? (
@@ -462,11 +462,11 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           )}
         </View>
       ) : null}
-      {/* 大螢幕橫向（平板橫放、電腦）：左欄＝舞台＋控制列，右欄＝章節與其他內容（業主 2026-11-18）；手機、平板直式維持上下排列。 */}
+      {/* 大螢幕橫向（平板橫放、電腦）：左欄＝舞台＋控制列，右欄＝章節與其他內容（杜杜龍 2026-11-18）；手機、平板直式維持上下排列。 */}
       <View style={lay.split ? styles.split : styles.stack}>
       <StageWidth.Provider value={lay.split ? null : undefined}>
       <View style={lay.split ? [styles.splitLeft, { width: Math.round(lay.width * 0.56) }] : undefined}>
-        {/* 迷你播放器／小圓圖播放中：上方不放封面與時間軸（業主 2026-11-25）。 */}
+        {/* 迷你播放器／小圓圖播放中：上方不放封面與時間軸（杜杜龍 2026-11-25）。 */}
         {hideTop ? null : (
         <LessonStage
           stage={stage}
@@ -487,7 +487,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
       </StageWidth.Provider>
       <View style={lay.split ? [styles.splitRight, { borderLeftColor: c.border }] : styles.stack}>
       <Screen header={false} gutter={lay.split ? space.lg : undefined} footer={editing ? undefined : stickyAction}>
-        {/* 這個中心與所屬系列的公告：和中心頁、系列頁同一條，位置在封面（播放器）正下方（業主 2026-11-21）。 */}
+        {/* 這個中心與所屬系列的公告：和中心頁、系列頁同一條，位置在封面（播放器）正下方（杜杜龍 2026-11-21）。 */}
         <BroadcastZone center={course.hostCenter || undefined} series={course.series || undefined} title="公告" gutter={lay.split ? space.lg : undefined} />
         {message ? <NoticeBox tone={message.tone} text={message.text} /> : null}
         {session.playError ? <NoticeBox tone="danger" text={session.playError} /> : null}
@@ -498,9 +498,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
           <NoticeBox tone="success" text="恭喜！你已完成這門課程的最後一堂。" />
         ) : null}
         {!editing ? stickyNotice : null}
-        {/* 作業入口（業主 2026-11-25）：已開通的學員與老師才看得到 */}
+        {/* 作業入口（杜杜龍 2026-11-25）：已開通的學員與老師才看得到 */}
         {!editing && member && !course.isList ? <CourseHomeworkEntry courseId={course.id} /> : null}
-        {/* 有審核權限的人（不是編輯模式）也能看報名名單（業主 2026-11-20）。 */}
+        {/* 有審核權限的人（不是編輯模式）也能看報名名單（杜杜龍 2026-11-20）。 */}
         {!editing && course.canRoster ? (
           <Card style={{ paddingVertical: 0 }}>
             <ListRow icon="list-outline" title="報名名單" subtitle="查看報名學員、匯出 CSV、移除資格" onPress={() => setSheet("roster")} />
@@ -508,7 +508,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
         ) : null}
         {manages && mode === "view" && course.status !== "published" ? <NoticeBox tone="warning" text={course.status === "archived" ? "這門課已下架封存：學員在全部課程看不到，已報名的人照常上課。" : "這門課尚未上架：只有管理者看得到。按右上「編輯」可以上架。"} /> : null}
         {editing ? (
-          // 編輯模式的「設定」預設收起，按右側「展開」才看到（業主 2026-11-18，全站一致）。
+          // 編輯模式的「設定」預設收起，按右側「展開」才看到（杜杜龍 2026-11-18，全站一致）。
           <View style={{ gap: space.sm }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
               <AppText variant="title" accessibilityRole="header" style={{ flex: 1 }}>
@@ -537,7 +537,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
                 <NoticeBox text="同一支影片可以切成多堂：每堂選同一支影片，再填各自的「開始／結束」時間，學員點選章節就會跳到該段。" />
               </Section>
             )}
-            {/* 清單卡（業主 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
+            {/* 清單卡（杜杜龍 2026-11-16）：只有其他教材，而且不顯示「其他教材」標題、沒有完整版課程影片。 */}
             <Section title="其他教材">
                 <>
                 {<Check label="顯示完整版課程影片" value={!!fullRow} onChange={toggleFull} disabled={lessonBusy} />}
@@ -546,7 +546,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
             </Section>
           </>
         ) : null}
-        {(editing && canEditContent) || course.isList || (pkgBlocks && !lessons.length) || (!course.lessons.some((l) => !l.material) && course.lessons.some((l) => l.material && !l.section)) ? null : ( // 沒有章節、只有教材時不再顯示「敬請期待」，全部都叫教材（業主 2026-11-20）
+        {(editing && canEditContent) || course.isList || (pkgBlocks && !lessons.length) || (!course.lessons.some((l) => !l.material) && course.lessons.some((l) => l.material && !l.section)) ? null : ( // 沒有章節、只有教材時不再顯示「敬請期待」，全部都叫教材（杜杜龍 2026-11-20）
           <View>
           <ChapterList course={chapterView} style={allLocked ? { minHeight: 230 } : undefined} playingId={editing ? null : playingId} onPlay={playLesson_} />
           {allLocked ? (
@@ -561,7 +561,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
             ) : null}
             <View style={!editing && materialsLocked ? { minHeight: 230 } : undefined}>
               <FullVersionList course={blockView} openBlock={block} layout={listLayout} albumOpen={albumOpen} onBrowsePhotos={(id) => (setAlbumOpen(id), setListLayout("album"))} onPhotosChanged={reload} playingId={editing ? null : playingId} onPlay={playLesson_} />
-              {/* 沒有權限時，其他教材也蓋上同一個大鎖頭（業主 2026-11-20）。 */}
+              {/* 沒有權限時，其他教材也蓋上同一個大鎖頭（杜杜龍 2026-11-20）。 */}
               {!editing && materialsLocked ? (
                 <LockMask lines={[lockedText, ...(needRank ? [needRank] : [])]} />
               ) : null}
@@ -582,12 +582,12 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
       ) : sheet ? (
         <SectionSheet section={sheet} course={course} onClose={() => setSheet(null)} onSaved={onSaved} />
       ) : null}
-      {/* 沒在播放時，封面往下滑縮成右下角的迷你小視窗（業主 2026-11-24；成對的 CollapseBand 在 LessonStage 的 idle）。 */}
+      {/* 沒在播放時，封面往下滑縮成右下角的迷你小視窗（杜杜龍 2026-11-24；成對的 CollapseBand 在 LessonStage 的 idle）。 */}
       <CoverMiniFloat enabled={!hideTop && !stage && !(playLegacy && session.playback) && !lay.split} cover={<CourseMiniCover course={course} />} label={course.title} />
       {photoBlock ? <BlockPhotosSheet head={photoBlock} onClose={() => setPhotoBlock(null)} onChanged={reload} /> : null}
       {pickBlock ? <PickMaterialsSheet items={blockGroup} blockId={pickBlock} onMove={(ids) => (moveManyToBlock(ids, pickBlock), setPickBlock(null))} onClose={() => setPickBlock(null)} /> : null}
       {moveTarget ? <MoveToBlockSheet items={blockGroup} lesson={moveTarget} onPick={(id) => (moveToBlock(moveTarget, id), setMoveTarget(null))} onClose={() => setMoveTarget(null)} /> : null}
-      {/* 右下角「＋新增教材」（業主 2026-11-23：每張卡的頁面都要有新增鈕）：有修改權限就顯示（不必先進編輯模式，業主 2026-11-23 再次回報點進卡片沒有新增鈕）；播放中隱藏。 */}
+      {/* 右下角「＋新增教材」（杜杜龍 2026-11-23：每張卡的頁面都要有新增鈕）：有修改權限就顯示（不必先進編輯模式，杜杜龍 2026-11-23 再次回報點進卡片沒有新增鈕）；播放中隱藏。 */}
       {canEditContent && !sheet && !lessonSheet && !newCardOpen && !composeOpen && (editing || !playLesson) ? <AddMaterialFab kinds={["material", ...(canCreateCourse(member) ? (["course"] as const) : []), ...(isSuperAdmin(member) ? (["announce"] as const) : [])]} onPick={(k) => (k === "material" ? (setMaterialBlock(undefined), setSheet("newMaterial")) : k === "announce" ? setComposeOpen(true) : setNewCardOpen(true))} /> : null}
       {newCardOpen ? <NewCourseSheet onClose={() => setNewCardOpen(false)} defaultSeries={course.series || undefined} /> : null}
       {composeOpen ? <BroadcastComposer targets={[...(course.series ? [{ scope: "series" as const, name: course.series, label: `${course.series}系列公告` }] : []), { scope: "home" as const, label: "首頁公告" }]} onClose={() => setComposeOpen(false)} onDone={() => undefined} /> : null}

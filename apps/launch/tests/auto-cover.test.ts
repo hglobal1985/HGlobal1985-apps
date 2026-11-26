@@ -23,7 +23,7 @@ test("課程封面不抓 YouTube 縮圖（課程用標題文字封面）；YouTu
   const d = await call<CourseDetail>("GET", `/courses/${id}`, token);
   assert.equal(d.data.coverUrl, null, "有 YouTube 章節也不產生封面");
   assert.equal(d.data.edmUrl, null);
-  assert.equal(d.data.lessons[0]!.coverUrl, "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg", "YouTube 教材沒上傳封面＝用 YouTube 縮圖（業主 2026-11-25）");
+  assert.equal(d.data.lessons[0]!.coverUrl, "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg", "YouTube 教材沒上傳封面＝用 YouTube 縮圖（杜杜龍 2026-11-25）");
   assert.equal(d.data.lessons[0]!.coverAuto, true);
   await call("PATCH", `/admin/courses/${id}`, token, { status: "published" });
   const idx = (await call<{ lessons: { id: string; coverUrl: string | null; ytThumb?: string | null }[] }>("GET", "/search-index", token)).data.lessons.find((x) => x.id === lessonId)!;

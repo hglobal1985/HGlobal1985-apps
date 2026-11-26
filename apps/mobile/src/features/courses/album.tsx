@@ -19,15 +19,15 @@ const GAP = 6;
 const COLS = 3;
 
 /**
- * 相簿（業主 2026-11-21）：中心頁第一個分頁「相簿」，也用在系列、課程封面的照片管理。
+ * 相簿（杜杜龍 2026-11-21）：中心頁第一個分頁「相簿」，也用在系列、課程封面的照片管理。
  * 與封面輪播是同一份資料（cover_media）：這裡新增的照片與短影音，會直接出現在封面輪播；管理者可上傳、整理順序、刪除。
  * 點照片開全螢幕看圖（可左右翻整本相簿）；點影片開播放視窗。
  */
-export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, scope, emptyHint, onMovePhoto }: { /** 區塊相簿：有資料夾管理權限的人，每張照片右上角多一顆「移到資料夾」鈕（業主 2026-11-26）。 */ onMovePhoto?: (id: string) => void; kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void; /** 中心的儲存區（cover＝封面編輯、edm＝EDM 分頁）；系列、課程不用給。 */ scope?: CoverScope; emptyHint?: string }) {
+export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, scope, emptyHint, onMovePhoto }: { /** 區塊相簿：有資料夾管理權限的人，每張照片右上角多一顆「移到資料夾」鈕（杜杜龍 2026-11-26）。 */ onMovePhoto?: (id: string) => void; kind: CoverMediaKind; ownerKey: string; title: string; items: CoverMediaItem[]; canEdit: boolean; onChanged: () => void; /** 中心的儲存區（cover＝封面編輯、edm＝EDM 分頁）；系列、課程不用給。 */ scope?: CoverScope; emptyHint?: string }) {
   const { c } = useTheme();
   const thumb = useThumb();
   // canEdit＝看的人的權限（兩種模式一樣傳）；要不要顯示排序／刪除等編輯小鈕由模式設定檔決定（至尊模式 adminEdit＝false）。
-  // 「圖片資訊」驚嘆號只看權限，兩種模式都有（業主 2026-11-24 回報至尊模式少了驚嘆號）。
+  // 「圖片資訊」驚嘆號只看權限，兩種模式都有（杜杜龍 2026-11-24 回報至尊模式少了驚嘆號）。
   const adminEdit = useFeature("adminEdit");
   const editUi = canEdit && adminEdit;
   const { config } = useUiConfig();
@@ -61,7 +61,7 @@ export function CoverAlbum({ kind, ownerKey, title, items, canEdit, onChanged, s
       flashText((e as Error).message);
     }
   };
-  // 綁定課程的 EDM 不能刪，只能更換照片（業主 2026-11-23）。
+  // 綁定課程的 EDM 不能刪，只能更換照片（杜杜龍 2026-11-23）。
   const replace = (x: CoverMediaItem) => replaceAlbumPhoto(x.id, { maxSide: config.app.centerMaxSide, quality: config.app.centerQuality / 100 }, onChanged);
   return (
     <View style={{ gap: space.md }} onLayout={(e) => setW(e.nativeEvent.layout.width)}>

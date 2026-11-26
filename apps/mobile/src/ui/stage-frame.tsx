@@ -4,7 +4,7 @@ import { useLayout } from "@/theme/layout";
 
 /**
  * 舞台最大寬度：預設＝手機 720、大螢幕用閱讀寬度（theme/layout.ts 的 readMax）；
- * 課程頁大螢幕左右兩欄時，左欄用 StageWidth.Provider value={null} 讓舞台填滿左欄（業主 2026-11-18）。
+ * 課程頁大螢幕左右兩欄時，左欄用 StageWidth.Provider value={null} 讓舞台填滿左欄（杜杜龍 2026-11-18）。
  */
 export const StageWidth = createContext<number | null | undefined>(undefined);
 

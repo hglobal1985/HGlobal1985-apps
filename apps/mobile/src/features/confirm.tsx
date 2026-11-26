@@ -46,7 +46,7 @@ export function confirmSheet(opts: ConfirmOptions): Promise<boolean> {
 export const confirmAsk = (title: string, message: string, confirmLabel = "確定") => confirmSheet({ title, message, confirmLabel, danger: true });
 
 /**
- * 三選一的確認面板（業主 2026-11-26：設定頁有沒存檔的修改要離開時，主動問「儲存／放棄／繼續編輯」）。
+ * 三選一的確認面板（杜杜龍 2026-11-26：設定頁有沒存檔的修改要離開時，主動問「儲存／放棄／繼續編輯」）。
  * 點面板外面或按「繼續編輯」＝回傳 null（留在原頁）。
  */
 export type ChoiceOption = { key: string; label: string; variant: "primary" | "dangerSolid" | "cancel" | "secondary" };

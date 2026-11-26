@@ -8,10 +8,10 @@ import { AppText, EmptyState, ErrorView, LoadingView, NoticeBox } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 /**
- * 設定 › 搜尋關聯詞（業主 2026-11-25，超級管理員）：一行一組，詞之間用「＝」隔開，例如
+ * 設定 › 搜尋關聯詞（杜杜龍 2026-11-25，超級管理員）：一行一組，詞之間用「＝」隔開，例如
  * 「王老師 = 王儷凱」「水課程 = 益之源 = 淨水器」。搜尋時，課程文字裡有其中一個詞，同組的其他詞也算這門課的搜尋文字；
  * 每個詞照樣支援打錯字（模糊比對）與 AI 語意搜尋。超派、至尊兩個模式的搜尋共用。
- * 業主 2026-11-26：不再自動儲存。草稿由 `useSynonymsDraft` 持有，跟著所在頁面唯一的「儲存」一起存。
+ * 杜杜龍 2026-11-26：不再自動儲存。草稿由 `useSynonymsDraft` 持有，跟著所在頁面唯一的「儲存」一起存。
  */
 export type SynonymsDraft = { loaded: boolean; text: string; setText: (v: string) => void; dirty: boolean; save: () => Promise<void>; discard: () => void; error: string | null; reload: () => void };
 

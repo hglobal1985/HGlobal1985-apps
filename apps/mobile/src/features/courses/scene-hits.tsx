@@ -13,7 +13,7 @@ import { flashText } from "@/ui/flash-notice";
 type Hit = { blockId: string; courseId: string; courseTitle: string; blockTitle: string; count: number; scene: string; locked?: boolean; lockLines?: string[]; /** 符合的照片（有權限才有）：點了直接全螢幕看圖。 */ photos?: { id: string; url: string }[] };
 
 /**
- * 相簿照片的「場景」搜尋（業主 2026-11-24）：AI 看照片認出的場景、行為、物品，搜尋時分類標籤＝「場景」。
+ * 相簿照片的「場景」搜尋（杜杜龍 2026-11-24）：AI 看照片認出的場景、行為、物品，搜尋時分類標籤＝「場景」。
  * 停止打字 0.4 秒才送出；伺服器只回你有權限看的課程（獎銜、瀏覽範圍鎖住的不會出現）。
  */
 export function useSceneSearch(q: string): { hits: Hit[]; loading: boolean } {

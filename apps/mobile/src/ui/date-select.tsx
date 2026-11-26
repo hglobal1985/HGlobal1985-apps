@@ -38,10 +38,10 @@ export function DateSelect({ label, value, onChange, clearable = true, defaultVa
   const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
   const set = (ny: number, nm: number, nd: number) => onChange(`${ny}-${pad(nm)}-${pad(Math.min(nd, daysIn(ny, nm)))}`);
   const years: SelectOption[] = [];
-  // 全站日期選擇統一（業主 2026-11-16）：年份從 5 年後到 40 年前，新的在上面。
+  // 全站日期選擇統一（杜杜龍 2026-11-16）：年份從 5 年後到 40 年前，新的在上面。
   for (let i = Math.max(now + 5, y); i >= Math.min(now - YEARS_BACK, y); i--) years.push({ key: String(i), label: `${i} 年`, short: `${i}` });
   const months: SelectOption[] = MONTH_EN.map((en, i) => ({ key: String(i + 1), label: `${i + 1} 月 ${en}`, short: `${i + 1}月` }));
-  // 「日」選單帶星期（業主 2026-11-17）：23日（一）；週六、週日紅字。
+  // 「日」選單帶星期（杜杜龍 2026-11-17）：23日（一）；週六、週日紅字。
   const days: SelectOption[] = Array.from({ length: daysIn(y, mo) }, (_, i) => {
     const wd = new Date(y, mo - 1, i + 1).getDay();
     const text = `${i + 1}日（${WEEKDAY[wd]}）`;

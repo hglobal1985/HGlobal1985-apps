@@ -1,12 +1,12 @@
 # 寰宇行動大學：上架資料（App Store／Google Play）
 
-最後更新：2026-11-11。這份文件是送審時要填的內容草稿與檢查清單，送審前請業主確認文字。
+最後更新：2026-11-11。這份文件是送審時要填的內容草稿與檢查清單，送審前請杜杜龍確認文字。
 
 ## 基本資料
 
 | 項目 | 內容 |
 | --- | --- |
-| App 名稱 | 寰宇行動大學（業主已確認） |
+| App 名稱 | 寰宇行動大學（杜杜龍已確認） |
 | 副標題（Apple，30 字內） | 隨時隨地，持續成長 |
 | 套件識別碼 | iOS `com.hglobal1985.learn`／Android `com.hglobal1985.learn` |
 | 類別 | 教育（Education） |
@@ -55,7 +55,7 @@ Google Play「資料安全性」：同上；資料傳輸皆加密；可要求刪
 ## 送審備註（Review Notes）草稿
 
 > 本 App 為會員學習平台。登入使用 Google 帳號（會員中心登入中繼）。
-> 審查用帳號：請業主準備一個 Google 測試帳號（不要用私人帳號），並在會員中心把它設成可看到所有課程的狀態；把帳號密碼填在 App Store Connect／Play Console 的審查資訊欄，**不要寫在這個 repo 裡**。
+> 審查用帳號：請杜杜龍準備一個 Google 測試帳號（不要用私人帳號），並在會員中心把它設成可看到所有課程的狀態；把帳號密碼填在 App Store Connect／Play Console 的審查資訊欄，**不要寫在這個 repo 裡**。
 > App 內沒有任何付費項目或繳費入口；付費課程只在網站報名，App 只讓已開通的學員觀看（符合 App Store 審查指南 3.1.3(a)／3.1.1 的相關規定，App 內沒有任何外部繳費連結）。
 > 帳號刪除：App 內「設定」→「會員中心」可刪除會員帳號；「設定」→「刪除學習資料」可立即刪除本 App 的資料。
 
@@ -73,19 +73,19 @@ Google Play「資料安全性」：同上；資料傳輸皆加密；可要求刪
 2. `npx eas build -p ios --profile production` → `npx eas submit -p ios` 上傳 TestFlight。
 3. 內部測試者可直接測試；外部測試需先通過 Beta 審查。
 
-> EAS 指令需要業主的 Expo 帳號登入（`npx eas login`）；這些步驟必須在業主的電腦或有 Expo 帳號的環境執行。
+> EAS 指令需要杜杜龍的 Expo 帳號登入（`npx eas login`）；這些步驟必須在杜杜龍的電腦或有 Expo 帳號的環境執行。
 
 ## 上架前必須完成的設定
 
 - [ ] **關閉模擬登入**：`apps/launch/wrangler.jsonc` 的 `vars.DEMO_LOGIN` 改成 `"off"` 後重新部署（關閉後「測試身分」與任何人都能當管理員的入口就會消失）。
 - [ ] 首頁「內部測試版」標示移除（`apps/mobile/app/(tabs)/index.tsx` 的 `SandboxBanner`）。
 - [ ] 示範課程換成正式課程，各堂設定 YouTube 或 Mux 影片（管理員：「設定」→「課程設定」→「各堂影片」）。
-- [x] Mux 簽名金鑰已由業主在 Cloudflare 設定（`MUX_SIGNING_KEY_ID` 一般變數、`MUX_SIGNING_PRIVATE_KEY` Secret），後端已確認能簽出播放網址。
+- [x] Mux 簽名金鑰已由杜杜龍在 Cloudflare 設定（`MUX_SIGNING_KEY_ID` 一般變數、`MUX_SIGNING_PRIVATE_KEY` Secret），後端已確認能簽出播放網址。
 - [ ] 用一支真實的 Mux 影片（Signed Playback ID）在 App 與網站各播放一次。
 - [ ] App Store 上架取得 App ID 後，把 `apps/mobile/src/features/app-gate.tsx` 的 iOS 更新網址改成商店網址。
 - [ ] 實機測試：iPhone 與 Android 各測一次 Google 登入、領課、播放（示範影片／YouTube／Mux）、通知、刪除資料。
 
-## 待業主決定
+## 待杜杜龍決定
 
 - 是否支援 iPad（影響截圖數量）。
 - 付費課程的繳費方式說明文字（目前寫「依客服提供的方式繳費」）。

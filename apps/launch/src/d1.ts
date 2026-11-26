@@ -46,9 +46,9 @@ export interface Env {
   IMAGES?: ImagesBinding;
   /** 這次部署的程式版本（git 提交編號，由 scripts/safe-deploy.mjs 部署時寫入）；GET /api/v2/version 回報，部署前用來確認不會蓋掉別人較新的版本。 */
   GIT_SHA?: string;
-  /** YouTube Data API 金鑰（Secret，由業主在 Cloudflare 後台設定）：補教材的影片長度與發布日期。沒設定就不補。 */
+  /** YouTube Data API 金鑰（Secret，由杜杜龍在 Cloudflare 後台設定）：補教材的影片長度與發布日期。沒設定就不補。 */
   YOUTUBE_API_KEY?: string;
-  /** 從使用者自己的 Google 雲端硬碟匯入教材用（Google Picker，業主在 Cloudflare 後台設定；都是給瀏覽器用的公開值，沒有密鑰）：OAuth 用戶端 ID、API 金鑰（限制只能從 learn.hglobal1985.com 使用）、Google Cloud 專案編號。缺任何一個就不顯示這個來源。 */
+  /** 從使用者自己的 Google 雲端硬碟匯入教材用（Google Picker，杜杜龍在 Cloudflare 後台設定；都是給瀏覽器用的公開值，沒有密鑰）：OAuth 用戶端 ID、API 金鑰（限制只能從 learn.hglobal1985.com 使用）、Google Cloud 專案編號。缺任何一個就不顯示這個來源。 */
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_PICKER_API_KEY?: string;
   GOOGLE_PROJECT_NUMBER?: string;
@@ -70,7 +70,7 @@ export interface Env {
   LEARN_ADMIN_SUBS?: string;
   /** Workers AI 綁定（wrangler.jsonc 的 ai 設定；不是金鑰）：逐字稿、關鍵字、語意搜尋用。 */
   AI?: { run(model: string, input: unknown): Promise<unknown> };
-  /** Anthropic（Claude）API 金鑰（Secret，由業主在 Cloudflare 後台設定）：只有選用 Claude 模型時才需要。 */
+  /** Anthropic（Claude）API 金鑰（Secret，由杜杜龍在 Cloudflare 後台設定）：只有選用 Claude 模型時才需要。 */
   ANTHROPIC_API_KEY?: string;
   /** R2 bucket「learn」：章節音檔。 */
   MEDIA?: R2Bucket;

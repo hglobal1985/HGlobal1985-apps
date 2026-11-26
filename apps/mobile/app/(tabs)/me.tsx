@@ -52,7 +52,7 @@ export default function MeScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: "danger" | "success"; text: string } | null>(null);
   const isWeb = Platform.OS === "web";
-  // 至尊模式（業主 2026-11-24）：這頁只從模式面板的「帳號」進來；不顯示我的清單、我的書櫃與管理功能。
+  // 至尊模式（杜杜龍 2026-11-24）：這頁只從模式面板的「帳號」進來；不顯示我的清單、我的書櫃與管理功能。
   const { features } = useModeProfile();
 
   const run = async (key: string, fn: () => Promise<void>, done?: string) => {

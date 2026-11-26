@@ -10,7 +10,7 @@ import { flashText } from "@/ui/flash-notice";
 
 type Row = { sub: string; number: string; title: string; owner: string; views: number; books: number };
 
-/** 書櫃管理（超級管理員，業主 2026-11-17）：產生「我的書櫃」邀請網址（24 小時、一次有效）、查看與移除書櫃。 */
+/** 書櫃管理（超級管理員，杜杜龍 2026-11-17）：產生「我的書櫃」邀請網址（24 小時、一次有效）、查看與移除書櫃。 */
 export default function AdminLibraries() {
   const { data, error, loading, reload } = useApi<Row[]>("/admin/libraries");
   const [invite, setInvite] = useState<string | null>(null);

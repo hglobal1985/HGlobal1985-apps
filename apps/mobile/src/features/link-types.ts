@@ -24,5 +24,5 @@ const ICONS: Record<Attachment["type"], IconName> = {
   file: "document-attach-outline",
 };
 
-/** 類型的圖示（通用圖示，畫面優先用官方 Logo）與文字（文字來自 link-rules.ts 的 LINK_TYPES，業主 2026-11-18：規則集中一處）。 */
+/** 類型的圖示（通用圖示，畫面優先用官方 Logo）與文字（文字來自 link-rules.ts 的 LINK_TYPES，杜杜龍 2026-11-18：規則集中一處）。 */
 export const TYPE_INFO = Object.fromEntries(Object.entries(ICONS).map(([k, icon]) => [k, { icon, label: LINK_TYPES[k as Attachment["type"]].label }])) as Record<Attachment["type"], { icon: IconName; label: string }>;

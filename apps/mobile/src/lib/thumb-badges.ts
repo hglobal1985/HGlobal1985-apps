@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { api, type ThumbBadge, type ThumbBadgeKind } from "@/api/client";
 
 /**
- * 縮圖符號（業主 2026-11-23）：全站只讀一次 `/thumb-badges`（所有系列卡、課程卡、中心卡指定的符號與顏色），
+ * 縮圖符號（杜杜龍 2026-11-23）：全站只讀一次 `/thumb-badges`（所有系列卡、課程卡、中心卡指定的符號與顏色），
  * 每個縮圖用 `useThumbBadge(kind, key)` 取自己的；編輯存檔後呼叫 `reloadThumbBadges()`，全站縮圖立刻更新。
  */
 let data: Map<string, ThumbBadge> | null = null;
