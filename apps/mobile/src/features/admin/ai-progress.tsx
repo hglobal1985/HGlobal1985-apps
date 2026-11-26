@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useRef, useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 import { api } from "@/api/client";
 import { flashText } from "@/ui/flash-notice";
@@ -67,6 +68,32 @@ const ON_KEY = { edm: "aiOnEdm", photoOcr: "photoOcrEnabled", scene: "aiOnScene"
 /** 辨識來源的優先順序與開關（業主 2026-11-26）：排在上面的先辨識；關掉的來源排程不處理。▲▼ 調整順序、開關即時儲存。 */
 function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
   const { c } = useTheme();
+  // 立即開始辨識（業主 2026-11-26）：連續呼叫伺服器各跑一輪（約 70 秒），直到這一輪一張都沒處理（做完了或額度用完）；可隨時停止。
+  const [running, setRunning] = useState(false);
+  const [total, setTotal] = useState(0);
+  const stop = useRef(false);
+  const start = async () => {
+    if (running) return;
+    stop.current = false;
+    setRunning(true);
+    setTotal(0);
+    let sum = 0;
+    try {
+      for (let i = 0; i < 30 && !stop.current; i++) {
+        const r = await api<{ done: number; stopped: boolean }>("POST", "/admin/ai/run-now");
+        sum += r.done;
+        setTotal(sum);
+        reload();
+        if (r.stopped) return void flashText("今天的 AI 額度或模型權限有問題，已停止");
+        if (r.done === 0) break;
+      }
+      flashText(stop.current ? `已停止，這次共處理 ${sum} 張` : `辨識完成，這次共處理 ${sum} 張`);
+    } catch (e) {
+      flashText((e as Error).message);
+    } finally {
+      setRunning(false);
+    }
+  };
   const save = async (values: Record<string, number | boolean>) => {
     try {
       await api("PUT", "/admin/search-settings", { values });
@@ -86,6 +113,12 @@ function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
     <Card>
       <AppText variant="headline">辨識優先順序與開關</AppText>
       <AppText variant="caption" tone="muted">排在上面的先辨識；額度或時間不夠時，後面的會等前面的做完。關掉開關＝排程不再辨識這一類圖檔（已辨識的不受影響）。</AppText>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={running ? "停止辨識" : "立即開始辨識"} onPress={() => (running ? (stop.current = true) : void start())} style={{ flex: 1, minHeight: 50, borderRadius: 25, backgroundColor: running ? c.danger : c.accent, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}>
+          <Ionicons name={running ? "stop-circle-outline" : "flash-outline"} size={22} color={running ? c.dangerSoft : c.textOnAccent} />
+          <AppText variant="callout" style={{ color: running ? c.dangerSoft : c.textOnAccent, fontWeight: "800" }}>{running ? `辨識中…已處理 ${total} 張（點一下停止）` : "立即開始辨識"}</AppText>
+        </Pressable>
+      </View>
       {jobs.map((j, i) => (
         <View key={j.key} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 56, opacity: j.on ? 1 : 0.55 }}>
           <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: c.accent, alignItems: "center", justifyContent: "center" }}>

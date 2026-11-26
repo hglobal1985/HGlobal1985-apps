@@ -18,12 +18,12 @@ const JOBS: Job[] = [
   { name: "photo scene", on: "aiOnScene", prio: "aiPrioScene", ids: sceneIds, run: sceneImage },
 ];
 
-export async function runAiBatch(env: Env, db: D1Database): Promise<{ done: number; stopped: boolean }> {
+export async function runAiBatch(env: Env, db: D1Database, opts: { budgetSec?: number } = {}): Promise<{ done: number; stopped: boolean }> {
   if (!env.AI) return { done: 0, stopped: false };
   const st = await loadSearchSettings(db);
   const size = Math.max(1, Number(st.aiBatchSize ?? 12));
   const conc = Math.max(1, Number(st.aiConcurrency ?? 4));
-  const until = Date.now() + Math.max(30, Number(st.aiBudgetSec ?? 240)) * 1000;
+  const until = Date.now() + Math.max(30, opts.budgetSec ?? Number(st.aiBudgetSec ?? 240)) * 1000;
   let done = 0;
   let stopped = false;
   // 依「設定 › AI 文字辨識」的優先順序（數字小的先）與開關（業主 2026-11-26）。
