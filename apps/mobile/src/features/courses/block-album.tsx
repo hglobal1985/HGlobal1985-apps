@@ -26,9 +26,9 @@ export function BlockAlbum({ course, openId, onChanged }: { course: CourseDetail
   const [open, setOpen] = useState<string | null>(openId ?? null);
   // 場景搜尋（杜杜龍 2026-11-24）：AI 辨識出的行為、場景、物品標籤；有搜尋時只列出符合的照片，符合的區塊自動展開。
   // 搜尋改用共用模組 album-search.tsx（場景標籤＋照片裡的文字 OCR；杜杜龍 2026-11-25，與中心 EDM 一致）。
-  const { q, setQ, key } = useAlbumSearch();
+  const { q, setQ, key, sem } = useAlbumSearch();
   const hasScene = all.some((g) => albumSearchable(g.photos!));
-  const groups = key ? all.map((g) => ({ ...g, photos: g.photos!.filter((p) => matchAlbumItem(p, key)) })).filter((g) => g.photos.length) : all;
+  const groups = key ? all.map((g) => ({ ...g, photos: g.photos!.filter((p) => matchAlbumItem(p, key, sem)) })).filter((g) => g.photos.length) : all;
   useEffect(() => {
     if (!openId) return;
     setOpen(openId);
