@@ -1,4 +1,4 @@
-import { prepareVisionImage } from "./ai-image.ts";
+import { aiResponseText, prepareVisionImage } from "./ai-image.ts";
 /**
  * 相簿照片場景辨識（業主 2026-11-24）：只辨識「其他相簿」（區塊照片，例如成交百寶箱），不辨識封面、也不辨識中心 EDM（EDM 走文字辨識）。
  * 用 Workers AI 視覺模型（設定 → AI 模型 →「相簿照片場景辨識」）認出行為、場景、物品，存成逗號分隔的短標籤到 cover_media.scene_text。
@@ -54,8 +54,8 @@ export async function sceneImage(env: Env, db: D1Database, rowId: string): Promi
   let out = "";
   try {
     const dataUri = `data:${type};base64,${toBase64(bytes)}`;
-    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: 200 } as never)) as { response?: string; choices?: { message?: { content?: string } }[] };
-    out = res?.response ?? res?.choices?.[0]?.message?.content ?? "";
+    const res = (await env.AI.run(model as never, { messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: dataUri } }] }], max_tokens: 200 } as never)) as { response?: unknown; choices?: { message?: { content?: string } }[] };
+    out = aiResponseText(res);
   } catch (e) {
     const msg = String((e as Error)?.message ?? e);
     if (/3036|daily free allocation/i.test(msg)) {

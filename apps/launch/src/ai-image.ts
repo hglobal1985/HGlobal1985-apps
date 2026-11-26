@@ -15,3 +15,12 @@ export async function prepareVisionImage(env: Env, bytes: Uint8Array, type: stri
     return { bytes, type };
   }
 }
+
+/**
+ * 取出 AI 回的文字。Llama 4 Scout 這類模型在要求 JSON 時，`response` 會直接是「已解析的物件」而不是字串（業主 2026-11-26 回報 EDM 一直 0 張的真正原因：
+ * 物件被當字串處理而丟出錯誤，辨識卡在「處理中」，點數卻已扣掉）。物件一律轉回 JSON 字串，讓後面的解析照舊。
+ */
+export function aiResponseText(res: { response?: unknown; choices?: { message?: { content?: unknown } }[] } | null | undefined): string {
+  const pick = (v: unknown): string => (typeof v === "string" ? v : v && typeof v === "object" ? JSON.stringify(v) : "");
+  return pick(res?.response) || pick(res?.choices?.[0]?.message?.content);
+}
