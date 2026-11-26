@@ -10,7 +10,7 @@ type Job = { id: string; course_id: string; block_id: string; kind: "playlist" |
 const short = () => crypto.randomUUID().slice(0, 6);
 
 /** 把新建的教材放到某區塊的最後面（區塊＝到下一個區塊標題之前），完整版課程影片永遠在最後；順序重新編號。 */
-async function placeInBlock(db: D1Database, courseId: string, blockId: string, newIds: string[]): Promise<void> {
+export async function placeInBlock(db: D1Database, courseId: string, blockId: string, newIds: string[]): Promise<void> {
   if (!newIds.length) return;
   const { results } = await db.prepare("SELECT id, kind, is_full FROM lessons WHERE course_id = ? ORDER BY position").bind(courseId).all<{ id: string; kind: string; is_full: number }>();
   const fresh = new Set(newIds);
@@ -23,7 +23,7 @@ async function placeInBlock(db: D1Database, courseId: string, blockId: string, n
 }
 
 /** 把新建的教材放到這份清單所有教材（含區塊）的最前面，完整版課程影片永遠在最後；順序重新編號。 */
-async function placeOnTop(db: D1Database, courseId: string, newIds: string[]): Promise<void> {
+export async function placeOnTop(db: D1Database, courseId: string, newIds: string[]): Promise<void> {
   if (!newIds.length) return;
   const { results } = await db.prepare("SELECT id, kind, is_full FROM lessons WHERE course_id = ? ORDER BY position").bind(courseId).all<{ id: string; kind: string; is_full: number }>();
   const fresh = new Set(newIds);
@@ -94,7 +94,7 @@ async function placeAtEnd(db: D1Database, courseId: string, newIds: string[]): P
   await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
 }
 
-const nextPos = async (db: D1Database, courseId: string) => ((await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0) + 1;
+export const nextPos = async (db: D1Database, courseId: string) => ((await db.prepare("SELECT COALESCE(MAX(position), 0) AS m FROM lessons WHERE course_id = ?").bind(courseId).first<{ m: number }>())?.m ?? 0) + 1;
 const EXT: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/avif": "avif" };
 
 async function fetchImage(url: string, side: number): Promise<{ data: ArrayBuffer; type: string } | null> {
