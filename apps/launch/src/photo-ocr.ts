@@ -74,7 +74,9 @@ export async function ocrPhoto(env: Env, db: D1Database, rowId: string): Promise
     }
     return fail();
   }
-  const text = NONE.test(out.trim()) ? "" : cleanOcrText(out).slice(0, 2000);
+  let text = NONE.test(out.trim()) ? "" : cleanOcrText(out).slice(0, 2000);
+  // 模型卡住亂重複：整段幾乎都是重複垃圾，清掉後剩不到 3 成，視為沒有可用文字。
+  if (out.length > 200 && text.length < out.length * 0.15 && text.length < 40) text = "";
   await db.prepare("UPDATE cover_media SET ocr_text = ?, ocr_status = 'done', ocr_model = ? WHERE id = ?").bind(text, model, rowId).run();
 }
 
