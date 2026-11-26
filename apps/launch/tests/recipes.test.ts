@@ -141,3 +141,15 @@ test("食譜照片：做場景辨識、不做文字辨識；食譜搜尋也比�
   const res = await handleApi(new Request(`https://learn.test/api/v2/recipes?q=${encodeURIComponent("雞肉")}`), env);
   assert.equal(((await res.json()) as { recipes: unknown[] }).recipes.length, 1, "用場景標籤找得到食譜");
 });
+
+test("相簿類別順序：食譜專區和其他類別一起排（albumOrder 含 recipe）", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on" };
+  const call = async (method: string, path: string, token?: string, body?: unknown) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env);
+    return (await res.json()) as { order?: string[] };
+  };
+  const admin = ((await (await handleApi(new Request("https://learn.test/api/v2/auth/demo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: "demo-admin" }) }), env)).json()) as { token: string }).token;
+  assert.deepEqual((await call("GET", "/albums")).order, ["recipe"], "沒有照片類別時只有食譜");
+  await call("PUT", "/admin/ui-config", admin, { albumOrder: ["recipe", "edm"] });
+  assert.equal((await call("GET", "/albums")).order?.[0], "recipe", "可以把食譜排到最前面");
+});

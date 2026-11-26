@@ -189,7 +189,7 @@ test("相簿專區 GET /albums：全站相簿照片依來源分資料夾（杜�
     return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
   };
   type Albums = { total: number; groups: { id: string; label: string; folders: { id: string; kind: string; key: string; title: string; count: number; thumb: string | null }[] }[] };
-  assert.deepEqual((await call<Albums>("GET", "/albums")).data, { total: 0, groups: [] }, "沒有照片＝空");
+  assert.deepEqual((await call<Albums>("GET", "/albums")).data, { total: 0, groups: [], order: ["recipe"] }, "沒有照片＝空（類別順序只有食譜專區）");
   const admin = ((await (await handleApi(new Request("https://learn.test/api/v2/auth/demo", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ sub: "demo-admin" }) }), env)).json()) as { token: string }).token;
   await call("PUT", `/admin/cover-media?kind=center&key=${encodeURIComponent("台北中心")}&scope=edm&w=10&h=10`, { token: admin, bytes: jpeg });
   await call("PUT", "/admin/cover-media?kind=series&key=U40&w=10&h=10", { token: admin, bytes: jpeg });

@@ -68,6 +68,8 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const subName = sub === null ? "" : sub === "" ? "未分類" : (sf.subs?.folders.find((x) => x.id === sub)?.name ?? "");
   useEffect(() => (setSub(null), setSortBy(null)), [view?.folder.id]); // 換資料夾：子資料夾與排序都重來
   const groups = data?.groups ?? [];
+  const [recipeCat, setRecipeCat] = useState<string>("all"); // 從側邊欄點食譜的某個分類進來
+  const order = data?.order ?? [...groups.map((g) => g.id), "recipe"]; // 類別順序（含食譜專區，超級管理員可調）
   const viewGroup = view ? groups.find((g) => g.folders.some((f) => f.id === view.folder.id)) : undefined;
   const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)); // 沒有＝相簿首頁（類別資料夾）
   const key = q.trim().toLowerCase();
@@ -117,7 +119,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
     }
   };
   const move = async (id: string, d: number) => {
-    const ids = groups.map((g) => g.id);
+    const ids = [...order];
     const i = ids.indexOf(id);
     const j = i + d;
     if (i < 0 || j < 0 || j >= ids.length) return;
@@ -209,7 +211,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
     const half = Math.floor((cardW - 6) / 2);
     const withThumb = recipeList.filter((r) => r.thumb);
     return (
-      <Pressable key="recipe" accessibilityRole="button" accessibilityLabel={`食譜，${recipeList.length} 道`} onPress={() => (setGroup("recipe"), setQ(""))} style={({ pressed }) => [{ width: cardW, borderRadius: 12, backgroundColor: "#262629", padding: 3, opacity: pressed ? 0.75 : 1 }]}>
+      <Pressable key="recipe" accessibilityRole="button" accessibilityLabel={`食譜，${recipeList.length} 道`} onPress={() => (setRecipeCat("all"), setGroup("recipe"), setQ(""))} style={({ pressed }) => [{ width: cardW, borderRadius: 12, backgroundColor: "#262629", padding: 3, opacity: pressed ? 0.75 : 1 }]}>
         <View style={{ width: cardW - 6, height: cardW - 6, borderRadius: 9, overflow: "hidden", flexDirection: "row", flexWrap: "wrap", gap: 2, backgroundColor: "#1a1a1c" }}>
           {[0, 1, 2, 3].map((i) => (
             <View key={i} style={{ width: half - 1, height: half - 1, backgroundColor: "#2e2e31", alignItems: "center", justifyContent: "center" }}>
@@ -218,9 +220,9 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
           ))}
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 6, paddingVertical: 6 }}>
-          <Ionicons name="restaurant" size={16} color="#cfcfd4" {...UI_ONLY} />
+          <Ionicons name="folder" size={16} color="#cfcfd4" {...UI_ONLY} />
           <AppText variant="callout" numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800" }}>食譜</AppText>
-          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{`${recipeList.length} 道`}</AppText>
+          <AppText variant="caption" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{recipeList.length}</AppText>
         </View>
       </Pressable>
     );
@@ -316,29 +318,45 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
           <Ionicons name="home-outline" size={18} color="#fff" {...UI_ONLY} />
           <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>相簿首頁</AppText>
         </Pressable>
-        {groups.map((g, gi) => {
-          const isOpen = expanded.has(g.id);
+        {/* 所有類別（含食譜專區）用同一種列：標題＋數量、上下移動（超級管理員）、展開收起；食譜展開＝它的分類（杜杜龍 2026-11-26「選單要一致」） */}
+        {order.map((oid, gi) => {
+          const g = groups.find((x) => x.id === oid);
+          const isRecipe = oid === "recipe";
+          if (!g && !isRecipe) return null;
+          const label = isRecipe ? "食譜" : g!.label;
+          const count = isRecipe ? recipeList.length : g!.folders.length;
+          const active = isRecipe ? inRecipe : g!.id === cur?.id;
+          const isOpen = expanded.has(oid);
           return (
-            <View key={g.id}>
-              <View style={{ flexDirection: "row", alignItems: "center", minHeight: 42, paddingLeft: 12, backgroundColor: g.id === cur?.id ? "#2e7d32" : "transparent" }}>
+            <View key={oid}>
+              <View style={{ flexDirection: "row", alignItems: "center", minHeight: 42, paddingLeft: 12, backgroundColor: active ? "#2e7d32" : "transparent" }}>
                 {/* 點標題＝進入這個類別的總覽縮圖 */}
-                <Pressable accessibilityRole="button" accessibilityLabel={`${g.label}，進入總覽`} onPress={() => (setView(null), setGroup(g.id), setQ(""), !large && setSide(false))} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingRight: 8 }}>
-                  <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>{g.label}</AppText>
-                  <AppText {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 14 }}>{g.folders.length}</AppText>
+                <Pressable accessibilityRole="button" accessibilityLabel={`${label}，進入總覽`} onPress={() => (setView(null), isRecipe && setRecipeCat("all"), setGroup(oid), setQ(""), !large && setSide(false))} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingRight: 8 }}>
+                  <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>{label}</AppText>
+                  <AppText {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 14 }}>{count}</AppText>
                 </Pressable>
                 {admin ? (
                   <>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往上移`} disabled={gi === 0} onPress={() => void move(g.id, -1)} style={{ width: 32, height: 38, alignItems: "center", justifyContent: "center", opacity: gi === 0 ? 0.3 : 1 }}><Ionicons name="arrow-up" size={18} color="#fff" {...UI_ONLY} /></Pressable>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`${g.label} 往下移`} disabled={gi === groups.length - 1} onPress={() => void move(g.id, 1)} style={{ width: 32, height: 38, alignItems: "center", justifyContent: "center", opacity: gi === groups.length - 1 ? 0.3 : 1 }}><Ionicons name="arrow-down" size={18} color="#fff" {...UI_ONLY} /></Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`${label} 往上移`} disabled={gi === 0} onPress={() => void move(oid, -1)} style={{ width: 32, height: 38, alignItems: "center", justifyContent: "center", opacity: gi === 0 ? 0.3 : 1 }}><Ionicons name="arrow-up" size={18} color="#fff" {...UI_ONLY} /></Pressable>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`${label} 往下移`} disabled={gi === order.length - 1} onPress={() => void move(oid, 1)} style={{ width: 32, height: 38, alignItems: "center", justifyContent: "center", opacity: gi === order.length - 1 ? 0.3 : 1 }}><Ionicons name="arrow-down" size={18} color="#fff" {...UI_ONLY} /></Pressable>
                   </>
                 ) : null}
-                {/* 標題右側的小按鈕：展開／收起這個類別的資料夾清單 */}
-                <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${isOpen ? "收起" : "展開"}${g.label}的資料夾`} onPress={() => toggleExpanded(g.id)} style={{ width: 40, height: 38, alignItems: "center", justifyContent: "center" }}>
+                {/* 標題右側的小按鈕：展開／收起這個類別的資料夾（食譜＝分類）清單 */}
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${isOpen ? "收起" : "展開"}${label}的${isRecipe ? "分類" : "資料夾"}`} onPress={() => toggleExpanded(oid)} style={{ width: 40, height: 38, alignItems: "center", justifyContent: "center" }}>
                   <Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#fff" {...UI_ONLY} />
                 </Pressable>
               </View>
-              {isOpen
-                ? g.folders.map((f) => (
+              {isOpen && isRecipe
+                ? (recipes.data?.categories ?? []).map((c) => (
+                    <Pressable key={c.id} accessibilityRole="button" accessibilityLabel={c.name} onPress={() => (setView(null), setRecipeCat(c.id), setGroup("recipe"), setQ(""), !large && setSide(false))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34, paddingLeft: 28, paddingRight: 12 }}>
+                      <Ionicons name="folder-outline" size={16} color="#cfcfd4" {...UI_ONLY} />
+                      <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontSize: 16, lineHeight: 21 }}>{c.name}</AppText>
+                      <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{recipeList.filter((r) => r.categoryId === c.id).length}</AppText>
+                    </Pressable>
+                  ))
+                : null}
+              {isOpen && !isRecipe
+                ? g!.folders.map((f) => (
                     <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={folderName(f)} onPress={() => (!large && setSide(false), void openFolder(f))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34, paddingLeft: 28, paddingRight: 12 }}>
                       <Ionicons name={f.locked ? "lock-closed-outline" : "folder-outline"} size={16} color="#cfcfd4" {...UI_ONLY} />
                       <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontSize: 16, lineHeight: 21 }}>{folderName(f)}</AppText>
@@ -349,11 +367,6 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
             </View>
           );
         })}
-        {/* 食譜專區（杜杜龍 2026-11-26） */}
-        <Pressable accessibilityRole="button" accessibilityLabel="食譜" onPress={() => (setView(null), setGroup("recipe"), setQ(""), !large && setSide(false))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingHorizontal: 12, backgroundColor: inRecipe ? "#2e7d32" : "transparent" }}>
-          <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>食譜</AppText>
-          <AppText {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 14 }}>{recipeList.length}</AppText>
-        </Pressable>
       </ScrollView>
     </View>
   );
@@ -378,7 +391,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
         {/* 類別返回列：在某個類別裡時，回到相簿首頁（類別資料夾） */}
         {cur && !view ? <AlbumBackHeader title={cur.label} meta={`${cur.folders.length} 個資料夾`} onBack={() => (setGroup(null), setQ(""))} /> : null}
         {inRecipe && !(scope === "all" && key) ? (
-          <RecipeZone q={q} onBack={() => (setGroup(null), setQ(""))} onOpenPhotos={(title, items, index) => onPick({ folder: null, title, items, index })} />
+          <RecipeZone key={recipeCat} initialCat={recipeCat} q={q} onBack={() => (setGroup(null), setQ(""))} onOpenPhotos={(title, items, index) => onPick({ folder: null, title, items, index })} />
         ) : view && hasSubs && sub === null && !key && sf.subs ? (
           <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6, gap: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -417,7 +430,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
           ) : (
             <>
               {/* 相簿首頁：每個「類別」就是一個資料夾（有新類別會自動出現）；進去才是該類別的資料夾 */}
-              {!cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeCats.map(catCard)}{!key || "食譜".includes(key) ? recipeCard() : null}</View> : null}
+              {!cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{order.map((oid) => (oid === "recipe" ? (!key || "食譜".includes(key) ? recipeCard() : null) : homeCats.filter((g) => g.id === oid).map(catCard)))}</View> : null}
               {!cur && key ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeFolderHits.map(card)}</View> : null}
               {cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View> : null}
               {data && ((cur && !folders.length) || (!cur && !homeCats.length && !homeFolderHits.length && !(!key || "食譜".includes(key)))) && !(key && pageFound?.length) ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? (pageFound === null && key.length >= 2 ? "搜尋中…" : "沒有符合的資料夾或照片") : "還沒有相簿照片"}</AppText> : null}

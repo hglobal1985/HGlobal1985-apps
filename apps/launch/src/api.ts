@@ -2588,7 +2588,7 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
     const l = locks.get(courseId);
     return l && l.locked ? { locked: true, lockReason: l.lines.join("、") || "沒有權限進入這個相簿" } : { locked: false };
   };
-  const groups: Record<string, AlbumFolder[]> = { edm: [], cover: [], series: [], course: [], block: [], treasure: [] };
+  const groups: Record<string, AlbumFolder[]> = { edm: [], cover: [], series: [], course: [], block: [], treasure: [], recipe: [] }; // recipe 永遠空（食譜不是照片資料夾，只佔順序）
   for (const r of rows.results) {
     const thumbs = r.thumbs ? r.thumbs.split("|").map((k) => pubUrl(k, 0)) : [];
     const base = { count: r.n, thumb: thumbs[0] ?? null, thumbs };
@@ -2620,14 +2620,15 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
       }
   }
   const sort = (a: AlbumFolder, b: AlbumFolder) => b.count - a.count || a.title.localeCompare(b.title, "zh-Hant");
-  const defs: [string, string][] = [["edm", "中心 EDM"], ["cover", "中心封面照片"], ["series", "系列封面照片"], ["course", "課程封面照片"], ["block", "課程區塊相簿"], ["treasure", "成交百寶箱"]];
+  const defs: [string, string][] = [["edm", "中心 EDM"], ["cover", "中心封面照片"], ["series", "系列封面照片"], ["course", "課程封面照片"], ["block", "課程區塊相簿"], ["treasure", "成交百寶箱"], ["recipe", "食譜"]];
   const order = cfg.albumOrder ?? [];
   const pos = (id: string) => (order.includes(id) ? order.indexOf(id) : 100 + defs.findIndex((d) => d[0] === id));
   const out = defs
     .map(([id, l]) => ({ id, label: l, folders: groups[id]!.sort(sort) }))
     .filter((g) => g.folders.length)
     .sort((a, b) => pos(a.id) - pos(b.id));
-  return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out };
+  const orderAll = [...out.map((g) => g.id), "recipe"].sort((a, b) => pos(a) - pos(b)); // 食譜專區不是照片資料夾，但和其他類別一起排順序
+  return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out, order: orderAll };
 }
 /** 全站 AI 辨識（文字 OCR、場景）還沒處理的張數與預估完成時間（圖片資訊「藍字」區給所有人看；杜杜龍 2026-11-26）。速度取最近 3 小時實際完成的張數。 */
 async function aiQueueInfo(db: D1Database, edm: boolean): Promise<{ pending: number; perHour: number; etaMin: number | null; quotaOut: boolean; sceneOn: boolean; ocrOn: boolean }> {
@@ -4636,10 +4637,22 @@ const routes: [string, RegExp, Handler][] = [
       const legal = new Map<string, string>();
       for (const m of await Promise.all(chunks.map((c) => lookupLegalNames(ctx.env.CENTRAL_SERVICE_SECRET, c).catch(() => new Map<string, string>())))) for (const [k, v] of m) legal.set(k, v);
       const ql = q.toLowerCase();
-      const out = new Map<string, { sub: string; name: string; legalName: string; avatar: string | null }>();
+      const out = new Map<string, { sub: string; name: string; legalName: string; avatar: string | null; center: string }>();
       for (const p of [...byNick.results, ...pool.results.filter((p) => (legal.get(p.sub) ?? "").toLowerCase().includes(ql))]) {
         if (out.size >= 20) break;
-        if (!out.has(p.sub)) out.set(p.sub, { sub: p.sub, name: p.name, legalName: legal.get(p.sub) ?? "", avatar: p.avatar || null });
+        if (!out.has(p.sub)) out.set(p.sub, { sub: p.sub, name: p.name, legalName: legal.get(p.sub) ?? "", avatar: p.avatar || null, center: "" });
+      }
+      // 還沒用過行動大學的會員（不在 member_profiles）：向會員中心依暱稱搜尋（2～30 字，任何啟用中的會員，附所屬中心；杜杜龍 2026-11-26 回報查不到會員）。
+      if (ctx.session?.kind === "central" && q.length >= 2) {
+        const st = await staffSearch(ctx.session.token, q).catch(() => null);
+        const extra = (st?.members ?? []).filter((m) => !out.has(m.memberId));
+        const names = extra.length ? await lookupLegalNames(ctx.env.CENTRAL_SERVICE_SECRET, extra.map((m) => m.memberId)).catch(() => new Map<string, string>()) : new Map<string, string>();
+        for (const m of st?.members ?? []) {
+          if (out.size >= 20) break;
+          const mine = out.get(m.memberId);
+          if (mine) mine.center = m.center;
+          else out.set(m.memberId, { sub: m.memberId, name: m.name, legalName: names.get(m.memberId) ?? "", avatar: null, center: m.center });
+        }
       }
       return { members: [...out.values()] };
     },
@@ -4650,12 +4663,23 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [id]) => {
       // 更換食譜上傳者（只有超級管理員）：新上傳者的暱稱、所屬中心一起換（中心取自會員中心，不可手動填）。
       const s = requireSuperAdmin(ctx);
-      const b = await readJson<{ sub?: unknown }>(ctx.req);
+      const b = await readJson<{ sub?: unknown; name?: unknown }>(ctx.req);
       const sub = typeof b.sub === "string" ? b.sub.slice(0, 80) : "";
       await recipeRow(ctx, id!);
-      const prof = sub ? await ctx.db.prepare("SELECT name FROM member_profiles WHERE sub = ? AND name <> ''").bind(sub).first<{ name: string }>() : null;
-      if (!prof) return fail(404, "member_not_found", "找不到這位會員（需要是行動大學已註冊的會員）");
-      const label = (await lookupCenterLabels(ctx.env.CENTRAL_SERVICE_SECRET, [sub]).catch(() => new Map<string, string>())).get(sub) ?? "";
+      let prof = sub ? await ctx.db.prepare("SELECT name FROM member_profiles WHERE sub = ? AND name <> ''").bind(sub).first<{ name: string }>() : null;
+      let label = "";
+      if (!prof && sub && s.kind === "central") {
+        // 還沒用過行動大學的會員：再向會員中心確認這位會員存在（暱稱與所屬中心都以會員中心為準，不信任畫面傳來的）。
+        const nm = typeof (b as { name?: unknown }).name === "string" ? ((b as { name: string }).name).slice(0, 30) : "";
+        const hit = nm.length >= 2 ? (await staffSearch(s.token, nm).catch(() => null))?.members.find((m) => m.memberId === sub) : undefined;
+        if (hit) {
+          prof = { name: hit.name };
+          label = hit.center;
+          await ctx.db.prepare("INSERT OR IGNORE INTO member_profiles (sub, name) VALUES (?, ?)").bind(sub, hit.name.slice(0, 60)).run(); // 只記顯示名稱（之後搜尋、上傳者標記用）
+        }
+      }
+      if (!prof) return fail(404, "member_not_found", "找不到這位會員");
+      if (!label) label = (await lookupCenterLabels(ctx.env.CENTRAL_SERVICE_SECRET, [sub]).catch(() => new Map<string, string>())).get(sub) ?? "";
       await ctx.db.batch([
         ctx.db.prepare("UPDATE recipes SET author_sub = ?, author_name = ?, author_center_key = ?, author_center_label = ?, updated_at = datetime('now') WHERE id = ?").bind(sub, prof.name.slice(0, 60), label ? centerKey(label) : "", label, id),
         audit(ctx.db, s.sub, "recipe.author", "recipe", id!, sub),
