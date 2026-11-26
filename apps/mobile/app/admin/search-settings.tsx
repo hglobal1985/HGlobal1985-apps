@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, NoticeBox, Screen, Section, SegmentTabs, Fold } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, NoticeBox, Screen, Section, SegmentTabs, Fold, SettingsFooter } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { clearSemanticMemo } from "@/features/courses/use-semantic";
 import { clearPhoneticMemo } from "@/features/courses/use-phonetic";
-import { SynonymsEditor } from "@/features/search/synonyms-editor";
+import { SynonymsEditor, useSynonymsDraft } from "@/features/search/synonyms-editor";
 
 type Def = { key: string; group: string; label: string; desc: string; advice: string; type: "bool" | "number" | "choice"; default: boolean | number | string; min?: number; max?: number; step?: number; unit?: string; choices?: { value: string; label: string }[] };
 type Data = { values: Record<string, boolean | number | string>; params: Def[]; groups: { key: string; title: string; intro: string }[] };
@@ -18,7 +19,7 @@ const fmt = (v: number, step = 1) => (step < 1 ? v.toFixed(step < 0.1 ? 2 : 2).r
 
 /**
  * 設定 › 搜尋與 AI 設定（業主 2026-11-25，超級管理員）：語意搜尋（AI 嵌入）、同音、模糊、排序、EDM 辨識的參數，
- * 每項附白話功能與建議值，改了立刻儲存；下方有「試搜尋」顯示相似度分數方便調門檻；最後是原本的「搜尋關聯詞」。
+ * 每項附白話功能與建議值，改完按下方「儲存」；下方有「試搜尋」顯示相似度分數方便調門檻；最後是原本的「搜尋關聯詞」。
  */
 export default function SearchSettingsScreen() {
   const { c } = useTheme();
@@ -29,24 +30,40 @@ export default function SearchSettingsScreen() {
   const [q, setQ] = useState("");
   const [test, setTest] = useState<Test | null>(null);
   const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // 整頁只有一個「儲存」（業主 2026-11-26）：各參數先改草稿，統一按儲存才寫入；離開前有未存的修改會主動詢問。
+  const syn = useSynonymsDraft();
+  const valsDirty = !!vals && !!data && JSON.stringify(vals) !== JSON.stringify(data.values);
+  const dirty = valsDirty || syn.dirty;
+  const commitRef = useRef<() => Promise<boolean>>(async () => true);
+  useUnsavedPrompt({ dirty, save: () => commitRef.current(), discard: () => (setVals(null), syn.discard()) });
   if (!isSuper) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
   if (!data) return <Screen header={false}>{error ? <ErrorView message={error} onRetry={reload} /> : <LoadingView />}</Screen>;
   const cur = vals ?? data.values;
-  const save = async (patch: Record<string, boolean | number | string>, reset = false) => {
-    const before = cur;
+  /** 控制項的修改（只改草稿；reset＝全部換成建議值，也是草稿）。 */
+  const save = (patch: Record<string, boolean | number | string>, reset = false) => {
     setVals(reset ? Object.fromEntries(data.params.map((p) => [p.key, p.default])) : { ...cur, ...patch });
+  };
+  const commit = async (): Promise<boolean> => {
+    setSaving(true);
     try {
-      const r = await api<{ values: Data["values"] }>("PUT", "/admin/search-settings", reset ? { reset: true } : { values: patch });
-      setVals(r.values);
+      if (valsDirty) await api<{ values: Data["values"] }>("PUT", "/admin/search-settings", { values: cur });
+      if (syn.dirty) await syn.save();
+      setVals(null);
+      reload();
       clearSemanticMemo();
       clearPhoneticMemo();
       invalidate();
-      flashText(reset ? "已全部恢復建議值" : "已儲存");
+      flashText("已儲存");
+      return true;
     } catch (e) {
-      setVals(before);
       flashText((e as Error).message);
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
+  commitRef.current = commit;
   const runTest = async () => {
     setTesting(true);
     try {
@@ -83,10 +100,10 @@ export default function SearchSettingsScreen() {
   };
   const same = (p: Def) => cur[p.key] === p.default;
   return (
-    <Screen header={false}>
-      <NoticeBox text="這一頁所有設定都不用按儲存：每改一項（含下方搜尋關聯詞，打完字停一下）就立即存好、立即生效，超派、至尊模式同時套用。不確定就維持建議值；要全部還原按最下方「全部恢復建議值」。" />
+    <Screen header={false} footer={<SettingsFooter dirty={dirty} saving={saving} onSave={() => void commit()} onDiscard={() => (setVals(null), syn.discard())} />}>
+      <NoticeBox text="這一頁所有設定（含下方搜尋關聯詞）改完後，統一按下方「儲存」才會生效，超派、至尊模式同時套用；有沒存的修改要離開時，系統會問你要儲存還是放棄。不確定就維持建議值；要全部還原按最下方「全部恢復建議值」。" />
       <Section fold title="搜尋關聯詞（打字自動儲存）">
-        <SynonymsEditor />
+        <SynonymsEditor draft={syn} />
       </Section>
       {data.groups.map((g) => (
         <Section fold key={g.key} title={g.title}>

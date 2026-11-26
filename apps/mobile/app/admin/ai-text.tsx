@@ -1,14 +1,16 @@
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { api } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Fold } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, SettingsFooter, Fold } from "@/ui";
 import { useApi, useSession } from "@/state/session";
-import { AiProgressPanel } from "@/features/admin/ai-progress";
+import { AiProgressPanel, jobsValues, type JobRow, type Progress } from "@/features/admin/ai-progress";
+import { useUnsavedPrompt } from "@/lib/settings-page";
+import { flashText } from "@/ui/flash-notice";
 import { AiSpecialRulesPanel } from "@/features/admin/ai-special-rules";
 
 type Field = { name: string; hint: string };
@@ -25,6 +27,19 @@ export default function AiTextScreen() {
   const { data, error, loading, reload } = useApi<View_>(isSuper ? "/admin/edm-fields" : null);
   const [rows, setRows] = useState<Field[] | null>(null);
   const [busy, setBusy] = useState(false);
+  // 辨識進度與「辨識優先順序與開關」（業主 2026-11-26：整頁只有一個儲存鈕，開關與順序也改成草稿，一起存）
+  const progress = useApi<Progress>(isSuper ? "/admin/ai/progress" : null);
+  const [jobs, setJobs] = useState<JobRow[] | null>(null);
+  const savedJobs = progress.data?.jobs ?? null;
+  const jobsDirty = !!jobs && !!savedJobs && JSON.stringify(jobsValues(jobs)) !== JSON.stringify(jobsValues(savedJobs));
+  useEffect(() => {
+    if (savedJobs && !jobs) setJobs(savedJobs.map((j) => ({ ...j })));
+  }, [savedJobs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const saveRef = useRef<() => Promise<boolean>>(async () => true);
+  const discardRef = useRef<() => void>(() => undefined);
+  const fieldsDirty = !!rows && !!data && JSON.stringify(rows) !== JSON.stringify(data.fields);
+  const dirty = fieldsDirty || jobsDirty;
+  useUnsavedPrompt({ dirty, save: () => saveRef.current(), discard: () => discardRef.current() });
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   useEffect(() => {
     if (data && !rows) setRows(data.fields.map((f) => ({ ...f })));
@@ -46,23 +61,33 @@ export default function AiTextScreen() {
     [n[i], n[j]] = [n[j]!, n[i]!];
     setRows(n);
   };
-  const dirty = JSON.stringify(rows) !== JSON.stringify(data.fields);
   const names = rows.map((r) => r.name.trim());
   const bad = names.some((n) => !n) || new Set(names).size !== names.length || names.includes(data.other);
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     setBusy(true);
     setMsg(null);
     try {
-      await api("PUT", "/admin/edm-fields", { fields: rows.map((r) => ({ name: r.name.trim(), hint: r.hint.trim() })) });
+      if (fieldsDirty) await api("PUT", "/admin/edm-fields", { fields: rows.map((r) => ({ name: r.name.trim(), hint: r.hint.trim() })) });
+      if (jobsDirty && jobs) await api("PUT", "/admin/search-settings", { values: jobsValues(jobs) });
       setRows(null);
+      setJobs(null);
       reload();
-      setMsg({ tone: "success", text: "已儲存。已辨識的舊 EDM 會在背景慢慢用新格式重新整理。" });
+      progress.reload();
+      setMsg({ tone: "success", text: fieldsDirty ? "已儲存。已辨識的舊 EDM 會在背景慢慢用新格式重新整理。" : "已儲存。" });
+      return true;
     } catch (e) {
       setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  const discard = () => {
+    setRows(data.fields.map((f) => ({ ...f })));
+    setJobs(savedJobs ? savedJobs.map((j) => ({ ...j })) : null);
+  };
+  saveRef.current = save;
+  discardRef.current = discard;
   const runNow = async () => {
     setBusy(true);
     setMsg(null);
@@ -82,10 +107,10 @@ export default function AiTextScreen() {
   };
   const input = [styles.input, { borderColor: c.border, backgroundColor: c.surface, color: c.text }];
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={<SettingsFooter dirty={dirty} saving={busy} onSave={() => void (bad ? flashText("欄位名稱不可空白、不可重複") : save())} onDiscard={discard} />}>
       <View style={{ gap: space.md }}>
         <AppText variant="title">AI 文字辨識</AppText>
-        <AiProgressPanel />
+        <AiProgressPanel data={progress.data} reload={progress.reload} jobs={jobs} setJobs={setJobs} dirty={jobsDirty} />
         <AiSpecialRulesPanel />
         <AppText variant="callout" tone="muted">
           EDM 上傳後，AI 會先讀出海報上的文字，再照下面的欄位整理好，顯示在「全螢幕看圖 › 圖片資訊」。歸不進任何欄位的內容，固定放在最後的「{data.other}」。
@@ -122,10 +147,7 @@ export default function AiTextScreen() {
         </Card>
         {rows.length < 20 ? <Button label="新增欄位" icon="add" variant="secondary" onPress={() => setRows([...rows, { name: "", hint: "" }])} fullWidth /> : null}
         {bad ? <NoticeBox tone="danger" text={`欄位名稱不可空白、不可重複，也不能叫「${data.other}」`} /> : null}
-        <View style={{ flexDirection: "row", gap: space.sm }}>
-          <View style={{ flex: 1 }}><Button label="還原預設" variant="cancel" onPress={reset} fullWidth /></View>
-          <View style={{ flex: 1 }}><Button label="儲存" onPress={save} loading={busy} disabled={busy || !dirty || bad} fullWidth /></View>
-        </View>
+        <Button label="還原預設格式" variant="secondary" onPress={reset} fullWidth />
         </Fold>
       </View>
     </Screen>

@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Switch, View } from "react-native";
 import { api, DEFAULT_APP_SETTINGS, type UiConfig } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, EmptyState, Icon, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, Chips, EmptyState, Icon, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
 
 type App = UiConfig["app"];
 
@@ -23,28 +24,30 @@ export default function AppSettingsScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   useEffect(() => setApp(config.app), [config.app]);
-  if (!member?.titles.includes("超級管理員")) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
-
-  const set = <K extends keyof App>(k: K, v: App[K]) => setApp((x) => ({ ...x, [k]: v }));
-  const rec = <K extends keyof App["rec"]>(k: K, v: App["rec"][K]) => setApp((x) => ({ ...x, rec: { ...x.rec, [k]: v } }));
   const dirty = JSON.stringify(app) !== JSON.stringify(config.app);
-  const save = async (next: App) => {
+  const save = async (next: App): Promise<boolean> => {
     setBusy(true);
     setMsg(null);
     try {
       await api("PUT", "/admin/ui-config", { app: next });
       reload();
       setMsg({ tone: "success", text: "已儲存。所有人重新開啟 APP 後套用。" });
+      return true;
     } catch (e) {
       setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  useUnsavedPrompt({ dirty, save: () => save(app), discard: () => setApp(config.app) });
+  if (!member?.titles.includes("超級管理員")) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
+
+  const set = <K extends keyof App>(k: K, v: App[K]) => setApp((x) => ({ ...x, [k]: v }));
+  const rec = <K extends keyof App["rec"]>(k: K, v: App["rec"][K]) => setApp((x) => ({ ...x, rec: { ...x.rec, [k]: v } }));
   const restore = async () => {
     if (!(await confirmSheet({ title: "還原預設值", message: "全部數值與規則會改回出廠預設，確定嗎？", confirmLabel: "還原", cancelLabel: "先不要", danger: true }))) return;
-    setApp(DEFAULT_APP_SETTINGS);
-    await save(DEFAULT_APP_SETTINGS);
+    setApp(DEFAULT_APP_SETTINGS); // 只改畫面上的草稿，要按下方「儲存」才生效
   };
 
   const toggle = (label: string, hint: string, value: boolean, onChange: (v: boolean) => void) => (
@@ -79,7 +82,7 @@ export default function AppSettingsScreen() {
   );
 
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={<SettingsFooter dirty={dirty} saving={busy} onSave={() => void save(app)} onDiscard={() => setApp(config.app)} />}>
       <AppText variant="callout" tone="muted">
         整個 APP 的數值與規則集中在這裡調整。改完按最下面的「儲存」，所有人重新開啟 APP 後套用。
       </AppText>
@@ -145,10 +148,7 @@ export default function AppSettingsScreen() {
         </Card>
       </Section>
 
-      <View style={{ gap: space.sm }}>
-        <Button label="儲存" icon="save-outline" loading={busy} disabled={!dirty || busy} onPress={() => save(app)} fullWidth />
-        <Button variant="secondary" label="還原預設值" icon="refresh-outline" disabled={busy} onPress={restore} fullWidth />
-      </View>
+      <Button variant="secondary" label="還原預設值（要按下方「儲存」才生效）" icon="refresh-outline" disabled={busy} onPress={restore} fullWidth />
     </Screen>
   );
 }

@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { StyleSheet, Switch, TextInput, View } from "react-native";
 import { api, DEFAULT_SHARE_SETTINGS, reviewerInviteMessage, shareMessage, type UiConfig } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
 
 type Share = UiConfig["share"];
 
@@ -24,27 +25,29 @@ export default function ShareDefaultsScreen() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   useEffect(() => setS(config.share), [config.share]);
-  if (!member?.titles.includes("超級管理員")) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
 
   const set = <K extends keyof Share>(k: K, v: Share[K]) => setS((x) => ({ ...x, [k]: v }));
   const dirty = JSON.stringify(s) !== JSON.stringify(config.share);
-  const save = async (next: Share) => {
+  const save = async (next: Share): Promise<boolean> => {
     setBusy(true);
     setMsg(null);
     try {
       await api("PUT", "/admin/ui-config", { share: next });
       reload();
       setMsg({ tone: "success", text: "已儲存。預覽卡片立刻套用；分享選單的文字重新開啟 APP 後套用。" });
+      return true;
     } catch (e) {
       setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  useUnsavedPrompt({ dirty, save: () => save(s), discard: () => setS(config.share) });
+  if (!member?.titles.includes("超級管理員")) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
   const restore = async () => {
     if (!(await confirmSheet({ title: "還原預設值", message: "分享的文字與預覽格式會全部改回出廠預設，確定嗎？", confirmLabel: "還原", cancelLabel: "先不要", danger: true }))) return;
-    setS(DEFAULT_SHARE_SETTINGS);
-    await save(DEFAULT_SHARE_SETTINGS);
+    setS(DEFAULT_SHARE_SETTINGS); // 只改畫面上的草稿，要按下方「儲存」才生效
   };
 
   const input = (label: string, hint: string, value: string, onChange: (v: string) => void, opts?: { multiline?: boolean; placeholder?: string }) => (
@@ -89,7 +92,7 @@ export default function ShareDefaultsScreen() {
   const sampleUrl = "https://learn.hglobal1985.com/136/wang-xiaoming-001";
 
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={<SettingsFooter dirty={dirty} saving={busy} onSave={() => void save(s)} onDiscard={() => setS(config.share)} />}>
       <AppText variant="callout" tone="muted">
         所有「分享」的文字與 LINE 預覽卡片格式集中在這裡。改完按最下面的「儲存」。
       </AppText>
@@ -198,10 +201,7 @@ export default function ShareDefaultsScreen() {
         </Card>
       </Section>
 
-      <View style={{ gap: space.sm }}>
-        <Button label="儲存" icon="save-outline" loading={busy} disabled={!dirty || busy} onPress={() => save(s)} fullWidth />
-        <Button variant="secondary" label="還原預設值" icon="refresh-outline" disabled={busy} onPress={restore} fullWidth />
-      </View>
+      <Button variant="secondary" label="還原預設值（要按下方「儲存」才生效）" icon="refresh-outline" disabled={busy} onPress={restore} fullWidth />
     </Screen>
   );
 }

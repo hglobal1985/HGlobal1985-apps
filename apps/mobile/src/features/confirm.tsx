@@ -45,13 +45,56 @@ export function confirmSheet(opts: ConfirmOptions): Promise<boolean> {
 /** 最常用的簡短寫法：標題＋說明，危險樣式（紅色確定鈕）。 */
 export const confirmAsk = (title: string, message: string, confirmLabel = "確定") => confirmSheet({ title, message, confirmLabel, danger: true });
 
+/**
+ * 三選一的確認面板（業主 2026-11-26：設定頁有沒存檔的修改要離開時，主動問「儲存／放棄／繼續編輯」）。
+ * 點面板外面或按「繼續編輯」＝回傳 null（留在原頁）。
+ */
+export type ChoiceOption = { key: string; label: string; variant: "primary" | "dangerSolid" | "cancel" | "secondary" };
+type PendingChoice = { title: string; message?: string; options: ChoiceOption[]; resolve: (key: string | null) => void };
+let currentChoice: PendingChoice | null = null;
+export function choiceSheet(opts: { title: string; message?: string; options: ChoiceOption[] }): Promise<string | null> {
+  currentChoice?.resolve(null);
+  return new Promise((done) => {
+    const p: PendingChoice = {
+      ...opts,
+      resolve: (key) => {
+        if (currentChoice === p) {
+          currentChoice = null;
+          emit();
+        }
+        done(key);
+      },
+    };
+    currentChoice = p;
+    emit();
+  });
+}
+
 /** 放在根版面一次即可。 */
 export function ConfirmSheetHost() {
+  const c = useSyncExternalStore(
+    (l) => (listeners.add(l), () => void listeners.delete(l)),
+    () => currentChoice,
+    () => currentChoice,
+  );
   const p = useSyncExternalStore(
     (l) => (listeners.add(l), () => void listeners.delete(l)),
     () => current,
     () => current,
   );
+  if (c) {
+    return (
+      <BottomSheet onClose={() => c.resolve(null)}>
+        <AppText variant="title">{c.title}</AppText>
+        {c.message ? <AppText tone="muted">{c.message}</AppText> : null}
+        <View style={{ gap: space.sm }}>
+          {c.options.map((o) => (
+            <Button key={o.key} variant={o.variant} label={o.label} fullWidth onPress={() => c.resolve(o.key)} />
+          ))}
+        </View>
+      </BottomSheet>
+    );
+  }
   if (!p) return null;
   return (
     <BottomSheet onClose={() => p.resolve(false)}>

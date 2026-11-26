@@ -1,15 +1,16 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_TYPES, api, type AchievementCategory, type AdminAchievement } from "@/api/client";
 import { BadgeIcon } from "@/features/achievements/badge-icon";
 import { conditionText } from "@/features/achievements/text";
 import { confirmSheet } from "@/features/confirm";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, EmptyState, ErrorView, LoadingView, Screen, Section } from "@/ui";
+import { AppText, Button, Card, Chips, EmptyState, ErrorView, LoadingView, Screen, Section, SettingsFooter } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";
 
@@ -30,6 +31,8 @@ export default function ListUnlocksScreen() {
   const [pick, setPick] = useState(false);
   const [cat, setCat] = useState<"all" | AchievementCategory>("all");
   const [busy, setBusy] = useState(false);
+  const saveRef = useRef<() => Promise<boolean>>(async () => true);
+  useUnsavedPrompt({ dirty: base !== null || rules !== null, save: () => saveRef.current(), discard: () => (setBase(null), setRules(null)) });
   if (!isSuper) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
   if (!list.data) return <Screen header={false}>{list.error ? <ErrorView message={list.error} onRetry={list.reload} /> : <LoadingView />}</Screen>;
   const curBase = base ?? config.app.listBaseQuota ?? 2;
@@ -37,7 +40,7 @@ export default function ListUnlocksScreen() {
   const byId = new Map(list.data.map((a) => [a.id, a]));
   const total = curBase + cur.reduce((a, r) => a + r.extra, 0);
   const dirty = base !== null || rules !== null;
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     setBusy(true);
     try {
       await api("PUT", "/admin/ui-config", { app: { ...config.app, listBaseQuota: curBase, listUnlocks: cur } });
@@ -45,19 +48,22 @@ export default function ListUnlocksScreen() {
       setBase(null);
       setRules(null);
       flashText("已儲存清單解鎖設定");
+      return true;
     } catch (e) {
       flashText(e instanceof Error ? e.message : "儲存失敗");
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  saveRef.current = save;
   const setExtra = (id: string, d: number) => setRules(cur.map((r) => (r.achievementId === id ? { ...r, extra: Math.min(20, Math.max(1, r.extra + d)) } : r)));
   const remove = async (id: string) => {
     if (await confirmSheet({ title: "移除解鎖條件", message: `不再用「${byId.get(id)?.name ?? id}」解鎖清單？已經多出來的清單不會被刪除，只是之後不能再新增超過額度。`, confirmLabel: "移除", danger: true })) setRules(cur.filter((r) => r.achievementId !== id));
   };
   const choices = list.data.filter((a) => a.active && !cur.some((r) => r.achievementId === a.id) && (cat === "all" || ACHIEVEMENT_TYPES[a.type].category === cat));
   return (
-    <Screen header={false} footer={dirty ? <View style={styles.foot}><View style={{ flex: 1 }}><Button variant="cancel" label="取消" onPress={() => { setBase(null); setRules(null); }} fullWidth /></View><View style={{ flex: 1 }}><Button label="儲存" onPress={() => void save()} loading={busy} fullWidth /></View></View> : undefined}>
+    <Screen header={false} footer={<SettingsFooter dirty={dirty} saving={busy} onSave={() => void save()} onDiscard={() => (setBase(null), setRules(null))} />}>
       <Section fold title="基本數量">
         <Card style={{ gap: space.sm }}>
           <AppText variant="callout">每位會員一開始可以建立的清單份數：</AppText>
