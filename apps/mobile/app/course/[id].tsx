@@ -34,6 +34,7 @@ import { LessonStage } from "@/features/player/lesson-stage";
 import { setStayMini, useStayMini } from "@/features/player/stay-mini";
 import { SHRINK_PX } from "@/features/player/shrink";
 import { useBandScroll } from "@/ui/band-scroll";
+import { DOWNLOAD_TAB, DownloadList, downloadItems } from "@/features/courses/download-tab";
 import { ElderCourse } from "@/features/elder/elder-course";
 import { ElderBroadcastBox } from "@/features/elder/elder-broadcast";
 import { useModeProfile } from "@/lib/app-mode";
@@ -83,9 +84,9 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   // 封面的訂閱鈕與點閱次數：統一用封面統計模組（進入頁面時點閱 +1，算進主辦中心、所屬系列與這門課自己的封面）。
   const stats = useCoverStats("course", data?.id ?? null, `/course/${id}`, data?.isList ? "清單" : "課程");
   // 教材區右上角「縮圖／詳細列表」切換：每次進入課程卡頁一律從「縮圖」開始（杜杜龍 2026-11-21，不再記住上次的選擇）；區塊預設全部收起。
-  const [listLayout, setListLayout] = useState<"thumb" | "detail" | "album">(album ? "album" : "thumb"); // 從搜尋的「場景」結果進來＝直接開相簿（杜杜龍 2026-11-24）
+  const [listLayout, setListLayout] = useState<"thumb" | "detail" | "album" | "download">(album ? "album" : "thumb"); // 從搜尋的「場景」結果進來＝直接開相簿（杜杜龍 2026-11-24）
   const [albumOpen, setAlbumOpen] = useState<string | null>(album ?? null); // 相簿分頁自動展開的區塊（「瀏覽本區照片」跳過來，杜杜龍 2026-11-24）
-  const pickLayout = (v: "thumb" | "detail" | "album") => (setListLayout(v), v !== "album" && setAlbumOpen(null));
+  const pickLayout = (v: "thumb" | "detail" | "album" | "download") => (setListLayout(v), v !== "album" && setAlbumOpen(null));
   const [opt, setOpt] = useState<Lesson[] | null>(null);
   const pendingOps = useRef(0);
   const opQueue = useRef<Promise<unknown>>(Promise.resolve());
@@ -272,6 +273,7 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
   const inBlockChapters = new Set(pkgBlocks ? nonFull.slice(firstSec).filter((l) => !l.material).map((l) => l.id) : []);
   const blockView: CourseDetail = pkgBlocks ? { ...course, lessons: course.lessons.filter((l) => l.material || inBlockChapters.has(l.id)).map((l) => (inBlockChapters.has(l.id) ? { ...l, material: true } : l)) } : course;
   const materialItems = blockView.lessons.filter((l) => l.material && !l.section);
+  const hasDownload = downloadItems(blockView).length > 0; // 有影片以外的檔案／連結才顯示「下載」標籤
   // 沒有教材列、只有區塊照片的課程（成交百寶箱）：改看區塊本身有沒有被鎖（杜杜龍 2026-11-24 回報相簿沒出現鎖頭遮罩）。
   const blockHeads = blockView.lessons.filter((l) => l.material && l.section);
   const materialsLocked = materialItems.length > 0 ? materialItems.every((l) => l.locked) : blockHeads.length > 0 && blockHeads.every((l) => l.locked);
@@ -556,11 +558,20 @@ export function CourseDetailScreen({ id, edit, lesson, chapter, block, album }: 
         )}
         {!(editing && canEditContent) && blockView.lessons.some((l) => l.material) ? (
           <Section title="">
-            {course.lessons.some((l) => l.section) ? (
-              <SegmentTabs options={[{ key: "detail", label: "清單" }, { key: "thumb", label: "縮圖" }, ...(albumTotal(course) ? [{ key: "album" as const, label: "相簿" }] : [])]} value={listLayout} onChange={pickLayout} />
+            {/* 分類標籤：清單、縮圖（有區塊才有）、下載（有影片以外的檔案或連結才有，杜杜龍 2026-11-26，共用模組 download-tab.tsx）、相簿 */}
+            {course.lessons.some((l) => l.section) || hasDownload ? (
+              <SegmentTabs
+                options={[{ key: "detail" as const, label: "清單" }, ...(course.lessons.some((l) => l.section) ? [{ key: "thumb" as const, label: "縮圖" }] : []), ...(hasDownload ? [DOWNLOAD_TAB] : []), ...(albumTotal(course) ? [{ key: "album" as const, label: "相簿" }] : [])]}
+                value={listLayout === "download" && !hasDownload ? "detail" : listLayout === "thumb" && !course.lessons.some((l) => l.section) ? "detail" : listLayout}
+                onChange={pickLayout}
+              />
             ) : null}
             <View style={!editing && materialsLocked ? { minHeight: 230 } : undefined}>
-              <FullVersionList course={blockView} openBlock={block} layout={listLayout} albumOpen={albumOpen} onBrowsePhotos={(id) => (setAlbumOpen(id), setListLayout("album"))} onPhotosChanged={reload} playingId={editing ? null : playingId} onPlay={playLesson_} />
+              {listLayout === "download" && hasDownload ? (
+                <DownloadList course={blockView} />
+              ) : (
+              <FullVersionList course={blockView} openBlock={block} layout={listLayout === "download" ? "thumb" : listLayout} albumOpen={albumOpen} onBrowsePhotos={(id) => (setAlbumOpen(id), setListLayout("album"))} onPhotosChanged={reload} playingId={editing ? null : playingId} onPlay={playLesson_} />
+              )}
               {/* 沒有權限時，其他教材也蓋上同一個大鎖頭（杜杜龍 2026-11-20）。 */}
               {!editing && materialsLocked ? (
                 <LockMask lines={[lockedText, ...(needRank ? [needRank] : [])]} />

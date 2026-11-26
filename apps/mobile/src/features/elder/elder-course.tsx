@@ -1,3 +1,4 @@
+import { DOWNLOAD_TAB, downloadItems } from "@/features/courses/download-tab";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useBorderW } from "@/lib/elder-mode";
 import { useEffect, useState, type ReactNode } from "react";
@@ -223,13 +224,14 @@ export function ElderCourse({
 }) {
   const { c } = useTheme();
   const bw = useBorderW(2);
-  const [tab, setTab] = useState<"learn" | "intro">(locked ? "intro" : "learn");
+  const [tab, setTab] = useState<"learn" | "intro" | "download">(locked ? "intro" : "learn");
   const items = elderItems(course);
   const can = (l: Lesson) => !l.locked && (l.ready || !!l.linkUrl);
   const current = items.find((l) => l.id === playingId);
   const next = current ?? items.find((l) => can(l) && !l.completed) ?? null;
   const rest = items.filter((l) => l !== next);
   const extras = elderExtras(course);
+  const downloads = downloadItems(course); // 「下載」標籤（杜杜龍 2026-11-26，與超派模式共用 download-tab.tsx 的規則）：影片以外的檔案／連結
   // 區塊（清單卡的「區塊 > 教材」，杜杜龍 2026-11-24：至尊模式也要顯示、預設收起）：區塊底下的教材＝排在它後面、下一個區塊之前；超派模式 `lesson-list.tsx` 同一規則。
   const blockMode = course.lessons.some((l) => l.section);
   const blocks = splitBlocks(course, (l) => l.ready || !!l.linkUrl);
@@ -251,6 +253,7 @@ export function ElderCourse({
           {(
             [
               { key: "learn", label: "上課", icon: "play" },
+              ...(downloads.length ? ([{ key: "download", label: DOWNLOAD_TAB.label, icon: "download" }] as const) : []),
               { key: "intro", label: "介紹", icon: "book" },
             ] as const
           ).map((t) => {
@@ -266,7 +269,9 @@ export function ElderCourse({
           })}
         </View>
         {message}
-        {tab === "learn" ? (
+        {tab === "download" && downloads.length ? (
+          downloads.map((l) => <LessonRow key={l.id} lesson={l} highlight={false} playing={false} onPress={() => (l.locked ? setTab("intro") : can(l) ? (openMaterial(l) ? undefined : onPlay(l.id)) : undefined)} />)
+        ) : tab === "learn" || tab === "download" ? (
           <>
             {!items.length && !blocks.lead.length && !blocks.blocks.length ? <NoticeBox text="課程內容準備中，敬請期待。" /> : null}
             {locked ? (
