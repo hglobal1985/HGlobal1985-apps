@@ -17,6 +17,8 @@ let holdUntil = 0;
 export const holdFullscreenClose = (ms = 120_000) => void (holdUntil = Date.now() + ms);
 export const releaseFullscreenClose = () => void (holdUntil = Date.now() + 1500);
 export const overlayPopRecent = () => Date.now() - lastOverlayPop < 500;
+/** 自己退掉多記的那筆瀏覽紀錄之前呼叫：讓其他監聽 popstate 的畫面略過這一次。 */
+export const markOverlayPop = () => void (lastOverlayPop = Date.now());
 
 export function useBackToClose(onClose: () => void): void {
   const close = useRef(onClose);

@@ -1,6 +1,7 @@
 import { useNavigation } from "expo-router";
 import { useEffect, useRef } from "react";
-import { Platform } from "react-native";
+import { BackHandler, Platform } from "react-native";
+import { markOverlayPop } from "./back-close";
 import { choiceSheet } from "@/features/confirm";
 import { setUnsavedGuard } from "./unsaved-guard";
 
@@ -16,7 +17,7 @@ export function useUnsavedPrompt({ dirty, save, discard }: { dirty: boolean; sav
   live.current = { dirty, save, discard };
   const bypass = useRef(false);
 
-  const ask = async (proceed: () => void) => {
+  const ask = async (proceed: () => void, onStay?: () => void) => {
     const pick = await choiceSheet({
       title: "有修改還沒儲存",
       message: "這一頁的修改還沒有存檔。要儲存、放棄修改，還是繼續編輯？",
@@ -37,7 +38,7 @@ export function useUnsavedPrompt({ dirty, save, discard }: { dirty: boolean; sav
       bypass.current = true;
       proceed();
       setTimeout(() => (bypass.current = false), 1000);
-    }
+    } else onStay?.();
   };
 
   // 底部主選單與頁面上的跳轉按鈕（走 runGuarded）
@@ -60,6 +61,47 @@ export function useUnsavedPrompt({ dirty, save, discard }: { dirty: boolean; sav
       }),
     [nav], // eslint-disable-line react-hooks/exhaustive-deps
   );
+
+  // 網頁：瀏覽器「上一頁」、安卓手機的返回手勢（業主回報：只靠導覽套件的 beforeRemove 攔不住，2026-11-26 修）。
+  // 有修改時多記一筆瀏覽紀錄（同網址）；按「上一頁」只會退掉這一筆、畫面不動，這時跳出確認：
+  // 繼續編輯＝把那一筆補回去；儲存／放棄＝再退一頁真的離開。沒有修改了（存好或還原）就把多記的那一筆退掉。
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || !dirty) return;
+    let popped = false;
+    let active = true;
+    const push = () => window.history.pushState({ ...(window.history.state ?? {}), hgDirty: 1 }, "", window.location.href);
+    push();
+    const onPop = () => {
+      if (!active || popped) return;
+      popped = true;
+      void ask(
+        () => window.history.back(),
+        () => {
+          popped = false;
+          push();
+        },
+      );
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      active = false;
+      window.removeEventListener("popstate", onPop);
+      if (!popped) {
+        markOverlayPop();
+        window.history.back();
+      }
+    };
+  }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 安卓 App 的實體返回鍵／手勢
+  useEffect(() => {
+    if (Platform.OS !== "android" || !dirty) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      void ask(() => nav.goBack());
+      return true;
+    });
+    return () => sub.remove();
+  }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 網頁：關閉分頁、重新整理
   useEffect(() => {
