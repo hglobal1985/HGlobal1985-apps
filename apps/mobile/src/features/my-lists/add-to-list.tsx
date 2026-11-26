@@ -13,6 +13,7 @@ import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";
 import { ListIcon } from "@/ui/list-icon";
 import { bumpMark, useMark, type ListRef } from "./store";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 export type OwnList = { id: string; title: string; slug: string; clicks: number; people: number; count: number; url: string; coverItemId: string | null; coverUrl: string | null; coverMode: "item" | "text"; coverBgUrl: string | null; coverText?: string | null; coverColor?: string | null; has?: boolean };
 export type Quota = { base: number; total: number; used: number; unlocks: { achievementId: string; name: string; extra: number; earned: boolean; description: string; type: string; threshold: number; feature: string | null }[] };
@@ -227,7 +228,7 @@ export function AddToListSheet({ target, title, onClose }: { target: ListRef; ti
               <Button variant="cancel" label="關閉" onPress={onClose} fullWidth />
             </View>
             <View style={{ flex: 1 }}>
-              <Button label="我的清單" onPress={() => { onClose(); router.push("/my-lists"); }} fullWidth />
+              <Button label="我的清單" onPress={() => { onClose(); afterSheetClose(() => router.push("/my-lists")); }} fullWidth />
             </View>
           </View>
         )}

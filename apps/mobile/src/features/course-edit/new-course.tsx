@@ -7,6 +7,7 @@ import { isSuperAdmin } from "@/lib/roles";
 import { BasicsFields, type BasicsForm } from "./course-sections";
 import { HostField } from "./field-groups";
 import { EditSheet } from "./edit-sheet";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 /**
  * 「＋新增課程」：只填名稱、主講人姓名（必填）、主辦中心、系列（可不選），建立成未上架的草稿後，
@@ -36,7 +37,7 @@ export function NewCourseSheet({ onClose, defaultCenter, defaultSeries, list: li
       const d = await api<CourseDetail>("POST", "/admin/courses", body);
       invalidate();
       onClose();
-      router.push({ pathname: "/course/[id]", params: { id: d.id, edit: "1" } });
+      afterSheetClose(() => router.push({ pathname: "/course/[id]", params: { id: d.id, edit: "1" } }));
     } catch (e) {
       setError((e as Error).message);
     } finally {

@@ -7,6 +7,7 @@ import { space } from "@/theme/tokens";
 import { AppText, ErrorView, LoadingLadybug, SheetAction } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ChapterList } from "./lesson-list";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 /**
  * 中心頁點某一門課：從下方彈出這門課的章節（與課程介紹頁的章節清單是同一個元件 ChapterList，內容格式一致），
@@ -16,7 +17,7 @@ export function CourseLessonsSheet({ course, onClose }: { course: CourseSummary;
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${course.id}`);
   const goDetail = () => {
     onClose();
-    router.push(`/course/${course.id}`);
+    afterSheetClose(() => router.push(`/course/${course.id}`));
   };
   return (
     <BottomSheet onClose={onClose} onExpand={goDetail} expandLabel="繼續上拉進入完整介紹">

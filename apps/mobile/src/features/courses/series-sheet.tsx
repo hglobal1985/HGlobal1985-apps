@@ -17,6 +17,7 @@ import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { displayName, seriesOrdered } from "./sort";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 
 /** 狀態標籤：與課程卡左邊緞帶同步的文字與顏色；沒有左緞帶時用右邊緞帶（倒數、進行中…）。 */
@@ -51,7 +52,7 @@ export function BlockSheet({ course, onClose }: { course: CourseSummary; onClose
   const admin = useSession().member?.role === "admin";
   const open = (block?: string) => {
     onClose();
-    router.push(block ? { pathname: "/course/[id]", params: { id: course.id, block } } : `/course/${course.id}`);
+    afterSheetClose(() => router.push(block ? { pathname: "/course/[id]", params: { id: course.id, block } } : `/course/${course.id}`));
   };
   return (
     <BottomSheet onClose={onClose} onExpand={() => open()} expandLabel="繼續上拉進入清單">
@@ -98,7 +99,7 @@ export function MaterialsSheet({ course, onClose }: { course: CourseSummary; onC
   const { data, error, loading, reload } = useApi<CourseDetail>(`/courses/${course.id}`);
   const open = () => {
     onClose();
-    router.push(`/course/${course.id}`);
+    afterSheetClose(() => router.push(`/course/${course.id}`));
   };
   const items = (data?.lessons ?? []).filter((l) => l.material && !l.section && !l.full && (l.ready || data?.can?.edit));
   return (
@@ -137,7 +138,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
   const showAll = () => {
     onClose();
     const slug = links.data?.find((l) => l.kind === "series" && l.value === showAllSeries)?.slug;
-    router.push(slug ? `/${slug}` : `/series/${encodeURIComponent(showAllSeries ?? "")}`);
+    afterSheetClose(() => router.push(slug ? `/${slug}` : `/series/${encodeURIComponent(showAllSeries ?? "")}`));
   };
   return (
     <BottomSheet onClose={onClose} onExpand={showAllSeries ? showAll : undefined} expandLabel="繼續上拉顯示全部">
@@ -154,8 +155,7 @@ export function SeriesSheet({ title, items, onClose, onPick, currentId, showAllS
             accessibilityLabel={`${x.title} ${x.eventStart ?? ""}`}
             onPress={() => {
               onClose();
-              if (onPick) onPick(x);
-              else router.push(`/course/${x.id}`);
+              afterSheetClose(() => (onPick ? onPick(x) : router.push(`/course/${x.id}`)));
             }}
             leading={
               <SheetThumb>

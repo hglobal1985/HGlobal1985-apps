@@ -4,6 +4,7 @@ import { dateTime } from "@/features/format";
 import { space } from "@/theme/tokens";
 import { AppText, SheetAction } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 /**
  * 通知「先看摘要、再看全部」：點一則通知先從下方彈出完整內容（標題、全文、時間），
@@ -12,7 +13,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 export function NoticeSheet({ notice, onClose, onOpen }: { notice: Notice; onClose: () => void; /** 前往這則通知對應的頁面（沒有連結就不傳）。 */ onOpen?: () => void }) {
   const go = () => {
     onClose();
-    onOpen?.();
+    afterSheetClose(() => onOpen?.());
   };
   return (
     <BottomSheet onClose={onClose} onExpand={onOpen ? go : undefined} expandLabel="繼續上拉前往查看">
