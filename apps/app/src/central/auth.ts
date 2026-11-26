@@ -281,6 +281,7 @@ export async function handleWebReturn(): Promise<{ back: string; deleteReauth?: 
   if (pending.purpose === "delete") return { back: pending.back, deleteReauth: { idToken: q.get("id_token")!, nonce: pending.nonce } };
   const t = await central<Tokens>("/v1/auth/google", "POST", { app_id: APP_ID, id_token: q.get("id_token"), nonce: pending.nonce, device_label: deviceLabel() });
   await saveTokens(t);
+  ss()?.setItem(K.ssoCheckAt, String(Date.now())); // 剛登入，不用馬上再問一次共用登入
   emit();
   // 讓中央記住這個瀏覽器（其他 H-Global1985 網頁版自動登入）
   const sso = await ssoStart();
