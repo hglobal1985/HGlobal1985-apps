@@ -6,7 +6,7 @@ import { useSession } from "@/state/session";
  * 「加入我的清單」的標記（杜杜龍 2026-11-21）：每個內容在我的幾份清單裡。全站所有按鈕共用同一份、只查一次；
  * 加入或移除後用 bumpMark 立刻更新畫面，不必重新查。換帳號、登出時清空。
  */
-export type ListKind = "course" | "lesson" | "series" | "center";
+export type ListKind = "course" | "lesson" | "series" | "center" | "recipe";
 export type ListRef = { kind: ListKind; ref: string; ref2?: string };
 export const markKey = (r: { kind: ListKind; ref: string }) => `${r.kind}:${r.ref}`;
 

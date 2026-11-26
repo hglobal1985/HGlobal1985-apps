@@ -9,7 +9,7 @@ import { itemHref } from "./links";
 import type { ListKind } from "./store";
 
 export type ListItem = { id: string; kind: ListKind; ref: string; ref2: string; note: string; title: string; subtitle: string; coverUrl: string | null; missing: boolean };
-const KIND_LABEL: Record<ListKind, string> = { course: "課程", lesson: "教材", series: "系列", center: "中心" };
+const KIND_LABEL: Record<ListKind, string> = { course: "課程", lesson: "教材", series: "系列", center: "中心", recipe: "食譜" };
 
 /**
  * 清單項目一列：用全站清單列模組 `CompactRow`（縮圖、單行標題、第二行類型＋說明，列高緊密，沒有外框），

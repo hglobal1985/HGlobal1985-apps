@@ -3,10 +3,11 @@ import { inAppBrowser } from "@/lib/in-app-browser";
 import { lessonHref } from "@/lib/lesson-href";
 import type { ListKind } from "./store";
 
-/** 清單項目點下去要去哪（課程卡、教材所屬的課程頁、系列頁、中心頁）。 */
+/** 清單項目點下去要去哪（課程卡、教材所屬的課程頁、系列頁、中心頁、食譜）。 */
 export function itemHref(it: { kind: ListKind; ref: string; ref2: string; block?: boolean }): string {
   if (it.kind === "course") return `/course/${it.ref}`;
   if (it.kind === "lesson") return it.ref2 ? (it.block ? `/course/${it.ref2}?block=${it.ref}` : lessonHref(it.ref2, it.ref)) : "/courses";
+  if (it.kind === "recipe") return `/recipe/${it.ref}`;
   if (it.kind === "series") return `/series/${encodeURIComponent(it.ref)}`;
   return `/courses?center=${encodeURIComponent(it.ref)}`;
 }

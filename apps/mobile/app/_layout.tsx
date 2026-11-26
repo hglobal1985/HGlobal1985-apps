@@ -74,6 +74,7 @@ function AppStack() {
             <Stack.Screen name="admin/list-unlocks" options={{ title: "清單解鎖設定" }} />
             <Stack.Screen name="[slug]" options={{ title: "課程" }} />
             <Stack.Screen name="series/[name]" options={{ title: "課程" }} />
+            <Stack.Screen name="recipe/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="learn/[courseId]/[lessonId]" options={{ title: "上課" }} />
             <Stack.Screen name="admin/list-rules" options={{ title: "課程排序與條件" }} />
             <Stack.Screen name="admin/stats" options={{ title: "統計分析" }} />

@@ -18,7 +18,7 @@ const fail = (status: number, code: string, message: string): never => {
   throw new ListError(status, code, message);
 };
 
-export const LIST_ITEM_KINDS = ["course", "lesson", "series", "center"] as const;
+export const LIST_ITEM_KINDS = ["course", "lesson", "series", "center", "recipe"] as const;
 export type ListItemKind = (typeof LIST_ITEM_KINDS)[number];
 export const LIST_ITEM_MAX = 100;
 const NAME_MAX = 30;
@@ -149,8 +149,14 @@ export async function resolveItems(db: D1Database, listId: string): Promise<List
   const courseIds = [...new Set(results.flatMap((r) => (r.kind === "course" ? [r.ref] : r.kind === "lesson" && r.ref2 ? [r.ref2] : [])))];
   const lessonIds = results.filter((r) => r.kind === "lesson").map((r) => r.ref);
   const mk = (n: number) => Array(n).fill("?").join(",");
+  const recipeIds = results.filter((r) => r.kind === "recipe").map((r) => r.ref);
   type C = { id: string; title: string; status: string; cover_key: string | null; edm_key: string | null; art_version: number | null };
   type L = { id: string; title: string; course_id: string; kind: string; cover_key: string | null; art_version: number | null };
+  type RC = { id: string; title: string; status: string; thumb: string | null; cat: string | null };
+  const recipes = recipeIds.length
+    ? await db.prepare(`SELECT r.id, r.title, r.status, c.name AS cat, (SELECT m.r2_key FROM cover_media m WHERE m.owner_kind = 'course' AND m.owner_key = 'rcp:' || r.id AND m.kind = 'image' ORDER BY m.position LIMIT 1) AS thumb FROM recipes r LEFT JOIN recipe_categories c ON c.id = r.category_id WHERE r.id IN (${mk(recipeIds.length)})`).bind(...recipeIds).all<RC>()
+    : { results: [] as RC[] };
+  const rMap = new Map(recipes.results.map((r) => [r.id, r]));
   const [courses, lessons] = await Promise.all([
     courseIds.length ? db.prepare(`SELECT id, title, status, cover_key, edm_key, art_version FROM courses WHERE id IN (${mk(courseIds.length)})`).bind(...courseIds).all<C>() : Promise.resolve({ results: [] as C[] }),
     lessonIds.length ? db.prepare(`SELECT id, title, course_id, kind, cover_key, art_version FROM lessons WHERE id IN (${mk(lessonIds.length)})`).bind(...lessonIds).all<L>() : Promise.resolve({ results: [] as L[] }),
@@ -167,6 +173,10 @@ export async function resolveItems(db: D1Database, listId: string): Promise<List
       const l = lMap.get(r.ref);
       const c = cMap.get(l?.course_id ?? r.ref2);
       return { ...r, ref2: l?.course_id ?? r.ref2, ...(l?.kind === "section" ? { block: true } : {}), title: l?.title ?? "已下架的內容", subtitle: c?.title ?? "", coverUrl: pub(l?.cover_key ?? c?.cover_key ?? c?.edm_key ?? null, l?.art_version ?? c?.art_version ?? 0), missing: !l || !live(c) };
+    }
+    if (r.kind === "recipe") {
+      const x = rMap.get(r.ref);
+      return { ...r, title: x?.title || "已下架的內容", subtitle: x?.cat ?? "", coverUrl: pub(x?.thumb ?? null, 0), missing: !x || x.status !== "published" };
     }
     return { ...r, title: r.ref, subtitle: "", coverUrl: null, missing: false };
   });
