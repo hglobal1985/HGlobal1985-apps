@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { handleApi } from "../src/api.ts";
 import type { Env } from "../src/d1.ts";
+import { resolveShareMeta } from "../src/og.ts";
 import { youtubeIdOfLine, videoCount } from "../src/recipes.ts";
 import { createTestDb } from "./sqlite-d1.ts";
 
@@ -68,6 +69,26 @@ test("食譜：草稿 → 會員投稿待審核 → 管理者核准；權限與�
   assert.equal((await call("GET", `/recipes?q=${encodeURIComponent("牛番茄")}`)).status, 200);
   assert.equal(((await call<List>("GET", `/recipes?q=${encodeURIComponent("牛番茄")}`)).data).recipes.length, 1, "文字內容也能搜尋");
   assert.equal(((await call<List>("GET", `/recipes?q=${encodeURIComponent("burger")}`)).data).recipes.length, 0);
+
+  // 短網址 /icook/001：送出時領流水號；前綴可在設定改，舊前綴照樣有效；LINE 預覽卡
+  type Detail = { number: number | null; shortPath: string | null };
+  const d1 = (await call<Detail>("GET", `/recipes/${id}`)).data;
+  assert.deepEqual([d1.number, d1.shortPath], [1, "/icook/001"], "第一道食譜＝001");
+  assert.equal((await call<{ recipeId?: string }>("GET", "/short-links/icook/001")).data.recipeId, id);
+  assert.equal((await call<{ recipeId?: string }>("GET", "/short-links/ICOOK/001")).data.recipeId, id, "不分大小寫");
+  assert.equal((await call("GET", "/short-links/icook/002")).status, 404);
+  const meta = await resolveShareMeta(env.DB, new URL("https://learn.test/icook/001"));
+  assert.ok(meta?.title.startsWith("瑪格麗特披薩"), "預覽卡標題＝食譜名稱＋站名");
+  assert.ok(meta?.title.includes("寰宇行動大學"));
+  assert.equal((await resolveShareMeta(env.DB, new URL("https://learn.test/recipe/" + id)))?.title, meta?.title, "/recipe/編號 同一張卡");
+  assert.equal(await resolveShareMeta(env.DB, new URL("https://learn.test/icook/009")), null);
+  assert.equal((await call("PUT", "/admin/ui-config", { token: a, body: { share: { recipePrefix: "cook" } } })).status, 403, "只有超級管理員能改前綴");
+  assert.equal((await call("PUT", "/admin/ui-config", { token: admin, body: { share: { recipePrefix: "courses" } } })).status, 400, "不能用網站保留路徑");
+  assert.equal((await call("PUT", "/admin/ui-config", { token: admin, body: { share: { recipePrefix: "cook" } } })).status, 200);
+  assert.equal((await call<{ recipeId?: string }>("GET", "/short-links/cook/001")).data.recipeId, id, "新前綴");
+  assert.equal((await call<{ recipeId?: string }>("GET", "/short-links/icook/001")).data.recipeId, id, "舊前綴照樣打得開");
+  assert.equal((await call<Detail>("GET", `/recipes/${id}`)).data.shortPath, "/cook/001");
+  assert.equal((await call("PUT", "/admin/short-links", { token: admin, body: { kind: "series", value: "X", slug: "cook" } })).status, 409, "別的短網址不能佔用食譜前綴");
 
   // 管理者新增、直接發佈
   const id2 = (await call<{ id: string }>("POST", "/recipes", { token: admin })).data.id;

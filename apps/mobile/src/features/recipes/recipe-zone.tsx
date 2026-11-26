@@ -1,14 +1,14 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, Share, TextInput, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
+import { Image, Pressable, ScrollView, TextInput, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, resolveUrl, type CoverMediaItem, type RecipeCard, type RecipeDetail, type RecipesResponse } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { AddToListSheet } from "@/features/my-lists/add-to-list";
 import { useMark } from "@/features/my-lists/store";
 import { useFeature } from "@/lib/app-mode";
-import { absoluteUrl } from "@/lib/share";
+import { prepareRecipePhotos, shareRecipe } from "@/lib/share";
 import { useSheetBack } from "@/lib/sheet-back";
 import { trackUsage } from "@/lib/usage";
 import { useThumb } from "@/lib/thumb";
@@ -163,13 +163,15 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit 
       <AppText {...UI_ONLY_TEXT} style={{ color: fg, fontWeight: "800", fontSize: 15 }}>{label}</AppText>
     </Pressable>
   );
+  // 開啟食譜就先把所有照片準備成檔案：網頁分享必須在點下去後很短時間內呼叫（杜杜龍 2026-11-26）。
+  const files = useRef<Promise<File[]> | null>(null);
+  const photoKey = photos.map((p) => p.id).join(",");
+  useEffect(() => {
+    files.current = photos.length ? prepareRecipePhotos(photos.map((p) => p.url), d?.title || "食譜") : null;
+  }, [photoKey, d?.title]); // eslint-disable-line react-hooks/exhaustive-deps
   const share = async () => {
-    try {
-      await Share.share({ title: d!.title, message: `${text}\n\n${absoluteUrl(`/recipe/${id}`)}` });
-    } catch {
-      await Clipboard.setStringAsync(text);
-      flashText("已複製食譜文字");
-    }
+    const r = await shareRecipe({ title: d!.title, body: d!.body, path: d!.shortPath ?? `/recipe/${id}`, files: files.current ?? undefined });
+    if (r === "copied") flashText("已複製食譜（含照片連結請用手機分享）");
   };
   const approve = async () => {
     try {
