@@ -26,6 +26,7 @@ import { useCoverMedia } from "./cover-media";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { CoverBadges, type CoverStats } from "./cover-stats";
 import { EdmInfoPanel } from "./edm-info";
+import { trackUsage } from "@/lib/usage";
 
 /**
  * 課程介紹頁與教材清單頁上方的封面（業主 2026-11-18：封面上不放任何提示文字，全部封面一致；左下角固定是封面統計模組的訂閱鈕＋點閱）。
@@ -341,11 +342,17 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // 使用統計（相簿操作習慣）：每看一張相簿照片記一次。
+  useEffect(() => {
+    if (cur.id) trackUsage("album_photo", "單張檢視");
+  }, [cur.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const share = async () => {
+    if (cur.id) trackUsage("album_share", "單張");
     const r = await shareImage(cur.title, cur.uri, `${cur.title}.jpg`);
     if (r === "copied") flashText("已複製連結");
   };
   const download = async () => {
+    if (cur.id) trackUsage("album_download", "單張");
     try {
       await downloadImage(cur.uri, `${cur.title}.jpg`);
     } catch {
@@ -432,7 +439,7 @@ export function EdmLightbox({ uri, title, onClose, showInfo = false, bg, items, 
               <View style={[styles.row, smallLand && { flexDirection: "column", alignItems: "flex-end" }]} pointerEvents="box-none">
                 {hideHelp ? tool("顯示操作說明", () => setHelp(false), <Ionicons name="move" size={24} color="#fff" {...UI_ONLY} />) : null}
                 {many ? tool("檢視全部", () => (over?.folder ? setLibOpen(true) : setGrid(true)), <Ionicons name="grid-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
-                {list.length && canInfo ? tool("圖片資訊", () => setInfoOpen((v) => !v), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
+                {list.length && canInfo ? tool("圖片資訊", () => (!infoOpen && trackUsage("album_info", cur.id ? "相簿照片" : "其他圖片"), setInfoOpen((v) => !v)), <Ionicons name={infoOpen ? "alert-circle" : "alert-circle-outline"} size={26} color={infoOpen ? "#ffd54f" : "#fff"} {...UI_ONLY} />) : null}
                 {list.length ? tool("下載", download, <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />) : null}
                 {list.length ? tool("分享", share, <ShareIcon size={24} color="#fff" uiOnly />) : null}
                 {tool("關閉", () => closeNow.current(), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}

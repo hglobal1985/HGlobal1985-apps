@@ -4,6 +4,7 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl } from "@/api/client";
 import { downloadImages, shareImages } from "@/lib/share";
+import { trackUsage } from "@/lib/usage";
 import { useThumb } from "@/lib/thumb";
 import { space } from "@/theme/tokens";
 import { AppText, ShareIcon } from "@/ui";
@@ -82,8 +83,8 @@ export function LightboxGrid({ list, current, onPick, onClose, heading, extra, a
           <>
             {btn(picked.length === list.length ? "取消全選" : "全選", () => setSel(picked.length === list.length ? new Set() : new Set(list.map((_, i) => i))), <Ionicons name={picked.length === list.length ? "checkmark-done-circle" : "checkmark-done-outline"} size={26} color="#fff" {...UI_ONLY} />)}
             {onMove ? btn("移到資料夾", () => onMove(picked.map((i) => list[i]!.id ?? "").filter(Boolean)), <Ionicons name="folder-open-outline" size={24} color="#fff" {...UI_ONLY} />, !picked.length) : null}
-            {btn("下載", () => void run(() => downloadImages(urls(), name), "下載失敗，請稍後再試"), <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />, !picked.length || busy)}
-            {btn("分享", () => void run(() => shareImages(name, urls()), "分享失敗，請稍後再試"), <ShareIcon size={24} color="#fff" uiOnly />, !picked.length || busy)}
+            {btn("下載", () => (trackUsage("album_download", "複選"), void run(() => downloadImages(urls(), name), "下載失敗，請稍後再試")), <Ionicons name="download-outline" size={24} color="#fff" {...UI_ONLY} />, !picked.length || busy)}
+            {btn("分享", () => (trackUsage("album_share", "複選"), void run(() => shareImages(name, urls()), "分享失敗，請稍後再試")), <ShareIcon size={24} color="#fff" uiOnly />, !picked.length || busy)}
             {btn("取消複選", () => setSel(null), <Ionicons name="close" size={26} color="#fff" {...UI_ONLY} />)}
           </>
         ) : embedded ? (

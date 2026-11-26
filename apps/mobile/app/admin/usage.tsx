@@ -17,6 +17,15 @@ const KINDS = [
   { key: "card_course", label: "課程卡" },
   { key: "card_series", label: "系列卡" },
   { key: "card_center", label: "中心卡" },
+  { key: "album_open", label: "打開相簿" },
+  { key: "album_folder", label: "打開資料夾" },
+  { key: "album_photo", label: "看照片" },
+  { key: "album_search", label: "相簿搜尋" },
+  { key: "album_sort", label: "相簿排序" },
+  { key: "album_info", label: "看圖片資訊" },
+  { key: "album_share", label: "分享照片" },
+  { key: "album_download", label: "下載照片" },
+  { key: "album_move", label: "移到子資料夾" },
 ];
 const DIMS: { key: Dim; label: string }[] = [
   { key: "device", label: "裝置" },
@@ -28,11 +37,13 @@ const DIMS: { key: Dim; label: string }[] = [
   { key: "kind", label: "統計項目" },
   { key: "item", label: "卡片" },
 ];
+const ALBUM_KINDS = ["album_open", "album_folder", "album_photo", "album_search", "album_sort", "album_info", "album_share", "album_download", "album_move"];
 const PRESETS: { label: string; kinds: string[]; rows: Dim; cols: Dim | null }[] = [
   { label: "手機／電腦／平板", kinds: ["visit"], rows: "device", cols: null },
   { label: "至尊／超派模式", kinds: ["visit"], rows: "mode", cols: null },
   { label: "iOS／Android", kinds: ["visit"], rows: "os", cols: null },
   { label: "哪個時段最多人", kinds: ["visit"], rows: "slot", cols: null },
+  { label: "相簿操作", kinds: ALBUM_KINDS, rows: "kind", cols: null },
   { label: "首頁卡片點閱", kinds: ["card_course", "card_series", "card_center"], rows: "item", cols: null },
   { label: "裝置 × 系統", kinds: ["visit"], rows: "device", cols: "os" },
   { label: "模式 × 裝置", kinds: ["visit"], rows: "mode", cols: "device" },
@@ -207,7 +218,18 @@ const top = (d: Table, what: string, noun = "最多") => {
   return r && d.total ? `答：${r.label}${noun}，${what}佔 ${pct(r.total, d.total)}%（${r.total} 次）` : "還沒有資料（從 2026/11/22 開始累計）";
 };
 const CARDS = "kinds=card_course,card_series,card_center";
+const ALBUM = `kinds=${ALBUM_KINDS.join(",")}`;
 const QUESTIONS: Q[] = [
+  { icon: "images-outline", title: "大家在相簿裡都做什麼？", qs: `${ALBUM}&rows=kind&days=30`, view: "bars", answer: (d) => top(d, "", "最常見") },
+  { icon: "folder-open-outline", title: "哪個相簿類別最常被打開？", qs: "kinds=album_folder&rows=item&days=30", view: "bars", answer: (d) => (d.rows[0] && d.total ? `答：第一名是「${d.rows[0].label.replace("打開相簿資料夾｜", "")}」，佔 ${pct(d.rows[0].total, d.total)}%` : "還沒有資料（從相簿統計上線那天開始累計）") },
+  { icon: "search-outline", title: "搜尋相簿，習慣搜「此頁」還是「全部」？", qs: "kinds=album_search&rows=item&days=30", view: "bars", answer: (d) => top(d, "") },
+  { icon: "share-social-outline", title: "看完照片，是下載還是分享比較多？", qs: "kinds=album_share,album_download&rows=item&days=30", view: "bars", answer: (d) => top(d, "") },
+  { icon: "swap-vertical-outline", title: "相簿排序，大家偏好活動日期還是上傳時間？", qs: "kinds=album_sort&rows=item&days=30", view: "bars", answer: (d) => top(d, "") },
+  { icon: "alert-circle-outline", title: "有多少人會點「!」看圖片資訊？", qs: "kinds=album_info&rows=item&days=30", view: "bars", answer: (d) => (d.total ? `答：近 30 天共 ${d.total} 次` : "還沒有資料（從相簿統計上線那天開始累計）") },
+  { icon: "phone-portrait-outline", title: "手機、平板、電腦，誰最常用相簿？", qs: "kinds=album_open&rows=device&days=30", view: "bars", answer: (d) => top(d, "") },
+  { icon: "accessibility-outline", title: "至尊模式和超派模式，誰比較常開相簿？", qs: "kinds=album_open&rows=mode&days=30", view: "bars", answer: (d) => top(d, "") },
+  { icon: "time-outline", title: "相簿一天中哪個時段最多人用？", qs: "kinds=album_open&rows=slot&days=30", view: "bars", answer: (d) => top(d, "") },
+  { icon: "enter-outline", title: "怎麼進入相簿的？（從頭／回到上次／從單張回來）", qs: "kinds=album_open&rows=item&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "phone-portrait-outline", title: "大家用手機、電腦還是平板？", qs: "kinds=visit&rows=device&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "accessibility-outline", title: "至尊模式和超派模式各幾成？", qs: "kinds=visit&rows=mode&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "logo-apple", title: "iPhone 和 Android 各幾成？", qs: "kinds=visit&rows=os&days=30", view: "bars", answer: (d) => top(d, "") },

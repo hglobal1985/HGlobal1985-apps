@@ -7,7 +7,7 @@ import { currentModeKey } from "./elder-mode";
  * 使用統計回報（業主 2026-11-22，管理員 > 設定 > 使用統計）：匿名回報裝置（手機／平板／電腦）、系統（iOS／Android／其他）、
  * 開啟網站，以及首頁卡片被點開。不送會員編號；失敗靜默略過，不影響操作。伺服器依收到的時間記台灣時段。
  */
-type Kind = "visit" | "card_course" | "card_series" | "card_center";
+type Kind = "visit" | "card_course" | "card_series" | "card_center" | "album_open" | "album_folder" | "album_photo" | "album_search" | "album_sort" | "album_info" | "album_share" | "album_download" | "album_move";
 
 function detect(): { device: "mobile" | "tablet" | "desktop"; os: "ios" | "android" | "other" } {
   if (Platform.OS !== "web") {

@@ -5,7 +5,7 @@
  */
 import type { D1Database } from "./d1.ts";
 
-export const USAGE_KINDS = ["visit", "card_course", "card_series", "card_center"] as const;
+export const USAGE_KINDS = ["visit", "card_course", "card_series", "card_center", "album_open", "album_folder", "album_photo", "album_search", "album_sort", "album_info", "album_share", "album_download", "album_move"] as const;
 const DEVICES = ["mobile", "tablet", "desktop"] as const;
 const MODES = ["elder", "super"] as const;
 const OSES = ["ios", "android", "other"] as const;
@@ -49,7 +49,7 @@ const MODE_LABEL: Record<string, string> = { elder: "至尊模式", super: "超�
 const SLOTS = ["凌晨 0–5 點", "早上 6–11 點", "下午 12–17 點", "晚上 18–23 點"];
 const DEVICE_LABEL: Record<string, string> = { mobile: "手機", desktop: "電腦", tablet: "平板" };
 const OS_LABEL: Record<string, string> = { ios: "iOS", android: "Android", other: "其他（電腦等）" };
-const KIND_LABEL: Record<string, string> = { visit: "開啟網站／App", card_course: "課程卡點閱", card_series: "系列卡點閱", card_center: "中心卡點閱" };
+const KIND_LABEL: Record<string, string> = { visit: "開啟網站／App", card_course: "課程卡點閱", card_series: "系列卡點閱", card_center: "中心卡點閱", album_open: "打開相簿", album_folder: "打開相簿資料夾", album_photo: "看相簿照片", album_search: "相簿搜尋", album_sort: "相簿排序", album_info: "看圖片資訊", album_share: "分享相簿照片", album_download: "下載相簿照片", album_move: "移到子資料夾" };
 const SLOT_SQL = "CASE WHEN hour < 6 THEN 0 WHEN hour < 12 THEN 1 WHEN hour < 18 THEN 2 ELSE 3 END";
 const DIM_SQL: Record<UsageDim, string> = { device: "device", os: "os", slot: SLOT_SQL, hour: "hour", day: "day", kind: "kind", item: "kind || '|' || target", mode: "mode" };
 
@@ -99,6 +99,7 @@ export async function usageTable(db: D1Database, q: UsageQuery): Promise<UsageTa
     if (dim === "item") {
       const [k, ...rest] = s.split("|");
       const t = rest.join("|");
+      if (k!.startsWith("album_")) return `${KIND_LABEL[k!] ?? k}｜${t}`;
       return `${{ card_course: "課程", card_series: "系列", card_center: "中心" }[k!] ?? ""}｜${k === "card_course" ? titles.get(t) ?? t : t}`;
     }
     return s.replace(/^\d{4}-/, "").replace("-", "/");

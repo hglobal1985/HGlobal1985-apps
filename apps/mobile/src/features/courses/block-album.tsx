@@ -8,6 +8,7 @@ import { AppText, Card } from "@/ui";
 import { LockMask } from "@/ui";
 import { blockPhotoCount } from "./block-photos";
 import { CoverAlbum } from "./album";
+import { trackUsage } from "@/lib/usage";
 import { SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
 import { AlbumSearchBar, albumSearchable, matchAlbumItem, useAlbumSearch } from "./album-search";
 
@@ -108,7 +109,7 @@ function BlockBody({ group: g, canEdit, searching, onChanged }: { group: Lesson;
         </ScrollView>
       ) : null}
       <CoverAlbum kind="course" ownerKey={g.photoKey!} title={g.title} items={items} canEdit={canEdit && shownChip === "all"} onChanged={onChanged} onMovePhoto={manage ? (id) => (setMoveIds([id]), setSheet({ t: "move" })) : undefined} />
-      <SubfolderSheet dark={false} sheet={sheet} setSheet={setSheet} blockKey={g.photoKey!} subs={subs} selIds={moveIds} onChanged={done} onMoved={() => setMoveIds([])} />
+      <SubfolderSheet dark={false} sheet={sheet} setSheet={setSheet} blockKey={g.photoKey!} subs={subs} selIds={moveIds} onChanged={done} onMoved={() => (trackUsage("album_move", "課程相簿分頁"), setMoveIds([]))} />
     </View>
   );
 }
