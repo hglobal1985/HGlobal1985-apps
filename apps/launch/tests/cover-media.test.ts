@@ -353,3 +353,9 @@ test("區塊相簿子資料夾：建立／重新命名／移動／刪除、名�
   assert.equal((await call("POST", "/admin/album-folders", { token: stu, json: { key: "bs", name: "會員的" } })).status, 200);
   assert.equal((await call<Sub>("GET", "/albums/subfolders?key=bs", { token: stu })).data.canManage, true);
 });
+
+test("文字辨識：拆掉 JSON 殼並去掉卡住的重複行", async () => {
+  const { cleanOcrText } = await import("../src/edm-structure.ts");
+  const bad = '{"text":"\n' + "title:\n".repeat(40) + '生活層次\n從心觸動\n生活層次';
+  assert.equal(cleanOcrText(bad), "生活層次\n從心觸動");
+});

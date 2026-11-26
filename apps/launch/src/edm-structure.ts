@@ -65,10 +65,18 @@ export function cleanOcrText(s: string): string {
   let t = s.replace(/\\n/g, "\n").replace(/^\s{0,3}#{1,6}\s*/gm, "").replace(/\*\*/g, "").replace(/^\s*[*•]\s+/gm, "");
   t = t.replace(/^[\s\S]*?(以下文字|文字如下|文字內容如下|如下)\s*[：:]\s*/, ""); // 「…圖片上有以下文字：」之前的開場白整段拿掉
   t = t.replace(/[，,]?\s*今天是[^。\n]*[。]?/g, "").replace(/[，,]?\s*(活動(舉辦)?日期|日期)\s*(應該|可能|推測|大概)[^。\n]*[。]?/g, "");
+  // 模型有時把答案包成 {"text":"…"} 的 JSON 殼，或卡住一直重複同一行（例如一堆「title:」）：拆掉殼、去掉重複與只有欄位名的空行（業主 2026-11-26 回報）。
+  t = t.replace(/^\s*\{\s*"?(text|ocr|content)"?\s*:\s*"?/i, "").replace(/"?\s*\}\s*$/, "");
+  const seen = new Map<string, number>();
   return t
     .split("\n")
     .map((l) => l.replace(/[ \t]+/g, " ").trim())
-    .filter((l) => l && !talk.test(l))
+    .filter((l) => l && !talk.test(l) && !/^[A-Za-z_]{1,20}\s*[:：]\s*"?$/.test(l) && !/^["{}[\],:\s]+$/.test(l))
+    .filter((l) => {
+      const n = (seen.get(l) ?? 0) + 1;
+      seen.set(l, n);
+      return n <= 1;
+    })
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
