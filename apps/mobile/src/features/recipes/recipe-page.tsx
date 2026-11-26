@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useState } from "react";
 import { View } from "react-native";
 import { type CoverMediaItem, type RecipesResponse } from "@/api/client";
@@ -19,6 +19,7 @@ export function RecipePage({ id: rid }: { id: string }) {
   const leave = () => (router.canGoBack() ? router.back() : router.replace("/courses"));
   return (
     <View style={{ flex: 1, backgroundColor: "#000" }}>
+      <Stack.Screen options={{ headerShown: false }} />
       <RecipeDetailView key={ver} id={rid} onClose={leave} onOpenPhotos={(title, items, index) => setPhotos({ title, items, index })} onChanged={list.reload} onEdit={() => setEdit(true)} />
       {edit ? <RecipeEditor id={rid} isNew={false} cats={list.data?.categories ?? []} manager={!!list.data?.manager} onCatsChanged={list.reload} onClose={() => (setEdit(false), setVer((v) => v + 1), list.reload())} /> : null}
       {photos ? <EdmLightbox uri={photos.items[photos.index]?.url ?? ""} title={photos.title} items={photos.items.map((x) => lightboxItem(x, photos.title))} index={photos.index} onClose={() => setPhotos(null)} /> : null}
