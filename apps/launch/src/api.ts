@@ -1556,6 +1556,12 @@ async function requireSyncManager(ctx: Ctx, syncId: string): Promise<Session> {
   if (s.roles.includes("super_admin")) return s;
   return managerVia(ctx, "SELECT course_id FROM youtube_syncs WHERE id = ?", syncId, "同步設定");
 }
+/** 雲端資料夾同步的管理權：超級管理員，或有該設定所屬課程修改權限的人（杜杜龍 2026-11-26：課程頁「新增教材」貼資料夾連結也能加入同步）。 */
+async function requireDriveSyncManager(ctx: Ctx, syncId: string): Promise<Session> {
+  const s = requireMember(ctx);
+  if (s.roles.includes("super_admin")) return s;
+  return managerVia(ctx, "SELECT course_id FROM drive_syncs WHERE id = ?", syncId, "同步設定");
+}
 const requireLessonManager = (ctx: Ctx, id: string) => managerVia(ctx, "SELECT course_id FROM lessons WHERE id = ?", id, "章節");
 /** 可以新增課程的人：總部、有中心的會長與音控、有「新增」權限的小編。 */
 async function requireCourseCreator(ctx: Ctx): Promise<Session> {
@@ -5548,8 +5554,8 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/drive-syncs$/,
     async (ctx) => {
-      const s = requireSuperAdmin(ctx);
       const body = await readJson<{ url?: unknown; courseId?: unknown; blockId?: unknown; titleFormat?: unknown; label?: unknown; syncNow?: unknown }>(ctx.req);
+      const s = typeof body.courseId === "string" && body.courseId ? await requireCourseManager(ctx, body.courseId) : requireSuperAdmin(ctx);
       const { folderIdOf } = await import("./drive-sync.ts");
       const folderId = typeof body.url === "string" ? folderIdOf(body.url) : null;
       if (!folderId) return fail(400, "invalid_folder", "請貼上 Google 雲端資料夾的連結（網址裡要有 /folders/…）");
@@ -5572,7 +5578,7 @@ const routes: [string, RegExp, Handler][] = [
     "POST",
     /^\/admin\/drive-syncs\/([\w-]+)\/sync$/,
     async (ctx, [id]) => {
-      requireSuperAdmin(ctx);
+      await requireDriveSyncManager(ctx, id!);
       const { runDriveSync } = await import("./drive-sync.ts");
       return runDriveSync(ctx.env, id!);
     },
@@ -5581,7 +5587,7 @@ const routes: [string, RegExp, Handler][] = [
     "PATCH",
     /^\/admin\/drive-syncs\/([\w-]+)$/,
     async (ctx, [id]) => {
-      const s = requireSuperAdmin(ctx);
+      const s = await requireDriveSyncManager(ctx, id!);
       const body = await readJson<{ titleFormat?: unknown; blockId?: unknown; label?: unknown }>(ctx.req);
       const cur = await ctx.db.prepare("SELECT course_id FROM drive_syncs WHERE id = ?").bind(id).first<{ course_id: string }>();
       if (!cur) return fail(404, "not_found", "找不到這份同步設定");
@@ -5604,7 +5610,7 @@ const routes: [string, RegExp, Handler][] = [
     /^\/admin\/drive-syncs\/([\w-]+)\/delete-with-materials$/,
     async (ctx, [id]) => {
       // 刪除清單與關聯教材：重新讀資料夾，這張卡裡連結指向資料夾內檔案的教材全部刪除，再刪同步設定。讀不到就整個不動。
-      const s = requireSuperAdmin(ctx);
+      const s = await requireDriveSyncManager(ctx, id!);
       const sync = await ctx.db.prepare("SELECT course_id, folder_id FROM drive_syncs WHERE id = ?").bind(id).first<{ course_id: string; folder_id: string }>();
       if (!sync) return fail(404, "not_found", "找不到這份同步設定");
       if (!ctx.env.GOOGLE_DRIVE_API_KEY) return fail(503, "drive_key_missing", "尚未設定 Google Drive 金鑰，無法判斷哪些教材屬於這個資料夾；請改用「只刪除清單」");
@@ -5627,7 +5633,7 @@ const routes: [string, RegExp, Handler][] = [
     "DELETE",
     /^\/admin\/drive-syncs\/([\w-]+)$/,
     async (ctx, [id]) => {
-      requireSuperAdmin(ctx);
+      await requireDriveSyncManager(ctx, id!);
       await ctx.db.prepare("DELETE FROM drive_syncs WHERE id = ?").bind(id).run();
       return { ok: true };
     },
