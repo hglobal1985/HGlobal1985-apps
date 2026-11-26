@@ -1,6 +1,6 @@
 import { useEffect, type MutableRefObject } from "react";
 import { Platform } from "react-native";
-import { markOverlayPop, overlayPopRecent } from "./back-close";
+import { markOverlayPop, nextOrder, overlayAbove, registerSheet, unregisterSheet } from "./back-close";
 
 /**
  * 所有上拉面板（`BottomSheet`）的「瀏覽器上一頁／手機返回手勢」處理（杜杜龍 2026-11-26 永久指示：
@@ -45,16 +45,18 @@ export function useSheetBack(close: MutableRefObject<() => unknown>): void {
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     const id = ++seq;
+    const order = nextOrder();
+    registerSheet(order);
     stack.push(id);
     let popped = false;
     let alive = true;
     const push = () => window.history.pushState({ ...(window.history.state ?? {}), hgSheet: id }, "", window.location.href);
     push();
     const onCapture = () => {
-      if (stack[stack.length - 1] === id && !popped && Date.now() >= selfPopUntil && !overlayPopRecent()) lastSheetPop = Date.now();
+      if (stack[stack.length - 1] === id && !popped && Date.now() >= selfPopUntil && !overlayAbove(order)) lastSheetPop = Date.now();
     };
     const onPop = () => {
-      if (!alive || popped || stack[stack.length - 1] !== id || Date.now() < selfPopUntil || overlayPopRecent()) return;
+      if (!alive || popped || stack[stack.length - 1] !== id || Date.now() < selfPopUntil || overlayAbove(order)) return;
       popped = true;
       void Promise.resolve()
         .then(() => close.current())
@@ -75,6 +77,7 @@ export function useSheetBack(close: MutableRefObject<() => unknown>): void {
       window.removeEventListener("popstate", onPop);
       const i = stack.indexOf(id);
       if (i >= 0) stack.splice(i, 1);
+      unregisterSheet(order);
       if (!popped) {
         // 不是用「上一頁」關的（按取消、點背景…）：把多記的那一筆退掉，別讓其他面板、全螢幕視窗誤以為使用者離開頁面。
         selfPopUntil = Date.now() + 400;

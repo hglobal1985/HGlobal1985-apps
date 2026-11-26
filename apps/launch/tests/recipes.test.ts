@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { handleApi } from "../src/api.ts";
+import type { Env } from "../src/d1.ts";
+import { youtubeIdOfLine, videoCount } from "../src/recipes.ts";
+import { createTestDb } from "./sqlite-d1.ts";
+
+// 杜杜龍 2026-11-26：食譜專區（一道食譜＝多張照片＋一篇文字＋影片連結；會員投稿要審核）。
+test("YouTube 網址：只有獨立一行才算影片", () => {
+  assert.equal(youtubeIdOfLine("https://youtu.be/AbC123xyz"), "AbC123xyz");
+  assert.equal(youtubeIdOfLine("  https://www.youtube.com/watch?v=AbC123xyz&t=3  "), "AbC123xyz");
+  assert.equal(youtubeIdOfLine("https://www.youtube.com/shorts/AbC123xyz"), "AbC123xyz");
+  assert.equal(youtubeIdOfLine("看這支 https://youtu.be/AbC123xyz"), null, "文字中間的網址不算");
+  assert.equal(youtubeIdOfLine("https://example.com/watch?v=AbC123xyz"), null);
+  assert.equal(videoCount("材料\nhttps://youtu.be/AbC123xyz\n做法\nhttps://youtu.be/ZzZ987abc"), 2);
+});
+
+test("食譜：草稿 → 會員投稿待審核 → 管理者核准；權限與照片", async () => {
+  const env: Env = { DB: createTestDb(), DEMO_LOGIN: "on" };
+  const call = async <T = Record<string, unknown>,>(method: string, path: string, opts: { token?: string; body?: unknown } = {}) => {
+    const res = await handleApi(new Request(`https://learn.test/api/v2${path}`, { method, headers: { "content-type": "application/json", ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}) }, body: opts.body === undefined ? undefined : JSON.stringify(opts.body) }), env);
+    const text = await res.text();
+    return { status: res.status, data: (text.startsWith("{") || text.startsWith("[") ? JSON.parse(text) : text) as T };
+  };
+  const login = async (sub: string) => (await call<{ token: string }>("POST", "/auth/demo", { body: { sub } })).data.token;
+  const [admin, a, b] = await Promise.all([login("demo-admin"), login("demo-student"), login("demo-silver")]);
+  type List = { categories: { id: string; name: string; count: number }[]; recipes: { id: string; status: string; title: string; canEdit: boolean; videos: number }[]; manager: boolean; canSubmit: boolean };
+
+  const l0 = (await call<List>("GET", "/recipes")).data;
+  assert.deepEqual(l0.categories.map((c) => c.name), ["西式", "中式", "湯品", "點心", "飲品"], "預設五個分類");
+  assert.equal(l0.canSubmit, false, "訪客不能投稿");
+  assert.equal((await call("POST", "/recipes")).status, 401);
+
+  // 會員投稿
+  const id = (await call<{ id: string }>("POST", "/recipes", { token: a })).data.id;
+  assert.equal((await call<List>("GET", "/recipes", { token: a })).data.recipes.length, 0, "草稿不在列表");
+  assert.equal((await call("PUT", `/recipes/${id}`, { token: a, body: { title: "", finish: true } })).status, 400, "名稱必填");
+  assert.equal((await call("PUT", `/recipes/${id}`, { token: b, body: { title: "x" } })).status, 403, "別人不能改我的草稿");
+  const saved = await call<{ status: string; body: string }>("PUT", `/recipes/${id}`, { token: a, body: { title: "瑪格麗特披薩", categoryId: "western", body: "材料：\r\n牛番茄\r\nhttps://youtu.be/AbC123xyz\r\n", finish: true } });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.data.status, "pending", "會員投稿進待審核");
+  assert.equal(saved.data.body, "材料：\n牛番茄\nhttps://youtu.be/AbC123xyz");
+  assert.equal((await call<List>("GET", "/recipes", { token: b })).data.recipes.length, 0, "別的會員看不到待審核");
+  const mine = (await call<List>("GET", "/recipes", { token: a })).data.recipes;
+  assert.deepEqual(mine.map((r) => [r.status, r.canEdit, r.videos]), [["pending", true, 1]], "投稿者看得到自己的，可修改");
+  const adm = (await call<List>("GET", "/recipes", { token: admin })).data;
+  assert.equal(adm.manager, true);
+  assert.equal(adm.recipes.length, 1, "管理者看得到待審核");
+
+  // 審核
+  assert.equal((await call("POST", `/recipes/${id}/approve`, { token: a })).status, 403, "會員不能自己核准");
+  assert.equal((await call("POST", `/recipes/${id}/approve`, { token: admin })).status, 200);
+  assert.equal((await call<List>("GET", "/recipes", { token: b })).data.recipes[0]?.title, "瑪格麗特披薩", "核准後所有人看得到");
+  assert.equal((await call("PUT", `/recipes/${id}`, { token: a, body: { title: "改名" } })).status, 403, "核准後投稿者不能再改");
+  assert.equal((await call("GET", `/recipes?q=${encodeURIComponent("牛番茄")}`)).status, 200);
+  assert.equal(((await call<List>("GET", `/recipes?q=${encodeURIComponent("牛番茄")}`)).data).recipes.length, 1, "文字內容也能搜尋");
+  assert.equal(((await call<List>("GET", `/recipes?q=${encodeURIComponent("burger")}`)).data).recipes.length, 0);
+
+  // 管理者新增、直接發佈
+  const id2 = (await call<{ id: string }>("POST", "/recipes", { token: admin })).data.id;
+  assert.equal((await call<{ status: string }>("PUT", `/recipes/${id2}`, { token: admin, body: { title: "南瓜濃湯", categoryId: "soup", finish: true } })).data.status, "published", "管理者直接發佈");
+
+  // 分類：有權限的人新增與改名；只有超級管理員刪除
+  assert.equal((await call("POST", "/recipes/categories", { token: a, body: { name: "早餐" } })).status, 403);
+  const cat = (await call<{ id: string }>("POST", "/recipes/categories", { token: admin, body: { name: "早餐" } })).data.id;
+  assert.equal((await call("POST", "/recipes/categories", { token: admin, body: { name: "早餐" } })).status, 409, "不能重名");
+  assert.equal((await call("PUT", `/recipes/categories/${cat}`, { token: admin, body: { name: "早午餐" } })).status, 200);
+  assert.ok((await call<List>("GET", "/recipes")).data.categories.some((c) => c.name === "早午餐"));
+
+  // 照片用相簿的上傳（key＝rcp:編號）：沒權限擋下
+  const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...Array.from({ length: 50 }, (_, i) => i)]);
+  const up = (token: string, rid: string) => handleApi(new Request(`https://learn.test/api/v2/admin/cover-media?kind=course&key=${encodeURIComponent(`rcp:${rid}`)}&w=100&h=100`, { method: "PUT", headers: { authorization: `Bearer ${token}` }, body: jpeg }), { ...env, MEDIA: undefined });
+  assert.equal((await up(b, id)).status, 403, "別人不能替我的食譜上傳照片");
+
+  // 刪除
+  assert.equal((await call("DELETE", `/recipes/${id}`, { token: a })).status, 403, "核准後投稿者不能刪");
+  assert.equal((await call("DELETE", `/recipes/${id}`, { token: admin })).status, 200);
+  assert.equal((await call("GET", `/recipes/${id}`)).status, 404);
+  assert.equal((await call("DELETE", `/recipes/categories/${cat}`, { token: a })).status, 403);
+});

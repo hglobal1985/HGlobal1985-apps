@@ -18,6 +18,20 @@ let holdUntil = 0;
 export const holdFullscreenClose = (ms = 120_000) => void (holdUntil = Date.now() + ms);
 export const releaseFullscreenClose = () => void (holdUntil = Date.now() + 1500);
 export const overlayPopRecent = () => Date.now() - lastOverlayPop < 500;
+/**
+ * 開啟順序（杜杜龍 2026-11-26，食譜專區上線時補）：全螢幕視窗與上拉面板共用一個遞增編號。
+ * 「上一頁」只該由最後開啟（最上層）的那一個處理：面板蓋在全螢幕視窗上時，視窗不能搶著關掉。
+ */
+let orderSeq = 0;
+export const nextOrder = () => ++orderSeq;
+const overlayOrders: number[] = [];
+/** 有沒有比這個編號更晚開啟、還開著的全螢幕視窗（有的話，這個面板不是最上層，不處理上一頁）。 */
+const sheetOrders: number[] = [];
+export const registerSheet = (o: number) => void sheetOrders.push(o);
+export const unregisterSheet = (o: number) => void (sheetOrders.includes(o) && sheetOrders.splice(sheetOrders.indexOf(o), 1));
+/** 有沒有比這個全螢幕視窗更晚開啟、還開著的上拉面板（有的話「上一頁」是面板的，視窗不處理——不靠監聽器的先後順序，瀏覽器各版本順序不同）。 */
+const sheetAbove = (order: number) => sheetOrders.some((o) => o > order);
+export const overlayAbove = (order: number) => overlayOrders.some((o) => o > order);
 /** 自己退掉多記的那筆瀏覽紀錄之前呼叫：讓其他監聽 popstate 的畫面略過這一次。 */
 export const markOverlayPop = () => void (lastOverlayPop = Date.now());
 
@@ -28,13 +42,15 @@ export function useBackToClose(onClose: () => void): void {
     if (Platform.OS !== "web" || typeof window === "undefined") return;
     let popped = false;
     let wasFs = false;
+    const myOrder = nextOrder();
+    overlayOrders.push(myOrder);
     // 沿用目前這筆紀錄的 state（導覽套件靠 state.id 認得紀錄），只多加一個記號。
     window.history.pushState({ ...(window.history.state ?? {}), hgOverlay: 1 }, "", window.location.href);
     const onPopFirst = () => {
       if (!popped) lastOverlayPop = Date.now(); // 捕捉階段先記下，讓其他 popstate 監聽者能略過
     };
     const onPop = () => {
-      if (popped || sheetPopRecent()) return; // 上層的上拉面板處理的上一頁，不是離開這個全螢幕視窗
+      if (popped || sheetPopRecent() || sheetAbove(myOrder)) return; // 上層的上拉面板處理的上一頁，不是離開這個全螢幕視窗
       popped = true;
       close.current();
     };
@@ -49,6 +65,8 @@ export function useBackToClose(onClose: () => void): void {
       window.removeEventListener("popstate", onPopFirst, true);
       window.removeEventListener("popstate", onPop);
       document.removeEventListener("fullscreenchange", onFs);
+      const oi = overlayOrders.indexOf(myOrder);
+      if (oi >= 0) overlayOrders.splice(oi, 1);
       // 不是用「上一頁」關的（按 X、Esc、點背景）：把多記的那一筆退掉。
       if (!popped) {
         popped = true;

@@ -488,6 +488,11 @@ export type AlbumInfo = {
 export type AlbumPermissions = { ranks: { code: string; name: string }[]; groups: { id: string; label: string; uploadMinRank: string }[]; folders: { id: string; title: string; groupId: string; count: number; uploadMinRank: string | null }[] };
 /** 區塊相簿的子資料夾（杜杜龍 2026-11-26）：folders 依張數多到少；uncat＝還沒分資料夾的照片（固定排最後）。 */
 export type AlbumSubfolder = { id: string; name: string; count: number; thumbs: string[] };
+/** 食譜專區（杜杜龍 2026-11-26）：一道食譜＝名稱＋分類＋多張照片（cover_media，owner_key＝`rcp:`＋編號）＋一篇純文字（獨立一行的 YouTube 網址＝影片卡片）。 */
+export type RecipeCategory = { id: string; name: string; count: number };
+export type RecipeCard = { id: string; title: string; categoryId: string; categoryName: string; status: "pending" | "published"; thumb: string | null; photos: number; videos: number; authorName: string; /** 這道食譜我可不可以修改／刪除。 */ canEdit: boolean };
+export type RecipesResponse = { categories: RecipeCategory[]; recipes: RecipeCard[]; /** 管理者（超級管理員或「食譜」上傳獎銜達標）：可直接發佈、審核投稿、新增與改名分類。 */ manager: boolean; /** 超級管理員：可刪除分類。 */ admin: boolean; /** 已登入的會員可以投稿。 */ canSubmit: boolean };
+export type RecipeDetail = { id: string; title: string; categoryId: string; categoryName: string; body: string; status: "draft" | "pending" | "published"; authorName: string; updatedAt: string; canEdit: boolean; manager: boolean };
 export type AlbumSubfolders = { folders: AlbumSubfolder[]; uncat: { count: number; thumbs: string[] }; canManage: boolean };
 export type AlbumGroup = { id: string; label: string; folders: AlbumFolder[] };
 export type AlbumsResponse = { total: number; groups: AlbumGroup[] };
