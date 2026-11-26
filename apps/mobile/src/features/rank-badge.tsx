@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AccessibilityInfo, Animated, Easing, Image, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Animated, Easing, Image, Platform, StyleSheet, View } from "react-native";
 import { resolveUrl } from "@/api/client";
 
 /** 徽章高度：92（杜杜龍 2026-11-14：48→72→108，再縮小 15% 到 92）。圖是直式（380×720），寬度依比例。要改大小只改這裡，閃光球大小會跟著縮放。 */
@@ -86,12 +86,19 @@ export function RankBadge({ url, label, art, layoutHeight = BADGE_SIZE }: { url:
     // 外層只佔 layoutHeight 的高度（會員抬頭傳 48＝頭像高度，所以徽章放大後上下間距不變）；徽章本體（BADGE_SIZE 高）置中，上下溢出到外面。
     <View style={{ width: BADGE_W, height: layoutHeight, overflow: "visible", alignItems: "center", justifyContent: "center" }} accessible accessibilityRole="image" accessibilityLabel={label ? `${label}徽章` : "獎銜徽章"}>
       <Animated.View style={[styles.box, { position: "absolute", top: (layoutHeight - BADGE_SIZE) / 2, transform: [{ scale }] }]}>
-        <Image source={{ uri: resolveUrl(url) }} resizeMode="contain" onError={() => setFailed(true)} style={styles.img} accessibilityIgnoresInvertColors />
+        <Image source={{ uri: resolveUrl(url) }} resizeMode="contain" onError={() => setFailed(true)} style={[styles.img, CONTRAST_FILTER]} accessibilityIgnoresInvertColors />
         {!still ? SPARKS.map((s, i) => <Spark key={i} cx={s.x * BADGE_W} cy={y0 + s.y * artH} size={s.size * K} delay={s.delay} period={s.period} still={still} />) : null}
       </Animated.View>
     </View>
   );
 }
+
+/**
+ * 徽章對比加強（杜杜龍 2026-11-26：Amway 徽章「又灰又小」）：中央的徽章圖本身就是銀灰色（例如鑽石系列），
+ * 沒有被我們淡化（程式沒有任何透明度）；所以只在顯示時加一圈細深色描邊陰影＋略提高對比與飽和度，讓淺色圖在白底上也看得出輪廓。
+ * 只動顯示效果，不改圖（圖以中央為準）。native 不支援圖片陰影濾鏡，維持原樣。
+ */
+const CONTRAST_FILTER = Platform.OS === "web" ? ({ filter: "contrast(1.15) saturate(1.2) drop-shadow(0 0 1px rgba(40,30,10,0.7)) drop-shadow(0 2px 3px rgba(40,30,10,0.35))" } as object) : null;
 
 const styles = StyleSheet.create({
   box: { width: BADGE_W, height: BADGE_SIZE },

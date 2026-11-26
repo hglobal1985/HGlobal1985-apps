@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { runGuarded } from "@/lib/unsaved-guard";
 import { useTheme } from "@/theme/theme";
+import { UI_SCALE } from "@/theme/ui-scale";
 import { barHeight, minTouch } from "@/theme/tokens";
 
 /**
@@ -90,7 +91,8 @@ export function TopBarButton({ label, icon, iconName, onPress, tone = "accent", 
 const styles = StyleSheet.create({
   wrap: { zIndex: 10, position: "relative" },
   bar: { flexDirection: "row", alignItems: "center" },
-  back: { width: 48, height: 48, alignItems: "center", justifyContent: "center", marginLeft: -8 },
+  // 平板上圖示會被放大 1.3 倍，按鈕寬度也要跟著放大，否則箭頭會超出按鈕左緣、貼到畫面邊（杜杜龍 2026-11-26 iPad 實測）。
+  back: { width: Math.round(48 * UI_SCALE), height: 48, alignItems: "center", justifyContent: "center", marginLeft: 8 },
   title: { flex: 1, minWidth: 0, marginLeft: 4, fontSize: 18, fontWeight: "500" },
   right: { flexDirection: "row", alignItems: "center", paddingRight: 6 },
   btn: { minWidth: minTouch, height: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 },
