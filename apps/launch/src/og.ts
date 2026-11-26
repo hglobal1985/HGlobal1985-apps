@@ -52,14 +52,15 @@ type ShareMeta = { title: string; description: string; url: string; image: strin
 
 /** 分享預設值（設定頁「分享預設值」，超級管理員編輯）。 */
 const shareCfg = async (db: D1Database): Promise<ShareSettings> => (await loadConfig(db).catch(() => null))?.share ?? DEFAULT_SHARE_SETTINGS;
-const titleOf = (S: ShareSettings, name: string) => `${name}${S.titleSeparator}${S.siteName}`;
+/** 預覽卡的第一行（杜杜龍 2026-11-26 一律格式）：「課程／系列／中心名稱 | 寰宇行動大學 🎓」。 */
+export const SHARE_BADGE = "🎓";
+export const titleOf = (S: ShareSettings, name: string) => `${name}${S.titleSeparator}${S.siteName}${S.siteName.includes(SHARE_BADGE) ? "" : ` ${SHARE_BADGE}`}`;
 const randomQuote = async (db: D1Database) => (await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null))?.body?.trim() || "";
 
-/** 預覽卡片的備註：「📍 地址」換行再接一句隨機學習金句（可在設定頁各自關閉）；兩者都沒有就用備用文字。 */
-async function describe(db: D1Database, S: ShareSettings, address = ""): Promise<string> {
-  const addr = S.showAddress && address ? `${S.addressIcon ? `${S.addressIcon} ` : ""}${address}` : "";
+/** 預覽卡片的備註（杜杜龍 2026-11-26 一律格式）：只放一句隨機學習金句（每次被讀取都重新抽，LINE 重新抓取時就會換一句）；金句關閉或沒有金句才用備用文字。不再放地址。 */
+async function describe(db: D1Database, S: ShareSettings, _address = ""): Promise<string> {
   const quote = S.showQuote ? await randomQuote(db) : "";
-  return [addr, quote].filter(Boolean).join("\n") || S.fallbackDescription || S.siteName;
+  return quote || S.fallbackDescription || S.siteName;
 }
 
 /** 中心的預覽卡片（標題與備註）；label＝null 表示總部（沒有主辦中心）。單堂課程的分享也用它主辦中心的卡片。 */
@@ -113,34 +114,32 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
   const serRow = hq ? null : await slugRow(db, slug, "series");
   if (serRow) {
     const m =
-      (await db.prepare("SELECT mat_url AS n, host_unit AS h, host_center_key AS hk, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE series = ? AND mat_url = ? COLLATE NOCASE AND status = 'published'").bind(serRow.value, name).first<{ n: string; h: string; hk: string | null; k: string | null; v: number }>()) ??
-      (await db.prepare("SELECT c.mat_url AS n, c.host_unit AS h, c.host_center_key AS hk, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM material_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.series = ? AND a.name = ? COLLATE NOCASE AND c.status = 'published'").bind(serRow.value, name).first<{ n: string; h: string; hk: string | null; k: string | null; v: number }>());
+      (await db.prepare("SELECT mat_url AS n, title AS t, host_unit AS h, host_center_key AS hk, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE series = ? AND mat_url = ? COLLATE NOCASE AND status = 'published'").bind(serRow.value, name).first<{ n: string; t: string; h: string; hk: string | null; k: string | null; v: number }>()) ??
+      (await db.prepare("SELECT c.mat_url AS n, c.title AS t, c.host_unit AS h, c.host_center_key AS hk, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM material_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.series = ? AND a.name = ? COLLATE NOCASE AND c.status = 'published'").bind(serRow.value, name).first<{ n: string; t: string; h: string; hk: string | null; k: string | null; v: number }>());
     if (!m) return null;
     const S = await shareCfg(db);
-    const card = await centerCard(db, S, m.hk ? (m.h.split(/[、,，;；\n]+/)[0] ?? "").trim() : null);
-    return { title: titleOf(S, card.name), description: card.description, url: `${origin}/${serRow.slug}/${m.n}`, image: pubImage(origin, m.k, m.v) };
+    return { title: titleOf(S, m.t), description: await describe(db, S), url: `${origin}/${serRow.slug}/${m.n}`, image: pubImage(origin, m.k, m.v) };
   }
   const center = hq ? null : await slugRow(db, slug, "center");
   if (!hq && !center) return null;
   const vs = urlNameVariants(name);
-  const cols = "SELECT url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
+  const cols = "SELECT url_name AS n, title AS t, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
   const c = await (center
     ? db.prepare(`${cols} host_center_key = ? AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published'`).bind(centerKey(center.value), ...vs)
     : db.prepare(`${cols} host_center_key IS NULL AND url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND status = 'published'`).bind(...vs)
-  ).first<{ n: string; k: string | null; v: number }>();
+  ).first<{ n: string; t: string; k: string | null; v: number }>();
   let hit = c;
   if (!hit) {
     // 改名前的舊網址（別名）：預覽照常給，網址用目前的新網址。
     hit = await db
-      .prepare(`SELECT c.url_name AS n, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM course_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.scope = ? AND a.url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND c.status = 'published' AND c.url_name IS NOT NULL`)
+      .prepare(`SELECT c.url_name AS n, c.title AS t, COALESCE(c.cover_key, c.edm_key) AS k, c.art_version AS v FROM course_url_aliases a JOIN courses c ON c.id = a.course_id WHERE a.scope = ? AND a.url_name COLLATE NOCASE IN (${vs.map(() => "?").join(",")}) AND c.status = 'published' AND c.url_name IS NOT NULL`)
       .bind(center ? centerKey(center.value) : "", ...vs)
-      .first<{ n: string; k: string | null; v: number }>()
+      .first<{ n: string; t: string; k: string | null; v: number }>()
       .catch(() => null);
   }
   if (!hit) return null;
   const S = await shareCfg(db);
-  const card = await centerCard(db, S, center ? center.value : null);
-  return { title: titleOf(S, card.name), description: card.description, url: `${origin}/${center ? center.slug : HQ_SLUG}/${hit.n}`, image: pubImage(origin, hit.k, hit.v) };
+  return { title: titleOf(S, hit.t), description: await describe(db, S), url: `${origin}/${center ? center.slug : HQ_SLUG}/${hit.n}`, image: pubImage(origin, hit.k, hit.v) };
 }
 
 /**
@@ -155,7 +154,7 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
   const path = url.pathname;
   const short = /^\/([A-Za-z0-9-]{2,30})$/.exec(path);
   if (short && !RESERVED_SLUGS.has(short[1]!.toLowerCase())) return shortLinkMeta(db, short[1]!, origin);
-  const courseUrl = /^\/([A-Za-z0-9-]{2,30})\/([A-Za-z0-9-]{3,80})$/.exec(path);
+  const courseUrl = /^\/([A-Za-z0-9-]{2,30})\/([A-Za-z0-9-]{2,80})$/.exec(path);
   const first = courseUrl?.[1]?.toLowerCase() ?? "";
   if (courseUrl && (first === HQ_SLUG || !RESERVED_SLUGS.has(first)) && first !== "series") return courseUrlMeta(db, courseUrl[1]!, courseUrl[2]!, origin);
 
@@ -188,18 +187,16 @@ export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareM
   const courseId = course?.[1] ?? lesson?.[1];
   if (courseId) {
     const c = await db
-      .prepare("SELECT host_center_key AS hk, host_unit AS hu, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published'")
+      .prepare("SELECT title AS t, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE id = ? AND status = 'published'")
       .bind(courseId)
-      .first<{ hk: string | null; hu: string | null; k: string | null; v: number }>()
+      .first<{ t: string; k: string | null; v: number }>()
       .catch(() => null);
     if (!c) return null;
     const l = lesson ? await db.prepare("SELECT 1 AS ok FROM lessons WHERE id = ? AND course_id = ?").bind(lesson[2], courseId).first<{ ok: number }>().catch(() => null) : null;
     if (lesson && !l) return null;
     const S = await shareCfg(db);
-    // 主辦中心＝主辦單位裡第一個不是總部的名稱（保留原本的大小寫與名稱）；沒有就是總部。
-    const label = c.hk ? (c.hu ?? "").split("、").map((x) => x.trim()).find((x) => x && x !== "寰宇總部") ?? c.hk : null;
-    const card = await centerCard(db, S, label);
-    return { title: titleOf(S, card.name), description: card.description, url: `${origin}${path}`, image: pubImage(origin, c.k, c.v) };
+    // 單堂課程與章節的預覽：標題用「課程名稱」（杜杜龍 2026-11-26），不再用主辦中心名稱。
+    return { title: titleOf(S, c.t), description: await describe(db, S), url: `${origin}${path}`, image: pubImage(origin, c.k, c.v) };
   }
   return null;
 }
