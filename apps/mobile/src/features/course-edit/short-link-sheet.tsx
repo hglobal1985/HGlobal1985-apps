@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { View } from "react-native";
 import { api, type CourseDetail } from "@/api/client";
-import { useApi } from "@/state/session";
+import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, Button, ErrorView, Field, LoadingLadybug } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
@@ -13,7 +13,10 @@ import { ShortLinkRow, type ShortLinkItem } from "./short-link-row";
  * 在這張卡上直接設定它的系列、中心、分類短網址（`ShortLinkRow`，與設定頁共用），清單卡另有「清單網址」（`matUrl`，系列短網址底下的第二層）。
  */
 export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDetail; onClose: () => void; onSaved: (d: CourseDetail) => void }) {
+  const { invalidate } = useSession();
   const links = useApi<ShortLinkItem[]>("/admin/short-links");
+  /** 改了短網址：連同課程資料一起重新讀取，邀請、分享、網址列馬上換成新的短網址。 */
+  const changed = () => (links.reload(), invalidate());
   const cats = (course.category ?? "").split(/[,，、]/).map((x) => x.trim()).filter(Boolean);
   const find = (kind: ShortLinkItem["kind"], value: string, alt?: string): ShortLinkItem => links.data?.find((i) => i.kind === kind && (i.value === value || (alt && i.value === alt))) ?? { kind, value, slug: null };
   const seriesItem = course.series ? find("series", course.series) : null;
@@ -28,6 +31,7 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
       const d = await api<CourseDetail>("PATCH", `/admin/courses/${course.id}`, { matUrl: matUrl.trim(), ifUpdatedAt: course.admin?.updatedAt });
       flashText("已儲存清單網址");
       onSaved(d);
+      invalidate();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -47,7 +51,7 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
             {seriesItem ? (
               <View style={{ gap: space.xs }}>
                 <AppText variant="caption" tone="muted">系列頁的短網址（打開這個系列的頁面，同系列所有卡共用）</AppText>
-                <ShortLinkRow item={seriesItem} onChanged={links.reload} />
+                <ShortLinkRow item={seriesItem} onChanged={changed} />
               </View>
             ) : null}
             {course.isList && course.series && seriesItem?.slug ? (
@@ -61,13 +65,13 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
             {centerItem ? (
               <View style={{ gap: space.xs }}>
                 <AppText variant="caption" tone="muted">主辦中心的專屬頁短網址（這個中心所有課程共用，不是只有這張卡）</AppText>
-                <ShortLinkRow item={centerItem} onChanged={links.reload} />
+                <ShortLinkRow item={centerItem} onChanged={changed} />
               </View>
             ) : null}
             {cats.map((cat) => (
               <View key={cat} style={{ gap: space.xs }}>
                 <AppText variant="caption" tone="muted">分類清單頁的短網址（打開這個分類底下所有課程，同分類共用）</AppText>
-                <ShortLinkRow item={find("category", cat)} onChanged={links.reload} />
+                <ShortLinkRow item={find("category", cat)} onChanged={changed} />
               </View>
             ))}
             {!seriesItem && !centerItem && !cats.length ? <AppText tone="muted">這張卡還沒有系列、中心或分類，沒有可設定的短網址。</AppText> : null}

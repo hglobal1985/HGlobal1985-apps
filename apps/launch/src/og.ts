@@ -72,9 +72,21 @@ async function centerCard(db: D1Database, S: ShareSettings, label: string | null
 const clip = (v: string | null | undefined, n = 60) => (v ?? "").trim().slice(0, n);
 const pubImage = (origin: string, k: string | null | undefined, v: number | null | undefined) => (k ? `${origin}/api/v2/media/pub?k=${encodeURIComponent(k)}&v=${v ?? 0}` : `${origin}/icon-512.png`);
 
+/** 縮寫 → {現在的縮寫, 種類, 值}；改名前的舊縮寫（別名）也認得，但回傳現在的縮寫，預覽網址永遠是最新的（杜杜龍 2026-11-26）。 */
+async function slugRow(db: D1Database, slug: string, kind?: string): Promise<{ slug: string; kind: string; value: string } | null> {
+  const cond = kind ? " AND kind = ?" : "";
+  const bind = kind ? [slug, kind] : [slug];
+  const now = await db.prepare(`SELECT slug, kind, value FROM short_links WHERE slug = ? COLLATE NOCASE${cond}`).bind(...bind).first<{ slug: string; kind: string; value: string }>();
+  if (now) return now;
+  const old = await db.prepare(`SELECT kind, value FROM short_link_aliases WHERE slug = ? COLLATE NOCASE${cond}`).bind(...bind).first<{ kind: string; value: string }>().catch(() => null);
+  if (!old) return null;
+  const cur = await db.prepare("SELECT slug FROM short_links WHERE kind = ? AND value = ?").bind(old.kind, old.value).first<{ slug: string }>();
+  return cur ? { slug: cur.slug, kind: old.kind, value: old.value } : null;
+}
+
 /** 短網址的分享預覽：中心＝中心的預覽卡片；分類／系列＝標題 {名稱}＋站名、備註是隨機學習金句。找不到短網址回 null。 */
 export async function shortLinkMeta(db: D1Database, slug: string, origin: string): Promise<ShareMeta | null> {
-  const row = await db.prepare("SELECT slug, kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ slug: string; kind: string; value: string }>();
+  const row = await slugRow(db, slug);
   if (!row) return null;
   const S = await shareCfg(db);
   // 預覽圖：系列有上傳 EDM 就用 EDM；中心優先用「裁切好的 16:9 封面」（杜杜龍指定的位置），沒有封面才用整張 EDM；都沒有用網站圖示。
@@ -98,7 +110,7 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
   // 中心縮寫（照設定的大小寫顯示、輸入不分大小寫）或總部的 hq。
   const hq = slug.toLowerCase() === HQ_SLUG;
   // 素材的第二層網址：/系列縮寫/素材名稱（改名前的舊名稱也認得）。
-  const serRow = hq ? null : await db.prepare("SELECT slug, value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'series'").bind(slug).first<{ slug: string; value: string }>();
+  const serRow = hq ? null : await slugRow(db, slug, "series");
   if (serRow) {
     const m =
       (await db.prepare("SELECT mat_url AS n, host_unit AS h, host_center_key AS hk, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE series = ? AND mat_url = ? COLLATE NOCASE AND status = 'published'").bind(serRow.value, name).first<{ n: string; h: string; hk: string | null; k: string | null; v: number }>()) ??
@@ -108,7 +120,7 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
     const card = await centerCard(db, S, m.hk ? (m.h.split(/[、,，;；\n]+/)[0] ?? "").trim() : null);
     return { title: titleOf(S, card.name), description: card.description, url: `${origin}/${serRow.slug}/${m.n}`, image: pubImage(origin, m.k, m.v) };
   }
-  const center = hq ? null : await db.prepare("SELECT slug, value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ slug: string; value: string }>();
+  const center = hq ? null : await slugRow(db, slug, "center");
   if (!hq && !center) return null;
   const vs = urlNameVariants(name);
   const cols = "SELECT url_name AS n, COALESCE(cover_key, edm_key) AS k, art_version AS v FROM courses WHERE";
