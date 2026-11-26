@@ -58,7 +58,7 @@ export default function ListUnlocksScreen() {
   const choices = list.data.filter((a) => a.active && !cur.some((r) => r.achievementId === a.id) && (cat === "all" || ACHIEVEMENT_TYPES[a.type].category === cat));
   return (
     <Screen header={false} footer={dirty ? <View style={styles.foot}><View style={{ flex: 1 }}><Button variant="cancel" label="取消" onPress={() => { setBase(null); setRules(null); }} fullWidth /></View><View style={{ flex: 1 }}><Button label="儲存" onPress={() => void save()} loading={busy} fullWidth /></View></View> : undefined}>
-      <Section title="基本數量">
+      <Section fold title="基本數量">
         <Card style={{ gap: space.sm }}>
           <AppText variant="callout">每位會員一開始可以建立的清單份數：</AppText>
           <View style={styles.stepRow}>
@@ -80,7 +80,7 @@ export default function ListUnlocksScreen() {
           </AppText>
         </Card>
       </Section>
-      <Section title="解鎖條件">
+      <Section fold title="解鎖條件">
         {cur.length === 0 ? <AppText variant="callout" tone="muted">還沒有解鎖條件。新增後，會員完成該學習成就就多解鎖幾份。</AppText> : null}
         {cur.map((r) => {
           const a = byId.get(r.achievementId);

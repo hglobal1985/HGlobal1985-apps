@@ -4,7 +4,7 @@ import { api } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, NoticeBox, Screen, Section, SegmentTabs } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, NoticeBox, Screen, Section, SegmentTabs, Fold } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { clearSemanticMemo } from "@/features/courses/use-semantic";
 import { clearPhoneticMemo } from "@/features/courses/use-phonetic";
@@ -85,11 +85,11 @@ export default function SearchSettingsScreen() {
   return (
     <Screen header={false}>
       <NoticeBox text="這一頁所有設定都不用按儲存：每改一項（含下方搜尋關聯詞，打完字停一下）就立即存好、立即生效，超派、至尊模式同時套用。不確定就維持建議值；要全部還原按最下方「全部恢復建議值」。" />
-      <Section title="搜尋關聯詞（打字自動儲存）">
+      <Section fold title="搜尋關聯詞（打字自動儲存）">
         <SynonymsEditor />
       </Section>
       {data.groups.map((g) => (
-        <Section key={g.key} title={g.title}>
+        <Section fold key={g.key} title={g.title}>
           <AppText variant="caption" tone="muted">{g.intro}</AppText>
           {data.params.filter((p) => p.group === g.key).map((p) => (
             <Card key={p.key} style={{ gap: space.sm }}>
@@ -105,8 +105,7 @@ export default function SearchSettingsScreen() {
             </Card>
           ))}
           {g.key === "semantic" ? (
-            <Card style={{ gap: space.sm }}>
-              <AppText variant="headline">試搜尋（看相似度分數）</AppText>
+            <Fold title="試搜尋（看相似度分數）">
               <AppText variant="callout">輸入一個詞（例如「水機」），列出 AI 認為最接近的前 20 筆。這裡的結果就是 App 實際搜尋的結果：只列已開啟的資料類別、分數含加分、依「顯示順序」排列，標「會顯示」的才會出現在搜尋結果。目前門檻 {fmt(Number(cur.semanticMin), 0.01)}。</AppText>
               <TextInput value={q} onChangeText={setQ} placeholder="輸入要測試的搜尋詞" placeholderTextColor={c.textMuted} onSubmitEditing={runTest} returnKeyType="search" style={[styles.input, { borderColor: c.border, backgroundColor: c.surface, color: c.text }]} />
               <Button label={testing ? "搜尋中…" : "試搜尋"} onPress={runTest} disabled={testing || q.trim().length < 2} />
@@ -123,7 +122,7 @@ export default function SearchSettingsScreen() {
                   </View>
                 );
               })}
-            </Card>
+            </Fold>
           ) : null}
         </Section>
       ))}

@@ -95,14 +95,14 @@ export default function ShareDefaultsScreen() {
       </AppText>
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
 
-      <Section title="① 一般分享">
+      <Section fold title="① 一般分享">
         <Card>
           {input("一般分享的文字", "分享中心、分類、系列等頁面時，放在網址前面的文字", s.inviteText, (v) => set("inviteText", v), { multiline: true })}
           {input("網址前的引導文字", "自成一行，放在文字與網址中間（所有分享都用）", s.linkLead, (v) => set("linkLead", v))}
         </Card>
       </Section>
 
-      <Section title="② 課程的分享">
+      <Section fold title="② 課程的分享">
         <Card>
           {input("單堂課程分享的文字", "課程頁右上角與課程列的分享：可用 {主講人}、{職稱}、{課程名稱}，送出時會換成實際的內容（沒填職稱的課程，{職稱} 會自動省略；有職稱時姓名與職稱中間自動空一格）", s.courseText, (v) => set("courseText", v), { multiline: true })}
           {input("邀請審核人員的文字", "課程「費用與審核 > 審核窗口」的「產生邀請網址並分享」：可用 {課程名稱}；後面接引導文字與 24 小時有效的邀請網址", s.reviewerInviteText, (v) => set("reviewerInviteText", v), { multiline: true })}
@@ -110,7 +110,7 @@ export default function ShareDefaultsScreen() {
         </Card>
       </Section>
 
-      <Section title="③ 清單（影片／檔案）的分享">
+      <Section fold title="③ 清單（影片／檔案）的分享">
         <Card>
           {input("純教材卡分享的文字", "「新增清單（影片／檔案）」建立的清單：清單頁右上角與清單列的分享，可用 {清單名稱}", s.listText, (v) => set("listText", v), { multiline: true })}
           {input("清單裡單一影片分享的文字", "清單每段影片右側的分享鈕（點開直接播放這一段）：可用 {影片名稱}、{清單名稱}", s.listItemText, (v) => set("listItemText", v), { multiline: true })}
@@ -118,7 +118,7 @@ export default function ShareDefaultsScreen() {
         </Card>
       </Section>
 
-      <Section title="④ LINE 預覽卡片（標題與備註）">
+      <Section fold title="④ LINE 預覽卡片（標題與備註）">
         <Card>
           {input("站名", "標題最後面固定的名稱", s.siteName, (v) => set("siteName", v))}
           {input("標題的分隔符號", "名稱與站名中間，例如「 | 」（前後空白也會保留）", s.titleSeparator, (v) => set("titleSeparator", v))}
@@ -133,7 +133,7 @@ export default function ShareDefaultsScreen() {
         </Card>
       </Section>
 
-      <Section title="預覽（範例）">
+      <Section fold title="預覽（範例）">
         <Card>
           <AppText variant="callout" tone="muted">
             LINE 預覽卡片：中心／該中心主辦的單堂課程

@@ -5,7 +5,7 @@ import { api } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { useApi } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { AppText, Button, Card, ErrorView, ListRow, LoadingView, Screen, Section } from "@/ui";
+import { AppText, Button, Card, ErrorView, ListRow, LoadingView, Screen, Section, Fold } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 type Row = { sub: string; number: string; title: string; owner: string; views: number; books: number };
@@ -31,8 +31,7 @@ export default function AdminLibraries() {
   };
   return (
     <Screen header={false}>
-      <Card>
-        <AppText variant="headline">指定書櫃擁有者</AppText>
+      <Fold title="指定書櫃擁有者">
         <AppText variant="callout" tone="muted">
           產生一個 24 小時有效、只能一個人使用的邀請網址，傳給要擁有「我的書櫃」的會員；對方登入後按「接受」，書櫃網址就是他在會員中心的會員編號。
         </AppText>
@@ -42,8 +41,8 @@ export default function AdminLibraries() {
             {invite}
           </AppText>
         ) : null}
-      </Card>
-      <Section title="已建立的書櫃">
+      </Fold>
+      <Section fold title="已建立的書櫃">
         {loading && !data ? <LoadingView /> : null}
         {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}
         {data && !data.length ? <AppText variant="callout" tone="muted">還沒有人。</AppText> : null}

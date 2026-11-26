@@ -85,7 +85,7 @@ export default function AppSettingsScreen() {
       </AppText>
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
 
-      <Section title="① 首頁「推薦課程」規則">
+      <Section fold title="① 首頁「推薦課程」規則">
         <Card>
           <Chips
             label="推薦範圍"
@@ -117,7 +117,7 @@ export default function AppSettingsScreen() {
         </Card>
       </Section>
 
-      <Section title="② 首頁自動輪播">
+      <Section fold title="② 首頁自動輪播">
         <Card>
           {stepper("左邊「繼續學習」換下一張", "每隔幾秒自動換一張；0＝不自動輪播", app.homeLeftSec, 0, 60, (v) => set("homeLeftSec", v), " 秒", "關閉")}
           {stepper("右邊「推薦課程」換下一張", "每隔幾秒自動換一張；0＝不自動輪播", app.homeRightSec, 0, 60, (v) => set("homeRightSec", v), " 秒", "關閉")}
@@ -127,14 +127,14 @@ export default function AppSettingsScreen() {
         </Card>
       </Section>
 
-      <Section title="③ 其他全站數值">
+      <Section fold title="③ 其他全站數值">
         <Card>
           {stepper("課程「新」標籤", "課程建立幾天內，分類下拉顯示「新」", app.freshDays, 1, 90, (v) => set("freshDays", v), " 天")}
           {stepper("圖片「完整顯示」背景模糊", "合成封面時背景的模糊強度，數字越大越模糊（建議 12～24）", app.blurStrength, 4, 40, (v) => set("blurStrength", v), "")}
         </Card>
       </Section>
 
-      <Section title="④ 學習紀錄">
+      <Section fold title="④ 學習紀錄">
         <Card>
           {stepper("開始學習的播放比例", "播放超過這個比例，這門課就列入學員的「學習中」（已開通的課程本來就會列入）", app.learnStartPct, 1, 50, (v) => set("learnStartPct", v), "%")}
           {stepper("自動完成的播放比例", "播放超過這個比例（或播到結尾），自動標記這一堂完成；一定要大於上面的比例", app.learnDonePct, 50, 100, (v) => set("learnDonePct", v), "%")}

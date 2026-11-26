@@ -7,13 +7,12 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, Fold, ErrorView, LoadingView, NoticeBox, Screen, Section } from "@/ui";
 
 function Block({ b }: { b: StatBlock }) {
   const { c } = useTheme();
   return (
-    <Card>
-      <AppText variant="headline">{b.title}</AppText>
+    <Fold title={b.title}>
       {b.note ? (
         <AppText variant="caption" tone="muted">
           {b.note}
@@ -82,7 +81,7 @@ function Block({ b }: { b: StatBlock }) {
           )}
         </View>
       ) : null}
-    </Card>
+    </Fold>
   );
 }
 
@@ -166,7 +165,7 @@ export default function StatsScreen() {
       <Source title="③ App 資料庫統計" from="資料來自本 App 自己的資料庫（D1）" path="/admin/stats/app" />
 
       {isSuper ? (
-        <Section title="誰可以看這一頁（超級管理員設定）">
+        <Section fold title="誰可以看這一頁（超級管理員設定）">
           <Card>
             <AppText variant="callout" tone="muted">
               超級管理員與總部秘書一律可以看。也可以勾選其他有職務的會員（會出現在他們的「設定」頁）：

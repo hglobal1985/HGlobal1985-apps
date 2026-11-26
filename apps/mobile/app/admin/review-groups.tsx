@@ -4,7 +4,7 @@ import { api, DUTY_LABELS, type Duty, type ReviewGroup } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, Icon, LoadingView, NoticeBox, Pill, Screen } from "@/ui";
+import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, Icon, LoadingView, NoticeBox, Pill, Screen, Fold } from "@/ui";
 
 const ALL = "";
 const duties = (Object.keys(DUTY_LABELS) as Duty[]).map((key) => ({ key, label: DUTY_LABELS[key] }));
@@ -48,8 +48,7 @@ export default function ReviewGroupsScreen() {
       {groups.data.map((g) => (
         <GroupCard key={g.id} group={g} centers={centers.data ?? []} run={run} busy={busy} />
       ))}
-      <Card>
-        <AppText variant="headline">建立審核群組</AppText>
+      <Fold title="建立審核群組">
         <Field label="群組名稱" value={name} onChange={setName} placeholder="例如：翡翠達標班" />
         <Button
           label={isAdmin ? "建立總部群組" : `建立 ${member?.center ?? ""} 的群組`}
@@ -60,7 +59,7 @@ export default function ReviewGroupsScreen() {
             if (await run(() => api("POST", "/admin/review-groups", { name, ownerCenter: isAdmin ? null : member?.center }))) setName("");
           }}
         />
-      </Card>
+      </Fold>
     </Screen>
   );
 }

@@ -365,7 +365,7 @@ function Question({ q, open, onToggle, admin }: { q: Q; open: boolean; onToggle:
  */
 export default function UsageScreen() {
   const { c } = useTheme();
-  const [openQ, setOpenQ] = useState<string | null>(QUESTIONS[0]!.title);
+  const [openQ, setOpenQ] = useState<string | null>(null); // 預設全部收起（業主 2026-11-26）
   const [custom, setCustom] = useState(false);
   const [admin, setAdmin] = useState(false); // 包含管理員（業主本人）操作；預設不含（業主 2026-11-23）
   return (

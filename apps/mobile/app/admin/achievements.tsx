@@ -10,7 +10,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type as typo } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen, Section, Fold } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 type Diff = 1 | 2 | 3;
@@ -172,8 +172,7 @@ export default function AdminAchievementsScreen() {
           <Stat n={active} label="啟用中" />
           <Stat n={rows.reduce((s, a) => s + a.earnedCount, 0)} label="已取得人次" />
         </View>
-        <View style={{ gap: 6 }}>
-          <AppText variant="headline">🔑 書櫃鑰匙門檻</AppText>
+        <Fold card={false} title="🔑 書櫃鑰匙門檻">
           <AppText variant="caption" tone="muted">
             會員集滿這麼多枚徽章，就自動解鎖「我的書櫃」。
           </AppText>
@@ -189,7 +188,7 @@ export default function AdminAchievementsScreen() {
             ))}
           </View>
           {active < need ? <NoticeBox tone="warning" text={`啟用中的徽章只有 ${active} 枚，少於門檻 ${need}，沒有人能解鎖書櫃。請新增任務或調低門檻。`} /> : null}
-        </View>
+        </Fold>
       </Card>
 
       <Button label="新增任務" icon="add-circle-outline" onPress={() => open(blank())} fullWidth />
@@ -202,7 +201,7 @@ export default function AdminAchievementsScreen() {
       {shown.length !== rows.length ? <AppText variant="caption" tone="muted">符合條件 {shown.length} 個任務</AppText> : null}
 
       {grouped.map(({ cat, items }) => (
-        <Section key={cat.key} title={`${cat.icon} ${cat.label}（${items.length}）`}>
+        <Section fold key={cat.key} title={`${cat.icon} ${cat.label}（${items.length}）`}>
           <AppText variant="caption" tone="muted">
             {cat.desc}
           </AppText>

@@ -100,7 +100,7 @@ function RecompressSection() {
   const doneAll = data.total - data.pending;
   const pctDone = data.total ? Math.round((doneAll / data.total) * 100) : 0;
   return (
-    <Section title="舊照片重新壓縮">
+    <Section fold title="舊照片重新壓縮">
       <Card>
         <NoticeBox tone="warning" text="把相簿裡所有舊照片（中心 EDM、中心封面、系列與課程封面輪播、區塊相簿）依上面「相簿照片」的格式與畫質重新壓縮，覆蓋原檔，不可復原。不包含縮圖（縮圖由即時縮圖處理）、品牌 logo、課程單張封面與課表。" />
         <View style={{ height: 10, borderRadius: 5, backgroundColor: c.surfaceMuted, overflow: "hidden" }}>
@@ -183,7 +183,7 @@ export default function StorageScreen() {
   if (!isSuper) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以查看" /></Screen>;
   return (
     <Screen header={false}>
-      <Section title="上傳設定與圖片壓縮">
+      <Section fold title="上傳設定與圖片壓縮">
         <Card>
           <NoticeBox tone="info" text="所有上傳到雲端的圖片（封面、EDM、教材圖片、雲端硬碟匯入、匯入工作…全站）都會先壓縮才存，不保留原圖；使用者下載到的就是壓縮後的版本；下載、分享到手機時不會再縮小解析度（尺寸維持站內儲存的樣子，AVIF／WebP 只換成 JPEG 格式，畫質 95）。LINE 等 App 收到照片後自己可能再壓縮，那不是行動大學控制的。長邊在上限內的圖片尺寸不變，但仍會照下面設定的畫質壓縮。" />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
@@ -218,7 +218,7 @@ export default function StorageScreen() {
         </Card>
       </Section>
       <RecompressSection />
-      <Section title="封面輪播與短影音">
+      <Section fold title="封面輪播與短影音">
         <Card>
           <NoticeBox tone="info" text="中心、系列、課程的封面可放不限張數的照片或 1 分鐘內的短影音，會自動輪播；中心頁的「相簿」與封面輪播是同一份資料。影片在上傳者的瀏覽器內先壓縮再上傳（不需要另外付費），規範如下。" />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
@@ -238,7 +238,7 @@ export default function StorageScreen() {
           <Button label="儲存封面輪播設定" icon="save-outline" loading={cvSaving} disabled={!cvDirty || cvSaving} onPress={saveCv} fullWidth />
         </Card>
       </Section>
-      <Section title="教材檔案：從 Google 雲端硬碟匯入與下載">
+      <Section fold title="教材檔案：從 Google 雲端硬碟匯入與下載">
         <Card>
           {fs ? (
             <>
@@ -281,7 +281,7 @@ export default function StorageScreen() {
               </View>
             ))}
           </Card>
-          <Section title="各中心使用量">
+          <Section fold title="各中心使用量">
             {data.byCenter.length ? (
               data.byCenter.map((r) => (
                 <Card key={r.center}>

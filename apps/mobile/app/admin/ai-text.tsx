@@ -6,7 +6,7 @@ import { api } from "@/api/client";
 import { confirmSheet } from "@/features/confirm";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Fold } from "@/ui";
 import { useApi, useSession } from "@/state/session";
 import { AiProgressPanel } from "@/features/admin/ai-progress";
 import { AiSpecialRulesPanel } from "@/features/admin/ai-special-rules";
@@ -91,14 +91,13 @@ export default function AiTextScreen() {
           EDM 上傳後，AI 會先讀出海報上的文字，再照下面的欄位整理好，顯示在「全螢幕看圖 › 圖片資訊」。歸不進任何欄位的內容，固定放在最後的「{data.other}」。
         </AppText>
         {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
-        <Card>
-          <AppText variant="callout" style={{ fontWeight: "800" }}>整理進度</AppText>
+        <Fold title="EDM 文字整理進度與模型">
           <AppText variant="callout" tone="muted">{`已辨識 ${data.stats.total} 張，其中 ${data.stats.done} 張已用目前格式整理${data.stats.pending ? `，${data.stats.pending} 張排隊中（背景每次開啟中心頁會補整理幾張）` : "，全部完成"}。`}</AppText>
           {data.stats.pending ? <Button label="現在整理 5 張" icon="sparkles-outline" onPress={runNow} loading={busy} disabled={busy} fullWidth /> : null}
           <AppText variant="caption" tone="muted">{data.model ? `使用模型：${data.model.name}（${data.model.cost}）。要換模型到「設定 › AI 模型 › EDM 文字整理」。` : ""}</AppText>
           <Button label="到 AI 模型頁換模型" variant="secondary" onPress={() => router.push("/admin/ai-models")} fullWidth />
-        </Card>
-        <AppText variant="headline">欄位格式（由上到下的顯示順序）</AppText>
+        </Fold>
+        <Fold title="欄位格式（由上到下的顯示順序）">
         <AppText variant="caption" tone="muted">這份格式「只適用中心 EDM」：只有 EDM 的辨識文字會被整理成下面的欄位（日期、時間、主題…）。相簿（區塊）照片、課程封面等其他照片的辨識文字不套用格式，直接顯示辨識出來的原文。</AppText>
         {rows.map((r, i) => (
           <Card key={i}>
@@ -127,6 +126,7 @@ export default function AiTextScreen() {
           <View style={{ flex: 1 }}><Button label="還原預設" variant="cancel" onPress={reset} fullWidth /></View>
           <View style={{ flex: 1 }}><Button label="儲存" onPress={save} loading={busy} disabled={busy || !dirty || bad} fullWidth /></View>
         </View>
+        </Fold>
       </View>
     </Screen>
   );
