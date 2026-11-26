@@ -52,7 +52,7 @@ test("短網址：設定、重複、格式、改名跟著走、刪除，並可�
   await call("PUT", "/admin/short-links", admin, { kind: "series", value: "新手系列", slug: "newbie" });
 
   assert.deepEqual(await resolve("nutri"), { kind: "category", value: "營養" });
-  assert.equal(await resolve("nutrition"), null); // 舊縮寫失效
+  assert.deepEqual(await resolve("nutrition"), { kind: "category", value: "營養" }, "舊縮寫仍然有效（杜杜龍 2026-11-26：已分享的舊網址不能失效）");
   assert.deepEqual(await resolve("newbie"), { kind: "series", value: "新手系列" });
   assert.equal((await call("PUT", "/admin/short-links", admin, { kind: "category", value: "營養", slug: "courses" })).status, 400); // 與網站頁面同名
 
@@ -65,4 +65,5 @@ test("短網址：設定、重複、格式、改名跟著走、刪除，並可�
   // 刪除關鍵字時縮寫一併刪除
   await call("POST", "/admin/keywords/remove", admin, { kind: "category", value: "營養" });
   assert.equal(await resolve("nutri"), null);
+  assert.equal(await resolve("nutrition"), null, "刪除關鍵字：舊縮寫也一併失效");
 });

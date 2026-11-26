@@ -13,16 +13,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 function OwnerDevices() {
   const { member } = useSession();
   const isSuper = !!member?.titles.includes("超級管理員");
-  const list = useApi<{ devices: { fp: string; label: string; at: string }[] }>(isSuper ? "/admin/usage/devices" : null);
+  const list = useApi<{ devices: { fp: string; label: string; at: string; nets: number; here: boolean }[] }>(isSuper ? "/admin/usage/devices" : null);
   const [busy, setBusy] = useState(false);
   if (!isSuper) return null;
   const mine = deviceFingerprint();
-  const has = list.data?.devices.some((d) => d.fp === mine);
+  const has = list.data?.devices.some((d) => d.fp === mine && d.here); // 這台裝置、而且目前的網路都已登記
   const add = async () => {
     setBusy(true);
     try {
       await api("POST", "/admin/usage/devices", { fp: mine, label: deviceLabel() });
-      flashText("已登記這台裝置");
+      flashText("已登記這台裝置與目前的網路");
       list.reload();
     } catch (e) {
       flashText((e as Error).message);
@@ -41,15 +41,15 @@ function OwnerDevices() {
   return (
     <Card style={{ gap: space.sm }}>
       <AppText variant="headline">本人裝置</AppText>
-      <AppText variant="caption" tone="muted">登記後，這種裝置的所有操作（即使無痕模式、沒登入、換網路）都算管理員本人的操作，要勾上面的「包含管理員操作」才會列入統計。</AppText>
+      <AppText variant="caption" tone="muted">登記後，這台裝置在登記過的網路上的所有操作（即使無痕模式、沒登入）都算管理員本人的操作，要勾上面的「包含管理員操作」才會列入統計。要「裝置特徵相同」而且「網路是登記過的」兩個都符合才算，所以別人的裝置不會被誤認。</AppText>
       {(list.data?.devices ?? []).map((d) => (
         <View key={d.fp} style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
-          <AppText variant="callout" style={{ flex: 1 }}>{`${d.label}${d.fp === mine ? "（目前這台）" : ""}`}</AppText>
+          <AppText variant="callout" style={{ flex: 1 }}>{`${d.label}${d.fp === mine ? "（目前這台）" : ""}・已登記 ${d.nets} 個網路`}</AppText>
           <Button variant="cancel" label="移除" onPress={() => void remove(d.fp)} />
         </View>
       ))}
-      <Button label={has ? "這台裝置已登記" : `登記這台裝置（${deviceLabel()}）`} icon="phone-portrait-outline" disabled={busy || !!has} loading={busy} onPress={() => void add()} fullWidth />
-      <AppText variant="caption" tone="muted">注意：無痕模式沒有可記住的識別碼，所以是用「裝置型號特徵」（螢幕大小、像素比、系統）辨識。同型號的其他裝置（例如別人的 iPad Air）也會被算成本人。</AppText>
+      <Button label={has ? "這台裝置與目前網路已登記" : `登記這台裝置與目前網路（${deviceLabel()}）`} icon="phone-portrait-outline" disabled={busy || !!has} loading={busy} onPress={() => void add()} fullWidth />
+      <AppText variant="caption" tone="muted">注意：無痕模式沒有可記住的識別碼，瀏覽器也拿不到網卡（MAC）位址，所以用「裝置特徵＋網路位置」一起判斷（不存原始 IP）。換到沒登記過的網路（例如手機熱點、別的 Wi-Fi）就認不出，請在那個網路再按一次登記。若登記的是很多人共用的 Wi-Fi，同網路、同型號的別人裝置仍可能被誤認。</AppText>
     </Card>
   );
 }

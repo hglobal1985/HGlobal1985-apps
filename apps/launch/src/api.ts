@@ -115,7 +115,7 @@ import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnecti
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
-import { FP_RE, isOwnerDevice, isOwnerNet, markOwnerNet, ownerDevices, saveOwnerDevices, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
+import { FP_RE, isOwnerDevice, isOwnerNet, markOwnerNet, netHash, ownerDevices, registerOwnerDevice, saveOwnerDevices, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
 import { collectMuxStats } from "./mux-stats.ts";
 import { imageSize } from "./image-size.ts";
 import { audioUrl, sniffImage, verifyAudioUrl } from "./media.ts";
@@ -5354,7 +5354,7 @@ const routes: [string, RegExp, Handler][] = [
     // 杜杜龍本人的操作不列入統計（2026-11-23）：管理員帳號、管理員用過的裝置（App 帶 owner=1）、管理員用過的網路（無痕／未登入也認得）。
     const adminNow = isOwnerSession(ctx.session);
     if (adminNow) await markOwnerNet(ctx.db, ip).catch(() => undefined);
-    const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false)) || (await isOwnerDevice(ctx.db, body.fp).catch(() => false));
+    const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false)) || (await isOwnerDevice(ctx.db, body.fp, ip).catch(() => false));
     await recordUsage(ctx.db, body, mine).catch(() => undefined);
     return { ok: true };
   }],
@@ -5365,16 +5365,20 @@ const routes: [string, RegExp, Handler][] = [
     return { ok: true };
   }],
   // 本人裝置登記（杜杜龍 2026-11-26，超級管理員）：在那台裝置上按「登記這台裝置」，之後相同特徵的操作一律算本人。
-  ["GET", /^\/admin\/usage\/devices$/, async (ctx) => (requireSuperAdmin(ctx), { devices: await ownerDevices(ctx.db) })],
+  ["GET", /^\/admin\/usage\/devices$/, async (ctx) => {
+    requireSuperAdmin(ctx);
+    const here = await netHash(ctx.req.headers.get("cf-connecting-ip") ?? "");
+    return { devices: (await ownerDevices(ctx.db)).map((d) => ({ fp: d.fp, label: d.label, at: d.at, nets: d.nets.length, here: d.nets.includes(here) })) };
+  }],
   ["POST", /^\/admin\/usage\/devices$/, async (ctx) => {
     const s = requireSuperAdmin(ctx);
     const body = await readJson<{ fp?: unknown; label?: unknown }>(ctx.req);
     if (typeof body.fp !== "string" || !FP_RE.test(body.fp)) return fail(400, "invalid_device", "讀不到這台裝置的特徵");
-    const list = (await ownerDevices(ctx.db)).filter((d) => d.fp !== body.fp);
-    list.push({ fp: body.fp, label: (typeof body.label === "string" ? body.label.trim() : "").slice(0, 40) || "我的裝置", at: new Date().toISOString() });
-    await saveOwnerDevices(ctx.db, list);
+    const ip = ctx.req.headers.get("cf-connecting-ip") ?? "";
+    if (!ip) return fail(400, "no_network", "讀不到目前的網路位置");
+    const list = await registerOwnerDevice(ctx.db, body.fp, (typeof body.label === "string" ? body.label.trim() : "").slice(0, 40), ip);
     await audit(ctx.db, s.sub, "usage.owner_device.add", "usage", "device", body.fp).run();
-    return { devices: list };
+    return { devices: list.map((d) => ({ fp: d.fp, label: d.label, at: d.at, nets: d.nets.length, here: true })) };
   }],
   ["POST", /^\/admin\/usage\/devices\/remove$/, async (ctx) => {
     const s = requireSuperAdmin(ctx);
@@ -8126,6 +8130,7 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("DELETE FROM keywords WHERE kind = ? AND value = ?").bind(kind, from),
         ctx.db.prepare("INSERT OR IGNORE INTO keywords (kind, value) VALUES (?, ?)").bind(kind, to),
         ...(kind === "category" || kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE short_links SET value = ? WHERE kind = ? AND value = ?").bind(to, kind, from)] : []),
+        ...(kind === "category" || kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE short_link_aliases SET value = ? WHERE kind = ? AND value = ?").bind(to, kind, from)] : []), // 舊縮寫也跟著改名
         ...(kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE series_settings SET series = ? WHERE series = ?").bind(to, from), ctx.db.prepare("UPDATE OR REPLACE series_art SET series = ? WHERE series = ?").bind(to, from), ctx.db.prepare("UPDATE OR REPLACE page_views SET key = ? WHERE kind = 'series' AND key = ?").bind(to, from)] : []),
         audit(ctx.db, s.sub, "keyword.rename", "keyword", kind, `${from} → ${to}`),
       ]);
