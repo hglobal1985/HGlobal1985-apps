@@ -5515,6 +5515,129 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/admin\/drive-syncs$/,
+    async (ctx) => {
+      // 設定 › 同步雲端資料夾（杜杜龍 2026-11-26，超級管理員）：列出所有同步設定與每份「已同步幾項」。
+      requireSuperAdmin(ctx);
+      const { results } = await ctx.db
+        .prepare("SELECT d.id, d.label, d.url, d.course_id AS courseId, c.title AS courseTitle, d.block_id AS blockId, COALESCE(b.title, '') AS blockTitle, d.title_format AS titleFormat, d.last_synced_at AS lastSyncedAt, d.last_imported AS lastImported, d.last_total AS lastTotal, d.last_note AS lastNote FROM drive_syncs d JOIN courses c ON c.id = d.course_id LEFT JOIN lessons b ON b.id = d.block_id ORDER BY d.created_at")
+        .all<{ id: string }>();
+      const { DRIVE_FORMAT_HELP, PLATINUM_FORMAT, getAutoSync } = await import("./drive-sync.ts");
+      return { syncs: results, keyReady: !!ctx.env.GOOGLE_DRIVE_API_KEY, formatHelp: DRIVE_FORMAT_HELP, platinumFormat: PLATINUM_FORMAT, weekly: (await getAutoSync(ctx.db)).weekly };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/drive-syncs$/,
+    async (ctx) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ url?: unknown; courseId?: unknown; blockId?: unknown; titleFormat?: unknown; label?: unknown; syncNow?: unknown }>(ctx.req);
+      const { folderIdOf } = await import("./drive-sync.ts");
+      const folderId = typeof body.url === "string" ? folderIdOf(body.url) : null;
+      if (!folderId) return fail(400, "invalid_folder", "請貼上 Google 雲端資料夾的連結（網址裡要有 /folders/…）");
+      const courseId = typeof body.courseId === "string" ? body.courseId : "";
+      if (!courseId || !(await ctx.db.prepare("SELECT 1 AS ok FROM courses WHERE id = ?").bind(courseId).first())) return fail(400, "card_required", "請選擇要放進的教材卡");
+      const blockId = typeof body.blockId === "string" ? body.blockId : "";
+      if (blockId && !(await ctx.db.prepare("SELECT 1 AS ok FROM lessons WHERE id = ? AND course_id = ? AND kind = 'section'").bind(blockId, courseId).first())) return fail(400, "block_not_found", "找不到這個區塊");
+      const id = `ds${randomId(8)}`;
+      const format = (typeof body.titleFormat === "string" ? body.titleFormat.trim() : "").slice(0, 120) || "{標題}";
+      await ctx.db.prepare("INSERT INTO drive_syncs (id, label, url, folder_id, course_id, block_id, title_format) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(id, typeof body.label === "string" ? body.label.trim().slice(0, 60) : "", String(body.url).trim().slice(0, 300), folderId, courseId, blockId, format).run();
+      await audit(ctx.db, s.sub, "drive_sync.create", "drive_sync", id, folderId).run();
+      if (body.syncNow === true) {
+        const { runDriveSync } = await import("./drive-sync.ts");
+        return { id, ...(await runDriveSync(ctx.env, id)) };
+      }
+      return { id };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/drive-syncs\/([\w-]+)\/sync$/,
+    async (ctx, [id]) => {
+      requireSuperAdmin(ctx);
+      const { runDriveSync } = await import("./drive-sync.ts");
+      return runDriveSync(ctx.env, id!);
+    },
+  ],
+  [
+    "PATCH",
+    /^\/admin\/drive-syncs\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ titleFormat?: unknown; blockId?: unknown; label?: unknown }>(ctx.req);
+      const cur = await ctx.db.prepare("SELECT course_id FROM drive_syncs WHERE id = ?").bind(id).first<{ course_id: string }>();
+      if (!cur) return fail(404, "not_found", "找不到這份同步設定");
+      if (typeof body.titleFormat === "string") {
+        const f = body.titleFormat.trim().slice(0, 120);
+        if (!f) return fail(400, "format_required", "請輸入命名規則");
+        await ctx.db.prepare("UPDATE drive_syncs SET title_format = ? WHERE id = ?").bind(f, id).run();
+      }
+      if (typeof body.blockId === "string") {
+        if (body.blockId && !(await ctx.db.prepare("SELECT 1 AS ok FROM lessons WHERE id = ? AND course_id = ? AND kind = 'section'").bind(body.blockId, cur.course_id).first())) return fail(400, "block_not_found", "找不到這個區塊");
+        await ctx.db.prepare("UPDATE drive_syncs SET block_id = ? WHERE id = ?").bind(body.blockId, id).run();
+      }
+      if (typeof body.label === "string") await ctx.db.prepare("UPDATE drive_syncs SET label = ? WHERE id = ?").bind(body.label.trim().slice(0, 60), id).run();
+      await audit(ctx.db, s.sub, "drive_sync.rules", "drive_sync", id!, "").run();
+      return { ok: true };
+    },
+  ],
+  [
+    "POST",
+    /^\/admin\/drive-syncs\/([\w-]+)\/delete-with-materials$/,
+    async (ctx, [id]) => {
+      // 刪除清單與關聯教材：重新讀資料夾，這張卡裡連結指向資料夾內檔案的教材全部刪除，再刪同步設定。讀不到就整個不動。
+      const s = requireSuperAdmin(ctx);
+      const sync = await ctx.db.prepare("SELECT course_id, folder_id FROM drive_syncs WHERE id = ?").bind(id).first<{ course_id: string; folder_id: string }>();
+      if (!sync) return fail(404, "not_found", "找不到這份同步設定");
+      if (!ctx.env.GOOGLE_DRIVE_API_KEY) return fail(503, "drive_key_missing", "尚未設定 Google Drive 金鑰，無法判斷哪些教材屬於這個資料夾；請改用「只刪除清單」");
+      const { readDriveFolder } = await import("./drive-sync.ts");
+      const read = await readDriveFolder(ctx.env.GOOGLE_DRIVE_API_KEY, sync.folder_id);
+      if ("error" in read) return fail(502, "folder_unreadable", `${read.error}；為了不誤刪，什麼都沒有刪除`);
+      let deleted = 0;
+      for (const f of read.files) {
+        const row = await ctx.db.prepare("SELECT lesson_id FROM lesson_attachments WHERE course_id = ? AND kind = 'link' AND link_url LIKE ?").bind(sync.course_id, `https://drive.google.com/file/d/${f.id}/%`).first<{ lesson_id: string }>();
+        if (!row) continue;
+        await ctx.db.prepare("DELETE FROM lessons WHERE id = ? AND kind = 'material'").bind(row.lesson_id).run();
+        deleted++;
+      }
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM drive_syncs WHERE id = ?").bind(id), audit(ctx.db, s.sub, "drive_sync.delete_with_materials", "drive_sync", id!, String(deleted))]);
+      await renumber(ctx.db, sync.course_id);
+      return { ok: true, deleted };
+    },
+  ],
+  [
+    "DELETE",
+    /^\/admin\/drive-syncs\/([\w-]+)$/,
+    async (ctx, [id]) => {
+      requireSuperAdmin(ctx);
+      await ctx.db.prepare("DELETE FROM drive_syncs WHERE id = ?").bind(id).run();
+      return { ok: true };
+    },
+  ],
+  [
+    "GET",
+    /^\/admin\/sync-settings$/,
+    async (ctx) => {
+      requireSuperAdmin(ctx);
+      const { getAutoSync } = await import("./drive-sync.ts");
+      return getAutoSync(ctx.db);
+    },
+  ],
+  [
+    "PUT",
+    /^\/admin\/sync-settings$/,
+    async (ctx) => {
+      // 自動同步開關（杜杜龍 2026-11-26）：YouTube 清單與雲端資料夾共用，開＝每週自動同步一次。
+      const s = requireSuperAdmin(ctx);
+      const body = await readJson<{ weekly?: unknown }>(ctx.req);
+      const { setAutoSync } = await import("./drive-sync.ts");
+      await setAutoSync(ctx.db, body.weekly !== false);
+      await audit(ctx.db, s.sub, "sync_settings.update", "sync_settings", "auto", body.weekly === false ? "off" : "weekly").run();
+      return { weekly: body.weekly !== false };
+    },
+  ],
+  [
+    "GET",
     /^\/admin\/stats\/cloudflare$/,
     async (ctx) => {
       const s = requireMember(ctx);

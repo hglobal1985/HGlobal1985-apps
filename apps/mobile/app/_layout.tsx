@@ -96,6 +96,7 @@ function AppStack() {
             <Stack.Screen name="admin/synonyms" options={{ title: "搜尋關聯詞" }} />
             <Stack.Screen name="admin/search-settings" options={{ title: "搜尋與 AI 設定" }} />
             <Stack.Screen name="admin/youtube-syncs" options={{ title: "同步 YouTube 清單" }} />
+            <Stack.Screen name="admin/drive-syncs" options={{ title: "同步雲端資料夾" }} />
             <Stack.Screen name="admin/thumbnails" options={{ title: "Cloudflare即時縮圖" }} />
             <Stack.Screen name="admin/storage" options={{ title: "儲存空間管理" }} />
             <Stack.Screen name="comments/[courseId]" options={{ title: "留言板" }} />

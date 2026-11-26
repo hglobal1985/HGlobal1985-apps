@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { api, type CourseSummary } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
+import { SyncAutoCard } from "@/features/sync-auto";
 import { AppPlayerCheck, SyncNamingFields, TITLE_ONLY } from "@/features/course-edit/youtube-import";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
@@ -78,6 +79,7 @@ export default function YoutubeSyncsScreen() {
         貼上 YouTube 播放清單的網址，之後清單有新影片，到這裡按「同步」就會自動加進教材卡（已經加過的影片不會重複）。
       </AppText>
       {!list.data.keyReady ? <NoticeBox tone="warning" text="尚未設定 YouTube 金鑰，目前無法同步。" /> : null}
+      <SyncAutoCard />
       <Button label="新增同步清單" icon="add-circle-outline" onPress={() => setAdding(true)} fullWidth />
       {list.data.syncs.length ? (
         list.data.syncs.map((s) => (

@@ -6,6 +6,7 @@ import { runAiBatch } from "./ai-batch.ts";
 import { runRecompress } from "./recompress.ts";
 import { backfillYoutube } from "./youtube.ts";
 import { processFirstSyncs, processImportJobs } from "./imports.ts";
+import { processWeeklySyncs } from "./drive-sync.ts";
 import { indexSearchVectors } from "./semantic-search.ts";
 import { handleApi } from "./api.ts";
 import type { Env } from "./d1.ts";
@@ -46,6 +47,7 @@ export function createWorker(staticFiles: StaticFiles) {
         await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));
         await processImportJobs(env).catch((e) => console.error("import jobs", e instanceof Error ? e.message : "error"));
         await processFirstSyncs(env).catch((e) => console.error("first syncs", e instanceof Error ? e.message : "error"));
+        await processWeeklySyncs(env).catch((e) => console.error("weekly syncs", e instanceof Error ? e.message : "error")); // 每週自動同步 YouTube 清單與雲端資料夾（杜杜龍 2026-11-26）
         await ensureBrandCards(env).catch((e) => console.error("brand cards", e instanceof Error ? e.message : "error"));
         await ensureTreasureLinks(env).catch((e) => console.error("treasure links", e instanceof Error ? e.message : "error")); // 成交百寶箱 ↔ 品牌館（杜杜龍 2026-11-24）
         await migrateFilePhotos(env).catch((e) => console.error("block photos", e instanceof Error ? e.message : "error")); // 區塊裡以教材檔案上傳的圖片 → 相簿（杜杜龍 2026-11-24）
