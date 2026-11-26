@@ -2622,26 +2622,31 @@ async function albumsIndex(ctx: Ctx): Promise<AlbumsResponse> {
   return { total: out.reduce((n, g) => n + g.folders.reduce((m, f) => m + f.count, 0), 0), groups: out };
 }
 /** 全站 AI 辨識（文字 OCR、場景）還沒處理的張數與預估完成時間（圖片資訊「藍字」區給所有人看；業主 2026-11-26）。速度取最近 3 小時實際完成的張數。 */
-async function aiQueueInfo(db: D1Database): Promise<{ pending: number; perHour: number; etaMin: number | null; quotaOut: boolean }> {
+async function aiQueueInfo(db: D1Database, edm: boolean): Promise<{ pending: number; perHour: number; etaMin: number | null; quotaOut: boolean; sceneOn: boolean; ocrOn: boolean }> {
+  // 只算「這張圖所屬那一類」的待辨識張數：中心 EDM 只有文字辨識；相簿（區塊）照片有文字＋場景（業主 2026-11-26）。
   const since = new Date(Date.now() - 3 * 3600_000).toISOString();
-  const [q, st, used] = await Promise.all([
+  const [q, st, used, ss] = await Promise.all([
     db
       .prepare(
         `SELECT
           SUM(CASE WHEN kind = 'image' AND ocr_status = '' AND ((owner_kind = 'center' AND scope = 'edm') OR owner_kind = 'course') THEN 1 ELSE 0 END) AS po,
           SUM(CASE WHEN kind = 'image' AND owner_kind = 'course' AND scene_status = '' THEN 1 ELSE 0 END) AS ps,
+          SUM(CASE WHEN kind = 'image' AND owner_kind = 'center' AND scope = 'edm' AND ocr_status = '' THEN 1 ELSE 0 END) AS pe,
           SUM(CASE WHEN ocr_status = 'done' AND ocr_at >= ?1 THEN 1 ELSE 0 END) AS dof,
           SUM(CASE WHEN scene_status = 'done' AND scene_at >= ?1 THEN 1 ELSE 0 END) AS dsc
         FROM cover_media`,
       )
       .bind(since)
-      .first<{ po: number | null; ps: number | null; dof: number | null; dsc: number | null }>(),
+      .first<{ po: number | null; ps: number | null; pe: number | null; dof: number | null; dsc: number | null }>(),
     loadAiSettings(db),
     aiTodayUsed(db),
+    (await import("./search-settings.ts")).loadSearchSettings(db),
   ]);
-  const pending = (q?.po ?? 0) + (q?.ps ?? 0);
-  const perHour = Math.round((((q?.dof ?? 0) + (q?.dsc ?? 0)) / 3) * 10) / 10;
-  return { pending, perHour, etaMin: pending && perHour > 0 ? Math.ceil((pending / perHour) * 60) : null, quotaOut: !!st.capEnabled && used >= st.dailyCap };
+  const sceneOn = ss.aiOnScene !== false;
+  const ocrOn = edm ? ss.aiOnEdm !== false : ss.photoOcrEnabled !== false;
+  const pending = edm ? (q?.pe ?? 0) : (q?.po ?? 0) - (q?.pe ?? 0) + (sceneOn ? (q?.ps ?? 0) : 0);
+  const perHour = Math.round((((q?.dof ?? 0) + (edm ? 0 : sceneOn ? (q?.dsc ?? 0) : 0)) / 3) * 10) / 10;
+  return { pending, perHour, etaMin: pending && perHour > 0 ? Math.ceil((pending / perHour) * 60) : null, quotaOut: !!st.capEnabled && used >= st.dailyCap, sceneOn, ocrOn };
 }
 
 function coverItem(r: { id: string; scope: CoverScope; folder_id?: string | null; created_at?: string | null; uploader_name?: string | null; uploader_avatar?: string | null; scene_text?: string | null; ocr_text?: string | null; event_date?: string | null; course_id?: string | null; course_title?: string | null; kind: "image" | "video"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number }): CoverMediaItem {
@@ -2931,7 +2936,7 @@ async function coverMediaInfo(ctx: Ctx, id: string) {
     ocrStatus: r.ocr_status,
     sceneStatus: String(r.scene_status ?? ""),
     sceneText: String(r.scene_text ?? ""),
-    queue: await aiQueueInfo(ctx.db),
+    queue: await aiQueueInfo(ctx.db, r.owner_kind === "center" && r.scope === "edm"),
     ocrModel: r.ocr_model,
     ocrAt: r.ocr_at,
     eventDate: r.event_date,
