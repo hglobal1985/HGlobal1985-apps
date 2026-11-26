@@ -86,3 +86,4 @@
 
 - **上傳者標記永遠是最新的暱稱與頭像、舊照片沒有就不顯示（業主 2026-11-25）**：migration 0135 `member_profiles(sub, name, avatar)`：會員每次登入使用，`api.ts` 的 `touchProfile` 把會員中心的公開暱稱、頭像寫進來（只有「變動」才寫；記憶體 `profMemo` 擋重複），並用既有照片上傳當下記下的 `uploader_name`／`uploader_avatar` 墊底。**所有上傳者標記一律以 `member_profiles` 為準、沒有才用上傳當下的快照**：相簿資料夾／封面輪播／區塊照片／搜尋結果的 `coverItem`（`LEFT JOIN member_profiles`）、圖片資訊的「上傳者」、相簿資訊的上傳者排名（依 `created_by` 彙整）。系統搬移的舊照片（`migration`、`course-edm`）沒有上傳者就**不顯示**。新增任何顯示上傳者的地方都要走這個 JOIN，不可直接用 `uploader_name`。
 - **儲存空間管理的畫質下限放寬到 30%（業主 2026-11-25）**：中心封面、一般、EDM 海報三組「畫質」最低都可設到 30（原本 70／50／70 擋住無法調低）；後端 `ui-config.ts` 的範圍同步改為 30～100，否則存檔會被拉回 70。
+- **EDM／相簿文字辨識預設改 Llama 4 Scout＋全部 EDM 重新辨識（業主 2026-11-26，因 Llama 3.2 Vision 繁體中文錯字多，「安麗」讀成「安適」）**：`ai-models.ts` 的 `edm_vision`、`photo_ocr` 預設改 `@cf/meta/llama-4-scout-17b-16e-instruct`；migration 0141 把已存的選擇一併改掉，並把所有中心 EDM 圖 `ocr_status` 重設為空字串重新排隊（舊文字保留到新結果覆蓋；批次排程每 10 分鐘處理，順序仍是 EDM＞相簿 OCR＞場景）。場景辨識模型未改。
