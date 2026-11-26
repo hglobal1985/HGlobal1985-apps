@@ -128,7 +128,7 @@ function RuleSheet({ sync, help, platinum, onClose, onDone }: { sync: Sync; help
   return (
     <EditSheet title="修改同步規則" onClose={onClose} onSave={submit} dirty={fmt.trim() !== sync.titleFormat || block !== sync.blockId} busy={busy} error={error}>
       <Field label="教材命名規則" value={fmt} onChange={setFmt} placeholder={platinum} />
-      <Chips label="快速套用" options={[{ key: platinum, label: "白金溝通會：簡報x年x月 白金溝通會" }, { key: "{標題}", label: "直接用檔名" }]} value={fmt} onChange={setFmt} />
+      <Chips label="快速套用" options={[{ key: platinum, label: "白金溝通會：簡報x年x月 白金溝通會（括號文字）" }, { key: "{標題}", label: "直接用檔名" }]} value={fmt} onChange={setFmt} />
       <AppText variant="caption" tone="muted">{`${help}。只影響之後新同步的檔案。`}</AppText>
       <BlockPick courseId={sync.courseId} value={block} onChange={setBlock} />
     </EditSheet>
@@ -165,7 +165,7 @@ function AddSheet({ help, platinum, onClose, onDone }: { help: string; platinum:
       <Chips label="放進哪一張教材卡（只列純教材卡）" options={noChapter.map((x) => ({ key: x.id, label: x.title }))} value={courseId} onChange={(v) => { setCourseId(v); setBlock(""); }} />
       <BlockPick courseId={courseId} value={block} onChange={setBlock} />
       <Field label="教材命名規則" value={fmt} onChange={setFmt} placeholder="{標題}" />
-      <Chips label="快速套用" options={[{ key: platinum, label: "白金溝通會：簡報x年x月 白金溝通會" }, { key: "{標題}", label: "直接用檔名" }]} value={fmt} onChange={setFmt} />
+      <Chips label="快速套用" options={[{ key: platinum, label: "白金溝通會：簡報x年x月 白金溝通會（括號文字）" }, { key: "{標題}", label: "直接用檔名" }]} value={fmt} onChange={setFmt} />
       <AppText variant="caption" tone="muted">{help}</AppText>
     </EditSheet>
   );
