@@ -1,13 +1,14 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api, STATS_ROLE_OPTIONS, type MuxStats, type StatBlock } from "@/api/client";
 import { dateTime } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, Fold, ErrorView, LoadingView, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, Fold, ErrorView, LoadingView, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
 
 function Block({ b }: { b: StatBlock }) {
   const { c } = useTheme();
@@ -146,20 +147,31 @@ export default function StatsScreen() {
   const allowed = !!member?.canViewStats;
   const [roles, setRoles] = useState<string[] | null>(null);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
+  const [saving, setSaving] = useState(false);
+  const rolesDirty = roles !== null && JSON.stringify(roles) !== JSON.stringify(config.statsRoles);
+  const saveRef = useRef<() => Promise<boolean>>(async () => true);
+  useUnsavedPrompt({ dirty: rolesDirty, save: () => saveRef.current(), discard: () => setRoles(null) });
   if (!allowed) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="沒有查看統計分析的權限" /></Screen>;
   const isSuper = !!member?.titles.includes("超級管理員");
   const cur = roles ?? config.statsRoles;
-  const saveRoles = async () => {
+  const saveRoles = async (): Promise<boolean> => {
+    setSaving(true);
     try {
       await api("PUT", "/admin/ui-config", { statsRoles: cur });
       reloadCfg();
+      setRoles(null);
       setMsg({ tone: "success", text: "已儲存可查看的職務" });
+      return true;
     } catch (e) {
       setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
+  saveRef.current = saveRoles;
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={isSuper ? <SettingsFooter dirty={rolesDirty} saving={saving} onSave={() => void saveRoles()} onDiscard={() => setRoles(null)} /> : undefined}>
       <Source title="① Mux 影片統計" from="資料來自 Mux（影片服務）" path="/admin/stats/mux" advancedTitle="進階統計（裝置、瀏覽器、國家、播放錯誤、直播）" />
       <Source title="② Cloudflare 網站流量" from="資料來自 Cloudflare（網站主機）" path="/admin/stats/cloudflare" advancedTitle="進階統計（來源網站、狀態碼、請求方式、快取、機房…）" />
       <Source title="③ App 資料庫統計" from="資料來自本 App 自己的資料庫（D1）" path="/admin/stats/app" />
@@ -179,7 +191,6 @@ export default function StatsScreen() {
                 </Pressable>
               );
             })}
-            <Button label="儲存" icon="save-outline" onPress={saveRoles} />
             {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
           </Card>
         </Section>

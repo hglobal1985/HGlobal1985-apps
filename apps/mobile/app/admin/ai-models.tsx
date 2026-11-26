@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
 
 type Kind = "speech" | "text" | "embedding" | "vision";
 type Model = { id: string; name: string; vendor: string; kind: Kind; cost: string; costLevel: "低" | "中" | "高"; strengths: string; bestFor: string; needsKey: boolean };
@@ -34,6 +35,15 @@ export default function AiModelsScreen() {
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const [testing, setTesting] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
+  // 整頁只有一個「儲存」（業主 2026-11-26）：選模型、額度上限、只用免費模型、Claude 預算都先改草稿，統一按儲存才寫入。
+  type SettingsDraft = Partial<Pick<Usage, "freeOnly" | "dailyCap" | "capEnabled" | "claudeMonthlyCapUsd">>;
+  const [sdraft, setSdraft] = useState<SettingsDraft>({});
+  const [saving, setSaving] = useState(false);
+  const selDirty = !!sel && !!data && JSON.stringify(sel) !== JSON.stringify(data.selection);
+  const setDirty = !!data && (Object.keys(sdraft) as (keyof SettingsDraft)[]).some((k) => sdraft[k] !== data.usage[k]);
+  const dirty = selDirty || setDirty;
+  const commitRef = useRef<() => Promise<boolean>>(async () => true);
+  useUnsavedPrompt({ dirty, save: () => commitRef.current(), discard: () => (setSel(null), setSdraft({})) });
   if (!isSuper)
     return (
       <Screen header={false}>
@@ -41,7 +51,8 @@ export default function AiModelsScreen() {
       </Screen>
     );
   const current = sel ?? data?.selection ?? {};
-  const u = usage ?? data?.usage;
+  const uBase = usage ?? data?.usage;
+  const u = uBase ? { ...uBase, ...sdraft } : undefined;
   const testKey = async (k: KeyInfo) => {
     setTesting(k.key);
     setMsg(null);
@@ -55,39 +66,37 @@ export default function AiModelsScreen() {
       setTesting(null);
     }
   };
-  const saveSettings = async (settings: Partial<Pick<Usage, "freeOnly" | "dailyCap" | "capEnabled" | "claudeMonthlyCapUsd">>, ok: string) => {
+  /** 額度、免費模型、Claude 預算的修改（只改草稿；okText 保留給舊呼叫，不再使用）。 */
+  const saveSettings = (settings: SettingsDraft, _okText?: string) => setSdraft((d) => ({ ...d, ...settings }));
+  const commit = async (): Promise<boolean> => {
+    setSaving(true);
     setMsg(null);
     try {
-      const r = await api<Data>("PUT", "/admin/ai-models", { settings });
+      const r = await api<Data>("PUT", "/admin/ai-models", { ...(setDirty ? { settings: sdraft } : {}), ...(selDirty && sel ? { selection: sel } : {}) });
       setUsage(r.usage);
-      setSel(r.selection);
-      setMsg({ tone: "success", text: ok });
+      setSel(null);
+      setSdraft({});
+      reload();
+      setMsg({ tone: "success", text: "已儲存。" });
+      return true;
     } catch (e) {
       setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
+    } finally {
+      setSaving(false);
     }
   };
+  commitRef.current = commit;
   const resumeText = u ? `明天早上 8:00（台灣時間）自動恢復` : "";
-  const choose = async (job: Job, id: string) => {
+  const choose = (job: Job, id: string) => {
     if (current[job.key] === id) return;
-    const before = current;
     setSel({ ...current, [job.key]: id });
-    setMsg(null);
-    try {
-      const r = await api<Data>("PUT", "/admin/ai-models", { selection: { [job.key]: id } });
-      setSel(r.selection);
-      setUsage(r.usage);
-      const m = r.models.find((x) => x.id === id);
-      setMsg({ tone: "success", text: `「${job.label}」已改用 ${m?.name ?? id}` });
-    } catch (e) {
-      setSel(before);
-      setMsg({ tone: "danger", text: (e as Error).message });
-    }
   };
 
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={<SettingsFooter dirty={dirty} saving={saving} onSave={() => void commit()} onDiscard={() => (setSel(null), setSdraft({}))} />}>
       <AppText variant="callout" tone="muted">
-        替每一項 AI 工作選擇要用的模型，點一下就會儲存。下方總表可以比較各模型的花費與特性。
+        替每一項 AI 工作選擇要用的模型，選好後按下方「儲存」才生效。下方總表可以比較各模型的花費與特性。
       </AppText>
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
       {error && !data ? <ErrorView message={error} onRetry={reload} /> : null}

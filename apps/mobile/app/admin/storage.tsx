@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, View } from "react-native";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api } from "@/api/client";
 import { useUiConfig } from "@/state/ui-config";
 import { confirmAsk } from "@/features/confirm";
-import { Button, NoticeBox } from "@/ui";
+import { Button, NoticeBox, SettingsFooter } from "@/ui";
 import { centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
@@ -118,71 +119,55 @@ function RecompressSection() {
 export default function StorageScreen() {
   const { c } = useTheme();
   const { config, reload: reloadConfig } = useUiConfig();
+  const limOf = () => ({ imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, albumFormat: config.app.albumFormat, albumQuality: config.app.albumQuality, albumScope: config.app.albumScope });
   const [lim, setLim] = useState({ imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, albumFormat: config.app.albumFormat, albumQuality: config.app.albumQuality, albumScope: config.app.albumScope });
   useEffect(() => setLim({ imageMaxSide: config.app.imageMaxSide, imageQuality: config.app.imageQuality, centerMaxSide: config.app.centerMaxSide, centerQuality: config.app.centerQuality, edmMaxSide: config.app.edmMaxSide, edmQuality: config.app.edmQuality, albumFormat: config.app.albumFormat, albumQuality: config.app.albumQuality, albumScope: config.app.albumScope }), [config.app.imageMaxSide, config.app.imageQuality, config.app.centerMaxSide, config.app.centerQuality, config.app.edmMaxSide, config.app.edmQuality, config.app.storeFormat]);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const dirty = lim.imageMaxSide !== config.app.imageMaxSide || lim.imageQuality !== config.app.imageQuality || lim.centerMaxSide !== config.app.centerMaxSide || lim.centerQuality !== config.app.centerQuality || lim.edmMaxSide !== config.app.edmMaxSide || lim.edmQuality !== config.app.edmQuality || lim.albumFormat !== config.app.albumFormat || lim.albumQuality !== config.app.albumQuality || lim.albumScope !== config.app.albumScope;
-  const saveLim = async () => {
-    setSaving(true);
-    setMsg(null);
-    try {
-      await api("PUT", "/admin/ui-config", { app: { ...config.app, ...lim } });
-      reloadConfig();
-      setMsg({ tone: "success", text: "已儲存，之後的上傳照新設定。" });
-    } catch (e) {
-      setMsg({ tone: "danger", text: (e as Error).message });
-    } finally {
-      setSaving(false);
-    }
-  };
   // 封面輪播與短影音（業主 2026-11-21）：輪播秒數與影片壓縮規範放在一起，一次儲存。
   const cvKeys = ["coverSec", "videoMaxHeight", "videoKbps", "videoFps", "videoMaxMb", "videoMaxSec"] as const;
   const cvOf = () => Object.fromEntries(cvKeys.map((k) => [k, config.app[k]])) as Record<(typeof cvKeys)[number], number>;
   const [cv, setCv] = useState(cvOf);
   useEffect(() => setCv(cvOf()), cvKeys.map((k) => config.app[k])); // eslint-disable-line react-hooks/exhaustive-deps
-  const [cvSaving, setCvSaving] = useState(false);
-  const [cvMsg, setCvMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const cvDirty = cvKeys.some((k) => cv[k] !== config.app[k]);
-  const saveCv = async () => {
-    setCvSaving(true);
-    setCvMsg(null);
-    try {
-      await api("PUT", "/admin/ui-config", { app: { ...config.app, ...cv } });
-      reloadConfig();
-      setCvMsg({ tone: "success", text: "已儲存，之後的輪播與影片上傳照新設定。" });
-    } catch (e) {
-      setCvMsg({ tone: "danger", text: (e as Error).message });
-    } finally {
-      setCvSaving(false);
-    }
-  };
   const { member } = useSession();
   const [fs, setFs] = useState<FileSettings | null>(null);
-  const [fsSaving, setFsSaving] = useState(false);
-  const [fsMsg, setFsMsg] = useState<{ tone: "success" | "danger"; text: string } | null>(null);
   const isSuper = !!member?.titles.includes("超級管理員");
   const { data, error, loading, reload } = useApi<Storage>(isSuper ? "/admin/storage" : null);
   useEffect(() => {
     if (data) setFs(data.fileSettings);
   }, [data]);
-  const saveFs = async () => {
-    if (!fs) return;
-    setFsSaving(true);
-    setFsMsg(null);
+  // 整頁只有一個「儲存」（業主 2026-11-26）：上傳／壓縮設定、封面輪播與短影音、教材檔案設定一起存。
+  const fsDirty = !!fs && !!data && JSON.stringify(fs) !== JSON.stringify(data.fileSettings);
+  const allDirty = dirty || cvDirty || fsDirty;
+  const saveAll = async (): Promise<boolean> => {
+    setSaving(true);
+    setMsg(null);
     try {
-      await api("PUT", "/admin/files/settings", fs);
-      setFsMsg({ tone: "success", text: "已儲存。" });
+      if (dirty || cvDirty) await api("PUT", "/admin/ui-config", { app: { ...config.app, ...lim, ...cv } });
+      if (fsDirty && fs) await api("PUT", "/admin/files/settings", fs);
+      reloadConfig();
       reload();
+      setMsg({ tone: "success", text: "已儲存。之後的上傳、輪播與影片照新設定。" });
+      return true;
     } catch (e) {
-      setFsMsg({ tone: "danger", text: (e as Error).message });
+      setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
     } finally {
-      setFsSaving(false);
+      setSaving(false);
     }
   };
+  const discardAll = () => {
+    setLim({ ...limOf() });
+    setCv(cvOf());
+    if (data) setFs(data.fileSettings);
+  };
+  useUnsavedPrompt({ dirty: allDirty, save: saveAll, discard: discardAll });
   if (!isSuper) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以查看" /></Screen>;
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={<SettingsFooter dirty={allDirty} saving={saving} onSave={() => void saveAll()} onDiscard={discardAll} />}>
+      {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
       <Section fold title="上傳設定與圖片壓縮">
         <Card>
           <NoticeBox tone="info" text="所有上傳到雲端的圖片（封面、EDM、教材圖片、雲端硬碟匯入、匯入工作…全站）都會先壓縮才存，不保留原圖；使用者下載到的就是壓縮後的版本；下載、分享到手機時不會再縮小解析度（尺寸維持站內儲存的樣子，AVIF／WebP 只換成 JPEG 格式，畫質 95）。LINE 等 App 收到照片後自己可能再壓縮，那不是行動大學控制的。長邊在上限內的圖片尺寸不變，但仍會照下面設定的畫質壓縮。" />
@@ -213,8 +198,6 @@ export default function StorageScreen() {
           </AppText>
           <Stepper label="長邊像素" hint="海報上有小字與 QR code，建議維持高一點（預設 2048）" value={lim.edmMaxSide} min={800} max={4096} step={128} unit="px" onChange={(v) => setLim((x) => ({ ...x, edmMaxSide: v }))} />
           <Stepper label="畫質" hint="數字越大畫質越好、檔案越大（預設 90）" value={lim.edmQuality} min={30} max={100} step={1} unit="%" onChange={(v) => setLim((x) => ({ ...x, edmQuality: v }))} />
-          {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
-          <Button label="儲存上傳設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={saveLim} fullWidth />
         </Card>
       </Section>
       <RecompressSection />
@@ -234,8 +217,6 @@ export default function StorageScreen() {
           <Stepper label="影片最長" hint="超過就不能上傳（最長 60 秒）" value={cv.videoMaxSec} min={5} max={60} step={5} unit="秒" onChange={(v) => setCv((x) => ({ ...x, videoMaxSec: v }))} />
           <Stepper label="壓縮後的大小上限" hint="壓縮後仍超過就不能上傳，請上傳者剪短或管理員調低畫質（預設 25MB）" value={cv.videoMaxMb} min={2} max={60} step={1} unit="MB" onChange={(v) => setCv((x) => ({ ...x, videoMaxMb: v }))} />
           <NoticeBox tone="info" text="影片預設靜音播放，右下角可以手動開聲音。壓縮時間約等於影片長度（1 分鐘的影片要 1 分鐘），壓縮中請不要離開頁面。需要電腦或手機的 Chrome 等較新的瀏覽器。" />
-          {cvMsg ? <NoticeBox tone={cvMsg.tone} text={cvMsg.text} /> : null}
-          <Button label="儲存封面輪播設定" icon="save-outline" loading={cvSaving} disabled={!cvDirty || cvSaving} onPress={saveCv} fullWidth />
         </Card>
       </Section>
       <Section fold title="教材檔案：從 Google 雲端硬碟匯入與下載">
@@ -246,8 +227,6 @@ export default function StorageScreen() {
               <Stepper label="下載連結有效時間" hint="學員按下載後，連結幾秒內有效（只能用一次，轉傳給別人無效）" value={fs.ticketSec} min={30} max={600} step={30} unit="秒" onChange={(v) => setFs({ ...fs, ticketSec: v })} />
               <Stepper label="每人每日下載次數" hint="24 小時內最多下載幾個檔案，防止被大量搜刮（0＝不限，管理員不受限）" value={fs.dailyDownloads} min={0} max={1000} step={10} unit="次" onChange={(v) => setFs({ ...fs, dailyDownloads: v })} />
               <Stepper label="每人每日下載流量" hint="24 小時內最多下載多少（0＝不限）" value={Math.round(fs.dailyDownloadMb / 1024)} min={0} max={1000} step={1} unit="GB" onChange={(v) => setFs({ ...fs, dailyDownloadMb: v * 1024 })} />
-              {fsMsg ? <NoticeBox tone={fsMsg.tone} text={fsMsg.text} /> : null}
-              <Button label="儲存教材檔案設定" icon="save-outline" loading={fsSaving} disabled={fsSaving || JSON.stringify(fs) === JSON.stringify(data?.fileSettings)} onPress={saveFs} fullWidth />
             </>
           ) : (
             <LoadingView />

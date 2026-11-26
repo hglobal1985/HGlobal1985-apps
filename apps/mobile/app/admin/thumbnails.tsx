@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Image, StyleSheet, TextInput, View } from "react-native";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api, resolveUrl, THUMB_WIDTH_CHOICES, type ThumbSettings } from "@/api/client";
 import { Stepper } from "@/ui/stepper";
 import { Check } from "@/ui/check";
@@ -7,7 +8,7 @@ import { useApi } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, ErrorView, LoadingView, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, Chips, ErrorView, LoadingView, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
 
 type Status = { binding: boolean; lastError: { at: string; key: string; w: number; message: string } | null; samples: string[]; totalCovers: number };
 type Probe = { w: number; kb: number | null; header: string };
@@ -50,19 +51,22 @@ export default function ThumbnailsScreen() {
   const [probing, setProbing] = useState(false);
   const dirty = JSON.stringify(t) !== JSON.stringify(saved);
 
-  const save = async () => {
+  const save = async (): Promise<boolean> => {
     setSaving(true);
     setMsg(null);
     try {
       await api("PUT", "/admin/ui-config", { app: { ...config.app, thumb: t } });
       reloadConfig();
       setMsg({ tone: "success", text: "已儲存。手機的卡片縮圖會依新設定縮小。" });
+      return true;
     } catch (e) {
       setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
     } finally {
       setSaving(false);
     }
   };
+  useUnsavedPrompt({ dirty, save, discard: () => setT(saved) });
   const toggleWidth = (w: number) => set("widths", t.widths.includes(w) ? t.widths.filter((x) => x !== w) : [...t.widths, w].sort((a, b) => a - b));
 
   const sample = status.data?.samples[0];
@@ -94,7 +98,7 @@ export default function ThumbnailsScreen() {
   const unique = (st.totalCovers || 0) * Math.max(1, saved.widths.length);
 
   return (
-    <Screen>
+    <Screen footer={<SettingsFooter dirty={dirty} saving={saving} onSave={() => void save()} onDiscard={() => setT(saved)} />}>
       <Section fold title="總開關">
         <Card>
           <Check label="啟用即時縮圖（手機小螢幕的卡片縮圖改用縮小版）" value={t.enabled} onChange={(v) => set("enabled", v)} />
@@ -179,7 +183,6 @@ export default function ThumbnailsScreen() {
       </Section>
 
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
-      <Button label="儲存設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={save} fullWidth />
 
       <Section fold title="試算（用已儲存的設定，對一張真實封面縮圖）">
         <Card>

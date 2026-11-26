@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_TYPES, ACH_ICON_POOL, ACH_TIMES, ACH_UNITS, ACH_VERBS, FEATURES, achDefaultIcon, achRecipeOf, achTypeOf, api, type AchTime, type AchievementCategory, type AchievementType, type AdminAchievement } from "@/api/client";
 import { confirmAsk } from "@/features/confirm";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { BadgeIcon } from "@/features/achievements/badge-icon";
 import { achPhrase, conditionText } from "@/features/achievements/text";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
@@ -10,7 +11,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type as typo } from "@/theme/tokens";
-import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen, Section, Fold } from "@/ui";
+import { AppText, Button, Card, Chips, EmptyState, ErrorView, Field, LoadingView, NoticeBox, Screen, Section, Fold, SettingsFooter } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 
 type Diff = 1 | 2 | 3;
@@ -52,6 +53,12 @@ export default function AdminAchievementsScreen() {
   const [over, setOver] = useState<Record<string, Diff>>({});
   const [form, setForm] = useState<Form | null>(null);
   const [busy, setBusy] = useState(false);
+  // 書櫃鑰匙門檻（業主 2026-11-26：設定值一律草稿＋唯一的「儲存」；徽章任務本身是逐筆資料，維持各自編輯）
+  const [needDraft, setNeedDraft] = useState<number | null>(null);
+  const savedNeed = config.app.libraryKeyBadges ?? 100;
+  const needDirty = needDraft !== null && needDraft !== savedNeed;
+  const needSaveRef = useRef<() => Promise<boolean>>(async () => true);
+  useUnsavedPrompt({ dirty: needDirty, save: () => needSaveRef.current(), discard: () => setNeedDraft(null) });
   const [error, setError] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const rows = (list.data ?? []).map((a) => (over[a.id] ? { ...a, difficulty: over[a.id]! } : a));
@@ -68,7 +75,7 @@ export default function AdminAchievementsScreen() {
   if (!list.data) return <Screen header={false}>{list.error ? <ErrorView message={list.error} onRetry={list.reload} /> : <LoadingView />}</Screen>;
 
   const active = rows.filter((a) => a.active).length;
-  const need = config.app.libraryKeyBadges ?? 100;
+  const need = needDraft ?? savedNeed;
   const run = async (fn: () => Promise<unknown>, done: string) => {
     setBusy(true);
     setError(null);
@@ -162,10 +169,16 @@ export default function AdminAchievementsScreen() {
       setBusy(false);
     }
   };
-  const saveNeed = (v: number) => run(() => api("PUT", "/admin/ui-config", { app: { ...config.app, libraryKeyBadges: v } }).then(() => reloadConfig()), "已更新書櫃鑰匙門檻");
+  const saveNeed = (v: number) => setNeedDraft(v);
+  const commitNeed = async (): Promise<boolean> => {
+    const ok = await run(() => api("PUT", "/admin/ui-config", { app: { ...config.app, libraryKeyBadges: need } }).then(() => reloadConfig()), "已更新書櫃鑰匙門檻");
+    if (ok) setNeedDraft(null);
+    return !!ok;
+  };
+  needSaveRef.current = commitNeed;
 
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={<SettingsFooter dirty={needDirty} saving={busy} onSave={() => void commitNeed()} onDiscard={() => setNeedDraft(null)} />}>
       <Card>
         <View style={styles.stats}>
           <Stat n={rows.length} label="全部任務" />

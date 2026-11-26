@@ -9,6 +9,7 @@ export { SheetAction } from "./sheet-action";
 export { LockMask } from "./lock-mask";
 export { Section } from "./section";
 export { Fold } from "./fold";
+export { SettingsFooter } from "./settings-footer";
 export { EmptyState } from "./empty-state";
 export { SandboxBanner } from "./sandbox-banner";
 export { ListRow } from "./list-row";

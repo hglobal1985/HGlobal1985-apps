@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Switch, View } from "react-native";
+import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api, RIBBON_INFO, RIBBON_KEYS, RIBBON_PALETTE, type CourseSummary, type RibbonKey, type UiConfig } from "@/api/client";
 import { RIBBON_COLORS } from "@/features/courses/ribbons";
 import { groupBySeries, orderGroups, sortCourses } from "@/features/courses/sort";
@@ -8,7 +9,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, Field, LoadingLadybug, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, Field, LoadingLadybug, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
 
 /** 緞帶小預覽：一條橫的色帶，顯示目前的文字與顏色。 */
 function Sample({ label, color }: { label: string; color: keyof typeof RIBBON_COLORS }) {
@@ -40,7 +41,6 @@ export default function ListRulesScreen() {
     const all = sortCourses(courses.data ?? [], member, cfg.sortGroups);
     return orderGroups(groupBySeries(all, all), cfg.seriesOrder ?? []).map((g) => ({ key: g.key, title: g.key.startsWith("s:") ? g.key.slice(2) : g.nearest.title, hint: g.key.startsWith("s:") ? `${g.sessions.length} 個梯次` : "單一課程" }));
   }, [courses.data, member, cfg.sortGroups, cfg.seriesOrder]);
-  if (!member?.titles.includes("超級管理員")) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
 
   /** 小卡順序：把目前畫面上的完整順序寫回設定（含尚未列入的新系列），再移動指定那一張。 */
   const reorder = (from: number, to: number) =>
@@ -52,19 +52,24 @@ export default function ListRulesScreen() {
       return { ...x, seriesOrder: keys };
     });
   const setRibbon = (k: RibbonKey, patch: Partial<UiConfig["ribbons"][RibbonKey]>) => setCfg((x) => ({ ...x, ribbons: { ...x.ribbons, [k]: { ...x.ribbons[k], ...patch } } }));
-  const save = async () => {
+  const dirty = JSON.stringify([cfg.seriesOrder, cfg.ribbons]) !== JSON.stringify([config.seriesOrder, config.ribbons]);
+  const save = async (): Promise<boolean> => {
     setBusy(true);
     setMsg(null);
     try {
       await api("PUT", "/admin/ui-config", { seriesOrder: cards.map((k) => k.key), ribbons: cfg.ribbons });
       reload();
       setMsg({ tone: "success", text: "已儲存，全部課程馬上套用。" });
+      return true;
     } catch (e) {
       setMsg({ tone: "danger", text: (e as Error).message });
+      return false;
     } finally {
       setBusy(false);
     }
   };
+  useUnsavedPrompt({ dirty, save, discard: () => setCfg(config) });
+  if (!member?.titles.includes("超級管理員")) return <Screen header={false}><EmptyState icon="lock-closed-outline" title="只有超級管理員可以設定" /></Screen>;
   const ribbonCard = (k: RibbonKey) => {
     const r = cfg.ribbons[k];
     return (
@@ -95,7 +100,7 @@ export default function ListRulesScreen() {
   };
 
   return (
-    <Screen header={false}>
+    <Screen header={false} footer={<SettingsFooter dirty={dirty} saving={busy} onSave={() => void save()} onDiscard={() => setCfg(config)} />}>
       <AppText variant="callout" tone="muted">
         調整「全部課程 › 系列」的小卡順序與卡片緞帶。緞帶顏色只能從寰宇生態系固定色表挑選。
       </AppText>
@@ -146,10 +151,6 @@ export default function ListRulesScreen() {
       <Section fold title="② 左上角緞帶（資格或狀態）">{RIBBON_KEYS.filter((k) => RIBBON_INFO[k].side === "left").map(ribbonCard)}</Section>
       <Section fold title="③ 右上角緞帶（日期）">{RIBBON_KEYS.filter((k) => RIBBON_INFO[k].side === "right").map(ribbonCard)}</Section>
 
-      <View style={styles.row}>
-        <Button label="儲存" icon="save-outline" loading={busy} disabled={busy} onPress={save} />
-        <Button variant="ghost" label="還原目前設定" disabled={busy} onPress={() => setCfg(config)} />
-      </View>
     </Screen>
   );
 }

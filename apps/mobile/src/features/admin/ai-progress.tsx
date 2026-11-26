@@ -3,14 +3,13 @@ import { useRef, useState } from "react";
 import { Pressable, Switch, Text, View } from "react-native";
 import { api } from "@/api/client";
 import { flashText } from "@/ui/flash-notice";
-import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
 import { AppText, Card, Fold } from "@/ui";
 
 type Pack = { total: number; done: number; failed: number; pending: number; groups: { label: string; total: number; done: number; failed: number }[] };
-type JobRow = { key: "edm" | "photoOcr" | "scene"; label: string; on: boolean; prio: number };
-type Progress = { jobs?: JobRow[]; ocr: Pack; scene: Pack; photoOcr?: Pack; ai: { capEnabled: boolean; dailyCap: number; used: number; remaining: number } };
+export type JobRow = { key: "edm" | "photoOcr" | "scene"; label: string; on: boolean; prio: number };
+export type Progress = { jobs?: JobRow[]; ocr: Pack; scene: Pack; photoOcr?: Pack; ai: { capEnabled: boolean; dailyCap: number; used: number; remaining: number } };
 
 function Bar({ done, total }: { done: number; total: number }) {
   const { c } = useTheme();
@@ -61,11 +60,17 @@ function PackCard({ title, rule, pack }: { title: string; rule: string; pack: Pa
   );
 }
 
-const PRIO_KEY = { edm: "aiPrioEdm", photoOcr: "aiPrioPhotoOcr", scene: "aiPrioScene" } as const;
-const ON_KEY = { edm: "aiOnEdm", photoOcr: "photoOcrEnabled", scene: "aiOnScene" } as const;
+export const PRIO_KEY = { edm: "aiPrioEdm", photoOcr: "aiPrioPhotoOcr", scene: "aiPrioScene" } as const;
+export const ON_KEY = { edm: "aiOnEdm", photoOcr: "photoOcrEnabled", scene: "aiOnScene" } as const;
+
+/** 辨識來源設定（優先順序＋開關）轉成 search-settings 要存的值（業主 2026-11-26：隨頁面唯一的「儲存」一起存）。 */
+export const jobsValues = (jobs: JobRow[]): Record<string, number | boolean> => ({
+  ...Object.fromEntries(jobs.map((x, n) => [PRIO_KEY[x.key], n + 1])),
+  ...Object.fromEntries(jobs.map((x) => [ON_KEY[x.key], x.on])),
+});
 
 /** 辨識來源的優先順序與開關（業主 2026-11-26）：排在上面的先辨識；關掉的來源排程不處理。▲▼ 調整順序、開關即時儲存。 */
-function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
+function JobOrder({ jobs, setJobs, dirty, reload }: { jobs: JobRow[]; setJobs: (j: JobRow[]) => void; dirty: boolean; reload: () => void }) {
   const { c } = useTheme();
   // 立即開始辨識（業主 2026-11-26）：連續呼叫伺服器各跑一輪（約 70 秒），直到這一輪一張都沒處理（做完了或額度用完）；可隨時停止。
   const [running, setRunning] = useState(false);
@@ -73,6 +78,7 @@ function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
   const stop = useRef(false);
   const start = async () => {
     if (running) return;
+    if (dirty) return void flashText("優先順序或開關還沒儲存，請先按下方「儲存」再開始辨識");
     stop.current = false;
     setRunning(true);
     setTotal(0);
@@ -93,20 +99,12 @@ function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
       setRunning(false);
     }
   };
-  const save = async (values: Record<string, number | boolean>) => {
-    try {
-      await api("PUT", "/admin/search-settings", { values });
-      reload();
-    } catch (e) {
-      flashText((e as Error).message);
-    }
-  };
   const move = (i: number, d: number) => {
     const next = [...jobs];
     const j = i + d;
     if (j < 0 || j >= next.length) return;
     [next[i], next[j]] = [next[j]!, next[i]!];
-    void save(Object.fromEntries(next.map((x, n) => [PRIO_KEY[x.key], n + 1])));
+    setJobs(next);
   };
   return (
     <Fold title="辨識優先順序與開關">
@@ -129,7 +127,7 @@ function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
           <Pressable accessibilityRole="button" accessibilityLabel={`${j.label} 往後`} disabled={i === jobs.length - 1} onPress={() => move(i, 1)} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: c.surfaceMuted, alignItems: "center", justifyContent: "center", opacity: i === jobs.length - 1 ? 0.35 : 1 }}>
             <Ionicons name="arrow-down" size={20} color={c.text} />
           </Pressable>
-          <Switch accessibilityLabel={`${j.label} 開關`} value={j.on} onValueChange={(v) => void save({ [ON_KEY[j.key]]: v })} />
+          <Switch accessibilityLabel={`${j.label} 開關`} value={j.on} onValueChange={(v) => setJobs(jobs.map((x) => (x.key === j.key ? { ...x, on: v } : x)))} />
         </View>
       ))}
     </Fold>
@@ -140,8 +138,7 @@ function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
  * AI 辨識進度與額度（設定 › AI 文字辨識，業主 2026-11-24）：中心 EDM 文字辨識、相簿場景辨識各自的完成張數與進度（依中心／依區塊），
  * 以及今天的 AI 總額度、已用、剩餘（兩種辨識和其他 AI 工作共用每日免費額度，用完自動停、隔天續辨）。
  */
-export function AiProgressPanel() {
-  const { data, reload } = useApi<Progress>("/admin/ai/progress");
+export function AiProgressPanel({ data, reload, jobs, setJobs, dirty }: { data: Progress | undefined; reload: () => void; jobs: JobRow[] | null; setJobs: (j: JobRow[]) => void; dirty: boolean }) {
   if (!data) return null;
   const a = data.ai;
   return (
@@ -151,7 +148,7 @@ export function AiProgressPanel() {
         <AppText variant="callout">{a.capEnabled ? `已用 ${a.used} 點／上限 ${a.dailyCap} 點・剩餘 ${a.remaining} 點` : `已用 ${a.used} 點（額度限制已關閉）`}</AppText>
         <AppText variant="caption" tone="muted">優先順序可在下方「辨識優先順序與開關」自訂。封面（課程、系列、中心照片）不辨識。每天台灣時間早上 8:00 重置。</AppText>
       </Fold>
-      {data.jobs ? <JobOrder jobs={data.jobs} reload={reload} /> : null}
+      {jobs ? <JobOrder jobs={jobs} setJobs={setJobs} dirty={dirty} reload={reload} /> : null}
       <PackCard title="中心 EDM 文字辨識" rule="只辨識中心 EDM；套用「欄位格式範本」，可被文字搜尋。" pack={data.ocr} />
       <PackCard title="相簿場景辨識" rule="只辨識其他相簿（例如成交百寶箱）；認出行為、場景、物品，搜尋時分類標籤＝「場景」。" pack={data.scene} />
       <PackCard title="相簿照片文字辨識（OCR）" rule="只辨識相簿（區塊）照片；讀出照片裡的文字（招牌、白板、包裝…），相簿搜尋與場景搜尋都能用文字找到。可在「搜尋與 AI 設定」開關。" pack={data.photoOcr ?? { total: 0, done: 0, failed: 0, pending: 0, groups: [] }} />
