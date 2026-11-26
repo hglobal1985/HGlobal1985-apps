@@ -10,6 +10,7 @@ import { LightboxGrid } from "./lightbox-grid";
 import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
 import { SubfolderHome, SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
 import { AlbumSearchBar, matchAlbumItem } from "./album-search";
+import { trackUsage } from "@/lib/usage";
 import { saveAlbumPos } from "@/lib/album-memory";
 import { isSuperAdmin } from "@/lib/roles";
 import { useThumb } from "@/lib/thumb";
@@ -67,6 +68,16 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)); // 沒有＝相簿首頁（類別資料夾）
   const key = q.trim().toLowerCase();
 
+  // 使用統計（相簿操作習慣）：打開相簿一次；搜尋停手 1 秒記一次（只記搜尋範圍，不記搜尋內容）。
+  useEffect(() => {
+    trackUsage("album_open", initial ? "從單張回來" : restore ? "回到上次位置" : "從頭進入");
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (key.length < 2) return;
+    const t = setTimeout(() => trackUsage("album_search", scope === "all" ? "搜尋全部相簿" : "搜尋此頁"), 1000);
+    return () => clearTimeout(t);
+  }, [scope, key]);
+
   // 搜尋「全部」：停手 0.4 秒後才問伺服器。
   useEffect(() => {
     if (scope !== "all" || key.length < 2) return void setFound(null);
@@ -91,6 +102,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       const items = r.items.filter((x) => x.kind === "image");
       if (!items.length) return void flashText("這個相簿還沒有照片");
       setView({ folder: f, items });
+      trackUsage("album_folder", groups.find((g) => g.id === f.groupId)?.label ?? f.groupId);
       setFocusId(undefined);
       setQ("");
     } catch (e) {
@@ -205,6 +217,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       <Pressable key={k} accessibilityRole="button" accessibilityLabel={`${label}${on ? (sortBy!.dir === "desc" ? "，目前新到舊" : "，目前舊到新") : ""}`} onPress={() => {
         const dir = on ? (sortBy!.dir === "desc" ? "asc" : "desc") : "desc";
         setSortBy({ key: k, dir });
+        trackUsage("album_sort", k === "date" ? "活動日期" : "上傳時間");
         // 點了跳出該功能的文字提示（與課程頁切換檢視模式同款的全螢幕提醒視窗 showFlash）
         showFlash({ icon: <Ionicons name={icon as never} size={FLASH_ICON - 3} color="#2E7D32" />, title: label, body: dir === "desc" ? "新到舊" : "舊到新" });
       }} style={[styles.tool, on && { backgroundColor: "#2e7d32" }]}>
@@ -383,7 +396,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       ) : null}
       </View>
       {panel === "perms" ? <AlbumPermissionsPanel onClose={() => setPanel(null)} onChanged={() => (reload(), void reloadView())} /> : null}
-      {isBlock && view ? <SubfolderSheet dark sheet={fsheet} setSheet={setFsheet} blockKey={view.folder.key} subs={sf.subs} selIds={moveIds} onChanged={() => (sf.reload(), void reloadView())} onMoved={() => setMoveIds([])} /> : null}
+      {isBlock && view ? <SubfolderSheet dark sheet={fsheet} setSheet={setFsheet} blockKey={view.folder.key} subs={sf.subs} selIds={moveIds} onChanged={() => (sf.reload(), void reloadView())} onMoved={() => (trackUsage("album_move", "相簿瀏覽器"), setMoveIds([]))} /> : null}
       {panel === "info" && view ? <AlbumInfoPanel folderId={view.folder.id} title={folderName(view.folder)} onClose={() => setPanel(null)} onChanged={() => (reload(), void reloadView())} /> : null}
     </View>
   );

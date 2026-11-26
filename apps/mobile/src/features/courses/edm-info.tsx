@@ -150,6 +150,13 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
                 </>
               ) : null}
             </>, "#9fd8ff") : null}
+            {info.kind === "image" && !info.basic ? sec("tags", "場景與關鍵字標籤", info.sceneText ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {info.sceneText.split(/[，,、]/).map((t) => t.trim()).filter(Boolean).map((t) => (
+                  <Text key={t} selectable style={styles.tag}>{t}</Text>
+                ))}
+              </View>
+            ) : <Text style={styles.v}>{info.sceneStatus === "done" ? "沒有辨識出標籤。" : `${aiState(info.sceneStatus, "")}，辨識完會自動顯示在這裡。`}</Text>, "#9fd8ff") : null}
             {info.basic ? null : sec("ocr", "① 辨識後的圖片文字", <>
               {info.kind === "video" ? <Text style={styles.v}>影片沒有文字辨識。</Text> : (
                 <>
@@ -239,6 +246,7 @@ const styles = StyleSheet.create({
   fmt: { gap: 4, paddingHorizontal: 16, paddingBottom: 8 },
   fmtHead: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 40 },
   fmtRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  tag: { color: "#fff", fontSize: 15, fontWeight: "700", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: "rgba(159,216,255,0.22)", overflow: "hidden" },
   fmtSub: { color: "#9fd8ff", fontSize: 13, lineHeight: 18 },
   fmtText: { flex: 1, color: "#9fd8ff", fontSize: 15, fontWeight: "800", lineHeight: 21 },
   h: { color: "#ffd54f", fontSize: 16, fontWeight: "800" },
