@@ -91,17 +91,16 @@ const text = (v: unknown) => (Array.isArray(v) ? v.join(", ") : typeof v === "bo
 export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string; /** 沒有相簿照片編號時，用圖片網址裡的儲存檔名查（課程封面、品牌 logo、課表…）。 */ imageKey?: string; top?: number; onClose: () => void }) {
   const r = useApi<MediaInfo>(id ? `/cover-media/${id}/info` : `/image-info?k=${encodeURIComponent(imageKey ?? "")}`);
   const info = r.data;
-  const [statusOpen, setStatusOpen] = useState(false); // 藍字區（儲存格式與辨識狀態）預設收起
   const [showRaw, setShowRaw] = useState(false);
   // 每個區塊預設收起，點標題才展開（業主 2026-11-25）。
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const sec = (id: string, title: string, body: React.ReactNode) => {
+  const sec = (id: string, title: string, body: React.ReactNode, color?: string) => {
     const on = open.has(id);
     return (
       <View style={styles.sec}>
         <Pressable accessibilityRole="button" accessibilityState={{ expanded: on }} accessibilityLabel={`${title}，${on ? "點一下收起" : "點一下展開"}`} onPress={() => setOpen((s0) => { const n = new Set(s0); if (n.has(id)) n.delete(id); else n.add(id); return n; })} style={styles.secHead}>
-          <Text style={[styles.h, { flex: 1 }]}>{title}</Text>
-          <Ionicons name={on ? "chevron-up" : "chevron-down"} size={20} color="#ffd54f" />
+          <Text style={[styles.h, color ? { color } : null, { flex: 1 }]}>{title}</Text>
+          <Ionicons name={on ? "chevron-up" : "chevron-down"} size={20} color={color ?? "#ffd54f"} />
         </Pressable>
         {on ? body : null}
       </View>
@@ -137,40 +136,20 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
           <Ionicons name="close" size={24} color="#fff" />
         </Pressable>
       </View>
-      {info?.stored ? (
-        <View style={styles.fmt}>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: statusOpen }} accessibilityLabel={`儲存格式與辨識狀態，${statusOpen ? "點一下收起" : "點一下展開"}`} onPress={() => setStatusOpen((v) => !v)} style={styles.fmtHead}>
-            <Ionicons name="server-outline" size={18} color="#9fd8ff" />
-            <Text style={[styles.fmtText, { flex: 1 }]}>儲存格式與辨識狀態</Text>
-            <Ionicons name={statusOpen ? "chevron-up" : "chevron-down"} size={20} color="#9fd8ff" />
-          </Pressable>
-          {statusOpen ? (
-            <View style={{ gap: 4, paddingTop: 6 }}>
-          <View style={styles.fmtRow}>
-            <Ionicons name="server-outline" size={18} color="#9fd8ff" />
-            <Text style={styles.fmtText}>{`R2 儲存格式：${storedFormat(info.stored)}　${size(info.stored.bytes)}`}</Text>
-          </View>
-          {info.kind === "image" && !info.basic ? (
-            <>
-              <View style={styles.fmtRow}>
-                <Ionicons name="text-outline" size={18} color="#9fd8ff" />
-                <Text style={styles.fmtText}>{`文字辨識（OCR）：${aiState(info.ocrStatus, info.ocrText ? "已辨識，有文字" : "已辨識，沒有文字")}`}</Text>
-              </View>
-              <View style={styles.fmtRow}>
-                <Ionicons name="eye-outline" size={18} color="#9fd8ff" />
-                <Text style={styles.fmtText}>{`場景辨識：${aiState(info.sceneStatus, info.sceneText ? info.sceneText : "已辨識")}`}</Text>
-              </View>
-              {info.ocrStatus === "done" && info.sceneStatus === "done" ? null : <Text style={styles.fmtSub}>{queueLine(info.queue)}</Text>}
-            </>
-          ) : null}
-            </View>
-          ) : null}
-        </View>
-      ) : null}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: space.md, gap: space.md }} showsVerticalScrollIndicator>
         {!info ? <Text style={styles.v}>{r.error ? `讀取失敗：${r.error}` : "讀取中…"}</Text> : null}
         {info ? (
           <>
+            {info.stored ? sec("status", "儲存格式與辨識狀態", <>
+              {row("R2 儲存格式", `${storedFormat(info.stored)}　${size(info.stored.bytes)}`)}
+              {info.kind === "image" && !info.basic ? (
+                <>
+                  {row("文字辨識", aiState(info.ocrStatus, info.ocrText ? "已辨識，有文字" : "已辨識，沒有文字"))}
+                  {row("場景辨識", aiState(info.sceneStatus, info.sceneText ? info.sceneText : "已辨識"))}
+                  {info.ocrStatus === "done" && info.sceneStatus === "done" ? null : <Text style={styles.fmtSub}>{queueLine(info.queue)}</Text>}
+                </>
+              ) : null}
+            </>, "#9fd8ff") : null}
             {info.basic ? null : sec("ocr", "① 辨識後的圖片文字", <>
               {info.kind === "video" ? <Text style={styles.v}>影片沒有文字辨識。</Text> : (
                 <>
@@ -251,7 +230,7 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
 }
 
 const styles = StyleSheet.create({
-  panel: { position: "absolute", left: 12, right: 12, top: 140, bottom: 16, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.82)", overflow: "hidden" },
+  panel: { position: "absolute", left: 12, right: 12, top: 140, bottom: 16, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.9)", overflow: "hidden" },
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingLeft: 16, paddingRight: 6, paddingTop: 6, minHeight: 52 },
   title: { color: "#fff", fontSize: 18, fontWeight: "800" },
   x: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(255,255,255,0.15)" },
