@@ -2,7 +2,7 @@ import { Button } from "@/ui/button";
 import { useModeProfile } from "@/lib/app-mode";
 import { useBorderW } from "@/lib/elder-mode";
 import { trackFeature } from "@/lib/feature-track";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { type HostInstance, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { api } from "@/api/client";
@@ -79,10 +79,14 @@ function Row({ bad, z, fixed, anchor, children }: { bad?: boolean; z?: number; /
   return <View nativeID={anchor ? `pf-${anchor}` : undefined} style={[{ gap: 2, zIndex: z ?? 1 }, fixed && { ...box, borderColor: "transparent" }, bad && { ...box, borderColor: c.warning, backgroundColor: c.warningSoft }]}>{children}</View>;
 }
 
+/** 已經填寫、鎖住不能改的欄位（會員中心內嵌的個人資料）：欄位框已經是淡化效果，文字也一樣淡化（杜杜龍 2026-11-26）。 */
+const FadedForm = createContext(false);
+
 function Input({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   const { c } = useTheme();
   const bw = useBorderW(1);
-  return <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.textMuted} autoCapitalize="none" style={[styles.input, { color: c.text, borderColor: c.border, borderWidth: bw, backgroundColor: c.surface }]} />;
+  const faded = useContext(FadedForm);
+  return <TextInput value={value} onChangeText={onChange} placeholder={placeholder} placeholderTextColor={c.textMuted} autoCapitalize="none" editable={!faded} style={[styles.input, { color: faded ? c.textMuted : c.text, borderColor: c.border, borderWidth: bw, backgroundColor: c.surface }]} />;
 }
 
 /** 與中央會員相同的「無」勾選框：只寫一個字「無」，排在輸入框／下拉選單右邊。 */
@@ -402,7 +406,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
             options={options}
             value={sel}
             label={blocked ? (sysVal && sysVal !== "" ? "無" : "先選系統") : none ? "無" : other ? "其他" : v || "（未選擇）"}
-            disabled={blocked || none}
+            disabled={blocked || none || readOnly}
             open={openKey === key}
             onOpenChange={(o) => setOpenKey(o ? key : null)}
             onPick={onPick}
@@ -449,6 +453,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
           ) : null}
           {!data && !error ? <AppText tone="muted">讀取中…</AppText> : null}
           {data ? (
+            <FadedForm.Provider value={readOnly}>
             <View pointerEvents={readOnly ? "none" : "auto"} style={[{ gap: space.xs }, readOnly ? { opacity: 0.8 } : null]} accessibilityState={{ disabled: readOnly }}>
               {/* 本名（四個中文字寬）＋縮小的手機推播（杜杜龍 2026-11-23：暱稱欄位刪除，推播改放這裡）。 */}
               <View style={stack ? { gap: space.sm } : [styles.line, { alignItems: "flex-end" }]}>
@@ -481,7 +486,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                         <View key={k} ref={k === "upline_platinum" ? platBox : diamBox} collapsable={false} style={stack ? { width: "100%" } : { flex: 1, minWidth: 0 }}>
                          <Row fixed anchor={k} bad={showBad && missing.includes(k)}>
                           <Label text={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
-                          <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} />
+                          <SuggestField value={vals[k]} onChange={set(k)} onFocusChange={(f) => setUplineFocus((cur) => (f ? k : cur === k ? null : cur))} accessibilityLabel={k === "upline_platinum" ? "上手白金" : "上手鑽石"} inputStyle={readOnly ? { color: c.textMuted } : undefined} />
                          </Row>
                         </View>
                       ))}
@@ -499,7 +504,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                             options={data.rankOptions.filter((o) => o.value !== "none").map((o) => ({ value: o.value, label: o.label }))}
                             value={rankNone ? "" : vals.rank}
                             label={rankNone ? "無" : vals.rank ? rankLabel(vals.rank) : "請選擇"}
-                            disabled={rankNone}
+                            disabled={rankNone || readOnly}
                             open={openKey === "rank"}
                             onOpenChange={(o) => setOpenKey(o ? "rank" : null)}
                             onPick={set("rank")}
@@ -531,6 +536,7 @@ export function ProfilePrompt({ onClose, initial: first, inline = false, focusMi
                 ) : null}
               </View>
             </View>
+            </FadedForm.Provider>
           ) : null}
       </Body>
       {leaving ? (
