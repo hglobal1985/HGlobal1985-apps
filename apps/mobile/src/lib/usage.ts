@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, Dimensions, PixelRatio, Platform } from "react-native";
 import { api } from "@/api/client";
-import { currentModeKey } from "./elder-mode";
+import { currentModeKey } from "@/lib/elder-mode";
 
 /**
  * 使用統計回報（杜杜龍 2026-11-22，管理員 > 設定 > 使用統計）：匿名回報裝置（手機／平板／電腦）、系統（iOS／Android／其他）、

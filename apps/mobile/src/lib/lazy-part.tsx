@@ -1,6 +1,6 @@
 import { Component, lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import { Text } from "react-native";
-import { reportClientError } from "./error-report";
+import { reportClientError } from "@/lib/error-report";
 
 /**
  * 「用到才下載」的元件（2026-11-21 載入速度優化）：只有管理者會打開的編輯面板、上傳工具……

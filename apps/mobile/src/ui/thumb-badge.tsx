@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import type { ThumbBadgeKind } from "@/api/client";
 import { useThumbBadge } from "@/lib/thumb-badges";
-import { AppText } from "./text";
+import { AppText } from "@/ui/text";
 import { ThumbFallback } from "./thumb-fallback";
 
 /** 符號字數 → 字級占框短邊的比例（emoji／1 個字最大，4 個字兩行）。 */

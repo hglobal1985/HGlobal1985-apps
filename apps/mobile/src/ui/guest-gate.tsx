@@ -1,9 +1,9 @@
 import { router } from "expo-router";
 import type { ComponentProps } from "react";
-import { Button } from "./button";
+import { Button } from "@/ui/button";
 import { useSession } from "@/state/session";
-import { EmptyState } from "./empty-state";
-import { LoadingView } from "./state-views";
+import { EmptyState } from "@/ui/empty-state";
+import { LoadingView } from "@/ui/state-views";
 
 /**
  * 「尚未登入」提示卡（杜杜龍 2026-11-17：全站統一用「學習中」那一款）：圓形圖示＋「尚未登入」＋說明＋「前往登入」。

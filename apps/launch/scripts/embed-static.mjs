@@ -30,7 +30,7 @@ function slimIcons(path, data) {
   if (!/\/Ionicons\.[0-9a-f]+\.ttf$/.test(path)) return data;
   try {
     const map = JSON.parse(readFileSync(new URL("../../../node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/glyphmaps/Ionicons.json", import.meta.url), "utf8"));
-    const used = usedIconNames([join(mobile, "src"), join(mobile, "app")], map);
+    const used = usedIconNames([join(mobile, "src"), join(mobile, "app"), join(mobile, "../../packages/ui/src")], map); // 共用元件（packages/ui）用到的圖示也要留
     const r = subsetFont(data, [...used].map((n) => map[n]));
     console.log(`icon font: kept ${r.kept}/${r.total} glyphs, ${(data.length / 1024).toFixed(0)} → ${(r.font.length / 1024).toFixed(0)} KiB`);
     return r.font;

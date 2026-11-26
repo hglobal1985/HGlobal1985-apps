@@ -2,7 +2,7 @@ import { router, usePathname } from "expo-router";
 import { Platform, StyleSheet, View } from "react-native";
 import { useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
-import { Button } from "./button";
+import { Button } from "@/ui/button";
 
 /**
  * 訪客登入提示（杜杜龍 2026-11-17 定稿，全站唯一來源）：單一按鈕「尚未登入 免費註冊」（杜杜龍 2026-11-20：刪除旁邊的備註小字），置中。

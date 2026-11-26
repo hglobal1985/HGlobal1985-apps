@@ -5,7 +5,7 @@ import { resolveUrl } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { textCoverLines } from "@/api/client";
 import { courseThemes, coverBronze, radius, space } from "@/theme/tokens";
-import { AppText } from "./text";
+import { AppText } from "@/ui/text";
 
 /** 估算文字寬度（以字級為單位）：中日韓全形字算 1，英數與標點約 0.58。 */
 const textUnits = (t: string) => [...t].reduce((n, ch) => n + (/[\u2E80-\u9FFF\uF900-\uFAFF\uFF00-\uFFEF]/.test(ch) ? 1 : 0.58), 0);

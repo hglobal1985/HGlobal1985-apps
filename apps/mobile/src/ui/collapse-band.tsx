@@ -1,8 +1,8 @@
 import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { View } from "react-native";
-import { setBandExtra } from "./band-extra";
-import { getBandRect, setBandRect } from "./band-rect";
+import { setBandExtra } from "@/ui/band-extra";
+import { getBandRect, setBandRect } from "@/ui/band-rect";
 import { resetBandScroll, scrollBandTop, useBandScroll } from "./band-scroll";
 import { MiniWindow } from "./mini-window";
 
