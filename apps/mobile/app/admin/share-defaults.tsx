@@ -151,7 +151,7 @@ export default function ShareDefaultsScreen() {
             <AppText variant="caption" tone="muted">{`以前用過、仍然有效的路徑：${s.recipeAliases.join("、")}`}</AppText>
           ) : null}
           <AppText variant="caption" tone="muted">
-            分享食譜時，會把這道食譜的所有照片、食譜文字（含 YouTube 連結）和上面這段說明一起交給手機的分享選單。預覽卡片格式同 ④（標題＝食譜名稱＋站名，圖＝第一張照片）。
+            分享食譜時分兩個動作（LINE 收到「照片＋文字」只會收照片，所以分開傳）：①文字與連結＝食譜文字（含 YouTube 連結）＋上面這段說明與短網址；②所有照片（同時把文字複製起來，可在對話裡貼上）。預覽卡片格式同 ④（標題＝食譜名稱＋站名，圖＝第一張照片）。
           </AppText>
         </Card>
       </Section>
