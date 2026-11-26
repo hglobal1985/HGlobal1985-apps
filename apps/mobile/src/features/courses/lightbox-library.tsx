@@ -9,6 +9,7 @@ import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { RecipeZone } from "@/features/recipes/recipe-zone";
 import { LightboxGrid } from "./lightbox-grid";
 import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
+import { AlbumBackHeader } from "./album-header";
 import { SubfolderHome, SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
 import { AlbumSearchBar, matchAlbumItem, useAlbumSemantic } from "./album-search";
 import { trackUsage } from "@/lib/usage";
@@ -368,19 +369,13 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       {side && large ? sidebar : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* 搜尋列：與頁面相簿共用 AlbumSearchBar（深色款＋「此頁／全部」切換），永遠顯示 */}
-        {!inRecipe ? <View style={{ paddingHorizontal: 16 }}>
-          <AlbumSearchBar dark q={q} setQ={setQ} scope={scope} onScope={setScope} placeholder={scope === "page" ? (view ? "搜尋這個資料夾的照片" : cur ? `搜尋「${cur.label}」裡的資料夾與照片` : "搜尋相簿類別與資料夾") : "搜尋全部相簿的場景、照片文字"} />
-        </View> : null}
+        <View style={{ paddingHorizontal: 16 }}>
+          <AlbumSearchBar dark q={q} setQ={setQ} scope={scope} onScope={setScope} placeholder={scope === "page" ? (inRecipe ? "搜尋食譜的名稱、食材" : view ? "搜尋這個資料夾的照片" : cur ? `搜尋「${cur.label}」裡的資料夾與照片` : "搜尋相簿類別與資料夾") : "搜尋全部相簿的場景、照片文字"} />
+        </View>
         {/* 類別返回列：在某個類別裡時，回到相簿首頁（類別資料夾） */}
-        {cur && !view ? (
-          <View style={{ paddingHorizontal: 16, paddingTop: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {btn("回相簿首頁", () => (setGroup(null), setQ("")), "chevron-back")}
-            <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 18 }}>{cur.label}</AppText>
-            <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`${cur.folders.length} 個資料夾`}</AppText>
-          </View>
-        ) : null}
-        {inRecipe ? (
-          <RecipeZone onBack={() => (setGroup(null), setQ(""))} onOpenPhotos={(title, items, index) => onPick({ folder: null, title, items, index })} />
+        {cur && !view ? <AlbumBackHeader title={cur.label} meta={`${cur.folders.length} 個資料夾`} onBack={() => (setGroup(null), setQ(""))} /> : null}
+        {inRecipe && !(scope === "all" && key) ? (
+          <RecipeZone q={q} onBack={() => (setGroup(null), setQ(""))} onOpenPhotos={(title, items, index) => onPick({ folder: null, title, items, index })} />
         ) : view && hasSubs && sub === null && !key && sf.subs ? (
           <View style={{ flex: 1, minHeight: 0, paddingHorizontal: 16, paddingTop: 6, gap: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

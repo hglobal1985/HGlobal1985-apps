@@ -17,6 +17,7 @@ import { useApi, useSession } from "@/state/session";
 import { AppText } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { RecipeBody } from "./recipe-body";
+import { AlbumBackHeader, AlbumRoundButton } from "@/features/courses/album-header";
 import { RecipeEditor, RecipeSheet } from "./recipe-editor";
 
 const UI_ONLY = { uiOnly: true } as object;
@@ -33,12 +34,11 @@ const round = (label: string, icon: string, onPress: () => void) => (
  * 列表（分類標籤、搜尋名稱與整篇文字、右下「＋新增食譜」）→ 單道食譜（可左右滑的照片、文字、影片、複製／分享）。
  * 所有會員都能投稿（進「待審核」）；管理者（超級管理員、總部管理員、相簿齒輪「食譜」上傳獎銜達標者）直接發佈、審核、管理分類。
  */
-export function RecipeZone({ onBack, onOpenPhotos }: { onBack: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void }) {
+export function RecipeZone({ q, onBack, onOpenPhotos }: { /** 相簿上方共用搜尋列（`AlbumSearchBar`）的字：食譜頁不自己做搜尋框。 */ q: string; onBack: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void }) {
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const thumb = useThumb();
   const { member } = useSession();
-  const [q, setQ] = useState("");
   const [qs, setQs] = useState("");
   useEffect(() => {
     const t = setTimeout(() => setQs(q.trim()), 350);
@@ -100,18 +100,8 @@ export function RecipeZone({ onBack, onOpenPhotos }: { onBack: () => void; onOpe
 
   return (
     <View style={{ flex: 1, minHeight: 0 }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
-        {round("回相簿首頁", "chevron-back", onBack)}
-        <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "900", fontSize: 20 }}>🍳 食譜</AppText>
-        {data?.manager ? round("管理分類", "settings-outline", () => setCatSheet(true)) : null}
-      </View>
-      <View style={{ paddingHorizontal: 16, paddingTop: 10 }}>
-        <View style={{ minHeight: 46, borderRadius: 23, backgroundColor: "#1b1b1b", borderWidth: 1, borderColor: "#333", flexDirection: "row", alignItems: "center", paddingHorizontal: 14, gap: 8 }}>
-          <Ionicons name="search" size={18} color="#9a9aa0" {...UI_ONLY} />
-          <TextInput value={q} onChangeText={setQ} placeholder="搜尋料理名稱、食材…" placeholderTextColor="#6f6f75" accessibilityLabel="搜尋食譜" style={{ flex: 1, color: "#fff", fontSize: 16, paddingVertical: 10 }} />
-          {q ? <Pressable accessibilityRole="button" accessibilityLabel="清除搜尋" onPress={() => setQ("")} style={{ padding: 6 }}><Ionicons name="close-circle" size={20} color="#9a9aa0" {...UI_ONLY} /></Pressable> : null}
-        </View>
-      </View>
+      {/* 返回列：與相簿其他類別同一個共用元件（搜尋列在它上面，由相簿統一提供） */}
+      <AlbumBackHeader title="🍳 食譜" meta={`${recipes.length} 道食譜`} onBack={onBack} right={data?.manager ? <AlbumRoundButton label="管理分類" icon="settings-outline" onPress={() => setCatSheet(true)} /> : null} />
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
           {chipBtn("all", `全部 ${recipes.length}`)}
