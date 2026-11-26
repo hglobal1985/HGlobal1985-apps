@@ -492,7 +492,7 @@ export type AlbumSubfolder = { id: string; name: string; count: number; thumbs: 
 export type RecipeCategory = { id: string; name: string; count: number };
 export type RecipeCard = { id: string; title: string; categoryId: string; categoryName: string; status: "pending" | "published"; thumb: string | null; photos: number; videos: number; authorName: string; /** 這道食譜我可不可以修改／刪除。 */ canEdit: boolean };
 export type RecipesResponse = { categories: RecipeCategory[]; recipes: RecipeCard[]; /** 管理者（超級管理員或「食譜」上傳獎銜達標）：可直接發佈、審核投稿、新增與改名分類。 */ manager: boolean; /** 超級管理員：可刪除分類。 */ admin: boolean; /** 已登入的會員可以投稿。 */ canSubmit: boolean };
-export type RecipeDetail = { id: string; title: string; categoryId: string; categoryName: string; body: string; status: "draft" | "pending" | "published"; authorName: string; updatedAt: string; canEdit: boolean; manager: boolean };
+export type RecipeDetail = { id: string; /** 流水號（送出後才有）與短網址路徑（例：/icook/001）。 */ number: number | null; shortPath: string | null; title: string; categoryId: string; categoryName: string; body: string; status: "draft" | "pending" | "published"; authorName: string; updatedAt: string; canEdit: boolean; manager: boolean };
 export type AlbumSubfolders = { folders: AlbumSubfolder[]; uncat: { count: number; thumbs: string[] }; canManage: boolean };
 export type AlbumGroup = { id: string; label: string; folders: AlbumFolder[] };
 export type AlbumsResponse = { total: number; groups: AlbumGroup[] };
@@ -954,6 +954,12 @@ export type ShareSettings = {
   listItemText: string;
   /** 邀請特定會員擔任課程審核人員（24 小時有效的邀請網址）：可用 {課程名稱}；後面接 linkLead 與邀請網址。 */
   reviewerInviteText: string;
+  /** 食譜短網址的路徑前綴（杜杜龍 2026-11-26）：網址＝/前綴/流水號（例：/icook/001）。只能小寫英文與連字號、不可含數字（含數字的開頭是會員編號的清單網址）。 */
+  recipePrefix: string;
+  /** 以前用過的前綴（改前綴時由伺服器自動記下），舊網址照樣打得開。 */
+  recipeAliases: string[];
+  /** 分享食譜時，放在文字最後的說明＋網址：{網址} 會換成食譜的短網址。 */
+  recipeText: string;
 };
 export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   inviteText: "分享給我的好朋友，這裡有好多精彩的免費講座與課程唷 ❤️",
@@ -971,8 +977,14 @@ export const DEFAULT_SHARE_SETTINGS: ShareSettings = {
   chapterText: "我剛聽完這場 {主講人}{職稱}的這場精彩演講 {章節名稱} 我就立刻想到要分享給你！",
   listText: "推薦你看「{清單名稱}」，裡面有好多精彩影片，一起來看吧！",
   listItemText: "我剛看完這段精彩影片「{影片名稱}」（{清單名稱}），立刻想到要分享給你！",
+  recipePrefix: "icook",
+  recipeAliases: [],
+  recipeText: "更多食譜按這裡 👉 {網址}",
   reviewerInviteText: "邀請你擔任「{課程名稱}」的報名審核人員。請在 24 小時內點開下方網址並登入寰宇行動大學，按「接受」後就能審核這門課的報名。",
 };
+
+/** 食譜的短網址路徑：/前綴/流水號（至少 3 位數，不夠再加位數）。 */
+export const recipeShortPath = (prefix: string, n: number) => `/${prefix}/${String(n).padStart(3, "0")}`;
 
 /** 組出「邀請審核人員」的分享文字。 */
 export function reviewerInviteMessage(s: ShareSettings, url: string, courseTitle: string): string {

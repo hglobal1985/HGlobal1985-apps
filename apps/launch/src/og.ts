@@ -4,6 +4,7 @@ import { DEFAULT_SHARE_SETTINGS, type ShareSettings } from "./contract.ts";
 import { urlNameVariants } from "./romanize.ts";
 import { HQ_SLUG, RESERVED_SLUGS } from "./short-links.ts";
 import { loadConfig } from "./ui-config.ts";
+import { recipeByShortPath } from "./recipes.ts";
 
 const SITE = "寰宇行動大學";
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -152,9 +153,28 @@ export async function courseUrlMeta(db: D1Database, slug: string, name: string, 
  *   /courses?center=…&category=…（沒設短網址的中心／分類）、/series/{系列名}、/course/{編號}、/learn/{課程}/{章節}。
  * 課程、章節只處理「已上架」的（未上架／封存一律用預設，避免洩漏未公開的名稱）；單堂課程與章節一律用它主辦中心的預覽卡片。找不到回 null＝維持預設標籤。
  */
+/** 食譜的預覽卡（杜杜龍 2026-11-26）：同一格式——標題＝食譜名稱＋分隔符號＋站名＋圖示，第二行＝隨機學習金句，圖＝食譜第一張照片。只處理已發佈的食譜。 */
+async function recipeMeta(db: D1Database, id: string, url: string, origin: string): Promise<ShareMeta | null> {
+  const r = await db
+    .prepare("SELECT r.title AS t, (SELECT m.r2_key FROM cover_media m WHERE m.owner_kind = 'course' AND m.owner_key = 'rcp:' || r.id AND m.kind = 'image' ORDER BY m.position LIMIT 1) AS k FROM recipes r WHERE r.id = ? AND r.status = 'published'")
+    .bind(id)
+    .first<{ t: string; k: string | null }>()
+    .catch(() => null);
+  if (!r) return null;
+  const S = await shareCfg(db);
+  return { title: titleOf(S, r.t), description: await describe(db, S), url, image: pubImage(origin, r.k, 0) };
+}
+
 export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareMeta | null> {
   const origin = url.origin;
   const path = url.pathname;
+  const rcp = /^\/recipe\/([a-z0-9]{6,16})$/.exec(path);
+  if (rcp) return recipeMeta(db, rcp[1]!, `${origin}${path}`, origin);
+  const rnum = /^\/([A-Za-z-]{2,20})\/(\d{3,9})$/.exec(path);
+  if (rnum) {
+    const id = await recipeByShortPath(db, rnum[1]!, rnum[2]!);
+    if (id) return recipeMeta(db, id, `${origin}${path}`, origin);
+  }
   const short = /^\/([A-Za-z0-9-]{2,30})$/.exec(path);
   if (short && !RESERVED_SLUGS.has(short[1]!.toLowerCase())) return shortLinkMeta(db, short[1]!, origin);
   const courseUrl = /^\/([A-Za-z0-9-]{2,30})\/([A-Za-z0-9-]{2,80})$/.exec(path);

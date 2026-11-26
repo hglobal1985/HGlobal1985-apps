@@ -2,6 +2,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useApi } from "@/state/session";
 import { EmptyState, ErrorView, LoadingView, Screen } from "@/ui";
 import { PublicListScreen } from "@/features/my-lists/public-list";
+import { RecipePage } from "@/features/recipes/recipe-page";
 import { chapterFromParams, CourseDetailScreen } from "../course/[id]";
 
 /** 課程專屬網址：learn.hglobal1985.com/中心縮寫/英譯姓名-編號（網址列維持不變，內容就是課程介紹頁）。 */
@@ -15,7 +16,7 @@ export default function CourseUrl() {
 function CourseUrlInner() {
   const params = useLocalSearchParams<{ slug: string; name: string; lesson?: string }>();
   const { slug, name, lesson } = params;
-  const { data, error, loading, reload } = useApi<{ courseId: string }>(`/short-links/${slug}/${name}`);
+  const { data, error, loading, reload } = useApi<{ courseId?: string; recipeId?: string }>(`/short-links/${slug}/${name}`);
   if (loading && !data)
     return (
       <Screen header={false}>
@@ -28,5 +29,6 @@ function CourseUrlInner() {
         {error && !/找不到|not_found|404/.test(error) ? <ErrorView message={error} onRetry={reload} /> : <EmptyState icon="link-outline" title="找不到這個網址" />}
       </Screen>
     );
-  return <CourseDetailScreen id={data.courseId} lesson={lesson} chapter={chapterFromParams(params)} />;
+  if (data.recipeId) return <RecipePage id={data.recipeId} />; // 食譜短網址 /icook/001（前綴在設定頁可改）
+  return <CourseDetailScreen id={data.courseId!} lesson={lesson} chapter={chapterFromParams(params)} />;
 }

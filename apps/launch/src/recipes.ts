@@ -5,6 +5,7 @@
  */
 import type { D1Database, Env } from "./d1.ts";
 import type { RecipeCard, RecipeCategory } from "./contract.ts";
+import { loadConfig } from "./ui-config.ts";
 
 export const RECIPE_KEY = "rcp:";
 export const TITLE_MAX = 60;
@@ -12,6 +13,23 @@ export const BODY_MAX = 20000;
 export const CATEGORY_MAX = 10;
 export const recipeKey = (id: string) => `${RECIPE_KEY}${id}`;
 export const recipeIdOfKey = (key: string): string | null => (key.startsWith(RECIPE_KEY) ? key.slice(RECIPE_KEY.length) : null);
+/** 目前與以前用過的短網址前綴（小寫）。 */
+export async function recipePrefixes(db: D1Database): Promise<{ cur: string; all: string[] }> {
+  const s = (await loadConfig(db)).share;
+  return { cur: s.recipePrefix, all: [s.recipePrefix, ...s.recipeAliases].map((x) => x.toLowerCase()) };
+}
+export async function isRecipePrefix(db: D1Database, slug: string): Promise<boolean> {
+  return (await recipePrefixes(db)).all.includes(slug.toLowerCase());
+}
+/** /icook/001 → 食譜編號（只認已發佈的；前綴不分大小寫，舊前綴也認得）。 */
+export async function recipeByShortPath(db: D1Database, prefix: string, name: string): Promise<string | null> {
+  if (!/^\d{3,9}$/.test(name) || !(await isRecipePrefix(db, prefix))) return null;
+  return (await db.prepare("SELECT id FROM recipes WHERE number = ? AND status = 'published'").bind(Number(name)).first<{ id: string }>())?.id ?? null;
+}
+/** 第一次送出時領流水號（編輯中的草稿不佔號碼）。 */
+export async function assignNumber(db: D1Database, id: string): Promise<void> {
+  await db.prepare("UPDATE recipes SET number = (SELECT COALESCE(MAX(number), 0) + 1 FROM recipes) WHERE id = ? AND number IS NULL").bind(id).run();
+}
 export const newId = () => crypto.randomUUID().replace(/-/g, "").slice(0, 10);
 
 const YT_LINE = /^\s*(?:https?:\/\/)?(?:www\.|m\.)?(?:youtube\.com|youtu\.be|youtube-nocookie\.com)\/\S+\s*$/i;

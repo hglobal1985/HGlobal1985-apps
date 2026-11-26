@@ -97,8 +97,8 @@ import {
 import { flushEmails } from "./email.ts";
 import { checkPassword, checkPasswordInput, checkToken, expiresAt, hashPassword, libraryNumber, makeToken, pwActive } from "./library.ts";
 import { ensureCentersReconciled } from "./center-reconcile.ts";
-import { BODY_MAX, CATEGORY_MAX, cleanBody, cleanTitle as cleanRecipeTitle, deleteRecipe, listRecipes, newId as newRecipeId, purgeStaleDrafts, recipeIdOfKey } from "./recipes.ts";
-import type { RecipeDetail } from "./contract.ts";
+import { BODY_MAX, CATEGORY_MAX, cleanBody, cleanTitle as cleanRecipeTitle, assignNumber, deleteRecipe, isRecipePrefix, listRecipes, recipeByShortPath, recipePrefixes, newId as newRecipeId, purgeStaleDrafts, recipeIdOfKey } from "./recipes.ts";
+import { recipeShortPath, type RecipeDetail } from "./contract.ts";
 import { ListError, checkSlug, checkTitle, copyList, createList, listStats, ownDetail, ownLists, ownedList, quotaOf, readItem, recordEvent, recordItemHit, setItem, refreshOwner, setNote, setSlug, viewPublic } from "./my-lists.ts";
 import { centralDeleteAccount, lastSharerError, lookupSharerRank, lastUplineError, lookupUplines, lookupLegalNames, takeCentralTimings, setBackground, memberNumberOf, centerMembers, centralAddJobTitle, centralDecide, centralReviews, staffAssign, staffSearch, rankBadges, amwayMe, centerKey, centerList, rankOptionList, centralProfileView, centralSuggest, centralWriteField, centralEnableAmway, contactEmail, forgetMember, legalNameOf, profileGaps, profileSummary, rankOptions, rankValue, reportIntegration, saveContactEmail, validEmail, verifyWebhook, APP_ID, isAdmin, looksLikeJwt, memberContext, rankEligibility, verifyAccessToken } from "./central.ts";
 import type { D1Database, D1PreparedStatement, Env } from "./d1.ts";
@@ -2826,9 +2826,9 @@ async function recipeManager(ctx: Ctx): Promise<boolean> {
   if (ctx.session.roles.includes("super_admin") || (await rightsOf(ctx)).admin) return true;
   return albumRankAllows(ctx, { folderId: "recipe", groupId: "recipe" });
 }
-type RecipeRow = { id: string; title: string; category_id: string; body: string; status: "draft" | "pending" | "published"; author_sub: string; author_name: string; updated_at: string };
+type RecipeRow = { number: number | null; id: string; title: string; category_id: string; body: string; status: "draft" | "pending" | "published"; author_sub: string; author_name: string; updated_at: string };
 async function recipeRow(ctx: Ctx, id: string): Promise<RecipeRow> {
-  return (await ctx.db.prepare("SELECT id, title, category_id, body, status, author_sub, author_name, updated_at FROM recipes WHERE id = ?").bind(id).first<RecipeRow>()) ?? fail(404, "not_found", "找不到這道食譜");
+  return (await ctx.db.prepare("SELECT number, id, title, category_id, body, status, author_sub, author_name, updated_at FROM recipes WHERE id = ?").bind(id).first<RecipeRow>()) ?? fail(404, "not_found", "找不到這道食譜");
 }
 async function requireRecipeEdit(ctx: Ctx, id: string): Promise<{ s: Session; row: RecipeRow; manager: boolean }> {
   const s = requireMember(ctx);
@@ -2842,7 +2842,8 @@ async function recipeDetail(ctx: Ctx, row: RecipeRow): Promise<RecipeDetail> {
   const mine = !!ctx.session && row.author_sub === ctx.session.sub;
   if (row.status !== "published" && !manager && !mine) fail(404, "not_found", "找不到這道食譜");
   const cat = row.category_id ? await ctx.db.prepare("SELECT name FROM recipe_categories WHERE id = ?").bind(row.category_id).first<{ name: string }>() : null;
-  return { id: row.id, title: row.title, categoryId: row.category_id, categoryName: cat?.name ?? "", body: row.body, status: row.status, authorName: row.author_name, updatedAt: row.updated_at, canEdit: manager || (mine && row.status !== "published"), manager };
+  const shortPath = row.number && row.status === "published" ? recipeShortPath((await recipePrefixes(ctx.db)).cur, row.number) : null;
+  return { id: row.id, number: row.number, shortPath, title: row.title, categoryId: row.category_id, categoryName: cat?.name ?? "", body: row.body, status: row.status, authorName: row.author_name, updatedAt: row.updated_at, canEdit: manager || (mine && row.status !== "published"), manager };
 }
 /** 這次請求要管理的封面（含權限檢查）：中心＝能編輯該中心封面的人；系列＝超級管理員；課程＝有該課程修改權的人。 */
 async function requireCoverOwner(ctx: Ctx, fromBody = false) {
@@ -4584,6 +4585,7 @@ const routes: [string, RegExp, Handler][] = [
         audit(ctx.db, s.sub, "recipe.save", "recipe", id!, status),
         ...(submitted ? [notify(ctx.db, { role: "admin" }, "有新的食譜投稿，等待審核", `${s.name ?? "會員"} 投稿了「${title}」，請到食譜專區審核。`, `/recipe/${id}`)] : []),
       ]);
+      if (b.finish === true && row.status === "draft") await assignNumber(ctx.db, id!);
       return recipeDetail(ctx, await recipeRow(ctx, id!));
     },
   ],
@@ -5250,6 +5252,9 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/short-links\/([A-Za-z0-9-]{2,30})\/([A-Za-z0-9-]{2,80})$/,
     async (ctx, [slug, name]) => {
+      // 食譜短網址：/icook/001（前綴在「設定 › 分享預設值」；舊前綴也認得）→ 食譜編號。
+      const rp = await recipeByShortPath(ctx.db, slug!, name!);
+      if (rp) return { recipeId: rp };
       // 課程專屬網址：中心縮寫（或總部 hq）+ 英譯姓名-編號 → 課程編號。網址不分大小寫。
       // 素材的第二層網址：系列縮寫 + 素材名稱 → 素材編號（改名前的舊名稱也認得）。
       const serRow = slug.toLowerCase() === HQ_SLUG ? null : await slugTarget(ctx.db, slug, "series");
@@ -5475,6 +5480,14 @@ const routes: [string, RegExp, Handler][] = [
       const cur = await loadConfig(ctx.db);
       const bodyApp = (body.app && typeof body.app === "object" ? body.app : {}) as { rec?: object };
       const next = normalizeConfig({ ...cur, ...body, ribbons: { ...cur.ribbons, ...((body.ribbons as object) ?? {}) }, app: { ...cur.app, ...bodyApp, rec: { ...cur.app.rec, ...(bodyApp.rec ?? {}) } }, share: { ...cur.share, ...((body.share as object) ?? {}) } });
+      // 食譜短網址前綴改名（杜杜龍 2026-11-26）：新前綴不能撞到網站頁面或別人的短網址；舊前綴自動存成別名，已分享出去的網址照樣打得開。
+      if (next.share.recipePrefix !== cur.share.recipePrefix) {
+        const np = next.share.recipePrefix;
+        if (RESERVED_SLUGS.has(np) || np === HQ_SLUG || np === "series" || np === "recipe") return fail(400, "slug_reserved", `「${np}」是網站保留的路徑，請換一個`);
+        const used = (await ctx.db.prepare("SELECT 1 AS ok FROM short_links WHERE slug = ? COLLATE NOCASE UNION SELECT 1 FROM short_link_aliases WHERE slug = ? COLLATE NOCASE").bind(np, np).first()) !== null;
+        if (used) return fail(409, "slug_taken", `「${np}」已經是別的短網址，請換一個`);
+        next.share.recipeAliases = [...new Set([cur.share.recipePrefix, ...cur.share.recipeAliases])].filter((x) => x !== np).slice(0, 20);
+      }
       await saveConfig(ctx.db, next);
       if (body.seriesOrder !== undefined) await syncTreasureFromSeriesOrder(ctx.db).catch(() => undefined); // 品牌館卡片順序 → 成交百寶箱區塊順序
       await audit(ctx.db, s.sub, "ui_config.update", "ui_config", "ui_config", Object.keys(body).join(",")).run();
@@ -8141,6 +8154,7 @@ const routes: [string, RegExp, Handler][] = [
       if (RESERVED_SLUGS.has(slug.toLowerCase())) fail(400, "reserved_slug", `「${slug}」是網站頁面名稱，請換一個縮寫`);
       if (!SLUG_RE.test(slug)) fail(400, "invalid_slug", "縮寫只能用英文字母（大小寫都可以）、數字與連字號（-），長度 2～30 字");
       const taken = await slugTarget(ctx.db, slug);
+      if (await isRecipePrefix(ctx.db, slug)) fail(409, "slug_taken", `「${slug}」是食譜短網址的路徑`);
       if (taken && !(taken.kind === kind && taken.value === value)) fail(409, "slug_taken", `「${slug}」已被「${taken.value}」使用`);
       // 改縮寫：舊縮寫記成別名，已經分享出去的舊網址照樣打得開、自動轉到現在的網址（杜杜龍 2026-11-26）。
       const prev = await ctx.db.prepare("SELECT slug FROM short_links WHERE kind = ? AND value = ?").bind(kind, value).first<{ slug: string }>();

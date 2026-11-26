@@ -142,6 +142,20 @@ export default function ShareDefaultsScreen() {
         </Card>
       </Section>
 
+      <Section fold title="⑤ 食譜的分享與短網址">
+        <Card>
+          {input("食譜短網址的路徑", "食譜分享出去的網址＝網域／這個路徑／流水號（例：learn.hglobal1985.com/icook/001，編號 3 位數，不夠再加位數）。只能用小寫英文字母與連字號（-），不可含數字。改了以後，舊路徑的網址仍然打得開", s.recipePrefix, (v) => set("recipePrefix", v.toLowerCase().replace(/[^a-z-]/g, "")), { placeholder: "icook" })}
+          <AppText variant="caption" tone="muted">{`預覽：learn.hglobal1985.com/${s.recipePrefix || "icook"}/001`}</AppText>
+          {input("食譜分享最後的說明與網址", "分享食譜時，接在食譜文字最後面（自成一段）：{網址} 會換成這道食譜的短網址", s.recipeText, (v) => set("recipeText", v), { multiline: true })}
+          {s.recipeAliases.length ? (
+            <AppText variant="caption" tone="muted">{`以前用過、仍然有效的路徑：${s.recipeAliases.join("、")}`}</AppText>
+          ) : null}
+          <AppText variant="caption" tone="muted">
+            分享食譜時，會把這道食譜的所有照片、食譜文字（含 YouTube 連結）和上面這段說明一起交給手機的分享選單。預覽卡片格式同 ④（標題＝食譜名稱＋站名，圖＝第一張照片）。
+          </AppText>
+        </Card>
+      </Section>
+
       <Section fold title="預覽（範例）">
         <Card>
           <AppText variant="callout" tone="muted">

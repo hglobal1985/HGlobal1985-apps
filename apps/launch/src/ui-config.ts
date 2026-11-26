@@ -68,8 +68,17 @@ export function normalizeShare(raw: unknown): ShareSettings {
     listText: str(r.listText, d.listText, 300),
     listItemText: str(r.listItemText, d.listItemText, 300),
     reviewerInviteText: str(r.reviewerInviteText, d.reviewerInviteText, 300),
+    recipePrefix: typeof r.recipePrefix === "string" && RECIPE_PREFIX_RE.test(r.recipePrefix.trim().toLowerCase()) ? r.recipePrefix.trim().toLowerCase() : d.recipePrefix,
+    recipeAliases: Array.isArray(r.recipeAliases) ? [...new Set((r.recipeAliases as unknown[]).filter((x): x is string => typeof x === "string" && RECIPE_PREFIX_RE.test(x)))].slice(0, 20) : d.recipeAliases,
+    recipeText: (() => {
+      const t = str(r.recipeText, d.recipeText, 100);
+      return t.includes("{網址}") ? t : `${t} {網址}`;
+    })(),
   };
 }
+
+/** 食譜短網址前綴：2～20 字，小寫英文與連字號（不可含數字、不可以連字號開頭或結尾）。 */
+export const RECIPE_PREFIX_RE = /^[a-z](?:[a-z-]{0,18}[a-z])$/;
 
 /** 學習紀錄的兩個比例：開始 1～50%、完成 50～100%；完成必須大於開始（否則自動調成開始＋1），避免設錯後永遠無法完成。 */
 function learnPct(r: Record<string, unknown>, d: AppSettings): { learnStartPct: number; learnDonePct: number } {
