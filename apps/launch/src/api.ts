@@ -115,7 +115,7 @@ import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnecti
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
-import { FP_RE, isOwnerDevice, isOwnerNet, markOwnerNet, ownerDevices, saveOwnerDevices, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
+import { FP_RE, isOwnerDevice, isOwnerNet, markOwnerNet, netHash, ownerDevices, registerOwnerDevice, saveOwnerDevices, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
 import { collectMuxStats } from "./mux-stats.ts";
 import { imageSize } from "./image-size.ts";
 import { audioUrl, sniffImage, verifyAudioUrl } from "./media.ts";
@@ -3480,6 +3480,16 @@ async function aiModelsView(ctx: Ctx) {
   return { jobs: AI_JOBS, models: AI_MODELS, selection: await loadSelection(ctx.db), usage: await usageSummary(ctx.db), keys: keyStatuses(ctx.env) };
 }
 
+/** 縮寫 → 它指向的分類／系列／中心；現在的縮寫優先，找不到再看「改名前的舊縮寫」（舊網址永遠有效）。 */
+async function slugTarget(db: D1Database, slug: string, kind?: string): Promise<{ kind: string; value: string } | null> {
+  const cond = kind ? " AND kind = ?" : "";
+  const bind = kind ? [slug, kind] : [slug];
+  return (
+    (await db.prepare(`SELECT kind, value FROM short_links WHERE slug = ? COLLATE NOCASE${cond}`).bind(...bind).first<{ kind: string; value: string }>()) ??
+    (await db.prepare(`SELECT kind, value FROM short_link_aliases WHERE slug = ? COLLATE NOCASE${cond}`).bind(...bind).first<{ kind: string; value: string }>())
+  );
+}
+
 async function listShortLinks(ctx: Ctx): Promise<ShortLinkItem[]> {
   const [kw, links] = await Promise.all([listKeywords(ctx), ctx.db.prepare("SELECT slug, kind, value FROM short_links").all<{ slug: string; kind: string; value: string }>()]);
   const slugOf = new Map(links.results.map((r) => [`${r.kind}:${r.value}`, r.slug]));
@@ -5094,13 +5104,13 @@ const routes: [string, RegExp, Handler][] = [
     async (ctx, [slug, name]) => {
       // 課程專屬網址：中心縮寫（或總部 hq）+ 英譯姓名-編號 → 課程編號。網址不分大小寫。
       // 素材的第二層網址：系列縮寫 + 素材名稱 → 素材編號（改名前的舊名稱也認得）。
-      const serRow = slug.toLowerCase() === HQ_SLUG ? null : await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'series'").bind(slug).first<{ value: string }>();
+      const serRow = slug.toLowerCase() === HQ_SLUG ? null : await slugTarget(ctx.db, slug, "series");
       if (serRow) {
         const m = (await ctx.db.prepare("SELECT id FROM courses WHERE series = ? AND mat_url = ? COLLATE NOCASE").bind(serRow.value, name).first<{ id: string }>()) ?? (await ctx.db.prepare("SELECT course_id AS id FROM material_url_aliases WHERE series = ? AND name = ? COLLATE NOCASE").bind(serRow.value, name).first<{ id: string }>());
         if (m) return { courseId: m.id };
         return fail(404, "not_found", "找不到這個網址");
       }
-      const row = slug.toLowerCase() === HQ_SLUG ? { value: "" } : await ctx.db.prepare("SELECT value FROM short_links WHERE slug = ? COLLATE NOCASE AND kind = 'center'").bind(slug).first<{ value: string }>();
+      const row = slug.toLowerCase() === HQ_SLUG ? { value: "" } : await slugTarget(ctx.db, slug, "center");
       const course = row
         ? row.value
           ? await ctx.db.prepare(`SELECT id FROM courses WHERE host_center_key = ? AND url_name COLLATE NOCASE IN (${urlNameVariants(name).map(() => "?").join(",")})`).bind(centerKey(row.value), ...urlNameVariants(name)).first<{ id: string }>()
@@ -5119,7 +5129,7 @@ const routes: [string, RegExp, Handler][] = [
     "GET",
     /^\/short-links\/([A-Za-z0-9-]{2,30})$/,
     async (ctx, [slug]) => {
-      const row = await ctx.db.prepare("SELECT kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ kind: string; value: string }>();
+      const row = await slugTarget(ctx.db, slug);
       return row ?? fail(404, "not_found", "找不到這個短網址");
     },
   ],
@@ -5344,7 +5354,7 @@ const routes: [string, RegExp, Handler][] = [
     // 杜杜龍本人的操作不列入統計（2026-11-23）：管理員帳號、管理員用過的裝置（App 帶 owner=1）、管理員用過的網路（無痕／未登入也認得）。
     const adminNow = isOwnerSession(ctx.session);
     if (adminNow) await markOwnerNet(ctx.db, ip).catch(() => undefined);
-    const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false)) || (await isOwnerDevice(ctx.db, body.fp).catch(() => false));
+    const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false)) || (await isOwnerDevice(ctx.db, body.fp, ip).catch(() => false));
     await recordUsage(ctx.db, body, mine).catch(() => undefined);
     return { ok: true };
   }],
@@ -5355,16 +5365,20 @@ const routes: [string, RegExp, Handler][] = [
     return { ok: true };
   }],
   // 本人裝置登記（杜杜龍 2026-11-26，超級管理員）：在那台裝置上按「登記這台裝置」，之後相同特徵的操作一律算本人。
-  ["GET", /^\/admin\/usage\/devices$/, async (ctx) => (requireSuperAdmin(ctx), { devices: await ownerDevices(ctx.db) })],
+  ["GET", /^\/admin\/usage\/devices$/, async (ctx) => {
+    requireSuperAdmin(ctx);
+    const here = await netHash(ctx.req.headers.get("cf-connecting-ip") ?? "");
+    return { devices: (await ownerDevices(ctx.db)).map((d) => ({ fp: d.fp, label: d.label, at: d.at, nets: d.nets.length, here: d.nets.includes(here) })) };
+  }],
   ["POST", /^\/admin\/usage\/devices$/, async (ctx) => {
     const s = requireSuperAdmin(ctx);
     const body = await readJson<{ fp?: unknown; label?: unknown }>(ctx.req);
     if (typeof body.fp !== "string" || !FP_RE.test(body.fp)) return fail(400, "invalid_device", "讀不到這台裝置的特徵");
-    const list = (await ownerDevices(ctx.db)).filter((d) => d.fp !== body.fp);
-    list.push({ fp: body.fp, label: (typeof body.label === "string" ? body.label.trim() : "").slice(0, 40) || "我的裝置", at: new Date().toISOString() });
-    await saveOwnerDevices(ctx.db, list);
+    const ip = ctx.req.headers.get("cf-connecting-ip") ?? "";
+    if (!ip) return fail(400, "no_network", "讀不到目前的網路位置");
+    const list = await registerOwnerDevice(ctx.db, body.fp, (typeof body.label === "string" ? body.label.trim() : "").slice(0, 40), ip);
     await audit(ctx.db, s.sub, "usage.owner_device.add", "usage", "device", body.fp).run();
-    return { devices: list };
+    return { devices: list.map((d) => ({ fp: d.fp, label: d.label, at: d.at, nets: d.nets.length, here: true })) };
   }],
   ["POST", /^\/admin\/usage\/devices\/remove$/, async (ctx) => {
     const s = requireSuperAdmin(ctx);
@@ -7970,9 +7984,13 @@ const routes: [string, RegExp, Handler][] = [
       const slug = typeof body.slug === "string" ? body.slug.trim() : ""; // 照輸入的大小寫保存與顯示；比對時不分大小寫
       if (RESERVED_SLUGS.has(slug.toLowerCase())) fail(400, "reserved_slug", `「${slug}」是網站頁面名稱，請換一個縮寫`);
       if (!SLUG_RE.test(slug)) fail(400, "invalid_slug", "縮寫只能用英文字母（大小寫都可以）、數字與連字號（-），長度 2～30 字");
-      const taken = await ctx.db.prepare("SELECT kind, value FROM short_links WHERE slug = ? COLLATE NOCASE").bind(slug).first<{ kind: string; value: string }>();
+      const taken = await slugTarget(ctx.db, slug);
       if (taken && !(taken.kind === kind && taken.value === value)) fail(409, "slug_taken", `「${slug}」已被「${taken.value}」使用`);
+      // 改縮寫：舊縮寫記成別名，已經分享出去的舊網址照樣打得開、自動轉到現在的網址（杜杜龍 2026-11-26）。
+      const prev = await ctx.db.prepare("SELECT slug FROM short_links WHERE kind = ? AND value = ?").bind(kind, value).first<{ slug: string }>();
       await ctx.db.batch([
+        ...(prev && prev.slug.toLowerCase() !== slug.toLowerCase() ? [ctx.db.prepare("INSERT OR REPLACE INTO short_link_aliases (slug, kind, value) VALUES (?, ?, ?)").bind(prev.slug, kind, value)] : []),
+        ctx.db.prepare("DELETE FROM short_link_aliases WHERE slug = ? COLLATE NOCASE").bind(slug), // 改回舊縮寫：不再是別名
         ctx.db.prepare("DELETE FROM short_links WHERE kind = ? AND value = ?").bind(kind, value),
         ctx.db.prepare("INSERT INTO short_links (slug, kind, value) VALUES (?, ?, ?)").bind(slug, kind, value),
         audit(ctx.db, s.sub, "short_link.set", "short_link", kind, `${value} → ${slug}`),
@@ -7990,7 +8008,8 @@ const routes: [string, RegExp, Handler][] = [
       const body = await readJson<Record<string, unknown>>(ctx.req);
       const kind = body.kind === "center" ? "center" : keywordKind(body.kind);
       const value = keywordText(body.value);
-      await ctx.db.batch([ctx.db.prepare("DELETE FROM short_links WHERE kind = ? AND value = ?").bind(kind, value), audit(ctx.db, s.sub, "short_link.remove", "short_link", kind, value)]);
+      // 「清除」＝這個短網址不要了：現在的縮寫與改名前的舊縮寫一起失效（只是「改成別的縮寫」才會保留舊的）。
+      await ctx.db.batch([ctx.db.prepare("DELETE FROM short_links WHERE kind = ? AND value = ?").bind(kind, value), ctx.db.prepare("DELETE FROM short_link_aliases WHERE kind = ? AND value = ?").bind(kind, value), audit(ctx.db, s.sub, "short_link.remove", "short_link", kind, value)]);
       return listShortLinks(ctx);
     },
   ],
@@ -8111,6 +8130,7 @@ const routes: [string, RegExp, Handler][] = [
         ctx.db.prepare("DELETE FROM keywords WHERE kind = ? AND value = ?").bind(kind, from),
         ctx.db.prepare("INSERT OR IGNORE INTO keywords (kind, value) VALUES (?, ?)").bind(kind, to),
         ...(kind === "category" || kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE short_links SET value = ? WHERE kind = ? AND value = ?").bind(to, kind, from)] : []),
+        ...(kind === "category" || kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE short_link_aliases SET value = ? WHERE kind = ? AND value = ?").bind(to, kind, from)] : []), // 舊縮寫也跟著改名
         ...(kind === "series" ? [ctx.db.prepare("UPDATE OR REPLACE series_settings SET series = ? WHERE series = ?").bind(to, from), ctx.db.prepare("UPDATE OR REPLACE series_art SET series = ? WHERE series = ?").bind(to, from), ctx.db.prepare("UPDATE OR REPLACE page_views SET key = ? WHERE kind = 'series' AND key = ?").bind(to, from)] : []),
         audit(ctx.db, s.sub, "keyword.rename", "keyword", kind, `${from} → ${to}`),
       ]);
@@ -8136,6 +8156,7 @@ const routes: [string, RegExp, Handler][] = [
         ...(kind === "category" ? catUpdates : [ctx.db.prepare(`UPDATE courses SET ${col} = '' WHERE ${col} = ?`).bind(value)]),
         ctx.db.prepare("DELETE FROM keywords WHERE kind = ? AND value = ?").bind(kind, value),
         ctx.db.prepare("DELETE FROM short_links WHERE kind = ? AND value = ?").bind(kind, value),
+        ctx.db.prepare("DELETE FROM short_link_aliases WHERE kind = ? AND value = ?").bind(kind, value),
         audit(ctx.db, s.sub, "keyword.remove", "keyword", kind, value),
       ]);
       return listKeywords(ctx);

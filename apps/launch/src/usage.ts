@@ -33,12 +33,14 @@ export async function isOwnerNet(db: D1Database, ip: string): Promise<boolean> {
 }
 
 /**
- * 「本人裝置」登記（杜杜龍 2026-11-26：這台 iPad 的操作一律算本人，即使無痕、沒登入、換網路）：
- * 依裝置的螢幕大小、像素比、系統與類型組成「裝置特徵」（例：820x1180@2:ios:tablet），超級管理員在那台裝置按「登記這台裝置」存起來；
- * 之後任何請求帶來相同特徵就記成 admin=1（統計預設不含，勾「包含管理員操作」才算）。不存 IP、不存任何個人識別碼。
- * 限制：特徵相同的同型號裝置（例如另一台 iPad Air）也會被當成本人——無痕模式沒有任何可持久的識別碼，這是能做到的最準方式。
+ * 「本人裝置」登記（杜杜龍 2026-11-26：這台 iPad 的操作一律算本人，即使無痕、沒登入）。
+ * 無痕模式沒有任何能記住身分的東西，只靠「同型號特徵」太粗暴會誤判別人的裝置，所以改成**兩個條件同時符合**才算本人：
+ * ① 裝置特徵相同（螢幕大小、像素比、系統與類型，例 820x1180@2:ios:tablet）**且** ② 目前的網路位置（IP 的比對碼）是登記過的網路。
+ * 超級管理員在那台裝置按「登記這台裝置」＝把「這個裝置特徵＋目前的網路」存起來（同一台裝置可登記最多 5 個網路，例如家裡、辦公室）。
+ * 不存原始 IP（只存 SHA-256 前 12 bytes 的比對碼，IPv6 只看前 64 位元）。換到沒登記過的網路（例如手機熱點）就認不出，需要在那個網路再登記一次。
+ * 另外，別人的同型號裝置即使在同一個網路也只有「特徵相同＋網路相同」才會被誤認，比單看特徵或單看 IP 準很多。
  */
-export type OwnerDevice = { fp: string; label: string; at: string };
+export type OwnerDevice = { fp: string; label: string; at: string; nets: string[] };
 export const FP_RE = /^\d{3,4}x\d{3,4}@\d(\.\d{1,2})?:(ios|android|other):(mobile|tablet|desktop)$/;
 let ownerDevCache: { at: number; list: OwnerDevice[] } | null = null;
 export async function ownerDevices(db: D1Database): Promise<OwnerDevice[]> {
@@ -46,7 +48,7 @@ export async function ownerDevices(db: D1Database): Promise<OwnerDevice[]> {
   const row = await db.prepare("SELECT value FROM ui_settings WHERE key = 'usage_owner_devices'").first<{ value: string }>();
   let list: OwnerDevice[] = [];
   try {
-    list = row ? (JSON.parse(row.value) as OwnerDevice[]).filter((d) => FP_RE.test(d.fp)) : [];
+    list = row ? (JSON.parse(row.value) as OwnerDevice[]).filter((d) => FP_RE.test(d.fp)).map((d) => ({ ...d, nets: Array.isArray(d.nets) ? d.nets.filter((n) => typeof n === "string") : [] })) : [];
   } catch {
     list = [];
   }
@@ -57,9 +59,21 @@ export async function saveOwnerDevices(db: D1Database, list: OwnerDevice[]): Pro
   await db.prepare("INSERT INTO ui_settings (key, value) VALUES ('usage_owner_devices', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')").bind(JSON.stringify(list.slice(0, 20))).run();
   ownerDevCache = null;
 }
-export async function isOwnerDevice(db: D1Database, fp: unknown): Promise<boolean> {
-  if (typeof fp !== "string" || !FP_RE.test(fp)) return false;
-  return (await ownerDevices(db)).some((d) => d.fp === fp);
+/** 登記這台裝置在目前網路：同特徵的裝置加上這個網路（最多 5 個，最舊的先掉）。 */
+export async function registerOwnerDevice(db: D1Database, fp: string, label: string, ip: string): Promise<OwnerDevice[]> {
+  const hash = await netHash(ip);
+  const list = await ownerDevices(db);
+  const cur = list.find((d) => d.fp === fp);
+  const nets = [...(cur?.nets ?? []).filter((n) => n !== hash), hash].slice(-5);
+  const next = [...list.filter((d) => d.fp !== fp), { fp, label: label || cur?.label || "我的裝置", at: new Date().toISOString(), nets }];
+  await saveOwnerDevices(db, next);
+  return next;
+}
+/** 裝置特徵相同，而且目前的網路是登記過的網路，才算本人。 */
+export async function isOwnerDevice(db: D1Database, fp: unknown, ip: string): Promise<boolean> {
+  if (typeof fp !== "string" || !FP_RE.test(fp) || !ip) return false;
+  const dev = (await ownerDevices(db)).find((d) => d.fp === fp);
+  return !!dev && dev.nets.includes(await netHash(ip));
 }
 
 /** 記一次（訪客也可以）；欄位不合格就忽略，不報錯、不影響使用。admin＝這次是杜杜龍本人的操作。 */
