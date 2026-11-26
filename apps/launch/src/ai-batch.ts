@@ -11,11 +11,11 @@ import { photoOcrIds, ocrPhoto } from "./photo-ocr.ts";
 import { sceneIds, sceneImage } from "./scene-vision.ts";
 import { loadSearchSettings } from "./search-settings.ts";
 
-type Job = { name: string; ids: (db: D1Database, n: number) => Promise<string[]>; run: (env: Env, db: D1Database, id: string) => Promise<void> };
+type Job = { name: string; on: string; prio: string; ids: (db: D1Database, n: number) => Promise<string[]>; run: (env: Env, db: D1Database, id: string) => Promise<void> };
 const JOBS: Job[] = [
-  { name: "edm ocr", ids: edmOcrIds, run: ocrEdmImage },
-  { name: "photo ocr", ids: photoOcrIds, run: ocrPhoto },
-  { name: "photo scene", ids: sceneIds, run: sceneImage },
+  { name: "edm ocr", on: "aiOnEdm", prio: "aiPrioEdm", ids: edmOcrIds, run: ocrEdmImage },
+  { name: "photo ocr", on: "photoOcrEnabled", prio: "aiPrioPhotoOcr", ids: photoOcrIds, run: ocrPhoto },
+  { name: "photo scene", on: "aiOnScene", prio: "aiPrioScene", ids: sceneIds, run: sceneImage },
 ];
 
 export async function runAiBatch(env: Env, db: D1Database): Promise<{ done: number; stopped: boolean }> {
@@ -24,11 +24,11 @@ export async function runAiBatch(env: Env, db: D1Database): Promise<{ done: numb
   const size = Math.max(1, Number(st.aiBatchSize ?? 12));
   const conc = Math.max(1, Number(st.aiConcurrency ?? 4));
   const until = Date.now() + Math.max(30, Number(st.aiBudgetSec ?? 240)) * 1000;
-  const skipOcr = st.photoOcrEnabled === false;
   let done = 0;
   let stopped = false;
-  for (const job of JOBS) {
-    if (job.name === "photo ocr" && skipOcr) continue;
+  // 依「設定 › AI 文字辨識」的優先順序（數字小的先）與開關（業主 2026-11-26）。
+  const order = JOBS.filter((j) => st[j.on] !== false).sort((a, b) => Number(st[a.prio] ?? 9) - Number(st[b.prio] ?? 9));
+  for (const job of order) {
     while (!stopped && Date.now() < until) {
       const ids = await job.ids(db, size);
       if (!ids.length) break;

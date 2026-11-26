@@ -1,3 +1,4 @@
+import { prepareVisionImage } from "./ai-image.ts";
 /**
  * 相簿照片文字辨識 OCR（業主 2026-11-25）：讀出照片裡看得到的文字（招牌、白板、產品包裝、投影片…），存到 cover_media.ocr_text，
  * 和「場景標籤」一起用於相簿搜尋（BlockAlbum／中心 EDM 共用的 AlbumSearch 模組）與全站場景搜尋。
@@ -32,18 +33,9 @@ export async function ocrPhoto(env: Env, db: D1Database, rowId: string): Promise
   const fail = async () => void (await db.prepare("UPDATE cover_media SET ocr_status = 'failed', ocr_model = ? WHERE id = ?").bind(model, rowId).run());
   const obj = await env.MEDIA.get(row.r2_key);
   if (!obj) return fail();
-  let bytes = new Uint8Array(await new Response(obj.body).arrayBuffer());
+  let bytes: Uint8Array = new Uint8Array(await new Response(obj.body).arrayBuffer());
   let type = obj.httpMetadata?.contentType ?? "image/jpeg";
-  if (bytes.length > MAX_BYTES / 3 && env.IMAGES && /^image\/(jpeg|png|webp)$/.test(type)) {
-    try {
-      // 文字要看得清楚，縮到 1600 邊長（比場景辨識大）。
-      const out = await env.IMAGES.input(new Blob([bytes as BlobPart]).stream()).transform({ width: 1600, fit: "scale-down" }).output({ format: "image/jpeg", quality: 85 });
-      bytes = new Uint8Array(await out.response().arrayBuffer());
-      type = "image/jpeg";
-    } catch {
-      /* 縮不了就用原圖 */
-    }
-  }
+  ({ bytes, type } = await prepareVisionImage(env, bytes, type, 1600));
   if (!bytes.length || bytes.length > MAX_BYTES) return fail();
   let est = 0;
   try {
@@ -67,6 +59,11 @@ export async function ocrPhoto(env: Env, db: D1Database, rowId: string): Promise
       throw new AiStopped("今天的 AI 免費額度已用完");
     }
     await refundAi(db, est);
+    if (/5018|not allowed to access/i.test(msg)) {
+      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請業主到 設定 › AI 模型 換模型。
+      await release();
+      throw new AiStopped("這個帳號不能使用所選的 AI 模型，請到「設定 › AI 模型」改選 Llama 4 Scout");
+    }
     if (/5016|agree|license/i.test(msg)) {
       await env.AI.run(model as never, { prompt: "agree" } as never).catch(() => undefined);
       await release();

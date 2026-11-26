@@ -1,3 +1,4 @@
+import { prepareVisionImage } from "./ai-image.ts";
 /**
  * 相簿照片場景辨識（業主 2026-11-24）：只辨識「其他相簿」（區塊照片，例如成交百寶箱），不辨識封面、也不辨識中心 EDM（EDM 走文字辨識）。
  * 用 Workers AI 視覺模型（設定 → AI 模型 →「相簿照片場景辨識」）認出行為、場景、物品，存成逗號分隔的短標籤到 cover_media.scene_text。
@@ -37,18 +38,10 @@ export async function sceneImage(env: Env, db: D1Database, rowId: string): Promi
   const fail = async () => void (await db.prepare("UPDATE cover_media SET scene_status = 'failed', scene_model = ? WHERE id = ?").bind(model, rowId).run());
   const obj = await env.MEDIA.get(row.r2_key);
   if (!obj) return fail();
-  let bytes = new Uint8Array(await new Response(obj.body).arrayBuffer());
+  let bytes: Uint8Array = new Uint8Array(await new Response(obj.body).arrayBuffer());
   let type = obj.httpMetadata?.contentType ?? "image/jpeg";
   // 太大的照片先縮小再送（省額度、避免超過模型上限）；沒有縮圖綁定就只能略過太大的。
-  if (bytes.length > MAX_BYTES / 3 && env.IMAGES && /^image\/(jpeg|png|webp)$/.test(type)) {
-    try {
-      const out = await env.IMAGES.input(new Blob([bytes as BlobPart]).stream()).transform({ width: 1024, fit: "scale-down" }).output({ format: "image/jpeg", quality: 80 });
-      bytes = new Uint8Array(await out.response().arrayBuffer());
-      type = "image/jpeg";
-    } catch {
-      /* 縮不了就用原圖 */
-    }
-  }
+  ({ bytes, type } = await prepareVisionImage(env, bytes, type, 1024));
   if (!bytes.length || bytes.length > MAX_BYTES) return fail();
   let est = 0;
   try {
@@ -71,6 +64,11 @@ export async function sceneImage(env: Env, db: D1Database, rowId: string): Promi
       throw new AiStopped("今天的 AI 免費額度已用完");
     }
     await refundAi(db, est);
+    if (/5018|not allowed to access/i.test(msg)) {
+      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請業主到 設定 › AI 模型 換模型。
+      await release();
+      throw new AiStopped("這個帳號不能使用所選的 AI 模型，請到「設定 › AI 模型」改選 Llama 4 Scout");
+    }
     if (/5016|agree|license/i.test(msg)) {
       await env.AI.run(model as never, { prompt: "agree" } as never).catch(() => undefined);
       await release();

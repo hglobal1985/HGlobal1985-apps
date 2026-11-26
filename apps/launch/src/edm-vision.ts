@@ -1,3 +1,4 @@
+import { prepareVisionImage } from "./ai-image.ts";
 /**
  * EDM 圖片辨識（業主 2026-11-23）：用 Workers AI 的視覺模型（設定 → AI 模型 →「EDM 圖片辨識」選用）讀出海報上的文字與活動日期，
  * 存在 cover_media 的 ocr_text／event_date，用於搜尋與 EDM 依活動日期排序。額度走 reserveAi（和其他 AI 工作共用每日免費額度）。
@@ -79,9 +80,10 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
   const fail = async () => void (await db.prepare("UPDATE cover_media SET ocr_status = 'failed', ocr_model = ? WHERE id = ?").bind(model, rowId).run());
   const obj = await env.MEDIA.get(row.r2_key);
   if (!obj) return fail();
-  const bytes = new Uint8Array(await new Response(obj.body).arrayBuffer());
+  let bytes: Uint8Array = new Uint8Array(await new Response(obj.body).arrayBuffer());
+  let type = obj.httpMetadata?.contentType ?? "image/jpeg";
+  ({ bytes, type } = await prepareVisionImage(env, bytes, type, 1600));
   if (!bytes.length || bytes.length > MAX_BYTES) return fail();
-  const type = obj.httpMetadata?.contentType ?? "image/jpeg";
   let est = 0;
   try {
     est = await reserveAi(db, model, { inputTokens: 2500, outputTokens: 500 }); // 額度用完會丟 AiStopped（呼叫端接住，之後再試）
@@ -104,6 +106,11 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
       throw new AiStopped("今天的 AI 免費額度已用完");
     }
     await refundAi(db, est);
+    if (/5018|not allowed to access/i.test(msg)) {
+      // 這個帳號不能用所選的模型（例如 Gemma 3）：這張不算失敗，退回排隊，並停止這一輪，請業主到 設定 › AI 模型 換模型。
+      await release();
+      throw new AiStopped("這個帳號不能使用所選的 AI 模型，請到「設定 › AI 模型」改選 Llama 4 Scout");
+    }
     if (/5016|agree|license/i.test(msg)) {
       // Llama 3.2 Vision 第一次使用要先同意 Meta 授權（送一次 "agree"），之後會自動重試。
       await env.AI.run(model as never, { prompt: "agree" } as never).catch(() => undefined);

@@ -6940,6 +6940,14 @@ const routes: [string, RegExp, Handler][] = [
         scene: pack(scene.results),
         photoOcr: pack(photoOcr.results),
         ai: { capEnabled: st.capEnabled, dailyCap: st.dailyCap, used, remaining: Math.max(0, st.dailyCap - used) },
+        jobs: await (async () => {
+          const ss = await (await import("./search-settings.ts")).loadSearchSettings(ctx.db);
+          return [
+            { key: "edm", label: "中心 EDM 文字辨識", on: ss.aiOnEdm !== false, prio: Number(ss.aiPrioEdm ?? 1) },
+            { key: "photoOcr", label: "相簿照片文字辨識（OCR）", on: ss.photoOcrEnabled !== false, prio: Number(ss.aiPrioPhotoOcr ?? 2) },
+            { key: "scene", label: "相簿場景標籤辨識", on: ss.aiOnScene !== false, prio: Number(ss.aiPrioScene ?? 3) },
+          ].sort((a, b) => a.prio - b.prio);
+        })(),
       };
     },
   ],
