@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   wrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "flex-start", zIndex: 3500 },
   box: { height: FLASH_H, paddingHorizontal: space.sm, borderRadius: radius.lg, borderWidth: 2, alignItems: "center", justifyContent: "center", gap: space.sm, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
   inner: { alignSelf: "stretch", minHeight: FLASH_H - 9, paddingVertical: space.md, alignItems: "center", justifyContent: "center", gap: space.sm },
-  icon: { height: FLASH_ICON, flexShrink: 0, alignItems: "center", justifyContent: "center" },
+  icon: { minHeight: FLASH_ICON, flexShrink: 0, alignItems: "center", justifyContent: "center" },
   title: { fontWeight: "800", textAlign: "center" },
   body: { fontWeight: "600", textAlign: "center" },
 });
