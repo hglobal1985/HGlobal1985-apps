@@ -1,3 +1,4 @@
+import { DriveFolderOptions, isDriveFolderUrl } from "./drive-import";
 import { isDownloadUrl } from "@/lib/download-material";
 import { Check } from "@/ui/check";
 import { isSuperAdmin } from "@/lib/roles";
@@ -13,6 +14,7 @@ import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, DateSelect, FormBlock, Icon, LoadingView } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
+import { flashText } from "@/ui/flash-notice";
 import { FileUploadModule } from "@/features/uploads/file-upload-module";
 import { BrandIcon } from "@/ui/brand-icon";
 import { EditSheet } from "./edit-sheet";
@@ -107,6 +109,8 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const { c } = useTheme();
   const { invalidate } = useSession();
   const [ytOpen, setYtOpen] = useState(false);
+  const [driveSync, setDriveSync] = useState(false); // 貼的是雲端資料夾：勾選＝一列列匯入並自動同步（杜杜龍 2026-11-26）
+  const [driveFmt, setDriveFmt] = useState("{標題}");
   // 清單卡的影片教材存的是影片來源（不是外部連結）：編輯時把它還原成 YouTube 網址顯示。
   const baseLink = lesson?.linkUrl ?? (lesson?.media?.type === "youtube" && lesson.media.ref ? `https://www.youtube.com/watch?v=${lesson.media.ref}` : "");
   const [url, setUrl] = useState(baseLink);
@@ -127,6 +131,8 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const [error, setError] = useState<string | null>(null);
 
   const parsed = parseHttpsUrl(url);
+  const driveFolder = !lesson && isDriveFolderUrl(parsed);
+  const driveMode = driveFolder && driveSync;
   const fileType = parsed ? classifyLink(parsed) : null;
   const ytId = fileType === "youtube" ? ytIdOfUrl(parsed) : null;
   const dirty = lesson ? appPlayer !== baseApp || theme !== !!lesson.isSpeaker || url !== baseLink || title !== lesson.title || evDate !== (lesson.eventDate ?? "") || secOf(trim.start) !== (lesson.start ?? null) || secOf(trim.end) !== (lesson.end ?? null) : !!url.trim() || !!title.trim();
@@ -196,6 +202,14 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
     setBusy(true);
     setError(null);
     try {
+      if (!lesson && driveSync && isDriveFolderUrl(parsed)) {
+        // 雲端資料夾：建立同步設定並立刻同步一次（放進指定區塊的話，afterBlock 就是區塊編號）。
+        const r = await api<{ imported?: number; total?: number; note?: string }>("POST", "/admin/drive-syncs", { url: parsed.toString(), courseId: course.id, blockId: afterBlock ?? "", titleFormat: driveFmt.trim() || "{標題}", syncNow: true });
+        flashText(r.imported ? `已匯入 ${r.imported} 個檔案，並加入自動同步` : r.note || "已加入自動同步");
+        invalidate();
+        onClose();
+        return;
+      }
       const dateBody = { eventDate: evDate || null };
       let lessonId = lesson?.id;
       if (lesson) await api("PUT", `/admin/lessons/${lesson.id}/material`, { url: parsed.toString(), title, appPlayer, ...dateBody });
@@ -230,7 +244,7 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
   const input = [{ minHeight: minTouch, borderWidth: 1, borderRadius: radius.md, paddingHorizontal: space.md }, bodyFont, { color: c.text, borderColor: c.border, backgroundColor: c.surface }];
   const info = fileType ? TYPE_INFO[fileType] : null;
   return (
-    <EditSheet title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : "新增"} dirty={dirty} busy={busy} error={error}>
+    <EditSheet title={lesson ? `教材 ${lesson.position}：${lesson.title}` : "新增教材"} onClose={onClose} onSave={submit} saveLabel={lesson ? "儲存" : driveMode ? "匯入並同步" : "新增"} dirty={dirty} busy={busy} error={error}>
       {!lesson ? (
         <FormBlock title="YouTube 播放清單" hint="貼播放清單網址，一次匯入所有影片當教材；之後可再同步新影片，也會出現在「設定 › 同步 YouTube 清單」。">
           <Pressable accessibilityRole="button" accessibilityLabel="匯入 YouTube 播放清單" onPress={() => setYtOpen(true)} style={({ pressed }) => [{ minHeight: minTouch, borderRadius: radius.md, borderWidth: 1.5, borderColor: c.accent, backgroundColor: pressed ? c.accentSoft : c.surface, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space.sm }]}>
@@ -279,6 +293,9 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
           </AppText>
         ) : null}
       </View>
+      {driveFolder ? <DriveFolderOptions on={driveSync} setOn={setDriveSync} format={driveFmt} setFormat={setDriveFmt} /> : null}
+      {driveMode ? null : (
+        <>
       <View style={{ gap: space.xs }}>
         <AppText variant="callout" tone="muted">
           教材名稱
@@ -314,6 +331,8 @@ function LinkMaterialSheet({ course, lesson, onClose, afterBlock }: { course: Co
           showHint
         />
       ) : null}
+        </>
+      )}
     </EditSheet>
   );
 }
