@@ -164,7 +164,7 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
                   <Text style={[styles.sub, info.ocrStatus === "failed" && styles.fail]}>{`狀態：${OCR_STATUS[info.ocrStatus] ?? info.ocrStatus}`}{info.eventDate ? `　活動日期：${info.eventDate}` : ""}</Text>
                   {info.ocrText ? (
                     <>
-                      {info.structured.fields ? (
+                      {isEdm && info.structured.fields ? (
                         <View style={{ gap: 10 }}>
                           {info.structured.fields.filter(([, v]) => v).map(([k, v]) => (
                             <View key={k} style={{ gap: 2 }}>
@@ -182,7 +182,7 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
                         </View>
                       ) : (
                         <>
-                          <Text style={styles.sub}>{info.structured.stale ? "還沒套入欄位格式（AI 整理中，稍後再開會看到）；先顯示辨識原文：" : "這張無法套入欄位格式，顯示辨識原文："}</Text>
+                          {isEdm ? <Text style={styles.sub}>{info.structured.stale ? "還沒套入欄位格式（AI 整理中，稍後再開會看到）；先顯示辨識原文：" : "這張無法套入欄位格式，顯示辨識原文："}</Text> : null}
                           <Text selectable style={[styles.body, SELECTABLE]}>{info.ocrText}</Text>
                         </>
                       )}
@@ -191,13 +191,13 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
                           <Ionicons name="copy-outline" size={18} color="#fff" />
                           <Text style={styles.btnText}>複製全部文字</Text>
                         </Pressable>
-                        {info.structured.fields ? (
+                        {isEdm && info.structured.fields ? (
                           <Pressable accessibilityRole="button" onPress={() => setShowRaw((v) => !v)} style={styles.btn}>
                             <Text style={styles.btnText}>{showRaw ? "收起辨識原文" : "看辨識原文"}</Text>
                           </Pressable>
                         ) : null}
                       </View>
-                      {showRaw && info.structured.fields ? <Text selectable style={[styles.sub, SELECTABLE]}>{info.ocrText}</Text> : null}
+                      {showRaw && isEdm && info.structured.fields ? <Text selectable style={[styles.sub, SELECTABLE]}>{info.ocrText}</Text> : null}
                     </>
                   ) : <Text style={styles.v}>{info.ocrStatus === "done" ? "沒有辨識出文字。" : "目前還沒有辨識出的文字。"}</Text>}
                 </>

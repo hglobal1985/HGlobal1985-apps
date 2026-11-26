@@ -99,6 +99,7 @@ export default function AiTextScreen() {
           <Button label="到 AI 模型頁換模型" variant="secondary" onPress={() => router.push("/admin/ai-models")} fullWidth />
         </Card>
         <AppText variant="headline">欄位格式（由上到下的顯示順序）</AppText>
+        <AppText variant="caption" tone="muted">這份格式「只適用中心 EDM」：只有 EDM 的辨識文字會被整理成下面的欄位（日期、時間、主題…）。相簿（區塊）照片、課程封面等其他照片的辨識文字不套用格式，直接顯示辨識出來的原文。</AppText>
         {rows.map((r, i) => (
           <Card key={i}>
             <View style={styles.rowTop}>
