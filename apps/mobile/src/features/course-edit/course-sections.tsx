@@ -18,6 +18,7 @@ import { BrandField, CategoryField, HostField } from "./field-groups";
 import { ReviewDeskBlock } from "./review-desk";
 import { RosterSheet } from "./roster-sheet";
 import { YoutubeSyncSheet } from "./youtube-import";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 /** 編輯面板的種類（每一區各自一個底部面板、各自儲存）。 */
 export type SectionKey = "basics" | "when" | "price" | "enroll" | "advanced" | "status" | "roster" | "youtube";
@@ -478,7 +479,7 @@ function StatusSheet({ course, onClose, onSaved }: SheetProps) {
       const copy = await api<CourseDetail>("POST", `/admin/courses/${course.id}/duplicate`, {});
       invalidate();
       onClose();
-      router.push({ pathname: "/course/[id]", params: { id: copy.id, edit: "1" } });
+      afterSheetClose(() => router.push({ pathname: "/course/[id]", params: { id: copy.id, edit: "1" } }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -497,7 +498,7 @@ function StatusSheet({ course, onClose, onSaved }: SheetProps) {
       invalidate();
       onClose();
       flashText("已刪除課程");
-      router.replace("/courses");
+      afterSheetClose(() => router.replace("/courses"));
     } catch (e) {
       setError((e as Error).message);
     } finally {

@@ -5,6 +5,7 @@ import { OrderCard } from "@/features/orders/order-card";
 import { space } from "@/theme/tokens";
 import { AppText, SheetAction } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 /**
  * 報名紀錄「先看摘要、再看全部」：點一筆先從下方彈出摘要（編號、狀態、課程與金額），
@@ -13,7 +14,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 export function OrderSheet({ order, onClose }: { order: Order; onClose: () => void }) {
   const go = () => {
     onClose();
-    router.push(`/orders/${order.id}`);
+    afterSheetClose(() => router.push(`/orders/${order.id}`));
   };
   return (
     <BottomSheet onClose={onClose} onExpand={go} expandLabel="繼續上拉進入完整明細">

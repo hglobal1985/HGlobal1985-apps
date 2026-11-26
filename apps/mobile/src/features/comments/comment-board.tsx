@@ -10,6 +10,7 @@ import { space } from "@/theme/tokens";
 import { confirmAsk } from "@/features/confirm";
 import { AppText, Button, Card, Field, NoticeBox, Pill, Section, SheetAction } from "@/ui";
 import { BottomSheet } from "@/ui/bottom-sheet";
+import { afterSheetClose } from "@/lib/sheet-back";
 
 /**
  * 課程留言板：登入會員可留言；可檢舉、封鎖對方（商店規範要求）；管理員可隱藏。
@@ -77,7 +78,7 @@ function CommentBoardInner({ courseId, full = false, focusId }: { courseId: stri
 
   const goFull = (focus?: string) => {
     setOpen(null);
-    router.push({ pathname: "/comments/[courseId]", params: { courseId, ...(focus ? { focus } : {}) } });
+    afterSheetClose(() => router.push({ pathname: "/comments/[courseId]", params: { courseId, ...(focus ? { focus } : {}) } }));
   };
 
   return (
