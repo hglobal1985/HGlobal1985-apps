@@ -34,7 +34,7 @@ const round = (label: string, icon: string, onPress: () => void) => (
  * 列表（分類標籤、搜尋名稱與整篇文字、右下「＋新增食譜」）→ 單道食譜（可左右滑的照片、文字、影片、複製／分享）。
  * 所有會員都能投稿（進「待審核」）；管理者（超級管理員、總部管理員、相簿齒輪「食譜」上傳獎銜達標者）直接發佈、審核、管理分類。
  */
-export function RecipeZone({ q, onBack, onOpenPhotos }: { /** 相簿上方共用搜尋列（`AlbumSearchBar`）的字：食譜頁不自己做搜尋框。 */ q: string; onBack: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void }) {
+export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /** 從側邊欄點某個分類進來時預先選好。 */ initialCat?: string; /** 相簿上方共用搜尋列（`AlbumSearchBar`）的字：食譜頁不自己做搜尋框。 */ q: string; onBack: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void }) {
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const thumb = useThumb();
@@ -45,7 +45,7 @@ export function RecipeZone({ q, onBack, onOpenPhotos }: { /** 相簿上方共用
     return () => clearTimeout(t);
   }, [q]);
   const { data, loading, error, reload } = useApi<RecipesResponse>(`/recipes${qs ? `?q=${encodeURIComponent(qs)}` : ""}`);
-  const [cat, setCat] = useState<string>("all");
+  const [cat, setCat] = useState<string>(initialCat);
   const [openId, setOpenId] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: string; isNew: boolean } | null>(null);
   const [catSheet, setCatSheet] = useState(false);
@@ -300,7 +300,7 @@ function CategorySheet({ cats, admin, onClose, onChanged }: { cats: { id: string
   );
 }
 
-type AuthorHit = { sub: string; name: string; legalName: string; avatar: string | null };
+type AuthorHit = { sub: string; name: string; legalName: string; avatar: string | null; center: string };
 /**
  * 更換食譜上傳者（只有超級管理員，杜杜龍 2026-11-26）：從行動大學已註冊的會員直接輸入名字挑選，暱稱與本名都能搜尋；
  * 換了以後，上傳者暱稱與所屬中心跟著變（中心取自會員中心，不能手動填）。本名只給超級管理員在這裡辨識同名的人，不存進資料庫。
@@ -328,7 +328,7 @@ function AuthorSheet({ recipeId, current, onClose, onChanged }: { recipeId: stri
     if (!(await confirmAsk("更換上傳者", `這道食譜的上傳者改成「${m.name}」？所屬中心會跟著換成他的中心。`, "更換"))) return;
     setBusy(true);
     try {
-      await api("PUT", `/admin/recipes/${recipeId}/author`, { sub: m.sub });
+      await api("PUT", `/admin/recipes/${recipeId}/author`, { sub: m.sub, name: m.name });
       flashText(`已更換上傳者為「${m.name}」`);
       onChanged();
       onClose();
@@ -340,7 +340,7 @@ function AuthorSheet({ recipeId, current, onClose, onChanged }: { recipeId: stri
   };
   return (
     <RecipeSheet title="更換上傳者" onClose={onClose}>
-      <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`目前上傳者：${current || "（沒有）"}。輸入暱稱或本名搜尋行動大學的會員。`}</AppText>
+      <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{`目前上傳者：${current || "（沒有）"}。暱稱可以搜尋所有會員中心的會員（2 個字以上）；本名只找得到用過行動大學的會員。`}</AppText>
       <TextInput value={q} onChangeText={setQ} autoFocus placeholder="輸入暱稱或本名" placeholderTextColor="#6f6f75" accessibilityLabel="搜尋會員" style={{ borderWidth: 2, borderColor: "#2e7d32", borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, color: "#fff", backgroundColor: "#0b0b0b" }} />
       {q.trim() && hits === null ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>搜尋中…</AppText> : null}
       {hits && !hits.length ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>找不到符合的會員</AppText> : null}
@@ -351,6 +351,7 @@ function AuthorSheet({ recipeId, current, onClose, onChanged }: { recipeId: stri
           </View>
           <View style={{ flex: 1 }}>
             <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{m.name}</AppText>
+            {m.center ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9fe3b8", fontSize: 13 }}>{centerTitle(m.center)}</AppText> : null}
             {m.legalName ? <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13 }}>{`本名：${m.legalName}`}</AppText> : null}
           </View>
         </Pressable>
