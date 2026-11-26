@@ -1,5 +1,6 @@
 import type { D1Database, Env } from "./d1.ts";
 import { classifyLink } from "./links.ts";
+import { taipeiDay } from "./youtube.ts";
 import { nextPos, placeInBlock, placeOnTop, runYoutubeSync, sortMaterialsByDate } from "./imports.ts";
 
 /**
@@ -14,7 +15,10 @@ export const PLATINUM_FORMAT = "簡報{年}年{月}月 白金溝通會{括號}";
 
 export const folderIdOf = (url: string): string | null => /\/folders\/([\w-]{10,})/.exec(url)?.[1] ?? /[?&]id=([\w-]{10,})/.exec(url)?.[1] ?? null;
 
-export type DriveFile = { id: string; name: string; modified: string | null };
+export type DriveFile = { id: string; name: string; modified: string | null; /** Google Drive 的「建立日期」（教材日期用它，杜杜龍 2026-11-26）。 */ created?: string | null };
+
+/** 教材日期＝Drive 檔案的建立日期（台灣時間的那一天）；讀不到才退回檔名的年月。 */
+export const driveDate = (f: DriveFile): string | null => taipeiDay(f.created ?? undefined) ?? (parseDriveName(f.name, f.modified).ym || null);
 
 /** 檔名 → 年月（開頭 YYYYMM，例如「202611 線上白金溝通會（…）.pdf」）；沒有就用修改日。 */
 export function parseDriveName(name: string, modified: string | null): { year: string; month: string; title: string; ym: string; bracket: string } {
@@ -50,7 +54,7 @@ export async function readDriveFolder(key: string, folderId: string): Promise<{ 
     folders++;
     let token = "";
     for (let page = 0; page < 20; page++) {
-      const qs = new URLSearchParams({ q: `'${cur.id}' in parents and trashed = false`, fields: "nextPageToken,files(id,name,mimeType,modifiedTime)", pageSize: "200", supportsAllDrives: "true", includeItemsFromAllDrives: "true", key });
+      const qs = new URLSearchParams({ q: `'${cur.id}' in parents and trashed = false`, fields: "nextPageToken,files(id,name,mimeType,modifiedTime,createdTime)", pageSize: "200", supportsAllDrives: "true", includeItemsFromAllDrives: "true", key });
       if (token) qs.set("pageToken", token);
       let res: Response;
       try {
@@ -64,11 +68,11 @@ export async function readDriveFolder(key: string, folderId: string): Promise<{ 
         if (res.status === 403 || res.status === 400) return { error: "Google 拒絕讀取：請確認 Google Drive API 已啟用、金鑰正確，且資料夾共用設為「知道連結的任何人可檢視」" };
         return { error: `Google 回應錯誤（${res.status}）` };
       }
-      const j = (await res.json()) as { nextPageToken?: string; files?: { id: string; name: string; mimeType: string; modifiedTime?: string }[] };
+      const j = (await res.json()) as { nextPageToken?: string; files?: { id: string; name: string; mimeType: string; modifiedTime?: string; createdTime?: string }[] };
       for (const f of j.files ?? []) {
         if (f.mimeType === "application/vnd.google-apps.folder") {
           if (cur.depth < 3) queue.push({ id: f.id, depth: cur.depth + 1 });
-        } else files.push({ id: f.id, name: f.name, modified: f.modifiedTime ?? null });
+        } else files.push({ id: f.id, name: f.name, modified: f.modifiedTime ?? null, created: f.createdTime ?? null });
       }
       if (!j.nextPageToken) break;
       token = j.nextPageToken;
@@ -104,13 +108,14 @@ async function sortBlockByDate(db: D1Database, courseId: string, blockId: string
 
 /** 已經匯入的檔案也依目前的命名規則改名（改規則、補括號文字後，舊的教材跟著更新；同步一律以命名規則為準）。 */
 async function renameExisting(db: D1Database, courseId: string, fmt: string, files: DriveFile[]): Promise<void> {
-  const { results } = await db.prepare("SELECT a.lesson_id AS lid, a.link_url AS url, l.title FROM lesson_attachments a JOIN lessons l ON l.id = a.lesson_id WHERE a.course_id = ? AND a.kind = 'link' AND a.link_url LIKE 'https://drive.google.com/file/d/%'").bind(courseId).all<{ lid: string; url: string; title: string }>();
+  const { results } = await db.prepare("SELECT a.lesson_id AS lid, a.link_url AS url, l.title, l.event_date AS date FROM lesson_attachments a JOIN lessons l ON l.id = a.lesson_id WHERE a.course_id = ? AND a.kind = 'link' AND a.link_url LIKE 'https://drive.google.com/file/d/%'").bind(courseId).all<{ lid: string; url: string; title: string; date: string | null }>();
   const byId = new Map(files.map((f) => [f.id, f]));
   const stmts = results.flatMap((r) => {
     const f = byId.get(/\/file\/d\/([\w-]+)/.exec(r.url)?.[1] ?? "");
     if (!f) return [];
-    const name = driveTitle(fmt, f).slice(0, 120);
-    return name && name !== r.title ? [db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(name, r.lid)] : [];
+    const name = driveTitle(fmt, f).slice(0, 120) || r.title;
+    const date = driveDate(f);
+    return name !== r.title || (date && date !== r.date) ? [db.prepare("UPDATE lessons SET title = ?, event_date = ? WHERE id = ?").bind(name, date ?? r.date, r.lid)] : [];
   });
   if (stmts.length) await db.batch(stmts);
 }
@@ -129,7 +134,7 @@ export async function runDriveSync(env: Env, syncId: string): Promise<{ imported
   const total = read.files.length;
   const have = await existingDriveIds(db, sync.course_id);
   await renameExisting(db, sync.course_id, sync.title_format || "{標題}", read.files);
-  const fresh = read.files.filter((f) => !have.has(f.id)).sort((a, b) => parseDriveName(b.name, b.modified).ym.localeCompare(parseDriveName(a.name, a.modified).ym));
+  const fresh = read.files.filter((f) => !have.has(f.id)).sort((a, b) => (driveDate(b) ?? "").localeCompare(driveDate(a) ?? ""));
   if (!fresh.length) return finish({ imported: 0, total, note: "沒有新的檔案（都已經同步過了）" });
   const fmt = sync.title_format || "{標題}";
   const pos = await nextPos(db, sync.course_id);
@@ -141,7 +146,7 @@ export async function runDriveSync(env: Env, syncId: string): Promise<{ imported
       const name = driveTitle(fmt, f).slice(0, 120);
       lines.push(`${name}｜${f.name}`);
       return [
-        db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, event_date, kind) VALUES (?, ?, ?, ?, 0, 'demo', ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, p.ym || null),
+        db.prepare("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, event_date, kind) VALUES (?, ?, ?, ?, 0, 'demo', ?, 'material')").bind(ids[i]!, sync.course_id, pos + i, name, driveDate(f)),
         db.prepare("INSERT INTO lesson_attachments (id, lesson_id, course_id, name, kind, link_url, att_type, created_by) VALUES (?, ?, ?, ?, 'link', ?, ?, 'system')").bind(crypto.randomUUID(), ids[i]!, sync.course_id, p.title.slice(0, 120), driveUrl(f.id), classifyLink(new URL(driveUrl(f.id)))),
       ];
     }),

@@ -23,8 +23,8 @@ test("雲端資料夾同步：只加新檔案、放進區塊、最新的在最�
   await run("INSERT INTO lessons (id, course_id, position, title, duration_minutes, media_type, kind) VALUES ('blk', 'c1', 1, '簡報', 0, 'demo', 'section')");
   await run("INSERT INTO drive_syncs (id, url, folder_id, course_id, block_id, title_format) VALUES ('d1', 'u', 'FOLDER12345', 'c1', 'blk', ?)", PLATINUM_FORMAT);
   const files = [
-    { id: "F202610", name: "202610 線上白金溝通會（A）.pdf", mimeType: "application/pdf", modifiedTime: "2026-11-26T00:00:00Z" },
-    { id: "F202611", name: "202611 線上白金溝通會（B）.pdf", mimeType: "application/pdf", modifiedTime: "2026-11-01T00:00:00Z" },
+    { id: "F202610", name: "202610 線上白金溝通會（A）.pdf", mimeType: "application/pdf", modifiedTime: "2026-11-26T00:00:00Z", createdTime: "2026-10-28T09:10:29Z" },
+    { id: "F202611", name: "202611 線上白金溝通會（B）.pdf", mimeType: "application/pdf", modifiedTime: "2026-11-26T00:00:00Z", createdTime: "2026-11-24T09:59:43Z" },
     { id: "SUBFLD", name: "子資料夾", mimeType: "application/vnd.google-apps.folder" },
   ];
   const realFetch = globalThis.fetch;
@@ -39,6 +39,9 @@ test("雲端資料夾同步：只加新檔案、放進區塊、最新的在最�
     assert.equal(a.total, 3);
     const rows = (await db.prepare("SELECT title FROM lessons WHERE course_id = 'c1' AND kind = 'material' ORDER BY position").all<{ title: string }>()).results;
     assert.deepEqual(rows.map((r) => r.title), ["簡報2026年11月 白金溝通會（B）", "簡報2026年10月 白金溝通會（A）", "簡報2026年9月 白金溝通會"]);
+    // 教材日期＝Drive 檔案的建立日期（杜杜龍 2026-11-26），不是檔名的年月
+    const dates = (await db.prepare("SELECT event_date FROM lessons WHERE course_id = 'c1' AND kind = 'material' ORDER BY position").all<{ event_date: string }>()).results.map((r) => r.event_date);
+    assert.deepEqual(dates.slice(0, 2), ["2026-11-24", "2026-10-28"]);
     const first = await db.prepare("SELECT kind FROM lessons WHERE course_id = 'c1' ORDER BY position LIMIT 1").first<{ kind: string }>();
     assert.equal(first?.kind, "section");
     const att = await db.prepare("SELECT link_url, att_type FROM lesson_attachments WHERE course_id = 'c1' LIMIT 1").first<{ link_url: string; att_type: string }>();
