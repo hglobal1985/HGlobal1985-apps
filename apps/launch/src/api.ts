@@ -4657,6 +4657,31 @@ const routes: [string, RegExp, Handler][] = [
   ],
   [
     "GET",
+    /^\/recipes\/([a-z0-9]{6,16})\/cover$/,
+    async (ctx, [id]) => {
+      // 食譜的 LINE 預覽卡縮圖（杜杜龍 2026-11-26）：食譜封面照片（第一張）裁成 1200×630 的 JPEG。
+      // 相簿照片可能存成 AVIF／WebP，LINE 預覽讀不到，所以這裡一律轉成 JPEG；只給已發佈的食譜；轉檔失敗就回原圖。
+      const r = await ctx.db
+        .prepare("SELECT m.r2_key AS k FROM recipes r JOIN cover_media m ON m.owner_kind = 'course' AND m.owner_key = 'rcp:' || r.id AND m.kind = 'image' WHERE r.id = ? AND r.status = 'published' ORDER BY m.position LIMIT 1")
+        .bind(id)
+        .first<{ k: string }>();
+      const obj = r && ctx.env.MEDIA ? await ctx.env.MEDIA.get(r.k) : null;
+      if (!obj) return new Response("Not found", { status: 404 });
+      const type = obj.httpMetadata?.contentType ?? "image/jpeg";
+      if (ctx.env.IMAGES) {
+        try {
+          const out = await ctx.env.IMAGES.input(obj.body).transform({ width: 1200, height: 630, fit: "cover" }).output({ format: "image/jpeg", quality: 85 });
+          return new Response(await out.response().arrayBuffer(), { headers: { "content-type": "image/jpeg", "cache-control": "public, max-age=86400", "x-content-type-options": "nosniff" } });
+        } catch {
+          const again = await ctx.env.MEDIA!.get(r!.k);
+          if (again) return new Response(again.body, { headers: { "content-type": type, "cache-control": "public, max-age=300", "x-content-type-options": "nosniff" } });
+        }
+      }
+      return new Response(obj.body, { headers: { "content-type": type, "cache-control": "public, max-age=300", "x-content-type-options": "nosniff" } });
+    },
+  ],
+  [
+    "GET",
     /^\/albums$/,
     async (ctx) => albumsIndex(ctx),
   ],

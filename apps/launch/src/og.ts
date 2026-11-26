@@ -162,7 +162,8 @@ async function recipeMeta(db: D1Database, id: string, url: string, origin: strin
     .catch(() => null);
   if (!r) return null;
   const S = await shareCfg(db);
-  return { title: titleOf(S, r.t), description: await describe(db, S), url, image: pubImage(origin, r.k, 0) };
+  // 縮圖＝食譜封面照片（第一張），一律轉成 JPEG 讓 LINE 讀得到（v＝照片檔名，換封面時網址跟著變，LINE 才會重抓）。
+  return { title: titleOf(S, r.t), description: await describe(db, S), url, image: r.k ? `${origin}/api/v2/recipes/${id}/cover?v=${encodeURIComponent(r.k.split("/").pop()!.slice(0, 12))}` : `${origin}/icon-512.png` };
 }
 
 export async function resolveShareMeta(db: D1Database, url: URL): Promise<ShareMeta | null> {

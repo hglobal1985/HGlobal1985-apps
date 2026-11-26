@@ -151,7 +151,7 @@ export default function ShareDefaultsScreen() {
             <AppText variant="caption" tone="muted">{`以前用過、仍然有效的路徑：${s.recipeAliases.join("、")}`}</AppText>
           ) : null}
           <AppText variant="caption" tone="muted">
-            分享食譜時分兩個動作（LINE 收到「照片＋文字」只會收照片，所以分開傳）：①文字與連結＝食譜文字（含 YouTube 連結）＋上面這段說明與短網址；②所有照片（同時把文字複製起來，可在對話裡貼上）。預覽卡片格式同 ④（標題＝食譜名稱＋站名，圖＝第一張照片）。
+            分享食譜時一次只傳文字：食譜名稱、整篇食譜（含 YouTube 連結）、再加上面這段說明與短網址，不傳照片檔案（LINE 收到照片加文字會把文字丟掉）。照片由 LINE 預覽卡的縮圖呈現：預覽卡格式同 ④（標題＝食譜名稱＋站名，縮圖＝食譜封面照片，也就是第一張照片）。
           </AppText>
         </Card>
       </Section>

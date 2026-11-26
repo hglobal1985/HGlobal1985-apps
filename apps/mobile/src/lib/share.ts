@@ -171,45 +171,14 @@ export async function shareImages(title: string, urls: string[]): Promise<"share
 }
 
 /**
- * 食譜分享（杜杜龍 2026-11-26；同日實測改版）：LINE 收到「照片檔案＋文字」時**只收照片、把文字丟掉**（實機驗證，LINE 的限制，網頁無法改變），
- * 所以分兩個動作，各自都能完整送出：①「文字與連結」＝食譜名稱、整篇食譜（含 YouTube 連結行）、最後一段「更多食譜按這裡 👉 短網址」（範本 `recipeText`，
- * 在「設定 › 分享預設值」）；②「所有照片」＝把這道食譜的全部照片檔交給系統分享選單，**同時把①的文字複製到剪貼簿**，在 LINE 傳完照片可以直接貼上。
- * 網頁：照片用 Web Share 的檔案分享；不能傳檔案的瀏覽器退成只傳文字。App：系統分享選單一次只能帶文字，所以只有①。
- * 照片要先抓成檔案，網頁分享必須在點下去後很短時間內呼叫，所以開啟食譜時就用 `prepareRecipePhotos` 先準備好。
+ * 食譜分享（杜杜龍 2026-11-26，最終版）：**一次只傳固定的文字**——食譜名稱、整篇食譜（含 YouTube 連結行）、最後一段「更多食譜按這裡 👉 短網址」（範本 `recipeText`，
+ * 在「設定 › 分享預設值」）。**不傳照片檔案**：實測 LINE 收到「照片＋文字」只收照片、把文字丟掉，所以照片改由 LINE 預覽卡的縮圖呈現（圖＝食譜封面照片，見 `og.ts` 的 `recipeMeta`）。
+ * 網頁／App 都呼叫系統分享選單；電腦（沒有分享選單）複製文字。
  */
-export function prepareRecipePhotos(urls: string[], baseName: string): Promise<File[]> {
-  if (Platform.OS !== "web" || typeof window === "undefined") return Promise.resolve([]);
-  return Promise.all(
-    urls.slice(0, 50).map(async (u, i) => {
-      const blob = await asJpeg(await (await fetch(absolute(originalUrl(u)))).blob());
-      return new window.File([blob], `${baseName}-${i + 1}.jpg`, { type: blob.type || "image/jpeg" });
-    }),
-  ).catch(() => []);
-}
-/** 食譜的分享文字：名稱、整篇食譜、最後一段說明與短網址。 */
 export function recipeShareText(o: { title: string; body: string; path: string }): string {
   return [o.title, o.body.trim(), shareSettings.recipeText.replaceAll("{網址}", absolute(o.path))].filter(Boolean).join("\n\n");
 }
-/** 這個瀏覽器能不能一次傳照片檔案（不能就不必問「文字或照片」）。 */
-export const canSharePhotos = () => Platform.OS === "web" && typeof navigator !== "undefined" && typeof navigator.share === "function" && typeof navigator.canShare === "function";
-/** ①文字與連結。 */
 export const shareRecipeText = (o: { title: string; body: string; path: string }) => shareText(o.title, recipeShareText(o));
-/** ②所有照片（同時把文字複製到剪貼簿）。 */
-export async function shareRecipePhotos(o: { title: string; body: string; path: string; files: Promise<File[]> }): Promise<"shared" | "copied" | "cancelled"> {
-  const text = recipeShareText(o);
-  void navigator.clipboard?.writeText(text).catch(() => undefined);
-  try {
-    const files = await o.files;
-    if (files.length && navigator.canShare({ files })) {
-      await navigator.share({ files });
-      trackFeature("share");
-      return "shared";
-    }
-  } catch (e) {
-    if ((e as { name?: string }).name === "AbortError") return "cancelled";
-  }
-  return shareText(o.title, text);
-}
 
 /** 一次下載多張圖片：網頁依序觸發瀏覽器下載（每張間隔一下，避免被瀏覽器擋下）；App 交給系統分享選單。 */
 export async function downloadImages(urls: string[], baseName: string): Promise<void> {
