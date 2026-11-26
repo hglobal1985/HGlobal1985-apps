@@ -164,3 +164,12 @@ export async function semanticDebug(env: Env, db: D1Database, q: string, n = 20)
   const top = scored.sort((a, b) => b.s - a.s).slice(0, n).sort((a, b) => Number(b.s >= min) - Number(a.s >= min) || prio(a.r.kind) - prio(b.r.kind) || b.s - a.s);
   return { min, rows: top.map((x) => ({ kind: tagOf(x.r.kind), title: x.r.txt.replace(/\s+/g, " ").slice(0, 80), score: Math.round(x.s * 1000) / 1000, boost: boost(x.r.kind), pass: x.s >= min })) };
 }
+
+/**
+ * 相簿搜尋的語意比對（杜杜龍 2026-11-26：搜「下午茶」要找到寫「午茶交流會」的 EDM）：
+ * 用同一套語意搜尋（同樣的門檻、來源開關），只取 EDM 與相片類的命中，回傳照片編號（cover_media.id）。沒登入、AI 沒回應、語意搜尋關閉時回空。
+ */
+export async function semanticMediaIds(env: Env, db: D1Database, q: string): Promise<string[]> {
+  const r = await semanticSearch(env, db, q);
+  return r.extras.filter((h) => h.kind === "edm" || h.kind === "photo").map((h) => h.id.slice(h.id.indexOf(":") + 1));
+}

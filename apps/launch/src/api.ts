@@ -4666,10 +4666,18 @@ const routes: [string, RegExp, Handler][] = [
       const tokens = (ctx.url.searchParams.get("q") ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, 4);
       if (!tokens.length || tokens.join("").length < 2) return { items: [] };
       const like = (t: string) => `%${t.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
-      const { results } = await ctx.db
+      const { results: byText } = await ctx.db
         .prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, cm.event_date, COALESCE(NULLIF(mp.name, ''), cm.uploader_name) AS uploader_name, COALESCE(NULLIF(mp.avatar, ''), cm.uploader_avatar) AS uploader_avatar, cm.owner_kind, cm.center_key, cm.owner_key FROM cover_media cm LEFT JOIN member_profiles mp ON mp.sub = cm.created_by WHERE cm.kind = 'image' AND ${tokens.map(() => "lower(cm.scene_text || ' ' || cm.ocr_text || ' ' || COALESCE(cm.event_date, '')) LIKE ? ESCAPE '\\'").join(" AND ")} ORDER BY cm.created_at DESC LIMIT 400`)
         .bind(...tokens.map(like))
         .all<{ id: string; scope: CoverScope; kind: "image"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number; scene_text: string; ocr_text: string; event_date: string | null; uploader_name: string | null; uploader_avatar: string | null; owner_kind: string; center_key: string | null; owner_key: string }>();
+      // 語意比對（杜杜龍 2026-11-26）：搜「下午茶」也找得到寫「午茶交流會」的 EDM；只加入還沒被文字比對找到的照片，沒登入或 AI 沒回應就略過。
+      const semIds = ctx.session ? await (await import("./semantic-search.ts")).semanticMediaIds(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "").catch(() => [] as string[]) : [];
+      const haveIds = new Set(byText.map((r) => r.id));
+      const moreIds = semIds.filter((id) => !haveIds.has(id)).slice(0, 100);
+      const byMeaning = moreIds.length
+        ? (await ctx.db.prepare(`SELECT cm.id, cm.scope, cm.kind, cm.r2_key, cm.poster_key, cm.width, cm.height, cm.duration_sec, cm.scene_text, cm.ocr_text, cm.event_date, COALESCE(NULLIF(mp.name, ''), cm.uploader_name) AS uploader_name, COALESCE(NULLIF(mp.avatar, ''), cm.uploader_avatar) AS uploader_avatar, cm.owner_kind, cm.center_key, cm.owner_key FROM cover_media cm LEFT JOIN member_profiles mp ON mp.sub = cm.created_by WHERE cm.kind = 'image' AND cm.id IN (${moreIds.map(() => "?").join(",")})`).bind(...moreIds).all<{ id: string; scope: CoverScope; kind: "image"; r2_key: string; poster_key: string | null; width: number; height: number; duration_sec: number; scene_text: string; ocr_text: string; event_date: string | null; uploader_name: string | null; uploader_avatar: string | null; owner_kind: string; center_key: string | null; owner_key: string }>()).results
+        : [];
+      const results = [...byText, ...byMeaning];
       const folders = new Map((await albumsIndex(ctx)).groups.flatMap((g) => g.folders).map((f) => [f.id, f]));
       const items = [];
       for (const r of results) {
@@ -4679,6 +4687,16 @@ const routes: [string, RegExp, Handler][] = [
         items.push({ ...coverItem(r), folderId: f.id, folderTitle: f.title });
       }
       return { items: items.slice(0, 300) };
+    },
+  ],
+  [
+    "GET",
+    /^\/albums\/semantic$/,
+    async (ctx) => {
+      // 相簿「此頁」搜尋的語意比對（杜杜龍 2026-11-26）：回意思相近的照片編號，畫面只在自己已打開的相簿裡挑出這些照片（權限照相簿本身）。
+      if (!ctx.session) return { ids: [] };
+      const { semanticMediaIds } = await import("./semantic-search.ts");
+      return { ids: await semanticMediaIds(ctx.env, ctx.db, ctx.url.searchParams.get("q") ?? "").catch(() => [] as string[]) };
     },
   ],
   [

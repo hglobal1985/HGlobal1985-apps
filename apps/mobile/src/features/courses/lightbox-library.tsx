@@ -9,7 +9,7 @@ import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { LightboxGrid } from "./lightbox-grid";
 import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
 import { SubfolderHome, SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
-import { AlbumSearchBar, matchAlbumItem } from "./album-search";
+import { AlbumSearchBar, matchAlbumItem, useAlbumSemantic } from "./album-search";
 import { trackUsage } from "@/lib/usage";
 import { saveAlbumPos } from "@/lib/album-memory";
 import { isSuperAdmin } from "@/lib/roles";
@@ -67,6 +67,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const viewGroup = view ? groups.find((g) => g.folders.some((f) => f.id === view.folder.id)) : undefined;
   const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)); // 沒有＝相簿首頁（類別資料夾）
   const key = q.trim().toLowerCase();
+  const sem = useAlbumSemantic(key, scope === "page"); // 此頁搜尋的語意比對；「全部」由伺服器的 /albums/search 自己加語意結果
 
   // 使用統計（相簿操作習慣）：打開相簿一次；搜尋停手 1 秒記一次（只記搜尋範圍，不記搜尋內容）。
   useEffect(() => {
@@ -80,7 +81,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
 
   // 搜尋「全部」：停手 0.4 秒後才問伺服器。
   useEffect(() => {
-    if (scope !== "all" || key.length < 2) return void setFound(null);
+    if ((scope !== "all" && view) || key.length < 2) return void setFound(null); // 「全部」，或在類別／首頁（還沒進資料夾）搜尋：也找照片（杜杜龍 2026-11-26）
     let alive = true;
     const t = setTimeout(() => {
       api<{ items: Found[] }>("GET", `/albums/search?q=${encodeURIComponent(key)}`)
@@ -91,7 +92,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       alive = false;
       clearTimeout(t);
     };
-  }, [scope, key]);
+  }, [scope, key, !!view]);
 
   const openFolder = async (f: AlbumFolder) => {
     if (f.locked) return void flashText(f.lockReason || "沒有權限進入這個相簿");
@@ -161,6 +162,22 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   };
   // 相簿首頁的「類別資料夾」（款式 C 的大類別標籤改成這個）：4 格預覽取自該類別資料夾的封面；此頁搜尋會過濾類別名稱。
   const homeCats = groups.filter((g) => !key || g.label.toLowerCase().includes(key));
+  const pageFound = scope === "all" || !cur ? found : found && found.filter((p) => cur.folders.some((f) => f.id === p.folderId)); // 此頁＝目前這個類別裡的照片
+  /** 搜尋到的照片格（「全部」搜尋，以及在類別／首頁搜尋時），點開用看圖畫面；文字比對與 AI 語意比對的結果都在裡面。 */
+  const photosBlock = () => (
+    <>
+      <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>{pageFound === null ? (key.length < 2 ? "請輸入至少 2 個字" : "搜尋中…") : `照片 ${pageFound.length} 張`}</AppText>
+      {pageFound?.length ? (
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+          {pageFound.map((p, i) => (
+            <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`${p.folderTitle} 的照片`} onPress={() => onPick({ folder: null, title: `搜尋「${q.trim()}」`, items: pageFound, index: i })} style={{ width: thirdW, height: thirdW, backgroundColor: "#262629" }}>
+              <Image source={{ uri: thumb(resolveUrl(p.url), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
+    </>
+  );
   const homeFolderHits = key ? groups.flatMap((g) => g.folders).filter((f) => `${folderName(f)} ${f.subtitle ?? ""}`.toLowerCase().includes(key)) : [];
   const catCard = (g: (typeof groups)[number]) => {
     const half = Math.floor((cardW - 6) / 2);
@@ -201,7 +218,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
 
   // 資料夾裡的照片（此頁搜尋會過濾）
   const inSub = hasSubs && sub !== null ? view!.items.filter((p) => (p.folderId ?? "") === sub) : view?.items ?? [];
-  const filtered = view ? (scope === "page" && key ? inSub.filter((p) => matchAlbumItem(p, key)) : inSub) : [];
+  const filtered = view ? (scope === "page" && key ? inSub.filter((p) => matchAlbumItem(p, key, sem)) : inSub) : [];
   // 排序（杜杜龍 2026-11-25）：活動日期、上傳時間；點一下遞減，再點遞增。沒有排序＝相簿原本的順序。沒有日期的照片永遠排最後。
   const shown = sortBy
     ? [...filtered].sort((a, b) => {
@@ -322,7 +339,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* 搜尋列：與頁面相簿共用 AlbumSearchBar（深色款＋「此頁／全部」切換），永遠顯示 */}
         <View style={{ paddingHorizontal: 16 }}>
-          <AlbumSearchBar dark q={q} setQ={setQ} scope={scope} onScope={setScope} placeholder={scope === "page" ? (view ? "搜尋這個資料夾的照片" : cur ? `搜尋「${cur.label}」裡的資料夾` : "搜尋相簿類別與資料夾") : "搜尋全部相簿的場景、照片文字"} />
+          <AlbumSearchBar dark q={q} setQ={setQ} scope={scope} onScope={setScope} placeholder={scope === "page" ? (view ? "搜尋這個資料夾的照片" : cur ? `搜尋「${cur.label}」裡的資料夾與照片` : "搜尋相簿類別與資料夾") : "搜尋全部相簿的場景、照片文字"} />
         </View>
         {/* 類別返回列：在某個類別裡時，回到相簿首頁（類別資料夾） */}
         {cur && !view ? (
@@ -365,16 +382,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
             <>
               {allFolderHits.length ? <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>資料夾</AppText> : null}
               {allFolderHits.length ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{allFolderHits.map(card)}</View> : null}
-              <AppText variant="callout" {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontWeight: "700" }}>{found === null ? (key.length < 2 ? "請輸入至少 2 個字" : "搜尋中…") : `照片 ${found.length} 張`}</AppText>
-              {found?.length ? (
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-                  {found.map((p, i) => (
-                    <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`${p.folderTitle} 的照片`} onPress={() => onPick({ folder: null, title: `搜尋「${q.trim()}」`, items: found, index: i })} style={{ width: thirdW, height: thirdW, backgroundColor: "#262629" }}>
-                      <Image source={{ uri: thumb(resolveUrl(p.url), 240) }} style={{ width: "100%", height: "100%" }} resizeMode="cover" accessibilityIgnoresInvertColors />
-                    </Pressable>
-                  ))}
-                </View>
-              ) : null}
+              {photosBlock()}
             </>
           ) : (
             <>
@@ -382,7 +390,8 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
               {!cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeCats.map(catCard)}</View> : null}
               {!cur && key ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{homeFolderHits.map(card)}</View> : null}
               {cur ? <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>{folders.map(card)}</View> : null}
-              {data && ((cur && !folders.length) || (!cur && !homeCats.length && !homeFolderHits.length)) ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? "沒有符合的資料夾" : "還沒有相簿照片"}</AppText> : null}
+              {data && ((cur && !folders.length) || (!cur && !homeCats.length && !homeFolderHits.length)) && !(key && pageFound?.length) ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{key ? (pageFound === null && key.length >= 2 ? "搜尋中…" : "沒有符合的資料夾或照片") : "還沒有相簿照片"}</AppText> : null}
+              {key ? photosBlock() : null}
             </>
           )}
         </ScrollView>
