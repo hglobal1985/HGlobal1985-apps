@@ -9,6 +9,7 @@ import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Card, EmptyState, ErrorView, LoadingView, NoticeBox, Screen } from "@/ui";
 import { useApi, useSession } from "@/state/session";
 import { AiProgressPanel } from "@/features/admin/ai-progress";
+import { AiSpecialRulesPanel } from "@/features/admin/ai-special-rules";
 
 type Field = { name: string; hint: string };
 type View_ = { fields: Field[]; defaults: Field[]; other: string; stats: { total: number; done: number; pending: number }; model: { id: string; name: string; cost: string } | null };
@@ -85,6 +86,7 @@ export default function AiTextScreen() {
       <View style={{ gap: space.md }}>
         <AppText variant="title">AI 文字辨識</AppText>
         <AiProgressPanel />
+        <AiSpecialRulesPanel />
         <AppText variant="callout" tone="muted">
           EDM 上傳後，AI 會先讀出海報上的文字，再照下面的欄位整理好，顯示在「全螢幕看圖 › 圖片資訊」。歸不進任何欄位的內容，固定放在最後的「{data.other}」。
         </AppText>

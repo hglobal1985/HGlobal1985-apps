@@ -22,33 +22,24 @@ const validDate = (y: number, m: number, d: number): string | null => {
   return new Date(iso + "T00:00:00Z").toISOString().slice(0, 10) === iso ? iso : null;
 };
 /**
- * 從辨識出的文字推活動日期（模型常常不照格式回，或猜錯年份）：
- * 優先找完整的 YYYY-MM-DD／YYYY年M月D日／YYYY/M/D；其次找「M/D」「M月D日」，有寫星期（例如「11/24日（二）」）就挑星期對得上的年份，
- * 沒寫星期就挑離今天最近的年份。找不到回 null。
+ * 從辨識出的文字推活動日期（業主 2026-11-26 規定）：EDM 上的日期通常沒寫年份，**一律用「上傳當下的年份」**（台灣時間）建檔；
+ * 海報上明確寫了完整年份（YYYY-MM-DD／YYYY年M月D日／YYYY/M/D）就照海報。只有月日（M/D、M月D日）→ 上傳年＋月日。找不到回 null。
+ * uploaded＝這張 EDM 上傳的時間（沒給就用現在）。
  */
-export function inferDate(text: string, now = new Date()): string | null {
-  const near = (c: string[]) => c.sort((a, b) => Math.abs(Date.parse(a) - +now) - Math.abs(Date.parse(b) - +now))[0] ?? null;
-  const md = /(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})\s*日?\s*[（(]?\s*(?:週|周|星期)?\s*([日一二三四五六])?/.exec(text);
-  const y0 = now.getUTCFullYear();
-  const cands = md ? [y0 - 1, y0, y0 + 1].map((y) => validDate(y, +md[1]!, +md[2]!)).filter((x): x is string => !!x) : [];
-  // ① 寫了星期：挑星期對得上的年份（模型猜的年份常常錯）
-  if (md?.[3]) {
-    const wd = WEEK.indexOf(md[3]);
-    const hit = near(cands.filter((c) => new Date(c + "T00:00:00Z").getUTCDay() === wd));
-    if (hit) return hit;
-  }
-  // ② 有完整年月日
+export function inferDate(text: string, uploaded = new Date()): string | null {
   const full = /(20\d{2})\s*[-/年.]\s*(\d{1,2})\s*[-/月.]\s*(\d{1,2})/.exec(text);
   if (full) {
     const v = validDate(+full[1]!, +full[2]!, +full[3]!);
     if (v) return v;
   }
-  // ③ 只有月日：挑離今天最近的年份
-  return near(cands);
+  const md = /(\d{1,2})\s*(?:\/|月)\s*(\d{1,2})\s*日?/.exec(text);
+  if (!md) return null;
+  const year = new Date(uploaded.getTime() + 8 * 3600_000).getUTCFullYear();
+  return validDate(year, +md[1]!, +md[2]!);
 }
 
 /** 從模型回的文字找出 JSON；活動日期必須是真實存在的 YYYY-MM-DD，否則當作沒有。 */
-export function parseVision(raw: string): { text: string; date: string | null } {
+export function parseVision(raw: string, uploaded?: Date): { text: string; date: string | null } {
   const m = /\{[\s\S]*\}/.exec(raw);
   let text = "";
   let date: string | null = null;
@@ -63,8 +54,8 @@ export function parseVision(raw: string): { text: string; date: string | null } 
   } else text = raw;
   const ok = date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date + "T00:00:00Z")) && new Date(date + "T00:00:00Z").toISOString().slice(0, 10) === date && +date.slice(0, 4) >= 2000 && +date.slice(0, 4) <= 2100;
   const clean = cleanOcrText(text).slice(0, 3000);
-  // 海報上有寫星期的日期比模型猜的年份可靠：兩個不一致時用文字推的；模型沒給合法日期時也用文字推。
-  const inferred = inferDate(clean);
+  // 日期以程式從文字推的為準（沒寫年份一律用上傳年）；推不出來才用模型給的合法日期。
+  const inferred = inferDate(clean, uploaded);
   return { text: clean, date: inferred ?? (ok ? date : null) };
 }
 
@@ -73,7 +64,7 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
   if (!env.AI || !env.MEDIA) return;
   const claim = await db.prepare("UPDATE cover_media SET ocr_status = 'working', ocr_at = ? WHERE id = ? AND kind = 'image' AND (ocr_status = '' OR (ocr_status = 'working' AND ocr_at < ?))").bind(new Date().toISOString(), rowId, new Date(Date.now() - 600_000).toISOString()).run();
   if (!claim.meta?.changes) return;
-  const row = await db.prepare("SELECT r2_key FROM cover_media WHERE id = ?").bind(rowId).first<{ r2_key: string }>();
+  const row = await db.prepare("SELECT r2_key, created_at FROM cover_media WHERE id = ?").bind(rowId).first<{ r2_key: string; created_at: string | null }>();
   if (!row) return;
   const release = () => db.prepare("UPDATE cover_media SET ocr_status = '' WHERE id = ? AND ocr_status = 'working'").bind(rowId).run();
   const model = (await loadSelection(db)).edm_vision!;
@@ -121,7 +112,7 @@ export async function ocrEdmImage(env: Env, db: D1Database, rowId: string): Prom
   }
   let parsed: { text: string; date: string | null };
   try {
-    parsed = parseVision(out);
+    parsed = parseVision(out, row.created_at ? new Date(row.created_at) : undefined);
   } catch {
     return fail(); // 解析出錯不可卡在「處理中」
   }
@@ -139,12 +130,7 @@ export async function edmOcrIds(db: D1Database, limit: number): Promise<string[]
 
 /** 背景處理還沒辨識的中心 EDM 圖（每次最多 limit 張；額度用完或沒綁定 AI 就停）。 */
 export async function ocrPending(env: Env, db: D1Database, limit = 3): Promise<void> {
-  // 已辨識但沒有日期的，用已存的文字重新推日期（不用 AI）。
-  const old = await db.prepare("SELECT id, ocr_text FROM cover_media WHERE scope = 'edm' AND ocr_status = 'done' AND event_date IS NULL AND ocr_text <> '' LIMIT 60").all<{ id: string; ocr_text: string }>();
-  for (const r of old.results) {
-    const d = inferDate(r.ocr_text);
-    if (d) await db.prepare("UPDATE cover_media SET event_date = ? WHERE id = ?").bind(d, r.id).run();
-  }
+  await fixEdmYears(db);
   if (!env.AI) return;
   const { results } = await db.prepare("SELECT id FROM cover_media WHERE owner_kind = 'center' AND scope = 'edm' AND kind = 'image' AND (ocr_status = '' OR (ocr_status = 'working' AND ocr_at < ?)) ORDER BY created_at DESC LIMIT ?").bind(new Date(Date.now() - 600_000).toISOString(), limit).all<{ id: string }>();
   for (const r of results) {
@@ -155,4 +141,21 @@ export async function ocrPending(env: Env, db: D1Database, limit = 3): Promise<v
     }
   }
   await structurePending(env, db, 2); // 已辨識但還沒套入目前欄位格式的，慢慢補整理
+}
+
+/**
+ * 補齊／校正 EDM 活動日期的年份（業主 2026-11-26）：已辨識的 EDM 依上傳年份重新推日期（不用 AI、可重複執行）。
+ * 規則見 `inferDate`：沒寫年份一律用上傳當年；海報寫了完整年份就照海報。排程、讀中心 EDM、「立即開始辨識」都會順便跑。
+ */
+export async function fixEdmYears(db: D1Database): Promise<number> {
+  const { results } = await db.prepare("SELECT id, ocr_text, event_date, created_at FROM cover_media WHERE scope = 'edm' AND kind = 'image' AND ocr_status = 'done' AND ocr_text <> '' LIMIT 500").all<{ id: string; ocr_text: string; event_date: string | null; created_at: string | null }>();
+  let n = 0;
+  for (const r of results) {
+    const d = inferDate(r.ocr_text, r.created_at ? new Date(r.created_at) : undefined);
+    if (d && d !== r.event_date) {
+      await db.prepare("UPDATE cover_media SET event_date = ? WHERE id = ?").bind(d, r.id).run();
+      n++;
+    }
+  }
+  return n;
 }
