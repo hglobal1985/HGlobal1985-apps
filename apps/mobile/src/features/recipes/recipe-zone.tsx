@@ -158,7 +158,7 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit 
   };
   const text = d ? `${d.title}\n\n${d.body}` : "";
   const act = (label: string, icon: string, onPress: () => void, bg = "#262629", fg = "#fff") => (
-    <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{ minHeight: 48, paddingHorizontal: 16, borderRadius: 24, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: bg }}>
+    <Pressable key={label} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} style={{ minHeight: 44, paddingHorizontal: 14, borderRadius: 22, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: bg }}>
       <Ionicons name={icon as never} size={20} color={fg} {...UI_ONLY} />
       <AppText {...UI_ONLY_TEXT} style={{ color: fg, fontWeight: "800", fontSize: 15 }}>{label}</AppText>
     </Pressable>
@@ -197,6 +197,16 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40, alignItems: "center" }}>
         <View style={{ width: w, gap: 14 }}>
           {!d ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>{detail.error ? "找不到這道食譜" : "讀取中…"}</AppText> : null}
+          {d ? (
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {d.body ? act("複製文字", "copy-outline", () => void Clipboard.setStringAsync(text).then(() => flashText("已複製食譜文字"))) : null}
+                {act("分享", "share-outline", () => void share())}
+                {d.status === "published" && listOn ? act(inList ? `已加入 ${inList} 份清單` : "加入我的清單", "bookmark-outline", () => (member ? setListOpen(true) : flashText("請先登入才能加入我的清單")), inList ? "#FFD43B" : "#262629", inList ? "#1F1A00" : "#fff") : null}
+                {d.manager && d.status === "pending" ? act("核准", "checkmark-circle-outline", () => void approve(), "#0c603c") : null}
+                {d.canEdit ? act("編輯", "create-outline", onEdit) : null}
+                {d.canEdit ? act("刪除", "trash-outline", () => void remove(), "#3a1c1c", "#ff8a80") : null}
+            </View>
+          ) : null}
           {photos.length ? (
             <View>
               <ScrollView ref={scroller} horizontal pagingEnabled showsHorizontalScrollIndicator={false} onMomentumScrollEnd={(e) => setIdx(Math.round(e.nativeEvent.contentOffset.x / w))} style={{ width: w, height: h, borderRadius: 12 }}>
@@ -225,14 +235,6 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit 
                 {d.status === "pending" ? <View style={{ backgroundColor: "#F5C842", borderRadius: 10, paddingHorizontal: 9, paddingVertical: 2 }}><AppText {...UI_ONLY_TEXT} style={{ color: "#1F1A00", fontSize: 12, fontWeight: "800" }}>待審核</AppText></View> : null}
               </View>
               {d.body ? <RecipeBody text={d.body} /> : <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>這道食譜還沒有文字。</AppText>}
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
-                {d.body ? act("複製文字", "copy-outline", () => void Clipboard.setStringAsync(text).then(() => flashText("已複製食譜文字"))) : null}
-                {act("分享", "share-outline", () => void share())}
-                {d.status === "published" && listOn ? act(inList ? `已加入 ${inList} 份清單` : "加入我的清單", "bookmark-outline", () => (member ? setListOpen(true) : flashText("請先登入才能加入我的清單")), inList ? "#FFD43B" : "#262629", inList ? "#1F1A00" : "#fff") : null}
-                {d.manager && d.status === "pending" ? act("核准", "checkmark-circle-outline", () => void approve(), "#0c603c") : null}
-                {d.canEdit ? act("編輯", "create-outline", onEdit) : null}
-                {d.canEdit ? act("刪除", "trash-outline", () => void remove(), "#3a1c1c", "#ff8a80") : null}
-              </View>
             </>
           ) : null}
         </View>
