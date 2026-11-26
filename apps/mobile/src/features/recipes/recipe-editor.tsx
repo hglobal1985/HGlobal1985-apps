@@ -1,7 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, resolveUrl, type CoverMediaItem, type RecipeCategory, type RecipeDetail } from "@/api/client";
 import { choiceSheet, confirmSheet } from "@/features/confirm";
 import { Sheet } from "@/features/courses/album-admin";
@@ -28,6 +29,33 @@ export function RecipeSheet({ title, onClose, children }: { title: string; onClo
     <Sheet title={title} onClose={() => void onClose()}>
       {children}
     </Sheet>
+  );
+}
+
+/**
+ * 整頁編輯畫面（杜杜龍 2026-11-26：編輯模式不要只有半頁、儲存鈕固定在最上面不要跟著捲動跑掉）：
+ * 蓋滿整個螢幕（網頁用 fixed，蓋過相簿自己的上方工具列），最上面固定一列「取消（左）｜標題｜儲存（右）」，內容在下面捲動。
+ * 上一頁／返回手勢＝呼叫 `onCancel`（有未存內容的會問「儲存／放棄／繼續編輯」）。
+ */
+export function RecipeFullPage({ title, onCancel, onSave, saving, children }: { title: string; onCancel: () => unknown; onSave: () => unknown; saving?: boolean; children: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const ref = useRef(onCancel);
+  ref.current = onCancel;
+  useSheetBack(ref);
+  const frame = Platform.OS === "web" ? ({ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 } as object) : StyleSheet.absoluteFill;
+  return (
+    <View style={[frame, { zIndex: 40, backgroundColor: "#101010" }]}>
+      <View style={{ paddingTop: insets.top + 10, paddingBottom: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#333", backgroundColor: "#101010" }}>
+        <Pressable accessibilityRole="button" accessibilityLabel="取消" onPress={() => void onCancel()} style={{ minHeight: 48, minWidth: 84, paddingHorizontal: 16, borderRadius: 24, borderWidth: 2, borderColor: "#ff6b6b", alignItems: "center", justifyContent: "center" }}>
+          <AppText {...UI_ONLY_TEXT} style={{ color: "#ff6b6b", fontWeight: "800", fontSize: 16 }}>取消</AppText>
+        </Pressable>
+        <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800", fontSize: 18, textAlign: "center" }}>{title}</AppText>
+        <Pressable accessibilityRole="button" accessibilityLabel="儲存" disabled={saving} onPress={() => void onSave()} style={[{ minHeight: 48, minWidth: 84, paddingHorizontal: 16, borderRadius: 24, backgroundColor: "#0c603c", alignItems: "center", justifyContent: "center" }, saving && { opacity: 0.5 }]}>
+          <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 16 }}>{saving ? "儲存中…" : "儲存"}</AppText>
+        </Pressable>
+      </View>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 60, gap: 16 }}>{children}</ScrollView>
+    </View>
   );
 }
 
@@ -195,7 +223,7 @@ export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged 
   );
 
   return (
-    <RecipeSheet title={isNew ? "新增食譜" : "修改食譜"} onClose={requestClose}>
+    <RecipeFullPage title={isNew ? "新增食譜" : "修改食譜"} onCancel={requestClose} onSave={() => void save().then((ok) => ok && finish(true))} saving={busy}>
       {!ready ? (
         <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0" }}>讀取中…</AppText>
       ) : (
@@ -273,17 +301,9 @@ export function RecipeEditor({ id, isNew, cats, manager, onClose, onCatsChanged 
             />
             <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13, textAlign: "right" }}>{`${body.length} / ${BODY_MAX}`}</AppText>
           </View>
-          <View style={{ flexDirection: "row", gap: 10 }}>
-            <Pressable accessibilityRole="button" accessibilityLabel="取消" onPress={() => void requestClose()} style={{ flex: 1, minHeight: 52, borderRadius: 26, borderWidth: 2, borderColor: "#ff6b6b", alignItems: "center", justifyContent: "center" }}>
-              <AppText {...UI_ONLY_TEXT} style={{ color: "#ff6b6b", fontWeight: "800", fontSize: 17 }}>取消</AppText>
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel="儲存" disabled={busy} onPress={() => void save().then((ok) => ok && finish(true))} style={[{ flex: 1, minHeight: 52, borderRadius: 26, backgroundColor: "#0c603c", alignItems: "center", justifyContent: "center" }, busy && { opacity: 0.5 }]}>
-              <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>{busy ? "儲存中…" : "儲存"}</AppText>
-            </Pressable>
-          </View>
           {!manager && isNew ? <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 13, textAlign: "center" }}>會員投稿的食譜會先送給管理者審核，通過後所有人才看得到。</AppText> : null}
         </>
       )}
-    </RecipeSheet>
+    </RecipeFullPage>
   );
 }

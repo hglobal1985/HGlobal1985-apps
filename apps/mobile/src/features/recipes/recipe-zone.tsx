@@ -49,6 +49,7 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
   const [openId, setOpenId] = useState<string | null>(null);
   const [edit, setEdit] = useState<{ id: string; isNew: boolean } | null>(null);
   const [catSheet, setCatSheet] = useState(false);
+  const [ver, setVer] = useState(0); // 編輯完成後讓還開著的單道食譜重新讀取（不關閉單道畫面，免得返回紀錄錯亂）
   useEffect(() => trackUsage("album_folder", "食譜"), []);
 
   const recipes = data?.recipes ?? [];
@@ -121,8 +122,8 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
         <Ionicons name="add" size={24} color="#fff" {...UI_ONLY} />
         <AppText {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>新增食譜</AppText>
       </Pressable>
-      {openId ? <RecipeDetailView id={openId} onClose={() => setOpenId(null)} onOpenPhotos={onOpenPhotos} onChanged={reload} onEdit={() => (setEdit({ id: openId, isNew: false }), setOpenId(null))} /> : null}
-      {edit ? <RecipeEditor id={edit.id} isNew={edit.isNew} cats={cats} manager={!!data?.manager} onCatsChanged={reload} onClose={() => (setEdit(null), reload())} /> : null}
+      {openId ? <RecipeDetailView id={openId} onClose={() => setOpenId(null)} onOpenPhotos={onOpenPhotos} onChanged={reload} onEdit={() => setEdit({ id: openId, isNew: false })} refreshKey={ver} /> : null}
+      {edit ? <RecipeEditor id={edit.id} isNew={edit.isNew} cats={cats} manager={!!data?.manager} onCatsChanged={reload} onClose={() => (setEdit(null), setVer((v) => v + 1), reload())} /> : null}
       {catSheet ? <CategorySheet cats={cats} admin={!!data?.admin} onClose={() => setCatSheet(false)} onChanged={reload} /> : null}
     </View>
   );
@@ -140,7 +141,7 @@ function BackToList({ onClose }: { onClose: () => unknown }) {
 }
 
 /** 單道食譜：可左右滑的照片（點照片放大看圖）、名稱、分類、文字與影片、複製／分享；管理者與投稿者（待審核時）可修改、刪除，管理者可核准。 */
-export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit, standalone = false }: { /** 獨立頁面（不在相簿裡）：上方要避開手機瀏海。 */ standalone?: boolean; id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
+export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit, standalone = false, refreshKey = 0 }: { /** 編輯完成後 +1：重新讀取這道食譜。 */ refreshKey?: number; /** 獨立頁面（不在相簿裡）：上方要避開手機瀏海。 */ standalone?: boolean; id: string; onClose: () => void; onOpenPhotos: (title: string, items: CoverMediaItem[], index: number) => void; onChanged: () => void; onEdit: () => void }) {
   const insets = useSafeAreaInsets();
   const win = useWindowDimensions();
   const thumb = useThumb();
@@ -151,6 +152,9 @@ export function RecipeDetailView({ id, onClose, onOpenPhotos, onChanged, onEdit,
   const [listOpen, setListOpen] = useState(false);
   const [authorOpen, setAuthorOpen] = useState(false);
   const photosApi = useApi<CoverMediaItem[]>(`/cover-media?kind=course&key=${encodeURIComponent(`rcp:${id}`)}`);
+  useEffect(() => {
+    if (refreshKey) (detail.reload(), photosApi.reload());
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const scroller = useRef<ScrollViewInstance | null>(null);
   const [idx, setIdx] = useState(0);
   const d = detail.data;
