@@ -81,7 +81,7 @@ export default function KeywordsScreen() {
       {loading && !data ? <LoadingView /> : null}
       {data
         ? [tab].map((kind) => (
-            <Section key={kind} title={KEYWORD_INFO[kind].title}>
+            <Section fold key={kind} title={KEYWORD_INFO[kind].title}>
               <Card>
                 <AppText variant="caption" tone="muted">
                   {KEYWORD_INFO[kind].hint}

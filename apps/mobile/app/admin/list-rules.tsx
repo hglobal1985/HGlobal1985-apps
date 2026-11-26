@@ -101,7 +101,7 @@ export default function ListRulesScreen() {
       </AppText>
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
 
-      <Section title="① 系列排序（由上到下）">
+      <Section fold title="① 系列排序（由上到下）">
         <AppText variant="callout" tone="muted">
           「全部課程」切到「所有系列」模式時，小卡就照這裡的順序排。用箭頭上下移動，或按「置頂」直接移到最上面；最後按下方「儲存」。
         </AppText>
@@ -143,8 +143,8 @@ export default function ListRulesScreen() {
         </AppText>
       </Section>
 
-      <Section title="② 左上角緞帶（資格或狀態）">{RIBBON_KEYS.filter((k) => RIBBON_INFO[k].side === "left").map(ribbonCard)}</Section>
-      <Section title="③ 右上角緞帶（日期）">{RIBBON_KEYS.filter((k) => RIBBON_INFO[k].side === "right").map(ribbonCard)}</Section>
+      <Section fold title="② 左上角緞帶（資格或狀態）">{RIBBON_KEYS.filter((k) => RIBBON_INFO[k].side === "left").map(ribbonCard)}</Section>
+      <Section fold title="③ 右上角緞帶（日期）">{RIBBON_KEYS.filter((k) => RIBBON_INFO[k].side === "right").map(ribbonCard)}</Section>
 
       <View style={styles.row}>
         <Button label="儲存" icon="save-outline" loading={busy} disabled={busy} onPress={save} />

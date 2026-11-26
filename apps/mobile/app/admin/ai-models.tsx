@@ -95,7 +95,7 @@ export default function AiModelsScreen() {
       {data ? (
         <>
           {u ? (
-            <Section title="今日 AI 用量">
+            <Section fold title="今日 AI 用量">
               <Card>
                 <AppText variant="headline">
                   {u.used.toLocaleString()} ／ {u.dailyCap.toLocaleString()} 點{u.stopped ? "　已自動停止" : ""}
@@ -156,7 +156,7 @@ export default function AiModelsScreen() {
             </Section>
           ) : null}
           {u ? (
-            <Section title="Claude 本月預算">
+            <Section fold title="Claude 本月預算">
               <Card>
                 <AppText variant="headline">
                   US${u.claude.spentUsd.toFixed(2)} ／ US${u.claude.capUsd}
@@ -187,7 +187,7 @@ export default function AiModelsScreen() {
               </Card>
             </Section>
           ) : null}
-          <Section title="AI 金鑰與連線">
+          <Section fold title="AI 金鑰與連線">
             <Card>
               {data.keys.map((k) => (
                 <View key={k.key} style={{ gap: space.sm }}>
@@ -221,7 +221,7 @@ export default function AiModelsScreen() {
             </Card>
           </Section>
           {data.jobs.map((job) => (
-            <Section key={job.key} title={job.label}>
+            <Section fold key={job.key} title={job.label}>
               <Card>
                 <AppText variant="callout" tone="muted">
                   {job.desc}
@@ -250,7 +250,7 @@ export default function AiModelsScreen() {
               </Card>
             </Section>
           ))}
-          <Section title="AI 模型總表">
+          <Section fold title="AI 模型總表">
             <AppText variant="caption" tone="muted">
               花費為約略估計，實際以各家官方牌價為準；左右滑動可看完整表格。
             </AppText>

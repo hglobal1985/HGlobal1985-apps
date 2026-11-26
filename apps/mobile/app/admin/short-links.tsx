@@ -45,7 +45,7 @@ export default function ShortLinksScreen() {
         ? GROUPS.map((g) => {
             const items = data.filter((i) => i.kind === g.kind);
             return (
-              <Section key={g.kind} title={`${g.title}短網址`}>
+              <Section fold key={g.kind} title={`${g.title}短網址`}>
                 <AppText variant="callout" tone="muted">
                   {g.hint}
                 </AppText>
@@ -59,7 +59,7 @@ export default function ShortLinksScreen() {
           })
         : null}
       {data ? (
-        <Section title="課程專屬網址">
+        <Section fold title="課程專屬網址">
           <AppText variant="callout" tone="muted">
             課程專屬網址：中心縮寫/主講人英文名-001。設定中心縮寫時會自動補上該中心的課程；舊課程可在這裡一次補齊。
           </AppText>

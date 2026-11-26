@@ -1,7 +1,7 @@
 import { View } from "react-native";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { AppText, Card } from "@/ui";
+import { AppText, Fold } from "@/ui";
 
 /**
  * 「特殊辨識規則」清單（業主 2026-11-26：業主要求過的特殊規則，一律列在設定 › AI 文字辨識讓他看得到）。
@@ -28,8 +28,7 @@ const RULES: { title: string; body: string; where: string; setup?: string }[] = 
 export function AiSpecialRulesPanel() {
   const { c } = useTheme();
   return (
-    <Card style={{ gap: space.sm }}>
-      <AppText variant="headline">特殊規則與設定說明（業主指定）</AppText>
+    <Fold title="特殊規則與設定說明（業主指定）">
       <AppText variant="caption" tone="muted">這些是業主指定、已經寫進系統的規則（給所有管理員看的說明）：每條說明規則內容、要去哪裡設定。之後有新的規則會加在這裡。</AppText>
       {RULES.map((r, i) => (
         <View key={r.title} style={{ flexDirection: "row", gap: 10 }}>
@@ -44,6 +43,6 @@ export function AiSpecialRulesPanel() {
           </View>
         </View>
       ))}
-    </Card>
+    </Fold>
   );
 }

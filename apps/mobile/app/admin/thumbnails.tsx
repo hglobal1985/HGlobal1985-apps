@@ -95,7 +95,7 @@ export default function ThumbnailsScreen() {
 
   return (
     <Screen>
-      <Section title="總開關">
+      <Section fold title="總開關">
         <Card>
           <Check label="啟用即時縮圖（手機小螢幕的卡片縮圖改用縮小版）" value={t.enabled} onChange={(v) => set("enabled", v)} />
           <AppText variant="caption" tone="muted">
@@ -105,7 +105,7 @@ export default function ThumbnailsScreen() {
         </Card>
       </Section>
 
-      <Section title="額度與優先順序">
+      <Section fold title="額度與優先順序">
         <Card>
           <AppText variant="body">優先順序：① 封面（課程、系列、中心照片）＞ ② 中心 EDM ＞ ③ 其他相簿（成交百寶箱）。低優先的用到上限就改回傳原圖（不縮），額度預留給更高優先的。</AppText>
           {usage.data ? (
@@ -135,7 +135,7 @@ export default function ThumbnailsScreen() {
         </Card>
       </Section>
 
-      <Section title="尺寸">
+      <Section fold title="尺寸">
         <Card>
           <AppText variant="body">允許的縮圖寬度（每多選一種，每張圖就多算一種縮圖）</AppText>
           <View style={styles.wrap}>
@@ -152,7 +152,7 @@ export default function ThumbnailsScreen() {
         </Card>
       </Section>
 
-      <Section title="輸出格式與畫質">
+      <Section fold title="輸出格式與畫質">
         <Card>
           <Chips title="格式 format" value={t.format} onChange={(v) => set("format", v)} options={[{ key: "auto", label: "自動（建議）" }, { key: "avif", label: "AVIF" }, { key: "webp", label: "WebP" }, { key: "jpeg", label: "JPEG" }, { key: "png", label: "PNG" }]} />
           <Stepper label="畫質" hint="數字越小檔案越小（有選下方文字等級時以等級為準）" value={t.quality} min={10} max={100} step={5} unit="" onChange={(v) => set("quality", v)} />
@@ -162,7 +162,7 @@ export default function ThumbnailsScreen() {
         </Card>
       </Section>
 
-      <Section title="影像調整">
+      <Section fold title="影像調整">
         <Card>
           <Stepper label="模糊 blur" hint="0＝不模糊" value={t.blur} min={0} max={250} step={5} unit="" onChange={(v) => set("blur", v)} />
           <Stepper label="銳利化 sharpen" hint="0＝不處理（縮小後變糊時可加 1～2）" value={t.sharpen} min={0} max={10} step={1} unit="" onChange={(v) => set("sharpen", v)} />
@@ -181,7 +181,7 @@ export default function ThumbnailsScreen() {
       {msg ? <NoticeBox tone={msg.tone} text={msg.text} /> : null}
       <Button label="儲存設定" icon="save-outline" loading={saving} disabled={!dirty || saving} onPress={save} fullWidth />
 
-      <Section title="試算（用已儲存的設定，對一張真實封面縮圖）">
+      <Section fold title="試算（用已儲存的設定，對一張真實封面縮圖）">
         <Card>
           {!saved.enabled ? <NoticeBox tone="danger" text="總開關目前是關閉的，所以下面的圖與試算都是原圖（沒有縮小）。請在最上方勾選「啟用即時縮圖」並按「儲存設定」，再試算。" /> : null}
           {sample ? <Image source={{ uri: `${resolveUrl(sample)}${sample.includes("?") ? "&" : "?"}w=${[...saved.widths].sort((x, y) => x - y)[0] ?? 320}` }} style={styles.sample} resizeMode="cover" accessibilityIgnoresInvertColors /> : <AppText tone="muted">目前沒有已上架的封面可試算。</AppText>}
@@ -200,7 +200,7 @@ export default function ThumbnailsScreen() {
         </Card>
       </Section>
 
-      <Section title="狀態">
+      <Section fold title="狀態">
         <Card>
           {st.lastError ? (
             <>

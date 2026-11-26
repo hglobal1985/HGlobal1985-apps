@@ -61,7 +61,7 @@ export default function ReportScreen() {
   );
   return (
     <Screen header={false}>
-      <Section title="期間">
+      <Section fold title="期間">
         <Chips label="快速選擇" options={presets.map((p) => ({ key: p.key, label: p.label }))} value={preset} onChange={(k) => { const p = presets.find((x) => x.key === k)!; setFrom(p.range[0]); setTo(p.range[1]); }} />
         <DateSelect label="開始日期" value={from} clearable={false} onChange={setFrom} />
         <DateSelect label="結束日期" value={to} clearable={false} onChange={setTo} />

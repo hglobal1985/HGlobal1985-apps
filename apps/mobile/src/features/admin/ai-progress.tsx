@@ -6,7 +6,7 @@ import { flashText } from "@/ui/flash-notice";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { AppText, Card } from "@/ui";
+import { AppText, Card, Fold } from "@/ui";
 
 type Pack = { total: number; done: number; failed: number; pending: number; groups: { label: string; total: number; done: number; failed: number }[] };
 type JobRow = { key: "edm" | "photoOcr" | "scene"; label: string; on: boolean; prio: number };
@@ -36,8 +36,7 @@ function Failed({ n, lead = "" }: { n: number; lead?: string }) {
 
 function PackCard({ title, rule, pack }: { title: string; rule: string; pack: Pack }) {
   return (
-    <Card>
-      <AppText variant="headline">{title}</AppText>
+    <Fold title={title}>
       <AppText variant="caption" tone="muted">{rule}</AppText>
       <Bar done={pack.done} total={pack.total} />
       <AppText variant="callout">
@@ -58,7 +57,7 @@ function PackCard({ title, rule, pack }: { title: string; rule: string; pack: Pa
       ) : (
         <AppText tone="muted">還沒有照片。</AppText>
       )}
-    </Card>
+    </Fold>
   );
 }
 
@@ -110,8 +109,7 @@ function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
     void save(Object.fromEntries(next.map((x, n) => [PRIO_KEY[x.key], n + 1])));
   };
   return (
-    <Card>
-      <AppText variant="headline">辨識優先順序與開關</AppText>
+    <Fold title="辨識優先順序與開關">
       <AppText variant="caption" tone="muted">排在上面的先辨識；額度或時間不夠時，後面的會等前面的做完。關掉開關＝排程不再辨識這一類圖檔（已辨識的不受影響）。</AppText>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
         <Pressable accessibilityRole="button" accessibilityLabel={running ? "停止辨識" : "立即開始辨識"} onPress={() => (running ? (stop.current = true) : void start())} style={{ flex: 1, minHeight: 50, borderRadius: 25, backgroundColor: running ? c.danger : c.accent, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8 }}>
@@ -134,7 +132,7 @@ function JobOrder({ jobs, reload }: { jobs: JobRow[]; reload: () => void }) {
           <Switch accessibilityLabel={`${j.label} 開關`} value={j.on} onValueChange={(v) => void save({ [ON_KEY[j.key]]: v })} />
         </View>
       ))}
-    </Card>
+    </Fold>
   );
 }
 
@@ -148,12 +146,11 @@ export function AiProgressPanel() {
   const a = data.ai;
   return (
     <View style={{ gap: space.md }}>
-      <Card>
-        <AppText variant="headline">今天的 AI 額度</AppText>
+      <Fold title="今天的 AI 額度">
         <Bar done={a.used} total={a.dailyCap} />
         <AppText variant="callout">{a.capEnabled ? `已用 ${a.used} 點／上限 ${a.dailyCap} 點・剩餘 ${a.remaining} 點` : `已用 ${a.used} 點（額度限制已關閉）`}</AppText>
         <AppText variant="caption" tone="muted">優先順序可在下方「辨識優先順序與開關」自訂。封面（課程、系列、中心照片）不辨識。每天台灣時間早上 8:00 重置。</AppText>
-      </Card>
+      </Fold>
       {data.jobs ? <JobOrder jobs={data.jobs} reload={reload} /> : null}
       <PackCard title="中心 EDM 文字辨識" rule="只辨識中心 EDM；套用「欄位格式範本」，可被文字搜尋。" pack={data.ocr} />
       <PackCard title="相簿場景辨識" rule="只辨識其他相簿（例如成交百寶箱）；認出行為、場景、物品，搜尋時分類標籤＝「場景」。" pack={data.scene} />
