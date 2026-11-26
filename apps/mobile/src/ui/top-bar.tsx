@@ -90,7 +90,7 @@ export function TopBarButton({ label, icon, iconName, onPress, tone = "accent", 
 const styles = StyleSheet.create({
   wrap: { zIndex: 10, position: "relative" },
   bar: { flexDirection: "row", alignItems: "center" },
-  back: { width: 48, height: 48, alignItems: "center", justifyContent: "center", marginLeft: -8 },
+  back: { width: 48, height: 48, alignItems: "center", justifyContent: "center", marginLeft: 4 },
   title: { flex: 1, minWidth: 0, marginLeft: 4, fontSize: 18, fontWeight: "500" },
   right: { flexDirection: "row", alignItems: "center", paddingRight: 6 },
   btn: { minWidth: minTouch, height: 40, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, paddingHorizontal: 6 },

@@ -50,6 +50,7 @@ export function flashText(text: string): void {
  * 文字依字數自動換行、自動縮小；點一下立刻關閉。
  */
 export const FLASH_W = 190;
+/** 卡片最矮的高度；內容多（字被放大、文字換行）時卡片會自動長高。 */
 export const FLASH_H = 184;
 /** 圖示區高度（原本 64 的 80%）；呼叫端的圖示請用 FLASH_ICON 當尺寸。 */
 export const FLASH_ICON = 51;
@@ -101,16 +102,19 @@ export function FlashHost() {
       <Pressable accessibilityRole="button" accessibilityLabel={`${shown.title}${shown.body ? `，${shown.body}` : ""}，點一下關閉`} onPress={dismiss}>
         <Animated.View style={{ opacity: op }} accessibilityLiveRegion="polite">
           {/* 邊框＝迷你播放器同款流光漸層邊框（共用模組 ui/gradient-frame，杜杜龍 2026-11-17） */}
-          <GradientFrame width={Math.min(FLASH_W, width - space.lg * 2)} height={FLASH_H} radius={radius.lg}>
+          <GradientFrame width={Math.min(FLASH_W, width - space.lg * 2)} height="auto" radius={radius.lg}>
+          {/* 高度依內容自動（杜杜龍 2026-11-26：至尊模式字被放大，「已切換到至尊模式」被截成「已切換到至…」、圖示被上緣切掉）：文字不限行數、不出現刪節號，最矮仍是原本卡片的高度。 */}
+          <View style={styles.inner}>
           {shown.icon ? <View style={styles.icon}>{shown.icon}</View> : null}
-          <AppText numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.title, { color: c.text, fontSize: titleSize(shown.title), lineHeight: Math.round(titleSize(shown.title) * 1.25) }]}>
+          <AppText style={[styles.title, { color: c.text, fontSize: titleSize(shown.title), lineHeight: Math.round(titleSize(shown.title) * 1.25) }]}>
             {shown.title}
           </AppText>
           {shown.body ? (
-            <AppText numberOfLines={4} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.body, { color: c.textMuted, fontSize: bodySize(shown.body), lineHeight: Math.round(bodySize(shown.body) * 1.35) }]}>
+            <AppText style={[styles.body, { color: c.textMuted, fontSize: bodySize(shown.body), lineHeight: Math.round(bodySize(shown.body) * 1.35) }]}>
               {shown.body}
             </AppText>
           ) : null}
+          </View>
           </GradientFrame>
         </Animated.View>
       </Pressable>
@@ -122,7 +126,8 @@ export function FlashHost() {
 const styles = StyleSheet.create({
   wrap: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "flex-start", zIndex: 3500 },
   box: { height: FLASH_H, paddingHorizontal: space.sm, borderRadius: radius.lg, borderWidth: 2, alignItems: "center", justifyContent: "center", gap: space.sm, shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 10 },
-  icon: { height: FLASH_ICON, alignItems: "center", justifyContent: "center" },
+  inner: { alignSelf: "stretch", minHeight: FLASH_H - 9, paddingVertical: space.md, alignItems: "center", justifyContent: "center", gap: space.sm },
+  icon: { height: FLASH_ICON, flexShrink: 0, alignItems: "center", justifyContent: "center" },
   title: { fontWeight: "800", textAlign: "center" },
   body: { fontWeight: "600", textAlign: "center" },
 });

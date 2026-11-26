@@ -47,6 +47,24 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
   /** 按鈕文字顯示目前狀態（杜杜龍 2026-11-24）。 */
   const label = state === "on" ? "訊息通知：已開啟" : state === "off" ? "訊息通知：未開啟" : state === null ? "訊息通知" : state === "denied" ? "訊息通知：已被封鎖" : "訊息通知：無法使用";
   // 橫幅版（杜杜龍 2026-11-23）：整列可點、打勾開啟；沒開啟＝整列紅色（含圖示），開啟後整列變綠色。
+  // 不能操作（瀏覽器不支援、要先加入主畫面、被封鎖、App 版尚未開放…）時不再畫整塊紅色、右邊空方框的假開關（杜杜龍 2026-11-26）：
+  // 改成一個小的灰底提示列（鈴鐺＋「訊息通知：狀態」），原因與做法完整顯示在下面小字，不佔版面、不會被誤以為能點。
+  if (banner && !canToggle) {
+    const checking = Platform.OS === "web" && state === null && !err;
+    return (
+      <View accessibilityRole="text" style={{ gap: 2, borderRadius: radius.md, backgroundColor: c.surfaceMuted, paddingHorizontal: space.sm, paddingVertical: space.sm }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm }}>
+          <Icon name="notifications-off-outline" size={compact ? 18 : 22} color={c.textMuted} />
+          <AppText style={{ fontWeight: "800", fontSize: compact ? 14 : 17, lineHeight: compact ? 20 : 24, flexShrink: 1 }}>{checking ? "訊息通知：確認中…" : label}</AppText>
+        </View>
+        {hint ? (
+          <AppText variant="caption" tone={err ? "danger" : "muted"}>
+            {hint}
+          </AppText>
+        ) : null}
+      </View>
+    );
+  }
   if (banner) {
     const bg = on ? c.accent : c.danger;
     const fg = on ? c.textOnAccent : scheme === "dark" ? "#601410" : "#FFFFFF";
@@ -82,7 +100,7 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
           <Icon name={on ? "checkbox" : "square-outline"} size={compact ? 22 : 34} color={fg} />
         </Pressable>
         {hint ? (
-          <AppText variant="caption" tone={err ? "danger" : "muted"} numberOfLines={2}>
+          <AppText variant="caption" tone={err ? "danger" : "muted"}>
             {hint}
           </AppText>
         ) : null}
@@ -101,7 +119,7 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
         <Switch value={on} disabled={busy || !canToggle} onValueChange={toggle} trackColor={{ false: c.border, true: c.accent }} thumbColor="#FFFFFF" ios_backgroundColor={c.border} accessibilityLabel="手機推播開關" />
       </View>
       {hint ? (
-        <AppText variant="caption" tone={err ? "danger" : "muted"} numberOfLines={2}>
+        <AppText variant="caption" tone={err ? "danger" : "muted"}>
           {hint}
         </AppText>
       ) : null}

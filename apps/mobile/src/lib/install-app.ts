@@ -42,6 +42,9 @@ export const isStandalone = () => typeof window !== "undefined" && (window.match
 export const isIpad = () =>
   typeof navigator !== "undefined" && (/iPad/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && (navigator.maxTouchPoints ?? 0) > 1));
 export const isIos = () => typeof navigator !== "undefined" && (/iPhone|iPod/.test(navigator.userAgent) || isIpad());
+/** 這台是「平板」還是「手機」（杜杜龍 2026-11-26：iPad 上不要寫「手機」）：iPad、沒有 Mobile 字樣的 Android 算平板，其餘算手機。 */
+export const deviceNoun = (): "平板" | "手機" =>
+  typeof navigator !== "undefined" && (isIpad() || (/Android/i.test(navigator.userAgent) && !/Mobile/i.test(navigator.userAgent))) ? "平板" : "手機";
 /** 手機或平板（Android 手機與平板、iPhone、iPad）；一般電腦不算。 */
 const isMobile = () => typeof navigator !== "undefined" && (/Android|iPhone|iPod/i.test(navigator.userAgent) || isIpad());
 

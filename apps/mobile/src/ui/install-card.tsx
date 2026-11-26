@@ -3,7 +3,7 @@ import { useBorderW } from "@/lib/elder-mode";
 import { useCallback, useState } from "react";
 import Svg, { Circle, Rect } from "react-native-svg";
 import { Pressable, StyleSheet, View } from "react-native";
-import { installNative, isIos, isIpad, likelyInstalledAndroid, useInstallState } from "@/lib/install-app";
+import { deviceNoun, installNative, isIos, isIpad, likelyInstalledAndroid, useInstallState } from "@/lib/install-app";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText } from "./text";
@@ -47,7 +47,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
         <PhoneAppIcon size={34} color={RED} />
         {/* 一行文字，空間不夠時自動換行（杜杜龍 2026-11-18） */}
         <View style={{ flex: 1, minWidth: 0 }}>
-          <AppText style={styles.title}>安裝至手機主畫面變成app</AppText>
+          <AppText style={styles.title}>安裝至{deviceNoun()}主畫面變成app</AppText>
         </View>
         <Pressable accessibilityRole="button" accessibilityLabel="安裝" onPress={go} style={styles.btn}>
           <AppText style={{ color: "#fff", fontWeight: "800", fontSize: 17 }}>安裝</AppText>

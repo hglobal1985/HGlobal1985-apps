@@ -6,6 +6,8 @@ import { space } from "@/theme/tokens";
 import { AppText } from "@/ui";
 import { BADGE_SIZE, BADGE_W, RankBadge } from "./rank-badge";
 
+/** 至尊模式頁獎章放大倍數（杜杜龍 2026-11-26：1.4→1.8，圖案本身只佔畫布約 64% 高，原本太小）。 */
+const BADGE_STACK_SCALE = 1.8;
 const AVATAR = 48; // 大頭照尺寸；徽章在版面上只佔這個高度（上下間距維持原樣）
 
 /**
@@ -48,8 +50,8 @@ export function MemberHeader({ member, onPress, scale = 1, stacked = false }: { 
         </View>
         {hasBadge ? (
           // 獎章放大用 transform（不佔版面），列高只等於頭像高度，上下不留大片空白（杜杜龍 2026-11-24）。
-          <View style={{ width: Math.round(BADGE_W * 1.4), height: av, alignItems: "center", justifyContent: "center" }}>
-            <View style={{ transform: [{ scale: 1.4 }] }}>
+          <View style={{ width: Math.round(BADGE_W * BADGE_STACK_SCALE), height: av, alignItems: "center", justifyContent: "center" }}>
+            <View style={{ transform: [{ scale: BADGE_STACK_SCALE }] }}>
               <RankBadge url={member.rankBadge!} label={member.rankLabel} art={member.rankBadgeArt} layoutHeight={BADGE_SIZE} />
             </View>
           </View>
