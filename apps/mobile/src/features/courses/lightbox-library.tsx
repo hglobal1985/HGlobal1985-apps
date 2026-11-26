@@ -62,7 +62,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
   const sf = useSubfolders(isBlock ? view!.folder.key : null);
   const hasSubs = isBlock && (sf.subs?.folders.length ?? 0) > 0;
   const subName = sub === null ? "" : sub === "" ? "未分類" : (sf.subs?.folders.find((x) => x.id === sub)?.name ?? "");
-  useEffect(() => setSub(null), [view?.folder.id]);
+  useEffect(() => (setSub(null), setSortBy(null)), [view?.folder.id]); // 換資料夾：子資料夾與排序都重來
   const groups = data?.groups ?? [];
   const viewGroup = view ? groups.find((g) => g.folders.some((f) => f.id === view.folder.id)) : undefined;
   const cur = groups.find((g) => g.id === (viewGroup?.id ?? group)); // 沒有＝相簿首頁（類別資料夾）
@@ -353,7 +353,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
               onMove={isBlock && sf.subs?.canManage ? (ids) => (setMoveIds(ids), setFsheet({ t: "move" })) : undefined}
               extra={(view.folder.canEdit || admin) && !key ? (<View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><View style={{ flex: 1, minWidth: 0 }}>{view.folder.canEdit ? <AlbumUploadButton kind={view.folder.kind === "block" ? "course" : view.folder.kind} ownerKey={view.folder.key} folder={sub || undefined} count={view.items.length} onDone={() => void reloadView()} scope={view.folder.scope} label={view.folder.scope === "edm" ? "上傳EDM" : "上傳照片或影片"} /> : <View style={{ flex: 1 }} />}</View>{isBlock && !hasSubs && sf.subs?.canManage ? btn("新增資料夾", () => setFsheet({ t: "new", move: false }), "folder-open-outline") : null}{admin ? btn("相簿資訊與權限", () => setPanel("info"), "settings-outline") : null}</View>) : undefined}
               onPick={(i) => onPick({ folder: view.folder, title: folderName(view.folder), items: shown, index: i })}
-              actions={<View style={{ flexDirection: "row", gap: 8 }}>{sortBtn("date", "calendar-outline", "活動日期排序")}{sortBtn("upload", "time-outline", "上傳時間排序")}</View>}
+              actions={<View style={{ flexDirection: "row", gap: 8 }}>{view.folder.kind === "center" && view.folder.scope === "edm" ? sortBtn("date", "calendar-outline", "活動日期排序") : null}{sortBtn("upload", "time-outline", "上傳時間排序")}</View>}
               onClose={() => (hasSubs && sub !== null ? setSub(null) : (setGroup(cur?.id ?? null), setView(null), setSortBy(null)))}
             />
           </View>
