@@ -38,17 +38,16 @@ const folderName = (f: AlbumFolder) => (f.kind === "center" ? centerTitle(f.titl
  * ④沒有權限的資料夾（鎖定的課程、區塊相簿）禁止進入，點了只顯示原因（伺服器也會擋）。
  * 點資料夾 → onPick（交給全螢幕看圖換成這個資料夾的照片並進入「檢視全部」格狀畫面）。
  */
-export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到上次位置（相簿專區入口）：類別與資料夾；沒有 initial 才套用。 */ restore?: { group: string | null; folder: string | null } | null; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[]; focusId?: string } | null }) {
+export function LightboxLibrary({ onPick, onClose, initial, restore, inline = false }: { /** 放在一般頁面裡（上有工具列、下有選單列）：不留手機安全區。 */ inline?: boolean; onPick: (p: LibraryPick) => void; onClose: () => void; /** 回到上次位置（相簿專區入口）：類別與資料夾；沒有 initial 才套用。 */ restore?: { group: string | null; folder: string | null } | null; /** 回到相簿時停在哪個資料夾（從單張看圖按「相簿」回來）。 */ initial?: { folder: AlbumFolder; items: CoverMediaItem[]; focusId?: string } | null }) {
   const thumb = useThumb();
-  const insets = useSafeAreaInsets();
+  const safe = useSafeAreaInsets();
+  const insets = inline ? { top: -8, bottom: 0, left: 0, right: 0 } : safe;
   const win = useWindowDimensions();
   const { member } = useSession();
   const admin = isSuperAdmin(member);
   const { data, loading, error, reload } = useApi<AlbumsResponse>("/albums");
   const [group, setGroup] = useState<string | null>(null);
   const recipes = useApi<RecipesResponse>("/recipes"); // 食譜專區（杜杜龍 2026-11-26）：相簿首頁的「食譜」類別卡與數量
-  const large = win.width >= 900;
-  const [side, setSide] = useState(large); // 大螢幕資料夾清單預設一直顯示
   // 目前打開的資料夾（null＝資料夾總覽）：搜尋列、類別標籤、側邊欄在資料夾裡一樣永遠顯示（杜杜龍 2026-11-25）。
   const [view, setView] = useState<{ folder: AlbumFolder; items: CoverMediaItem[] } | null>(initial ?? null);
   const inRecipe = group === "recipe" && !view;
@@ -118,23 +117,9 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
       setBusy(false);
     }
   };
-  const move = async (id: string, d: number) => {
-    const ids = [...order];
-    const i = ids.indexOf(id);
-    const j = i + d;
-    if (i < 0 || j < 0 || j >= ids.length) return;
-    [ids[i], ids[j]] = [ids[j]!, ids[i]!];
-    try {
-      await api("PUT", "/admin/ui-config", { albumOrder: ids });
-      reload();
-    } catch (e) {
-      flashText((e as Error).message);
-    }
-  };
-
   const gap = 10;
   // 大螢幕開側邊欄時，主畫面變窄（相簿往右推）：資料夾卡片的欄數與寬度隨主畫面寬度算（杜杜龍 2026-11-25）。
-  const mainW = win.width - (win.width >= 900 && side ? 280 : 0) - insets.left - insets.right - 16 * 2;
+  const mainW = win.width - insets.left - insets.right - 16 * 2;
   const cols = mainW >= 900 ? 5 : mainW >= 640 ? 4 : mainW >= 420 ? 3 : 2;
   const cardW = Math.floor((mainW - gap * (cols - 1)) / cols);
   const thirdW = Math.floor((mainW - 4 * (cols * 2 - 1)) / (cols * 2));
@@ -233,16 +218,7 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
     </Pressable>
   );
 
-  // 大螢幕（≥900）：側邊欄是左邊固定的一欄，相簿自動往右推、不重疊；小裝置：側邊欄蓋在相簿上，寬度只要剛好符合文字。
-  const [expanded, setExpanded] = useState<Set<string>>(new Set()); // 側邊欄裡展開哪些大類別的資料夾清單（預設全部收起）
-  const toggleExpanded = (id: string) =>
-    setExpanded((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 - 104 - 36 - 8 * 3 - (large && side ? 280 : 0)) / 8.6)));
+  const titleSize = Math.max(14, Math.min(22, Math.floor((win.width - 32 - 50 - 104 - 36 - 8 * 3) / 8.6)));
 
   // 資料夾裡的照片（此頁搜尋會過濾）
   const inSub = hasSubs && sub !== null ? view!.items.filter((p) => (p.folderId ?? "") === sub) : view?.items ?? [];
@@ -303,78 +279,10 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
     if (ready && data && !busy) saveAlbumPos({ group: cur?.id ?? null, folder: view?.folder.id ?? null, photo: null, mode: "library" });
   }, [ready, busy, cur?.id, view?.folder.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sidebar = (
-    <View style={large ? { width: 300, backgroundColor: "#1c1c1f", paddingTop: 6, borderRightWidth: 1, borderRightColor: "#2f2f33" } : { alignSelf: "flex-start", minWidth: 220, maxWidth: win.width * 0.9, maxHeight: "100%", backgroundColor: "#1c1c1f", paddingTop: 6, borderRadius: 14, overflow: "hidden" }}>
-      <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: 16, paddingRight: 8, paddingBottom: 4 }}>
-        <AppText variant="caption" {...UI_ONLY_TEXT} style={{ flex: 1, color: "#9a9aa0" }}>{admin ? "相簿類別（可上下移動順序）" : "相簿類別"}</AppText>
-        {admin ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="相簿權限設定" onPress={() => setPanel("perms")} style={{ width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" }}>
-            <Ionicons name="settings-outline" size={22} color="#fff" {...UI_ONLY} />
-          </Pressable>
-        ) : null}
-      </View>
-      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="相簿首頁" onPress={() => (setView(null), setGroup(null), setQ(""), !large && setSide(false))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingHorizontal: 12, backgroundColor: !cur ? "#2e7d32" : "transparent" }}>
-          <Ionicons name="home-outline" size={18} color="#fff" {...UI_ONLY} />
-          <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>相簿首頁</AppText>
-        </Pressable>
-        {/* 所有類別（含食譜專區）用同一種列：標題＋數量、上下移動（超級管理員）、展開收起；食譜展開＝它的分類（杜杜龍 2026-11-26「選單要一致」） */}
-        {order.map((oid, gi) => {
-          const g = groups.find((x) => x.id === oid);
-          const isRecipe = oid === "recipe";
-          if (!g && !isRecipe) return null;
-          const label = isRecipe ? "食譜" : g!.label;
-          const count = isRecipe ? recipeList.length : g!.folders.length;
-          const active = isRecipe ? inRecipe : g!.id === cur?.id;
-          const isOpen = expanded.has(oid);
-          return (
-            <View key={oid}>
-              <View style={{ flexDirection: "row", alignItems: "center", minHeight: 42, paddingLeft: 12, backgroundColor: active ? "#2e7d32" : "transparent" }}>
-                {/* 點標題＝進入這個類別的總覽縮圖 */}
-                <Pressable accessibilityRole="button" accessibilityLabel={`${label}，進入總覽`} onPress={() => (setView(null), isRecipe && setRecipeCat("all"), setGroup(oid), setQ(""), !large && setSide(false))} style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 8, minHeight: 42, paddingRight: 8 }}>
-                  <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ color: "#fff", fontWeight: "800", fontSize: 18, lineHeight: 24 }}>{label}</AppText>
-                  <AppText {...UI_ONLY_TEXT} style={{ color: "#cfcfd4", fontSize: 14 }}>{count}</AppText>
-                </Pressable>
-                {admin ? (
-                  <>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`${label} 往上移`} disabled={gi === 0} onPress={() => void move(oid, -1)} style={{ width: 32, height: 38, alignItems: "center", justifyContent: "center", opacity: gi === 0 ? 0.3 : 1 }}><Ionicons name="arrow-up" size={18} color="#fff" {...UI_ONLY} /></Pressable>
-                    <Pressable accessibilityRole="button" accessibilityLabel={`${label} 往下移`} disabled={gi === order.length - 1} onPress={() => void move(oid, 1)} style={{ width: 32, height: 38, alignItems: "center", justifyContent: "center", opacity: gi === order.length - 1 ? 0.3 : 1 }}><Ionicons name="arrow-down" size={18} color="#fff" {...UI_ONLY} /></Pressable>
-                  </>
-                ) : null}
-                {/* 標題右側的小按鈕：展開／收起這個類別的資料夾（食譜＝分類）清單 */}
-                <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} accessibilityLabel={`${isOpen ? "收起" : "展開"}${label}的${isRecipe ? "分類" : "資料夾"}`} onPress={() => toggleExpanded(oid)} style={{ width: 40, height: 38, alignItems: "center", justifyContent: "center" }}>
-                  <Ionicons name={isOpen ? "chevron-up" : "chevron-down"} size={20} color="#fff" {...UI_ONLY} />
-                </Pressable>
-              </View>
-              {isOpen && isRecipe
-                ? (recipes.data?.categories ?? []).map((c) => (
-                    <Pressable key={c.id} accessibilityRole="button" accessibilityLabel={c.name} onPress={() => (setView(null), setRecipeCat(c.id), setGroup("recipe"), setQ(""), !large && setSide(false))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34, paddingLeft: 28, paddingRight: 12 }}>
-                      <Ionicons name="folder-outline" size={16} color="#cfcfd4" {...UI_ONLY} />
-                      <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontSize: 16, lineHeight: 21 }}>{c.name}</AppText>
-                      <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{recipeList.filter((r) => r.categoryId === c.id).length}</AppText>
-                    </Pressable>
-                  ))
-                : null}
-              {isOpen && !isRecipe
-                ? g!.folders.map((f) => (
-                    <Pressable key={f.id} accessibilityRole="button" accessibilityLabel={folderName(f)} onPress={() => (!large && setSide(false), void openFolder(f))} style={{ flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34, paddingLeft: 28, paddingRight: 12 }}>
-                      <Ionicons name={f.locked ? "lock-closed-outline" : "folder-outline"} size={16} color="#cfcfd4" {...UI_ONLY} />
-                      <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, color: "#fff", fontSize: 16, lineHeight: 21 }}>{folderName(f)}</AppText>
-                      <AppText {...UI_ONLY_TEXT} style={{ color: "#9a9aa0", fontSize: 14 }}>{f.count}</AppText>
-                    </Pressable>
-                  ))
-                : null}
-            </View>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: "#000" }]} pointerEvents="auto">
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 8, flexDirection: "row", alignItems: "center", gap: 8 }}>
-          {btn("資料夾清單", () => setSide((v) => !v), "folder-open", side)}
+          {admin ? btn("相簿權限設定", () => setPanel("perms"), "settings-outline") : null}
           <AppText numberOfLines={1} {...UI_ONLY_TEXT} style={{ flex: 1, minWidth: 0, color: "#fff", fontWeight: "900", fontSize: titleSize, lineHeight: titleSize + 6 }}>寰宇行動大學相簿</AppText>
           {/* 右上角：文字「退出相簿」（杜杜龍 2026-11-26，取代圓形 ✕，避免和下層的關閉／返回混淆） */}
           <Pressable accessibilityRole="button" accessibilityLabel="退出相簿" onPress={onClose} style={styles.exit}>
@@ -382,7 +290,6 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
           </Pressable>
         </View>
       <View style={{ flex: 1, minHeight: 0, flexDirection: "row" }}>
-      {side && large ? sidebar : null}
       <View style={{ flex: 1, minWidth: 0 }}>
         {/* 搜尋列：與頁面相簿共用 AlbumSearchBar（深色款＋「此頁／全部」切換），永遠顯示 */}
         <View style={{ paddingHorizontal: 16 }}>
@@ -440,12 +347,6 @@ export function LightboxLibrary({ onPick, onClose, initial, restore }: { onPick:
         </ScrollView>
         )}
       </View>
-      {side && !large ? (
-        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-          <Pressable accessibilityLabel="收起資料夾清單" style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.35)" }]} onPress={() => setSide(false)} />
-          <View style={{ position: "absolute", left: 12, top: 0, bottom: 0 }} pointerEvents="box-none">{sidebar}</View>
-        </View>
-      ) : null}
       </View>
       {panel === "perms" ? <AlbumPermissionsPanel onClose={() => setPanel(null)} onChanged={() => (reload(), void reloadView())} /> : null}
       {isBlock && view ? <SubfolderSheet dark sheet={fsheet} setSheet={setFsheet} blockKey={view.folder.key} subs={sf.subs} selIds={moveIds} onChanged={() => (sf.reload(), void reloadView())} onMoved={() => (trackUsage("album_move", "相簿瀏覽器"), setMoveIds([]))} /> : null}

@@ -58,7 +58,7 @@ export function cleanBody(raw: unknown): string {
   return (typeof raw === "string" ? raw : "").replace(/\r\n?/g, "\n").replace(/[ \t]+\n/g, "\n").replace(/\n{4,}/g, "\n\n\n").trim().slice(0, BODY_MAX);
 }
 
-type Row = { author_center_label: string; id: string; title: string; category_id: string; category_name: string | null; status: "draft" | "pending" | "published"; author_sub: string; author_name: string; body: string; thumb: string | null; photos: number };
+type Row = { created_at: string; author_center_label: string; id: string; title: string; category_id: string; category_name: string | null; status: "draft" | "pending" | "published"; author_sub: string; author_name: string; body: string; thumb: string | null; photos: number };
 
 /** 列表用：已發佈的全部＋待審核的（管理者看全部、投稿者看自己的）；q 同時找名稱與整篇文字。 */
 export async function listRecipes(db: D1Database, o: { me: string | null; manager: boolean; q: string; pub: (key: string) => string }): Promise<{ categories: RecipeCategory[]; recipes: RecipeCard[] }> {
@@ -67,7 +67,7 @@ export async function listRecipes(db: D1Database, o: { me: string | null; manage
     db.prepare("SELECT c.id, c.name, (SELECT COUNT(*) FROM recipes r WHERE r.category_id = c.id AND r.status = 'published') AS n FROM recipe_categories c ORDER BY c.position, c.created_at").all<{ id: string; name: string; n: number }>(),
     db
       .prepare(
-        `SELECT r.id, r.title, r.category_id, c.name AS category_name, r.status, r.author_sub, r.author_name, r.author_center_label, r.body,
+        `SELECT r.id, r.title, r.category_id, c.name AS category_name, r.status, r.author_sub, r.author_name, r.author_center_label, r.body, r.created_at,
           (SELECT m.r2_key FROM cover_media m WHERE m.owner_kind = 'course' AND m.owner_key = 'rcp:' || r.id AND m.kind = 'image' ORDER BY m.position LIMIT 1) AS thumb,
           (SELECT COUNT(*) FROM cover_media m WHERE m.owner_kind = 'course' AND m.owner_key = 'rcp:' || r.id AND m.kind = 'image') AS photos
          FROM recipes r LEFT JOIN recipe_categories c ON c.id = r.category_id
@@ -82,6 +82,7 @@ export async function listRecipes(db: D1Database, o: { me: string | null; manage
     categories: cats.results.map((c) => ({ id: c.id, name: c.name, count: c.n })),
     recipes: rows.results.map((r) => ({
       id: r.id,
+      createdAt: r.created_at,
       title: r.title,
       categoryId: r.category_id,
       categoryName: r.category_name ?? "",

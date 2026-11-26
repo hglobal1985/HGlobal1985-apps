@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as Clipboard from "expo-clipboard";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Pressable, ScrollView, TextInput, useWindowDimensions, View, type ScrollViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api, resolveUrl, type CoverMediaItem, type RecipeCard, type RecipeDetail, type RecipesResponse } from "@/api/client";
@@ -15,7 +15,7 @@ import { trackUsage } from "@/lib/usage";
 import { useThumb } from "@/lib/thumb";
 import { useApi, useSession } from "@/state/session";
 import { AppText } from "@/ui";
-import { flashText } from "@/ui/flash-notice";
+import { FLASH_ICON, flashText, showFlash } from "@/ui/flash-notice";
 import { RecipeBody } from "./recipe-body";
 import { AlbumBackHeader, AlbumRoundButton } from "@/features/courses/album-header";
 import { RecipeEditor, RecipeSheet } from "./recipe-editor";
@@ -55,7 +55,27 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
   const recipes = data?.recipes ?? [];
   const cats = data?.categories ?? [];
   const pendingN = recipes.filter((r) => r.status === "pending").length;
-  const shown = recipes.filter((r) => (cat === "all" ? true : cat === "pending" ? r.status === "pending" : cat === "none" ? !r.categoryId : r.categoryId === cat));
+  // 每次進入食譜相簿都是隨機排序（杜杜龍 2026-11-26）：每道食譜進來時抽一個固定亂數，重新整理資料不會再洗牌；按「上傳時間排序」才改成依時間。
+  const randKey = useRef(new Map<string, number>());
+  const rand = (id: string) => {
+    let v = randKey.current.get(id);
+    if (v === undefined) randKey.current.set(id, (v = Math.random()));
+    return v;
+  };
+  const [sortDir, setSortDir] = useState<"asc" | "desc" | null>(null);
+  const shown = useMemo(() => {
+    const list = recipes.filter((r) => (cat === "all" ? true : cat === "pending" ? r.status === "pending" : cat === "none" ? !r.categoryId : r.categoryId === cat));
+    return sortDir ? [...list].sort((a, b) => (sortDir === "desc" ? b.createdAt.localeCompare(a.createdAt) : a.createdAt.localeCompare(b.createdAt))) : [...list].sort((a, b) => rand(a.id) - rand(b.id));
+  }, [recipes, cat, sortDir]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 與其他相簿同款的「上傳時間排序」鈕：點一下新到舊，再點舊到新；點了跳出全螢幕文字提示。
+  const sortBtn = (
+    <AlbumRoundButton label={`上傳時間排序${sortDir ? (sortDir === "desc" ? "，目前新到舊" : "，目前舊到新") : ""}`} icon="time-outline" on={!!sortDir} onPress={() => {
+      const dir = sortDir === "desc" ? "asc" : "desc";
+      setSortDir(dir);
+      trackUsage("album_sort", "上傳時間");
+      showFlash({ icon: <Ionicons name="time-outline" size={FLASH_ICON - 3} color="#2E7D32" />, title: "上傳時間排序", body: dir === "desc" ? "新到舊" : "舊到新" });
+    }} />
+  );
   const gap = 12;
   const cols = win.width >= 1000 ? 4 : win.width >= 700 ? 3 : 2;
   const w = Math.min(win.width, 1100) - 32;
@@ -103,7 +123,7 @@ export function RecipeZone({ q, initialCat = "all", onBack, onOpenPhotos }: { /*
   return (
     <View style={{ flex: 1, minHeight: 0 }}>
       {/* 返回列：與相簿其他類別同一個共用元件（搜尋列在它上面，由相簿統一提供） */}
-      <AlbumBackHeader title="🍳 食譜" meta={`${recipes.length} 道食譜`} onBack={onBack} right={data?.manager ? <AlbumRoundButton label="管理分類" icon="settings-outline" onPress={() => setCatSheet(true)} /> : null} />
+      <AlbumBackHeader title="🍳 食譜" meta={`${recipes.length} 道食譜`} onBack={onBack} right={<View style={{ flexDirection: "row", gap: 8 }}>{sortBtn}{data?.manager ? <AlbumRoundButton label="管理分類" icon="settings-outline" onPress={() => setCatSheet(true)} /> : null}</View>} />
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
           {chipBtn("all", `全部 ${recipes.length}`)}
