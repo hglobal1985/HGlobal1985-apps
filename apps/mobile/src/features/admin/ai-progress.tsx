@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, Switch, View } from "react-native";
+import { Pressable, Switch, Text, View } from "react-native";
 import { api } from "@/api/client";
 import { flashText } from "@/ui/flash-notice";
 import { useApi } from "@/state/session";
@@ -21,19 +21,37 @@ function Bar({ done, total }: { done: number; total: number }) {
   );
 }
 
+/** 失敗張數一律用醒目的紅色粗體＋淺紅底標記（業主 2026-11-26）；0 張時用一般灰字，不搶眼。 */
+function Failed({ n, lead = "" }: { n: number; lead?: string }) {
+  const { c } = useTheme();
+  if (!n) return <Text>{`${lead}失敗 0 張`}</Text>;
+  return (
+    <>
+      {lead}
+      <Text style={{ color: c.danger, fontWeight: "900", backgroundColor: c.dangerSoft }}>{` 失敗 ${n} 張 `}</Text>
+    </>
+  );
+}
+
 function PackCard({ title, rule, pack }: { title: string; rule: string; pack: Pack }) {
   return (
     <Card>
       <AppText variant="headline">{title}</AppText>
       <AppText variant="caption" tone="muted">{rule}</AppText>
       <Bar done={pack.done} total={pack.total} />
-      <AppText variant="callout">{`完成 ${pack.done} / ${pack.total} 張（${pack.total ? Math.round((pack.done / pack.total) * 100) : 0}%）・等待 ${pack.pending} 張・失敗 ${pack.failed} 張`}</AppText>
+      <AppText variant="callout">
+        {`完成 ${pack.done} / ${pack.total} 張（${pack.total ? Math.round((pack.done / pack.total) * 100) : 0}%）・等待 ${pack.pending} 張・`}
+        <Failed n={pack.failed} />
+      </AppText>
       {pack.groups.length ? (
         pack.groups.map((g) => (
           <View key={g.label} style={{ gap: 4 }}>
             <AppText variant="callout" numberOfLines={2}>{g.label}</AppText>
             <Bar done={g.done} total={g.total} />
-            <AppText variant="caption" tone="muted">{`完成 ${g.done} / ${g.total} 張${g.failed ? `・失敗 ${g.failed}` : ""}`}</AppText>
+            <AppText variant="caption" tone="muted">
+              {`完成 ${g.done} / ${g.total} 張`}
+              {g.failed ? <Failed n={g.failed} lead="・" /> : null}
+            </AppText>
           </View>
         ))
       ) : (
