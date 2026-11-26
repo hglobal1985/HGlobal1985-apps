@@ -117,7 +117,7 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
   const row = (k: string, v: string, key = k) => (
     <View key={key} style={styles.row}>
       <Text style={styles.k}>{k}</Text>
-      <Text selectable style={[styles.v, SELECTABLE]}>{v || "—"}</Text>
+      <Text selectable style={[styles.v, SELECTABLE, /失敗/.test(v) && styles.fail]}>{v || "—"}</Text>
     </View>
   );
   const exif = info?.exif ?? {};
@@ -160,7 +160,7 @@ export function EdmInfoPanel({ id, imageKey, top = 140, onClose }: { id?: string
             {info.basic ? null : sec("ocr", "① 辨識後的圖片文字", <>
               {info.kind === "video" ? <Text style={styles.v}>影片沒有文字辨識。</Text> : (
                 <>
-                  <Text style={styles.sub}>{`狀態：${OCR_STATUS[info.ocrStatus] ?? info.ocrStatus}`}{info.eventDate ? `　活動日期：${info.eventDate}` : ""}</Text>
+                  <Text style={[styles.sub, info.ocrStatus === "failed" && styles.fail]}>{`狀態：${OCR_STATUS[info.ocrStatus] ?? info.ocrStatus}`}{info.eventDate ? `　活動日期：${info.eventDate}` : ""}</Text>
                   {info.ocrText ? (
                     <>
                       {info.structured.fields ? (
@@ -247,6 +247,7 @@ const styles = StyleSheet.create({
   fmtHead: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 40 },
   fmtRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   tag: { color: "#fff", fontSize: 15, fontWeight: "700", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: "rgba(159,216,255,0.22)", overflow: "hidden" },
+  fail: { color: "#ff6b6b", fontWeight: "900" },
   fmtSub: { color: "#9fd8ff", fontSize: 13, lineHeight: 18 },
   fmtText: { flex: 1, color: "#9fd8ff", fontSize: 15, fontWeight: "800", lineHeight: 21 },
   h: { color: "#ffd54f", fontSize: 16, fontWeight: "800" },
