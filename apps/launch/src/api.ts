@@ -115,7 +115,7 @@ import { AI_JOBS, AI_MODELS, AiStopped, keyStatuses, loadSelection, testConnecti
 import { loadConfig, normalizeConfig, saveConfig } from "./ui-config.ts";
 import { collectCfStats } from "./cf-stats.ts";
 import { collectAppStats } from "./app-stats.ts";
-import { isOwnerNet, markOwnerNet, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
+import { FP_RE, isOwnerDevice, isOwnerNet, markOwnerNet, ownerDevices, saveOwnerDevices, parseUsageQuery, recordUsage, usageTable } from "./usage.ts";
 import { collectMuxStats } from "./mux-stats.ts";
 import { imageSize } from "./image-size.ts";
 import { audioUrl, sniffImage, verifyAudioUrl } from "./media.ts";
@@ -5344,7 +5344,7 @@ const routes: [string, RegExp, Handler][] = [
     // 杜杜龍本人的操作不列入統計（2026-11-23）：管理員帳號、管理員用過的裝置（App 帶 owner=1）、管理員用過的網路（無痕／未登入也認得）。
     const adminNow = isOwnerSession(ctx.session);
     if (adminNow) await markOwnerNet(ctx.db, ip).catch(() => undefined);
-    const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false));
+    const mine = adminNow || body.owner === 1 || (await isOwnerNet(ctx.db, ip).catch(() => false)) || (await isOwnerDevice(ctx.db, body.fp).catch(() => false));
     await recordUsage(ctx.db, body, mine).catch(() => undefined);
     return { ok: true };
   }],
@@ -5353,6 +5353,26 @@ const routes: [string, RegExp, Handler][] = [
     if (!isOwnerSession(ctx.session)) return { ok: false };
     await markOwnerNet(ctx.db, ctx.req.headers.get("cf-connecting-ip") ?? "").catch(() => undefined);
     return { ok: true };
+  }],
+  // 本人裝置登記（杜杜龍 2026-11-26，超級管理員）：在那台裝置上按「登記這台裝置」，之後相同特徵的操作一律算本人。
+  ["GET", /^\/admin\/usage\/devices$/, async (ctx) => (requireSuperAdmin(ctx), { devices: await ownerDevices(ctx.db) })],
+  ["POST", /^\/admin\/usage\/devices$/, async (ctx) => {
+    const s = requireSuperAdmin(ctx);
+    const body = await readJson<{ fp?: unknown; label?: unknown }>(ctx.req);
+    if (typeof body.fp !== "string" || !FP_RE.test(body.fp)) return fail(400, "invalid_device", "讀不到這台裝置的特徵");
+    const list = (await ownerDevices(ctx.db)).filter((d) => d.fp !== body.fp);
+    list.push({ fp: body.fp, label: (typeof body.label === "string" ? body.label.trim() : "").slice(0, 40) || "我的裝置", at: new Date().toISOString() });
+    await saveOwnerDevices(ctx.db, list);
+    await audit(ctx.db, s.sub, "usage.owner_device.add", "usage", "device", body.fp).run();
+    return { devices: list };
+  }],
+  ["POST", /^\/admin\/usage\/devices\/remove$/, async (ctx) => {
+    const s = requireSuperAdmin(ctx);
+    const body = await readJson<{ fp?: unknown }>(ctx.req);
+    const list = (await ownerDevices(ctx.db)).filter((d) => d.fp !== body.fp);
+    await saveOwnerDevices(ctx.db, list);
+    await audit(ctx.db, s.sub, "usage.owner_device.remove", "usage", "device", String(body.fp ?? "")).run();
+    return { devices: list };
   }],
   ["GET", /^\/admin\/usage$/, async (ctx) => {
     const s = requireMember(ctx);

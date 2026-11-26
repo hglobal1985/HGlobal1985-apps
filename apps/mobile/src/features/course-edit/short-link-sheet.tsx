@@ -17,8 +17,7 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
   const cats = (course.category ?? "").split(/[,，、]/).map((x) => x.trim()).filter(Boolean);
   const find = (kind: ShortLinkItem["kind"], value: string, alt?: string): ShortLinkItem => links.data?.find((i) => i.kind === kind && (i.value === value || (alt && i.value === alt))) ?? { kind, value, slug: null };
   const seriesItem = course.series ? find("series", course.series) : null;
-  const centerValue = course.hostCenter || course.hostUnit;
-  const centerItem = centerValue ? find("center", course.hostCenter, course.hostUnit) : null;
+  const centerItem = course.hostCenter ? find("center", course.hostCenter, course.hostUnit) : null; // 總部主辦（沒有中心）就不顯示中心這一列
   const [matUrl, setMatUrl] = useState(course.matUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,7 +44,12 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
         {links.data ? (
           <View style={{ gap: space.lg }}>
             {course.shortPath ? <AppText variant="callout" style={{ fontWeight: "700" }}>{`這張卡的網址：${typeof location !== "undefined" ? location.host : "learn.hglobal1985.com"}/${course.shortPath}`}</AppText> : null}
-            {seriesItem ? <ShortLinkRow item={seriesItem} onChanged={links.reload} /> : null}
+            {seriesItem ? (
+              <View style={{ gap: space.xs }}>
+                <AppText variant="caption" tone="muted">系列頁的短網址（打開這個系列的頁面，同系列所有卡共用）</AppText>
+                <ShortLinkRow item={seriesItem} onChanged={links.reload} />
+              </View>
+            ) : null}
             {course.isList && course.series && seriesItem?.slug ? (
               <View style={{ gap: space.xs }}>
                 <AppText variant="callout">{`清單網址：${seriesItem.slug}/`}</AppText>
@@ -54,8 +58,18 @@ export function ShortLinkSheet({ course, onClose, onSaved }: { course: CourseDet
                 {error ? <AppText variant="caption" tone="danger">{error}</AppText> : null}
               </View>
             ) : null}
-            {centerItem ? <ShortLinkRow item={centerItem} onChanged={links.reload} /> : null}
-            {cats.map((cat) => <ShortLinkRow key={cat} item={find("category", cat)} onChanged={links.reload} />)}
+            {centerItem ? (
+              <View style={{ gap: space.xs }}>
+                <AppText variant="caption" tone="muted">主辦中心的專屬頁短網址（這個中心所有課程共用，不是只有這張卡）</AppText>
+                <ShortLinkRow item={centerItem} onChanged={links.reload} />
+              </View>
+            ) : null}
+            {cats.map((cat) => (
+              <View key={cat} style={{ gap: space.xs }}>
+                <AppText variant="caption" tone="muted">分類清單頁的短網址（打開這個分類底下所有課程，同分類共用）</AppText>
+                <ShortLinkRow item={find("category", cat)} onChanged={links.reload} />
+              </View>
+            ))}
             {!seriesItem && !centerItem && !cats.length ? <AppText tone="muted">這張卡還沒有系列、中心或分類，沒有可設定的短網址。</AppText> : null}
           </View>
         ) : null}

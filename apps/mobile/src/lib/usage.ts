@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AppState, Dimensions, Platform } from "react-native";
+import { AppState, Dimensions, PixelRatio, Platform } from "react-native";
 import { api } from "@/api/client";
 import { currentModeKey } from "./elder-mode";
 
@@ -24,6 +24,32 @@ function detect(): { device: "mobile" | "tablet" | "desktop"; os: "ios" | "andro
   return { device: "desktop", os: "other" };
 }
 
+/**
+ * 裝置特徵（杜杜龍 2026-11-26「本人裝置」登記用）：螢幕短邊x長邊（CSS 像素）@像素比:系統:類型，例如 iPad Air 是 820x1180@2:ios:tablet。
+ * 不含任何個人識別碼；同型號裝置會得到相同特徵。
+ */
+export function deviceFingerprint(): string {
+  const d = detect();
+  let w: number, h: number, r: number;
+  if (Platform.OS === "web" && typeof screen !== "undefined") {
+    w = screen.width;
+    h = screen.height;
+    r = typeof devicePixelRatio === "number" ? devicePixelRatio : 1;
+  } else {
+    const s = Dimensions.get("screen");
+    w = s.width;
+    h = s.height;
+    r = PixelRatio.get();
+  }
+  const a = Math.round(Math.min(w, h));
+  const b = Math.round(Math.max(w, h));
+  return `${a}x${b}@${Math.round(r * 100) / 100}:${d.os}:${d.device}`;
+}
+export const deviceLabel = (): string => {
+  const d = detect();
+  return `${d.os === "ios" ? "iOS" : d.os === "android" ? "Android" : "電腦"} ${d.device === "tablet" ? "平板" : d.device === "mobile" ? "手機" : "電腦"}・${deviceFingerprint().split(":")[0]}`;
+};
+
 /** 「這是杜杜龍本人的裝置」記號（杜杜龍 2026-11-23）：管理員在這個瀏覽器／手機登入過就留下，之後未登入、換測試帳號也不列入統計。 */
 const OWNER_KEY = "learn.usage.owner";
 let ownerDevice = false;
@@ -38,7 +64,7 @@ export function markOwnerDevice() {
 
 export function trackUsage(kind: Kind, target?: string) {
   try {
-    void ownerReady.then(() => api("POST", "/usage", { kind, ...detect(), mode: currentModeKey(), ...(target ? { target } : {}), ...(ownerDevice ? { owner: 1 } : {}) })).catch(() => undefined);
+    void ownerReady.then(() => api("POST", "/usage", { kind, ...detect(), fp: deviceFingerprint(), mode: currentModeKey(), ...(target ? { target } : {}), ...(ownerDevice ? { owner: 1 } : {}) })).catch(() => undefined);
   } catch {
     /* 統計失敗不影響使用 */
   }
