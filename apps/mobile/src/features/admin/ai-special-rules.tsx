@@ -8,7 +8,7 @@ import { AppText, Card } from "@/ui";
  * 這裡是白話版；程式裡實際執行的位置寫在括號。**之後業主再指定任何辨識相關的特殊規則，除了寫進程式與 docs/rules/，也要在這裡加一條。**
  */
 const RULES: { title: string; body: string; where: string }[] = [
-  { title: "活動日期沒寫年份 → 一律用上傳當年", body: "EDM 上的日期通常只有月和日。系統一律用「這張 EDM 上傳當下的年份」補上建檔；海報上明確寫了完整年份才照海報。舊的 EDM 也已依這條補齊，而且每次排程都會自動校正。", where: "edm-vision.ts inferDate／fixEdmYears" },
+  { title: "活動日期沒寫年份 → 取離上傳日最近的年份", body: "EDM 上的日期通常只有月和日。系統會試「上傳前一年、當年、後一年」，挑和上傳日最接近的那一年建檔：1 月上傳 12 月的海報會是前一年，12 月上傳 1 月的活動會是隔年。海報上明確寫了完整年份才照海報。已經建檔的舊 EDM 不重算。", where: "edm-vision.ts inferDate／fillMissingEdmDates" },
   { title: "辨識文字只能是海報上的原文", body: "AI 不可以寫自己的話、開場白、判斷或猜測；提示裡也不放「今天日期」，避免被當成海報內容寫出來。「今天是…」「活動日期應該是…」這類句子會被自動刪掉。", where: "edm-vision.ts／edm-structure.ts cleanOcrText" },
   { title: "不使用 Markdown 符號", body: "辨識結果會去掉 ** ### 與條列符號，只留純文字。", where: "cleanOcrText" },
   { title: "套入欄位格式：不可加字、不可加年份", body: "文字整理時，每個欄位只能放海報原有的字句；歸不進任何欄位的內容，固定放最後的「其他內容」。欄位格式可在本頁自訂。", where: "edm-structure.ts" },

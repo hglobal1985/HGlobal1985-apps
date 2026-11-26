@@ -18,12 +18,13 @@ test("parseVision 不是 JSON 時整段當文字", () => {
   assert.equal(r.date, null);
 });
 
-test("inferDate 沒寫年份一律用上傳年份（不管星期、不管最近年份）", () => {
+test("inferDate 沒寫年份：取離上傳日最近的年份（含跨年）", () => {
   const up = new Date("2026-11-10T04:00:00Z");
   assert.equal(inferDate("11/24日（二）晚上7:30", up), "2026-11-24");
   assert.equal(inferDate("12月5日（六）", up), "2026-12-05");
-  assert.equal(inferDate("1/8 講座", up), "2026-01-08");
-  assert.equal(inferDate("1/8 講座", new Date("2025-12-31T20:00:00Z")), "2026-01-08", "台灣時間已是 2026");
+  assert.equal(inferDate("1/8 講座", new Date("2026-12-28T04:00:00Z")), "2027-01-08", "12 月上傳 1 月的活動＝隔年");
+  assert.equal(inferDate("12/20 講座", new Date("2027-01-05T04:00:00Z")), "2026-12-20", "1 月上傳 12 月的海報＝前一年");
+  assert.equal(inferDate("1/8 講座", new Date("2025-12-31T20:00:00Z")), "2026-01-08", "台灣時間已是 2026/1/1");
 });
 test("inferDate 海報有寫完整年份就照海報；沒有日期回 null", () => {
   const up = new Date("2026-11-10T04:00:00Z");
