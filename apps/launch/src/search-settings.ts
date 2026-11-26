@@ -41,7 +41,7 @@ export const GROUPS: { key: ParamDef["group"]; title: string; intro: string }[] 
 export const PARAMS: ParamDef[] = [
   { key: "semanticEnabled", group: "semantic", label: "啟用意思相近搜尋", desc: "關閉後完全不呼叫 AI，只用字面、同音、模糊比對。完全比對有結果時本來就不會呼叫 AI，只有「找不到」才補找。", advice: "建議開。想省 AI 額度或結果太雜時才關。", type: "bool", default: true },
   { key: "semanticMin", group: "semantic", label: "相似度門檻", desc: "AI 判斷兩段文字意思有多接近（0～1，越高越像）。低於這個數字的不顯示。調高＝更準但可能漏掉；調低＝找得多但會混進不相干的課（例如搜「水機」出現保養品）。", advice: "建議 0.62。看到不相干的結果就每次調高 0.03；漏掉該找到的就調低 0.03。", type: "number", default: 0.62, min: 0.4, max: 0.9, step: 0.01 },
-  { key: "semanticLimit", group: "semantic", label: "最多顯示幾筆（Top-K）", desc: "AI 最多回傳幾門課（章節另外算）。越大結果越多、越雜。", advice: "建議 100（業主指定）；課程不多可降到 10～15。", type: "number", default: 100, min: 5, max: 200, step: 1, unit: "筆" },
+  { key: "semanticLimit", group: "semantic", label: "最多顯示幾筆（Top-K）", desc: "AI 最多回傳幾門課（章節另外算）。越大結果越多、越雜。", advice: "建議 100（杜杜龍指定）；課程不多可降到 10～15。", type: "number", default: 100, min: 5, max: 200, step: 1, unit: "筆" },
   { key: "semSrcCourse", group: "sources", label: "教材卡　［標籤：教材卡］", desc: "搜尋欄位：courses.title（教材卡名稱）。", advice: "建議開（核心）。", type: "bool", default: true },
   { key: "semSrcLesson", group: "sources", label: "單一教材　［標籤：單一教材］", desc: "搜尋欄位：lessons.title（教材標題，不含區塊）。點結果直接到所屬課程。", advice: "建議開。", type: "bool", default: true },
   { key: "semSrcSection", group: "sources", label: "區塊　［標籤：區塊］", desc: "搜尋欄位：lessons.title（課程裡的區塊／分組名稱）。", advice: "建議開。", type: "bool", default: true },
@@ -87,7 +87,7 @@ export const PARAMS: ParamDef[] = [
   { key: "aiBatchSize", group: "batch", label: "每一輪處理幾張（每種辨識各自）", desc: "每輪從待辨識的照片裡取這麼多張，同時處理完再取下一輪。", advice: "建議 12。", type: "number", default: 12, min: 3, max: 50, step: 1, unit: "張" },
   { key: "aiConcurrency", group: "batch", label: "同時處理幾張", desc: "一輪裡同時送給 AI 的張數。越多越快，但太多可能被 Cloudflare 限流。", advice: "建議 4。", type: "number", default: 4, min: 1, max: 8, step: 1, unit: "張" },
   { key: "aiBudgetSec", group: "batch", label: "每次排程最多處理幾秒", desc: "每 10 分鐘的排程最多跑這麼久，時間到就停、下次再接著做（避免和其他排程工作互相拖累）。", advice: "建議 240 秒（4 分鐘）。", type: "number", default: 240, min: 60, max: 600, step: 30, unit: "秒" },
-  { key: "showLocked", group: "scene", label: "沒有權限的內容也列在搜尋結果", desc: "開＝沒權限的課程、教材、照片也搜尋得到，縮圖中央蓋鎖頭、寫出需要的權限，點了顯示原因；關＝場景與其他項目看不到的就不列。", advice: "建議開（業主指示）。", type: "bool", default: true },
+  { key: "showLocked", group: "scene", label: "沒有權限的內容也列在搜尋結果", desc: "開＝沒權限的課程、教材、照片也搜尋得到，縮圖中央蓋鎖頭、寫出需要的權限，點了顯示原因；關＝場景與其他項目看不到的就不列。", advice: "建議開（杜杜龍指示）。", type: "bool", default: true },
   { key: "fuzzyEnabled", group: "fuzzy", label: "啟用模糊比對（打錯字）", desc: "容許漏字、多字、錯字。", advice: "建議開（免費）。", type: "bool", default: true },
   { key: "fuzzyMaxDiff", group: "fuzzy", label: "最多容許差幾個字", desc: "上限。實際容許數依詞長：1～2 字必須完全一樣、3～4 字差 1、5 字以上差 2；這裡的數字是再往下壓的天花板。填 0＝等於關閉。", advice: "建議 2。覺得亂配就改 1。", type: "number", default: 2, min: 0, max: 3, step: 1, unit: "字" },
   { key: "charsEnabled", group: "fuzzy", label: "啟用字元比對", desc: "查詢的每個字（不分順序）都出現在同一門課的文字裡就算符合，例如「線上白金」找得到「安麗與白金線上溝通會」。", advice: "建議開。", type: "bool", default: true },
