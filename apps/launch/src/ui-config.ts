@@ -57,6 +57,7 @@ export function normalizeShare(raw: unknown): ShareSettings {
     siteName: str(r.siteName, d.siteName, 30),
     // 分隔符號前後的空白要保留（例如「 | 」），所以不 trim。
     titleSeparator: typeof r.titleSeparator === "string" && r.titleSeparator.length <= 10 && r.titleSeparator.trim() ? r.titleSeparator : d.titleSeparator,
+    titleBadge: str(r.titleBadge, d.titleBadge, 8, true),
     addressIcon: str(r.addressIcon, d.addressIcon, 8, true),
     showAddress: typeof r.showAddress === "boolean" ? r.showAddress : d.showAddress,
     showQuote: typeof r.showQuote === "boolean" ? r.showQuote : d.showQuote,

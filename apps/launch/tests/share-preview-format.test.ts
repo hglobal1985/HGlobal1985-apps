@@ -21,3 +21,11 @@ test("分享預覽一律格式：第一行「名稱 | 寰宇行動大學 🎓」
   const series = await resolveShareMeta(db, new URL("https://learn.test/series/" + encodeURIComponent("白金會")));
   assert.equal(series?.title, "白金會 | 寰宇行動大學 🎓");
 });
+
+test("分享預覽標題的圖示可在設定頁自訂；清空＝不加（杜杜龍 2026-11-26）", async () => {
+  const { normalizeShare } = await import("../src/ui-config.ts");
+  assert.equal(titleOf(normalizeShare({}), "A"), "A | 寰宇行動大學 🎓", "預設 🎓");
+  assert.equal(titleOf(normalizeShare({ titleBadge: "⭐" }), "A"), "A | 寰宇行動大學 ⭐");
+  assert.equal(titleOf(normalizeShare({ titleBadge: "" }), "A"), "A | 寰宇行動大學", "清空＝不加");
+  assert.equal(titleOf(normalizeShare({ siteName: "寰宇行動大學 🎓" }), "A"), "A | 寰宇行動大學 🎓", "站名已含圖示不重複加");
+});

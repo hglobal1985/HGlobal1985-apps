@@ -53,21 +53,24 @@ type ShareMeta = { title: string; description: string; url: string; image: strin
 /** 分享預設值（設定頁「分享預設值」，超級管理員編輯）。 */
 const shareCfg = async (db: D1Database): Promise<ShareSettings> => (await loadConfig(db).catch(() => null))?.share ?? DEFAULT_SHARE_SETTINGS;
 /** 預覽卡的第一行（杜杜龍 2026-11-26 一律格式）：「課程／系列／中心名稱 | 寰宇行動大學 🎓」。 */
-export const SHARE_BADGE = "🎓";
-export const titleOf = (S: ShareSettings, name: string) => `${name}${S.titleSeparator}${S.siteName}${S.siteName.includes(SHARE_BADGE) ? "" : ` ${SHARE_BADGE}`}`;
+export const titleOf = (S: ShareSettings, name: string) => `${name}${S.titleSeparator}${S.siteName}${S.titleBadge && !S.siteName.includes(S.titleBadge) ? ` ${S.titleBadge}` : ""}`;
 const randomQuote = async (db: D1Database) => (await db.prepare("SELECT body FROM quotes ORDER BY RANDOM() LIMIT 1").first<{ body: string }>().catch(() => null))?.body?.trim() || "";
 
-/** 預覽卡片的備註（杜杜龍 2026-11-26 一律格式）：只放一句隨機學習金句（每次被讀取都重新抽，LINE 重新抓取時就會換一句）；金句關閉或沒有金句才用備用文字。不再放地址。 */
+/** 預覽卡片的備註（杜杜龍 2026-11-26）：課程、系列、分類＝一句隨機學習金句（每次被讀取都重新抽，LINE 重新抓取時就會換一句）；金句關閉或沒有金句才用備用文字。中心卡的第二行是地址（見 centerCard）。 */
 async function describe(db: D1Database, S: ShareSettings, _address = ""): Promise<string> {
   const quote = S.showQuote ? await randomQuote(db) : "";
   return quote || S.fallbackDescription || S.siteName;
 }
 
-/** 中心的預覽卡片（標題與備註）；label＝null 表示總部（沒有主辦中心）。單堂課程的分享也用它主辦中心的卡片。 */
+/**
+ * 中心的預覽卡片（杜杜龍 2026-11-26）：標題＝中心名稱；**第二行固定顯示地址**（「📍 地址」，不是學習金句）；
+ * 中心沒填地址（或設定關閉地址）時才退回學習金句／備用文字。label＝null 表示總部（沒有主辦中心），沒有地址，用金句。
+ */
 async function centerCard(db: D1Database, S: ShareSettings, label: string | null): Promise<{ name: string; description: string }> {
   if (!label) return { name: S.hqName, description: await describe(db, S) };
   const p = await centerShareParts(db, label);
-  return { name: p.name, description: await describe(db, S, p.address) };
+  const addr = S.showAddress && p.address ? `${S.addressIcon ? `${S.addressIcon} ` : ""}${p.address}` : "";
+  return { name: p.name, description: addr || (await describe(db, S)) };
 }
 
 const clip = (v: string | null | undefined, n = 60) => (v ?? "").trim().slice(0, n);
