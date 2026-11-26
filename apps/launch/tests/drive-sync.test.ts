@@ -8,7 +8,8 @@ test("雲端資料夾同步：連結判讀與檔名解析成統一格式", () =>
   assert.equal(folderIdOf("https://drive.google.com/drive/folders/1bckEgllJGpG7NGSAVyBZwUtHkUFFsVzY?usp=drive_link"), "1bckEgllJGpG7NGSAVyBZwUtHkUFFsVzY");
   assert.equal(folderIdOf("https://example.com/x"), null);
   const f = { id: "a", name: "202611 線上白金溝通會（淨熱組/公益/悅齡錠）.pdf", modified: "2026-11-26T00:00:00Z" };
-  assert.equal(driveTitle(PLATINUM_FORMAT, f), "簡報2026年11月 白金溝通會");
+  assert.equal(driveTitle(PLATINUM_FORMAT, f), "簡報2026年11月 白金溝通會（淨熱組/公益/悅齡錠）");
+  assert.equal(driveTitle(PLATINUM_FORMAT, { id: "c", name: "202609 線上白金溝通會(魅力領導/益之源pro).pdf", modified: null }), "簡報2026年9月 白金溝通會（魅力領導/益之源pro）");
   assert.equal(driveTitle(PLATINUM_FORMAT, { id: "b", name: "202603 線上白金溝通會.pdf", modified: null }), "簡報2026年3月 白金溝通會");
   assert.equal(driveTitle("{標題}", f), "202611 線上白金溝通會（淨熱組/公益/悅齡錠）");
   assert.equal(parseDriveName("說明.pdf", "2026-05-02T00:00:00Z").ym, "2026-05-01"); // 檔名沒有年月就用修改日
@@ -37,14 +38,17 @@ test("雲端資料夾同步：只加新檔案、放進區塊、最新的在最�
     assert.equal(a.imported, 3);
     assert.equal(a.total, 3);
     const rows = (await db.prepare("SELECT title FROM lessons WHERE course_id = 'c1' AND kind = 'material' ORDER BY position").all<{ title: string }>()).results;
-    assert.deepEqual(rows.map((r) => r.title), ["簡報2026年11月 白金溝通會", "簡報2026年10月 白金溝通會", "簡報2026年9月 白金溝通會"]);
+    assert.deepEqual(rows.map((r) => r.title), ["簡報2026年11月 白金溝通會（B）", "簡報2026年10月 白金溝通會（A）", "簡報2026年9月 白金溝通會"]);
     const first = await db.prepare("SELECT kind FROM lessons WHERE course_id = 'c1' ORDER BY position LIMIT 1").first<{ kind: string }>();
     assert.equal(first?.kind, "section");
     const att = await db.prepare("SELECT link_url, att_type FROM lesson_attachments WHERE course_id = 'c1' LIMIT 1").first<{ link_url: string; att_type: string }>();
     assert.match(att!.link_url, /^https:\/\/drive\.google\.com\/file\/d\/F2026/);
     assert.equal(att!.att_type, "google_drive");
+    // 改規則後再同步：舊的教材也跟著改名
+    await db.prepare("UPDATE drive_syncs SET title_format = '{年}年{月}月' WHERE id = 'd1'").run();
     const b = await runDriveSync(env, "d1");
     assert.equal(b.imported, 0);
+    assert.equal((await db.prepare("SELECT title FROM lessons WHERE kind = 'material' ORDER BY position LIMIT 1").first<{ title: string }>())?.title, "2026年11月");
     assert.equal(b.total, 3);
     const sync = await db.prepare("SELECT last_total, last_imported FROM drive_syncs WHERE id = 'd1'").first<{ last_total: number; last_imported: number }>();
     assert.equal(sync?.last_total, 3);

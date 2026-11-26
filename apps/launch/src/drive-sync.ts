@@ -8,22 +8,24 @@ import { nextPos, placeInBlock, placeOnTop, runYoutubeSync, sortMaterialsByDate 
  */
 const short = () => crypto.randomUUID().slice(0, 6);
 
-export const DRIVE_FORMAT_HELP = "可用：{年}、{月}（檔名開頭的 YYYYMM，沒有就用檔案修改日）、{標題}（檔名，不含副檔名）";
+export const DRIVE_FORMAT_HELP = "可用：{年}、{月}（檔名開頭的 YYYYMM，沒有就用檔案修改日）、{括號}（檔名裡（）括號和裡面的文字，沒有就省略）、{標題}（檔名，不含副檔名）";
 /** 白金溝通會的固定格式；其他資料夾預設只用檔名。 */
-export const PLATINUM_FORMAT = "簡報{年}年{月}月 白金溝通會";
+export const PLATINUM_FORMAT = "簡報{年}年{月}月 白金溝通會{括號}";
 
 export const folderIdOf = (url: string): string | null => /\/folders\/([\w-]{10,})/.exec(url)?.[1] ?? /[?&]id=([\w-]{10,})/.exec(url)?.[1] ?? null;
 
 export type DriveFile = { id: string; name: string; modified: string | null };
 
 /** 檔名 → 年月（開頭 YYYYMM，例如「202611 線上白金溝通會（…）.pdf」）；沒有就用修改日。 */
-export function parseDriveName(name: string, modified: string | null): { year: string; month: string; title: string; ym: string } {
+export function parseDriveName(name: string, modified: string | null): { year: string; month: string; title: string; ym: string; bracket: string } {
   const title = name.replace(/\.[A-Za-z0-9]{1,5}$/, "").trim();
   const m = /^(20\d{2})(0[1-9]|1[0-2])(?!\d)/.exec(title);
   const d = /^(\d{4})-(\d{2})/.exec(modified ?? "");
   const year = m ? m[1]! : d ? d[1]! : "";
   const month = m ? String(Number(m[2])) : d ? String(Number(d[2])) : "";
-  return { year, month, title, ym: year && month ? `${year}-${month.padStart(2, "0")}-01` : "" };
+  // 括號內的原文一律完整保留（杜杜龍 2026-11-26：（淨熱組/公益/悅齡錠）這些字都要顯示）；半形括號統一成全形。
+  const br = /[（(]([^（）()]*)[）)]/.exec(title);
+  return { year, month, title, ym: year && month ? `${year}-${month.padStart(2, "0")}-01` : "", bracket: br ? `（${br[1]!.trim()}）` : "" };
 }
 
 export function driveTitle(format: string, f: DriveFile): string {
@@ -31,6 +33,7 @@ export function driveTitle(format: string, f: DriveFile): string {
   const out = format
     .replace(/\{年\}\s*年?/g, p.year ? `${p.year}年` : "")
     .replace(/\{月\}\s*月?/g, p.month ? `${p.month}月` : "")
+    .replace(/\{括號\}/g, p.bracket)
     .replace(/\{標題\}/g, p.title);
   return out.replace(/\s+/g, " ").trim() || p.title;
 }
@@ -99,6 +102,19 @@ async function sortBlockByDate(db: D1Database, courseId: string, blockId: string
   await db.batch([db.prepare("UPDATE lessons SET position = -position WHERE course_id = ?").bind(courseId), ...order.map((id, i) => db.prepare("UPDATE lessons SET position = ? WHERE id = ?").bind(i + 1, id))]);
 }
 
+/** 已經匯入的檔案也依目前的命名規則改名（改規則、補括號文字後，舊的教材跟著更新；同步一律以命名規則為準）。 */
+async function renameExisting(db: D1Database, courseId: string, fmt: string, files: DriveFile[]): Promise<void> {
+  const { results } = await db.prepare("SELECT a.lesson_id AS lid, a.link_url AS url, l.title FROM lesson_attachments a JOIN lessons l ON l.id = a.lesson_id WHERE a.course_id = ? AND a.kind = 'link' AND a.link_url LIKE 'https://drive.google.com/file/d/%'").bind(courseId).all<{ lid: string; url: string; title: string }>();
+  const byId = new Map(files.map((f) => [f.id, f]));
+  const stmts = results.flatMap((r) => {
+    const f = byId.get(/\/file\/d\/([\w-]+)/.exec(r.url)?.[1] ?? "");
+    if (!f) return [];
+    const name = driveTitle(fmt, f).slice(0, 120);
+    return name && name !== r.title ? [db.prepare("UPDATE lessons SET title = ? WHERE id = ?").bind(name, r.lid)] : [];
+  });
+  if (stmts.length) await db.batch(stmts);
+}
+
 export async function runDriveSync(env: Env, syncId: string): Promise<{ imported: number; total: number; note: string }> {
   const db = env.DB;
   const sync = await db.prepare("SELECT folder_id, course_id, block_id, title_format FROM drive_syncs WHERE id = ?").bind(syncId).first<{ folder_id: string; course_id: string; block_id: string; title_format: string }>();
@@ -112,6 +128,7 @@ export async function runDriveSync(env: Env, syncId: string): Promise<{ imported
   if ("error" in read) return finish({ imported: 0, total: 0, note: read.error });
   const total = read.files.length;
   const have = await existingDriveIds(db, sync.course_id);
+  await renameExisting(db, sync.course_id, sync.title_format || "{標題}", read.files);
   const fresh = read.files.filter((f) => !have.has(f.id)).sort((a, b) => parseDriveName(b.name, b.modified).ym.localeCompare(parseDriveName(a.name, a.modified).ym));
   if (!fresh.length) return finish({ imported: 0, total, note: "沒有新的檔案（都已經同步過了）" });
   const fmt = sync.title_format || "{標題}";
