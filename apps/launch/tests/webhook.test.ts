@@ -75,3 +75,17 @@ test("webhook：獎銜、中心欄位變更 → 通知本人（2 分鐘內不重
   await post({ id: "a3", type: "member.profile_changed", app_id: "learn", member_id: sub, fields: ["rank"] });
   assert.equal(await count(), 1, "短時間內不重複");
 });
+
+test("webhook：eco.alert（網站巡檢警報）→ 替該會員發站內通知；格式不對或重送不重複發", async () => {
+  const { env, post } = setup();
+  const sub = "00000000-0000-4000-8000-000000000003";
+  const rows = async () => (await env.DB.prepare("SELECT title, body, link FROM notifications WHERE recipient_sub = ?").bind(sub).all<{ title: string; body: string; link: string }>()).results;
+  assert.equal((await post({ id: "z0", type: "eco.alert", app_id: "learn", member_id: sub, detail: { name: "行動大學", alert: "bad", note: "x" } })).status, 200);
+  assert.equal((await rows()).length, 0);
+  const ev = { id: "z1", type: "eco.alert", app_id: "learn", member_id: sub, detail: { name: "行動大學", alert: "down", note: "HTTP 503" } };
+  assert.equal((await post(ev)).status, 200);
+  assert.equal((await post(ev)).status, 200);
+  assert.deepEqual((await rows()).map((r) => ({ ...r })), [{ title: "網站打不開：行動大學", body: "HTTP 503", link: "/notices" }]);
+  await post({ id: "z2", type: "eco.alert", app_id: "learn", member_id: sub, detail: { name: "行動大學", alert: "recovered", note: "HTTP 200" } });
+  assert.equal((await rows()).length, 2);
+});
