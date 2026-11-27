@@ -6,6 +6,8 @@ import { APP_VERSION, INTEGRATED_VERSION, PRIVACY_URL } from "@/central/config";
 import { setElder, useElderOn } from "@/lib/elder-mode";
 import { useFeature } from "@/lib/app-mode";
 import { useData, useSession } from "@/state/session";
+import { PushCard } from "@/features/push-card";
+import { InstallCard } from "@/ui/install-card";
 import { Avatar, Btn, Card, confirmSheet, flash, flashError, Screen, Section, T, Toggle } from "@/kit";
 
 export default function MePage() {
@@ -44,6 +46,9 @@ export default function MePage() {
             </Card>
           </>
         ) : null}
+        <Section title="通知" />
+        <InstallCard />
+        <PushCard />
         <Section title="顯示模式" />
         <Card>
           <Toggle label="至尊模式（大字簡易版）" note="字放大、選單改成整頁顯示；和寰宇行動大學的至尊模式相同" value={elder} onChange={(on) => setElder({ on })} />

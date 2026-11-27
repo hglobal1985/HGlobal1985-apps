@@ -195,3 +195,39 @@ test("上傳壓縮設定：與行動大學共用同一份，只有超級管理�
   assert.equal(w.data.settings.imageQuality, 30, "超出範圍自動修正");
   assert.equal(JSON.parse(store.get("upload")!).imageMaxSide, 1600, "寫進共用儲存區（行動大學讀同一個鍵）");
 });
+
+test("手機推播：訂閱、站內通知新增後推到裝置、裝置失效就刪除", async () => {
+  const { flushPushes } = await import("../src/api.ts");
+  const { env, call } = setup();
+  const vapid = (await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign"])) as CryptoKeyPair;
+  const jwk = JSON.stringify(await crypto.subtle.exportKey("jwk", vapid.privateKey));
+  env.VAPID_PRIVATE_JWK = jwk;
+  const ua = (await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"])) as CryptoKeyPair;
+  const p256dh = Buffer.from(new Uint8Array((await crypto.subtle.exportKey("raw", ua.publicKey)) as ArrayBuffer)).toString("base64url");
+  const auth = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString("base64url");
+  assert.ok(((await call<{ publicKey: string }>("amy", "GET", "/push/key")).data.publicKey ?? "").length > 80, "有公鑰");
+  assert.equal((await call("amy", "POST", "/push/subscribe", { body: { endpoint: "https://push.example/abc", keys: { p256dh, auth } } })).status, 200);
+  env.VAPID_PRIVATE_JWK = undefined; // 操作期間先不在背景自動推（測試用假的推播伺服器手動推）
+  const { id } = (await call<{ id: string }>("admin1", "POST", "/activities", { body: { title: "推播測試" } })).data;
+  await call("admin1", "PATCH", `/activities/${id}`, { body: { status: "open", joinApproval: true } });
+  const code = (await call<ActivityView>("admin1", "GET", `/activities/${id}`)).data.activity.joinCode;
+  await call("amy", "POST", `/join/${code}`);
+  await call("admin1", "POST", `/activities/${id}/people/amy`, { body: { action: "approve" } }); // 產生「已加入作業」通知
+  env.VAPID_PRIVATE_JWK = jwk;
+  const sent: { url: string; headers: Record<string, string> }[] = [];
+  const fake = (async (url: string, init?: RequestInit) => {
+    sent.push({ url, headers: init?.headers as Record<string, string> });
+    return new Response(null, { status: 201 });
+  }) as typeof fetch;
+  assert.equal(await flushPushes(env, fake), 1);
+  assert.equal(sent[0].url, "https://push.example/abc");
+  assert.match(sent[0].headers.authorization, /^vapid t=/);
+  assert.equal(await flushPushes(env, fake), 0, "同一則不重複推");
+  env.VAPID_PRIVATE_JWK = undefined;
+  await call("admin1", "PATCH", `/activities/${id}`, { body: { status: "draft" } });
+  await call("admin1", "PATCH", `/activities/${id}`, { body: { status: "open" } }); // 「作業開放了」通知
+  env.VAPID_PRIVATE_JWK = jwk;
+  const gone = (async () => new Response(null, { status: 410 })) as typeof fetch;
+  await flushPushes(env, gone);
+  assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM push_subs").first<{ n: number }>())!.n, 0, "失效的裝置刪除");
+});

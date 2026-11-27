@@ -3,6 +3,7 @@ import { useBorderW } from "@/lib/elder-mode";
 import { useCallback, useState } from "react";
 import Svg, { Circle, Rect } from "react-native-svg";
 import { Pressable, StyleSheet, View } from "react-native";
+import { APP_NAME } from "@/lib/app-assets";
 import { deviceNoun, installNative, isIos, isIpad, likelyInstalledAndroid, useInstallState } from "@/lib/install-app";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
@@ -16,7 +17,7 @@ import { flashText } from "./flash-notice";
 const RED = "#B3261E";
 /**
  * 「加入主畫面」邀請卡（杜杜龍 2026-11-18，全站唯一來源）：只在手機與平板網頁（含 iPad）、還沒安裝時顯示。
- * 好處：手機推播的來源會顯示「寰宇行動大學」、開啟更快。Android 一鍵安裝；iPhone、iPad 顯示「分享 → 加入主畫面」教學。
+                   * 好處：手機推播的來源會顯示「App」、開啟更快。Android 一鍵安裝；iPhone、iPad 顯示「分享 → 加入主畫面」教學。
  * dismissible＝可按 ✕ 先關掉這一次（首頁用）；通知設定頁不可關。
  */
 export function InstallCard({ dismissible = false }: { dismissible?: boolean }) {
@@ -63,7 +64,7 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
           <View style={{ gap: space.sm }}>
             <AppText variant="headline">加入主畫面</AppText>
             {!ios && likelyInstalledAndroid() ? (
-              <AppText style={{ fontWeight: "800", color: RED }}>這支手機可能已經安裝過了（例如從超派模式裝過）：請直接從手機桌面點「寰宇行動大學」圖示開啟，就是 App 版。若桌面找不到，再照下面步驟安裝。</AppText>
+              <AppText style={{ fontWeight: "800", color: RED }}>{`這支手機可能已經安裝過了（例如從超派模式裝過）：請直接從手機桌面點「${APP_NAME}」圖示開啟，就是 App 版。若桌面找不到，再照下面步驟安裝。`}</AppText>
             ) : null}
             {ios ? (
               <>
@@ -71,14 +72,14 @@ export function InstallCard({ dismissible = false }: { dismissible?: boolean }) 
                 <AppText>{isIpad() ? "2. 點網址列右邊的「分享」圖示（方框加向上箭頭）。" : "2. 點下方的「分享」圖示（方框加向上箭頭）。"}</AppText>
                 <AppText>3. 往下找到「加入主畫面」，按右上角「加入」。</AppText>
                 <AppText variant="caption" tone="muted">
-                  之後從主畫面的「寰宇行動大學」圖示開啟，才能收到手機推播（iOS 16.4 以上）。
+                  {`之後從主畫面的「${APP_NAME}」圖示開啟，才能收到手機推播（iOS 16.4 以上）。`}
                 </AppText>
               </>
             ) : (
               <>
                 <AppText>1. 點瀏覽器右上角的「⋮」選單。</AppText>
                 <AppText>2. 選「加入主畫面」或「安裝應用程式」。</AppText>
-                <AppText>3. 按「安裝」或「新增」，主畫面就會出現「寰宇行動大學」圖示。</AppText>
+                <AppText>{`3. 按「安裝」或「新增」，主畫面就會出現「${APP_NAME}」圖示。`}</AppText>
               </>
             )}
             <Button label="我知道了" onPress={() => setSteps(false)} fullWidth />
