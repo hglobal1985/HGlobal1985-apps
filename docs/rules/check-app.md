@@ -13,3 +13,16 @@
 ## 測試推播按鈕（杜杜龍 2026-11-27）
 - 「我的」頁的推播卡改用共用元件 `PushCard`（見 shared-ui.md 第四批）：開關開啟後有「傳一則測試通知給我」（`POST /push/test`，只推給自己帳號開過推播的裝置，回報送到幾支）與手機端排查步驟。
 - iPhone 共用登入用的 Apple 開發團隊代碼已填在 `apps/check-app/app.json` 的 `extra.appleTeamId`（4W7QRTXN5Y，不是秘密）。
+
+## 先建組別、組長邀組員（杜杜龍 2026-11-27）
+- 流程：老師以上在「分組」頁按「＋新增組」（新增後直接取組名）→ 每組按「邀請組長」產生組長邀請連結（`POST /activities/:id/invites {role:"leader", groupId}`，7 天內有效、只能一人使用，`invites.group_id`）→ 組長接受（`/invite/<code>` 頁，`GET /invite/:code` 顯示是哪一組）後直接成為該組組長（不必等核准；原本的組長會被換掉；已經是老師／管理員的人不能接受）→ 組長在分組頁按「分享連結」邀組員。
+- 組員用本組連結申請加入（作業設定「加入要核准」時）：組長和管理員都會收到通知；**組長可以自己核准或拒絕本組的申請**（`personAction` approve／reject 允許本組組長；移出作業仍只有管理員）。
+
+## 作業檔案備份（杜杜龍 2026-11-27）
+- **刪除日期**：管理頁有填「自動刪除日期」就用它；沒填就是「活動結束日後 2 個月」（`retentionOf`）。兩個都沒有就不自動刪。只刪檔案，成績與評語保留。
+- **提醒**：活動結束隔天通知一次「已結束，請下載作業備份」，刪除前 30／7／1 天再提醒；**站內通知＋手機推播＋Email**，通知管理員、老師與全體組員。老師以上的連結開「全部檔案」（`/files/:id?all=1`），學員開自己的（`/files/:id`）。
+- **Email**：只寄 `notices.email = 1` 的通知（目前只有備份提醒），寄信當下才用中央「聯絡查詢」拿信箱（伺服器共用模組 `packages/server-shared/src/central-service.ts`，用途 `course_notice`，用完即丟）。需要：Worker `check` 的 Secret `CENTRAL_SERVICE_SECRET`（杜杜龍在中央後台替 check 建立服務金鑰並核准 course_notice 用途）＋ `send_email` 綁定（寄件人借用 `noreply@learn.hglobal1985.com`，顯示名稱「寰宇繳作業系統」）。缺一個就不寄 Email，站內通知與推播照常。
+- **一鍵下載備份**：備份頁最上面的按鈕（`GET /activities/:id/backup` 產生 1 小時有效的下載連結 `/z/<憑證>`）。伺服器邊讀邊打包成 ZIP（共用模組 `packages/server-shared/src/zip-stream.ts`，不壓縮、UTF-8 中文檔名、重複檔名加 (2)），每包最多 400MB，太大自動分成好幾包。資料夾：`作業名稱/課程/作業項目/（全部時加學員名_）檔名`；文字作業存成 .txt，連結收在「連結.txt」。學員只能下載自己的，老師以上可以下載全部。
+
+## 錯誤回報（杜杜龍 2026-11-27）
+- 用共用元件 `lib/error-report.ts`（與行動大學同一份；送到 `@/lib/app-assets` 的 `APP_ORIGIN`＋`ERROR_REPORT_PATH`）。繳作業系統的伺服器 `POST /api/client-errors`（不用登入、同一來源每分鐘最多 10 則）只寫進 Cloudflare 的錯誤紀錄，不存資料庫、不含會員身分。舊版網頁檔案失效時自動重新載入。

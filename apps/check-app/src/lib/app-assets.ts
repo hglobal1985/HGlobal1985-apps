@@ -2,3 +2,6 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 export const APP_LOGO = require("../../../mobile/assets/logo.png");
 export const APP_NAME = "寰宇繳作業系統";
+/** 錯誤回報（共用元件 lib/error-report.ts）送到哪裡：手機 App 用完整網址、網頁版用同網站的路徑。 */
+export const APP_ORIGIN = "https://check.hglobal1985.com";
+export const ERROR_REPORT_PATH = "/api/client-errors";

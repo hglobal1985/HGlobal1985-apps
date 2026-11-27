@@ -5,6 +5,7 @@
  * - 不保存任何 Amway 資料；日誌不得出現 Token、信箱、姓名。
  */
 import { createTokenVerifier, SIGNATURE_TOLERANCE_SECONDS, verifyWebhook } from "../../../packages/server-shared/src/central-verify.ts";
+import { createServiceClient } from "../../../packages/server-shared/src/central-service.ts";
 export const CENTRAL = "https://id.hglobal1985.com";
 export const APP_ID = "check";
 /** 採用的串接指令版本（每次依新版指令更新完才改）。 */
@@ -26,6 +27,8 @@ const verifier = createTokenVerifier(CENTRAL, APP_ID, () => centralFetch);
 const keys = { clear: verifier.reset };
 /** 驗證 Access Token，成功回傳 member_id，失敗回傳 null。 */
 export const verifyAccessToken = (token: string): Promise<string | null> => verifier.verify(token);
+/** 寄 Email 前向中央查聯絡信箱（伺服器共用模組 central-service.ts；用完即丟，不寫入資料庫或日誌）。 */
+export const lookupContactEmails = createServiceClient(CENTRAL, APP_ID, () => centralFetch).lookupContactEmails;
 
 /** 記憶體快取（只放記憶體，不落地）。失敗不快取。 */
 const memo = new Map<string, { value: unknown; until: number }>();

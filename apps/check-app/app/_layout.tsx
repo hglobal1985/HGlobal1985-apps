@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { installBottomGap } from "@/lib/bottom-gap";
+import { installErrorReporting } from "@/lib/error-report";
 import { BottomBar } from "@/ui/bottom-bar";
 import { installNoPageZoom } from "@/lib/no-page-zoom";
 import { installStableScrollbar } from "@/lib/stable-scrollbar";
@@ -15,6 +16,8 @@ import { PRIVACY_URL } from "@/central/config";
 import { SessionProvider, useSession } from "@/state/session";
 import { font, useColors } from "@/kit";
 import { Btn, Field, flashError, Hosts, Loading, T } from "@/kit";
+
+installErrorReporting(); // 共用：前台錯誤自動回報（lib/error-report.ts，與行動大學同一份）；舊版網頁檔案失效時自動重新載入
 
 export default function Root() {
   // 共用的全站行為（與行動大學相同）：禁止雙指縮放頁面、底部安全區、下拉重新整理、固定捲軸位置。

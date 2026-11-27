@@ -7,6 +7,7 @@
  * 日誌不得出現 Token、信箱、姓名。
  */
 import { createTokenVerifier, looksLikeJwt, SIGNATURE_TOLERANCE_SECONDS, verifyWebhook } from "../../../packages/server-shared/src/central-verify.ts";
+import { createServiceClient, validEmail, type ContactPurpose } from "../../../packages/server-shared/src/central-service.ts";
 import type { CentralReviews, StaffMember, StaffRole, StaffSearch } from "./contract.ts";
 export const CENTRAL = "https://id.hglobal1985.com";
 export const APP_ID = "learn";
@@ -448,8 +449,7 @@ export async function centerList(token: string): Promise<string[]> {
   return lastCenters;
 }
 
-const EMAIL_RE = /^[^\s@<>"',;]{1,64}@[^\s@<>"',;]{1,255}\.[^\s@<>"',;]{2,63}$/;
-export const validEmail = (s: string) => s.length <= 254 && EMAIL_RE.test(s);
+export { validEmail };
 
 /**
  * 登入者在會員中心的「聯絡信箱」（個人資料欄位 contact_email，正本在中央）。
@@ -599,56 +599,11 @@ export const INTEGRATED_VERSION = "2026-11-24.3";
 export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "snapshot_reconcile", "in_app_delete"];
 export { SIGNATURE_TOLERANCE_SECONDS, verifyWebhook };
 
-let svcToken: { token: string; until: number } | null = null;
-async function serviceToken(secret: string): Promise<string | null> {
-  if (svcToken && svcToken.until > Date.now() + 30_000) return svcToken.token;
-  try {
-    const res = await centralFetch(`${CENTRAL}/v1/service/token`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ app_id: APP_ID, client_secret: secret }),
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!res.ok) return null;
-    const b = (await res.json()) as { access_token?: unknown; expires_in?: unknown };
-    if (typeof b.access_token !== "string") return null;
-    svcToken = { token: b.access_token, until: Date.now() + (typeof b.expires_in === "number" ? b.expires_in : 300) * 1000 };
-    return svcToken.token;
-  } catch {
-    return null;
-  }
-}
-
-export type ContactPurpose = "payment_notice" | "course_notice";
-
-/**
- * 寄信時才向中央查聯絡信箱（用完即丟，不寫入資料庫或日誌）。查不到的會員不在結果裡；
- * 中央無法連線或金鑰無效時回傳空表（寧可不寄，也不用舊副本）。
- */
-export async function lookupContactEmails(secret: string | undefined, subs: string[], purpose: ContactPurpose): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const ids = [...new Set(subs)];
-  if (!secret || !ids.length) return out;
-  const token = await serviceToken(secret);
-  if (!token) return out;
-  for (let i = 0; i < ids.length; i += 50) {
-    try {
-      const res = await centralFetch(`${CENTRAL}/v1/apps/${APP_ID}/contacts/lookup`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ member_ids: ids.slice(i, i + 50), purpose }),
-        signal: AbortSignal.timeout(5000),
-      });
-      if (res.status === 401) svcToken = null;
-      if (!res.ok) continue;
-      const b = (await res.json()) as { contacts?: { member_id?: unknown; email?: unknown }[] };
-      for (const c of b.contacts ?? []) if (typeof c.member_id === "string" && typeof c.email === "string" && validEmail(c.email)) out.set(c.member_id, c.email);
-    } catch {
-      /* 查不到就不寄 */
-    }
-  }
-  return out;
-}
+// 服務 Token 與聯絡查詢：伺服器共用模組（packages/server-shared/src/central-service.ts，兩個 App 同一份）。
+const svc = createServiceClient(CENTRAL, APP_ID, () => centralFetch);
+const serviceToken = svc.token;
+export type { ContactPurpose };
+export const lookupContactEmails = svc.lookupContactEmails;
 
 let lastReport = 0;
 /** 向中央回報採用的串接指令版本與已符合的標準（只有超級管理員的 token 會被接受；每小時最多一次，失敗不影響任何功能）。 */
@@ -704,7 +659,7 @@ export async function lookupUplines(secret: string | undefined, subs: string[]):
           signal: AbortSignal.timeout(8000),
         });
         logCall(token, "/v1/apps/learn/members/lookup", Date.now() - t0);
-        if (res.status === 401) svcToken = null;
+        if (res.status === 401) svc.forget();
         if (!res.ok) {
           const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown; message?: unknown; details?: { field_key?: unknown } } } | null;
           const bad = res.status === 422 && typeof eb?.error?.details?.field_key === "string" ? /^member_ids\.(\d+)$/.exec(eb.error.details.field_key) : null;
@@ -772,7 +727,7 @@ export async function lookupLegalNames(secret: string | undefined, subs: string[
       body: JSON.stringify({ member_ids: need, fields: ["legal_name"], use: "display" }),
       signal: AbortSignal.timeout(8000),
     });
-    if (res.status === 401) svcToken = null;
+    if (res.status === 401) svc.forget();
     if (!res.ok) return out;
     const b = (await res.json().catch(() => null)) as { members?: unknown[] } | null;
     for (const raw of b?.members ?? []) {
@@ -814,7 +769,7 @@ export async function lookupCenterLabels(secret: string | undefined, subs: strin
       body: JSON.stringify({ member_ids: need, fields: ["education_center"], use: "display" }),
       signal: AbortSignal.timeout(8000),
     });
-    if (res.status === 401) svcToken = null;
+    if (res.status === 401) svc.forget();
     if (!res.ok) return out;
     const b = (await res.json().catch(() => null)) as { members?: unknown[] } | null;
     for (const raw of b?.members ?? []) {
@@ -871,7 +826,7 @@ export async function lookupSharerRank(secret: string | undefined, sub: string):
       signal: AbortSignal.timeout(6000),
     });
     logCall(token, "/v1/apps/learn/members/lookup", Date.now() - t0);
-    if (res.status === 401) svcToken = null;
+    if (res.status === 401) svc.forget();
     if (!res.ok) {
       const eb = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
       lastSharerError = `中央回應 ${res.status}${typeof eb?.error?.code === "string" ? `（${eb.error.code.slice(0, 40).replace(/[^\w.-]/g, "")}）` : ""}`;

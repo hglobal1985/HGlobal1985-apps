@@ -11,7 +11,8 @@
   "kv_namespaces": [{ "binding": "SHARED", "id": "0287ee74946943298b5a7b7885930829" }],
   // App 網頁版（apps/check-app 用 expo export 產生）由 scripts/embed-static.mjs 打包進 Worker（雲端環境上傳靜態資源會被代理擋下，與行動大學同一做法）。
   "alias": { "check:static": "./.generated/static-files.js" },
-  "vars": { "DEV_LOGIN": "off" },
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@learn.hglobal1985.com"] }],
+  "vars": { "DEV_LOGIN": "off", "EMAIL_FROM": "noreply@learn.hglobal1985.com" },
   // CENTRAL_WEBHOOK_SECRET 由業主在 Cloudflare 後台設定；部署時保留後台的變數。
   "keep_vars": true,
   "triggers": { "crons": ["7 * * * *"] },
