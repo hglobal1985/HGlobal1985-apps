@@ -70,7 +70,7 @@
 
 ## 開發與流程
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
-- **後端 API 已依功能拆檔（杜杜龍 2026-11-27）**：共用函式與型別在 `apps/launch/src/api-core.ts`；各功能的網址在 `apps/launch/src/routes/*.ts`（system、my、courses、orders、centers、media、recipes、sync、admin-courses、admin）；`api.ts` 只組合總路由表與處理請求。新增網址加進對應的 routes 檔（同一檔內順序會影響比對）；共用函式放 api-core.ts 並 export。不要再把功能程式寫回 api.ts。
+- **後端 API 已依功能拆檔（杜杜龍 2026-11-27）**：共用函式與型別在 `apps/launch/src/core/*.ts`（base 基礎、courses 課程、course-admin 課程管理與教材、orders 報名、series 系列與小編、media 封面相簿、library 書櫃、keywords 關鍵字審核群組留言板；`api-core.ts` 只是全部轉出的總入口）；各功能的網址在 `apps/launch/src/routes/*.ts`（system、my、courses、orders、centers、media、recipes、sync、admin-courses、admin）；`api.ts` 只組合總路由表與處理請求。新增網址加進對應的 routes 檔（同一檔內順序會影響比對）；共用函式放進對應的 core 檔並 export。不要再把功能程式寫回 api.ts 或 api-core.ts。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
 - **共用元件在 `packages/ui/src/`**（杜杜龍 2026-11-26：行動大學與寰宇繳作業系統共用同一套，改一次兩邊一起變；`@/` 先找 App 自己的 `src/` 再找這裡）。改共用元件時兩個 App 的型別檢查都要過。規則見 `docs/rules/shared-ui.md`。
 - **寰宇繳作業系統**：`apps/check-api`（Worker `check`）、`apps/check-app`（Expo）；規則見 `docs/rules/check-app.md`，部署前先問杜杜龍。
