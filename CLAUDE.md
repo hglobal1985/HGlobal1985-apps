@@ -87,7 +87,6 @@
 - `docs/rules/youtube-sync-import.md`：YouTube 同步、匯入工作、一次性匯入（13 條）
 - `docs/rules/performance-ops.md`：載入速度、部署、伺服器效能與維運（1 條）
 - `docs/rules/elder-mode.md`：至尊模式（長輩大字簡易版）／超派模式切換、字體放大、跟著手機字體（1 條）
-- `docs/rules/homework.md`：作業（學員繳交、老師批改評分、分組、誰看得到）（1 條）
 - `docs/rules/shared-ui.md`：**共用元件資料夾 packages/ui**（行動大學與繳作業系統共用同一套元件、轉接檔、哪些已搬、共用上傳設定、推播）（11 條）
 - `docs/rules/check-app.md`：寰宇繳作業系統（apps/check-api、apps/check-app）（9 條）
 - **自動規則搜尋**：杜杜龍每次送出訊息，`.claude/hooks/rules-search.py` 會自動用訊息內容比對 `docs/rules/`，把可能相關的規則標題列在對話開頭（【自動規則搜尋】）；看到時務必讀對應條目。沒有列出不代表沒有規則，仍要自己 grep 確認。

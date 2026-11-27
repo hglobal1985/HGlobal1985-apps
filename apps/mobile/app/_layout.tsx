@@ -60,10 +60,6 @@ function AppStack() {
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false, title: "寰宇行動大學" }} />
             <Stack.Screen name="course/[id]" options={{ title: "課程介紹" }} />
-            <Stack.Screen name="homework/[courseId]" options={{ title: "作業" }} />
-            <Stack.Screen name="homework/a/[id]" options={{ title: "作業" }} />
-            <Stack.Screen name="homework/s/[id]" options={{ title: "作業" }} />
-            <Stack.Screen name="homework/groups/[courseId]" options={{ title: "學員分組" }} />
             <Stack.Screen name="review-invite/[token]" options={{ title: "審核人員邀請" }} />
             <Stack.Screen name="library" options={{ headerShown: false }} />
             <Stack.Screen name="my-lists" options={{ title: "我的清單" }} />
