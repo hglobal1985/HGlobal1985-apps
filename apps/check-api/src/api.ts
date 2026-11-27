@@ -107,7 +107,7 @@ export async function webhook(req: Request, env: Env): Promise<Response> {
   if (!env.CENTRAL_WEBHOOK_SECRET) return json({ error: { code: "not_configured", message: "webhook 尚未設定" } }, 503);
   const ok = await verifyWebhook(env.CENTRAL_WEBHOOK_SECRET, req.headers.get("x-hg-timestamp"), req.headers.get("x-hg-signature"), raw);
   if (!ok) return json({ error: { code: "bad_signature", message: "簽章不正確" } }, 401);
-  let ev: { id?: string; type?: string; member_id?: string; fields?: string[] };
+  let ev: { id?: string; type?: string; member_id?: string; fields?: string[]; detail?: { name?: unknown; alert?: unknown; note?: unknown } };
   try {
     ev = JSON.parse(raw);
   } catch {
@@ -122,6 +122,10 @@ export async function webhook(req: Request, env: Env): Promise<Response> {
   if (ev.type === "member.profile_changed" && member) {
     await env.DB.prepare("UPDATE people SET stale = 1 WHERE member_id = ?").bind(member).run();
     forgetMember(member);
+  }
+  // 網站巡檢警報（串接指令 2026-11-27.8）：替這位超級管理員發站內通知，手機推播走既有推播流程；不認得的事件仍回 2xx。
+  if (ev.type === "eco.alert" && member && ev.detail && typeof ev.detail.name === "string" && (ev.detail.alert === "down" || ev.detail.alert === "recovered")) {
+    await notify(env.DB, [member], `${ev.detail.alert === "down" ? "網站打不開" : "網站已恢復"}：${ev.detail.name.slice(0, 40)}`, typeof ev.detail.note === "string" ? ev.detail.note.slice(0, 100) : "", "/").catch(() => undefined);
   }
   return json({ ok: true });
 }

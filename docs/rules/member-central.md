@@ -96,3 +96,8 @@
 - 還原方式：先 `UPDATE`（依主鍵）已存在的列，再 `INSERT OR IGNORE` 補回已被刪的列；**不可改用 INSERT OR REPLACE**（會觸發 ON DELETE CASCADE 把子表刪掉）。備份之後新增的資料不會被刪；沒有主鍵的表不還原；備份檔含清單外的資料表或欄位一律拒絕。**必填欄位刻意不在備份清單內的列（例如繳作業系統活動的加入代碼）被刪後補不回來**，回傳 `not_restored` 計數，畫面會提示要開發人員處理。
 - 網址（兩個 App 相同）：`GET /admin/backups`、`GET /admin/backups/<日期>`（預覽）、`POST /admin/backups/<日期>/restore`（body `{confirm}`）。行動大學 `apps/launch/src/backup-admin.ts`；繳作業系統 `apps/check-api/src/routes/backups.ts`。測試：launch／check-api 各一份 `tests/backup-restore.test.ts`。
 - 畫面：共用面板 `packages/ui/src/features/backup-restore.tsx`（`BackupRestorePanel`，只要傳 `request`）；行動大學「設定 › 備份還原」（`app/admin/backups.tsx`），繳作業系統「我的 › 管理 › 備份還原」（`app/settings/backups.tsx`），只有超級管理員看得到入口。流程：選日期 → 預覽 → 輸入日期 → 確認面板（`confirmSheet`）→ 還原。**沒有對正式資料真的還原過**；第一次要在有正式備份後，先在測試環境驗證。
+
+## 串接版本 2026-11-27.8 逐項核對（杜杜龍 2026-11-27；三個 INTEGRATED_VERSION 已升）
+- 照串接指令「六」逐項核對行動大學與繳作業系統：新增項目 40～45 都已符合——登入永不過期（沿用 .2 時的實作）、生態系統功能讀 config.eco_features、`.github/dependabot.yml` 每週、版本網址回報 sha、前台錯誤批次回報、每週備份、巡檢推播。
+- 繳作業系統這次補上 `eco.alert`（`apps/check-api/src/api.ts` webhook）：替事件的 `member_id`（超級管理員本人）發站內通知，手機推播走既有流程；不認得的事件仍回 2xx。**尚未用真的巡檢警報實測**（要中央後台對 check 設定 webhook 網址與簽章金鑰）。
+- 沒有逐字比對的部分（沿用前一版的結論）：項目 1～39 在 2026-11-27.2 已核對過，之後沒有改動登入、資格、會員資料頁的程式。
