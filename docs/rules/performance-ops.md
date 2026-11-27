@@ -28,8 +28,5 @@
 - **站內通知保存期限（杜杜龍 2026-11-27 授權 AI 決定）**：已讀的通知保存半年（180 天）、沒讀過的保存一年（365 天），排程自動刪除；**付費相關**（連到 `/orders`、`/admin/orders` 的通知）永久保留。行動大學 `audit-retention.ts` 的 `pruneNotifications`；繳作業系統在 `apps/check-api/src/api.ts` 的 `scheduled`（同樣的天數，沒有付費功能所以沒有例外）。
 - **套件安全漏洞提醒（杜杜龍 2026-11-27，生態系統功能 dependency_alerts）**：`.github/dependabot.yml` 每週一（台北 09:00）檢查 npm 套件與 GitHub Actions，自動開修正 PR（minor／patch 合成一個 PR、最多同時 5 個）。修正 PR 一樣要通過型別檢查與測試才合併，部署照一般流程；不可為了過關而關掉檢查。中央「系統功能」頁的設定與串接指令（三、18）是這條的來源。
 
-## 主要畫面自動截圖測試（生態系統功能 screenshot_test，杜杜龍 2026-11-27）
-- `.github/workflows/screenshot-test.yml`：每天台北 09:00（也可手動執行）用 Playwright 以手機 390px 截 `.github/screenshots.json` 列的頁面，和上次比對（`scripts/screenshot-test.mjs`，工具裝在專案外，不改套件清單），有差異（預設超過 2%）或截圖失敗就開 GitHub Issue（標籤 `screenshot-diff`）通知杜杜龍；不耗 AI 額度。上次的截圖放 Actions 快取，每次執行的截圖與差異圖放 Artifacts 14 天。
-- **只放不用登入的公開頁面**（公開程式庫的 Artifacts 人人看得到，不可截含會員資料的畫面）。新增 App 或主要頁面：在 `screenshots.json` 加一筆 `{name,url,wait_for}`；會輪播或每天不同的區塊用 `ignore:[{x,y,width,height}]` 塗掉不比對（首頁推薦課程輪播就是）。
-- 看到 `screenshot-diff` Issue：差異是預期的改版就關閉；看起來不對（版面壞掉、空白、錯誤畫面）要查原因。
-- 驗證：本機連截兩次，同一頁差異在 0.3% 以內才算穩定；差異大代表有動態區塊沒遮。
+## 截圖測試已永久刪除（杜杜龍 2026-11-28）
+- 「主要畫面自動截圖測試」功能（每日 workflow、截圖腳本、`screenshots.json`、`screenshot-diff` Issue）已整個刪除，**不要再做、不要再加回來**。
