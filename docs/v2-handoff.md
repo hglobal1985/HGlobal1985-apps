@@ -1,6 +1,6 @@
 # 寰宇行動大學 V2 交接文件（2026-11-11）
 
-分支：`claude/kind-dirac-3shqqo`（repo：hglobal1985/learn）。請從這份文件接手，不需要重問杜杜龍已決定的事。
+分支：`claude/kind-dirac-3shqqo`（repo：hglobal1985/HGlobal1985-apps）。請從這份文件接手，不需要重問杜杜龍已決定的事。
 
 ## 杜杜龍已決定（不要再問）
 - 使用者是程式小白，技術決定全部交給開發者；回覆使用台灣繁體中文，用白話說明。
