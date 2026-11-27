@@ -73,6 +73,7 @@ function AppStack() {
             <Stack.Screen name="recipe/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="learn/[courseId]/[lessonId]" options={{ title: "上課" }} />
             <Stack.Screen name="admin/list-rules" options={{ title: "課程排序與條件" }} />
+            <Stack.Screen name="admin/backups" options={{ title: "備份還原" }} />
             <Stack.Screen name="admin/stats" options={{ title: "統計分析" }} />
             <Stack.Screen name="admin/usage" options={{ title: "使用統計" }} />
             <Stack.Screen name="admin/report" options={{ title: "報名與營收報表" }} />

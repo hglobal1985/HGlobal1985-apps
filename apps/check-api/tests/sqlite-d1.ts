@@ -11,7 +11,7 @@ export function createTestDb(): D1Database {
     const args = () => values.map((v) => (v === undefined ? null : typeof v === "boolean" ? Number(v) : v)) as never[];
     const exec = (): D1Result => {
       const st = db.prepare(sql);
-      if (/^\s*(SELECT|WITH)/i.test(sql)) return { results: st.all(...args()) as unknown[] };
+      if (/^\s*(SELECT|WITH|PRAGMA)/i.test(sql)) return { results: st.all(...args()) as unknown[] };
       const r = st.run(...args());
       return { results: [], meta: { changes: Number(r.changes) } };
     };

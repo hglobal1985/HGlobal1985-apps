@@ -15,6 +15,7 @@ import "./routes/people.ts";
 import "./routes/submissions.ts";
 import "./routes/files.ts";
 import "./routes/system.ts";
+import "./routes/backups.ts";
 import { verifyWebhook, forgetMember, INTEGRATED_VERSION } from "./central.ts";
 import type { Env } from "./env.ts";
 import { API_VERSION, type Ctx, HttpError, type Row, authenticate, deleteR2, flushEmails, flushPushes, json, notify, refreshPerson, retentionOf, routes, setPushSoon } from "./core.ts";
