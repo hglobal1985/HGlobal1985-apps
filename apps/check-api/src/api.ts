@@ -151,6 +151,11 @@ export async function scheduled(env: Env): Promise<void> {
   setPushSoon(null);
   await db.prepare("DELETE FROM tickets WHERE expires_at < ?").bind(Date.now()).run();
   await db.prepare("DELETE FROM zip_tickets WHERE expires_at < ?").bind(Date.now()).run();
+  // 站內通知保存期限（杜杜龍 2026-11-27，與行動大學一致）：已讀的保存半年、沒讀過的保存一年。
+  await db
+    .prepare("DELETE FROM notices WHERE id IN (SELECT id FROM notices WHERE (read_at IS NOT NULL AND created_at < ?) OR created_at < ? LIMIT 2000)")
+    .bind(new Date(Date.now() - 180 * 86400_000).toISOString(), new Date(Date.now() - 365 * 86400_000).toISOString())
+    .run();
   const t = Date.now();
   const lessons = (
     await db

@@ -20,3 +20,25 @@ export async function pruneAuditLog(db: D1Database, now = new Date()): Promise<n
     .run();
   return r.meta?.changes ?? 0;
 }
+
+/**
+ * 站內通知保存期限（杜杜龍 2026-11-27 授權 AI 決定）：已讀的通知保存半年、沒讀過的保存一年，到期自動刪除。
+ * 永久保留：付費相關（連到報名紀錄 /orders、/admin/orders 的通知），與稽核紀錄「付費相關永久保留」一致。
+ */
+export const NOTICE_READ_DAYS = 180;
+export const NOTICE_UNREAD_DAYS = 365;
+export async function pruneNotifications(db: D1Database, now = new Date()): Promise<number> {
+  const readCut = new Date(now.getTime() - NOTICE_READ_DAYS * 86400_000).toISOString();
+  const unreadCut = new Date(now.getTime() - NOTICE_UNREAD_DAYS * 86400_000).toISOString();
+  const r = await db
+    .prepare(
+      `DELETE FROM notifications WHERE id IN (
+         SELECT id FROM notifications
+         WHERE link NOT LIKE '/orders%' AND link NOT LIKE '/admin/orders%'
+           AND ((read_at IS NOT NULL AND created_at < ?) OR created_at < ?)
+         LIMIT 2000)`,
+    )
+    .bind(readCut, unreadCut)
+    .run();
+  return r.meta?.changes ?? 0;
+}
