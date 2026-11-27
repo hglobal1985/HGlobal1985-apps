@@ -54,6 +54,8 @@ export async function superAdmin(c: Ctx): Promise<boolean> {
   if (c.superAdmin === undefined) {
     if (c.env.DEV_LOGIN === "on" && c.token.startsWith("dev:")) c.superAdmin = c.sub.startsWith("admin");
     else c.superAdmin = await isSuperAdmin(c.sub, c.token);
+    // 記下超級管理員的會員代號（排程失敗通知找得到人）；沒有資料表（舊環境）就略過
+    if (c.superAdmin) await c.env.DB.prepare("INSERT INTO super_admins (member_id, seen_at) VALUES (?, ?) ON CONFLICT(member_id) DO UPDATE SET seen_at = excluded.seen_at WHERE seen_at < ?").bind(c.sub, new Date().toISOString(), new Date(Date.now() - 86400_000).toISOString()).run().catch(() => {});
   }
   return c.superAdmin;
 }

@@ -32,3 +32,4 @@
 - `routes/*.ts`：account（我的、首頁、推播、上傳設定）、activities（作業、堂與項目、加入）、people（分組）、submissions（繳交、批改、留言）、files（通知、檔案保存、一鍵下載備份）、system（錯誤回報）。每個檔被載入時用 `on()` 登記網址。
 - `api.ts`：依序載入 routes 檔（**載入順序＝網址比對順序，不要隨意調換**）、`handleApi`、檔案下載、webhook、排程；`export *` 轉出全部，舊的 import 不用改。
 - 「新增通知後背景推播」用 `setPushSoon()` 設定（拆檔後不能跨檔案直接改值）。拆檔時比對過 54 個網址的登記順序與拆檔前完全相同。
+- **每週備份（杜杜龍 2026-11-27）**：`apps/check-api/src/weekly-backup.ts`（排程 `scheduled` 呼叫）；備份哪些表見 `BACKUP_TABLES`，通用規則見 `docs/rules/performance-ops.md`「每週備份」。新增資料表預設不備份；超級管理員名單存在 `super_admins`（`superAdmin()` 驗證成功時記一筆、一天最多更新一次），只為了備份失敗時通知得到人。

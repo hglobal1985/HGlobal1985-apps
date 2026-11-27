@@ -20,6 +20,7 @@ import type { Env } from "./env.ts";
 import { API_VERSION, type Ctx, HttpError, type Row, authenticate, deleteR2, flushEmails, flushPushes, json, notify, refreshPerson, retentionOf, routes, setPushSoon } from "./core.ts";
 import { notSubmitted, purgeFiles, twTime } from "./routes/files.ts";
 import { clientError } from "./routes/system.ts";
+import { weeklyBackup } from "./weekly-backup.ts";
 
 // ───────────── 進入點 ─────────────
 export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>) => void = () => {}): Promise<Response> {
@@ -141,6 +142,7 @@ export async function deleteMemberData(env: Env, member: string): Promise<void> 
     db.prepare("DELETE FROM members WHERE member_id = ?").bind(member),
     db.prepare("DELETE FROM people WHERE member_id = ?").bind(member),
     db.prepare("DELETE FROM push_subs WHERE member_id = ?").bind(member),
+    db.prepare("DELETE FROM super_admins WHERE member_id = ?").bind(member),
   ]);
   forgetMember(member);
 }
@@ -149,6 +151,8 @@ export async function deleteMemberData(env: Env, member: string): Promise<void> 
 export async function scheduled(env: Env): Promise<void> {
   const db = env.DB;
   setPushSoon(null);
+  // 每週備份（生態系統功能 4，杜杜龍 2026-11-27）：該備份的日子凌晨把成績資料匯出到自己的 R2；失敗只記日誌，不擋後面的排程工作
+  await weeklyBackup(env, notify.bind(null, db)).catch((e) => console.error("weekly backup", e instanceof Error ? e.message : "error"));
   await db.prepare("DELETE FROM tickets WHERE expires_at < ?").bind(Date.now()).run();
   await db.prepare("DELETE FROM zip_tickets WHERE expires_at < ?").bind(Date.now()).run();
   // 站內通知保存期限（杜杜龍 2026-11-27，與行動大學一致）：已讀的保存半年、沒讀過的保存一年。
