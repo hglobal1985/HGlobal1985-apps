@@ -8658,7 +8658,9 @@ const routes: [string, RegExp, Handler][] = [
       // 「傳一則測試通知給我」：建立一則站內通知，送出後會自動推播到自己所有已開啟的裝置。
       const s = requireMember(ctx);
       await notify(ctx.db, { sub: s.sub }, "推播測試", "看到這則就代表手機推播已經開好了 🎉", "/notices").run();
-      return { ok: true };
+      // 回報這個帳號有幾支裝置開了推播（共用的推播設定卡會顯示「已送出到 N 支裝置」；0 支就提示重新開啟）。
+      const devices = (await ctx.db.prepare("SELECT COUNT(*) AS n FROM push_subscriptions WHERE member_sub = ?").bind(s.sub).first<{ n: number }>())?.n ?? 0;
+      return { devices, ok: devices };
     },
   ],
   [

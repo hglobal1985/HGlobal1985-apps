@@ -9,7 +9,4 @@ export const WEB_ORIGIN = "https://check.hglobal1985.com";
 export const NATIVE_RETURN = "check://auth/google";
 export const PRIVACY_URL = `${CENTRAL_URL}/privacy`;
 export const APP_VERSION: string = Constants.expoConfig?.version ?? "0.0.0";
-/** iPhone 共用登入的 Keychain 群組（$(AppIdentifierPrefix)＝Apple 開發團隊代碼）。沒有團隊代碼時先不啟用共用登入。 */
-const team = (Constants.expoConfig?.extra as { appleTeamId?: string } | undefined)?.appleTeamId ?? "";
-export const SSO_ACCESS_GROUP = team ? `${team}.com.hglobal1985.shared` : "";
-export const SSO_KEY = "hglobal.sso";
+// iPhone 共用登入的 Keychain 群組與鍵名：改由共用元件 lib/sso-keychain.ts 提供（與行動大學同一份）。

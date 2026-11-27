@@ -4,7 +4,18 @@ import { trackFeature } from "@/lib/feature-track";
 import { disablePush, enablePush, pushState, type PushState } from "@/lib/web-push";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Icon } from "@/ui";
+import { api } from "@/api/client";
+import { Button } from "@/ui/button";
+import { Card } from "@/ui/card";
+import { Icon } from "@/ui/icon";
+import { LoadingLadybug } from "@/ui/loading-ladybug";
+import { NoticeBox } from "@/ui/notice-box";
+import { AppText } from "@/ui/text";
+
+/*
+ * 手機推播的開關與設定卡（共用元件：行動大學與寰宇繳作業系統同一份；杜杜龍 2026-11-27 從行動大學搬來）。
+ * 兩個 App 的伺服器都提供 /push/key、/push/subscribe、/push/unsubscribe、/push/test。
+ */
 
 export const PUSH_TEXT: Record<PushState, string> = {
   on: "開啟：有新通知時，手機會跳出提醒（關掉 App 也收得到）。",
@@ -124,5 +135,82 @@ export function PushSwitchRow({ banner, compact }: { banner?: boolean; /** 縮�
         </AppText>
       ) : null}
     </View>
+  );
+}
+
+/** 收不到推播時的排查步驟（杜杜龍 2026-11-27：讓杜杜龍自己就能一步一步檢查）。 */
+export const PUSH_TROUBLESHOOT =
+  "沒跳出通知？請檢查：①手機設定 › 應用程式 › Chrome › 通知：要開啟 ②Chrome 右上角 ⋮ › 設定 › 通知：這個網站要「允許」③iPhone：設定 › 通知 › 這個 App 要允許 ④手機的勿擾／專注模式要關閉。按完測試鈕先回到手機桌面等幾秒，比較看得出來。";
+
+/** 手機推播設定卡（杜杜龍 2026-11-17）：這個裝置的開關＋傳一則測試通知＋排查說明。每個裝置各自開啟。 */
+export function PushCard({ title = "手機推播", note = "所有通知都會直接推到這支手機（不能逐項關閉，要收就是全部收）。" }: { title?: string; note?: string } = {}) {
+  const { c } = useTheme();
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  useEffect(() => {
+    pushState().then(setState).catch(() => setState("unsupported"));
+  }, []);
+  const toggle = async (v: boolean) => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const next = v ? await enablePush() : await disablePush();
+      if (v && next === "on") trackFeature("push_enable");
+      setState(next);
+      if (v && next === "on") setMsg({ text: "已開啟手機推播", ok: true });
+      if (!v) setMsg({ text: "已關閉這個裝置的推播", ok: true });
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : "開啟失敗，請稍後再試", ok: false });
+    }
+    setBusy(false);
+  };
+  const test = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      // 伺服器可回報送到幾支裝置（{ devices, ok }）；只回 { ok: true } 時照常顯示已送出。
+      const r = await api<{ devices?: number; ok?: number | boolean }>("POST", "/push/test");
+      if (typeof r?.devices === "number" && typeof r.ok === "number") {
+        if (r.ok > 0) setMsg({ text: `已送出到 ${r.ok} 支裝置，幾秒內手機會跳出提醒。`, ok: true });
+        else setMsg({ text: r.devices ? "送出失敗：請把開關關掉再重新開啟一次。" : "這個帳號還沒有裝置開啟推播：請把開關關掉再重新開啟一次。", ok: false });
+      } else setMsg({ text: "已送出測試通知，幾秒內手機會跳出提醒。", ok: true });
+    } catch (e) {
+      setMsg({ text: e instanceof Error ? e.message : "送出失敗", ok: false });
+    }
+    setBusy(false);
+  };
+  if (Platform.OS !== "web")
+    return (
+      <Card>
+        <AppText variant="headline">{title}</AppText>
+        <AppText tone="muted">App 版的推播會在正式上架時開放；目前請用網頁版開啟。</AppText>
+      </Card>
+    );
+  const canToggle = state === "on" || state === "off";
+  return (
+    <Card>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 48 }}>
+        <View style={{ flex: 1 }}>
+          <AppText variant="headline">{title}</AppText>
+          <AppText variant="caption" tone="muted">
+            {note}
+          </AppText>
+        </View>
+        <Switch
+          value={state === "on"}
+          disabled={busy || !canToggle}
+          onValueChange={toggle}
+          trackColor={{ false: c.border, true: c.accent }}
+          thumbColor="#FFFFFF"
+          ios_backgroundColor={c.border}
+          accessibilityLabel="手機推播開關"
+        />
+      </View>
+      {state ? <NoticeBox tone={state === "on" ? "success" : state === "off" ? "info" : "warning"} text={PUSH_TEXT[state]} /> : <LoadingLadybug />}
+      {state === "on" ? <Button variant="secondary" icon="notifications-outline" label="傳一則測試通知給我" disabled={busy} onPress={test} /> : null}
+      {msg ? <NoticeBox text={msg.text} tone={msg.ok ? "success" : "danger"} /> : null}
+      {state === "on" ? <NoticeBox tone="info" text={PUSH_TROUBLESHOOT} /> : null}
+    </Card>
   );
 }
