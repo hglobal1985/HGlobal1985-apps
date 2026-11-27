@@ -3,7 +3,7 @@ import { DEMO_MEMBERS, type Announcement } from "../contract.ts";
 import { centerKey, errorDigest, forgetMember, verifyWebhook, APP_ID } from "../central.ts";
 import { loadConfig } from "../ui-config.ts";
 import { isOwnerDevice, isOwnerNet, markOwnerNet, recordUsage } from "../usage.ts";
-import { HOME_BC_KEY, REVIEW_FIELD_LABEL, SESSION_DAYS, type Session, audit, clientErrorHits, demoEnabled, fail, isOwnerSession, iso, memberOf, notifyReviewResult, pubUrl, purgeMember, randomToken, ranks, readJson, sha256, usageHits, ytThumbOf } from "../api-core.ts";
+import { HOME_BC_KEY, REVIEW_FIELD_LABEL, SESSION_DAYS, type Session, audit, clientErrorHits, demoEnabled, fail, isOwnerSession, iso, memberOf, notify, notifyReviewResult, pubUrl, purgeMember, randomToken, ranks, readJson, sha256, usageHits, ytThumbOf } from "../api-core.ts";
 import type { Handler } from "../api-core.ts";
 
 export const systemRoutes: [string, RegExp, Handler][] = [
@@ -89,6 +89,13 @@ export const systemRoutes: [string, RegExp, Handler][] = [
         await audit(ctx.db, "central", "webhook.profile_changed", "member", ev.member_id, Object.keys(evx).join(",").slice(0, 200) + "|" + raw.join(",").slice(0, 200)).run().catch(() => undefined);
         const hit = raw.map((k) => k.replace(/^amway\./, "")).filter((k) => k in REVIEW_FIELD_LABEL);
         if (hit.length) await notifyReviewResult(ctx.db, ev.member_id, [...new Set(hit.map((k) => REVIEW_FIELD_LABEL[k]!))].join("、")).catch(() => undefined);
+      } else if (ev.type === "eco.alert" && typeof ev.member_id === "string") {
+        // 網站巡檢警報（串接指令 2026-11-27.8）：中央對每位超級管理員送一則；這裡發站內通知，手機推播由背景推播流程送出。
+        const d = (ev as { detail?: { name?: unknown; alert?: unknown; note?: unknown } }).detail;
+        if (d && typeof d.name === "string" && (d.alert === "down" || d.alert === "recovered")) {
+          const title = `${d.alert === "down" ? "網站打不開" : "網站已恢復"}：${d.name.slice(0, 40)}`;
+          await notify(ctx.db, { sub: ev.member_id }, title, typeof d.note === "string" ? d.note.slice(0, 100) : "", "/notices").run().catch(() => undefined);
+        }
       }
       // webhook.test 與不認得的事件：只回 2xx（容忍未來新增的事件）。
       await ctx.db.batch([

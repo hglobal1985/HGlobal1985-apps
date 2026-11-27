@@ -86,3 +86,4 @@
 - 絕不送錯誤訊息、堆疊、網址參數、個資；送失敗或 429 就丟掉；中央沒讓這款 App 參與時會回 accepted 0。版本號固定寫在各 App 的 `central.ts`（行動大學對應 `apps/mobile/app.json`），改版時一起改。
 - 前台回報的種類對應在 `digestKind()`；新增前台錯誤種類時要一起補。
 - 兩個 App 的 `INTEGRATED_VERSION` 尚未升到 2026-11-27.4 以上（還有備份、截圖等項目沒逐項核對），升版前要照串接指令「六」檢查清單逐項做完。
+- **巡檢手機推播（杜杜龍 2026-11-27，中央串接指令 2026-11-27.8，三、18 (2)）**：中央網站巡檢掛了／恢復時，對超級管理員送 webhook 事件 `eco.alert`（每位一則，`member_id`＋`detail:{name, alert: down|recovered, note}`，不含個資）。行動大學在 `routes/system.ts` 的 `/central/webhook` 收到後，替該會員發站內通知（標題「網站打不開：名稱」或「網站已恢復：名稱」，連到 `/notices`），既有的推播流程（`flushPushes`）再推到他已開啟推播的裝置。格式不對的事件只回 2xx 忽略；重送由 `central_events` 去重。收件人是中央指定的超級管理員本人，行動大學不另做角色對應。
