@@ -4,7 +4,7 @@ import Constants from "expo-constants";
 export const CENTRAL_URL = "https://id.hglobal1985.com";
 export const APP_ID = "check";
 /** 採用的串接指令版本（每次依新版指令更新完才改）。 */
-export const INTEGRATED_VERSION = "2026-11-27.2";
+export const INTEGRATED_VERSION = "2026-11-27.8";
 export const WEB_ORIGIN = "https://check.hglobal1985.com";
 export const NATIVE_RETURN = "check://auth/google";
 export const PRIVACY_URL = `${CENTRAL_URL}/privacy`;
