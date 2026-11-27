@@ -15,6 +15,7 @@ import { resolveShareMeta, withShareMeta } from "./og.ts";
 import { serveStatic, type StaticFiles } from "./site.ts";
 import { courseReminders, flushPushes } from "./push.ts";
 import { setSharedKv } from "./ui-config.ts";
+import { runLaunchBackup } from "./weekly-backup.ts";
 
 /**
  * learn.hglobal1985.com：/api/v2/* 為 API，其餘為 Expo Web 靜態檔（SPA）。
@@ -61,6 +62,7 @@ export function createWorker(staticFiles: StaticFiles) {
         await indexSearchVectors(env).catch((e) => console.error("search vectors", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));
         await pruneAuditLog(env.DB).catch((e) => console.error("audit prune", e instanceof Error ? e.message : "error")); // 稽核紀錄保存 3 個月；付費相關與留言永久保留（杜杜龍 2026-11-27）
+        await runLaunchBackup(env, new Date()).catch((e) => console.error("weekly backup", e instanceof Error ? e.message : "error")); // 每週備份永久資料到 R2（生態系統功能 4，杜杜龍 2026-11-27；中央設定的星期、台北 03:00）
         await pruneNotifications(env.DB).catch((e) => console.error("notice prune", e instanceof Error ? e.message : "error")); // 站內通知：已讀半年、未讀一年；付費相關永久（杜杜龍 2026-11-27）
       })();
       if (exec) exec.waitUntil(job);
