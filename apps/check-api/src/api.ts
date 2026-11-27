@@ -1526,7 +1526,7 @@ export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/api/, "") || "/";
   try {
-    if (path === "/version") return json({ version: API_VERSION, integrated: INTEGRATED_VERSION });
+    if (path === "/version") return json({ version: API_VERSION, integrated: INTEGRATED_VERSION, sha: env.GIT_SHA ?? null });
     if (path === "/central/webhook" && req.method === "POST") return await webhook(req, env);
     if (path === "/client-errors" && req.method === "POST") return await clientError(req);
     const auth = await authenticate(req, env);
