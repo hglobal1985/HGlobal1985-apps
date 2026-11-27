@@ -26,3 +26,9 @@
 
 ## 錯誤回報（杜杜龍 2026-11-27）
 - 用共用元件 `lib/error-report.ts`（與行動大學同一份；送到 `@/lib/app-assets` 的 `APP_ORIGIN`＋`ERROR_REPORT_PATH`）。繳作業系統的伺服器 `POST /api/client-errors`（不用登入、同一來源每分鐘最多 10 則）只寫進 Cloudflare 的錯誤紀錄，不存資料庫、不含會員身分。舊版網頁檔案失效時自動重新載入。
+
+## 後端拆檔（杜杜龍 2026-11-27，做法同行動大學）
+- `apps/check-api/src/core.ts`：型別、權限、資料轉換、通知推播 Email、保存期限、路由表 `routes` 與登記函式 `on`。
+- `routes/*.ts`：account（我的、首頁、推播、上傳設定）、activities（作業、堂與項目、加入）、people（分組）、submissions（繳交、批改、留言）、files（通知、檔案保存、一鍵下載備份）、system（錯誤回報）。每個檔被載入時用 `on()` 登記網址。
+- `api.ts`：依序載入 routes 檔（**載入順序＝網址比對順序，不要隨意調換**）、`handleApi`、檔案下載、webhook、排程；`export *` 轉出全部，舊的 import 不用改。
+- 「新增通知後背景推播」用 `setPushSoon()` 設定（拆檔後不能跨檔案直接改值）。拆檔時比對過 54 個網址的登記順序與拆檔前完全相同。
