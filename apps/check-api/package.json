@@ -8,7 +8,8 @@
     "test": "node --no-warnings --experimental-strip-types --test tests/*.test.ts",
     "dev": "wrangler dev -c wrangler.local.jsonc",
     "migrate": "wrangler d1 migrations apply check --remote",
-    "deploy": "wrangler d1 migrations apply check --remote && wrangler deploy"
+    "embed": "node scripts/embed-static.mjs",
+    "deploy": "cd ../check-app && npx expo export --platform web && cd ../check-api && node scripts/embed-static.mjs && wrangler d1 migrations apply check --remote && wrangler deploy"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251101.0",
