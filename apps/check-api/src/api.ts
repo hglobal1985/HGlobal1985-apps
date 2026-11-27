@@ -755,6 +755,18 @@ on("POST", "/push/subscribe", async (c, _p, req) => {
     .run();
   return { ok: true };
 });
+// 測試推播：只推給自己這個帳號開過推播的每支裝置，回報送到幾支（杜杜龍 2026-11-27：讓杜杜龍自己就能排查收不到的原因）
+on("POST", "/push/test", async (c) => {
+  if (!vapidPublicKey(c.env.VAPID_PRIVATE_JWK)) fail(503, "推播功能還在設定中");
+  const subs = (await c.env.DB.prepare("SELECT endpoint, p256dh, auth FROM push_subs WHERE member_id = ?").bind(c.sub).all<{ endpoint: string; p256dh: string; auth: string }>()).results;
+  let ok = 0;
+  for (const d of subs) {
+    const r = await sendPush(c.env.VAPID_PRIVATE_JWK, PUSH_SUBJECT, d, { title: "測試通知", body: "看到這則就代表推播正常 👍", link: "/me" });
+    if (r === "ok") ok++;
+    else if (r === "gone") await c.env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(d.endpoint).run();
+  }
+  return { devices: subs.length, ok };
+});
 on("POST", "/push/unsubscribe", async (c, _p, req) => {
   await c.env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ? AND member_id = ?").bind(str((await body(req)).endpoint, 1000), c.sub).run();
   return { ok: true };
