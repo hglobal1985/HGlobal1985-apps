@@ -3,9 +3,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { Image, Linking, Platform, Pressable, Text, View } from "react-native";
 import { EdmLightbox } from "@/features/courses/lightbox";
-import { API_BASE } from "@/api/client";
+import { VideoViewer } from "@/ui/video-viewer";
 import type { CommentView, FileView } from "@check/contract";
-import { api, openFile } from "@/api/client";
+import { api, API_BASE, openFile } from "@/api/client";
 import { useColors } from "@/kit";
 import { Avatar, Btn, confirmSheet, Field, flash, flashError, Section, Sheet, T } from "@/kit";
 
@@ -15,6 +15,7 @@ export function FileGrid({ files, onRemove }: { files: FileView[]; onRemove?: (f
   const c = useColors();
   const [text, setText] = useState<FileView | null>(null);
   const [photo, setPhoto] = useState<number | null>(null);
+  const [video, setVideo] = useState<{ uri: string; title: string } | null>(null);
   const photos = files.filter((f) => f.kind === "photo" && f.url);
   if (!files.length) return null;
   const open = async (f: FileView) => {
@@ -24,7 +25,11 @@ export function FileGrid({ files, onRemove }: { files: FileView[]; onRemove?: (f
         if (Platform.OS === "web") window.open(f.url, "_blank", "noopener");
         else await Linking.openURL(f.url);
       } else if (f.kind === "text") setText(f);
-      else await openFile(f.id);
+      else if (f.kind === "video") {
+        // 短影片：在畫面裡直接播放（共用的影片檢視元件 VideoViewer），不用離開 App
+        const { url } = await api<{ url: string }>("POST", `/files/${f.id}/ticket`);
+        setVideo({ uri: API_BASE + url, title: f.name });
+      } else await openFile(f.id);
     } catch (e) {
       flashError(e);
     }
@@ -65,6 +70,7 @@ export function FileGrid({ files, onRemove }: { files: FileView[]; onRemove?: (f
           )}
         </Pressable>
       ))}
+      {video ? <VideoViewer uri={video.uri} title={video.title} onClose={() => setVideo(null)} /> : null}
       {photo !== null && photos.length ? (
         // 看圖程式：共用元件（與行動大學同一個；兩指放大、左右滑換張、下載、分享）
         <EdmLightbox uri={photos[0]!.url!} title={photos[photo]?.name ?? "照片"} items={photos.map((p) => ({ uri: p.url!, title: p.name }))} index={photo} onClose={() => setPhoto(null)} />

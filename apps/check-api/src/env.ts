@@ -25,6 +25,8 @@ export type Env = {
   DEV_LOGIN?: string;
   /** 與行動大學共用的設定（Cloudflare KV「hg-shared-settings」：上傳壓縮畫質）。 */
   SHARED?: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> };
+  /** 手機推播的 VAPID 私鑰（JWK 的 JSON 文字；杜杜龍在 Cloudflare 後台設定的 Secret）。沒設定就不推播，站內通知照常。 */
+  VAPID_PRIVATE_JWK?: string;
   /** 中央 webhook 簽章金鑰（業主在 Cloudflare 後台設定的 Secret）。 */
   CENTRAL_WEBHOOK_SECRET?: string;
 };

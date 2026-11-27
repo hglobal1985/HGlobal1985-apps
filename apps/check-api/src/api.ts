@@ -33,6 +33,7 @@ import {
 } from "./contract.ts";
 import type { D1Database, Env } from "./env.ts";
 import { DEFAULT_SHARED_UPLOAD, readSharedUpload, writeSharedUpload } from "../../../packages/server-shared/src/upload-settings.ts";
+import { sendPush, vapidPublicKey } from "../../../packages/server-shared/src/web-push.ts";
 
 export const API_VERSION = "0.1.0";
 
@@ -250,6 +251,32 @@ async function notify(db: D1Database, memberIds: string[], title: string, body: 
   const ids = [...new Set(memberIds)].filter(Boolean);
   if (!ids.length) return;
   await db.batch(ids.map((m) => db.prepare("INSERT INTO notices (id, member_id, title, body, link) VALUES (?, ?, ?, ?, ?)").bind(rid(), m, title.slice(0, 80), body.slice(0, 300), link)));
+  pushSoon?.();
+}
+/** 每個請求開始時設定：站內通知新增後，在背景把它推到手機（handleApi 設定；排程另外每小時補推一次）。 */
+let pushSoon: (() => void) | null = null;
+
+const PUSH_SUBJECT = "https://check.hglobal1985.com";
+/** 把最近 30 分鐘內還沒推播的站內通知推出去（先標記再推：寧可漏推也不重複推）。回傳推出去的則數。 */
+export async function flushPushes(env: Env, fetcher: typeof fetch = fetch): Promise<number> {
+  if (!vapidPublicKey(env.VAPID_PRIVATE_JWK)) return 0;
+  const db = env.DB;
+  const since = new Date(Date.now() - 30 * 60_000).toISOString();
+  const rows = (await db.prepare("SELECT id, member_id, title, body, link FROM notices WHERE pushed = 0 AND created_at >= ? ORDER BY created_at LIMIT 50").bind(since).all<Row>()).results;
+  let sent = 0;
+  for (const n of rows) {
+    const claim = await db.prepare("UPDATE notices SET pushed = 1 WHERE id = ? AND pushed = 0").bind(n.id).run();
+    if (!claim.meta?.changes) continue;
+    const subs = (await db.prepare("SELECT endpoint, p256dh, auth FROM push_subs WHERE member_id = ?").bind(n.member_id).all<{ endpoint: string; p256dh: string; auth: string }>()).results;
+    for (const d of subs) {
+      const r = await sendPush(env.VAPID_PRIVATE_JWK, PUSH_SUBJECT, d, { title: String(n.title), body: String(n.body), link: String(n.link || "/notices") }, fetcher);
+      if (r === "ok") sent++;
+      else if (r === "gone") await db.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(d.endpoint).run();
+      else await db.prepare("UPDATE push_subs SET failures = failures + 1 WHERE endpoint = ?").bind(d.endpoint).run();
+    }
+  }
+  await db.prepare("DELETE FROM push_subs WHERE failures >= 20").run();
+  return sent;
 }
 
 const deadlinePassed = (dueAt: unknown) => typeof dueAt === "string" && dueAt !== "" && Date.parse(dueAt) < Date.now();
@@ -715,6 +742,23 @@ on("GET", "/me", async (c) => {
   return me;
 });
 on("GET", "/home", async (c) => home(c));
+
+// 手機推播（網頁版；共用的開關模組 packages/ui/src/lib/web-push.ts 用同樣的網址）
+on("GET", "/push/key", async (c) => ({ publicKey: vapidPublicKey(c.env.VAPID_PRIVATE_JWK) }));
+on("POST", "/push/subscribe", async (c, _p, req) => {
+  const b = await body(req);
+  const keys = (b.keys ?? {}) as Row;
+  const endpoint = str(b.endpoint, 1000);
+  if (!/^https:\/\//.test(endpoint) || !str(keys.p256dh, 200) || !str(keys.auth, 100)) fail(400, "推播訂閱格式不正確");
+  await c.env.DB.prepare("INSERT INTO push_subs (endpoint, member_id, p256dh, auth) VALUES (?, ?, ?, ?) ON CONFLICT(endpoint) DO UPDATE SET member_id = excluded.member_id, p256dh = excluded.p256dh, auth = excluded.auth, failures = 0")
+    .bind(endpoint, c.sub, str(keys.p256dh, 200), str(keys.auth, 100))
+    .run();
+  return { ok: true };
+});
+on("POST", "/push/unsubscribe", async (c, _p, req) => {
+  await c.env.DB.prepare("DELETE FROM push_subs WHERE endpoint = ? AND member_id = ?").bind(str((await body(req)).endpoint, 1000), c.sub).run();
+  return { ok: true };
+});
 
 // 上傳壓縮設定：與行動大學共用同一份（Cloudflare KV；杜杜龍 2026-11-26）。任一邊改，另一邊自動跟上。
 on("GET", "/upload-settings", async (c) => ({ settings: (await readSharedUpload(c.env.SHARED)) ?? DEFAULT_SHARED_UPLOAD, shared: !!c.env.SHARED, canEdit: await superAdmin(c) }));
@@ -1293,6 +1337,12 @@ export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>
     const auth = await authenticate(req, env);
     if (!auth) return json({ error: { code: "unauthenticated", message: "請先登入" } }, 401);
     const c: Ctx = { env, sub: auth.sub, token: auth.token, bg };
+    let queued = false;
+    pushSoon = () => {
+      if (queued) return;
+      queued = true;
+      bg(flushPushes(env));
+    };
     for (const [method, re, h] of routes) {
       if (method !== req.method) continue;
       const m = re.exec(path);
@@ -1394,6 +1444,7 @@ export async function deleteMemberData(env: Env, member: string): Promise<void> 
     db.prepare("DELETE FROM reminders_sent WHERE member_id = ?").bind(member),
     db.prepare("DELETE FROM members WHERE member_id = ?").bind(member),
     db.prepare("DELETE FROM people WHERE member_id = ?").bind(member),
+    db.prepare("DELETE FROM push_subs WHERE member_id = ?").bind(member),
   ]);
   forgetMember(member);
 }
@@ -1401,6 +1452,7 @@ export async function deleteMemberData(env: Env, member: string): Promise<void> 
 /** 排程（每小時）：截止前 3 天、1 天自動提醒；到期自動刪除檔案（前 30／7／1 天預告）；清掉過期下載憑證。 */
 export async function scheduled(env: Env): Promise<void> {
   const db = env.DB;
+  pushSoon = null;
   await db.prepare("DELETE FROM tickets WHERE expires_at < ?").bind(Date.now()).run();
   const t = Date.now();
   const lessons = (
@@ -1437,4 +1489,5 @@ export async function scheduled(env: Env): Promise<void> {
     await notify(db, todo, `作業檔案 ${days} 天後刪除`, `「${a.title}」的作業檔案將在 ${until} 刪除（成績保留），需要的話請先下載備份。`, `/me`);
     await db.batch(todo.map((m) => db.prepare("INSERT INTO reminders_sent (lesson_id, member_id, kind) VALUES (?, ?, ?) ON CONFLICT DO NOTHING").bind(a.id, m, key)));
   }
+  await flushPushes(env).catch((e) => console.error("push flush", e instanceof Error ? e.message : "error"));
 }
