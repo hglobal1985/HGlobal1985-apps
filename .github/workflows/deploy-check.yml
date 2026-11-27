@@ -1,0 +1,47 @@
+# 自動部署：寰宇繳作業系統（杜杜龍 2026-11-27）：合併進 main 後由 GitHub 自動部署，AI 對話不再自己部署。
+# - 只部署 main；同一時間只跑一個，後來的排隊（不會兩個部署互相蓋掉）。
+# - 沿用同一套安全檢查（packages/server-shared/deploy/guard.mjs）：main 又有新合併就交給下一次，線上已是同一版就略過。
+# - 需要 GitHub Secret「CLOUDFLARE_API_TOKEN」（杜杜龍在 Cloudflare 建立的部署用金鑰）；還沒設定時這個作業只顯示提醒、不部署。
+# - 只有相關的檔案有改才會跑；要手動重新部署：Actions →「自動部署：寰宇繳作業系統」→ Run workflow。
+name: 自動部署：寰宇繳作業系統
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/check-api/**"
+      - "apps/check-app/**"
+      - "apps/launch/src/site.ts"
+      - "apps/mobile/assets/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-check.yml"
+  workflow_dispatch:
+concurrency:
+  group: deploy-check
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      DEPLOY_CI: "1"
+    steps:
+      - name: 還沒設定部署金鑰
+        if: env.CLOUDFLARE_API_TOKEN == ''
+        run: echo "::notice::還沒有設定 GitHub Secret CLOUDFLARE_API_TOKEN，這次不自動部署（請照 docs/rules/performance-ops.md 的步驟設定）。"
+      - uses: actions/checkout@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        with:
+          node-version: "22"
+      - if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: 部署
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npm run deploy -w @check/api

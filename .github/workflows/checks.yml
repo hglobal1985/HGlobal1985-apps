@@ -24,3 +24,4 @@ jobs:
       - run: npx tsc --noEmit -p apps/check-app/tsconfig.json
       - run: npx tsc --noEmit -p apps/check-api
       - run: npm test -w @check/api
+      - run: node packages/server-shared/deploy/check-migrations.mjs

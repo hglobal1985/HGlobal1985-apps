@@ -9,7 +9,7 @@
     "dev": "wrangler dev -c wrangler.local.jsonc",
     "migrate": "wrangler d1 migrations apply check --remote",
     "embed": "node scripts/embed-static.mjs",
-    "deploy": "cd ../check-app && npx expo export --platform web && cd ../check-api && node scripts/embed-static.mjs && wrangler d1 migrations apply check --remote && wrangler deploy"
+    "deploy": "node scripts/safe-deploy.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251101.0",
