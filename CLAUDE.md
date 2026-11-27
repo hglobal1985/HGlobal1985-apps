@@ -21,7 +21,7 @@
 1. **只有 `main` 是正本**。每個 AI 一律開自己的分支（`claude/…`）改程式 → 推上去 → 開 PR → **合併進 `main`**；不要在分支上直接部署。
 2. **部署只用 `npm run deploy -w @learn/launch`（`apps/launch/scripts/safe-deploy.mjs`）**，不可手動拼 `wrangler deploy`。這個腳本會擋下：有未提交的修改、不是最新的 `main`、線上版本（`GET /api/v2/version` 的 git 編號）不在目前程式歷史裡（＝會蓋掉別人的成果）。被擋下時照訊息做：先 `git pull origin main` 取得最新程式，再重新驗證、部署。**不可用 `--force` 繞過**，除非杜杜龍明說。
 3. **開工前先同步**：`git fetch origin && git checkout main && git pull`，再從最新的 `main` 開新分支；開工前也看一下 `git branch -r --no-merged origin/main`，有別人還沒合併的分支就先判斷會不會碰到同一批檔案，會的話先問杜杜龍。
-4. **合併前先把 `main` 併進自己的分支**（衝突自己解，不可丟棄別人的程式）；改到共用檔案（`api.ts`、`contract.ts`、`CLAUDE.md`、`courses-view.tsx`…）時，只增加自己的段落，不要整檔重寫或重新排版。
+4. **合併前先把 `main` 併進自己的分支**（衝突自己解，不可丟棄別人的程式）；改到共用檔案（`api-core.ts`、`routes/*.ts`、`contract.ts`、`CLAUDE.md`、`courses-view.tsx`…）時，只增加自己的段落，不要整檔重寫或重新排版。
 5. **資料庫 migration 編號要避開別人的**：新增 migration 前看 `apps/launch/migrations` 最新編號，合併時若撞號就改成下一個（部署腳本會依序套用）。
 6. **做完要在 CLAUDE.md 加上自己這項功能的規則段落**（接手的 AI 靠它知道現況），並在回報中說明部署的版本（`/api/v2/version`）。
 7. **開工第一步先開「草稿 PR」**（杜杜龍 2026-11-27）：從最新 main 開分支後，先推一個提交、開草稿 PR，標題寫要做什麼。GitHub 的 PR 清單＝所有對話、所有 Claude 帳號共用的工作看板；新對話開工前先看還開著的 PR，**有人正在改同一批檔案就不要同時改**（先問杜杜龍，或等它合併）。一個 PR 只做一件事，做完當天合併，不要留著半成品分支。
@@ -70,6 +70,7 @@
 
 ## 開發與流程
 - 後端：`apps/launch`（Cloudflare Worker `learn` + D1 `learn-v2`），測試 `npm test -w @learn/launch`。
+- **後端 API 已依功能拆檔（杜杜龍 2026-11-27）**：共用函式與型別在 `apps/launch/src/api-core.ts`；各功能的網址在 `apps/launch/src/routes/*.ts`（system、my、courses、orders、centers、media、recipes、sync、admin-courses、admin）；`api.ts` 只組合總路由表與處理請求。新增網址加進對應的 routes 檔（同一檔內順序會影響比對）；共用函式放 api-core.ts 並 export。不要再把功能程式寫回 api.ts。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
 - **共用元件在 `packages/ui/src/`**（杜杜龍 2026-11-26：行動大學與寰宇繳作業系統共用同一套，改一次兩邊一起變；`@/` 先找 App 自己的 `src/` 再找這裡）。改共用元件時兩個 App 的型別檢查都要過。規則見 `docs/rules/shared-ui.md`。
 - **寰宇繳作業系統**：`apps/check-api`（Worker `check`）、`apps/check-app`（Expo）；規則見 `docs/rules/check-app.md`，部署前先問杜杜龍。
