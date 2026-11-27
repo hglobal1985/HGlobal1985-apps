@@ -5,7 +5,7 @@ import { AppState, Platform } from "react-native";
 import { setFeatureTrackSignedIn } from "@/lib/feature-track";
 import { markOwnerDevice } from "@/lib/usage";
 import { reportClientError } from "@/lib/error-report";
-import { clearCentral, handleWebSsoReturn, hasCentralSession, refresh as refreshCentral, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
+import { clearCentral, handleWebSsoReturn, hasCentralSession, nativeSsoCheck, refresh as refreshCentral, signInWithGoogle, signOutCentral, webSsoCheck, webSsoCheckDue, webSsoLogout } from "@/api/central";
 import { api, cachedGet, clearApiCache, loadToken, peekCache, prefetchCommon, saveToken, type Member } from "@/api/client";
 
 /**
@@ -74,6 +74,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       // 只有伺服器明確回覆「未登入」才清除；連線失敗時保留登入，下次再試。
       if (demo && first === null) await saveToken(null);
       let m = known(first);
+      // 手機共用登入（iPhone）：在別的 H-Global1985 App 登入過就自動登入；在別的 App 登出或換人就跟著變（杜杜龍 2026-11-27）。
+      if (Platform.OS !== "web" && !demo && (await nativeSsoCheck())) m = known(await fetchMember());
       if (Platform.OS === "web" && !m?.demo) {
         // 共用登入：處理會員中心回傳，或（5 分鐘節流）詢問這個瀏覽器目前登入的會員。
         if (globalThis.location?.pathname === "/auth/sso") {
@@ -137,6 +139,20 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       globalThis.document?.removeEventListener?.("visibilitychange", onVisible);
     };
   }, [memberSub, refreshMember]);
+  // 手機 App 每次回到前景也做一次共用登入檢查（中央串接指令 三、2）。
+  const isDemo = !!member?.demo;
+  useEffect(() => {
+    if (Platform.OS === "web" || isDemo) return;
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st !== "active") return;
+      void nativeSsoCheck().then(async (changed) => {
+        if (!changed) return;
+        setMember(known(await fetchMember()));
+        invalidate();
+      });
+    });
+    return () => sub.remove();
+  }, [isDemo, invalidate]);
   const signInGoogle = useCallback(async (returnTo = "/") => {
     await saveToken(null);
     const result = await signInWithGoogle(returnTo);

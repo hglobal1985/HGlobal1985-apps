@@ -19,4 +19,8 @@
   - **播放控制列外觀 `ControlsBar`**（`features/player/controls-bar.tsx`：播放／暫停〔讀取中＝小瓢蟲〕、時間軸 `seek-bar.tsx`、倒數剩餘時間、倍數、小視窗、全螢幕；時間與倍數文字在 `features/player/time-format.ts`）。行動大學課程頁的 `PlayerControls` 只把自己的播放引擎接到它身上；**要改播放控制列外觀只改 controls-bar.tsx，兩個 App 一起變**。
   - **影片檢視 `VideoViewer`**（網頁 `ui/video-viewer.web.tsx`、App `ui/video-viewer.tsx`〔expo-video〕：全黑全螢幕在畫面內播放、下方是 `ControlsBar`、✕ 與上一頁／返回鍵關閉）。
   - **「加入主畫面」卡片 `InstallCard`**：App 名稱改讀轉接檔 `@/lib/app-assets` 的 `APP_NAME`（行動大學＝寰宇行動大學、繳作業系統＝寰宇繳作業系統）。
+- **第四批（2026-11-27）**：
+  - **手機共用登入 `lib/sso-keychain.ts`**：iPhone 共用 Keychain 群組（`Apple 開發團隊代碼.com.hglobal1985.shared`、鍵名 `hglobal.sso`）的讀寫 `readNativeSso`／`writeNativeSso`、`nativeSsoEnabled`、`memberOfToken`。團隊代碼寫在每個 App 的 `app.json → extra.appleTeamId`（`4W7QRTXN5Y`，不是秘密），`ios.entitlements.keychain-access-groups` 要有 `$(AppIdentifierPrefix)com.hglobal1985.shared`。行動大學手機版（`apps/mobile/src/api/central.ts` 的 `nativeSsoStart`／`nativeSsoCheck`，`state/session.tsx` 開啟與回到前景時呼叫）與繳作業系統都用它：在其中一個 App 登入，另一個開啟就自動登入；「登出所有 App」連同另一個一起登出。Android 是選做，目前略過。網頁版的共用登入照舊（整頁導向會員中心詢問）。
+  - **推播設定卡 `PushCard`／`PushSwitchRow`**（`features/push-switch.tsx`，從行動大學搬來）：開關＋「傳一則測試通知給我」＋收不到時的排查步驟 `PUSH_TROUBLESHOOT`。兩個 App 的伺服器 `POST /push/test` 都回 `{ devices, ok }`（送到幾支裝置），卡片會顯示「已送出到 N 支裝置」，0 支就提示重新開啟。
+  - **伺服器的中央驗證 `packages/server-shared/src/central-verify.ts`**：Access Token 驗證 `createTokenVerifier(中央網址, app_id, 取得 fetch)`（RS256、JWKS 快取 10 分鐘、不認得 kid 重抓）與 webhook 簽章 `verifyWebhook`。兩個後端的 `central.ts` 只接上自己的 app_id。
 - **還沒共用的**：行動大學的播放引擎本身（YouTube／Mux／音檔、迷你播放器、續播；`features/player/engine*`）、行動大學「儲存空間管理」頁本身（它還有其他行動大學專屬設定；上傳壓縮那幾欄改的是同一份）。

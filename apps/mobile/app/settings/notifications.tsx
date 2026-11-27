@@ -1,13 +1,11 @@
 import { trackFeature } from "@/lib/feature-track";
 import { useEffect, useState } from "react";
-import { Platform } from "react-native";
-import { PUSH_TEXT } from "@/features/push-switch";
-import { disablePush, enablePush, pushState, type PushState } from "@/lib/web-push";
+import { PushCard } from "@/features/push-switch";
 import { Switch, View } from "react-native";
 import { api, NOTICE_KINDS, type NotificationSettings } from "@/api/client";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
-import { AppText, Button, Card, EmptyState, ErrorView, Field, InstallCard, LoadingView, LoadingLadybug, NoticeBox, Screen, Section } from "@/ui";
+import { AppText, Button, Card, EmptyState, ErrorView, Field, InstallCard, LoadingView, NoticeBox, Screen, Section } from "@/ui";
 
 /** 通知設定：Email 是會員中心「聯絡信箱」的同一個欄位，這裡改就是改會員中心。 */
 export default function NotificationSettingsScreen() {
@@ -110,73 +108,5 @@ export default function NotificationSettingsScreen() {
       </Section>
       {msg ? <NoticeBox text={msg.text} tone={msg.ok ? "success" : "danger"} /> : null}
     </Screen>
-  );
-}
-
-/** 手機推播（杜杜龍 2026-11-17）：這個裝置的開關＋傳一則測試通知。每個裝置各自開啟。 */
-function PushCard() {
-  const { c } = useTheme();
-  const [state, setState] = useState<PushState | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-  useEffect(() => {
-    pushState().then(setState).catch(() => setState("unsupported"));
-  }, []);
-  const toggle = async (v: boolean) => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      const next = v ? await enablePush() : await disablePush();
-      if (v && next === "on") trackFeature("push_enable");
-      setState(next);
-      if (v && next === "on") setMsg({ text: "已開啟手機推播", ok: true });
-      if (!v) setMsg({ text: "已關閉這個裝置的推播", ok: true });
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : "開啟失敗，請稍後再試", ok: false });
-    }
-    setBusy(false);
-  };
-  const test = async () => {
-    setBusy(true);
-    setMsg(null);
-    try {
-      await api("POST", "/push/test");
-      setMsg({ text: "已送出測試通知，幾秒內手機會跳出提醒。", ok: true });
-    } catch (e) {
-      setMsg({ text: e instanceof Error ? e.message : "送出失敗", ok: false });
-    }
-    setBusy(false);
-  };
-  if (Platform.OS !== "web")
-    return (
-      <Card>
-        <AppText variant="headline">手機推播</AppText>
-        <AppText tone="muted">App 版的推播會在正式上架時開放；目前請用網頁版開啟。</AppText>
-      </Card>
-    );
-  const canToggle = state === "on" || state === "off";
-  return (
-    <Card>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, minHeight: 48 }}>
-        <View style={{ flex: 1 }}>
-          <AppText variant="headline">手機推播</AppText>
-          <AppText variant="caption" tone="muted">
-            所有通知都會直接推到這支手機（不能逐項關閉，要收就是全部收）。
-          </AppText>
-        </View>
-        <Switch
-          value={state === "on"}
-          disabled={busy || !canToggle}
-          onValueChange={toggle}
-          trackColor={{ false: c.border, true: c.accent }}
-          thumbColor="#FFFFFF"
-          ios_backgroundColor={c.border}
-          accessibilityLabel="手機推播開關"
-        />
-      </View>
-      {state ? <NoticeBox tone={state === "on" ? "success" : state === "off" ? "info" : "warning"} text={PUSH_TEXT[state]} /> : <LoadingLadybug />}
-      {state === "on" ? <Button variant="secondary" icon="notifications-outline" label="傳一則測試通知給我" disabled={busy} onPress={test} /> : null}
-      {msg ? <NoticeBox text={msg.text} tone={msg.ok ? "success" : "danger"} /> : null}
-    </Card>
   );
 }

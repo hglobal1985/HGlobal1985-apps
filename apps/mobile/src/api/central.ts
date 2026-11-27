@@ -3,6 +3,7 @@ import { UPGRADING_MSG } from "../../../launch/src/contract";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
+import { memberOfToken, nativeSsoEnabled, readNativeSso, writeNativeSso } from "@/lib/sso-keychain";
 
 /**
  * 中央會員登入（登入中繼，Google）。App 不持有密碼或 client secret。
@@ -247,6 +248,7 @@ export async function signInWithGoogle(returnTo = "/me"): Promise<"ok" | "cancel
   const back = new URL(result.url);
   if (back.protocol !== "learn:" || back.hostname !== "auth" || back.pathname !== "/google") throw new CentralError(400, "bad_return", "登入回傳網址無效");
   await finish(back.searchParams, pending);
+  await nativeSsoStart();
   return "ok";
 }
 
@@ -350,7 +352,67 @@ export async function signOutCentral(all = false): Promise<void> {
       }
     }
   } else if (token) await central("/v1/auth/logout", "POST", undefined, token).catch(() => undefined);
+  if (!web) {
+    // 手機共用登入：「登出所有 App」連同這支裝置上所有 H-Global1985 App 一起登出；只登出這個 App 時也清掉共用登入，免得下次開啟又自動登回來。
+    const sso = await readNativeSso();
+    if (sso && all) await central("/v1/auth/sso/logout", "POST", { sso_token: sso }).catch(() => undefined);
+    await writeNativeSso(null);
+  }
   await clearCentral();
+}
+
+// ---------- 共用登入（手機 App，iPhone 共用 Keychain；中央串接指令 三、2；杜杜龍 2026-11-27 補上）----------
+// 登入成功後 sso/start 取得 sso_token 存進共用 Keychain（共用元件 lib/sso-keychain.ts，與寰宇繳作業系統同一份）；
+// 開啟與每次回到前景：沒登入就 exchange（在別的 App 登入過就自動登入），已登入就 status 檢查（失效或換人就清掉）。
+
+/** 登入成功後建立手機共用登入（失敗不影響這個 App 的登入）。 */
+async function nativeSsoStart(): Promise<void> {
+  if (web || !nativeSsoEnabled() || !access) return;
+  try {
+    const prev = await readNativeSso();
+    const { sso_token } = await central<{ sso_token: string }>("/v1/auth/sso/start", "POST", prev ? { previous_sso_token: prev } : {}, access);
+    await writeNativeSso(sso_token);
+  } catch {
+    /* 共用登入失敗不影響這個 App */
+  }
+}
+
+const deviceLabel = () => (Platform.OS === "ios" ? "iPhone App" : "Android App");
+
+/**
+ * 手機共用登入檢查（只在手機 App；測試身分登入時不要呼叫）。
+ * 回傳 true 表示登入狀態有變（自動登入、被登出或換人），呼叫端要重新抓會員資料。
+ */
+export async function nativeSsoCheck(): Promise<boolean> {
+  if (web || !nativeSsoEnabled()) return false;
+  const sso = await readNativeSso();
+  if (!sso) return false;
+  const token = await centralToken().catch(() => null);
+  const currentSub = token ? memberOfToken(token) : null;
+  const exchange = async () => {
+    const data = await central<SignIn>("/v1/auth/sso/exchange", "POST", { app_id: APP_ID, sso_token: sso, device_label: deviceLabel() });
+    if (data.user.status === "active") await remember(data);
+  };
+  try {
+    if (!currentSub) {
+      await exchange();
+      return true;
+    }
+    const s = await central<{ active: boolean; member_id: string }>("/v1/auth/sso/status", "POST", { sso_token: sso });
+    if (s.active && s.member_id === currentSub) return false;
+    await clearCentral();
+    if (s.active) await exchange();
+    return true;
+  } catch (e) {
+    if (e instanceof CentralError && e.code === "invalid_sso") {
+      await writeNativeSso(null);
+      if (currentSub) {
+        await clearCentral();
+        return true;
+      }
+    }
+    return false;
+  }
 }
 
 // ---------- 共用登入（網頁版，同一個瀏覽器內連動）----------

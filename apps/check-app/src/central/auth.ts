@@ -8,7 +8,8 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
-import { APP_ID, CENTRAL_URL, NATIVE_RETURN, SSO_ACCESS_GROUP, SSO_KEY, WEB_ORIGIN } from "./config";
+import { memberOfToken, nativeSsoEnabled, readNativeSso, writeNativeSso } from "@/lib/sso-keychain";
+import { APP_ID, CENTRAL_URL, NATIVE_RETURN, WEB_ORIGIN } from "./config";
 
 const web = Platform.OS === "web";
 const K = { access: "check.access", accessExp: "check.access-exp", refresh: "check.refresh", pending: "check.pending", ssoWeb: "check.sso", ssoCheckAt: "check.sso-check-at", back: "check.back" };
@@ -72,31 +73,16 @@ const store = {
     else await SecureStore.deleteItemAsync(key);
   },
 };
-/** 共用登入的 sso_token：iPhone 放共用 Keychain 群組；Android 選做（目前略過）；網頁放 sessionStorage。 */
+/** 共用登入的 sso_token：iPhone 放共用 Keychain 群組（共用元件 lib/sso-keychain.ts，與行動大學同一份）；網頁放 sessionStorage。 */
 const ssoStore = {
-  enabled: () => web || (Platform.OS === "ios" && !!SSO_ACCESS_GROUP),
+  enabled: () => web || nativeSsoEnabled(),
   async get(): Promise<string | null> {
-    if (web) return ss()?.getItem(K.ssoWeb) ?? null;
-    if (!this.enabled()) return null;
-    try {
-      return await SecureStore.getItemAsync(SSO_KEY, { accessGroup: SSO_ACCESS_GROUP });
-    } catch {
-      return null;
-    }
+    return web ? (ss()?.getItem(K.ssoWeb) ?? null) : readNativeSso();
   },
   async set(v: string | null): Promise<void> {
-    if (web) {
-      if (v) ss()?.setItem(K.ssoWeb, v);
-      else ss()?.removeItem(K.ssoWeb);
-      return;
-    }
-    if (!this.enabled()) return;
-    try {
-      if (v) await SecureStore.setItemAsync(SSO_KEY, v, { accessGroup: SSO_ACCESS_GROUP });
-      else await SecureStore.deleteItemAsync(SSO_KEY, { accessGroup: SSO_ACCESS_GROUP });
-    } catch {
-      /* 共用登入失敗不影響這個 App 的登入 */
-    }
+    if (!web) return writeNativeSso(v);
+    if (v) ss()?.setItem(K.ssoWeb, v);
+    else ss()?.removeItem(K.ssoWeb);
   },
 };
 
@@ -112,15 +98,7 @@ export const onAuthChange = (fn: () => void) => {
 };
 const emit = () => listeners.forEach((f) => f());
 
-function memberOf(token: string): string | null {
-  try {
-    const p = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-    const json = JSON.parse(decodeURIComponent(escape(atob(p + "=".repeat((4 - (p.length % 4)) % 4))))) as { sub?: string };
-    return json.sub ?? null;
-  } catch {
-    return null;
-  }
-}
+const memberOf = memberOfToken;
 
 async function saveTokens(t: Tokens): Promise<void> {
   access = t.access_token;
