@@ -1,9 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "learn",
-  // 固定部署到「寰宇（hglobal1985）」的 Cloudflare 帳號（杜杜龍 2026-11-27）：換任何 Claude 帳號或電腦，都只會部署到這個帳號；
-  // 憑證沒有這個帳號的權限就直接失敗，不會在別的帳號另建一份。另一個生態系（例如 starry.phd）的 App 在自己的設定檔寫自己的帳號編號。
-  "account_id": "650a3b03d439a5f517b4f8a28244f9fe",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
   "workers_dev": false,
@@ -21,7 +18,7 @@
   "images": { "binding": "IMAGES" },
   // Cloudflare Email Service（網域 learn.hglobal1985.com 已開通寄信）；只用來寄通知，不需要金鑰。
   "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["noreply@learn.hglobal1985.com"] }],
-  "vars": { "DEMO_LOGIN": "off", "EMAIL_FROM": "noreply@learn.hglobal1985.com", "CF_ACCOUNT_ID": "650a3b03d439a5f517b4f8a28244f9fe", "CF_ZONE_ID": "1c9558ed07ec981a87ff0f9a005ec9c4" },
+  "vars": { "DEMO_LOGIN": "off", "EMAIL_FROM": "noreply@learn.hglobal1985.com", "CF_ZONE_ID": "1c9558ed07ec981a87ff0f9a005ec9c4" },
   // MUX_SIGNING_KEY_ID 由杜杜龍在 Cloudflare 後台設定；部署時保留後台的變數，避免被清掉。
   "keep_vars": true,
   // 排程：每 10 分鐘補推還沒推播的通知；台灣時間 20:00 後發「明天開課提醒」（src/push.ts）。

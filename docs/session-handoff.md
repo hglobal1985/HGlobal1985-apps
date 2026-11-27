@@ -28,7 +28,7 @@
   - `apps/mobile`：App（`app/` 路由、`src/features/*` 功能、`src/ui/*` 共用元件、`src/theme` 設計系統、`src/lib`、`src/state`）。
   - `apps/legal`：Worker `learn-legal`（`/privacy`、`/support`）。
   - `docs/`：交接與規格文件。`CLAUDE.md`：杜杜龍永久規則。
-- Cloudflare：帳號 `650a3b03d439a5f517b4f8a28244f9fe`（hglobal1985@gmail.com）、zone `1c9558ed07ec981a87ff0f9a005ec9c4`、網域 `learn.hglobal1985.com`（Worker 自訂網域）、Email Service 寄件 `noreply@learn.hglobal1985.com`。
+- Cloudflare：寰宇帳號（編號放在部署環境變數 `CLOUDFLARE_ACCOUNT_ID`，不寫進公開程式庫）、zone `1c9558ed07ec981a87ff0f9a005ec9c4`、網域 `learn.hglobal1985.com`（Worker 自訂網域）、Email Service 寄件 `noreply@learn.hglobal1985.com`。
 - **Secrets／變數的「名稱」**（值都在 Cloudflare 後台，由杜杜龍管理，**你看不到也不可寫進任何地方**）：`MEDIA_URL_SECRET`、`MUX_SIGNING_PRIVATE_KEY`、`MUX_SIGNING_KEY_ID`、`MUX_TOKEN_ID`、`MUX_TOKEN_SECRET`、`CENTRAL_SERVICE_SECRET`、`CENTRAL_WEBHOOK_SECRET`、`CF_API_TOKEN`、`ANTHROPIC_API_KEY`（若有）、`LEARN_ADMIN_SUBS`、`DEMO_LOGIN`（正式站固定 `off`）。`wrangler.jsonc` 已設 `keep_vars: true`。
 
 ## 三、每天的標準作業流程
@@ -50,7 +50,7 @@ npm run typecheck -w @learn/mobile
 npx eslint apps                       # 另可跑 npx tsc --noEmit -p apps/mobile --noUnusedLocals
 
 # 3) 部署（雲端環境的 Cloudflare 權限由 proxy 注入）
-export CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=650a3b03d439a5f517b4f8a28244f9fe
+export CLOUDFLARE_API_TOKEN=proxy-injected CLOUDFLARE_ACCOUNT_ID=<寰宇帳號編號，已設定在雲端環境變數>
 npm run build:web -w @learn/mobile && (cd apps/launch && npm run embed)
 cd apps/launch && npx wrangler d1 migrations apply learn-v2 --remote   # 只有新增 migration 才需要
 npx wrangler deploy                                                    # 看到 Current Version ID 即成功
