@@ -21,7 +21,7 @@
 
 ## 二、專案一覽
 - **寰宇行動大學**：Expo／React Native（iOS／Android／Web 共用一套程式）＋ Cloudflare Worker 後端。正式站：https://learn.hglobal1985.com
-- GitHub：`hglobal1985/learn`（本專案）、`hglobal1985/id`（中央會員系統，**原則上不要改**；杜杜龍 2026-11-12 授權過一次例外 `GET /v1/eligibility/context`，之後要改要先問杜杜龍並遵守該 repo 的 `AGENTS.md`；需要中央改動時，替杜杜龍寫好「可貼給中央會員 AI 的指令」）。
+- GitHub：`hglobal1985/HGlobal1985-apps`（本專案）、`hglobal1985/id`（中央會員系統，**原則上不要改**；杜杜龍 2026-11-12 授權過一次例外 `GET /v1/eligibility/context`，之後要改要先問杜杜龍並遵守該 repo 的 `AGENTS.md`；需要中央改動時，替杜杜龍寫好「可貼給中央會員 AI 的指令」）。
 - 分支：開發在 `claude/hglobal-learn-handoff-4bj5nb`，**`main` 與它保持同步（已授權 AI 自行快轉）**。每次做完：commit → push 開發分支 → `main` 快轉 → push。
 - 專案結構：
   - `apps/launch`：後端 Worker `learn`（`src/api.ts` 路由全在這個大檔案、`contract.ts` 型別（App 直接引用）、`central.ts` 中央串接、`og.ts` 分享預覽、`ui-config.ts` 全站設定、`romanize.ts` 姓名轉拼音…）＋ D1 `learn-v2`（migrations 0001～0059）＋ R2 `learn`＋ Workers AI。測試 `tests/*.test.ts`（133 項，node:sqlite）。
@@ -34,7 +34,7 @@
 ## 三、每天的標準作業流程
 ```bash
 # 0) 取得程式（雲端環境已 clone 好時略過）
-git clone https://github.com/hglobal1985/learn && cd learn && npm install
+git clone https://github.com/hglobal1985/HGlobal1985-apps && cd HGlobal1985-apps && npm install
 
 # 1) 本機測試用：複製 apps/launch/wrangler.jsonc → wrangler.local.jsonc（已 gitignore）：
 #    DEMO_LOGIN 改 "on"、加 MEDIA_URL_SECRET 任意字串、拿掉 routes。然後
@@ -97,7 +97,7 @@ npx wrangler deploy                                                    # 看到 
 - 中央 `/v1/admin/*` 只接受會員中心網站自己的登入；App 只能用本人 Token 呼叫 `/v1/me/*`、`/v1/eligibility/*`、`/v1/vocab/*`。
 
 ## 九、新帳號怎麼開始（給杜杜龍的步驟）
-1. 在新 Claude 帳號連結 GitHub（claude.ai 設定 → Connectors），並安裝 Claude GitHub App 到 `hglobal1985/learn` 與 `hglobal1985/id`（唯讀即可給 id）。
-2. 新增 Claude Code（雲端）環境，Repository 選 `hglobal1985/learn`；網路政策要允許 Cloudflare API（部署用）；在環境裡設定 Cloudflare 的 API 權杖（用「network secret／request_credential」功能，**不要貼進對話**），權限需含 Workers、D1、R2、Email。
+1. 在新 Claude 帳號連結 GitHub（claude.ai 設定 → Connectors），並安裝 Claude GitHub App 到 `hglobal1985/HGlobal1985-apps` 與 `hglobal1985/id`（唯讀即可給 id）。
+2. 新增 Claude Code（雲端）環境，Repository 選 `hglobal1985/HGlobal1985-apps`；網路政策要允許 Cloudflare API（部署用）；在環境裡設定 Cloudflare 的 API 權杖（用「network secret／request_credential」功能，**不要貼進對話**），權限需含 Workers、D1、R2、Email。
 3. 開新 session，貼上 `docs/新帳號第一則訊息.md` 的內容。
 4. 讓它先做一次「讀文件 → 跑測試 → 本機啟動 → 回報看懂了什麼」，再下新需求。

@@ -6,7 +6,7 @@
 
 杜杜龍決定：寰宇生態系所有 App 的設計，一律改用「寰宇行動大學」App 實際使用的設計，作為統一設計規範 2.0，取代原本的《固定配色規範 1.0》。請依下列步驟處理，並遵守本 repo 的 `AGENTS.md`：
 
-1. 從 `hglobal1985/learn` 的 `docs/hglobal-tokens.json`（version 2.0）與 `docs/hglobal-color-standard.md` 取得新規範，覆蓋中央自己保存的色值檔與規範文件（若中央有提供固定網址給各 App 引用 tokens，也一併更新成 2.0 的內容）。
+1. 從 `hglobal1985/HGlobal1985-apps` 的 `docs/hglobal-tokens.json`（version 2.0）與 `docs/hglobal-color-standard.md` 取得新規範，覆蓋中央自己保存的色值檔與規範文件（若中央有提供固定網址給各 App 引用 tokens，也一併更新成 2.0 的內容）。
 2. 淺色模式色值不變。**深色模式改成**：主色 `#2f8a5b`（原 `#cee49f`）、主色上的字 `#ffffff`（原 `#172016`）、淡綠底 `#1d3226`（原 `#2c3622`）、綠色文字與連結 `#5db383`（新增）、成功 `#4fa774`（原 `#9bd39e`）。其餘深色值與 1.0 相同。新增：次要底 surfaceMuted（淺 `#f0eee3`／深 `#252a29`）、底部分頁列 tabBar（淺 `#ffffff`／深 `#171b1b`）。
 3. 中央會員網站的介面（按鈕、連結、選中狀態、文字）改用上面的色值；字級、間距、圓角請對照規範第 3 節（間距 4/8/12/16/24/32、圓角 8/12/16/999、可點元素最小高度 48）。只改外觀，不改功能與資料。
 4. 1.0 的鍵名對照在 `hglobal-tokens.json` 的 `migrationFrom1_0`。
