@@ -1,0 +1,32 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "threshold_percent": 2,
+  "pages": [
+    {
+      "name": "learn-home",
+      "url": "https://learn.hglobal1985.com/",
+      "wait_for": "body",
+      "ignore": [
+        {
+          "x": 0,
+          "y": 235,
+          "width": 390,
+          "height": 490
+        }
+      ]
+    },
+    {
+      "name": "learn-course",
+      "url": "https://learn.hglobal1985.com/course/start",
+      "wait_for": "body"
+    },
+    {
+      "name": "check-home",
+      "url": "https://check.hglobal1985.com/",
+      "wait_for": "body"
+    }
+  ]
+}
