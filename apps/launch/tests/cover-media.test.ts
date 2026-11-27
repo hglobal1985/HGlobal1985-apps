@@ -137,7 +137,7 @@ test("課程 EDM 併入中心 EDM 空間：已上傳與未來上傳的自動綁�
   const list = async (center = C) => (await call<Item[]>("GET", `/cover-media?kind=center&key=${center}`)).data;
 
   // 已經上傳的課程 EDM：台北中心主辦、已發佈、有 EDM
-  await bucket.put("edm/c-a/old.jpg", jpeg);
+  await bucket.put("edm/c-a/old.jpg", jpeg.buffer);
   await db.prepare("UPDATE courses SET host_center_key = '台北中心', edm_key = 'edm/c-a/old.jpg', status = 'published' WHERE id = 'start'").run();
   const own = await call<{ id: string }>("PUT", `/admin/cover-media?kind=center&key=${C}&w=1200&h=800&scope=edm`, { token: admin, bytes: jpeg }); // 手動上傳的 EDM（沒綁課程）
   let items = await list();
@@ -167,7 +167,7 @@ test("課程 EDM 併入中心 EDM 空間：已上傳與未來上傳的自動綁�
 
   // 未來上傳／課程自己換 EDM：下次讀取自動同步，仍然只有一張
   await db.prepare("UPDATE courses SET edm_key = 'edm/start/other.jpg' WHERE id = 'start'").run();
-  await bucket.put("edm/start/other.jpg", jpeg);
+  await bucket.put("edm/start/other.jpg", jpeg.buffer);
   items = await list();
   assert.equal(items.filter((x) => x.courseId).length, 1);
   assert.ok(items.find((x) => x.courseId)!.url.includes("other.jpg"));
