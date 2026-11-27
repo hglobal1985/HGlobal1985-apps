@@ -115,32 +115,13 @@ export interface BackupRunOpts {
  * 失敗時會先呼叫 onFailure、再把例外丟出（排程那層寫日誌）。
  */
 export async function runWeeklyBackup(o: BackupRunOpts): Promise<number> {
-  const { config, bucket, db } = o;
+  const { config, bucket } = o;
   if (!config?.enabled || !bucket || !isBackupWindow(config.weekday, o.now)) return 0;
   const { date } = taipeiNow(o.now);
   const folder = backupFolder(date);
   if (await bucket.head(folder + "manifest.json")) return 0; // 今天已經備份過
   try {
-    const manifest: BackupManifest = { version: 1, app: o.appId, created_at: o.now.toISOString(), tables: {} };
-    let total = 0;
-    for (const [table, cols] of Object.entries(o.tables)) {
-      const files: string[] = [];
-      let rows = 0;
-      for (let offset = 0; ; offset += ROWS_PER_FILE) {
-        const r = await db.prepare(`SELECT ${cols.join(", ")} FROM ${table} ORDER BY rowid LIMIT ? OFFSET ?`).bind(ROWS_PER_FILE, offset).all<Record<string, unknown>>();
-        const list = r.results ?? [];
-        if (!list.length && offset > 0) break;
-        const name = `${table}.${files.length + 1}.ndjson`;
-        await bucket.put(folder + name, list.map((x) => JSON.stringify(x)).join("\n"), { httpMetadata: { contentType: "application/x-ndjson" } });
-        files.push(name);
-        rows += list.length;
-        if (list.length < ROWS_PER_FILE) break;
-      }
-      manifest.tables[table] = { rows, files };
-      total += rows;
-    }
-    await bucket.put(folder + "README.txt", restoreReadme(o.appLabel, date, Object.keys(o.tables)), { httpMetadata: { contentType: "text/plain; charset=utf-8" } });
-    await bucket.put(folder + "manifest.json", JSON.stringify(manifest), { httpMetadata: { contentType: "application/json" } });
+    const total = await exportBackup(o, folder, date);
     await pruneBackups(bucket, config.keep);
     return total;
   } catch (e) {
@@ -159,4 +140,31 @@ async function pruneBackups(bucket: BackupBucket, keep: number): Promise<void> {
       cursor = page.truncated ? page.cursor : undefined;
     } while (cursor);
   }
+}
+
+/** 把 tables 列的資料匯出到 R2 的 folder（manifest.json 最後才寫）；每週備份與「還原前的安全備份」共用。回傳總列數。 */
+export async function exportBackup(o: Pick<BackupRunOpts, "db" | "bucket" | "appId" | "appLabel" | "tables" | "now">, folder: string, label: string): Promise<number> {
+  const { db, bucket } = o;
+  if (!bucket) throw new Error("no_bucket");
+  const manifest: BackupManifest = { version: 1, app: o.appId, created_at: o.now.toISOString(), tables: {} };
+  let total = 0;
+  for (const [table, cols] of Object.entries(o.tables)) {
+    const files: string[] = [];
+    let rows = 0;
+    for (let offset = 0; ; offset += ROWS_PER_FILE) {
+      const r = await db.prepare(`SELECT ${cols.join(", ")} FROM ${table} ORDER BY rowid LIMIT ? OFFSET ?`).bind(ROWS_PER_FILE, offset).all<Record<string, unknown>>();
+      const list = r.results ?? [];
+      if (!list.length && offset > 0) break;
+      const name = `${table}.${files.length + 1}.ndjson`;
+      await bucket.put(folder + name, list.map((x) => JSON.stringify(x)).join("\n"), { httpMetadata: { contentType: "application/x-ndjson" } });
+      files.push(name);
+      rows += list.length;
+      if (list.length < ROWS_PER_FILE) break;
+    }
+    manifest.tables[table] = { rows, files };
+    total += rows;
+  }
+  await bucket.put(folder + "README.txt", restoreReadme(o.appLabel, label, Object.keys(o.tables)), { httpMetadata: { contentType: "text/plain; charset=utf-8" } });
+  await bucket.put(folder + "manifest.json", JSON.stringify(manifest), { httpMetadata: { contentType: "application/json" } });
+  return total;
 }

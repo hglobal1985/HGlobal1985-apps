@@ -10,8 +10,13 @@ import { FP_RE, netHash, ownerDevices, registerOwnerDevice, saveOwnerDevices, pa
 import { collectMuxStats } from "../mux-stats.ts";
 import { achievementBody, aiModelsView, audit, canViewStats, cleanAnnouncement, fail, keywordChoices, listAchievements, randomId, readJson, registrationReport, registrationReportCsv, requireCourseStaff, requireMember, requireSuperAdmin } from "../api-core.ts";
 import type { Handler } from "../api-core.ts";
+import { backupList, backupPlan, backupRestore } from "../backup-admin.ts";
 
 export const adminRoutes: [string, RegExp, Handler][] = [
+  // 備份還原（超級管理員；還原正式資料須杜杜龍核准，見 backup-admin.ts）
+  ["GET", /^\/admin\/backups$/, async (ctx) => backupList(ctx)],
+  ["GET", /^\/admin\/backups\/(\d{4}-\d{2}-\d{2})$/, async (ctx, [date]) => backupPlan(ctx, date!)],
+  ["POST", /^\/admin\/backups\/(\d{4}-\d{2}-\d{2})\/restore$/, async (ctx, [date]) => backupRestore(ctx, date!)],
   [
     "PUT",
     /^\/admin\/ui-config$/,

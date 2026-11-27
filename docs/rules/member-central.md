@@ -89,3 +89,10 @@
 - **巡檢手機推播（杜杜龍 2026-11-27，中央串接指令 2026-11-27.8，三、18 (2)）**：中央網站巡檢掛了／恢復時，對超級管理員送 webhook 事件 `eco.alert`（每位一則，`member_id`＋`detail:{name, alert: down|recovered, note}`，不含個資）。行動大學在 `routes/system.ts` 的 `/central/webhook` 收到後，替該會員發站內通知（標題「網站打不開：名稱」或「網站已恢復：名稱」，連到 `/notices`），既有的推播流程（`flushPushes`）再推到他已開啟推播的裝置。格式不對的事件只回 2xx 忽略；重送由 `central_events` 去重。收件人是中央指定的超級管理員本人，行動大學不另做角色對應。
 
 - **每週備份（生態系統功能 4，杜杜龍 2026-11-27，串接指令 三、18 (4)）**：共用模組 `packages/server-shared/src/weekly-backup.ts`（兩個 App 同一份）；行動大學 `apps/launch/src/weekly-backup.ts`（`LAUNCH_BACKUP_TABLES`，R2 bucket `learn`）、繳作業系統 `apps/check-api/src/weekly-backup.ts`（`CHECK_BACKUP_TABLES`，bucket `check`）。排程在台北 03 點那一次才向中央讀 `GET /v1/apps/<app_id>/config` 的 `config.eco_features.weekly_backup`（`enabled`、`weekday`、`keep`；沒有或關閉就不備份），到設定的星期就把「明確列出的資料表與欄位」匯出到 `backups/<台北日期>/`（`<表>.<序號>.ndjson` 每檔最多 5000 列、`README.txt` 還原說明、最後才寫 `manifest.json`；今天的 manifest 已存在就略過＝同一天只做一次），只留最近 `keep` 份。**新增資料表預設不備份**：要備份就加進該 App 的 `*_BACKUP_TABLES` 並確認沒有 Amway、Token、密碼雜湊、邀請碼、暫存與快取欄位（測試 `tests/weekly-backup.test.ts` 會檢查欄位真的存在、沒有敏感欄位名稱）。失敗：寫日誌＋站內通知（行動大學通知管理員角色；繳作業系統沒存超級管理員名單，通知各活動的管理員）。備份只存在 R2，不放公開程式庫、不貼進對話或 Issue；還原須杜杜龍核准（先在測試環境驗證）。後台「還原按鈕」尚未做。
+
+## 備份還原（後端已做、按鈕待做；杜杜龍 2026-11-27）
+- 共用模組 `packages/server-shared/src/backup-restore.ts`：列出備份（只列有 manifest.json 的日期資料夾）→ 預覽（只讀，核對資料表／欄位／主鍵）→ 還原。每週備份的匯出邏輯抽成 `exportBackup`，還原前的安全備份共用它。
+- **還原正式資料須杜杜龍核准**：只給超級管理員；呼叫端必須要求輸入備份日期當確認字樣（`confirm`）；還原前自動把現況匯出到 R2 `backups/pre-restore-<時間>/`（每週備份的清理不會刪它，一般備份清單也不列它）；任何檢查不過就中止、不動資料；稽核紀錄只寫張數與還原前備份位置，不寫資料內容。
+- 還原方式是「依主鍵 upsert」（`INSERT … ON CONFLICT DO UPDATE`），**不可改用 INSERT OR REPLACE**（會觸發 ON DELETE CASCADE 把子表刪掉）；備份之後新增的資料不會被刪；沒有主鍵的表不還原；備份檔含清單外的資料表或欄位一律拒絕。
+- 行動大學：`apps/launch/src/backup-admin.ts`＋`routes/admin.ts`：`GET /admin/backups`、`GET /admin/backups/<日期>`（預覽）、`POST /admin/backups/<日期>/restore`（body `{confirm}`）。測試 `tests/backup-restore.test.ts`。
+- **還沒做**：①後台「還原」按鈕畫面（要照手機優先、`confirmSheet`、上一頁攔截規則；入口放設定頁、超級管理員才看得到，流程＝選日期 → 看預覽 → 輸入日期確認）；②繳作業系統（`apps/check-api`）同樣三個網址與按鈕。
