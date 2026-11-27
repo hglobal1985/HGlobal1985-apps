@@ -25,7 +25,7 @@ export default function SearchSettingsScreen() {
   const { c } = useTheme();
   const { member, invalidate } = useSession();
   const isSuper = !!member?.titles.includes("超級管理員");
-  const { data, error, loading, reload } = useApi<Data>(isSuper ? "/admin/search-settings" : null);
+  const { data, error, reload } = useApi<Data>(isSuper ? "/admin/search-settings" : null);
   const [vals, setVals] = useState<Data["values"] | null>(null);
   const [q, setQ] = useState("");
   const [test, setTest] = useState<Test | null>(null);

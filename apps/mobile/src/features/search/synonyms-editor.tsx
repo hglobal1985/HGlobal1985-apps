@@ -5,7 +5,6 @@ import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space, type } from "@/theme/tokens";
 import { AppText, EmptyState, ErrorView, LoadingView, NoticeBox } from "@/ui";
-import { flashText } from "@/ui/flash-notice";
 
 /**
  * 設定 › 搜尋關聯詞（杜杜龍 2026-11-25，超級管理員）：一行一組，詞之間用「＝」隔開，例如

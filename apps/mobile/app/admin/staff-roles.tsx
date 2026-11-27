@@ -7,7 +7,7 @@ import { centerTitle } from "@/features/format";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, ErrorView, Icon, LoadingView, LoadingLadybug, NoticeBox, Screen, Select } from "@/ui";
+import { AppText, Button, EmptyState, Icon, LoadingView, LoadingLadybug, NoticeBox, Screen, Select } from "@/ui";
 import { Check } from "@/ui/check";
 import { SegmentTabs } from "@/ui/segment-tabs";
 import { flashText } from "@/ui/flash-notice";

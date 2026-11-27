@@ -236,7 +236,6 @@ export function ElderCourse({
   const blockMode = course.lessons.some((l) => l.section);
   const blocks = splitBlocks(course, (l) => l.ready || !!l.linkUrl);
   const ordered = [...(next ? [next] : []), ...rest.filter((l) => !l.completed), ...rest.filter((l) => l.completed)];
-  const done = items.filter((l) => l.completed).length;
   const word = items.some((l) => !l.material) ? "課" : "部";
   const fee = course.isList ? null : course.priceTba ? "費用尚未公布" : course.free || course.freeNow || course.watchFree ? "免費" : course.priceTwd != null ? `NT$ ${course.priceTwd.toLocaleString()}` : "付費課程";
   const date = course.eventStart ? (course.eventEnd && course.eventEnd !== course.eventStart ? `${course.eventStart} ～ ${course.eventEnd}` : course.eventStart) : null;

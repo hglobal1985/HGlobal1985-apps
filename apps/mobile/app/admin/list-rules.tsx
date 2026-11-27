@@ -9,7 +9,7 @@ import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, EmptyState, Field, LoadingLadybug, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
+import { AppText, Card, EmptyState, Field, LoadingLadybug, NoticeBox, Screen, Section, SettingsFooter } from "@/ui";
 
 /** 緞帶小預覽：一條橫的色帶，顯示目前的文字與顏色。 */
 function Sample({ label, color }: { label: string; color: keyof typeof RIBBON_COLORS }) {

@@ -4,10 +4,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { FlatList, Image, ScrollView, Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { resolveUrl, type AlbumsResponse, type CourseSummary } from "@/api/client";
-import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, matchCourses, rankCourses, type SearchLesson } from "@/features/courses/course-search";
-import { useSynonyms } from "@/features/courses/use-synonyms";
-import { usePhonetic } from "@/features/courses/use-phonetic";
-import { useSemantic } from "@/features/courses/use-semantic";
 import { SceneHits, useSceneSearch } from "@/features/courses/scene-hits";
 import { useThumb } from "@/lib/thumb";
 import { useProfileRedirect } from "@/features/profile-gate";
@@ -18,7 +14,7 @@ import { UI_SCALE } from "@/theme/ui-scale";
 import { elderTextScale } from "@/lib/elder-mode";
 import { fitFontSize } from "@/ui/course-cover";
 import { ELDER_FIELD } from "@/ui/elder-controls";
-import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbDuration, ThumbFallback, ThumbLock } from "@/ui";
+import { AppText, ErrorView, LoadingView, LoginPrompt, ThumbDuration, ThumbLock } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { lockReason } from "@/features/courses/lock-reason";
 import { TileCover } from "@/features/courses/series-tile";
@@ -28,18 +24,11 @@ import { centerKeyOf, centerTitle, eventDays } from "@/features/format";
 import { lessonHref } from "@/lib/lesson-href";
 import type { ChapterItem } from "@/features/courses/chapter-list";
 import { ELDER_ALBUM_ZONE, ELDER_ZONES, ElderZoneCard, ElderZoneHeader, useZoneItems, type ElderZone } from "./elder-zones";
-import { useSearchSettings } from "@/features/courses/use-search-settings";
-import { SemanticExtras, TagPill, splitExtras } from "@/features/search/semantic-extras";
+import { SemanticExtras, TagPill } from "@/features/search/semantic-extras";
 import { onHomeReset } from "@/lib/home-reset";
 import { markFromSearch, useRememberedQuery } from "@/lib/search-memory";
-import { listable, useSearchEngine } from "@/features/search/use-search-engine";
+import { useSearchEngine } from "@/features/search/use-search-engine";
 import { useVoice } from "./use-voice";
-
-/** 排序：已報名（上過）的優先，其次活動日期新的在前，清單卡最後。 */
-function order(list: CourseSummary[]) {
-  const mine = (x: CourseSummary) => Number(x.enrollment === "opened" || x.started);
-  return [...list].sort((a, b) => Number(a.isList) - Number(b.isList) || mine(b) - mine(a) || (b.eventStart ?? "").localeCompare(a.eventStart ?? ""));
-}
 
 /** 「繼續上課」：最近學過、還沒學完的課（都學完就拿最近學的那一門）。 */
 function lastCourse(courses: CourseSummary[]): CourseSummary | null {
@@ -75,7 +64,7 @@ export function ElderSearch({ mode }: { mode: "home" | "browse" }) {
   });
   // 搜尋引擎：與超派模式是同一個模組（features/search/use-search-engine.ts），杜杜龍 2026-11-25。
   const eng = useSearchEngine(q, courses.data ?? []);
-  const { key, all, chapters, semantic, phonetic } = eng;
+  const { key, all, chapters } = eng;
   const scenes = useSceneSearch(q);
   const itemsOf = useZoneItems(all);
   // 已經在首頁再按一次底部「首頁」＝清掉搜尋字與語音、回到預設畫面（杜杜龍 2026-11-25）。

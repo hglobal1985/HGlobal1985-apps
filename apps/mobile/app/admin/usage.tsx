@@ -283,7 +283,7 @@ const QUESTIONS: Q[] = [
   { icon: "logo-apple", title: "iPhone 和 Android 各幾成？", qs: "kinds=visit&rows=os&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "time-outline", title: "一天中哪個時段最多人看？", qs: "kinds=visit&rows=slot&days=30", view: "bars", answer: (d) => top(d, "") },
   { icon: "logo-apple", title: "iPhone 用戶都在幾點看？", qs: "kinds=visit&rows=slot&os=ios&device=mobile&days=30", view: "bars", answer: (d) => top(d, "iPhone 用戶的") },
-  { icon: "swap-horizontal-outline", title: "手機和電腦，看的時段有差別嗎？", qs: "kinds=visit&rows=device&cols=slot&days=30", view: "table", answer: (d) => "顏色越深＝越多人，直接比較每一列" },
+  { icon: "swap-horizontal-outline", title: "手機和電腦，看的時段有差別嗎？", qs: "kinds=visit&rows=device&cols=slot&days=30", view: "table", answer: () => "顏色越深＝越多人，直接比較每一列" },
   { icon: "flame-outline", title: "首頁哪種卡最多人點？", qs: `${CARDS}&rows=kind&days=30`, view: "bars", answer: (d) => top(d, "") },
   { icon: "trophy-outline", title: "首頁哪張卡最多人點？", qs: `${CARDS}&rows=item&days=30`, view: "bars", answer: (d) => (d.rows[0] && d.total ? `答：第一名是「${d.rows[0].label}」（${d.rows[0].total} 次）` : "還沒有資料（從 2026/11/22 開始累計）") },
   { icon: "tablet-portrait-outline", title: "平板最常點哪張系列卡？", qs: "kinds=card_series&rows=item&device=tablet&days=30", view: "bars", answer: (d) => (d.rows[0] && d.total ? `答：「${d.rows[0].label.replace(/^系列｜/, "")}」（${d.rows[0].total} 次）` : "平板還沒有資料") },

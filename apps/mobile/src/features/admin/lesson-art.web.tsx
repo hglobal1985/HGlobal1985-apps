@@ -195,7 +195,6 @@ export function LessonArt({ lesson, onChanged }: { lesson: Lesson; onChanged: ()
 
 /** 從 Mux 影片選畫面：指定秒數，伺服器直接給該秒的截圖。 */
 function FramePicker({ lesson, onClose, onPicked }: { lesson: Lesson; onClose: () => void; onPicked: (img: HTMLImageElement) => void }) {
-  const media = lesson.media!;
   const lo = lesson.start ?? 0;
   const hi = lesson.end ?? lo + Math.max(60, (lesson.minutes || 10) * 60);
   const [t, setT] = useState(lo);

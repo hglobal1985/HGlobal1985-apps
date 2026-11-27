@@ -83,7 +83,7 @@ export default function ShareDefaultsScreen() {
   );
 
   // 即時預覽（範例資料）
-  const card = (name: string, address: string) => ({
+  const card = (name: string, _address: string) => ({
     title: `${name}${s.titleSeparator}${s.siteName}${s.titleBadge && !s.siteName.includes(s.titleBadge) ? ` ${s.titleBadge}` : ""}`, // 名稱 | 站名 圖示
     desc: (s.showQuote ? "每天進步一點點，一年後強大 37 倍。" : "") || s.fallbackDescription || s.siteName, // 第二行只放一句隨機學習金句（不再放地址）
   });

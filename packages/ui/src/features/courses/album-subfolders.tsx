@@ -5,7 +5,7 @@ import { api, resolveUrl, type AlbumSubfolders } from "@/api/client";
 import { useThumb } from "@/lib/thumb";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
-import { radius, space } from "@/theme/tokens";
+import { radius } from "@/theme/tokens";
 import { AppText } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";

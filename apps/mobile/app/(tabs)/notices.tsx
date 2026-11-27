@@ -4,7 +4,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, type Href } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Platform, Pressable, View } from "react-native";
-import { api, type Notice, type NoticeCategory } from "@/api/client";
+import { api, type Notice } from "@/api/client";
 import { noticeTarget } from "@/features/format";
 import { CentralReviewList, hhmm, useCentralReviews } from "@/features/notices/central-reviews";
 import { NoticeSheet } from "@/features/notices/notice-sheet";

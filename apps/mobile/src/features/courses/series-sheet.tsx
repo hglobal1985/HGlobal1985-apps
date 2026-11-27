@@ -16,7 +16,7 @@ import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { ribbonsFor } from "./ribbons";
 import { useApi, useSession } from "@/state/session";
 import { useUiConfig } from "@/state/ui-config";
-import { displayName, seriesOrdered } from "./sort";
+import { seriesOrdered } from "./sort";
 import { afterSheetClose } from "@/lib/sheet-back";
 
 

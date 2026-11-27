@@ -127,7 +127,6 @@ export default function AdminAchievementsScreen() {
     setDirty(true);
   };
   const obj = form && form.vi >= 0 ? ACH_VERBS[form.vi]!.objects[form.oi]! : null;
-  const t = form ? ACHIEVEMENT_TYPES[form.type] : null;
   const auto = !!form && form.vi < 0;
   const autoDesc = form ? (form.vi >= 0 ? `會員${phraseOf(form)}，就會自動拿到這枚徽章。` : conditionText(form.type, Number(form.threshold) || 1, null, form.feature, form.lessonTitle)) : "";
   const save = async () => {

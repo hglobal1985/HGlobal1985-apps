@@ -15,7 +15,6 @@ const toBase64 = (b: Uint8Array): string => {
   return btoa(s);
 };
 
-const WEEK = "日一二三四五六";
 const validDate = (y: number, m: number, d: number): string | null => {
   if (y < 2000 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) return null;
   const iso = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
