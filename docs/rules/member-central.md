@@ -80,3 +80,9 @@
 - **獎銜徽章「又灰又小」的查證與調整（杜杜龍 2026-11-26，`features/rank-badge.tsx`）**：查過中央的徽章圖（例如鑽石 `f_diamond.png`，380×720）本身就是銀灰色、圖案只佔畫布中間約 64% 高，**我們程式沒有套任何透明度或淡化**。所以只調整顯示：網頁版加 `filter`（略提高對比與飽和度＋一圈細深色描邊陰影，`CONTRAST_FILTER`），淺色徽章在白底上也看得出輪廓；至尊模式頁的獎章放大到 1.8 倍。**不改圖、不存圖、不自己新增徽章**（圖仍以中央的 `rankBadge`／`rankBadgeArt` 為準）；若杜杜龍覺得圖本身太淡，要請中央更換圖檔。
 - **登入永不過期（杜杜龍 2026-11-27；中央串接指令 2026-11-27.1）**：中央已把 Refresh Token、共用登入改成沒有期限，只有登出、登出所有裝置、停權、刪除帳號才結束。App 端不可自己設登入期限。行動大學網頁版本來就存 localStorage＋跨分頁加鎖；繳作業系統網頁版也從 sessionStorage 改成 localStorage＋跨分頁加鎖（`apps/check-app/src/central/auth.ts`）。
 - **審核清單、職務清單短暫快取（杜杜龍 2026-11-27）**：`central.ts` 的 `centralReviews`、`staffSearch`（不帶搜尋字時）同一人 60 秒內只問中央一次（只放記憶體）；`centralDecide`、`staffAssign` 會立刻清掉快取。原因：中央的稽核紀錄有一半以上是這兩份清單被反覆查詢。
+
+## 前台錯誤統計送中央（杜杜龍 2026-11-27，生態系統功能 3）
+- 兩個 App 的 `/client-errors` 收到前台錯誤後，除了寫 Cloudflare 錯誤紀錄，還用 `packages/server-shared/src/error-digest.ts` 在記憶體累加「種類＋頁面路徑＋次數」，約每 30 秒（有新錯誤進來時才檢查）批次 POST 到中央 `/v1/apps/<app_id>/error-reports`（不帶 Token）。
+- 絕不送錯誤訊息、堆疊、網址參數、個資；送失敗或 429 就丟掉；中央沒讓這款 App 參與時會回 accepted 0。版本號固定寫在各 App 的 `central.ts`（行動大學對應 `apps/mobile/app.json`），改版時一起改。
+- 前台回報的種類對應在 `digestKind()`；新增前台錯誤種類時要一起補。
+- 兩個 App 的 `INTEGRATED_VERSION` 尚未升到 2026-11-27.4 以上（還有備份、截圖等項目沒逐項核對），升版前要照串接指令「六」檢查清單逐項做完。

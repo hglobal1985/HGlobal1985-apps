@@ -8,12 +8,15 @@
  */
 import { createTokenVerifier, looksLikeJwt, SIGNATURE_TOLERANCE_SECONDS, verifyWebhook } from "../../../packages/server-shared/src/central-verify.ts";
 import { createServiceClient, validEmail, type ContactPurpose } from "../../../packages/server-shared/src/central-service.ts";
+import { createErrorDigest } from "../../../packages/server-shared/src/error-digest.ts";
 import type { CentralReviews, StaffMember, StaffRole, StaffSearch } from "./contract.ts";
 export const CENTRAL = "https://id.hglobal1985.com";
 export const APP_ID = "learn";
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 let centralFetch: Fetch = (input, init) => fetch(input, init);
+/** 前台錯誤統計 → 中央（生態系統功能 3；只送種類、頁面路徑、次數；版本號對應 apps/mobile/app.json）。 */
+export const errorDigest = createErrorDigest({ central: CENTRAL, appId: APP_ID, version: "0.2.0", getFetch: () => centralFetch });
 /** 測試用：替換對中央的網路請求。 */
 export function setCentralFetch(f: Fetch): void {
   centralFetch = f;

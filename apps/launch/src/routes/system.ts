@@ -1,6 +1,6 @@
 /** 行動大學 API 路由：系統：健康檢查、版本、設定、錯誤回報、名言、公告、使用統計回報、搜尋索引（杜杜龍 2026-11-27 從 api.ts 拆出；順序會影響比對，同一檔內照原本順序）。 */
 import { DEMO_MEMBERS, type Announcement } from "../contract.ts";
-import { centerKey, forgetMember, verifyWebhook, APP_ID } from "../central.ts";
+import { centerKey, errorDigest, forgetMember, verifyWebhook, APP_ID } from "../central.ts";
 import { loadConfig } from "../ui-config.ts";
 import { isOwnerDevice, isOwnerNet, markOwnerNet, recordUsage } from "../usage.ts";
 import { HOME_BC_KEY, REVIEW_FIELD_LABEL, SESSION_DAYS, type Session, audit, clientErrorHits, demoEnabled, fail, isOwnerSession, iso, memberOf, notifyReviewResult, pubUrl, purgeMember, randomToken, ranks, readJson, sha256, usageHits, ytThumbOf } from "../api-core.ts";
@@ -23,6 +23,7 @@ export const systemRoutes: [string, RegExp, Handler][] = [
     const b = await readJson<Record<string, unknown>>(ctx.req);
     const str = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).slice(0, max) : "");
     console.error("client error", JSON.stringify({ kind: str("kind", 20), message: str("message", 300), page: str("page", 200), platform: str("platform", 10), ua: str("ua", 200), extra: str("extra", 300), stack: str("stack", 1500) }));
+    errorDigest.record(str("kind", 20), str("page", 200), ctx.defer); // 只累加種類＋頁面路徑＋次數，批次送中央週報（生態系統功能 3）
     return { ok: true };
   }],
   [
