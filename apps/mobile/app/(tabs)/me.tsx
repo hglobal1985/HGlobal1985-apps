@@ -153,6 +153,7 @@ export default function MeScreen() {
             ) : null}
             {member.canViewStats ? <ListRow icon="stats-chart-outline" title="統計分析" subtitle="Mux 免費額度用量、觀看與播放品質統計" onPress={() => router.push("/admin/stats")} /> : null}
             {member.canViewStats ? <ListRow icon="analytics-outline" title="使用統計" subtitle="手機／電腦／平板、iOS／Android、時段與首頁卡片點閱，可交叉統計" onPress={() => router.push("/admin/usage")} /> : null}
+            {member.titles.includes("超級管理員") ? <ListRow icon="cloud-download-outline" title="備份還原" subtitle="每週備份的預覽與還原（還原正式資料須杜杜龍核准）" onPress={() => router.push("/admin/backups")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="swap-vertical-outline" title="課程排序與條件" subtitle="全部課程的排序優先順位、卡片緞帶文字與顏色" onPress={() => router.push("/admin/list-rules")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="pricetags-outline" title="關鍵字管理" subtitle="集中新增、改名、刪除課程的分類、系列、場地" onPress={() => router.push("/admin/keywords")} /> : null}
             {member.titles.includes("超級管理員") ? <ListRow icon="options-outline" title="APP 數值設定" subtitle="首頁推薦規則、輪播秒數與其他全站數值" onPress={() => router.push("/admin/app-settings")} /> : null}

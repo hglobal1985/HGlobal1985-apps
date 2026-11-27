@@ -44,6 +44,13 @@ export default function MePage() {
               </View>
               <T muted>›</T>
             </Card>
+            <Card onPress={() => router.push("/settings/backups")} style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ flex: 1 }}>
+                <T bold>備份還原</T>
+                <T tiny muted>每週備份的預覽與還原（還原正式資料須杜杜龍核准）</T>
+              </View>
+              <T muted>›</T>
+            </Card>
           </>
         ) : null}
         <Section title="通知" />
