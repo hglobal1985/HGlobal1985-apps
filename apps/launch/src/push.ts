@@ -7,6 +7,7 @@ import type { D1Database, Env } from "./d1.ts";
  * - 內容依 RFC 8291（aes128gcm）加密；只用 Web Crypto，不靠外部套件。
  */
 
+import { flushNoticePushes } from "../../../packages/server-shared/src/notice-push.ts";
 import { encryptPayload, sendPush as sendWith, vapidJwk as parseJwk, vapidPublicKey as publicOf, type PushMessage, type PushSub } from "../../../packages/server-shared/src/web-push.ts";
 export { encryptPayload, type PushMessage };
 type Sub = PushSub;
@@ -41,24 +42,18 @@ export async function flushPushes(env: Env, fetcher: typeof fetch = fetch): Prom
   if (!vapidJwk(env)) return 0;
   const db = env.DB;
   const since = new Date(Date.now() - 30 * 60_000).toISOString();
-  const { results } = await db
-    .prepare("SELECT id, recipient_sub, recipient_role, recipient_center_key, title, body, link FROM notifications WHERE pushed = 0 AND created_at >= ? ORDER BY created_at LIMIT 30")
-    .bind(since)
-    .all<Pending>();
-  let sent = 0;
-  for (const n of results) {
-    const claim = await db.prepare("UPDATE notifications SET pushed = 1 WHERE id = ? AND pushed = 0").bind(n.id).run();
-    if (claim.meta?.changes === 0) continue;
-    for (const d of await devicesOf(db, n)) {
-      const r = await sendPush(env, d, { title: n.title, body: n.body, link: n.link || "/notices" }, fetcher);
-      if (r === "ok") sent++;
-      else if (r === "gone") await db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(d.endpoint).run();
-      else await db.prepare("UPDATE push_subscriptions SET failures = failures + 1 WHERE endpoint = ?").bind(d.endpoint).run();
-    }
-  }
-  // 連續失敗太多次的裝置不再嘗試。
-  await db.prepare("DELETE FROM push_subscriptions WHERE failures >= 20").run();
-  return sent;
+  // 推播流程是共用模組（packages/server-shared/src/notice-push.ts，與繳作業系統同一份）；這裡只提供行動大學的資料表怎麼讀寫。
+  return flushNoticePushes<Pending>({
+    pending: async () =>
+      (await db.prepare("SELECT id, recipient_sub, recipient_role, recipient_center_key, title, body, link FROM notifications WHERE pushed = 0 AND created_at >= ? ORDER BY created_at LIMIT 30").bind(since).all<Pending>()).results,
+    claim: async (n) => ((await db.prepare("UPDATE notifications SET pushed = 1 WHERE id = ? AND pushed = 0").bind(n.id).run()).meta?.changes ?? 0) > 0,
+    devices: (n) => devicesOf(db, n),
+    send: (d, msg) => sendPush(env, d, msg, fetcher),
+    onGone: (d) => db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").bind(d.endpoint).run(),
+    onError: (d) => db.prepare("UPDATE push_subscriptions SET failures = failures + 1 WHERE endpoint = ?").bind(d.endpoint).run(),
+    // 連續失敗太多次的裝置不再嘗試。
+    cleanup: () => db.prepare("DELETE FROM push_subscriptions WHERE failures >= 20").run(),
+  });
 }
 
 /**

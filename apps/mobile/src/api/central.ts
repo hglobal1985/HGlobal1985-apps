@@ -1,8 +1,8 @@
 import * as Crypto from "expo-crypto";
 import { UPGRADING_MSG } from "../../../launch/src/contract";
-import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
+import { CentralError, createTokenVault, isOutdated as sharedIsOutdated } from "@/lib/central-client";
 import { memberOfToken, nativeSsoEnabled, readNativeSso, writeNativeSso } from "@/lib/sso-keychain";
 
 /**
@@ -67,15 +67,8 @@ let access: string | null = null;
 let expiry = 0;
 let inflight: Promise<boolean> | null = null;
 
-export class CentralError extends Error {
-  status: number;
-  code: string;
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
+// 中央錯誤：共用工具（lib/central-client.ts，與繳作業系統同一份）。
+export { CentralError };
 
 async function central<T>(path: string, method = "GET", body?: unknown, token?: string): Promise<T> {
   let res: Response;
@@ -118,18 +111,9 @@ if (web && typeof globalThis.sessionStorage !== "undefined") {
     /* 讀不到就算了，照常需要登入 */
   }
 }
-const storage = {
-  async get(key: string) {
-    return web ? (ls()?.getItem(key) ?? null) : SecureStore.getItemAsync(key);
-  },
-  async set(key: string, value: string | null) {
-    if (web) {
-      if (value) ls()?.setItem(key, value);
-      else ls()?.removeItem(key);
-    } else if (value) await SecureStore.setItemAsync(key, value);
-    else await SecureStore.deleteItemAsync(key);
-  },
-};
+// 登入憑證的保存與跨分頁換發鎖：共用工具 createTokenVault（與繳作業系統同一份；鍵名沿用原本的，不會讓人被登出）。
+const vault = createTokenVault("hglobal.learn.refresh");
+const storage = { get: vault.get, set: vault.set };
 /** 網頁版有沒有保存的中央登入（同步判斷，給開機流程用）。 */
 export function hasSavedWebLogin(): boolean {
   return web && !!ls()?.getItem(REFRESH_KEY);
@@ -144,21 +128,14 @@ if (web && typeof globalThis.addEventListener === "function") {
   });
 }
 /** 跨分頁加鎖：同一時間只有一個分頁在換發（瀏覽器不支援就只在這個分頁內排隊）。 */
-function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
-  const locks = (globalThis.navigator as unknown as { locks?: { request: (name: string, cb: () => Promise<unknown>) => Promise<unknown> } } | undefined)?.locks;
-  return web && locks ? (locks.request("hglobal.learn.refresh", fn) as Promise<T>) : fn();
-}
+const withRefreshLock = vault.withLock;
 
 export async function appStatus(): Promise<AppStatus> {
   return central<AppStatus>(`/v1/apps/${APP_ID}/config`);
 }
 
-export function isOutdated(version: string, min: string): boolean {
-  const parse = (x: string) => x.split(".").slice(0, 3).map((n) => Number.parseInt(n, 10) || 0);
-  const [a, b] = [parse(version), parse(min)];
-  for (let i = 0; i < 3; i++) if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
-  return false;
-}
+/** App 版本是否比最低版本舊：共用工具（lib/central-client.ts）。 */
+export const isOutdated = sharedIsOutdated;
 
 async function remember(pair: TokenPair) {
   // 先保存新的 refresh token，再允許後續請求。
