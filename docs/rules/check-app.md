@@ -9,3 +9,7 @@
 - **第二批共用（2026-11-27）**：繳作業系統的底部主選單改用共用 `BottomBar`（分頁在 `apps/check-app/src/lib/nav-tabs.tsx`：作業、批改〔只給老師、管理員、組長〕、通知、我的＋至尊／超派模式鍵）；作業照片點開用共用看圖程式 `EdmLightbox`；照片壓縮用共用 `cropCompress`、網頁版短影片在瀏覽器裡用共用的影片壓縮模組壓縮，畫質依「上傳設定」（與行動大學共用的 KV）；進度條用共用 `UploadProgress`。`api()` 的參數順序已改成與行動大學相同：`api("POST", "/路徑", 內容)`。`/api/me` 多回 `staff`、`toReview`（底部選單用）。
 - **手機推播與影片（2026-11-27）**：繳作業系統的站內通知（`notify()`）新增後在背景推到手機（`flushPushes`，排程每小時補推），訂閱存在 `push_subs`（migration 0002）；「我的」頁有「加入主畫面」卡片與「手機推播」開關（`features/push-card.tsx`，共用的 `lib/web-push.ts`）。推播金鑰在 Cloudflare Worker `check` 的 Secret `VAPID_PRIVATE_JWK`（沒設定時開關顯示「推播功能還在設定中」；換金鑰後學員要重新開一次推播）。學員的短影片點了在畫面內播放（共用 `VideoViewer`＋與行動大學同一條播放控制列 `ControlsBar`；App 版用 expo-video 在 App 內播放）。推播金鑰 `VAPID_PRIVATE_JWK` 已設定（2026-11-27）。中央 webhook 金鑰已設定（2026-11-27 收到中央測試通知）。
 - **行動大學原本的作業功能已徹底刪除（杜杜龍 2026-11-27）**：程式（`homework.ts`、`app/homework/*`、`features/homework/*`、學習中的「我的作業」卡、課程頁的作業入口、課程設定的「作業與批改」「學員分組」）與資料表（migration 0154 刪除 `hw_*`，刪除前確認正式資料全是空的）都已移除。作業一律在寰宇繳作業系統，行動大學不要再做作業功能。
+
+## 測試推播按鈕（杜杜龍 2026-11-27）
+- 「我的」頁推播開關開啟後，多一顆「送一則測試通知給自己」（`POST /push/test`，只推給自己帳號開過推播的裝置，回報送到幾支）。下面附手機端排查步驟（Chrome 通知、網站通知允許、勿擾模式）。
+- iPhone 共用登入用的 Apple 開發團隊代碼已填在 `apps/check-app/app.json` 的 `extra.appleTeamId`（4W7QRTXN5Y，不是秘密）。
