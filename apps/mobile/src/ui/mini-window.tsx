@@ -75,7 +75,7 @@ export function MiniWindow({ visible, opacity = 1, windowContent, circleContent,
   const win = useSyncExternalStore((f) => (regSubs.add(f), () => void regSubs.delete(f)), winner, () => null);
   const mine = win === myId;
   const [area, setArea] = useState({ w: 0, h: 0 });
-  const root = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any;
+  const root = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [origin, setOrigin] = useState({ x: 0, y: 0 });
   const [collapsedOwn, setCollapsedOwn] = useState(false);
   const collapsed = collapsedProp ?? collapsedOwn;

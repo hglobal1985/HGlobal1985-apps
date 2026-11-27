@@ -22,7 +22,7 @@ export const miniProgress = (y: number, range = MINI_PX) => Math.min(1, Math.max
 export function CollapseBand({ children, enabled = true, shrink = true, range = MINI_PX }: { children: ReactNode; /** false＝不縮（例如大螢幕左右分欄，封面在左欄、內容在右欄）。 */ enabled?: boolean; /** false＝封面自己負責縮矮（中心頁、系列頁的 hero 隨捲動縮放），這裡只量位置、縮小途中隱藏本體讓小視窗畫變形框。 */ shrink?: boolean; /** 往下滑多少像素算縮完（預設 MINI_PX；hero 的縮放範圍＝展開高度）。 */ range?: number }) {
   const y = useBandScroll();
   const [full, setFull] = useState(0); // 展開時的高度（只在沒縮時量）
-  const box = useRef<any>(null) // eslint-disable-line @typescript-eslint/no-explicit-any;
+  const box = useRef<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   useEffect(() => resetBandScroll(), []);
   useEffect(() => () => setBandRect(null), []);
   // 登記需要的額外捲動空間：封面縮完＝捲動區多出 full，可捲範圍會跟著少 full（內容短的頁面也要捲得到縮完；見 band-extra.ts）。
