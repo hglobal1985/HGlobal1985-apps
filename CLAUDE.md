@@ -73,7 +73,7 @@
 - **後端 API 已依功能拆檔（杜杜龍 2026-11-27）**：共用函式與型別在 `apps/launch/src/core/*.ts`（base 基礎、courses 課程、course-admin 課程管理與教材、orders 報名、series 系列與小編、media 封面相簿、library 書櫃、keywords 關鍵字審核群組留言板；`api-core.ts` 只是全部轉出的總入口）；各功能的網址在 `apps/launch/src/routes/*.ts`（system、my、courses、orders、centers、media、recipes、sync、admin-courses、admin）；`api.ts` 只組合總路由表與處理請求。新增網址加進對應的 routes 檔（同一檔內順序會影響比對）；共用函式放進對應的 core 檔並 export。不要再把功能程式寫回 api.ts 或 api-core.ts。
 - App：`apps/mobile`（Expo），型別檢查 `npm run typecheck -w @learn/mobile`。
 - **共用元件在 `packages/ui/src/`**（杜杜龍 2026-11-26：行動大學與寰宇繳作業系統共用同一套，改一次兩邊一起變；`@/` 先找 App 自己的 `src/` 再找這裡）。改共用元件時兩個 App 的型別檢查都要過。規則見 `docs/rules/shared-ui.md`。
-- **寰宇繳作業系統**：`apps/check-api`（Worker `check`）、`apps/check-app`（Expo）；規則見 `docs/rules/check-app.md`，部署前先問杜杜龍。
+- **寰宇繳作業系統**：`apps/check-api`（Worker `check`）、`apps/check-app`（Expo）；規則見 `docs/rules/check-app.md`；部署和行動大學一樣全自動（`npm run deploy -w @check/api`，不必先問；杜杜龍 2026-11-27 同意）。上架 App 商店才要先問杜杜龍。
 - 部署：見 `docs/v2-handoff.md`「部署指令」。杜杜龍在 Cloudflare 後台改變數後，記得確認程式沒有被退回舊版。
 - **部署前套件齊全檢查（杜杜龍 2026-11-21 回報「＋邀請」按鈕當機）**：原因是雲端環境沒裝到新加進 `package.json` 的 `qrcode-generator`，網頁打包照樣成功，但用到它的頁面在使用者手機上才丟出「找不到模組」而當機。`apps/launch/scripts/safe-deploy.mjs` 現在在打包前檢查 `package.json` 列的每個套件都真的裝在 `node_modules`，缺了就自動 `npm install`，還缺就停下來不部署。**新增任何套件時一定要同時跑 `npm install`；本機型別檢查若出現 `Cannot find module` 就是沒裝好，不可忽略。**邀請面板的網址也改成最多 3 行、任意位置折行。
 - **中央串接指令永遠讀最新版（杜杜龍 2026-11-22 永久指示）**：中央會員的串接指令最新版固定在 https://id.hglobal1985.com/handoff/learn（純文字、公開、沒有金鑰，雲端環境用 `curl` 就讀得到）。每次杜杜龍說「照串接指令做」或貼了舊版內容，**一律重新讀這個網址，不要憑記憶或舊的貼上內容做**；讀不到要告訴杜杜龍，不可猜。已經串接過的只補差異（先比對「六、已串接 App 的更新檢查清單」），做完把 `central.ts` 的 `INTEGRATED_VERSION` 改成新版本號。
