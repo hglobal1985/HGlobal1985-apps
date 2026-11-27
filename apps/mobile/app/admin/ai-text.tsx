@@ -24,7 +24,7 @@ export default function AiTextScreen() {
   const { c } = useTheme();
   const { member } = useSession();
   const isSuper = !!member?.titles.includes("超級管理員");
-  const { data, error, loading, reload } = useApi<View_>(isSuper ? "/admin/edm-fields" : null);
+  const { data, error, reload } = useApi<View_>(isSuper ? "/admin/edm-fields" : null);
   const [rows, setRows] = useState<Field[] | null>(null);
   const [busy, setBusy] = useState(false);
   // 辨識進度與「辨識優先順序與開關」（杜杜龍 2026-11-26：整頁只有一個儲存鈕，開關與順序也改成草稿，一起存）

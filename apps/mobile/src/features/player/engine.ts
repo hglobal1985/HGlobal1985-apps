@@ -65,7 +65,7 @@ function bind(p: VideoPlayer) {
 
 let switchTimer: ReturnType<typeof setTimeout> | null = null;
 /** request() 的序號：只有最新的請求有資格真正載入。 */
-let requestSeq = 0;
+let _requestSeq = 0; // 保留：切換影片時遞增的計數（目前沒有讀它）
 
 let keepMini = false; // 下一次換播放軌時，沿用「小圓圖」狀態
 const consumeKeepMini = () => {
@@ -121,7 +121,7 @@ export const engine = {
   async request(t: Track): Promise<boolean> {
     // 同一堂而且內容也沒變才算「已經是這一堂」；key 相同但內容不同（章節改過起訖秒數、換了影片來源）要重新載入。
     if (snap.track?.key === t.key && snap.track.fp === t.fp) return true;
-    ++requestSeq; // 切換影片不再詢問（杜杜龍 2026-11-25），直接換
+    ++_requestSeq; // 切換影片不再詢問（杜杜龍 2026-11-25），直接換
     engine.load(t);
     return true;
   },

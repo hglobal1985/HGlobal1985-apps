@@ -1,6 +1,5 @@
 import { View } from "react-native";
 import { useTheme } from "@/theme/theme";
-import { space } from "@/theme/tokens";
 import { AppText, Fold } from "@/ui";
 
 /**

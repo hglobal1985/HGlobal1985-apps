@@ -16,7 +16,7 @@ import { HeaderInvite } from "@/features/invite-button";
 import { HeaderAddToList } from "@/features/my-lists/add-to-list";
 import { useCenterNames } from "@/state/center-names";
 import { SeriesTile } from "./series-tile";
-import { CenterListCard, CenterMaterialsCard } from "./center-list";
+import { CenterMaterialsCard } from "./center-list";
 import { useSeriesSettings } from "./series-settings";
 import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
@@ -36,14 +36,11 @@ import { flashMode } from "./mode-flash";
 import { ZoneMoveSheet, zoneLabel } from "./zone-move-sheet";
 import { ViewToggle, type CourseViewMode } from "./view-toggle";
 import { ChapterList, type ChapterItem } from "./chapter-list";
-import { useSynonyms } from "./use-synonyms";
-import { buildSearchIndex, charsCourses, expandQuery, fuzzyCourses, fuzzyLessons, matchCourses, matchLessons, rankCourses, suggestTerms, type SearchLesson } from "./course-search";
-import { usePhonetic } from "./use-phonetic";
+import { suggestTerms, type SearchLesson } from "./course-search";
 import { recallQuery, useRememberedQuery } from "@/lib/search-memory";
 import { useSearchEngine } from "@/features/search/use-search-engine";
-import { useSearchSettings } from "./use-search-settings";
 import { SceneHits } from "./scene-hits";
-import { SemanticExtras, splitExtras } from "@/features/search/semantic-extras";
+import { SemanticExtras } from "@/features/search/semantic-extras";
 import { InlineSearch, SEARCH_ICON_W, SearchBox } from "./search-box";
 import { groupBySeries, orderGroups, sortCourses, type SeriesGroup } from "./sort";
 import { useApi, useSession } from "@/state/session";
@@ -232,7 +229,7 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     });
   }); // eslint-disable-line react-hooks/exhaustive-deps
   const [rowW, setRowW] = useState(0);
-  const [wantIndex, setWantIndex] = useState(false);
+  const [, setWantIndex] = useState(false);
   const chapterMode = mode === "chapter" && !q.trim(); // 有搜尋字時一律顯示引擎的教材卡結果（杜杜龍 2026-11-25）
   const searchData = useApi<{ lessons: SearchLesson[] }>(chapterMode ? "/search-index" : null);
   const { c } = useTheme();
@@ -279,7 +276,6 @@ export function CoursesView({ initialCategory = "", initialCenter = "", inStack 
     return [...catStats.keys()].sort((a, b) => Number(a === NONE) - Number(b === NONE) || weight.get(b)! - weight.get(a)! || a.localeCompare(b, "zh-Hant"));
   }, [catStats, courses]);
   // 中心清單：只以會員中心（中央）為準，每個中心都列出，沒有中心課程的顯示 0 堂（杜杜龍 2026-11-15）；不混入本地資料。
-  const rights = member?.courseRights;
   const centerList = useApi<string[]>("/centers"); // 沒登入的訪客也讀得到（最近一次成功的副本）
   const centers = centerList.data ?? [];
   const normCenter = (v: string) => v.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();

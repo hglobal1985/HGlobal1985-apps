@@ -8,7 +8,7 @@ import { centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
-import { AppText, CardThumb, EmptyState, ErrorView, LoadingView, Screen, SegmentTabs, ThumbBadgeView, ThumbFallback } from "@/ui";
+import { AppText, EmptyState, ErrorView, LoadingView, Screen, SegmentTabs, ThumbBadgeView, ThumbFallback } from "@/ui";
 
 const TABS: { key: ThumbBadgeKind; label: string }[] = [
   { key: "center", label: "中心卡" },

@@ -5,7 +5,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import { resolveUrl, type CourseSummary } from "@/api/client";
-import { eventDays, minutesText, sharerLine } from "@/features/format";
+import { eventDays, sharerLine } from "@/features/format";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, CardThumb, ThumbDuration, ThumbLock } from "@/ui";

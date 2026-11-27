@@ -8,7 +8,6 @@ import { fitFontSize } from "@/ui/course-cover";
 export type ListCoverMode = "item" | "text";
 
 /** 文字封面的純色底（沒有選底圖時用，網站深綠）。 */
-const SOLID = "#0C603C";
 
 /** 色票（起始色代號）對應的底：網頁版是 135 度漸層，App 版暫用起始色單色（杜杜龍 2026-11-22）。 */
 export function coverFill(hex: string | null | undefined): object {

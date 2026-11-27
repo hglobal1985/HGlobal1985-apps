@@ -27,7 +27,6 @@ function memR2(): R2Bucket {
   } as unknown as R2Bucket;
 }
 const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, ...Array.from({ length: 50 }, (_, i) => i)]);
-const mp4 = new Uint8Array([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, ...Array.from({ length: 40 }, (_, i) => i)]);
 
 
 test("區塊新增照片：只有開放的課程可以、照片屬於區塊、連結區塊（品牌卡）看到同一批", async () => {

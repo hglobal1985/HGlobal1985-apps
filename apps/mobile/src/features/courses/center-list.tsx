@@ -35,7 +35,6 @@ export function CenterListCard({ courses, trailing }: { title?: string; courses:
 }
 
 function CenterListRow({ course, trailing }: { course: CourseSummary; trailing?: ReactNode }) {
-  const { c } = useTheme();
   const thumb = useThumb();
   const img = course.coverUrl || course.edmUrl;
   const date = course.eventStart && !course.isList ? eventDays(course.eventStart, course.eventEnd) : undefined;

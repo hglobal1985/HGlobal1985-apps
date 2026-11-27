@@ -15,7 +15,7 @@ import { absoluteUrl, shareLink } from "@/lib/share";
 import { useApi } from "@/state/session";
 import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
-import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, SegmentTabs, ShareIcon, ThumbFallback } from "@/ui";
+import { AppText, Button, Card, ErrorView, Field, LoadingView, Screen, SegmentTabs, ShareIcon } from "@/ui";
 import { DIM_COLOR } from "@/ui/dim-backdrop";
 import { flashText } from "@/ui/flash-notice";
 

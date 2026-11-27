@@ -13,7 +13,6 @@ import { ChapterList, FullVersionList } from "@/features/courses/lesson-list";
 import { engine } from "@/features/player/engine";
 import { usePlayer } from "@/features/player/use-player";
 import { useLessonSession } from "@/features/player/use-lesson-session";
-import { lessonHref } from "@/lib/lesson-href";
 import { BlockEditList, BlockPhotosSheet, EdmManager, ThumbBadgeEditor, EditLessonRows, LessonSheet, MoveToBlockSheet, NewLessonSheet, NewMaterialSheet, PickMaterialsSheet, preloadCourseEditor, SectionList, SectionSheet, SectionTitleSheet, YoutubeLengthFix } from "@/features/admin-parts";
 import type { SectionKey } from "@/features/course-edit/course-sections";
 import { EditSheet } from "@/features/course-edit/edit-sheet";

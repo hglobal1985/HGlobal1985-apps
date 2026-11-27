@@ -5,7 +5,7 @@ import { api } from "@/api/client";
 import { flashText } from "@/ui/flash-notice";
 import { useTheme } from "@/theme/theme";
 import { space } from "@/theme/tokens";
-import { AppText, Card, Fold } from "@/ui";
+import { AppText, Fold } from "@/ui";
 
 type Pack = { total: number; done: number; failed: number; pending: number; groups: { label: string; total: number; done: number; failed: number }[] };
 export type JobRow = { key: "edm" | "photoOcr" | "scene"; label: string; on: boolean; prio: number };

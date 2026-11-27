@@ -12,7 +12,6 @@ import { RowAddToList } from "@/features/my-lists/add-to-list";
 import { lessonHref, lessonShareHref } from "@/lib/lesson-href";
 import { shareLink } from "@/lib/share";
 import { useTheme } from "@/theme/theme";
-import { space } from "@/theme/tokens";
 import { Card, ShareIcon } from "@/ui";
 import { NowPlayingIcon } from "@/ui/now-playing-icon";
 import { UI_SCALE } from "@/theme/ui-scale";

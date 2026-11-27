@@ -75,7 +75,6 @@ export function SeriesTile({ group, width, flat = false, typeTag = false }: { gr
   const { member } = useSession();
   const isAdmin = member?.role === "admin";
   const { config } = useUiConfig();
-  const thumb = useThumb();
   const [sheet, setSheet] = useState(false);
   const settings = useSeriesSettings();
   // 系列卡（杜杜龍 2026-11-19）：被系列頁隱藏的卡不算；系列裡只有一張卡時，第一層直接顯示那張卡的內容、點了直接進去。

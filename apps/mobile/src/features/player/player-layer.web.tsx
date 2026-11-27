@@ -1,9 +1,9 @@
 import { lessonHref } from "@/lib/lesson-href";
 import { MiniWindow } from "@/ui/mini-window";
-import { MINI_CIRCLE, MINI_RADIUS } from "@/ui/mini-spec";
+import { MINI_RADIUS } from "@/ui/mini-spec";
 import { router } from "expo-router";
 import { PlayerControls } from "./player-controls";
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { createPortal } from "react-dom";
 import { useSession } from "@/state/session";
 import { FRAME_KEYFRAMES, FRAME_PAD, frameBoxStyle } from "@/ui/gradient-frame.web";
@@ -12,7 +12,6 @@ import { setStayMini } from "./stay-mini";
 import { usePlayer } from "./use-player";
 import { PipHelp } from "./pip-help";
 
-const CIRCLE = MINI_CIRCLE;
 /** 頁面往下滑多少像素，影片就完全縮成迷你播放器。 */
 const SHRINK_PX = 140;
 
@@ -24,7 +23,6 @@ function bottomEdge() {
 // 迷你播放器的按鈕：實心黑底白字（杜杜龍 2026-11-17：取消半透明）。
 /** 長按快轉的最高倍數：YouTube 內嵌播放器最高 2 倍（不分會員、免費，Premium 不影響內嵌播放速度）。 */
 const MAX_RATE = 2;
-const btn: CSSProperties = { position: "absolute", border: 0, borderRadius: 999, background: "#000", color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", touchAction: "manipulation", font: "700 16px sans-serif", padding: 0 };
 
 /**
  * Web 全站播放畫面層（只有一份、永遠存在）：
@@ -142,7 +140,6 @@ export function PlayerLayer() {
   // 影片／YouTube：在課程頁內嵌，其餘時間是浮動小視窗；純音檔只有「縮小」時才有畫面（小圓圖）。
   const inline = !!t && !isAudio && inlineSlot;
   const floating = !!t && !inlineSlot && (!isAudio || s.collapsed);
-  const circle = (floating || (inline && shrunk)) && s.collapsed; // 課程頁往下滑縮成的迷你播放器也能最小化成小圓圖（杜杜龍 2026-11-24）
   const windowed = (floating && !s.collapsed) || (inline && shrunk && !s.collapsed);
 
   // 影片區的點擊擋板（只擋 YouTube 自己的按鈕與連結；播放暫停只用下方控制列）。已移除雙指放大與拖曳（杜杜龍 2026-11-24）。
