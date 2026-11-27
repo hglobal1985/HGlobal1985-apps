@@ -1,80 +1,36 @@
 import { trackFeature } from "@/lib/feature-track";
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, StyleSheet, View } from "react-native";
-import { useTheme } from "@/theme/theme";
-import { minTouch } from "@/theme/tokens";
 import { useStageMax } from "@/ui/stage-frame";
-import { AppText, LoadingLadybug } from "@/ui";
+import { ControlsBar } from "@/features/player/controls-bar";
 import { engine } from "./engine";
-import { rateText, remainingText, segmentOf } from "./engine.types";
-import { SeekBar } from "@/features/player/seek-bar";
+import { segmentOf } from "./engine.types";
 import { usePlayer } from "./use-player";
 
 /**
- * 課程頁的播放控制列：Mux 影片、YouTube、純音檔三種「共用同一個元件」，
- * 位置在影片的外面下方（不在影片裡面）。播放／暫停、可拖曳的時間軸、時間、（影片才有）全螢幕。
- * 以後要改時間軸的外觀或位置，只改這個檔案（與 seek-bar.tsx），三種模式會自動一起變。
+ * 課程頁的播放控制列：Mux 影片、YouTube、純音檔三種「共用同一個元件」，位置在影片的外面下方（不在影片裡面）。
+ * 外觀在共用元件 ControlsBar（packages/ui/src/features/player/controls-bar.tsx，與繳作業系統同一個）；這裡只接上行動大學的播放引擎。
+ * 以後要改時間軸的外觀或位置，只改 controls-bar.tsx 與 seek-bar.tsx，三種模式與繳作業系統會自動一起變。
  */
 export function PlayerControls({ overlay = false }: { /** 全螢幕疊在影片上：黑色半透明底、白色圖示（杜杜龍 2026-11-24）。 */ overlay?: boolean } = {}) {
-  const theme = useTheme();
-  const c = overlay ? { ...theme.c, text: "#fff", textMuted: "rgba(255,255,255,0.85)", accentText: "#fff", surface: "rgba(0,0,0,0.55)", border: "transparent" } : theme.c;
   const s = usePlayer();
   const maxWidth = useStageMax(); // 與上方舞台同寬（大螢幕兩欄時填滿左欄）
   const t = s.track;
   if (!t) return null;
   const { start, end } = segmentOf(t);
   const total = Math.max(0, (end ?? s.duration) - start);
-  const at = Math.min(total, Math.max(0, s.position - start));
-  const icon = s.playing ? "pause" : "play";
   return (
-    <View style={[styles.outer, { backgroundColor: c.surface, borderBottomColor: c.border }]}>
-      <View style={[styles.box, { maxWidth }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel={s.playing ? "暫停" : "播放"} onPress={() => engine.toggle()} style={styles.btn}>
-          {s.loading ? <LoadingLadybug size={32} /> : <Ionicons name={icon} size={22} color={c.text} />}
-        </Pressable>
-        <View style={styles.bar}>
-          <SeekBar dark={overlay} value={at} max={total || 1} onSeek={(v) => engine.seek(start + v)} />
-        </View>
-        {/* 倒數剩餘時間（-12:34）。寬度依「整堂長度」固定，播放中數字變動時時間軸不會跟著抖動。 */}
-        <AppText variant="caption" tone="muted" numberOfLines={1} style={[styles.time, { minWidth: total >= 3600 ? 58 : 44 }]}>
-          {remainingText(total - at)}
-        </AppText>
-        {/* 倍數播放：每按一次跳一檔（1 → 1.2 → 1.5 → 1.8 → 2 → 1）；正常速度顯示加速圖示，加速中改顯示目前倍數。 */}
-        <Pressable accessibilityRole="button" accessibilityLabel={`播放速度，目前 ${s.rate} 倍，點一下切換`} onPress={() => (trackFeature("player_speed"), engine.cycleRate())} style={styles.btnTight}>
-          {s.rate === 1 ? (
-            <Ionicons name="speedometer-outline" size={22} color={c.text} />
-          ) : (
-            <AppText variant="callout" style={{ color: c.accentText, fontWeight: "800" }} numberOfLines={1}>
-              {rateText(s.rate)}
-            </AppText>
-          )}
-        </Pressable>
-        {t.mode === "video" && engine.canPip() ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="浮動小視窗" onPress={() => engine.togglePip()} style={styles.btn}>
-            <Ionicons name="albums-outline" size={20} color={engine.isPip() ? c.accentText : c.text} />
-            <AppText variant="caption" tone="muted" style={styles.pipLabel} numberOfLines={1}>
-              小視窗
-            </AppText>
-          </Pressable>
-        ) : null}
-        {t.mode !== "audio" && engine.canFullscreen() ? (
-          <Pressable accessibilityRole="button" accessibilityLabel="全螢幕" onPress={() => engine.toggleFullscreen()} style={styles.btnTight}>
-            <Ionicons name="expand" size={20} color={c.text} />
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
+    <ControlsBar
+      overlay={overlay}
+      maxWidth={maxWidth}
+      playing={s.playing}
+      loading={s.loading}
+      position={s.position - start}
+      total={total}
+      rate={s.rate}
+      onToggle={() => engine.toggle()}
+      onSeek={(v) => engine.seek(start + v)}
+      onRate={() => (trackFeature("player_speed"), engine.cycleRate())}
+      pip={t.mode === "video" && engine.canPip() ? { active: engine.isPip(), onPress: () => engine.togglePip() } : undefined}
+      onFullscreen={t.mode !== "audio" && engine.canFullscreen() ? () => engine.toggleFullscreen() : undefined}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  outer: { borderBottomWidth: 1, alignItems: "center" },
-  // 時間軸是主角：外距與按鈕間距都壓到最小，讓時間軸盡可能拉長（按鈕寬 36、高 44，圖示之間幾乎貼在一起）。
-  box: { flexDirection: "row", alignItems: "center", paddingHorizontal: 2, minHeight: minTouch, width: "100%" },
-  btn: { width: 36, height: minTouch, alignItems: "center", justifyContent: "center" },
-  // 倍速與全螢幕兩顆貼得更近（寬度壓到 30、倍速文字不加寬），讓時間軸更長。
-  btnTight: { minWidth: 30, height: minTouch, alignItems: "center", justifyContent: "center" },
-  bar: { flex: 1, minWidth: 0 },
-  pipLabel: { fontSize: 10, lineHeight: 12 },
-  time: { textAlign: "right", fontVariant: ["tabular-nums"], paddingRight: 2 },
-});
