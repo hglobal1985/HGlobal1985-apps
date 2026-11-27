@@ -41,8 +41,9 @@ function Gate() {
   if (s.gate === "paused") return <Message title="系統維護中" note="請稍後再回來，造成不便請見諒。" />;
   if (s.gate === "killed") return <Message title="這個 App 已停止服務" note="如有問題請聯絡你的作業管理員。" />;
   if (s.gate === "update") return <Message title="請更新 App" note="目前的版本太舊了，請到 App Store 或 Google Play 更新後再使用。" />;
-  if (!s.ready || path.startsWith("/auth/")) return <View style={{ flex: 1, backgroundColor: c.bg, justifyContent: "center" }}><Loading /></View>;
-  if (!s.signedIn) return <Login deleted={s.deleted} />;
+  if (!s.ready) return <View style={{ flex: 1, backgroundColor: c.bg, justifyContent: "center" }}><Loading /></View>;
+  // 從中央登入回來（/auth/done）：交給 auth/done 頁導回原本要去的頁面（不用先登入）
+  if (!s.signedIn && !path.startsWith("/auth/")) return <Login deleted={s.deleted} />;
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
