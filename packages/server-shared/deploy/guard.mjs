@@ -14,6 +14,9 @@ export const die = (msg) => {
 /** 檢查可以部署；回傳這次要部署的提交編號。versionUrl＝線上版本網址（回傳 JSON 有 sha）。 */
 export async function deployGuard({ versionUrl, force = process.argv.includes("--force") }) {
   const ci = process.env.DEPLOY_CI === "1";
+  // 部署到哪個 Cloudflare 帳號由環境變數決定（杜杜龍 2026-11-27 方案 B：公開程式庫不放帳號編號）。沒設定就不部署，避免部署到別的帳號。
+  if (!/^[0-9a-f]{32}$/.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? ""))
+    die("沒有設定環境變數 CLOUDFLARE_ACCOUNT_ID（寰宇 Cloudflare 帳號編號）。請杜杜龍在這個雲端環境的設定加上它，再重新部署。");
   sh("git fetch origin main --quiet");
   const branch = sh("git rev-parse --abbrev-ref HEAD");
   const head = sh("git rev-parse HEAD");
