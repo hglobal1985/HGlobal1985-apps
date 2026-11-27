@@ -1,4 +1,5 @@
 import { revokeLegacyDriveLink } from "./material-files.ts";
+import { pruneAuditLog } from "./audit-retention.ts";
 import { ensureBrandCards } from "./brand-cards.ts";
 import { ensureTreasureLinks } from "./treasure-box.ts";
 import { migrateFilePhotos } from "./block-photos.ts";
@@ -59,6 +60,7 @@ export function createWorker(staticFiles: StaticFiles) {
         await backfillYoutube(env).catch((e) => console.error("youtube backfill", e instanceof Error ? e.message : "error"));
         await indexSearchVectors(env).catch((e) => console.error("search vectors", e instanceof Error ? e.message : "error"));
         await flushPushes(env).catch((e) => console.error("flush pushes", e instanceof Error ? e.message : "error"));
+        await pruneAuditLog(env.DB).catch((e) => console.error("audit prune", e instanceof Error ? e.message : "error")); // 稽核紀錄保存 3 個月；付費相關與留言永久保留（杜杜龍 2026-11-27）
       })();
       if (exec) exec.waitUntil(job);
       else await job;

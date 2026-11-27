@@ -293,7 +293,41 @@ export async function rankEligibility(sub: string, token: string, minRanks: stri
  * 權限與中心範圍全由中央判斷（超級管理員、秘書看全部；審核員只看自己的中心）；這裡不判斷、不保存、不寫日誌。
  * 任何失敗（沒有權限、中央尚未開放、逾時）都回 available=false，畫面就不顯示審核區。
  */
+/**
+ * 審核清單與職務清單的短暫快取（杜杜龍 2026-11-27）：以前每開一次通知頁、設定頁就問中央一次，中央的稽核紀錄一天記上千筆。
+ * 改成同一個人 60 秒內重複開只問一次（只放記憶體、不落地）；處理審核、指派職務後立刻清掉，畫面馬上看到最新結果。
+ */
+const LIST_TTL_MS = 60_000;
+const listCache = new Map<string, { until: number; value: unknown }>();
+const subOfToken = (token: string): string => {
+  try {
+    const p = token.split(".")[1] ?? "";
+    return String((JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/") + "=".repeat((4 - (p.length % 4)) % 4))) as { sub?: unknown }).sub ?? "");
+  } catch {
+    return "";
+  }
+};
+async function listCached<T extends { available: boolean }>(kind: string, token: string, load: () => Promise<T>): Promise<T> {
+  const sub = subOfToken(token);
+  const key = `${kind}:${sub}`;
+  const hit = sub ? listCache.get(key) : undefined;
+  if (hit && hit.until > Date.now()) return hit.value as T;
+  const value = await load();
+  if (sub && value.available) {
+    if (listCache.size > 2000) listCache.clear();
+    listCache.set(key, { until: Date.now() + LIST_TTL_MS, value });
+  }
+  return value;
+}
+const forgetLists = (token: string) => {
+  const sub = subOfToken(token);
+  for (const k of [...listCache.keys()]) if (k.endsWith(`:${sub}`)) listCache.delete(k);
+};
+
 export async function centralReviews(token: string): Promise<CentralReviews> {
+  return listCached("reviews", token, () => loadCentralReviews(token));
+}
+async function loadCentralReviews(token: string): Promise<CentralReviews> {
   const none: CentralReviews = { available: false, scope: null, reviews: [] };
   const res = await callCentral(token, "/v1/eligibility/reviews");
   if (!res?.ok) return none;
@@ -304,6 +338,7 @@ export async function centralReviews(token: string): Promise<CentralReviews> {
 
 /** 處理一筆申請；回傳中央的狀態碼（200 成功；403 不是你的中心；404 已被處理過）。 */
 export async function centralDecide(token: string, id: string, decision: "approve" | "reject", value?: unknown): Promise<{ status: number; body: Record<string, unknown> | null }> {
+  forgetLists(token);
   const res = await callCentral(token, `/v1/eligibility/reviews/${encodeURIComponent(id)}/decision`, { method: "POST", body: JSON.stringify(value === undefined ? { decision } : { decision, value }) });
   const body = res ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
   return { status: res?.status ?? 503, body };
@@ -340,6 +375,10 @@ const textOfStaff = (...vs: unknown[]): string => {
   return "";
 };
 export async function staffSearch(token: string, q?: string): Promise<StaffSearch> {
+  // 只快取「有職務的人」清單；搜尋字每次即時查（不保存搜尋字）
+  return q ? loadStaff(token, q) : listCached("staff", token, () => loadStaff(token));
+}
+async function loadStaff(token: string, q?: string): Promise<StaffSearch> {
   const none: StaffSearch = { available: false, assignable: [], members: [] };
   const res = await callCentral(token, q ? `/v1/eligibility/staff?q=${encodeURIComponent(q)}` : "/v1/eligibility/staff");
   if (!res || res.status !== 200) return none;
@@ -359,6 +398,7 @@ export async function staffSearch(token: string, q?: string): Promise<StaffSearc
 }
 /** 指派（事後完整清單）。回傳中央的狀態碼與最新的職務清單（成功才有；畫面用它更新）。 */
 export async function staffAssign(token: string, memberId: string, roles: string[]): Promise<{ status: number; roles: string[] | null }> {
+  forgetLists(token);
   const res = await callCentral(token, `/v1/eligibility/staff/${encodeURIComponent(memberId)}`, { method: "PUT", body: JSON.stringify({ roles }) });
   if (!res) return { status: 503, roles: null };
   const b = res.status === 200 ? ((await res.json().catch(() => null)) as Record<string, unknown> | null) : null;
