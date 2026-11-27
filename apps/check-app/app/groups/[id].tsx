@@ -69,8 +69,33 @@ export default function Groups() {
   return (
     <Screen
       title={teacher ? "分組與名單" : "本組"}
-      right={teacher ? <Btn small flex={false} label="＋新增組" onPress={async () => { try { await api("POST", `/activities/${id}/groups`, {}); flash("已新增一組"); await reload(); } catch (e) { flashError(e); } }} /> : undefined}
+      right={
+        teacher ? (
+          <Btn
+            small
+            flex={false}
+            label="＋新增組"
+            onPress={async () => {
+              try {
+                // 新增後直接請你取組名（杜杜龍 2026-11-27：先建好組別再請組長邀組員）
+                const r = await api<{ id: string }>("POST", `/activities/${id}/groups`, {});
+                await reload();
+                setRename({ id: r.id, name: "" });
+              } catch (e) {
+                flashError(e);
+              }
+            }}
+          />
+        ) : undefined
+      }
     >
+      {teacher ? (
+        <Note>
+          建立組別的步驟：①按右上角「＋新增組」並取組名 ②每一組按「邀請組長」，把連結傳給那一組的組長（7 天內有效、只能一人使用）③組長接受後，在這一頁按「分享連結」邀請組員；組員申請由組長或管理員核准。
+        </Note>
+      ) : leaderGroup ? (
+        <Note>你是組長：按「分享連結」邀請組員；組員申請加入後會出現在「等待核准」，點一下核准。</Note>
+      ) : null}
       {v.pending.length ? (
         <>
           <Section title={`等待核准（${v.pending.length}）`} />
@@ -83,9 +108,27 @@ export default function Groups() {
             title={`${g.name}・${g.members.length} 人`}
             right={teacher || g.id === leaderGroup ? <Btn small flex={false} kind="grey" label="改組名" onPress={() => setRename({ id: g.id, name: g.name })} /> : undefined}
           />
+          {teacher ? (
+            <Card style={{ flexDirection: "row", alignItems: "center" }}>
+              <T small muted style={{ flex: 1 }}>{g.members.some((m) => m.isLeader) ? "要換組長：產生新的組長邀請連結" : "還沒有組長：把組長邀請連結傳給組長"}</T>
+              <Btn
+                small
+                flex={false}
+                label={g.members.some((m) => m.isLeader) ? "換組長" : "邀請組長"}
+                onPress={async () => {
+                  try {
+                    const r = await api<{ code: string }>("POST", `/activities/${id}/invites`, { role: "leader", groupId: g.id });
+                    await shareLink(`/invite/${r.code}`, `邀請你擔任「${g.name}」的組長（7 天內有效）`);
+                  } catch (e) {
+                    flashError(e);
+                  }
+                }}
+              />
+            </Card>
+          ) : null}
           {g.joinCode ? (
             <Card style={{ flexDirection: "row", alignItems: "center" }}>
-              <T small muted style={{ flex: 1 }}>學員點這一組的連結登入，就會自動加入「{g.name}」</T>
+              <T small muted style={{ flex: 1 }}>組員點這一組的連結登入，就會申請加入「{g.name}」</T>
               <Btn small flex={false} label="分享連結" onPress={() => shareLink(`/join/${g.joinCode}`, `請點連結加入「${g.name}」`)} />
             </Card>
           ) : null}
@@ -172,7 +215,7 @@ function RenameSheet({ value, onClose, onDone }: { value: { id: string; name: st
         </>
       }
     >
-      <Field value={name} onChangeText={setName} placeholder={value?.name} autoFocus />
+      <Field value={name} onChangeText={setName} placeholder={value?.name || "例如：台北一組"} autoFocus />
     </Sheet>
   );
 }

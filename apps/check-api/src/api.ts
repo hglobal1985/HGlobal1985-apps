@@ -6,7 +6,8 @@
  * - 組長：看自己這組全部（含分數）、確認或退回組員作業、留言、編自己這組；不能評分、不能指定組長。
  * - 學員：交自己的作業；看同組已送出的作業（分數預設看不到）。
  */
-import { isSuperAdmin, ownProfile, verifyAccessToken, verifyWebhook, forgetMember, INTEGRATED_VERSION } from "./central.ts";
+import { isSuperAdmin, lookupContactEmails, ownProfile, verifyAccessToken, verifyWebhook, forgetMember, INTEGRATED_VERSION } from "./central.ts";
+import { zipNamer, zipStream, type ZipEntry } from "../../../packages/server-shared/src/zip-stream.ts";
 import {
   DEFAULT_KINDS,
   KINDS,
@@ -157,7 +158,7 @@ function settings(a: Row): ActivitySettings {
     lateAllowed: !!a.late_allowed,
     autoRemind: !!a.auto_remind,
     peersSeeScores: !!a.peers_see_scores,
-    retentionUntil: (a.retention_until as string) ?? null,
+    retentionUntil: retentionOf(a),
     filesPurgedAt: (a.files_purged_at as string) ?? null,
   };
 }
@@ -247,11 +248,50 @@ async function totalOf(db: D1Database, activityId: string, sub: string): Promise
   return Math.round(Number(r?.t ?? 0) * 10) / 10;
 }
 
-async function notify(db: D1Database, memberIds: string[], title: string, body: string, link: string): Promise<void> {
+async function notify(db: D1Database, memberIds: string[], title: string, body: string, link: string, opts: { email?: boolean } = {}): Promise<void> {
   const ids = [...new Set(memberIds)].filter(Boolean);
   if (!ids.length) return;
-  await db.batch(ids.map((m) => db.prepare("INSERT INTO notices (id, member_id, title, body, link) VALUES (?, ?, ?, ?, ?)").bind(rid(), m, title.slice(0, 80), body.slice(0, 300), link)));
+  await db.batch(ids.map((m) => db.prepare("INSERT INTO notices (id, member_id, title, body, link, email) VALUES (?, ?, ?, ?, ?, ?)").bind(rid(), m, title.slice(0, 80), body.slice(0, 300), link, opts.email ? 1 : 0)));
   pushSoon?.();
+}
+
+const SITE = "https://check.hglobal1985.com";
+const esc = (s: string) => s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+/**
+ * 寄出標記要寄 Email 的站內通知（目前只有作業檔案備份與刪除提醒；杜杜龍 2026-11-27）。
+ * 信箱寄信當下才向中央查（聯絡查詢，用完即丟）；沒有寄信綁定或中央服務金鑰就不寄，站內通知與推播照常。先標記再寄：寧可漏寄也不重複寄。
+ */
+export async function flushEmails(env: Env): Promise<number> {
+  if (!env.EMAIL || !env.EMAIL_FROM || !env.CENTRAL_SERVICE_SECRET) return 0;
+  const db = env.DB;
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString();
+  const rows = (await db.prepare("SELECT id, member_id, title, body, link FROM notices WHERE email = 1 AND emailed = 0 AND created_at >= ? ORDER BY created_at LIMIT 100").bind(since).all<Row>()).results;
+  if (!rows.length) return 0;
+  await db.batch(rows.map((n) => db.prepare("UPDATE notices SET emailed = 1 WHERE id = ?").bind(n.id)));
+  const to = await lookupContactEmails(env.CENTRAL_SERVICE_SECRET, rows.map((n) => String(n.member_id)), "course_notice");
+  let sent = 0;
+  for (const n of rows) {
+    const email = to.get(String(n.member_id));
+    if (!email) continue;
+    const link = `${SITE}${String(n.link).startsWith("/") ? n.link : `/${n.link}`}`;
+    const text = `${n.body}\n\n立即下載備份：${link}\n\n——\n寰宇繳作業系統`;
+    const html = `<div style="font-family:sans-serif;line-height:1.6"><h3>${esc(String(n.title))}</h3><p>${esc(String(n.body)).replace(/\n/g, "<br>")}</p><p><a href="${esc(link)}" style="display:inline-block;background:#14663F;color:#fff;padding:12px 20px;border-radius:10px;text-decoration:none;font-weight:bold">立即下載備份</a></p><hr><p style="color:#888;font-size:12px">寰宇繳作業系統</p></div>`;
+    try {
+      await env.EMAIL.send({ from: { email: env.EMAIL_FROM, name: "寰宇繳作業系統" }, to: email, subject: String(n.title), text, html });
+      sent++;
+    } catch (e) {
+      console.error("email send failed", e instanceof Error ? e.message : "error");
+    }
+  }
+  return sent;
+}
+
+/** 作業檔案的刪除日期：有設定就用設定的；沒設定就是「活動結束日後 2 個月」（杜杜龍 2026-11-27）；兩個都沒有就不自動刪除。 */
+export function retentionOf(a: Row): string | null {
+  if (a.retention_until) return String(a.retention_until);
+  const end = typeof a.ends_on === "string" ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(a.ends_on) : null;
+  if (!end) return null;
+  return new Date(Date.UTC(Number(end[1]), Number(end[2]) - 1 + 2, Number(end[3]))).toISOString().slice(0, 10);
 }
 /** 每個請求開始時設定：站內通知新增後，在背景把它推到手機（handleApi 設定；排程另外每小時補推一次）。 */
 let pushSoon: (() => void) | null = null;
@@ -586,7 +626,8 @@ async function people(c: Ctx, activityId: string): Promise<PeopleView> {
     canEditGroupId: a.teacher ? null : leaderGroup,
     groups: gv,
     unassigned: a.teacher || leaderGroup ? students.filter((m) => !m.group_id).map(person) : [],
-    pending: a.manager ? ms.filter((m) => m.status === "pending").map(person) : [],
+    // 組長也看得到「用本組連結申請加入」的人，可以自己核准（杜杜龍 2026-11-27）
+    pending: a.manager ? ms.filter((m) => m.status === "pending").map(person) : leaderGroup ? ms.filter((m) => m.status === "pending" && m.group_id === leaderGroup).map(person) : [],
     staff: a.teacher ? ms.filter((m) => m.role !== "student" && m.status === "active").map(person) : [],
   };
 }
@@ -602,11 +643,14 @@ async function personAction(c: Ctx, activityId: string, memberId: string, body: 
   const title = String(a.activity.title);
   switch (action) {
     case "approve":
-      needManager(a);
+      if (!(a.manager || (leaderGroup && target!.status === "pending" && target!.group_id === leaderGroup))) fail(403, "只有管理員或本組組長可以核准");
       await db.prepare("UPDATE members SET status = 'active' WHERE activity_id = ? AND member_id = ?").bind(activityId, memberId).run();
       await notify(db, [memberId], "已加入作業", `你已加入「${title}」，可以開始交作業了。`, `/activity/${activityId}`);
       return;
     case "reject":
+      if (!(a.manager || (leaderGroup && target!.status === "pending" && target!.group_id === leaderGroup))) fail(403, "只有管理員或本組組長可以拒絕");
+      await db.prepare("UPDATE members SET status = 'removed', group_id = NULL, is_leader = 0 WHERE activity_id = ? AND member_id = ?").bind(activityId, memberId).run();
+      return;
     case "remove":
       needManager(a);
       if (memberId === c.sub) fail(400, "不能移除自己");
@@ -986,7 +1030,7 @@ on("POST", "/join/:code", async (c, [code]) => {
       .bind(act!.id, c.sub, status, g ? g.id : null)
       .run();
     if (status === "pending") {
-      const managers = (await db.prepare("SELECT member_id FROM members WHERE activity_id = ? AND role = 'manager' AND status = 'active'").bind(act!.id).all<Row>()).results.map((r) => String(r.member_id));
+      const managers = (await db.prepare("SELECT member_id FROM members WHERE activity_id = ? AND status = 'active' AND (role = 'manager' OR (? IS NOT NULL AND group_id = ? AND is_leader = 1))").bind(act!.id, g ? g.id : null, g ? g.id : null).all<Row>()).results.map((r) => String(r.member_id));
       await notify(db, managers, "有人申請加入", `「${act!.title}」有新的加入申請，請到分組頁核准。`, `/groups/${act!.id}`);
     }
   } else if (g && existing.role === "student" && !existing.group_id) {
@@ -996,18 +1040,55 @@ on("POST", "/join/:code", async (c, [code]) => {
   return { activityId: act!.id, status: m?.status ?? status };
 });
 on("POST", "/activities/:id/invites", async (c, [id], req) => {
-  needManager(await access(c, id));
-  const role = str((await body(req)).role, 10) === "manager" ? "manager" : "teacher";
+  const a = await access(c, id);
+  const b = await body(req);
+  const want = str(b.role, 10);
+  if (want === "leader") {
+    // 組長邀請：老師以上可以發，7 天內有效、只能一人使用；接受後直接成為這一組的組長（不用再等核准）
+    needTeacher(a);
+    const groupId = str(b.groupId, 40);
+    const g = await c.env.DB.prepare("SELECT id FROM groups WHERE id = ? AND activity_id = ?").bind(groupId, id).first<Row>();
+    if (!g) fail(404, "找不到這一組");
+    const code = rid(16);
+    await c.env.DB.prepare("INSERT INTO invites (code, activity_id, role, expires_at, created_by, group_id) VALUES (?, ?, 'leader', ?, ?, ?)").bind(code, id, new Date(Date.now() + 7 * 86400_000).toISOString(), c.sub, groupId).run();
+    return { code, role: "leader" };
+  }
+  needManager(a);
+  const role = want === "manager" ? "manager" : "teacher";
   const code = rid(16);
   await c.env.DB.prepare("INSERT INTO invites (code, activity_id, role, expires_at, created_by) VALUES (?, ?, ?, ?, ?)").bind(code, id, role, new Date(Date.now() + 86400_000).toISOString(), c.sub).run();
   return { code, role };
 });
+on("GET", "/invite/:code", async (c, [code]) => {
+  const inv = await c.env.DB.prepare("SELECT i.role, i.used_by, i.expires_at, a.title, g.name AS group_name FROM invites i JOIN activities a ON a.id = i.activity_id LEFT JOIN groups g ON g.id = i.group_id WHERE i.code = ?").bind(code).first<Row>();
+  if (!inv) fail(404, "找不到這個邀請");
+  const valid = !inv!.used_by && Date.parse(String(inv!.expires_at)) >= Date.now();
+  return { role: String(inv!.role), title: String(inv!.title), groupName: (inv!.group_name as string) ?? null, valid, usedByMe: inv!.used_by === c.sub };
+});
 on("POST", "/invite/:code", async (c, [code]) => {
   const db = c.env.DB;
   const inv = await db.prepare("SELECT * FROM invites WHERE code = ?").bind(code).first<Row>();
-  if (!inv || inv.used_by || Date.parse(String(inv.expires_at)) < Date.now()) fail(410, "這個邀請已失效（24 小時內、只能一人使用）");
+  if (!inv || inv.used_by || Date.parse(String(inv.expires_at)) < Date.now()) fail(410, inv?.role === "leader" ? "這個組長邀請已失效（7 天內、只能一人使用），請向老師索取新的" : "這個邀請已失效（24 小時內、只能一人使用）");
   const ok = await db.prepare("UPDATE invites SET used_by = ? WHERE code = ? AND used_by IS NULL").bind(c.sub, code).run();
   if (!ok.meta?.changes) fail(410, "這個邀請已被使用");
+  if (inv!.role === "leader") {
+    const me = await db.prepare("SELECT role FROM members WHERE activity_id = ? AND member_id = ? AND status = 'active'").bind(inv!.activity_id, c.sub).first<Row>();
+    if (me && me.role !== "student") {
+      await db.prepare("UPDATE invites SET used_by = NULL WHERE code = ?").bind(code).run();
+      fail(400, "你在這份作業已經是老師或管理員，不能再當組長；請把連結交給要當組長的人");
+    }
+    const g = await db.prepare("SELECT id, name FROM groups WHERE id = ?").bind(inv!.group_id).first<Row>();
+    if (!g) fail(404, "這一組已被刪除，請向老師索取新的邀請");
+    const act = await db.prepare("SELECT title FROM activities WHERE id = ?").bind(inv!.activity_id).first<Row>();
+    await db.batch([
+      db.prepare("UPDATE members SET is_leader = 0 WHERE activity_id = ? AND group_id = ?").bind(inv!.activity_id, g!.id),
+      db
+        .prepare("INSERT INTO members (activity_id, member_id, role, status, group_id, is_leader) VALUES (?, ?, 'student', 'active', ?, 1) ON CONFLICT(activity_id, member_id) DO UPDATE SET role = 'student', status = 'active', group_id = excluded.group_id, is_leader = 1")
+        .bind(inv!.activity_id, c.sub, g!.id),
+    ]);
+    await notify(db, [c.sub], "你是組長了", `「${act?.title ?? ""}」${g!.name}：到「分組」頁按「分享連結」邀請組員，組員申請後也由你核准。`, `/groups/${inv!.activity_id}`);
+    return { activityId: inv!.activity_id, role: "leader" };
+  }
   await db
     .prepare("INSERT INTO members (activity_id, member_id, role, status) VALUES (?, ?, ?, 'active') ON CONFLICT(activity_id, member_id) DO UPDATE SET role = excluded.role, status = 'active', group_id = NULL, is_leader = 0")
     .bind(inv!.activity_id, c.sub, inv!.role)
@@ -1294,8 +1375,89 @@ on("GET", "/activities/:id/files", async (c, [id], req) => {
     }
     out.push({ id: r.id, kind: r.kind, name: r.name, size: r.size, url, body: r.kind === "text" ? r.body : undefined, member: nameOr(nm, String(r.member_id)), item: r.item_name, lesson: r.lesson_title });
   }
-  return { retentionUntil: a.activity.retention_until ?? null, purged: !!a.activity.files_purged_at, files: out };
+  return { retentionUntil: retentionOf(a.activity), purged: !!a.activity.files_purged_at, files: out };
 });
+// 一鍵下載備份（杜杜龍 2026-11-27）：整份作業打包成 ZIP 壓縮檔，每包最多 400MB（太大自動分包，每包各自下載）。
+// 學員下載自己的；老師以上可以下載全部（依「課程／作業項目／學員」分資料夾）。文字作業存成 .txt，連結收在「連結.txt」。
+const ZIP_PART_BYTES = 400 * 1024 * 1024;
+type BackupRow = { id: string; kind: string; name: string; size: number; r2_key: string | null; url: string | null; body: string | null; created_at: string; member_id: string; item_name: string; lesson_title: string; lesson_pos: number; item_pos: number };
+async function backupParts(db: D1Database, activityId: string, member: string | null): Promise<{ rows: BackupRow[]; parts: BackupRow[][]; extras: BackupRow[] }> {
+  const rows = (
+    await db
+      .prepare(
+        `SELECT f.id, f.kind, f.name, f.size, f.r2_key, f.url, f.body, f.created_at, s.member_id, i.name AS item_name, l.title AS lesson_title, l.position AS lesson_pos, i.position AS item_pos FROM files f JOIN submissions s ON s.id = f.submission_id JOIN items i ON i.id = s.item_id JOIN lessons l ON l.id = i.lesson_id WHERE s.activity_id = ? ${member ? "AND s.member_id = ?" : ""} ORDER BY l.position, i.position, s.member_id, f.position, f.id`,
+      )
+      .bind(...(member ? [activityId, member] : [activityId]))
+      .all<BackupRow>()
+  ).results;
+  const parts: BackupRow[][] = [];
+  let cur: BackupRow[] = [];
+  let bytes = 0;
+  for (const r of rows.filter((x) => x.r2_key)) {
+    if (cur.length && bytes + Number(r.size) > ZIP_PART_BYTES) {
+      parts.push(cur);
+      cur = [];
+      bytes = 0;
+    }
+    cur.push(r);
+    bytes += Number(r.size);
+  }
+  const extras = rows.filter((x) => !x.r2_key && (x.kind === "text" || x.kind === "link"));
+  if (cur.length || extras.length || !parts.length) parts.push(cur);
+  return { rows, parts, extras };
+}
+on("GET", "/activities/:id/backup", async (c, [id], req) => {
+  const a = await access(c, id);
+  needActive(a);
+  const all = new URL(req.url).searchParams.get("all") === "1" && a.teacher;
+  if (a.activity.files_purged_at) return { purged: true, retentionUntil: retentionOf(a.activity), parts: [] };
+  const { parts } = await backupParts(c.env.DB, id, all ? null : c.sub);
+  const out = [];
+  for (let i = 0; i < parts.length; i++) {
+    const t = rid(24);
+    await c.env.DB.prepare("INSERT INTO zip_tickets (id, activity_id, member_id, scope, part, expires_at) VALUES (?, ?, ?, ?, ?, ?)").bind(t, id, c.sub, all ? "all" : "mine", i, Date.now() + 3600_000).run();
+    out.push({ index: i + 1, files: parts[i]!.length, bytes: parts[i]!.reduce((n, r) => n + Number(r.size), 0), url: `/z/${t}` });
+  }
+  return { purged: false, retentionUntil: retentionOf(a.activity), parts: out };
+});
+/** 下載壓縮檔（/z/<憑證>；1 小時內有效，有權限的人才拿得到憑證）。 */
+export async function handleZip(req: Request, env: Env): Promise<Response> {
+  const id = new URL(req.url).pathname.split("/")[2] ?? "";
+  const plain = { "content-type": "text/plain; charset=utf-8" };
+  const t = await env.DB.prepare("SELECT * FROM zip_tickets WHERE id = ?").bind(id).first<Row>();
+  if (!t || Number(t.expires_at) < Date.now()) return new Response("下載連結已失效，請回到 App 重新按「一鍵下載備份」", { status: 410, headers: plain });
+  const act = await env.DB.prepare("SELECT * FROM activities WHERE id = ?").bind(t.activity_id).first<Row>();
+  if (!act || act.files_purged_at) return new Response("檔案已刪除", { status: 410, headers: plain });
+  const all = t.scope === "all";
+  const { parts, extras } = await backupParts(env.DB, String(t.activity_id), all ? null : String(t.member_id));
+  const part = Number(t.part);
+  const files = parts[part] ?? [];
+  const nm = all ? await names(env.DB, [...files, ...extras].map((r) => r.member_id)) : new Map<string, { name: string; avatarUrl: string | null }>();
+  const who = (r: BackupRow) => (all ? `${nameOr(nm, r.member_id)}_` : "");
+  const top = String(act.title);
+  const naming = zipNamer();
+  const entries: ZipEntry[] = files.map((r) => ({
+    name: naming(`${top}/${r.lesson_title}/${r.item_name}/${who(r)}${r.name || r.id}`),
+    date: new Date(r.created_at),
+    open: async () => (await env.FILES.get(String(r.r2_key)))?.body ?? null,
+  }));
+  if (part === 0) {
+    const enc = new TextEncoder();
+    for (const r of extras.filter((x) => x.kind === "text"))
+      entries.push({ name: naming(`${top}/${r.lesson_title}/${r.item_name}/${who(r)}${(r.name || "文字作業").replace(/\.txt$/i, "")}.txt`), date: new Date(r.created_at), open: async () => enc.encode(String(r.body ?? "")) });
+    const links = extras.filter((x) => x.kind === "link");
+    if (links.length) entries.push({ name: naming(`${top}/連結.txt`), open: async () => enc.encode(links.map((r) => `${r.lesson_title}／${r.item_name}${all ? `／${nameOr(nm, r.member_id)}` : ""}：${r.url ?? ""}`).join("\r\n")) });
+  }
+  const fileName = `${top}${all ? "_全部作業" : "_我的作業"}${parts.length > 1 ? `_第${part + 1}包` : ""}.zip`;
+  return new Response(zipStream(entries), {
+    headers: {
+      "content-type": "application/zip",
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+      "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    },
+  });
+}
 on("GET", "/activities/:id/storage", async (c, [id]) => {
   needTeacher(await access(c, id));
   const r = await c.env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(f.size), 0) AS bytes FROM files f JOIN submissions s ON s.id = f.submission_id WHERE s.activity_id = ? AND f.r2_key IS NOT NULL").bind(id).first<Row>();
@@ -1339,6 +1501,26 @@ on("GET", "/activities/:id/scores", async (c, [id]) => {
   return new Response("﻿" + lines.join("\r\n"), { headers: { "content-type": "text/csv; charset=utf-8", "content-disposition": `attachment; filename="scores.csv"`, "cache-control": "no-store" } });
 });
 
+// 前台錯誤回報（共用元件 lib/error-report.ts；與行動大學同一套做法）：只寫進 Cloudflare 的錯誤紀錄，不存資料庫、不含會員身分；同一來源每分鐘最多 10 則。
+const clientErrorHits = new Map<string, { at: number; n: number }>();
+async function clientError(req: Request): Promise<Response> {
+  const ip = req.headers.get("cf-connecting-ip") ?? "";
+  const t = Date.now();
+  const hit = clientErrorHits.get(ip);
+  if (hit && t - hit.at < 60_000 && hit.n >= 10) return json({ ok: true });
+  clientErrorHits.set(ip, hit && t - hit.at < 60_000 ? { at: hit.at, n: hit.n + 1 } : { at: t, n: 1 });
+  if (clientErrorHits.size > 500) clientErrorHits.delete(clientErrorHits.keys().next().value!);
+  let b: Record<string, unknown> = {};
+  try {
+    b = (await req.json()) as Record<string, unknown>;
+  } catch {
+    /* 格式不對就記空的 */
+  }
+  const s = (k: string, max: number) => (typeof b[k] === "string" ? (b[k] as string).slice(0, max) : "");
+  console.error("client error", JSON.stringify({ kind: s("kind", 20), message: s("message", 300), page: s("page", 200), platform: s("platform", 10), ua: s("ua", 200), extra: s("extra", 300), stack: s("stack", 1500) }));
+  return json({ ok: true });
+}
+
 // ───────────── 進入點 ─────────────
 export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>) => void = () => {}): Promise<Response> {
   const url = new URL(req.url);
@@ -1346,6 +1528,7 @@ export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>
   try {
     if (path === "/version") return json({ version: API_VERSION, integrated: INTEGRATED_VERSION });
     if (path === "/central/webhook" && req.method === "POST") return await webhook(req, env);
+    if (path === "/client-errors" && req.method === "POST") return await clientError(req);
     const auth = await authenticate(req, env);
     if (!auth) return json({ error: { code: "unauthenticated", message: "請先登入" } }, 401);
     const c: Ctx = { env, sub: auth.sub, token: auth.token, bg };
@@ -1354,6 +1537,7 @@ export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>
       if (queued) return;
       queued = true;
       bg(flushPushes(env));
+      bg(flushEmails(env).catch(() => 0));
     };
     for (const [method, re, h] of routes) {
       if (method !== req.method) continue;
@@ -1466,6 +1650,7 @@ export async function scheduled(env: Env): Promise<void> {
   const db = env.DB;
   pushSoon = null;
   await db.prepare("DELETE FROM tickets WHERE expires_at < ?").bind(Date.now()).run();
+  await db.prepare("DELETE FROM zip_tickets WHERE expires_at < ?").bind(Date.now()).run();
   const t = Date.now();
   const lessons = (
     await db
@@ -1484,22 +1669,34 @@ export async function scheduled(env: Env): Promise<void> {
   }
   // 檔案保存期限
   const today = new Date(t + 8 * 3600_000).toISOString().slice(0, 10);
-  const acts = (await db.prepare("SELECT * FROM activities WHERE retention_until IS NOT NULL AND files_purged_at IS NULL").all<Row>()).results;
+  // 備份提醒（杜杜龍 2026-11-27）：活動結束隔天通知一次「請下載備份」，刪除前 30／7／1 天再提醒；
+  // 站內通知＋手機推播＋Email，通知管理員、老師與全體組員，連結直接開「一鍵下載備份」頁（老師以上是全部檔案，其他人是自己的）。
+  const acts = (await db.prepare("SELECT * FROM activities WHERE files_purged_at IS NULL AND (retention_until IS NOT NULL OR ends_on IS NOT NULL)").all<Row>()).results;
   for (const a of acts) {
-    const until = String(a.retention_until);
+    const until = retentionOf(a);
+    if (!until) continue;
     if (until <= today) {
       await purgeFiles(env, String(a.id));
       continue;
     }
     const days = Math.round((Date.parse(until) - Date.parse(today)) / 86400_000);
-    if (![30, 7, 1].includes(days)) continue;
-    const key = `purge-d${days}`;
-    const ids = (await db.prepare("SELECT member_id FROM members WHERE activity_id = ? AND status = 'active'").bind(a.id).all<Row>()).results.map((r) => String(r.member_id));
+    const ended = typeof a.ends_on === "string" && a.ends_on < today;
+    const key = [30, 7, 1].includes(days) ? `purge-d${days}` : ended ? "ended" : "";
+    if (!key) continue;
+    const ms = (await db.prepare("SELECT member_id, role FROM members WHERE activity_id = ? AND status = 'active'").bind(a.id).all<Row>()).results;
     const sent = new Set((await db.prepare("SELECT member_id FROM reminders_sent WHERE lesson_id = ? AND kind = ?").bind(a.id, key).all<Row>()).results.map((r) => String(r.member_id)));
-    const todo = ids.filter((x) => !sent.has(x));
+    const todo = ms.filter((m) => !sent.has(String(m.member_id)));
     if (!todo.length) continue;
-    await notify(db, todo, `作業檔案 ${days} 天後刪除`, `「${a.title}」的作業檔案將在 ${until} 刪除（成績保留），需要的話請先下載備份。`, `/me`);
-    await db.batch(todo.map((m) => db.prepare("INSERT INTO reminders_sent (lesson_id, member_id, kind) VALUES (?, ?, ?) ON CONFLICT DO NOTHING").bind(a.id, m, key)));
+    const untilTw = until.replace(/-/g, "/");
+    const title = key === "ended" ? `「${a.title}」已結束，請下載作業備份` : `作業檔案 ${days} 天後刪除，請下載備份`;
+    const text = (staff: boolean) =>
+      `「${a.title}」的作業檔案（照片、影片、文件）將在 ${untilTw} 自動刪除，成績與評語會保留。請在那之前按「一鍵下載備份」存到手機或電腦${staff ? "（你會下載到全部學員的檔案）" : ""}。`;
+    const staffIds = todo.filter((m) => m.role !== "student").map((m) => String(m.member_id));
+    const studentIds = todo.filter((m) => m.role === "student").map((m) => String(m.member_id));
+    await notify(db, staffIds, title, text(true), `/files/${a.id}?all=1`, { email: true });
+    await notify(db, studentIds, title, text(false), `/files/${a.id}`, { email: true });
+    await db.batch(todo.map((m) => db.prepare("INSERT INTO reminders_sent (lesson_id, member_id, kind) VALUES (?, ?, ?) ON CONFLICT DO NOTHING").bind(a.id, m.member_id, key)));
   }
   await flushPushes(env).catch((e) => console.error("push flush", e instanceof Error ? e.message : "error"));
+  await flushEmails(env).catch((e) => console.error("email flush", e instanceof Error ? e.message : "error"));
 }

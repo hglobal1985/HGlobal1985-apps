@@ -1,9 +1,11 @@
 import { Platform } from "react-native";
+import { APP_ORIGIN, ERROR_REPORT_PATH } from "@/lib/app-assets";
 
 /**
  * 前台錯誤回報（杜杜龍 2026-11-21 同意）：使用者手機上畫面出錯時，自動把「錯誤訊息＋發生在哪一頁」送回伺服器，
  * 寫進 Cloudflare 的錯誤紀錄（不存資料庫、不含會員身分），每週的自動檢查會一起看。
  * 同一次開網站最多回報 5 則、同樣的錯誤只報一次；回報失敗就算了，不影響使用。
+ * 共用元件（行動大學與繳作業系統同一份）：送到哪裡由各 App 的 `@/lib/app-assets`（APP_ORIGIN、ERROR_REPORT_PATH）決定。
  */
 const sent = new Set<string>();
 let count = 0;
@@ -25,7 +27,7 @@ export function reportClientError(kind: string, error: unknown, extra = ""): voi
       platform: Platform.OS,
       ua: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : "",
     });
-    const url = `${Platform.OS === "web" ? "" : "https://learn.hglobal1985.com"}/api/v2/client-errors`;
+    const url = `${Platform.OS === "web" ? "" : APP_ORIGIN}${ERROR_REPORT_PATH}`;
     void fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body, keepalive: true }).catch(() => undefined);
   } catch {
     /* 回報本身出錯就放棄 */
@@ -40,7 +42,7 @@ export function reportClientError(kind: string, error: unknown, extra = ""): voi
 const CHUNK_FAIL = /Failed to (load|fetch)|Loading (module|chunk|CSS chunk)|ChunkLoadError|Importing a module script failed|error loading dynamically imported|_expo\/static\/js/i;
 function recoverFromStaleChunks(): void {
   try {
-    const key = "hglobal:learn:chunk-reload";
+    const key = `hglobal:${ERROR_REPORT_PATH}:chunk-reload`;
     const last = Number(sessionStorage.getItem(key) ?? 0);
     if (Date.now() - last < 120_000) return;
     sessionStorage.setItem(key, String(Date.now()));

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { deleteMemberData, handleApi, handleFile, scheduled } from "../src/api.ts";
+import { deleteMemberData, handleApi, handleFile, handleZip, retentionOf, scheduled } from "../src/api.ts";
 import type { ActivityCard, ActivityView, ItemView, PeopleView, QueueEntry } from "../src/contract.ts";
 import type { Env } from "../src/env.ts";
 import { createTestDb, memR2 } from "./sqlite-d1.ts";
@@ -230,4 +230,74 @@ test("手機推播：訂閱、站內通知新增後推到裝置、裝置失效�
   const gone = (async () => new Response(null, { status: 410 })) as typeof fetch;
   await flushPushes(env, gone);
   assert.equal((await env.DB.prepare("SELECT COUNT(*) AS n FROM push_subs").first<{ n: number }>())!.n, 0, "失效的裝置刪除");
+});
+
+test("組長邀請、組長核准組員、活動結束備份提醒（含 Email）、一鍵下載備份壓縮檔", async () => {
+  const { env, bucket, call } = setup();
+  const sent: { to: string; subject: string }[] = [];
+  env.EMAIL = { send: async (m) => void sent.push({ to: m.to, subject: m.subject }) };
+  env.EMAIL_FROM = "noreply@learn.hglobal1985.com";
+  env.CENTRAL_SERVICE_SECRET = "svc";
+  const { setCentralFetch } = await import("../src/central.ts");
+  setCentralFetch(async (url, init) => {
+    if (url.endsWith("/v1/service/token")) return Response.json({ access_token: "t", expires_in: 600 });
+    if (url.endsWith("/contacts/lookup")) {
+      const ids = (JSON.parse(String(init?.body)) as { member_ids: string[] }).member_ids;
+      return Response.json({ contacts: ids.map((m) => ({ member_id: m, email: `${m}@example.com` })) });
+    }
+    return new Response("{}", { status: 404 });
+  });
+  const { id } = (await call<{ id: string }>("admin1", "POST", "/activities", { body: { title: "美力之星", endsOn: "2020-01-01" } })).data;
+  await call("admin1", "PATCH", `/activities/${id}`, { body: { status: "open", endsOn: "2099-01-01" } });
+  assert.equal(retentionOf({ ends_on: "2026-12-31" }), "2027-03-03", "沒設定刪除日：結束日後 2 個月");
+  assert.equal(retentionOf({ ends_on: "2026-12-31", retention_until: "2027-01-10" }), "2027-01-10");
+  const g = (await call<{ id: string }>("admin1", "POST", `/activities/${id}/groups`, { body: { name: "台北一組" } })).data.id;
+  // 組長邀請：只能老師以上發；接受後直接是組長
+  assert.equal((await call("amy", "POST", `/activities/${id}/invites`, { body: { role: "leader", groupId: g } })).status, 403);
+  const inv = (await call<{ code: string }>("admin1", "POST", `/activities/${id}/invites`, { body: { role: "leader", groupId: g } })).data.code;
+  assert.equal((await call<{ role: string; groupName: string; valid: boolean }>("amy", "GET", `/invite/${inv}`)).data.groupName, "台北一組");
+  assert.equal((await call<{ role: string }>("amy", "POST", `/invite/${inv}`)).data.role, "leader");
+  assert.equal((await call("bob", "POST", `/invite/${inv}`)).status, 410, "只能一人使用");
+  const view = (await call<PeopleView>("amy", "GET", `/activities/${id}/people`)).data;
+  assert.ok(view.groups[0]!.members.some((m) => m.memberId === "amy" && m.isLeader));
+  const groupCode = view.groups[0]!.joinCode!;
+  // 組員用本組連結申請 → 組長收到通知、自己核准
+  assert.equal((await call<{ status: string }>("bob", "POST", `/join/${groupCode}`)).data.status, "pending");
+  assert.ok((await call<{ title: string }[]>("amy", "GET", "/notices")).data.some((n) => n.title === "有人申請加入"));
+  assert.equal((await call<PeopleView>("amy", "GET", `/activities/${id}/people`)).data.pending.length, 1);
+  assert.equal((await call("amy", "POST", `/activities/${id}/people/bob`, { body: { action: "approve" } })).status, 200);
+  assert.equal((await call("cat", "POST", `/activities/${id}/people/bob`, { body: { action: "approve" } })).status, 403);
+
+  // 繳交一些作業
+  const l = (await call<{ id: string }>("admin1", "POST", `/activities/${id}/lessons`, { body: { title: "第一堂" } })).data.id;
+  const it = (await call<{ id: string }>("admin1", "POST", `/lessons/${l}/items`, { body: { name: "照片", kinds: ["photo", "text"] } })).data.id;
+  for (const n of ["a.jpg", "a.jpg"]) assert.equal((await call("bob", "POST", `/items/${it}/files?kind=photo&name=${n}`, { bytes: jpeg })).status, 200);
+  assert.equal(bucket.keys().length, 2);
+
+  // 一鍵下載備份：自己的、全部的（學員不能下載全部）
+  const mine = (await call<{ parts: { url: string; files: number }[] }>("bob", "GET", `/activities/${id}/backup`)).data;
+  assert.equal(mine.parts.length, 1);
+  assert.equal(mine.parts[0]!.files, 2);
+  const zip = await handleZip(new Request(`https://check.test${mine.parts[0]!.url}`), env);
+  assert.equal(zip.headers.get("content-type"), "application/zip");
+  const bytes = new Uint8Array(await zip.arrayBuffer());
+  assert.equal(new DataView(bytes.buffer).getUint32(0, true), 0x04034b50, "是 ZIP 檔");
+  assert.ok(new TextDecoder().decode(bytes).includes("美力之星/第一堂/照片/a (2).jpg"), "重複檔名自動加 (2)");
+  const allByStudent = (await call<{ parts: { url: string }[] }>("bob", "GET", `/activities/${id}/backup?all=1`)).data;
+  const z2 = new TextDecoder().decode(new Uint8Array(await (await handleZip(new Request(`https://check.test${allByStudent.parts[0]!.url}`), env)).arrayBuffer()));
+  assert.ok(z2.includes("_我的作業") || !z2.includes("學員_"), "學員只拿得到自己的");
+  assert.equal((await handleZip(new Request("https://check.test/z/nope"), env)).status, 410);
+
+  // 活動結束隔天：站內通知＋Email 通知全體（管理員連到全部、學員連到自己的）；不重複
+  await call("admin1", "PATCH", `/activities/${id}`, { body: { endsOn: "2020-01-01" } });
+  await call("admin1", "PATCH", `/activities/${id}`, { body: { retentionUntil: "2099-12-31" } });
+  await scheduled(env);
+  const nb = (await call<{ title: string; link: string }[]>("bob", "GET", "/notices")).data.find((n) => n.title.includes("請下載作業備份"));
+  assert.ok(nb && nb.link === `/files/${id}`);
+  const na = (await call<{ title: string; link: string }[]>("admin1", "GET", "/notices")).data.find((n) => n.title.includes("請下載作業備份"));
+  assert.ok(na && na.link === `/files/${id}?all=1`);
+  assert.ok(sent.some((m) => m.to === "bob@example.com") && sent.some((m) => m.to === "amy@example.com"), "Email 也寄了");
+  const count = sent.length;
+  await scheduled(env);
+  assert.equal(sent.length, count, "不重複寄");
 });
