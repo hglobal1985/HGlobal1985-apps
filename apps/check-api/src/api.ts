@@ -20,6 +20,7 @@ import type { Env } from "./env.ts";
 import { API_VERSION, type Ctx, HttpError, type Row, authenticate, deleteR2, flushEmails, flushPushes, json, notify, refreshPerson, retentionOf, routes, setPushSoon } from "./core.ts";
 import { notSubmitted, purgeFiles, twTime } from "./routes/files.ts";
 import { clientError } from "./routes/system.ts";
+import { runCheckBackup } from "./weekly-backup.ts";
 
 // ───────────── 進入點 ─────────────
 export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>) => void = () => {}): Promise<Response> {
@@ -149,6 +150,7 @@ export async function deleteMemberData(env: Env, member: string): Promise<void> 
 export async function scheduled(env: Env): Promise<void> {
   const db = env.DB;
   setPushSoon(null);
+  await runCheckBackup(env, new Date()).catch((e) => console.error("weekly backup", e instanceof Error ? e.message : "error")); // 每週備份永久資料到 R2（生態系統功能 4，杜杜龍 2026-11-27；中央設定的星期、台北 03:00）
   await db.prepare("DELETE FROM tickets WHERE expires_at < ?").bind(Date.now()).run();
   await db.prepare("DELETE FROM zip_tickets WHERE expires_at < ?").bind(Date.now()).run();
   // 站內通知保存期限（杜杜龍 2026-11-27，與行動大學一致）：已讀的保存半年、沒讀過的保存一年。
