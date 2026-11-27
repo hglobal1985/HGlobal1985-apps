@@ -46,16 +46,8 @@ jobs:
       - name: Open an Issue when something changed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          problems=$(node -e "console.log(JSON.parse(require('fs').readFileSync('.shots-out/report.json','utf8')).problems)")
-          if [ "$problems" != "0" ]; then
-            body=$(node -e "const r=JSON.parse(require('fs').readFileSync('.shots-out/report.json','utf8'));console.log(r.results.filter(x=>x.status==='changed'||x.status==='failed').map(x=>'- '+x.name+'（'+x.url+'）：'+(x.status==='failed'?'截圖失敗 '+(x.error||''):'畫面與上次相差 '+x.diff_percent+'%')).join('\n'))")
-            gh label create screenshot-diff --color FBCA04 --description "截圖測試發現差異" 2>/dev/null || true
-            gh issue create --title "截圖測試：主要畫面有變化（$(date -u +%Y-%m-%d)）" --label screenshot-diff \
-              --body "$body
-
-這是自動截圖測試（手機 390px）。差異若是預期的改版就不用處理；看起來不對請告訴 AI「繼續處理截圖測試的 Issue」。截圖與差異圖在這次執行的 Artifacts：${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          fi
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: node scripts/screenshot-issue.mjs .shots-out/report.json .shots-out/issue.md
       - name: Keep screenshots as the new baseline
         run: rm -rf .shots-prev && mkdir .shots-prev && cp .shots-out/*.png .shots-prev/ 2>/dev/null && rm -f .shots-prev/*.diff.png || true
       - uses: actions/cache/save@v4
