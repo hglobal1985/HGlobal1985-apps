@@ -24,6 +24,11 @@
 4. **合併前先把 `main` 併進自己的分支**（衝突自己解，不可丟棄別人的程式）；改到共用檔案（`api.ts`、`contract.ts`、`CLAUDE.md`、`courses-view.tsx`…）時，只增加自己的段落，不要整檔重寫或重新排版。
 5. **資料庫 migration 編號要避開別人的**：新增 migration 前看 `apps/launch/migrations` 最新編號，合併時若撞號就改成下一個（部署腳本會依序套用）。
 6. **做完要在 CLAUDE.md 加上自己這項功能的規則段落**（接手的 AI 靠它知道現況），並在回報中說明部署的版本（`/api/v2/version`）。
+7. **開工第一步先開「草稿 PR」**（杜杜龍 2026-11-27）：從最新 main 開分支後，先推一個提交、開草稿 PR，標題寫要做什麼。GitHub 的 PR 清單＝所有對話、所有 Claude 帳號共用的工作看板；新對話開工前先看還開著的 PR，**有人正在改同一批檔案就不要同時改**（先問杜杜龍，或等它合併）。一個 PR 只做一件事，做完當天合併，不要留著半成品分支。
+8. **開工簡報**：每個新對話一開始，`.claude/hooks/session-start.sh` 會自動列出各 App 線上版本、main 最近合併的工作、最近 3 天別的對話還沒合併的分支與它們改的檔案（【開工簡報】）。看到線上版本「不在 main 的歷史裡」要先查清楚，不可直接部署。
+9. **部署（杜杜龍 2026-11-27 起）**：每款 App 都用同一套安全檢查（`packages/server-shared/deploy/guard.mjs`）：行動大學 `npm run deploy -w @learn/launch`、繳作業系統 `npm run deploy -w @check/api`；新 App 也要照做（版本網址回報 `sha`）。**GitHub 自動部署**（`.github/workflows/deploy-*.yml`：合併進 main 就自動部署、排隊不互蓋）啟用後，AI 不再手動部署，合併後到 GitHub Actions 看部署結果再回報。啟用狀態寫在 `docs/rules/performance-ops.md`「GitHub 自動部署」。
+10. **Cloudflare 帳號固定寫在設定檔**：每個 Worker 的 `wrangler.jsonc` 有 `account_id`（寰宇生態系＝`650a3b03d439a5f517b4f8a28244f9fe`）。換任何 Claude 帳號或電腦都只會部署到這個帳號；憑證沒有權限就直接失敗，不可改 `account_id` 來「讓它過」。其他生態系（例如 starry.phd）的 App 在自己的設定檔寫自己的帳號編號。
+11. **分支清理**：合併後分支要刪（GitHub 設定「自動刪除已合併分支」）；另有每週一自動清理（`.github/workflows/cleanup-branches.yml`，只刪內容已在 main、3 天沒動、沒開 PR 的分支）。
 
 ## 杜杜龍已決定
 - **全自動合併與部署，不要詢問、不要等杜杜龍（杜杜龍 2026-11-20 永久指示）**：功能做完、測試與檢查通過後，AI 自己開 PR → 合併進 `main` → 用 `npm run deploy -w @learn/launch` 部署（流程與安全檢查不變，不可 `--force`），再回報部署的版本；**不必先問「要不要合併／部署」**。（在 Claude Code 雲端環境部署時設 `CLOUDFLARE_API_TOKEN=dummy`，真正的憑證由系統代換。）

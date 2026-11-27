@@ -34,4 +34,6 @@ export type Env = {
   /** Cloudflare Email Service 的寄信綁定（send_email）。沒綁定就不寄 Email。 */
   EMAIL?: { send(msg: { from: { email: string; name: string }; to: string; subject: string; text: string; html: string }): Promise<unknown> };
   EMAIL_FROM?: string;
+  /** 部署時寫入的 git 提交編號（safe-deploy：GET /api/version 的 sha；部署安全檢查用來確認不會蓋掉別人的成果）。 */
+  GIT_SHA?: string;
 };
