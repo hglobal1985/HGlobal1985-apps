@@ -21,8 +21,10 @@ type Session = {
   refreshMember: (maxAgeMs?: number) => Promise<void>;
   invalidate: () => void;
   version: number;
+  /** 從中央登入回來後要去的頁面（/auth/done 處理完導回這裡）。 */
+  returnTo: string | null;
 };
-const Ctx = createContext<Session>({ ready: false, signedIn: false, me: null, gate: "ok", reloadMe: async () => {}, deleted: false, member: null, refreshMember: async () => {}, invalidate: () => {}, version: 0 });
+const Ctx = createContext<Session>({ ready: false, signedIn: false, me: null, gate: "ok", reloadMe: async () => {}, deleted: false, member: null, refreshMember: async () => {}, invalidate: () => {}, version: 0, returnTo: null });
 export const useSession = () => useContext(Ctx);
 
 function gateOf(s: AppStatus | null): Gate {
@@ -40,6 +42,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [gate, setGate] = useState<Gate>("ok");
   const [deleted, setDeleted] = useState(false);
   const [version, setVersion] = useState(0);
+  const [returnTo, setReturnTo] = useState<string | null>(null);
   const invalidate = useCallback(() => setVersion((v) => v + 1), []);
 
   const reloadMe = useCallback(async () => {
@@ -74,7 +77,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       if (!alive) return;
       if (await ssoCheck()) return; // 網頁版導向中央詢問共用登入
       setSignedIn(ok || !!currentMember());
-      if (back && Platform.OS === "web" && back !== location.pathname) history.replaceState(null, "", back);
+      if (back) setReturnTo(back);
       setReady(true);
     })();
     const off = onAuthChange(() => {
@@ -98,7 +101,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     else setMe(null);
   }, [signedIn, reloadMe]);
 
-  return <Ctx.Provider value={{ ready, signedIn, me, gate, reloadMe, deleted, member: me, refreshMember: reloadMe, invalidate, version }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ ready, signedIn, me, gate, reloadMe, deleted, member: me, refreshMember: reloadMe, invalidate, version, returnTo }}>{children}</Ctx.Provider>;
 }
 
 /** 讀資料：進入畫面時讀取，回到畫面時自動重讀。 */
