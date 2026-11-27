@@ -27,7 +27,7 @@
 7. **開工第一步先開「草稿 PR」**（杜杜龍 2026-11-27）：從最新 main 開分支後，先推一個提交、開草稿 PR，標題寫要做什麼。GitHub 的 PR 清單＝所有對話、所有 Claude 帳號共用的工作看板；新對話開工前先看還開著的 PR，**有人正在改同一批檔案就不要同時改**（先問杜杜龍，或等它合併）。一個 PR 只做一件事，做完當天合併，不要留著半成品分支。
 8. **開工簡報**：每個新對話一開始，`.claude/hooks/session-start.sh` 會自動列出各 App 線上版本、main 最近合併的工作、最近 3 天別的對話還沒合併的分支與它們改的檔案（【開工簡報】）。看到線上版本「不在 main 的歷史裡」要先查清楚，不可直接部署。
 9. **部署（杜杜龍 2026-11-27 起）**：維持由 AI 自己部署（杜杜龍不採用 GitHub 自動部署：每次等 3～5 分鐘太久）。每款 App 都用同一套安全檢查（`packages/server-shared/deploy/guard.mjs`）：行動大學 `npm run deploy -w @learn/launch`、繳作業系統 `npm run deploy -w @check/api`；新 App 也要照做（版本網址回報 `sha`）。合併 PR 不必等 GitHub 自動檢查跑完：自己先在本機跑型別檢查與測試，過了就合併、部署。**杜杜龍的做法：同一時間只用一個 AI 開發、合併、部署**；萬一同時有兩個，部署安全檢查也會擋下會蓋掉別人成果的部署。
-10. **Cloudflare 帳號固定由部署環境提供（杜杜龍 2026-11-27 選方案 B：公開程式庫不放帳號編號）**：`wrangler.jsonc` 不寫 `account_id`；部署安全檢查（`guard.mjs`）要求環境變數 `CLOUDFLARE_ACCOUNT_ID`，沒有就停下不部署（雲端環境已設定；換新環境或新 Claude 帳號時，請杜杜龍在環境設定加上這個變數，值是寰宇 Cloudflare 帳號編號）。Worker 執行時要用的帳號編號（統計分析 `cf-stats.ts`）改成 Cloudflare Secret `CF_ACCOUNT_ID`。憑證沒有這個帳號的權限就直接失敗，不可改帳號來「讓它過」。其他生態系（例如 starry.phd）的 App 用自己的帳號編號。公開程式庫也不放杜杜龍的信箱。
+10. **Cloudflare 帳號固定由部署環境提供（杜杜龍 2026-11-27 選方案 B：公開程式庫不放帳號編號）**：`wrangler.jsonc` 不寫 `account_id`；部署安全檢查（`guard.mjs`）要求環境變數 `CLOUDFLARE_ACCOUNT_ID`，沒有就停下不部署（雲端環境已設定；換新環境或新 Claude 帳號時，請杜杜龍在環境設定加上這個變數，值是寰宇 Cloudflare 帳號編號）。Worker 執行時要用的帳號編號（統計分析 `cf-stats.ts` 的 `CF_ACCOUNT_ID`）只存在 Cloudflare 後台的 Worker 變數（`keep_vars: true` 會保留它，程式庫裡不寫）。憑證沒有這個帳號的權限就直接失敗，不可改帳號來「讓它過」。其他生態系（例如 starry.phd）的 App 用自己的帳號編號。公開程式庫也不放杜杜龍的信箱。
 11. **分支清理**：合併後分支要刪（GitHub 設定「自動刪除已合併分支」）；另有每週一自動清理（`.github/workflows/cleanup-branches.yml`，只刪內容已在 main、3 天沒動、沒開 PR 的分支）。
 
 ## 杜杜龍已決定

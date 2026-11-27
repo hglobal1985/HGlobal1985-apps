@@ -1,7 +1,8 @@
 /**
  * 中央會員登入（串接指令 三、2）：登入中繼（Google）、Token 保存與換發、共用登入、登出所有 App、刪除帳號。
  * - 手機：Access／Refresh Token 都放系統安全儲存（expo-secure-store）。
- * - 網頁：Access Token 只放記憶體、Refresh Token 放 sessionStorage（不放 localStorage）。
+ * - 網頁：登入永不過期（中央串接指令 2026-11-27.1，杜杜龍決定）：Refresh Token 與 Access Token 放 localStorage（關分頁、關瀏覽器都還是登入）；
+ *   同一個瀏覽器的分頁共用一份，換發時跨分頁加鎖（navigator.locks），避免兩個分頁拿同一張舊憑證去換而被判定盜用。
  * - 換發同一時間只跑一個（加鎖）；新的 Refresh Token 立刻覆蓋舊的；refresh_reused／invalid 就回登入畫面。
  */
 import * as Crypto from "expo-crypto";
@@ -58,15 +59,32 @@ const ss = () => {
     return undefined;
   }
 };
+const ls = () => {
+  try {
+    return globalThis.localStorage;
+  } catch {
+    return undefined; // 無痕模式或封鎖網站資料：退回只在這次開啟期間有效
+  }
+};
+// 舊版存在 sessionStorage 的登入：搬到 localStorage（這次升級不必重新登入）。
+if (web) {
+  try {
+    const old = ss()?.getItem("check.refresh");
+    if (old && !ls()?.getItem("check.refresh")) ls()?.setItem("check.refresh", old);
+    ss()?.removeItem("check.refresh");
+  } catch {
+    /* 讀不到就算了 */
+  }
+}
 const store = {
   async get(key: string): Promise<string | null> {
-    if (web) return ss()?.getItem(key) ?? null;
+    if (web) return ls()?.getItem(key) ?? null;
     return SecureStore.getItemAsync(key);
   },
   async set(key: string, value: string | null): Promise<void> {
     if (web) {
-      if (value) ss()?.setItem(key, value);
-      else ss()?.removeItem(key);
+      if (value) ls()?.setItem(key, value);
+      else ls()?.removeItem(key);
       return;
     }
     if (value) await SecureStore.setItemAsync(key, value);
@@ -105,25 +123,21 @@ async function saveTokens(t: Tokens): Promise<void> {
   accessExp = Date.now() + Math.max(60, t.expires_in - 30) * 1000;
   memberId = t.user?.member_id ?? memberOf(t.access_token);
   await store.set(K.refresh, t.refresh_token);
-  if (!web) {
-    await store.set(K.access, t.access_token);
-    await store.set(K.accessExp, String(accessExp));
-  }
+  await store.set(K.access, t.access_token);
+  await store.set(K.accessExp, String(accessExp));
 }
 async function clearLocal(): Promise<void> {
   access = null;
   accessExp = 0;
   memberId = null;
   await store.set(K.refresh, null);
-  if (!web) {
-    await store.set(K.access, null);
-    await store.set(K.accessExp, null);
-  }
+  await store.set(K.access, null);
+  await store.set(K.accessExp, null);
 }
 
 /** 開機：讀回保存的登入（手機），網頁只有 Refresh Token。 */
 export async function restore(): Promise<boolean> {
-  if (!web) {
+  {
     const a = await store.get(K.access);
     const exp = Number((await store.get(K.accessExp)) ?? 0);
     if (a && exp > Date.now()) {
@@ -141,9 +155,34 @@ export const currentMember = () => memberId;
 export const isSignedIn = () => !!memberId;
 
 /** 換發（加鎖）。成功回 true；被撤銷或失效就清掉登入回 false。 */
+/** 跨分頁加鎖：同一時間只有一個分頁在換發（瀏覽器不支援就只在這個分頁內排隊）。 */
+function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = (globalThis.navigator as unknown as { locks?: { request: (name: string, cb: () => Promise<unknown>) => Promise<unknown> } } | undefined)?.locks;
+  return web && locks ? (locks.request("hglobal.check.refresh", fn) as Promise<T>) : fn();
+}
+// 別的分頁換發或登出時，這個分頁的記憶體跟著更新（不會拿已作廢的舊憑證）。
+if (web && typeof globalThis.addEventListener === "function") {
+  globalThis.addEventListener("storage", (e: StorageEvent) => {
+    if (e.key === K.access || e.key === K.refresh || e.key === null) {
+      access = null;
+      accessExp = 0;
+    }
+  });
+}
+
 export function refresh(): Promise<boolean> {
   if (inflight) return inflight;
-  inflight = (async () => {
+  const stale = access;
+  inflight = withRefreshLock(async () => {
+    // 排隊等鎖的期間，別的分頁可能已經換好了：直接用它換來的。
+    const savedAccess = await store.get(K.access);
+    const savedExp = Number((await store.get(K.accessExp)) ?? 0);
+    if (savedAccess && savedAccess !== stale && savedExp > Date.now()) {
+      access = savedAccess;
+      accessExp = savedExp;
+      memberId = memberOf(savedAccess);
+      return true;
+    }
     const rt = await store.get(K.refresh);
     if (!rt) return false;
     try {
@@ -159,7 +198,7 @@ export function refresh(): Promise<boolean> {
     } finally {
       setTimeout(() => (inflight = null), 0);
     }
-  })();
+  });
   return inflight;
 }
 
