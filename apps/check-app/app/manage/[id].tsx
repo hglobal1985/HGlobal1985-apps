@@ -24,7 +24,7 @@ export default function Manage() {
   const a = v.activity;
   const patch = async (body: Partial<Record<keyof ActivitySettings, unknown>>, msg = "已儲存") => {
     try {
-      await api(`/activities/${id}`, "PATCH", body);
+      await api("PATCH", `/activities/${id}`, body);
       flash(msg);
       await reload();
     } catch (e) {
@@ -49,7 +49,7 @@ export default function Manage() {
           <Btn small label="分享加入連結" onPress={() => shareLink(`/join/${a.joinCode}`, `請點連結加入「${a.title}」`)} />
           <Btn small kind="grey" label="重新產生" onPress={async () => {
             if (!(await confirmSheet("重新產生加入連結？", "舊的連結會立刻失效。", "重新產生"))) return;
-            try { await api(`/activities/${id}/join-code`, "POST"); flash("已重新產生"); await reload(); } catch (e) { flashError(e); }
+            try { await api("POST", `/activities/${id}/join-code`); flash("已重新產生"); await reload(); } catch (e) { flashError(e); }
           }} />
         </View>
         <Toggle label="加入要管理員核准" value={a.joinApproval} onChange={(x) => patch({ joinApproval: x })} />
@@ -72,7 +72,7 @@ export default function Manage() {
                 <T small bold>{i.name}</T>
                 <T tiny muted>{MODES[i.mode]}・{itemRule(i)}</T>
               </View>
-              <Btn small flex={false} kind="grey" label="↑" disabled={k === 0} onPress={async () => { await api(`/items/${i.id}/move`, "POST", { dir: -1 }); await reload(); }} />
+              <Btn small flex={false} kind="grey" label="↑" disabled={k === 0} onPress={async () => { await api("POST", `/items/${i.id}/move`, { dir: -1 }); await reload(); }} />
               <Btn small flex={false} kind="grey" label="編輯" onPress={() => setItemEdit({ lessonId: l.id, item: i })} />
             </View>
           ))}
@@ -108,7 +108,7 @@ export default function Manage() {
         </View>
         <Btn small flex={false} kind="cancel" label="刪除全部檔案" disabled={!!a.filesPurgedAt} onPress={async () => {
           if (!(await confirmSheet("刪除這份作業的全部檔案？", `${storage.data?.files ?? 0} 個檔案會永久刪除，分數與評語保留。建議先備份。`, "刪除", true))) return;
-          try { const r = await api<{ deleted: number }>(`/activities/${id}/purge`, "POST"); flash("已刪除全部檔案", `${r.deleted} 個`); await reload(); await storage.reload(); } catch (e) { flashError(e); }
+          try { const r = await api<{ deleted: number }>("POST", `/activities/${id}/purge`); flash("已刪除全部檔案", `${r.deleted} 個`); await reload(); await storage.reload(); } catch (e) { flashError(e); }
         }} />
       </Card>
 
@@ -155,8 +155,8 @@ function LessonSheet({ activityId, value, onClose, onDone }: { activityId: strin
     if (dueAt === null) return flash("截止時間格式不正確", "例如 2027/01/09 23:59", true);
     setBusy(true);
     try {
-      if (isNew) await api(`/activities/${activityId}/lessons`, "POST", { title, dueAt });
-      else await api(`/lessons/${(value as LessonView).id}`, "PATCH", { title, dueAt });
+      if (isNew) await api("POST", `/activities/${activityId}/lessons`, { title, dueAt });
+      else await api("PATCH", `/lessons/${(value as LessonView).id}`, { title, dueAt });
       flash("已儲存");
       onClose();
       await onDone();
@@ -173,7 +173,7 @@ function LessonSheet({ activityId, value, onClose, onDone }: { activityId: strin
       {!isNew && value ? (
         <Btn kind="cancel" flex={false} label="刪除這一堂" onPress={async () => {
           if (!(await confirmSheet("刪除這一堂？", "這一堂的作業項目也會一起刪除。已經有人交作業就不能刪。", "刪除", true))) return;
-          try { await api(`/lessons/${value.id}`, "DELETE"); flash("已刪除"); onClose(); await onDone(); } catch (e) { flashError(e); }
+          try { await api("DELETE", `/lessons/${value.id}`); flash("已刪除"); onClose(); await onDone(); } catch (e) { flashError(e); }
         }} />
       ) : null}
     </Sheet>
@@ -207,8 +207,8 @@ function ItemSheet({ value, onClose, onDone }: { value: { lessonId: string; item
     setBusy(true);
     const body = { name: d.name, note: d.note, mode: d.mode, per: n(d.per), unit: d.unit, maxPoints: n(d.maxPoints), minCount: n(d.minCount), points: n(d.points), fullScore: n(d.fullScore), inTotal: d.inTotal, kinds: d.kinds };
     try {
-      if (value?.item) await api(`/items/${value.item.id}`, "PATCH", body);
-      else await api(`/lessons/${value!.lessonId}/items`, "POST", body);
+      if (value?.item) await api("PATCH", `/items/${value.item.id}`, body);
+      else await api("POST", `/lessons/${value!.lessonId}/items`, body);
       flash("已儲存", d.name);
       onClose();
       await onDone();
@@ -256,7 +256,7 @@ function ItemSheet({ value, onClose, onDone }: { value: { lessonId: string; item
       {value?.item ? (
         <Btn kind="cancel" flex={false} label="刪除這個項目" onPress={async () => {
           if (!(await confirmSheet("刪除這個項目？", "已經有人交了就不能刪。", "刪除", true))) return;
-          try { await api(`/items/${value.item!.id}`, "DELETE"); flash("已刪除"); onClose(); await onDone(); } catch (e) { flashError(e); }
+          try { await api("DELETE", `/items/${value.item!.id}`); flash("已刪除"); onClose(); await onDone(); } catch (e) { flashError(e); }
         }} />
       ) : null}
     </Sheet>

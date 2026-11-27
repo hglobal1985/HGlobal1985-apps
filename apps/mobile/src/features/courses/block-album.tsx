@@ -7,10 +7,10 @@ import { radius, space } from "@/theme/tokens";
 import { AppText, Card } from "@/ui";
 import { LockMask } from "@/ui";
 import { blockPhotoCount } from "./block-photos";
-import { CoverAlbum } from "./album";
+import { CoverAlbum } from "@/features/courses/album";
 import { trackUsage } from "@/lib/usage";
-import { SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";
-import { AlbumSearchBar, albumSearchable, matchAlbumItem, useAlbumSearch } from "./album-search";
+import { SubfolderSheet, useSubfolders, type FolderSheetState } from "@/features/courses/album-subfolders";
+import { AlbumSearchBar, albumSearchable, matchAlbumItem, useAlbumSearch } from "@/features/courses/album-search";
 
 /** 有照片的區塊（相簿分頁、「瀏覽本區照片」都以這份為準）。 */
 export const albumBlocks = (course: CourseDetail): Lesson[] => course.lessons.filter((l) => l.section && !!l.photoKey && blockPhotoCount(l) > 0);

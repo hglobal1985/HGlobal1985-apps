@@ -7,7 +7,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space, type } from "@/theme/tokens";
 import { AppText, ELDER_FIELD } from "@/ui";
 import { CoverAlbum } from "./album";
-import { useSearchSettings } from "./use-search-settings";
+import { useSearchSettings } from "@/features/courses/use-search-settings";
 
 /**
  * 相簿搜尋【共用模組】（杜杜龍 2026-11-25 永久指示：相簿與中心 EDM 的搜尋一律用這一份，不可另做）：

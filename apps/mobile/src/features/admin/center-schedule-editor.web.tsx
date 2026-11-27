@@ -7,7 +7,7 @@ import { useUiConfig } from "@/state/ui-config";
 import { space } from "@/theme/tokens";
 import { AppText, Button, NoticeBox, Select } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
-import { cropCompress, loadImage } from "./image-tools";
+import { cropCompress, loadImage } from "@/features/admin/image-tools";
 import { PickImageButton } from "./pick-image";
 
 /**

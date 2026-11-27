@@ -1,4 +1,4 @@
-import { cutPercentFor16x9 } from "./image-tools";
+import { cutPercentFor16x9 } from "@/features/admin/image-tools";
 
 export type CoverMode = "crop" | "contain";
 

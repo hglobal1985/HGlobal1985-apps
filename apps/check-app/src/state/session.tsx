@@ -48,7 +48,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      setMe(await api<Me>("/me"));
+      setMe(await api<Me>("GET", "/me"));
     } catch {
       /* 稍後再試 */
     }
@@ -112,7 +112,7 @@ export function useData<T>(path: string | null): { data: T | null; error: string
   const reload = useCallback(async () => {
     if (!pathRef.current) return;
     try {
-      const d = await api<T>(pathRef.current);
+      const d = await api<T>("GET", pathRef.current);
       setData(d);
       setError(null);
     } catch (e) {

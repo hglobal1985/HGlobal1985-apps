@@ -1,0 +1,6 @@
+{
+  "name": "@hg/server-shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "寰宇行動大學與寰宇繳作業系統兩個伺服器（Cloudflare Worker）共用的程式。"
+}

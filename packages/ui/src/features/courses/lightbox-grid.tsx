@@ -9,7 +9,7 @@ import { useThumb } from "@/lib/thumb";
 import { space } from "@/theme/tokens";
 import { AppText, ShareIcon } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
-import type { LightboxItem } from "./edm-viewer";
+import type { LightboxItem } from "./lightbox";
 
 const UI_ONLY = { uiOnly: true } as object;
 const UI_ONLY_TEXT = { dataSet: { uiOnly: "" } } as object;

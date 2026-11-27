@@ -10,7 +10,7 @@ import { EdmCropper } from "./edm-cropper.web";
 import { CoverLibraryPicker, deleteUnusedCover, type PickedCover } from "./cover-library.web";
 import { CoverModePicker, defaultCoverMode, type CoverMode } from "./cover-mode.web";
 import { useUiConfig } from "@/state/ui-config";
-import { composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { composeContain, cropCompress, loadImage, loadImageUrl, type Rect } from "@/features/admin/image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 type Job = { img: HTMLImageElement; src: string; isNew: boolean; cover: Rect; mode: CoverMode; /** 從封面庫挑了「未使用的封面檔」：儲存成功後把它刪掉。 */ consumeKey?: string };

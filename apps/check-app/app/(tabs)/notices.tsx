@@ -10,13 +10,13 @@ export default function Notices() {
   const { reloadMe } = useSession();
   const { data, reload } = useData<Notice[]>("/notices");
   const open = async (n: Notice) => {
-    if (!n.read) await api("/notices/read", "POST", { id: n.id }).catch(() => {});
+    if (!n.read) await api("POST", "/notices/read", { id: n.id }).catch(() => {});
     void reloadMe();
     if (n.link) router.push(n.link as never);
     else void reload();
   };
   return (
-    <Screen title="通知" back={false} right={data?.some((n) => !n.read) ? <Btn small flex={false} kind="grey" label="全部已讀" onPress={async () => { await api("/notices/read", "POST", {}); await reload(); void reloadMe(); }} /> : undefined}>
+    <Screen title="通知" back={false} right={data?.some((n) => !n.read) ? <Btn small flex={false} kind="grey" label="全部已讀" onPress={async () => { await api("POST", "/notices/read", {}); await reload(); void reloadMe(); }} /> : undefined}>
         {!data ? <Loading /> : !data.length ? <Empty title="還沒有通知" note="出新作業、評分、退回、留言、截止提醒都會通知你。" /> : null}
         {data?.map((n) => (
           <Card key={n.id} onPress={() => open(n)} style={!n.read ? { borderColor: c.green, borderWidth: 1.5 } : undefined}>

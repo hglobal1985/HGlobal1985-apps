@@ -8,7 +8,7 @@ import { detectYoutubeSeconds } from "@/features/admin/youtube-duration";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space, type } from "@/theme/tokens";
 import { AppText, Button, Icon, NoticeBox } from "@/ui";
-import { formatDuration, fromHms, toHms, type Hms } from "./hms";
+import { formatDuration, fromHms, toHms, type Hms } from "@/features/uploads/hms";
 import { TimeRangePicker } from "./time-range-picker";
 
 /**

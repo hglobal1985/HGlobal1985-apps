@@ -1,5 +1,5 @@
 /** 評分工具：依項目的計分方式自動換成對應的控制（核定件數、分數、星等、通過）。 */
-import { useEffect, useState } from "react";
+
 import { Pressable, Text, View } from "react-native";
 import { MODES, pointsFor, type ItemCard, type SubmissionView } from "@check/contract";
 import { useColors } from "@/kit";

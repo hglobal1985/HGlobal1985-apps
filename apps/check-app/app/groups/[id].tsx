@@ -44,7 +44,7 @@ export default function Groups() {
       flashError(e);
     }
   };
-  const post = (m: string, body: object) => () => api(`/activities/${id}/people/${encodeURIComponent(m)}`, "POST", body);
+  const post = (m: string, body: object) => () => api("POST", `/activities/${id}/people/${encodeURIComponent(m)}`, body);
   const actions = (p: Person): Act[] => {
     const out: Act[] = [];
     if (p.status === "pending")
@@ -69,7 +69,7 @@ export default function Groups() {
   return (
     <Screen
       title={teacher ? "分組與名單" : "本組"}
-      right={teacher ? <Btn small flex={false} label="＋新增組" onPress={async () => { try { await api(`/activities/${id}/groups`, "POST", {}); flash("已新增一組"); await reload(); } catch (e) { flashError(e); } }} /> : undefined}
+      right={teacher ? <Btn small flex={false} label="＋新增組" onPress={async () => { try { await api("POST", `/activities/${id}/groups`, {}); flash("已新增一組"); await reload(); } catch (e) { flashError(e); } }} /> : undefined}
     >
       {v.pending.length ? (
         <>
@@ -114,7 +114,7 @@ export default function Groups() {
             label="產生老師邀請連結"
             onPress={async () => {
               try {
-                const r = await api<{ code: string }>(`/activities/${id}/invites`, "POST", { role: "teacher" });
+                const r = await api<{ code: string }>("POST", `/activities/${id}/invites`, { role: "teacher" });
                 await shareLink(`/invite/${r.code}`, "邀請你擔任作業老師（24 小時內有效）");
               } catch (e) {
                 flashError(e);
@@ -158,7 +158,7 @@ function RenameSheet({ value, onClose, onDone }: { value: { id: string; name: st
             onPress={async () => {
               setBusy(true);
               try {
-                await api(`/groups/${value!.id}`, "PATCH", { name });
+                await api("PATCH", `/groups/${value!.id}`, { name });
                 flash("已儲存");
                 onClose();
                 await onDone();

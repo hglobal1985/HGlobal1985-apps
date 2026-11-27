@@ -22,7 +22,7 @@ import { useCoverStats } from "./cover-stats";
 import { CategoryFilterBox, CategorySheet, NONE, courseCats as cats, lessonsOf, matchesCats } from "./category-sheet";
 import { CenterAddress, CenterHero, centerHeroFull, HeroMiniCover } from "./center-hero";
 import { CoverMiniFloat } from "@/ui/collapse-band";
-import { SearchableAlbum } from "./album-search";
+import { SearchableAlbum } from "@/features/courses/album-search";
 import { canEditCenterArt } from "./center-rights";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { BottomSheet } from "@/ui/bottom-sheet";

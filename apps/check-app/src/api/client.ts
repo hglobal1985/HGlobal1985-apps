@@ -33,7 +33,8 @@ async function send(path: string, init: RequestInit, retry = true): Promise<Resp
   return res;
 }
 
-export async function api<T = unknown>(path: string, method = "GET", body?: unknown): Promise<T> {
+/** 呼叫伺服器：api("GET", "/home")、api("POST", "/x", 內容)。參數順序與行動大學相同（共用元件會用到）。 */
+export async function api<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await send(path, { method, headers: body === undefined ? {} : { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   return (await res.json()) as T;
 }
@@ -68,9 +69,15 @@ export async function upload<T>(path: string, data: Blob, onProgress?: (p: numbe
   });
 }
 
+/** 相對網址 → 可以直接顯示的網址（共用元件用：看圖程式、縮圖）。 */
+export const resolveUrl = (u: string): string => (u.startsWith("/") ? API_BASE + u : u);
+
+/** 共用看圖程式用到的型別（繳作業系統沒有相簿，只需要名稱一致）。 */
+export type CoverMediaItem = { id: string; kind: "image" | "video"; url: string; uploader?: string; uploaderAvatar?: string };
+
 /** 打開作業檔案（先拿 10 分鐘有效的下載憑證）。 */
 export async function openFile(fileId: string): Promise<void> {
-  const { url } = await api<{ url: string }>(`/files/${fileId}/ticket`, "POST");
+  const { url } = await api<{ url: string }>("POST", `/files/${fileId}/ticket`);
   const full = (Platform.OS === "web" ? "" : WEB_ORIGIN) + url;
   if (Platform.OS === "web") window.open(full, "_blank", "noopener");
   else {

@@ -12,6 +12,8 @@
   // Workers AI 綁定（逐字稿、關鍵字、語意搜尋）；用量由程式依「AI 模型」頁設定的每日上限控管。
   "ai": { "binding": "AI" },
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "learn" }],
+  // 兩個 App（行動大學、寰宇繳作業系統）共用的設定：上傳壓縮畫質（杜杜龍 2026-11-26；packages/server-shared/src/upload-settings.ts）。
+  "kv_namespaces": [{ "binding": "SHARED", "id": "0287ee74946943298b5a7b7885930829" }],
   // Cloudflare Images 綁定：封面縮圖即時縮小（免費方案每月 5,000 次不重複縮圖，超過不收費、改回傳原圖；杜杜龍 2026-11-20）。
   "images": { "binding": "IMAGES" },
   // Cloudflare Email Service（網域 learn.hglobal1985.com 已開通寄信）；只用來寄通知，不需要金鑰。

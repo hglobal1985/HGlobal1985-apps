@@ -20,7 +20,7 @@ export default function Invite() {
         onPress={async () => {
           setBusy(true);
           try {
-            const r = await api<{ activityId: string }>(`/invite/${code}`, "POST");
+            const r = await api<{ activityId: string }>("POST", `/invite/${code}`);
             flash("已加入", "你現在是這份作業的老師");
             router.replace(`/activity/${r.activityId}`);
           } catch (e) {

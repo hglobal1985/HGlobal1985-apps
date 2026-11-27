@@ -13,6 +13,7 @@ import type { Env } from "./d1.ts";
 import { resolveShareMeta, withShareMeta } from "./og.ts";
 import { serveStatic, type StaticFiles } from "./site.ts";
 import { courseReminders, flushPushes } from "./push.ts";
+import { setSharedKv } from "./ui-config.ts";
 
 /**
  * learn.hglobal1985.com：/api/v2/* 為 API，其餘為 Expo Web 靜態檔（SPA）。
@@ -21,6 +22,7 @@ import { courseReminders, flushPushes } from "./push.ts";
 export function createWorker(staticFiles: StaticFiles) {
   return {
     async fetch(req: Request, env: Env, exec?: { waitUntil(p: Promise<unknown>): void }): Promise<Response> {
+      setSharedKv(env.SHARED); // 兩個 App 共用的設定（上傳壓縮；ui-config.ts）
       const url = new URL(req.url);
       if (url.pathname === "/api/v2" || url.pathname.startsWith("/api/v2/")) return handleApi(req, env, exec);
       if (url.pathname.startsWith("/api/")) return new Response("Not found", { status: 404 });
@@ -42,6 +44,7 @@ export function createWorker(staticFiles: StaticFiles) {
     },
     /** 排程（每 10 分鐘）：開課前一天提醒（台灣時間 20:00 後）、補推還沒推播的通知。 */
     async scheduled(_event: unknown, env: Env, exec?: { waitUntil(p: Promise<unknown>): void }): Promise<void> {
+      setSharedKv(env.SHARED);
       const job = (async () => {
         await revokeLegacyDriveLink(env.DB).catch((e) => console.error("legacy drive cleanup", e instanceof Error ? e.message : "error")); // 舊的「杜杜龍雲端硬碟上傳」授權：撤銷並刪除（杜杜龍 2026-11-18 取消該功能）
         await courseReminders(env).catch((e) => console.error("course reminders", e instanceof Error ? e.message : "error"));

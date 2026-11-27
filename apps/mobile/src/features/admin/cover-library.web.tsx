@@ -9,7 +9,7 @@ import { radius, space } from "@/theme/tokens";
 import { AppText, Button, LoadingLadybug } from "@/ui";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";
 import { flashText } from "@/ui/flash-notice";
-import { loadImageUrl } from "./image-tools";
+import { loadImageUrl } from "@/features/admin/image-tools";
 
 /**
  * 封面庫（杜杜龍 2026-11-19 永久指示：所有「上傳／編輯封面」的介面一律用這一個元件，要改只改這個檔案）：

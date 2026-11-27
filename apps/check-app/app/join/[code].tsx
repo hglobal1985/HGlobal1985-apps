@@ -30,7 +30,7 @@ export default function Join() {
           onPress={async () => {
             setBusy(true);
             try {
-              const r = await api<{ activityId: string; status: string }>(`/join/${code}`, "POST");
+              const r = await api<{ activityId: string; status: string }>("POST", `/join/${code}`);
               if (r.status === "active") {
                 flash("已加入", data.title);
                 router.replace(`/activity/${r.activityId}`);

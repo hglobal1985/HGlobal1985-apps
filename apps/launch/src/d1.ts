@@ -76,6 +76,8 @@ export interface Env {
   ANTHROPIC_API_KEY?: string;
   /** R2 bucket「learn」：章節音檔。 */
   MEDIA?: R2Bucket;
+  /** 兩個 App 共用的設定（Cloudflare KV「hg-shared-settings」；杜杜龍 2026-11-26：上傳壓縮設定與寰宇繳作業系統同一份）。 */
+  SHARED?: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> };
   /** 音檔簽名網址用的 HMAC 金鑰（Secret）。 */
   MEDIA_URL_SECRET?: string;
   /** Cloudflare Email Service 的寄信綁定（send_email）。沒綁定就不寄 Email。 */

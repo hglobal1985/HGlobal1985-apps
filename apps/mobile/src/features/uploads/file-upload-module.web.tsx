@@ -4,9 +4,9 @@ import { useApi } from "@/state/session";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
 import { AppText, Button, NoticeBox } from "@/ui";
 import { useUiConfig } from "@/state/ui-config";
-import { COMPRESSIBLE, FILE_ACCEPT, FILE_TOO_BIG, fileProblem } from "./file-rules";
+import { COMPRESSIBLE, FILE_ACCEPT, FILE_TOO_BIG, fileProblem } from "@/features/uploads/file-rules";
 import { pickFromMyDrive, preloadGooglePicker } from "./google-picker.web";
-import { UploadProgress } from "./upload-progress";
+import { UploadProgress } from "@/features/uploads/upload-progress";
 
 type DriveCfg = { ready: boolean; clientId: string; apiKey: string; appId: string; maxBytes: number };
 

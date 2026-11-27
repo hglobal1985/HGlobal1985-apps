@@ -4,7 +4,7 @@ import type { MediaType } from "@/api/client";
 import { useTheme } from "@/theme/theme";
 import { minTouch, radius, space } from "@/theme/tokens";
 import { AppText, Icon } from "@/ui";
-import { fromHms, toHms, type Hms } from "./hms";
+import { fromHms, toHms, type Hms } from "@/features/uploads/hms";
 import { RangePreview } from "./range-preview";
 
 const STRIP_H = 72;

@@ -176,6 +176,7 @@ export default function StorageScreen() {
           </AppText>
           <NoticeBox tone="info" text="圖片存檔格式只在下面「相簿照片」設定：相簿照片與上傳當教材的圖片，格式與畫質都套用那一組；其他圖片（封面、EDM…）固定存成 JPEG，品牌 logo 保留原格式。" />
           <FormatTable />
+          <NoticeBox tone="info" text="一般圖片、中心首頁圖、EDM 海報的長邊與畫質，以及下面短影音的解析度、畫質、每秒格數，和「寰宇繳作業系統」共用同一份設定（杜杜龍 2026-11-26）：在任何一邊修改，另一邊約 1 分鐘內自動套用。" />
           <AppText variant="callout" style={{ fontWeight: "800", color: c.accentText }}>
             相簿照片（獨立設定，先在「成交百寶箱」試行）
           </AppText>

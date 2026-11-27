@@ -109,7 +109,7 @@ function NewActivity({ open, onClose, onDone }: { open: boolean; onClose: () => 
               if (s === "x" || e === "x") return flash("日期格式不正確", "例如 2026/12/05", true);
               setBusy(true);
               try {
-                const { id } = await api<{ id: string }>("/activities", "POST", { title, startsOn: s, endsOn: e });
+                const { id } = await api<{ id: string }>("POST", "/activities", { title, startsOn: s, endsOn: e });
                 flash("已建立", "先是草稿，設定好再開放");
                 onDone(id);
               } catch (err) {

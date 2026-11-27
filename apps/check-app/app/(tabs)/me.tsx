@@ -32,6 +32,18 @@ export default function MePage() {
             <T muted>›</T>
           </Card>
         ))}
+        {me?.superAdmin ? (
+          <>
+            <Section title="管理" />
+            <Card onPress={() => router.push("/settings/upload")} style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ flex: 1 }}>
+                <T bold>上傳設定</T>
+                <T tiny muted>照片、影片壓縮畫質（與行動大學共用同一份）</T>
+              </View>
+              <T muted>›</T>
+            </Card>
+          </>
+        ) : null}
         <Section title="顯示模式" />
         <Card>
           <Toggle label="至尊模式（大字簡易版）" note="字放大、選單改成整頁顯示；和寰宇行動大學的至尊模式相同" value={elder} onChange={(on) => setElder({ on })} />

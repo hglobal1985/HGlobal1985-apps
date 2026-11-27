@@ -8,7 +8,7 @@ import { BottomSheet } from "@/ui/bottom-sheet";
 import { EdmCropper } from "./edm-cropper.web";
 import { CoverLibraryPicker, deleteUnusedCover, type PickedCover } from "./cover-library.web";
 import { useUiConfig } from "@/state/ui-config";
-import { cropCompress, loadImage, loadImageUrl, type Rect } from "./image-tools";
+import { cropCompress, loadImage, loadImageUrl, type Rect } from "@/features/admin/image-tools";
 
 const FILE_ACCEPT = "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif";
 const POSTER_ASPECT = 3 / 4; // 直式封面

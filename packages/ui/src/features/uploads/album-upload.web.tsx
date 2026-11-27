@@ -7,9 +7,9 @@ import { space } from "@/theme/tokens";
 import { Button, NoticeBox } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
 import { holdFullscreenClose, releaseFullscreenClose } from "@/lib/back-close";
-import { readPhotoMeta } from "./exif-meta";
-import { compressVideo, probeVideo, videoCompressSupported } from "./video-compress";
-import { UploadProgress } from "./upload-progress";
+import { readPhotoMeta } from "@/features/uploads/exif-meta";
+import { compressVideo, probeVideo, videoCompressSupported } from "@/features/uploads/video-compress";
+import { UploadProgress } from "@/features/uploads/upload-progress";
 
 /**
  * 相簿／封面照片上傳（網頁版，杜杜龍 2026-11-21）：一次可選多張照片與短影音。

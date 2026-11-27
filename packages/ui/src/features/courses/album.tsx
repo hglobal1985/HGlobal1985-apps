@@ -12,7 +12,7 @@ import { useTheme } from "@/theme/theme";
 import { radius, space } from "@/theme/tokens";
 import { AppText, EmptyState } from "@/ui";
 import { flashText } from "@/ui/flash-notice";
-import { EdmLightbox, lightboxItem } from "./edm-viewer";
+import { EdmLightbox, lightboxItem } from "@/features/courses/edm-viewer";
 
 const NO_SCALE = Platform.OS === "web" ? ({ dataSet: { noScale: "" } } as object) : {};
 const GAP = 6;

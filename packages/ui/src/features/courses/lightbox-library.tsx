@@ -1,4 +1,4 @@
-import { lightboxItem } from "./edm-viewer";
+import { lightboxItem } from "@/features/courses/edm-viewer";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -6,7 +6,7 @@ import { api, resolveUrl, type AlbumFolder, type AlbumsResponse, type CoverMedia
 import { centerTitle } from "@/features/format";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { RecipeZone } from "@/features/recipes/recipe-zone";
-import { LightboxGrid } from "./lightbox-grid";
+import { LightboxGrid } from "@/features/courses/lightbox-grid";
 import { AlbumInfoPanel, AlbumPermissionsPanel } from "./album-admin";
 import { AlbumBackHeader } from "./album-header";
 import { SubfolderHome, SubfolderSheet, useSubfolders, type FolderSheetState } from "./album-subfolders";

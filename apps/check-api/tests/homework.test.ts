@@ -179,3 +179,19 @@ test("會員刪除帳號：作業檔案與資料一併刪除；排程截止提�
   await scheduled(env);
   assert.equal((await call<{ title: string }[]>("bob", "GET", "/notices")).data.filter((n) => n.title === "作業明天截止").length, 1, "不重複提醒");
 });
+
+test("上傳壓縮設定：與行動大學共用同一份，只有超級管理員能改", async () => {
+  const { resetSharedUploadMemo } = await import("../../../packages/server-shared/src/upload-settings.ts");
+  resetSharedUploadMemo();
+  const store = new Map<string, string>();
+  const { env, call } = setup();
+  env.SHARED = { get: async (k) => store.get(k) ?? null, put: async (k, v) => void store.set(k, v) };
+  const r = await call<{ settings: { imageMaxSide: number }; canEdit: boolean }>("amy", "GET", "/upload-settings");
+  assert.equal(r.data.settings.imageMaxSide, 1024);
+  assert.equal(r.data.canEdit, false);
+  assert.equal((await call("amy", "PUT", "/upload-settings", { body: { imageMaxSide: 1600 } })).status, 403);
+  const w = await call<{ settings: { imageMaxSide: number; imageQuality: number } }>("admin1", "PUT", "/upload-settings", { body: { imageMaxSide: 1600, imageQuality: 5 } });
+  assert.equal(w.data.settings.imageMaxSide, 1600);
+  assert.equal(w.data.settings.imageQuality, 30, "超出範圍自動修正");
+  assert.equal(JSON.parse(store.get("upload")!).imageMaxSide, 1600, "寫進共用儲存區（行動大學讀同一個鍵）");
+});

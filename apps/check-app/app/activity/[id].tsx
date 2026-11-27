@@ -81,7 +81,7 @@ export default function ActivityPage() {
                 label="提醒沒交的人"
                 onPress={async () => {
                   try {
-                    const r = await api<{ reminded: number }>(`/lessons/${l.id}/remind`, "POST");
+                    const r = await api<{ reminded: number }>("POST", `/lessons/${l.id}/remind`);
                     flash("已提醒", `${r.reminded} 位學員會收到通知`);
                   } catch (e) {
                     flashError(e);
