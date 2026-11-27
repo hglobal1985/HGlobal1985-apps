@@ -1,5 +1,5 @@
 import type { Lesson } from "@/api/client";
-import { CoverAlbum } from "./album";
+import { CoverAlbum } from "@/features/courses/album";
 
 /**
  * 區塊照片（杜杜龍 2026-11-24，先只有「成交百寶箱」）：區塊展開後，教材上方先顯示這個區塊的照片格（點開放大、可左右翻）。

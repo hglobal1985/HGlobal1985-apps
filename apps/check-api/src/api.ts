@@ -32,6 +32,7 @@ import {
   type SubStatus,
 } from "./contract.ts";
 import type { D1Database, Env } from "./env.ts";
+import { DEFAULT_SHARED_UPLOAD, readSharedUpload, writeSharedUpload } from "../../../packages/server-shared/src/upload-settings.ts";
 
 export const API_VERSION = "0.1.0";
 
@@ -706,10 +707,22 @@ const body = async (req: Request): Promise<Row> => {
 on("GET", "/me", async (c) => {
   const p = await c.env.DB.prepare("SELECT display_name, avatar_url FROM people WHERE member_id = ?").bind(c.sub).first<Row>();
   const unread = Number((await c.env.DB.prepare("SELECT COUNT(*) AS n FROM notices WHERE member_id = ? AND read_at IS NULL").bind(c.sub).first<Row>())?.n ?? 0);
-  const me: Me = { memberId: c.sub, name: String(p?.display_name || ""), avatarUrl: (p?.avatar_url as string) ?? null, superAdmin: await superAdmin(c), unread };
+  const sa = await superAdmin(c);
+  const cards = await home(c);
+  const staff = sa || cards.some((a) => a.role !== "student" || a.isLeader);
+  const toReview = cards.reduce((n, a) => n + a.toReview, 0);
+  const me: Me = { memberId: c.sub, name: String(p?.display_name || ""), avatarUrl: (p?.avatar_url as string) ?? null, superAdmin: sa, unread, staff, toReview };
   return me;
 });
 on("GET", "/home", async (c) => home(c));
+
+// 上傳壓縮設定：與行動大學共用同一份（Cloudflare KV；杜杜龍 2026-11-26）。任一邊改，另一邊自動跟上。
+on("GET", "/upload-settings", async (c) => ({ settings: (await readSharedUpload(c.env.SHARED)) ?? DEFAULT_SHARED_UPLOAD, shared: !!c.env.SHARED, canEdit: await superAdmin(c) }));
+on("PUT", "/upload-settings", async (c, _p, req) => {
+  if (!(await superAdmin(c))) fail(403, "只有超級管理員可以修改上傳設定");
+  if (!c.env.SHARED) fail(503, "共用設定儲存區尚未設定");
+  return { settings: await writeSharedUpload(c.env.SHARED, await body(req)) };
+});
 
 on("POST", "/activities", async (c, _p, req) => {
   if (!(await superAdmin(c))) fail(403, "只有超級管理員可以新增作業");

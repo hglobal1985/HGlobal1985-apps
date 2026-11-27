@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { DIM_COLOR } from "@/ui/dim-backdrop";
-import type { Rect } from "./image-tools";
+import type { Rect } from "@/features/admin/image-tools";
 
 const MIN = 32;
 type Drag = { kind: "move" | "nw" | "ne" | "sw" | "se"; startX: number; startY: number; box: Rect };

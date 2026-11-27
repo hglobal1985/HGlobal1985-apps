@@ -6,9 +6,10 @@ import { api, upload } from "@/api/client";
 import { Comments, FileGrid } from "@/features/files";
 import { itemRule, StatusChip } from "@/features/items";
 import { pickFiles, pickPhotos, pickVideo, takePhoto, type Picked } from "@/features/upload";
+import { UploadProgress } from "@/features/uploads/upload-progress";
 import { dueText, leftText } from "@/format";
 import { useData } from "@/state/session";
-import { Avatar, Btn, Card, Check, Chip, Field, flash, flashError, Loading, Note, Progress, Screen, Section, Seg, Sheet, Stepper, T } from "@/kit";
+import { Avatar, Btn, Card, Check, Chip, Field, flash, flashError, Loading, Note, Screen, Section, Seg, Sheet, Stepper, T } from "@/kit";
 
 export default function ItemPage() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,7 +41,7 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
   const [note, setNote] = useState(my?.note ?? "");
   const [agree, setAgree] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<number | null>(null);
+  const [progress, setProgress] = useState<{ label: string; pct: number | null } | null>(null);
   const [entry, setEntry] = useState<"link" | "text" | null>(null);
   const [photoMenu, setPhotoMenu] = useState(false);
   useEffect(() => {
@@ -51,13 +52,13 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
 
   const sendPicked = async (list: Picked[]) => {
     if (!list.length) return;
-    setProgress(0);
+    setProgress({ label: "上傳中，請不要關閉畫面", pct: 0 });
     try {
       let last: ItemView | null = null;
       for (let i = 0; i < list.length; i++) {
         const p = list[i];
         const q = `kind=${p.kind}&name=${encodeURIComponent(p.name)}${p.durationSec ? `&dur=${p.durationSec}` : ""}`;
-        last = await upload<ItemView>(`/items/${v.item.id}/files?${q}`, p.blob, (x) => setProgress((i + x) / list.length));
+        last = await upload<ItemView>(`/items/${v.item.id}/files?${q}`, p.blob, (x) => setProgress({ label: `上傳中（${i + 1}/${list.length}），請不要關閉畫面`, pct: Math.round(((i + x) / list.length) * 100) }));
       }
       if (last) set(last);
       if (v.item.mode === "count" && list[0].kind === "photo" && declared < files.length + list.length) setDeclared(files.length + list.length);
@@ -73,10 +74,15 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
     if (room <= 0) return flash(`最多 ${LIMITS.entries} 個`, "請先刪掉一些再加", true);
     try {
       if (kind === "photo") return setPhotoMenu(true);
-      if (kind === "video") return await sendPicked(await pickVideo());
+      if (kind === "video") {
+        const vids = await pickVideo((label, pct) => setProgress({ label, pct }));
+        setProgress(null);
+        return await sendPicked(vids);
+      }
       if (kind === "file") return await sendPicked(await pickFiles(room));
       setEntry(kind);
     } catch (e) {
+      setProgress(null);
       flashError(e);
     }
   };
@@ -90,7 +96,7 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
         onPress={async () => {
           setBusy(true);
           try {
-            set(await api<ItemView>(`/items/${v.item.id}/submit`, "POST", { declared, note }));
+            set(await api<ItemView>("POST", `/items/${v.item.id}/submit`, { declared, note }));
             flash("已送出", "老師批改後會通知你");
           } catch (e) {
             flashError(e);
@@ -106,7 +112,7 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
       kind="grey"
       onPress={async () => {
         try {
-          set(await api<ItemView>(`/items/${v.item.id}/unsubmit`, "POST"));
+          set(await api<ItemView>("POST", `/items/${v.item.id}/unsubmit`));
           flash("已收回", "改好後再送出一次");
         } catch (e) {
           flashError(e);
@@ -134,7 +140,7 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
               v.canEdit
                 ? async (f) => {
                     try {
-                      set(await api<ItemView>(`/files/${f.id}`, "DELETE"));
+                      set(await api<ItemView>("DELETE", `/files/${f.id}`));
                     } catch (e) {
                       flashError(e);
                     }
@@ -142,12 +148,7 @@ function StudentItem({ v, set, reload }: { v: ItemView; set: (d: ItemView) => vo
                 : undefined
             }
           />
-          {progress !== null ? (
-            <View style={{ gap: 4 }}>
-              <Progress value={progress} />
-              <T tiny muted>上傳中 {Math.round(progress * 100)}%，請不要關閉畫面</T>
-            </View>
-          ) : null}
+          {progress !== null ? <UploadProgress label={progress.label} pct={progress.pct} /> : null}
           {v.canEdit ? (
             <>
               <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -213,7 +214,7 @@ function EntrySheet({ kind, onClose, itemId, onDone }: { kind: "link" | "text" |
             onPress={async () => {
               setBusy(true);
               try {
-                onDone(await api<ItemView>(`/items/${itemId}/entries`, "POST", kind === "link" ? { kind, url: a } : { kind, body: a }));
+                onDone(await api<ItemView>("POST", `/items/${itemId}/entries`, kind === "link" ? { kind, url: a } : { kind, body: a }));
               } catch (e) {
                 flashError(e);
               } finally {
@@ -280,7 +281,7 @@ function TeacherItem({ v, reload }: { v: ItemView; reload: () => Promise<void> }
             kind="grey"
             onPress={async () => {
               try {
-                const r = await api<{ reminded: number }>(`/lessons/${v.lesson.id}/remind`, "POST");
+                const r = await api<{ reminded: number }>("POST", `/lessons/${v.lesson.id}/remind`);
                 flash("已提醒", `${r.reminded} 位學員會收到通知`);
               } catch (e) {
                 flashError(e);
@@ -308,7 +309,7 @@ function TeacherItem({ v, reload }: { v: ItemView; reload: () => Promise<void> }
               onPress={async () => {
                 setBusy(true);
                 try {
-                  await api(`/items/${v.item.id}/onsite`, "POST", { memberId: who!.memberId, score: Number(score) });
+                  await api("POST", `/items/${v.item.id}/onsite`, { memberId: who!.memberId, score: Number(score) });
                   flash("已登錄", `${who!.name} ${score} 分`);
                   setWho(null);
                   await reload();

@@ -1,3 +1,4 @@
+import { readSharedUpload, SHARED_UPLOAD_KEYS, writeSharedUpload, type SharedKv } from "../../../packages/server-shared/src/upload-settings.ts";
 /** 超級管理員可調整的畫面設定：存在 ui_settings 一筆 JSON；讀取時和預設值合併，缺的欄位自動補上。 */
 import { THUMB_WIDTH_CHOICES, type ThumbSettings, DEFAULT_APP_SETTINGS, DEFAULT_SHARE_SETTINGS, DEFAULT_UI_CONFIG, type AppSettings, type ShareSettings, RIBBON_KEYS, RIBBON_PALETTE, SORT_GROUPS, STATS_ROLE_OPTIONS, type RibbonColor, type SortGroup, type UiConfig } from "./contract.ts";
 import type { D1Database } from "./d1.ts";
@@ -193,14 +194,31 @@ export function normalizeApp(raw: unknown): AppSettings {
   };
 }
 
+/**
+ * 上傳壓縮設定的正本是兩個 App 共用的 Cloudflare KV（杜杜龍 2026-11-26，packages/server-shared/src/upload-settings.ts）：
+ * 讀設定時用 KV 的值蓋過 ui_settings 裡的同名欄位；存設定時同步寫進 KV（寰宇繳作業系統讀同一份）。
+ * Worker 每次請求與排程開始時呼叫 setSharedKv(env.SHARED)；沒有綁定（測試、本機）就只用 ui_settings。
+ */
+let sharedKv: SharedKv | undefined;
+export const setSharedKv = (kv: SharedKv | undefined) => void (sharedKv = kv);
+
 export async function loadConfig(db: D1Database): Promise<UiConfig> {
   const row = await db.prepare("SELECT value FROM ui_settings WHERE key = ?").bind(KEY).first<{ value: string }>();
-  if (!row) return normalizeConfig({});
+  let cfg: UiConfig;
   try {
-    return normalizeConfig(JSON.parse(row.value));
+    cfg = normalizeConfig(row ? JSON.parse(row.value) : {});
   } catch {
-    return normalizeConfig({});
+    cfg = normalizeConfig({});
   }
+  const shared = await readSharedUpload(sharedKv);
+  if (shared) cfg = { ...cfg, app: { ...cfg.app, ...shared } };
+  else if (sharedKv) {
+    // 第一次：共用儲存區還是空的，就把行動大學目前的設定放進去當起點（之後兩邊都改同一份）。
+    const seed: Record<string, unknown> = {};
+    for (const k of SHARED_UPLOAD_KEYS) seed[k] = cfg.app[k];
+    await writeSharedUpload(sharedKv, seed).catch(() => undefined);
+  }
+  return cfg;
 }
 
 export async function saveConfig(db: D1Database, cfg: UiConfig): Promise<void> {
@@ -208,4 +226,7 @@ export async function saveConfig(db: D1Database, cfg: UiConfig): Promise<void> {
     .prepare("INSERT INTO ui_settings (key, value, updated_at) VALUES (?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at")
     .bind(KEY, JSON.stringify(cfg))
     .run();
+  const shared: Record<string, unknown> = {};
+  for (const k of SHARED_UPLOAD_KEYS) shared[k] = cfg.app[k];
+  await writeSharedUpload(sharedKv, shared).catch((e) => console.error("shared settings", e instanceof Error ? e.message : "error"));
 }

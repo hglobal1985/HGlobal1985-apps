@@ -1,4 +1,4 @@
-export * from "./hms";
+export * from "@/features/uploads/hms";
 export * from "./media-upload-module";
-export * from "./file-rules";
+export * from "@/features/uploads/file-rules";
 export { FileUploadModule } from "./file-upload-module";

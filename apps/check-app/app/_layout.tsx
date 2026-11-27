@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Linking, Platform, Pressable, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { installBottomGap } from "@/lib/bottom-gap";
+import { BottomBar } from "@/ui/bottom-bar";
 import { installNoPageZoom } from "@/lib/no-page-zoom";
 import { installStableScrollbar } from "@/lib/stable-scrollbar";
 import { installWebPullRefresh } from "@/lib/web-pull-refresh";
@@ -42,7 +43,15 @@ function Gate() {
   if (s.gate === "update") return <Message title="請更新 App" note="目前的版本太舊了，請到 App Store 或 Google Play 更新後再使用。" />;
   if (!s.ready || path.startsWith("/auth/")) return <View style={{ flex: 1, backgroundColor: c.bg, justifyContent: "center" }}><Loading /></View>;
   if (!s.signedIn) return <Login deleted={s.deleted} />;
-  return <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />;
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }} />
+      </View>
+      {/* 底部主選單：共用元件（與行動大學同一個；分頁設定在 src/lib/nav-tabs.tsx） */}
+      <BottomBar />
+    </View>
+  );
 }
 
 function Message({ title, note }: { title: string; note: string }) {

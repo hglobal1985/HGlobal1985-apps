@@ -11,6 +11,12 @@ export type FeatureKey = "manage" | "deleteAccount";
 export type ModeProfile = {
   key: "elder" | "super";
   name: string;
+  /** 底部主選單要顯示的分頁（依序；分頁本身在 lib/nav-tabs.tsx）。 */
+  tabs: string[];
+  /** 底部主選單放大（至尊模式）。 */
+  bigNav: boolean;
+  /** 按模式鍵：switch＝直接切換到另一個模式。 */
+  modeKey: "switch" | "page";
   /** 頁面大標題與右側按鈕上下堆疊（字放大後才不會擠）。 */
   stackHeaders: boolean;
   /** 上拉選單：sheet＝從下方拉出；page＝整頁顯示（至尊模式不用上拉選單）。 */
@@ -19,8 +25,8 @@ export type ModeProfile = {
 };
 
 export const MODE_PROFILES: Record<ModeProfile["key"], ModeProfile> = {
-  elder: { key: "elder", name: "至尊", stackHeaders: true, sheets: "page", features: { manage: false, deleteAccount: false } },
-  super: { key: "super", name: "超派", stackHeaders: false, sheets: "sheet", features: { manage: true, deleteAccount: true } },
+  elder: { key: "elder", name: "至尊", tabs: ["home", "review", "notices", "me"], bigNav: true, modeKey: "switch", stackHeaders: true, sheets: "page", features: { manage: false, deleteAccount: false } },
+  super: { key: "super", name: "超派", tabs: ["home", "review", "notices", "me"], bigNav: false, modeKey: "switch", stackHeaders: false, sheets: "sheet", features: { manage: true, deleteAccount: true } },
 };
 
 export function useModeProfile(): ModeProfile {

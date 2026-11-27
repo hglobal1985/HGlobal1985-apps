@@ -23,6 +23,8 @@ export type Env = {
   ASSETS?: { fetch(req: Request): Promise<Response> };
   /** 只在本機測試開啟（wrangler.local.jsonc）：允許「dev:會員代號」當作登入憑證。正式環境一律 off。 */
   DEV_LOGIN?: string;
+  /** 與行動大學共用的設定（Cloudflare KV「hg-shared-settings」：上傳壓縮畫質）。 */
+  SHARED?: { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> };
   /** 中央 webhook 簽章金鑰（業主在 Cloudflare 後台設定的 Secret）。 */
   CENTRAL_WEBHOOK_SECRET?: string;
 };

@@ -1,7 +1,8 @@
 /** 繳交內容的方格（照片、影片、檔案、連結、文字）與留言區。 */
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Image, Linking, Modal, Platform, Pressable, Text, View } from "react-native";
+import { Image, Linking, Platform, Pressable, Text, View } from "react-native";
+import { EdmLightbox } from "@/features/courses/lightbox";
 import { API_BASE } from "@/api/client";
 import type { CommentView, FileView } from "@check/contract";
 import { api, openFile } from "@/api/client";
@@ -13,11 +14,12 @@ const ICON: Record<FileView["kind"], keyof typeof Ionicons.glyphMap> = { photo: 
 export function FileGrid({ files, onRemove }: { files: FileView[]; onRemove?: (f: FileView) => void }) {
   const c = useColors();
   const [text, setText] = useState<FileView | null>(null);
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<number | null>(null);
+  const photos = files.filter((f) => f.kind === "photo" && f.url);
   if (!files.length) return null;
   const open = async (f: FileView) => {
     try {
-      if (f.kind === "photo" && f.url) setPhoto(API_BASE + f.url);
+      if (f.kind === "photo" && f.url) setPhoto(Math.max(0, photos.findIndex((p) => p.id === f.id)));
       else if (f.kind === "link" && f.url) {
         if (Platform.OS === "web") window.open(f.url, "_blank", "noopener");
         else await Linking.openURL(f.url);
@@ -63,12 +65,10 @@ export function FileGrid({ files, onRemove }: { files: FileView[]; onRemove?: (f
           )}
         </Pressable>
       ))}
-      <Modal visible={!!photo} transparent animationType="fade" onRequestClose={() => setPhoto(null)}>
-        <Pressable accessibilityLabel="關閉" onPress={() => setPhoto(null)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}>
-          {photo ? <Image source={{ uri: photo }} resizeMode="contain" style={{ width: "100%", height: "86%" }} /> : null}
-          <Text style={{ color: "#fff", marginTop: 8 }}>點一下關閉</Text>
-        </Pressable>
-      </Modal>
+      {photo !== null && photos.length ? (
+        // 看圖程式：共用元件（與行動大學同一個；兩指放大、左右滑換張、下載、分享）
+        <EdmLightbox uri={photos[0]!.url!} title={photos[photo]?.name ?? "照片"} items={photos.map((p) => ({ uri: p.url!, title: p.name }))} index={photo} onClose={() => setPhoto(null)} />
+      ) : null}
       <Sheet open={!!text} onClose={() => setText(null)} title={text?.name} footer={<Btn label="關閉" kind="cancel" onPress={() => setText(null)} />}>
         <T>{text?.body ?? ""}</T>
       </Sheet>
@@ -110,7 +110,7 @@ export function Comments({ submissionId, comments, onChange, canModerate }: { su
           onPress={async () => {
             setBusy(true);
             try {
-              await api(`/submissions/${submissionId}/comments`, "POST", { body: text });
+              await api("POST", `/submissions/${submissionId}/comments`, { body: text });
               setText("");
               flash("已留言", "對方會收到通知");
               onChange();
@@ -132,7 +132,7 @@ export function Comments({ submissionId, comments, onChange, canModerate }: { su
               const m = menu!;
               setMenu(null);
               try {
-                await api(`/comments/${m.id}/hide`, "POST");
+                await api("POST", `/comments/${m.id}/hide`);
                 flash(m.mine ? "已刪除" : "已隱藏");
                 onChange();
               } catch (e) {
@@ -150,7 +150,7 @@ export function Comments({ submissionId, comments, onChange, canModerate }: { su
               const m = menu!;
               setMenu(null);
               try {
-                await api("/reports", "POST", { target: `comment:${m.id}`, reason: "" });
+                await api("POST", "/reports", { target: `comment:${m.id}`, reason: "" });
                 flash("已檢舉", "管理員會處理");
               } catch (e) {
                 flashError(e);

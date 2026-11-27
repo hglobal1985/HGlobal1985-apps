@@ -1,6 +1,6 @@
 import { api, apiUpload } from "@/api/client";
 import { cropCompress, loadImage } from "@/features/admin/image-tools";
-import { readPhotoMeta } from "./exif-meta";
+import { readPhotoMeta } from "@/features/uploads/exif-meta";
 import { flashText } from "@/ui/flash-notice";
 
 /**

@@ -9,7 +9,7 @@ import { AppText, LoadingLadybug } from "@/ui";
 import { engine } from "./engine";
 import { PlayerControls } from "./player-controls";
 import { remainingText, segmentOf } from "./engine.types";
-import { SeekBar } from "./seek-bar";
+import { SeekBar } from "@/features/player/seek-bar";
 import { usePlayer } from "./use-player";
 
 const back = (courseId: string, lessonId: string) => router.push(lessonHref(courseId, lessonId) as never);

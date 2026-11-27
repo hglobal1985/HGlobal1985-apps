@@ -56,9 +56,9 @@ export default function Review() {
         <>
           <Btn label="退回重交" kind="cancel" onPress={() => { setRetText(g?.comment ?? ""); setRet(true); }} />
           {teacher ? (
-            <Btn label={fixed ? "通過・下一份" : "儲存並下一份"} busy={busy} disabled={!g || !gradeReady(e.item, g)} onPress={() => run(() => api(`/submissions/${s.id}/grade`, "POST", gradeBody(e.item, g!)), "已儲存", `${s.name}，下一份`)} />
+            <Btn label={fixed ? "通過・下一份" : "儲存並下一份"} busy={busy} disabled={!g || !gradeReady(e.item, g)} onPress={() => run(() => api("POST", `/submissions/${s.id}/grade`, gradeBody(e.item, g!)), "已儲存", `${s.name}，下一份`)} />
           ) : (
-            <Btn label="確認沒問題" busy={busy} onPress={() => run(() => api(`/submissions/${s.id}/leader-ok`, "POST", { note: "" }), "已確認", "交給老師評分")} />
+            <Btn label="確認沒問題" busy={busy} onPress={() => run(() => api("POST", `/submissions/${s.id}/leader-ok`, { note: "" }), "已確認", "交給老師評分")} />
           )}
         </>
       }
@@ -94,7 +94,7 @@ export default function Review() {
               disabled={!retText.trim()}
               onPress={async () => {
                 setRet(false);
-                await run(() => api(`/submissions/${s.id}/return`, "POST", { comment: retText }), "已退回重交", `${s.name} 會收到通知`);
+                await run(() => api("POST", `/submissions/${s.id}/return`, { comment: retText }), "已退回重交", `${s.name} 會收到通知`);
               }}
             />
           </>

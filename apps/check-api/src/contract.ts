@@ -154,7 +154,8 @@ export type PeopleView = { canManage: boolean; canEditGroupId: string | null; gr
 
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string };
 
-export type Me = { memberId: string; name: string; avatarUrl: string | null; superAdmin: boolean; unread: number };
+/** staff＝在任何一份作業是老師、管理員或組長（底部選單顯示「批改」）；toReview＝等他處理的作業份數。 */
+export type Me = { memberId: string; name: string; avatarUrl: string | null; superAdmin: boolean; unread: number; staff: boolean; toReview: number };
 
 export const DEFAULT_KINDS: Record<ItemMode, Kind[]> = {
   count: ["photo", "video", "text"],

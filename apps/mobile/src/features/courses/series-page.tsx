@@ -19,7 +19,7 @@ import { flashText } from "@/ui/flash-notice";
 import { TopBarButton } from "@/ui/top-bar";
 import { CenterHero, centerHeroFull, HeroMiniCover } from "./center-hero";
 import { CoverMiniFloat } from "@/ui/collapse-band";
-import { CoverAlbum } from "./album";
+import { CoverAlbum } from "@/features/courses/album";
 import { AlbumUploadButton } from "@/features/uploads/album-upload";
 import { useCoverMedia } from "./cover-media";
 import { BottomSheet, SheetScroll } from "@/ui/bottom-sheet";

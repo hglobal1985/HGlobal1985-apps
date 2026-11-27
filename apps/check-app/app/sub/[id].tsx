@@ -45,9 +45,9 @@ export default function SubmissionPage() {
           <>
             <Btn label="退回重交" kind="cancel" onPress={() => { setRetText(""); setRet(true); }} />
             {v.canGrade && g ? (
-              <Btn label={s.status === "graded" ? "修改評分" : "儲存評分"} busy={busy} disabled={!gradeReady(v.item, g)} onPress={() => act(() => api(`/submissions/${s.id}/grade`, "POST", gradeBody(v.item, g)), "已儲存")} />
+              <Btn label={s.status === "graded" ? "修改評分" : "儲存評分"} busy={busy} disabled={!gradeReady(v.item, g)} onPress={() => act(() => api("POST", `/submissions/${s.id}/grade`, gradeBody(v.item, g)), "已儲存")} />
             ) : (
-              <Btn label="確認沒問題" busy={busy} onPress={() => act(() => api(`/submissions/${s.id}/leader-ok`, "POST", { note: "" }), "已確認")} />
+              <Btn label="確認沒問題" busy={busy} onPress={() => act(() => api("POST", `/submissions/${s.id}/leader-ok`, { note: "" }), "已確認")} />
             )}
           </>
         ) : undefined
@@ -75,7 +75,7 @@ export default function SubmissionPage() {
         footer={
           <>
             <Btn label="取消" kind="cancel" onPress={() => setRet(false)} />
-            <Btn label="退回" disabled={!retText.trim()} onPress={async () => { setRet(false); await act(() => api(`/submissions/${s.id}/return`, "POST", { comment: retText }), "已退回重交"); }} />
+            <Btn label="退回" disabled={!retText.trim()} onPress={async () => { setRet(false); await act(() => api("POST", `/submissions/${s.id}/return`, { comment: retText }), "已退回重交"); }} />
           </>
         }
       >

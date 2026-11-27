@@ -7,7 +7,7 @@ import { useStageMax } from "@/ui/stage-frame";
 import { AppText, LoadingLadybug } from "@/ui";
 import { engine } from "./engine";
 import { rateText, remainingText, segmentOf } from "./engine.types";
-import { SeekBar } from "./seek-bar";
+import { SeekBar } from "@/features/player/seek-bar";
 import { usePlayer } from "./use-player";
 
 /**

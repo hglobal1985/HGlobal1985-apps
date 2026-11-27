@@ -5,6 +5,9 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { Platform } from "react-native";
 import { LIMITS, type Kind } from "@check/contract";
+import { cropCompress, loadImage } from "@/features/admin/image-tools";
+import { compressVideo, probeVideo, videoCompressSupported } from "@/features/uploads/video-compress";
+import { uploadSettings } from "./upload-settings";
 
 export type Picked = { blob: Blob; name: string; kind: Kind; durationSec?: number };
 
@@ -12,17 +15,13 @@ async function toBlob(uri: string): Promise<Blob> {
   return await (await fetch(uri)).blob();
 }
 
-async function compressWebImage(blob: Blob, maxSide = 2000, quality = 0.85): Promise<Blob> {
+/** 照片壓縮：共用的圖片工具（features/admin/image-tools）＋共用的壓縮設定（長邊、畫質，與行動大學同一份）。 */
+async function compressWebImage(blob: Blob, name: string): Promise<Blob> {
   if (Platform.OS !== "web" || !/^image\/(jpeg|png|webp)/.test(blob.type)) return blob;
   try {
-    const bmp = await createImageBitmap(blob);
-    const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
-    if (k === 1 && blob.size < 3 * 1048576) return blob;
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(bmp.width * k);
-    canvas.height = Math.round(bmp.height * k);
-    canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    return await new Promise<Blob>((res) => canvas.toBlob((b) => res(b ?? blob), "image/jpeg", quality));
+    const { settings } = await uploadSettings();
+    const img = await loadImage(new window.File([blob], name, { type: blob.type }));
+    return await cropCompress(img, null, settings.imageMaxSide, settings.imageQuality / 100);
   } catch {
     return blob;
   }
@@ -49,7 +48,7 @@ export async function pickPhotos(max: number): Promise<Picked[]> {
   const out: Picked[] = [];
   for (const a of r.assets.slice(0, max)) {
     let blob = await toBlob(a.uri);
-    blob = await compressWebImage(blob);
+    blob = await compressWebImage(blob, a.fileName ?? "照片.jpg");
     const name = (a.fileName ?? `照片.jpg`).replace(/\.(png|webp|heic|heif)$/i, Platform.OS === "web" ? ".jpg" : ".$1");
     out.push({ blob, name, kind: "photo" });
   }
@@ -64,7 +63,11 @@ export async function takePhoto(): Promise<Picked[]> {
   return [{ blob: await toBlob(r.assets[0].uri), name: r.assets[0].fileName ?? "照片.jpg", kind: "photo" }];
 }
 
-export async function pickVideo(): Promise<Picked[]> {
+/**
+ * 短影片：3 分鐘內。網頁版在學員自己的瀏覽器裡壓縮（共用的影片壓縮模組＋共用壓縮設定：畫面高度、位元率、每秒格數，與行動大學同一份）；
+ * iPhone App 選影片時系統先轉成 720p。onStep 回報壓縮進度。
+ */
+export async function pickVideo(onStep?: (label: string, pct: number | null) => void): Promise<Picked[]> {
   const r = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["videos"],
     videoMaxDuration: LIMITS.videoSeconds,
@@ -73,11 +76,25 @@ export async function pickVideo(): Promise<Picked[]> {
   });
   if (r.canceled) return [];
   const a = r.assets[0];
-  const blob = await toBlob(a.uri);
-  const dur = a.duration ? a.duration / 1000 : await webVideoDuration(blob);
+  const name = a.fileName ?? "影片.mp4";
+  let blob = await toBlob(a.uri);
+  let dur = a.duration ? a.duration / 1000 : 0;
+  if (Platform.OS === "web") {
+    const file = (a as { file?: File }).file ?? new window.File([blob], name, { type: blob.type || "video/mp4" });
+    const info = await probeVideo(file).catch(() => null);
+    dur = info?.durationSec ?? (await webVideoDuration(blob));
+    if (dur > LIMITS.videoSeconds + 1) throw new Error("短影片要在 3 分鐘內，請先剪短再上傳");
+    if (videoCompressSupported()) {
+      const { settings } = await uploadSettings();
+      onStep?.(`壓縮影片中（約 ${Math.max(5, Math.round(dur))} 秒，請不要離開）`, 0);
+      const out = await compressVideo(file, { maxHeight: settings.videoMaxHeight, kbps: settings.videoKbps, fps: settings.videoFps, maxMb: LIMITS.videoMB, maxSec: LIMITS.videoSeconds }, (p) => onStep?.("壓縮影片中，請不要離開", p));
+      blob = out.blob;
+      dur = out.durationSec || dur;
+    }
+  }
   if (dur > LIMITS.videoSeconds + 1) throw new Error("短影片要在 3 分鐘內，請先剪短再上傳");
   if (blob.size > LIMITS.videoMB * 1048576) throw new Error(`影片太大（最大 ${LIMITS.videoMB}MB），請剪短或用較低畫質重錄`);
-  return [{ blob, name: a.fileName ?? "影片.mp4", kind: "video", durationSec: Math.round(dur) }];
+  return [{ blob, name: name.replace(/\.(mov|m4v|webm)$/i, blob.type.includes("webm") ? ".webm" : ".mp4"), kind: "video", durationSec: Math.round(dur) }];
 }
 
 export async function pickFiles(max: number): Promise<Picked[]> {
