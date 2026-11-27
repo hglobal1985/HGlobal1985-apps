@@ -3,6 +3,7 @@ import { isSuperAdmin, lookupContactEmails, ownProfile, verifyAccessToken } from
 import { KINDS, pointsFor, type ActivityCard, type ActivitySettings, type ActivityView, type CommentView, type FileView, type GroupView, type ItemCard, type ItemMode, type ItemView, type Kind, type PeopleView, type Person, type QueueEntry, type Role, type SubmissionView, type SubStatus } from "./contract.ts";
 import type { D1Database, Env } from "./env.ts";
 import { sendPush, vapidPublicKey } from "../../../packages/server-shared/src/web-push.ts";
+import { flushNoticePushes } from "../../../packages/server-shared/src/notice-push.ts";
 
 /**
  * 寰宇繳作業系統 API（/api/…）。每個請求都在這裡驗證身分與權限；前端隱藏按鈕不算權限控制。
@@ -283,21 +284,16 @@ export async function flushPushes(env: Env, fetcher: typeof fetch = fetch): Prom
   if (!vapidPublicKey(env.VAPID_PRIVATE_JWK)) return 0;
   const db = env.DB;
   const since = new Date(Date.now() - 30 * 60_000).toISOString();
-  const rows = (await db.prepare("SELECT id, member_id, title, body, link FROM notices WHERE pushed = 0 AND created_at >= ? ORDER BY created_at LIMIT 50").bind(since).all<Row>()).results;
-  let sent = 0;
-  for (const n of rows) {
-    const claim = await db.prepare("UPDATE notices SET pushed = 1 WHERE id = ? AND pushed = 0").bind(n.id).run();
-    if (!claim.meta?.changes) continue;
-    const subs = (await db.prepare("SELECT endpoint, p256dh, auth FROM push_subs WHERE member_id = ?").bind(n.member_id).all<{ endpoint: string; p256dh: string; auth: string }>()).results;
-    for (const d of subs) {
-      const r = await sendPush(env.VAPID_PRIVATE_JWK, PUSH_SUBJECT, d, { title: String(n.title), body: String(n.body), link: String(n.link || "/notices") }, fetcher);
-      if (r === "ok") sent++;
-      else if (r === "gone") await db.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(d.endpoint).run();
-      else await db.prepare("UPDATE push_subs SET failures = failures + 1 WHERE endpoint = ?").bind(d.endpoint).run();
-    }
-  }
-  await db.prepare("DELETE FROM push_subs WHERE failures >= 20").run();
-  return sent;
+  // 推播流程是共用模組（packages/server-shared/src/notice-push.ts，與行動大學同一份）；這裡只提供繳作業系統的資料表怎麼讀寫。
+  return flushNoticePushes<Row & { id: string; title: string; body: string; link: string }>({
+    pending: async () => (await db.prepare("SELECT id, member_id, title, body, link FROM notices WHERE pushed = 0 AND created_at >= ? ORDER BY created_at LIMIT 50").bind(since).all<Row & { id: string; title: string; body: string; link: string }>()).results,
+    claim: async (n) => ((await db.prepare("UPDATE notices SET pushed = 1 WHERE id = ? AND pushed = 0").bind(n.id).run()).meta?.changes ?? 0) > 0,
+    devices: async (n) => (await db.prepare("SELECT endpoint, p256dh, auth FROM push_subs WHERE member_id = ?").bind(n.member_id).all<{ endpoint: string; p256dh: string; auth: string }>()).results,
+    send: (d, msg) => sendPush(env.VAPID_PRIVATE_JWK, PUSH_SUBJECT, d, msg, fetcher),
+    onGone: (d) => db.prepare("DELETE FROM push_subs WHERE endpoint = ?").bind(d.endpoint).run(),
+    onError: (d) => db.prepare("UPDATE push_subs SET failures = failures + 1 WHERE endpoint = ?").bind(d.endpoint).run(),
+    cleanup: () => db.prepare("DELETE FROM push_subs WHERE failures >= 20").run(),
+  });
 }
 
 export const deadlinePassed = (dueAt: unknown) => typeof dueAt === "string" && dueAt !== "" && Date.parse(dueAt) < Date.now();

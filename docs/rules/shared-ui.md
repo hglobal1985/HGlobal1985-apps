@@ -26,4 +26,8 @@
   - **伺服器的服務金鑰與聯絡查詢 `packages/server-shared/src/central-service.ts`**（`createServiceClient` → `token`、`forget`、`lookupContactEmails`；`validEmail`）。行動大學 `central.ts` 的 `serviceToken`、`lookupContactEmails` 改用它。
   - **ZIP 壓縮檔串流 `packages/server-shared/src/zip-stream.ts`**（`zipStream`、`zipNamer`、`crc32Update`）：邊讀邊打包、不壓縮、UTF-8 檔名、每包請控制在 4GB 內（呼叫端分包）。繳作業系統的「一鍵下載備份」在用；行動大學之後要做「整包下載」也用這份。
   - **錯誤回報 `lib/error-report.ts`**：轉接檔 `@/lib/app-assets` 要多提供 `APP_ORIGIN`、`ERROR_REPORT_PATH`（行動大學 `/api/v2/client-errors`、繳作業系統 `/api/client-errors`）。
+- **第五批（2026-11-27）**：
+  - **中央登入共用工具 `lib/central-client.ts`**：`CentralError`、`createCentralRequest`（呼叫中央、錯誤轉中文）、`createTokenVault`（手機安全儲存／網頁 localStorage、跨分頁換發鎖 `withLock`、`onExternalChange`、`migrateFromSession`）、`isOutdated`、`nonceHash`、`randomHex`。行動大學 `api/central.ts` 與繳作業系統 `central/auth.ts` 都改用它（鍵名沿用各自原本的，不會讓人被登出）；各 App 的登入流程（回傳網址、畫面）仍在自己的檔。
+  - **站內通知→推播的共用流程 `packages/server-shared/src/notice-push.ts`**（`flushNoticePushes`）：先標記再推、失效裝置刪除、失敗累計、清理；兩個後端的 `flushPushes` 只提供讀寫資料表的小函式。
+  - **新 App 範本**：見 `docs/rules/new-app.md`。
 - **還沒共用的**：行動大學的播放引擎本身（YouTube／Mux／音檔、迷你播放器、續播；`features/player/engine*`）、行動大學「儲存空間管理」頁本身（它還有其他行動大學專屬設定；上傳壓縮那幾欄改的是同一份）。

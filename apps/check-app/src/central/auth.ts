@@ -6,50 +6,18 @@
  * - 換發同一時間只跑一個（加鎖）；新的 Refresh Token 立刻覆蓋舊的；refresh_reused／invalid 就回登入畫面。
  */
 import * as Crypto from "expo-crypto";
-import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { Platform } from "react-native";
+import { CentralError, createCentralRequest, createTokenVault, isOutdated } from "@/lib/central-client";
 import { memberOfToken, nativeSsoEnabled, readNativeSso, writeNativeSso } from "@/lib/sso-keychain";
 import { APP_ID, CENTRAL_URL, NATIVE_RETURN, WEB_ORIGIN } from "./config";
 
 const web = Platform.OS === "web";
 const K = { access: "check.access", accessExp: "check.access-exp", refresh: "check.refresh", pending: "check.pending", ssoWeb: "check.sso", ssoCheckAt: "check.sso-check-at", back: "check.back" };
 
-export class CentralError extends Error {
-  status: number;
-  code: string;
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.status = status;
-    this.code = code;
-  }
-}
-
-const FRIENDLY: Record<string, string> = {
-  app_unavailable: "系統維護中，請稍後再試",
-  account_disabled: "這個帳號已停用，請聯絡客服",
-  rate_limited: "操作太頻繁，請稍後再試",
-  network: "連不上會員中心，請檢查網路後再試",
-};
-
-async function central<T>(path: string, method = "GET", body?: unknown, token?: string): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(CENTRAL_URL + path, {
-      method,
-      headers: { ...(body ? { "content-type": "application/json" } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch {
-    throw new CentralError(0, "network", FRIENDLY.network);
-  }
-  if (!res.ok) {
-    const e = ((await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null)?.error;
-    const code = e?.code ?? "central_error";
-    throw new CentralError(res.status, code, FRIENDLY[code] ?? e?.message ?? "登入失敗，請再試一次");
-  }
-  return (res.status === 204 ? undefined : await res.json()) as T;
-}
+export { CentralError };
+/** 呼叫中央 API：共用工具（lib/central-client.ts，與行動大學同一份）。 */
+const central = createCentralRequest(CENTRAL_URL);
 
 // ───── 儲存 ─────
 const ss = () => {
@@ -59,38 +27,11 @@ const ss = () => {
     return undefined;
   }
 };
-const ls = () => {
-  try {
-    return globalThis.localStorage;
-  } catch {
-    return undefined; // 無痕模式或封鎖網站資料：退回只在這次開啟期間有效
-  }
-};
-// 舊版存在 sessionStorage 的登入：搬到 localStorage（這次升級不必重新登入）。
-if (web) {
-  try {
-    const old = ss()?.getItem("check.refresh");
-    if (old && !ls()?.getItem("check.refresh")) ls()?.setItem("check.refresh", old);
-    ss()?.removeItem("check.refresh");
-  } catch {
-    /* 讀不到就算了 */
-  }
-}
-const store = {
-  async get(key: string): Promise<string | null> {
-    if (web) return ls()?.getItem(key) ?? null;
-    return SecureStore.getItemAsync(key);
-  },
-  async set(key: string, value: string | null): Promise<void> {
-    if (web) {
-      if (value) ls()?.setItem(key, value);
-      else ls()?.removeItem(key);
-      return;
-    }
-    if (value) await SecureStore.setItemAsync(key, value);
-    else await SecureStore.deleteItemAsync(key);
-  },
-};
+// 登入憑證：共用工具 createTokenVault（手機放系統安全儲存、網頁放 localStorage，登入永不過期；跨分頁換發鎖）。
+const vault = createTokenVault("hglobal.check.refresh");
+vault.migrateFromSession(["check.refresh"]); // 舊版放在 sessionStorage 的登入搬過來（不必重新登入）
+const store = { get: vault.get, set: vault.set };
+
 /** 共用登入的 sso_token：iPhone 放共用 Keychain 群組（共用元件 lib/sso-keychain.ts，與行動大學同一份）；網頁放 sessionStorage。 */
 const ssoStore = {
   enabled: () => web || nativeSsoEnabled(),
@@ -155,20 +96,12 @@ export const currentMember = () => memberId;
 export const isSignedIn = () => !!memberId;
 
 /** 換發（加鎖）。成功回 true；被撤銷或失效就清掉登入回 false。 */
-/** 跨分頁加鎖：同一時間只有一個分頁在換發（瀏覽器不支援就只在這個分頁內排隊）。 */
-function withRefreshLock<T>(fn: () => Promise<T>): Promise<T> {
-  const locks = (globalThis.navigator as unknown as { locks?: { request: (name: string, cb: () => Promise<unknown>) => Promise<unknown> } } | undefined)?.locks;
-  return web && locks ? (locks.request("hglobal.check.refresh", fn) as Promise<T>) : fn();
-}
+const withRefreshLock = vault.withLock;
 // 別的分頁換發或登出時，這個分頁的記憶體跟著更新（不會拿已作廢的舊憑證）。
-if (web && typeof globalThis.addEventListener === "function") {
-  globalThis.addEventListener("storage", (e: StorageEvent) => {
-    if (e.key === K.access || e.key === K.refresh || e.key === null) {
-      access = null;
-      accessExp = 0;
-    }
-  });
-}
+vault.onExternalChange([K.access, K.refresh], () => {
+  access = null;
+  accessExp = 0;
+});
 
 export function refresh(): Promise<boolean> {
   if (inflight) return inflight;
@@ -439,14 +372,8 @@ export async function appConfig(): Promise<AppStatus | null> {
     return null;
   }
 }
-export function olderThan(v: string, min: string): boolean {
-  const a = v.split(".").map(Number);
-  const b = min.split(".").map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) < (b[i] ?? 0);
-  }
-  return false;
-}
+/** App 版本是否比最低版本舊：共用工具（lib/central-client.ts）。 */
+export const olderThan = isOutdated;
 
 /** 本機測試用登入（只有在開發模式、非正式網址、伺服器 DEV_LOGIN=on 時有效）。 */
 export async function devSignIn(member: string): Promise<void> {
