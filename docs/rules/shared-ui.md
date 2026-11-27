@@ -16,6 +16,7 @@
 - **兩個 App 共用的上傳壓縮設定（杜杜龍 2026-11-26）**：正本在 Cloudflare KV「hg-shared-settings」（id `0287ee74946943298b5a7b7885930829`，兩個 Worker 都綁成 `SHARED`），程式在 `packages/server-shared/src/upload-settings.ts`（一般圖片／中心首頁圖／EDM 的長邊與畫質、影片高度／位元率／每秒格數、存檔格式）。行動大學：設定頁照舊（「儲存空間管理」），`saveConfig` 存檔時同步寫進 KV、`loadConfig` 讀取時以 KV 為準（第一次 KV 是空的就用行動大學目前的值當起點）。繳作業系統：「我的 › 上傳設定」（超級管理員，`GET/PUT /api/upload-settings`），作業照片與短影片壓縮都用這份。KV 跨地區同步約 1 分鐘。各 App 自己的大小與長度上限（行動大學短影音 60 秒、作業短影片 3 分鐘 80MB）不在共用設定裡。
 - **第三批（2026-11-27）**：
   - **手機推播**：加密與傳送（RFC 8291、VAPID）抽到 `packages/server-shared/src/web-push.ts`（`sendPush(私鑰, 寄件網址, 裝置, 內容)`、`vapidPublicKey`、`encryptPayload`），行動大學 `apps/launch/src/push.ts` 只包一層接上自己的金鑰與網址（行為不變）；手機端的推播開關 `lib/web-push.ts`（`pushState`、`enablePush`、`disablePush`）在共用資料夾，兩個 App 的伺服器都要提供 `GET /push/key`、`POST /push/subscribe`、`POST /push/unsubscribe`。背景接收程式 `public/sw.js` 每個 App 各放一份（只差預設標題）。每個 Worker 各自的金鑰：Cloudflare Secret `VAPID_PRIVATE_JWK`。
-  - **影片檢視 `VideoViewer`**（`ui/video-viewer.web.tsx`：全黑全螢幕在畫面內播放、✕ 與上一頁關閉；App 版 `video-viewer.tsx` 暫時用系統瀏覽器）。
+  - **播放控制列外觀 `ControlsBar`**（`features/player/controls-bar.tsx`：播放／暫停〔讀取中＝小瓢蟲〕、時間軸 `seek-bar.tsx`、倒數剩餘時間、倍數、小視窗、全螢幕；時間與倍數文字在 `features/player/time-format.ts`）。行動大學課程頁的 `PlayerControls` 只把自己的播放引擎接到它身上；**要改播放控制列外觀只改 controls-bar.tsx，兩個 App 一起變**。
+  - **影片檢視 `VideoViewer`**（網頁 `ui/video-viewer.web.tsx`、App `ui/video-viewer.tsx`〔expo-video〕：全黑全螢幕在畫面內播放、下方是 `ControlsBar`、✕ 與上一頁／返回鍵關閉）。
   - **「加入主畫面」卡片 `InstallCard`**：App 名稱改讀轉接檔 `@/lib/app-assets` 的 `APP_NAME`（行動大學＝寰宇行動大學、繳作業系統＝寰宇繳作業系統）。
-- **還沒共用的**：課程頁的播放控制列 `PlayerControls`（跟行動大學的播放引擎綁在一起）、行動大學「儲存空間管理」頁本身（它還有其他行動大學專屬設定；上傳壓縮那幾欄改的是同一份）。
+- **還沒共用的**：行動大學的播放引擎本身（YouTube／Mux／音檔、迷你播放器、續播；`features/player/engine*`）、行動大學「儲存空間管理」頁本身（它還有其他行動大學專屬設定；上傳壓縮那幾欄改的是同一份）。

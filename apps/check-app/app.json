@@ -11,17 +11,38 @@
       "expo-secure-store",
       "expo-web-browser",
       "expo-document-picker",
-      ["expo-image-picker", { "photosPermission": "選擇要繳交的照片與影片", "cameraPermission": "拍攝要繳交的照片與影片" }]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "選擇要繳交的照片與影片",
+          "cameraPermission": "拍攝要繳交的照片與影片"
+        }
+      ],
+      "expo-video"
     ],
-    "web": { "bundler": "metro", "output": "single", "name": "寰宇繳作業系統", "lang": "zh-Hant" },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "寰宇繳作業系統",
+      "lang": "zh-Hant"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hglobal1985.check",
       "buildNumber": "1",
-      "infoPlist": { "ITSAppUsesNonExemptEncryption": false },
-      "entitlements": { "keychain-access-groups": ["$(AppIdentifierPrefix)com.hglobal1985.shared"] }
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "keychain-access-groups": [
+          "$(AppIdentifierPrefix)com.hglobal1985.shared"
+        ]
+      }
     },
-    "android": { "package": "com.hglobal1985.check", "versionCode": 1 },
+    "android": {
+      "package": "com.hglobal1985.check",
+      "versionCode": 1
+    },
     "extra": {
       "appleTeamId": ""
     }
