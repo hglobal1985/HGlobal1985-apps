@@ -46,7 +46,7 @@ export default function AppSettingsScreen() {
   const set = <K extends keyof App>(k: K, v: App[K]) => setApp((x) => ({ ...x, [k]: v }));
   const rec = <K extends keyof App["rec"]>(k: K, v: App["rec"][K]) => setApp((x) => ({ ...x, rec: { ...x.rec, [k]: v } }));
   const restore = async () => {
-    if (!(await confirmSheet({ title: "還原預設值", message: "全部數值與規則會改回出廠預設，確定嗎？", confirmLabel: "還原", cancelLabel: "先不要", danger: true }))) return;
+    if (!(await confirmSheet({ title: "還原預設值", message: "全部數值與規則會改回出廠預設，確定嗎？", confirmLabel: "還原", cancelLabel: "先不要", danger: true, typeOk: true }))) return;
     setApp(DEFAULT_APP_SETTINGS); // 只改畫面上的草稿，要按下方「儲存」才生效
   };
 

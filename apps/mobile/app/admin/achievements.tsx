@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_TYPES, ACH_ICON_POOL, ACH_TIMES, ACH_UNITS, ACH_VERBS, FEATURES, achDefaultIcon, achRecipeOf, achTypeOf, api, type AchTime, type AchievementCategory, type AchievementType, type AdminAchievement } from "@/api/client";
-import { confirmAsk } from "@/features/confirm";
+import { confirmAsk, confirmDanger } from "@/features/confirm";
 import { useUnsavedPrompt } from "@/lib/settings-page";
 import { BadgeIcon } from "@/features/achievements/badge-icon";
 import { achPhrase, conditionText } from "@/features/achievements/text";
@@ -146,7 +146,7 @@ export default function AdminAchievementsScreen() {
     if (await run(() => (form.id ? api("PATCH", `/admin/achievements/${form.id}`, body) : api("POST", "/admin/achievements", body)), form.id ? "已儲存" : "已新增徽章")) setForm(null);
   };
   const remove = async (a: AdminAchievement) => {
-    if (await confirmAsk("刪除徽章", `確定刪除「${a.name}」？已取得這枚徽章的 ${a.earnedCount} 位會員紀錄也會一併刪除，無法復原。`, "刪除")) {
+    if (await confirmDanger("刪除徽章", `確定刪除「${a.name}」？已取得這枚徽章的 ${a.earnedCount} 位會員紀錄也會一併刪除，無法復原。`, "刪除")) {
       if (await run(() => api("DELETE", `/admin/achievements/${a.id}`), "已刪除")) setForm(null);
     }
   };

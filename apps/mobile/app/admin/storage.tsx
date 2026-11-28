@@ -3,7 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { useUnsavedPrompt } from "@/lib/settings-page";
 import { api } from "@/api/client";
 import { useUiConfig } from "@/state/ui-config";
-import { confirmAsk } from "@/features/confirm";
+import { confirmDanger } from "@/features/confirm";
 import { Button, NoticeBox, SettingsFooter } from "@/ui";
 import { centerTitle } from "@/features/format";
 import { useApi, useSession } from "@/state/session";
@@ -88,7 +88,7 @@ function RecompressSection() {
     return () => clearInterval(t);
   }, [data?.job.running]); // eslint-disable-line react-hooks/exhaustive-deps
   const act = async (a: "start" | "stop") => {
-    if (a === "start" && !(await confirmAsk("重新壓縮所有舊照片", `會把相簿裡所有舊照片，依目前「相簿照片」設定（${data?.target.format.toUpperCase()}、畫質 ${data?.target.quality}%）重新壓縮並覆蓋原檔。站內不保留原圖，覆蓋後無法復原；已經是目標格式的會跳過。要先調整格式或畫質，請先取消、改好並儲存設定。確定開始？`, "開始重新壓縮"))) return;
+    if (a === "start" && !(await confirmDanger("重新壓縮所有舊照片", `會把相簿裡所有舊照片，依目前「相簿照片」設定（${data?.target.format.toUpperCase()}、畫質 ${data?.target.quality}%）重新壓縮並覆蓋原檔。站內不保留原圖，覆蓋後無法復原；已經是目標格式的會跳過。要先調整格式或畫質，請先取消、改好並儲存設定。確定開始？`, "開始重新壓縮"))) return;
     setBusy(true);
     try {
       await api("POST", `/admin/recompress/${a}`);

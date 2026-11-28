@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { api, type CourseSummary } from "@/api/client";
-import { confirmAsk } from "@/features/confirm";
+import { confirmAsk, confirmDanger } from "@/features/confirm";
 import { EditSheet } from "@/features/course-edit/edit-sheet";
 import { SyncAutoCard } from "@/features/sync-auto";
 import { useApi, useSession } from "@/state/session";
@@ -49,7 +49,7 @@ export default function DriveSyncsScreen() {
     }
   };
   const removeAll = async (s: Sync) => {
-    if (!(await confirmAsk("刪除清單與關聯教材", `會刪除「${s.label || s.courseTitle}」的同步設定，以及「${s.courseTitle}」裡連結指向這個資料夾檔案的所有教材（含學員的相關紀錄），無法復原。確定刪除？`, "全部刪除"))) return;
+    if (!(await confirmDanger("刪除清單與關聯教材", `會刪除「${s.label || s.courseTitle}」的同步設定，以及「${s.courseTitle}」裡連結指向這個資料夾檔案的所有教材（含學員的相關紀錄），無法復原。確定刪除？`, "全部刪除"))) return;
     setBusyId(s.id);
     try {
       const r = await api<{ deleted: number }>("POST", `/admin/drive-syncs/${s.id}/delete-with-materials`);

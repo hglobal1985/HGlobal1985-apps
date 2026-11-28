@@ -48,7 +48,7 @@ export default function Manage() {
         <View style={{ flexDirection: "row", gap: 10 }}>
           <Btn small label="分享加入連結" onPress={() => shareLink(`/join/${a.joinCode}`, `請點連結加入「${a.title}」`)} />
           <Btn small kind="grey" label="重新產生" onPress={async () => {
-            if (!(await confirmSheet("重新產生加入連結？", "舊的連結會立刻失效。", "重新產生"))) return;
+            if (!(await confirmSheet("重新產生加入連結？", "舊的連結會立刻失效。", "重新產生", true, true))) return;
             try { await api("POST", `/activities/${id}/join-code`); flash("已重新產生"); await reload(); } catch (e) { flashError(e); }
           }} />
         </View>
@@ -107,7 +107,7 @@ export default function Manage() {
           <Btn small kind="grey" label="下載成績表" onPress={() => downloadScores(id!, a.title)} />
         </View>
         <Btn small flex={false} kind="cancel" label="刪除全部檔案" disabled={!!a.filesPurgedAt} onPress={async () => {
-          if (!(await confirmSheet("刪除這份作業的全部檔案？", `${storage.data?.files ?? 0} 個檔案會永久刪除，分數與評語保留。建議先備份。`, "刪除", true))) return;
+          if (!(await confirmSheet("刪除這份作業的全部檔案？", `${storage.data?.files ?? 0} 個檔案會永久刪除，分數與評語保留。建議先備份。`, "刪除", true, true))) return;
           try { const r = await api<{ deleted: number }>("POST", `/activities/${id}/purge`); flash("已刪除全部檔案", `${r.deleted} 個`); await reload(); await storage.reload(); } catch (e) { flashError(e); }
         }} />
       </Card>

@@ -100,7 +100,7 @@ function CoverLibrarySheet({ onClose, onPick }: { onClose: () => void; onPick: (
   const chooseUnused = (u: Unused) => choose(async () => URL.createObjectURL(await apiBlob(`/admin/cover-library/file?k=${encodeURIComponent(u.key)}`)), u.key, u.key);
   const chooseCard = (x: Card) => choose(async () => resolveUrl((x.edmUrl ?? x.coverUrl)!), undefined, `${x.kind}:${x.id}`);
   const remove = async (u: Unused) => {
-    const ok = await confirmSheet({ title: "永久刪除這個封面檔？", message: `「${u.label}」（${kb(u.size)}）會從伺服器 R2 真實刪除，無法復原。`, confirmLabel: "永久刪除", cancelLabel: "先不要", danger: true });
+    const ok = await confirmSheet({ title: "永久刪除這個封面檔？", message: `「${u.label}」（${kb(u.size)}）會從伺服器 R2 真實刪除，無法復原。`, confirmLabel: "永久刪除", cancelLabel: "先不要", danger: true, typeOk: true });
     if (!ok) return;
     setBusy(u.key);
     try {

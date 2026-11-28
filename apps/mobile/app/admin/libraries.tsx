@@ -2,7 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import { useState } from "react";
 import { View } from "react-native";
 import { api } from "@/api/client";
-import { confirmAsk } from "@/features/confirm";
+import { confirmDanger } from "@/features/confirm";
 import { useApi } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, Button, Card, ErrorView, ListRow, LoadingView, Screen, Section, Fold } from "@/ui";
@@ -49,7 +49,7 @@ export default function AdminLibraries() {
         {data?.length ? (
           <Card style={{ paddingVertical: 0 }}>
             {data.map((r) => (
-              <ListRow key={r.sub} icon="library-outline" title={`${r.owner}｜/${r.number}`} subtitle={`${r.title}　${r.books} 本書　${r.views} 次翻閱`} onPress={async () => { if (await confirmAsk("移除書櫃", `確定移除 ${r.owner} 的書櫃？裡面所有書架與書都會刪除，無法復原。`, "移除")) { await api("DELETE", `/admin/libraries/${r.sub}`).catch((e) => flashText((e as Error).message)); reload(); } }} />
+              <ListRow key={r.sub} icon="library-outline" title={`${r.owner}｜/${r.number}`} subtitle={`${r.title}　${r.books} 本書　${r.views} 次翻閱`} onPress={async () => { if (await confirmDanger("移除書櫃", `確定移除 ${r.owner} 的書櫃？裡面所有書架與書都會刪除，無法復原。`, "移除")) { await api("DELETE", `/admin/libraries/${r.sub}`).catch((e) => flashText((e as Error).message)); reload(); } }} />
             ))}
           </Card>
         ) : null}

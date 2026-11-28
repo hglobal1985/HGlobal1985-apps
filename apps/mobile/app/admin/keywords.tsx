@@ -58,6 +58,7 @@ export default function KeywordsScreen() {
       confirmLabel: "刪除",
       cancelLabel: "先不要",
       danger: true,
+      typeOk: true,
     });
     if (ok) run(() => api("POST", "/admin/keywords/remove", { kind, value: item.value }), `已刪除「${item.value}」`);
   };
