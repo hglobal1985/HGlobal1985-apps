@@ -108,3 +108,8 @@
 - 行動大學：`apps/launch/src/check-notices.ts`＋`routes/my.ts` 的 `GET /notifications/check`、`POST /notifications/check/read`（要放在 `/notifications/<id>/read` 之前）；會員編號一律用行動大學已驗證的登入（`requireMember`），不收前端傳的；回傳的連結只收站內路徑（`/` 開頭），否則改成 `/`。繳作業：`apps/check-api/src/routes/bridge.ts`（`POST /api/internal/notices`，body `{member_id, action: list|read|read_all, id?}`，不走一般登入、只讀只改該會員自己的通知）。
 - 手機畫面：`app/(tabs)/notices.tsx` 五個分頁並排（留言、審核、訂閱、成就、繳作業），標籤角標＝繳作業未讀數。
 - 以後別的 App 要把通知放進行動大學，照同樣做法（內部橋接＋即時讀），不要另存副本。
+
+## 串接版本 2026-11-28.2 核對（杜杜龍 2026-11-28；三處 INTEGRATED_VERSION 已升）
+- 檢查清單 46（內部橋接）：行動大學只用已驗證登入的會員編號呼叫、逾時 5 秒、不存副本；繳作業用 `bridgeAuthorized` 常數時間比對 Bearer、沒設或不對 401、只回該會員自己的通知；密鑰只在 Worker Secret `APP_BRIDGE_SECRET`，不在程式庫與日誌。
+- 檢查清單 47（高度危險動作輸入 ok）：兩個 App 沒有瀏覽器內建 `confirm`／`Alert`；高度危險動作都用 `typeOk`（清單見 `docs/rules/ui-modules.md`）。
+- 尚未實測：設好 `APP_BRIDGE_SECRET` 後的端到端、輸入 ok 視窗在手機上的操作。
