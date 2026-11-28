@@ -5,6 +5,7 @@ import { loadConfig } from "../ui-config.ts";
 import { isOwnerDevice, isOwnerNet, markOwnerNet, recordUsage } from "../usage.ts";
 import { HOME_BC_KEY, REVIEW_FIELD_LABEL, SESSION_DAYS, type Session, audit, clientErrorHits, demoEnabled, fail, isOwnerSession, iso, memberOf, notify, notifyReviewResult, pubUrl, purgeMember, randomToken, ranks, readJson, sha256, usageHits, ytThumbOf } from "../api-core.ts";
 import type { Handler } from "../api-core.ts";
+import { bridgeNotices } from "../bridge-notices.ts";
 
 export const systemRoutes: [string, RegExp, Handler][] = [
   ["GET", /^\/health$/, async () => ({ ok: true })],
@@ -61,6 +62,8 @@ export const systemRoutes: [string, RegExp, Handler][] = [
       return { ok: true };
     },
   ],
+  // 內部橋接：繳作業系統通知頁讀行動大學指定類別的通知（APP_BRIDGE_SECRET；不走一般登入）
+  ["POST", /^\/internal\/notices$/, async (ctx) => bridgeNotices(ctx)],
   [
     "POST",
     /^\/central\/webhook$/,

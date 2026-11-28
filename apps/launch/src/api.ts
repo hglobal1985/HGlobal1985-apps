@@ -84,7 +84,7 @@ export async function handleApi(req: Request, env: Env, exec?: { waitUntil(p: Pr
 }
 
 /** 不需要登入身分的公開路徑：不必為它們向會員中心查詢（首頁的公告、金句、設定每次都會打）。 */
-const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|version|client-errors|central\/webhook|media\/(pub|img|file|audio|dl))(\?|$)/;
+const NO_SESSION = /^\/api\/v2\/(announcements|quotes\/random|config|version|client-errors|central\/webhook|internal\/notices|media\/(pub|img|file|audio|dl))(\?|$)/;
 
 async function context(req: Request, env: Env, url: URL): Promise<Ctx> {
   const light = /^\/api\/v2\/me\/(central-profile|vocab)$/.test(url.pathname);
