@@ -3,8 +3,8 @@ import { trackFeature } from "@/lib/feature-track";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router, type Href } from "expo-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Platform, Pressable, View } from "react-native";
-import { api, type Notice } from "@/api/client";
+import { Linking, Platform, Pressable, View } from "react-native";
+import { api, type CheckNotices, type Notice } from "@/api/client";
 import { noticeTarget } from "@/features/format";
 import { CentralReviewList, hhmm, useCentralReviews } from "@/features/notices/central-reviews";
 import { NoticeSheet } from "@/features/notices/notice-sheet";
@@ -26,17 +26,22 @@ export default function NoticesScreen() {
   const unread = (data ?? []).filter((n) => !n.read).length;
   // 檢視模式（杜杜龍 2026-11-17）：全部、審核、訂閱、留言。審核裡另外會顯示中央的獎銜、中心新申請（沒有權限就不顯示）。
   // 標籤順序與內容（杜杜龍 2026-11-25）：留言 > 審核 > 訂閱 > 成就，沒有「全部」；伺服器分類 other 歸到訂閱。預設停在第一個有未讀的標籤。
-  type Tab = "comment" | "subscribe" | "review" | "achievement";
+  type Tab = "comment" | "subscribe" | "review" | "achievement" | "check";
   const tabOf = (n: Notice): Tab => (n.category === "other" ? "subscribe" : n.category);
+  // 「繳作業」分頁（杜杜龍 2026-11-28）：向寰宇繳作業系統即時讀這位會員的通知，行動大學不存副本；已讀只有一份（在繳作業那邊）。
+  const checkRes = useApi<CheckNotices>(member ? "/notifications/check" : null);
+  const checkList: Notice[] = (checkRes.data?.notices ?? []).map((n) => ({ ...n, category: "other" as const }));
+  const checkUnread = checkList.filter((n) => !n.read).length;
   const [picked, setPicked] = useState<Tab | null>(null);
   const central = useCentralReviews();
   const centralCount = central.data?.available ? central.data.reviews.length : 0;
-  const count = (cat: Tab) => (data ?? []).filter((n) => tabOf(n) === cat && !n.read).length + (cat === "review" ? centralCount : 0);
+  const count = (cat: Tab) => (cat === "check" ? checkUnread : (data ?? []).filter((n) => tabOf(n) === cat && !n.read).length + (cat === "review" ? centralCount : 0));
   const MODES: { key: Tab; label: string }[] = [
     { key: "comment", label: "留言" },
     { key: "review", label: "審核" },
     { key: "subscribe", label: "訂閱" },
     { key: "achievement", label: "成就" },
+    { key: "check", label: "繳作業" },
   ];
   // 預設分頁只在第一次有資料時決定一次並固定（之後資料重抓、已讀變動都不再自動換分頁；杜杜龍 2026-11-25 回報置頂審核只停留一秒就消失）。
   // 有等待處理的審核就優先停在「審核」，讓紅框置頂看得到。
@@ -44,7 +49,7 @@ export default function NoticesScreen() {
   if (data && !autoTab.current) autoTab.current = (data ?? []).some((n) => n.pending) ? "review" : MODES.find((m) => count(m.key) > 0)?.key ?? "comment";
   const mode: Tab = picked ?? autoTab.current ?? "comment";
   const setMode = setPicked;
-  const list = (data ?? []).filter((n) => tabOf(n) === mode);
+  const list = mode === "check" ? checkList : (data ?? []).filter((n) => tabOf(n) === mode);
   // 審核相關而且還沒處理的置頂（伺服器標 pending）；其他分頁不需要。
   const pinned = mode === "review" ? list.filter((n) => n.pending) : [];
   const rest = pinned.length ? list.filter((n) => !n.pending) : list;
@@ -62,12 +67,25 @@ export default function NoticesScreen() {
   const [preview, setPreview] = useState<Notice | null>(null);
   const open = async (n: Notice) => {
     setPreview(n);
+    if (mode === "check") {
+      if (!n.read) await api("POST", "/notifications/check/read", { id: n.id }).catch(() => undefined);
+      checkRes.reload();
+      return;
+    }
     if (!n.read) await api("POST", `/notifications/${n.id}/read`).catch(() => undefined);
     invalidate();
   };
   const markAll = async () => {
-    await api("POST", "/notifications/read-all").catch(() => undefined);
+    if (mode === "check") await api("POST", "/notifications/check/read", {}).catch(() => undefined);
+    else await api("POST", "/notifications/read-all").catch(() => undefined);
     invalidate();
+    checkRes.reload();
+  };
+  // 繳作業的通知連結是繳作業系統內的路徑：用瀏覽器／系統開啟繳作業系統對應頁面。
+  const openCheck = (n: Notice) => {
+    const url = `${checkRes.data?.origin ?? "https://check.hglobal1985.com"}${n.link}`;
+    if (Platform.OS === "web") window.open(url, "_blank", "noopener");
+    else void Linking.openURL(url);
   };
   const wrapSeen = (n: Notice, row: ReactNode) => (mode === "achievement" || mode === "subscribe" ? <SeenRow key={n.id} onSeen={() => markSeen(n)}>{row}</SeenRow> : row);
   const renderRow = (n: Notice, i: number) => (
@@ -112,7 +130,7 @@ export default function NoticesScreen() {
       subtitle={elder ? undefined : data ? (unread ? `${unread} 則未讀` : "全部已讀") : undefined}
       right={elder ? undefined : (
         <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {unread ? <Button variant="ghost" label="全部標為已讀" onPress={markAll} /> : null}
+          {(mode === "check" ? checkUnread : unread) ? <Button variant="ghost" label="全部標為已讀" onPress={markAll} /> : null}
           <Pressable accessibilityRole="button" accessibilityLabel="通知設定" onPress={() => router.push("/settings/notifications")} hitSlop={8} style={{ width: 48, height: 48, alignItems: "center", justifyContent: "center" }}>
             <Ionicons name="settings-outline" size={26} color={c.text} />
           </Pressable>
@@ -158,13 +176,15 @@ export default function NoticesScreen() {
         </View>
       ) : null}
       {mode === "review" && central.data?.available ? <CentralReviewList data={central.data} onChanged={central.reload} /> : null}
-      {data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
+      {mode === "check" && checkRes.data && !checkRes.data.available ? <EmptyState icon="cloud-offline-outline" title="暫時讀不到繳作業的通知" /> : null}
+      {mode === "check" && checkRes.data?.available && !list.length ? <EmptyState icon="notifications-outline" title="繳作業目前沒有通知" /> : null}
+      {mode !== "check" && data && !list.length && !(mode === "review" && centralCount) ? <EmptyState icon="notifications-outline" title="這個分類目前沒有通知" /> : null}
       {/* 已處理／已讀的通知整列刷淡，不分日期、全部相黏排成一張清單（杜杜龍 2026-11-25）。 */}
       {rest.length ? (
         <Card style={{ paddingVertical: 4, marginTop: space.xs }}>{rest.map((n, i) => wrapSeen(n, renderRow(n, i)))}</Card>
       ) : null}
       {preview ? (
-        <NoticeSheet notice={preview} onClose={() => setPreview(null)} onOpen={preview.link ? () => router.push(noticeTarget(preview.link) as Href) : undefined} />
+        <NoticeSheet notice={preview} onClose={() => setPreview(null)} onOpen={preview.link ? () => (mode === "check" ? openCheck(preview) : router.push(noticeTarget(preview.link) as Href)) : undefined} />
       ) : null}
     </Screen>
   );

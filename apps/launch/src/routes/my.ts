@@ -1,4 +1,5 @@
 /** 行動大學 API 路由：我的：會員資料、我的清單、我的書櫃、通知、推播、搜尋（杜杜龍 2026-11-27 從 api.ts 拆出；順序會影響比對，同一檔內照原本順序）。 */
+import { loadCheckNotices, readCheckNotices } from "../check-notices.ts";
 import { vapidPublicKey } from "../push.ts";
 import { iconText, type Duty, type Notice, NOTICE_KINDS, FEATURES, type LibraryView, type LibraryUnlock, LIST_COVER_COLORS, UPGRADING_MSG } from "../contract.ts";
 import { checkPassword, checkToken, libraryNumber, makeToken, pwActive } from "../library.ts";
@@ -556,6 +557,17 @@ export const myRoutes: [string, RegExp, Handler][] = [
       if (!pwActive(exp)) return fail(403, "password_expired", "這個密碼已經失效，請向書櫃主人索取新的密碼");
       if (!(await checkPassword(pw, hash, salt))) return fail(403, "wrong_password", "密碼不正確");
       return makeToken(hash, scope, exp);
+    },
+  ],
+  // 「繳作業」分頁（杜杜龍 2026-11-28）：即時向繳作業系統讀、不存副本；要放在 /notifications/<id>/read 之前，避免 check 被當成通知編號。
+  ["GET", /^\/notifications\/check$/, async (ctx) => loadCheckNotices(ctx.env, requireMember(ctx).sub)],
+  [
+    "POST",
+    /^\/notifications\/check\/read$/,
+    async (ctx) => {
+      const s = requireMember(ctx);
+      const b = await readJson<{ id?: unknown }>(ctx.req);
+      return { ok: await readCheckNotices(ctx.env, s.sub, typeof b.id === "string" ? b.id : undefined) };
     },
   ],
   [

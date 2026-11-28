@@ -24,6 +24,8 @@ export type ReviewGroup = {
 /** 通知分類（通知頁的檢視模式：全部／審核／訂閱／留言；杜杜龍 2026-11-17）。 */
 export type NoticeCategory = "review" | "subscribe" | "comment" | "achievement" | "other";
 /** pending＝審核相關而且還沒處理（杜杜龍 2026-11-23：通知頁一律置頂）：待審的報名通知＝那筆報名還在待審；其他審核通知＝還沒讀。 */
+/** 通知頁「繳作業」分頁（向寰宇繳作業系統即時讀取，不存副本）。available＝false：沒設定或暫時讀不到。link 是繳作業系統內的路徑，前往時接在 origin 後面。 */
+export type CheckNotices = { available: boolean; origin: string; notices: { id: string; title: string; body: string; link: string; read: boolean; createdAt: string }[] };
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string; category: NoticeCategory; pending?: boolean };
 
 /** 中央的一筆「獎銜、中心」新申請（只即時顯示，不保存）。 */

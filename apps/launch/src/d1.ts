@@ -86,6 +86,8 @@ export interface Env {
   EMAIL_FROM?: string;
   /** 中央會員 webhook 的簽章金鑰（Secret）。沒設定就不接收事件。 */
   CENTRAL_WEBHOOK_SECRET?: string;
+  /** App 之間的內部橋接密鑰（通知頁「繳作業」分頁向繳作業系統讀通知用；杜杜龍在 Cloudflare 後台設定的 Secret，兩邊要相同）。沒設定就不顯示該分頁的內容。 */
+  APP_BRIDGE_SECRET?: string;
   /** 中央會員「服務金鑰」（Secret）：寄信時向中央查詢聯絡信箱。沒設定就不寄 Email。 */
   CENTRAL_SERVICE_SECRET?: string;
 }
