@@ -5,7 +5,6 @@ import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-nati
 import { confirmDanger } from "@/features/confirm";
 import { MemberHeader } from "@/features/member-header";
 import { useProfileGate } from "@/features/profile-gate";
-import { startDeleteReauth } from "@/api/central";
 import { openAccountCenter } from "@/features/account-link";
 import type { AppConfig, LibraryMine, Member } from "@/api/client";
 import { canManageCourses, canManageEditors } from "@/lib/roles";
@@ -78,11 +77,8 @@ export default function MeScreen() {
     );
     if (!ok) return;
     if (!central) return run("delete", deleteAccount, "已刪除測試帳號的資料。");
-    // App 內直接刪除（中央串接指令 2026-11-23.3）：重新驗證 → 中央刪除 → 成功才清本 App 資料；網頁版整頁跳去驗證，回來由 /auth/done 接手。
-    await run("delete", async () => {
-      const r = await startDeleteReauth();
-      if (r.status === "ok") await deleteCentralAccount(r.reauthToken);
-    });
+    // App 內直接刪除（中央串接指令 2026-11-28.3：不再重新登入 Google，確認視窗已要求輸入 ok）：中央刪除 → 成功才清本 App 資料。
+    await run("delete", () => deleteCentralAccount());
   };
 
   return (

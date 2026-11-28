@@ -148,7 +148,7 @@ const randomState = () => Crypto.randomUUID().replace(/-/g, "");
 const deviceLabel = () => (web ? "網頁版" : Platform.OS === "ios" ? "iPhone App" : "Android App");
 const webReturn = `${WEB_ORIGIN}/auth/done`;
 
-type Pending = { nonce: string; state: string; purpose: "login" | "delete" | "sso"; back: string; created: number };
+type Pending = { nonce: string; state: string; purpose: "login" | "sso"; back: string; created: number };
 async function startRelay(purpose: Pending["purpose"]): Promise<{ startUrl: string; pending: Pending }> {
   const { nonce } = await central<{ nonce: string }>("/v1/auth/nonce", "POST", { app_id: APP_ID });
   const state = randomState();
@@ -157,7 +157,7 @@ async function startRelay(purpose: Pending["purpose"]): Promise<{ startUrl: stri
   const ret = web ? webReturn : NATIVE_RETURN;
   const path = purpose === "sso" ? "/auth/sso/check" : "/auth/google/start";
   const startUrl =
-    `${CENTRAL_URL}${path}?app_id=${APP_ID}&nonce=${await hex(nonce)}&return=${encodeURIComponent(ret)}&state=${state}` + (purpose === "delete" ? "&purpose=delete_account" : "");
+    `${CENTRAL_URL}${path}?app_id=${APP_ID}&nonce=${await hex(nonce)}&return=${encodeURIComponent(ret)}&state=${state}`;
   return { startUrl, pending };
 }
 
@@ -201,7 +201,7 @@ async function ssoStart(): Promise<string | null> {
  * 網頁：處理從中央回來的 /auth/done#…（登入、共用登入檢查、刪除帳號的重新驗證）。
  * 回傳要導回的頁面路徑；不是中央回傳就回 null。
  */
-export async function handleWebReturn(): Promise<{ back: string; deleteReauth?: { idToken: string; nonce: string } } | null> {
+export async function handleWebReturn(): Promise<{ back: string } | null> {
   if (!web) return null;
   const hash = location.hash.startsWith("#") ? location.hash.slice(1) : "";
   if (!hash) return null;
@@ -228,7 +228,6 @@ export async function handleWebReturn(): Promise<{ back: string; deleteReauth?: 
     return { back: pending.back };
   }
   if (q.get("error") || !q.get("id_token")) throw new CentralError(400, q.get("error") ?? "cancelled", "登入沒有完成，請再試一次");
-  if (pending.purpose === "delete") return { back: pending.back, deleteReauth: { idToken: q.get("id_token")!, nonce: pending.nonce } };
   const t = await central<Tokens>("/v1/auth/google", "POST", { app_id: APP_ID, id_token: q.get("id_token"), nonce: pending.nonce, device_label: deviceLabel() });
   await saveTokens(t);
   ss()?.setItem(K.ssoCheckAt, String(Date.now())); // 剛登入，不用馬上再問一次共用登入
@@ -336,31 +335,17 @@ export async function openMemberCenter(): Promise<void> {
 }
 
 /**
- * 刪除帳號（串接指令 三、9）：重新驗證 → reauth_token → delete-account。
- * 網頁版會整頁導向中央再回來（回來後呼叫 finishDeleteAccount）。手機版一次完成。
+ * 刪除帳號（串接指令 三、9，2026-11-28.3 起不再重新登入 Google；畫面上的確認視窗已要求輸入 ok）：
+ * 直接 POST /v1/me/delete-account（Bearer Access Token，body {}）→ 成功就清掉本機資料與 Token。
  */
-export async function deleteAccount(): Promise<"done" | "redirected" | "cancelled"> {
-  const { startUrl, pending } = await startRelay("delete");
-  if (web) {
-    ss()?.setItem(K.pending, JSON.stringify(pending));
-    location.assign(startUrl);
-    return "redirected";
-  }
-  const r = await WebBrowser.openAuthSessionAsync(startUrl, NATIVE_RETURN);
-  if (r.type !== "success") return "cancelled";
-  const q = new URL(r.url).searchParams;
-  if (q.get("state") !== pending.state || !q.get("id_token")) throw new CentralError(400, "cancelled", "確認身分沒有完成，請再試一次");
-  await finishDeleteAccount(q.get("id_token")!, pending.nonce);
-  return "done";
-}
-export async function finishDeleteAccount(idToken: string, nonce: string): Promise<void> {
+export async function deleteAccount(): Promise<"done"> {
   const token = await accessToken();
   if (!token) throw new CentralError(401, "unauthenticated", "請先登入");
-  const { reauth_token } = await central<{ reauth_token: string }>("/v1/auth/reauth", "POST", { id_token: idToken, nonce }, token);
-  await central("/v1/me/delete-account", "POST", { reauth_token }, token);
+  await central("/v1/me/delete-account", "POST", {}, token);
   await ssoStore.set(null);
   await clearLocal();
   emit();
+  return "done";
 }
 
 /** 啟動檢查（串接指令 三、1）。連不上回 null（不需要登入的畫面照常）。 */

@@ -113,3 +113,8 @@
 - 檢查清單 46（內部橋接）：行動大學只用已驗證登入的會員編號呼叫、逾時 5 秒、不存副本；繳作業用 `bridgeAuthorized` 常數時間比對 Bearer、沒設或不對 401、只回該會員自己的通知；密鑰只在 Worker Secret `APP_BRIDGE_SECRET`，不在程式庫與日誌。
 - 檢查清單 47（高度危險動作輸入 ok）：兩個 App 沒有瀏覽器內建 `confirm`／`Alert`；高度危險動作都用 `typeOk`（清單見 `docs/rules/ui-modules.md`）。
 - 尚未實測：設好 `APP_BRIDGE_SECRET` 後的端到端、輸入 ok 視窗在手機上的操作。
+
+## 永久取消二次登入（杜杜龍 2026-11-28，串接版本 2026-11-28.3）
+- 全生態系統（含未來所有 App）**永久取消**「為了安全再要求重新登入 Google（二次登入）」，包含會員刪除帳號。新增任何功能都不要再加這類要求；高度危險動作一律用「輸入 ok」確認（`docs/rules/ui-modules.md`）。
+- 會員刪除帳號：確認視窗輸入 ok → 直接 `POST /v1/me/delete-account`（body `{}`）。行動大學 `POST /me/delete-account` 不再收 `reauth_token`；手機端 `startDeleteReauth`、`takeReauthToken`、`/auth/done` 的刪除回傳分支都已移除；繳作業 `deleteAccount()` 直接呼叫。中央端 `reauth_token` 已不再檢查（舊版 App 帶了也忽略）。
+- 後台管理員的危險操作用 passkey 確認（杜杜龍同意），第一把 passkey 不要求剛登入過。

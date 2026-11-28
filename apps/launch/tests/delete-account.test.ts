@@ -17,7 +17,7 @@ function token(sub: string) {
   return `${h}.${p}.${createSign("RSA-SHA256").update(`${h}.${p}`).sign(privateKey).toString("base64url")}`;
 }
 
-test("App 內刪除帳號：中央成功才清本 App 資料；中央拒絕就完全不動並帶回白話原因（中央串接指令 2026-11-23.3）", async () => {
+test("App 內刪除帳號：中央成功才清本 App 資料；中央拒絕就完全不動並帶回白話原因（中央串接指令 2026-11-28.3）", async () => {
   let central: { status: number; body: unknown } = { status: 200, body: { deleted: true } };
   const seen: { auth: string | null; body: unknown }[] = [];
   setCentralFetch(async (url, init) => {
@@ -42,32 +42,24 @@ test("App 內刪除帳號：中央成功才清本 App 資料；中央拒絕就�
   await db.prepare("INSERT INTO feature_uses (member_sub, feature) VALUES ('m_del', 'profile_edit')").run();
   assert.equal(await rows(), 1);
 
-  // 沒帶 reauth_token：不呼叫中央、不動資料
-  const none = await call({});
-  assert.equal(none.status, 422);
-  assert.equal(none.data.error?.code, "reauth_required");
-  assert.equal(seen.length, 0);
-  assert.equal(await rows(), 1);
-
   // 中央拒絕（最後一位超級管理員）：原因原樣帶回、資料不動
   central = { status: 409, body: { error: { code: "last_super_admin", message: "你是最後一位超級管理員，請先把職務移交給別人" } } };
-  const blocked = await call({ reauth_token: "rt_1" });
+  const blocked = await call({});
   assert.equal(blocked.status, 409);
   assert.equal(blocked.data.error?.message, "你是最後一位超級管理員，請先把職務移交給別人");
   assert.equal(await rows(), 1);
 
-  // 超過 10 分鐘：中央回 401 reauth_required → 轉成 422（不要讓 App 當成登入過期去換發重試）
-  central = { status: 401, body: { error: { code: "reauth_required", message: "請再重新驗證一次" } } };
-  const expired = await call({ reauth_token: "rt_2" });
+  // 中央回 401：轉成 422（不要讓 App 當成登入過期去換發重試）
+  central = { status: 401, body: { error: { code: "unauthenticated", message: "請先登入" } } };
+  const expired = await call({});
   assert.equal(expired.status, 422);
-  assert.equal(expired.data.error?.code, "reauth_required");
   assert.equal(await rows(), 1);
 
-  // 成功：本 App 資料清空；有帶會員自己的 Token 與 reauth_token
+  // 成功：本 App 資料清空；有帶會員自己的 Token（不帶 reauth_token）
   central = { status: 200, body: { deleted: true } };
-  const done = await call({ reauth_token: "rt_3" });
+  const done = await call({});
   assert.deepEqual(done.data, { ok: true });
   assert.equal(await rows(), 0);
   assert.ok(seen.at(-1)?.auth?.startsWith("Bearer "));
-  assert.deepEqual(seen.at(-1)?.body, { reauth_token: "rt_3" });
+  assert.deepEqual(seen.at(-1)?.body, {}); // 不再帶 reauth_token（2026-11-28.3）
 });
