@@ -61,7 +61,7 @@
 
 ## 共用元件速查（每個畫面都要遵守；細節與完整規則見 docs/rules/）
 - 分享：`ShareIcon`＋`shareLink`（系統分享選單）；分享文字範本在「設定 > 分享預設值」。
-- 確認動作：`confirmSheet()`／`confirmAsk()`（底部確認面板，不用瀏覽器對話框）；所有上拉面板用 `BottomSheet`；選單點選列用 `SheetRow`；清單用 `SheetScroll`。
+- 確認動作：`confirmSheet()`／`confirmAsk()`（底部確認面板，不用瀏覽器對話框）；**高度危險動作（重新產生金鑰、永久刪除、還原、刪帳號…）一律用 `confirmDanger()`／`typeOk: true`，要打字輸入「ok」才能按確定（杜杜龍 2026-11-28 永久規定，見 docs/rules/ui-modules.md）**；所有上拉面板用 `BottomSheet`；選單點選列用 `SheetRow`；清單用 `SheetScroll`。
 - 上方工具列：`TopBar`／`PageHeader`；右側按鈕 `TopBarButton`（綠色）；可分享頁面要給 `backTo`。
 - 一句話回饋：`flashText()`／`showFlash()`（不用 toast）；背景暗化 `DimBackdrop`；流光邊框 `GradientFrame`。
 - 編輯面板：`EditSheet`（取消在左、儲存在右同一列）；按鈕取消 `variant="cancel"`（左、紅框）、儲存在右（深綠）；欄位群組 `FormBlock`、`BrandField`／`CategoryField`／`HostField`。

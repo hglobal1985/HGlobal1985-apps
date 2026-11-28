@@ -51,7 +51,7 @@ export function BackupRestorePanel({ request }: { request: BackupRequest }) {
   };
   const restore = async () => {
     if (!plan) return;
-    const ok = await confirmSheet({ title: `還原 ${plan.date} 的備份？`, message: "會用這份備份蓋掉目前同一筆資料的內容（備份之後新增的資料不會被刪）。還原前系統會先自動備份現況。", confirmLabel: "還原", danger: true });
+    const ok = await confirmSheet({ title: `還原 ${plan.date} 的備份？`, message: "會用這份備份蓋掉目前同一筆資料的內容（備份之後新增的資料不會被刪）。還原前系統會先自動備份現況。", confirmLabel: "還原", danger: true, typeOk: true });
     if (!ok) return;
     setBusy(true);
     setMsg(null);

@@ -492,7 +492,7 @@ function StatusSheet({ course, onClose, onSaved }: SheetProps) {
     if (await save({ status: "archived" }, { done: "已下架封存" })) onClose();
   };
   const remove = async () => {
-    if (!(await confirmSheet({ title: "刪除課程", message: `確定永久刪除「${course.title}」？章節、EDM、附件與音檔會一併刪除，無法復原。`, confirmLabel: "永久刪除", cancelLabel: "先不要", danger: true }))) return;
+    if (!(await confirmSheet({ title: "刪除課程", message: `確定永久刪除「${course.title}」？章節、EDM、附件與音檔會一併刪除，無法復原。`, confirmLabel: "永久刪除", cancelLabel: "先不要", danger: true, typeOk: true }))) return;
     setWorking(true);
     try {
       await api("DELETE", `/admin/courses/${course.id}`);

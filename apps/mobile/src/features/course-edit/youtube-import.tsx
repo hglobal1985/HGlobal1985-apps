@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { api, type CourseDetail } from "@/api/client";
-import { confirmAsk } from "@/features/confirm";
+import { confirmAsk, confirmDanger } from "@/features/confirm";
 import { useApi, useSession } from "@/state/session";
 import { space } from "@/theme/tokens";
 import { AppText, Button, Card, Check, Chips, ErrorView, Field, LoadingView, NoticeBox } from "@/ui";
@@ -143,7 +143,7 @@ export function YoutubeSyncSheet({ course, onClose }: { course: CourseDetail; on
     }
   };
   const removeAll = async (s: Sync) => {
-    if (!(await confirmAsk("刪除清單與關聯教材", "會刪除這份同步設定，以及這張卡裡來源是這個播放清單影片的所有教材（含學員的相關紀錄），無法復原。確定刪除？", "全部刪除"))) return;
+    if (!(await confirmDanger("刪除清單與關聯教材", "會刪除這份同步設定，以及這張卡裡來源是這個播放清單影片的所有教材（含學員的相關紀錄），無法復原。確定刪除？", "全部刪除"))) return;
     setBusyId(s.id);
     try {
       const r = await api<{ deleted: number }>("POST", `/admin/youtube-syncs/${s.id}/delete-with-materials`);

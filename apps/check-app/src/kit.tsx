@@ -211,7 +211,8 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
 }
 
 /** 需要確認的動作：共用底部確認面板。 */
-export const confirmSheet = (title: string, message: string, ok: string, danger = false) => sharedConfirm({ title, message, confirmLabel: ok, danger });
+/** typeOk＝高度危險動作：要輸入 ok 才能按確定（杜杜龍 2026-11-28 全生態系統規定）。 */
+export const confirmSheet = (title: string, message: string, ok: string, danger = false, typeOk = false) => sharedConfirm({ title, message, confirmLabel: ok, danger: danger || typeOk, typeOk });
 
 /** 一句話回饋：共用全螢幕提醒。 */
 export function flash(title: string, note?: string, bad?: boolean) {

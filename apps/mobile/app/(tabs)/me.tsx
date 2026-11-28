@@ -2,7 +2,7 @@ import { router, useFocusEffect, useLocalSearchParams, type Href } from "expo-ro
 import { centerTitle } from "@/features/format";
 import { useCallback, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { confirmAsk } from "@/features/confirm";
+import { confirmDanger } from "@/features/confirm";
 import { MemberHeader } from "@/features/member-header";
 import { useProfileGate } from "@/features/profile-gate";
 import { startDeleteReauth } from "@/api/central";
@@ -69,7 +69,7 @@ export default function MeScreen() {
   };
   const removeAccount = async () => {
     const central = !member?.demo;
-    const ok = await confirmAsk(
+    const ok = await confirmDanger(
       "刪除帳號",
       central
         ? "會刪除你在所有寰宇 App 的帳號與資料（包含會員中心的個人資料與 Amway 資料、本 App 的學習紀錄、報名紀錄、徽章、通知），無法復原。\n\n確定後會請你再按一次 Google 登入確認身分。"
