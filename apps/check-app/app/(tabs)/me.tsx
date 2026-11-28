@@ -79,7 +79,7 @@ export default function MePage() {
             flex={false}
             label="刪除帳號"
             onPress={async () => {
-              if (!(await confirmSheet("刪除帳號？", "會刪除你在所有寰宇 App 的帳號與資料，無法復原。接著會請你再用 Google 登入一次確認是本人。", "刪除", true, true))) return;
+              if (!(await confirmSheet("刪除帳號？", "會刪除你在所有寰宇 App 的帳號與資料，無法復原。", "刪除", true, true))) return;
               try {
                 const r = await deleteAccount();
                 if (r === "done") flash("帳號已刪除");

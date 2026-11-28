@@ -113,3 +113,14 @@
 - 檢查清單 46（內部橋接）：行動大學只用已驗證登入的會員編號呼叫、逾時 5 秒、不存副本；繳作業用 `bridgeAuthorized` 常數時間比對 Bearer、沒設或不對 401、只回該會員自己的通知；密鑰只在 Worker Secret `APP_BRIDGE_SECRET`，不在程式庫與日誌。
 - 檢查清單 47（高度危險動作輸入 ok）：兩個 App 沒有瀏覽器內建 `confirm`／`Alert`；高度危險動作都用 `typeOk`（清單見 `docs/rules/ui-modules.md`）。
 - 尚未實測：設好 `APP_BRIDGE_SECRET` 後的端到端、輸入 ok 視窗在手機上的操作。
+
+## 永久取消二次登入（杜杜龍 2026-11-28，串接版本 2026-11-28.3）
+- 全生態系統（含未來所有 App）**永久取消**「為了安全再要求重新登入 Google（二次登入）」，包含會員刪除帳號。新增任何功能都不要再加這類要求；高度危險動作一律用「輸入 ok」確認（`docs/rules/ui-modules.md`）。
+- 會員刪除帳號：確認視窗輸入 ok → 直接 `POST /v1/me/delete-account`（body `{}`）。行動大學 `POST /me/delete-account` 不再收 `reauth_token`；手機端 `startDeleteReauth`、`takeReauthToken`、`/auth/done` 的刪除回傳分支都已移除；繳作業 `deleteAccount()` 直接呼叫。中央端 `reauth_token` 已不再檢查（舊版 App 帶了也忽略）。
+- 後台管理員的危險操作用 passkey 確認（杜杜龍同意），第一把 passkey 不要求剛登入過。
+
+## 通知橋接是雙向的：繳作業通知頁的「行動大學」分頁（杜杜龍 2026-11-28）
+- 同一把 `APP_BRIDGE_SECRET` 雙向共用：行動大學讀繳作業的通知（通知頁「繳作業」分頁），繳作業也讀行動大學**指定類別**的通知（繳作業通知頁「行動大學」分頁，類別選項：留言、審核、訂閱、成就，預設只有留言；選擇目前只在這次開啟畫面時有效，沒有存起來）。
+- 行動大學接收端：`apps/launch/src/bridge-notices.ts`＋`routes/system.ts` 的 `POST /internal/notices`（`api.ts` 的 `NO_SESSION` 要含 `internal/notices`）：Bearer 常數時間比對、沒設或不對 401；只回該會員**自己**的通知（`recipient_sub`，不含管理員／會長的角色通知）、只收已知類別、已讀只能改選中類別裡的；測試 `tests/bridge-notices.test.ts`。
+- 繳作業：`apps/check-api/src/routes/bridge.ts` 的 `GET /notices/learn?categories=`、`POST /notices/learn/read`（會員編號用繳作業已驗證的登入）；畫面 `apps/check-app/app/(tabs)/notices.tsx` 的「作業／行動大學」分頁。不存副本、點通知用瀏覽器開啟行動大學對應頁面。
+- 以後別的 App 要互通通知照同樣做法：每個接收端只回呼叫端指定會員自己的、只回允許的類別，不要整包轉。

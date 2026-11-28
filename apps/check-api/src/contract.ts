@@ -153,6 +153,8 @@ export type GroupView = { id: string; name: string; joinCode: string | null; mem
 export type PeopleView = { canManage: boolean; canEditGroupId: string | null; groups: GroupView[]; unassigned: Person[]; pending: Person[]; staff: Person[] };
 
 export type Notice = { id: string; title: string; body: string; link: string; read: boolean; createdAt: string };
+/** 通知頁「行動大學」分頁（向行動大學即時讀指定類別的通知，不存副本；杜杜龍 2026-11-28）。available＝false：沒設定或暫時讀不到。 */
+export type LearnNotices = { available: boolean; origin: string; categories: string[]; notices: Notice[] };
 
 /** staff＝在任何一份作業是老師、管理員或組長（底部選單顯示「批改」）；toReview＝等他處理的作業份數。 */
 export type Me = { memberId: string; name: string; avatarUrl: string | null; superAdmin: boolean; unread: number; staff: boolean; toReview: number };

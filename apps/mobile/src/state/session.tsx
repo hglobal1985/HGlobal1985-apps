@@ -26,7 +26,7 @@ type Session = {
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   /** 中央會員：App 內直接刪除帳號（中央串接指令 2026-11-23.3）；reauthToken 來自剛完成的重新驗證。成功後本機資料、登入全部清掉。 */
-  deleteCentralAccount: (reauthToken: string) => Promise<void>;
+  deleteCentralAccount: () => Promise<void>;
   version: number;
   invalidate: () => void;
   cart: string[];
@@ -200,8 +200,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [invalidate, setCart, member?.demo]);
 
   const deleteCentralAccount = useCallback(
-    async (reauthToken: string) => {
-      await api("POST", "/me/delete-account", { reauth_token: reauthToken }); // 伺服器：中央刪除成功才清本 App 資料；失敗會丟出中央的白話原因
+    async () => {
+      await api("POST", "/me/delete-account", {}); // 伺服器：中央刪除成功才清本 App 資料；失敗會丟出中央的白話原因
       await clearCentral();
       await saveToken(null);
       setMember(null);

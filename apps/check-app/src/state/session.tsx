@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { AppState, Platform } from "react-native";
 import type { Me } from "@check/contract";
 import { api } from "@/api/client";
-import { appConfig, currentMember, handleWebReturn, olderThan, onAuthChange, restore, restoreDev, ssoCheck, finishDeleteAccount, type AppStatus } from "@/central/auth";
+import { appConfig, currentMember, handleWebReturn, olderThan, onAuthChange, restore, restoreDev, ssoCheck, type AppStatus } from "@/central/auth";
 import { APP_VERSION } from "@/central/config";
 import { flash } from "@/kit";
 
@@ -40,7 +40,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
   const [me, setMe] = useState<Me | null>(null);
   const [gate, setGate] = useState<Gate>("ok");
-  const [deleted, setDeleted] = useState(false);
+  const [deleted] = useState(false);
   const [version, setVersion] = useState(0);
   const [returnTo, setReturnTo] = useState<string | null>(null);
   const invalidate = useCallback(() => setVersion((v) => v + 1), []);
@@ -65,11 +65,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       try {
         const r = await handleWebReturn();
         if (r?.back === "") return; // 正在導向中央（共用登入）
-        if (r?.deleteReauth) {
-          await restore();
-          await finishDeleteAccount(r.deleteReauth.idToken, r.deleteReauth.nonce);
-          setDeleted(true);
-        } else back = r?.back ?? null;
+        back = r?.back ?? null;
       } catch (e) {
         flash((e as Error).message, undefined, true);
       }
