@@ -101,3 +101,10 @@
 - 照串接指令「六」逐項核對行動大學與繳作業系統：新增項目 40～45 都已符合——登入永不過期（沿用 .2 時的實作）、生態系統功能讀 config.eco_features、`.github/dependabot.yml` 每週、版本網址回報 sha、前台錯誤批次回報、每週備份、巡檢推播。
 - 繳作業系統這次補上 `eco.alert`（`apps/check-api/src/api.ts` webhook）：替事件的 `member_id`（超級管理員本人）發站內通知，手機推播走既有流程；不認得的事件仍回 2xx。**尚未用真的巡檢警報實測**（要中央後台對 check 設定 webhook 網址與簽章金鑰）。
 - 沒有逐字比對的部分（沿用前一版的結論）：項目 1～39 在 2026-11-27.2 已核對過，之後沒有改動登入、資格、會員資料頁的程式。
+
+## 通知頁「繳作業」分頁（杜杜龍 2026-11-28，做法 A：即時讀、不存副本）
+- 行動大學「通知」頁多一個分頁「繳作業」（排在成就之後），顯示寰宇繳作業系統裡這位會員的所有通知；**行動大學不存副本**，已讀只有一份（在繳作業那邊），在這個分頁點開或「全部標為已讀」會透過橋接寫回繳作業。點通知 → 摘要面板 → 「前往查看」用瀏覽器／系統開啟繳作業系統對應頁面（`https://check.hglobal1985.com` ＋通知的站內路徑）。
+- 橋接：`packages/server-shared/src/app-bridge.ts`（`bridgeAuthorized` 常數時間比對 Bearer、`bridgePost` 逾時 5 秒）。兩個 Worker **各設同一個 Cloudflare Secret `APP_BRIDGE_SECRET`（至少 16 字元，由杜杜龍設定，不貼進對話、不放程式庫）**；沒設或不對一律拒絕（繳作業回 401；行動大學顯示「暫時讀不到繳作業的通知」）。
+- 行動大學：`apps/launch/src/check-notices.ts`＋`routes/my.ts` 的 `GET /notifications/check`、`POST /notifications/check/read`（要放在 `/notifications/<id>/read` 之前）；會員編號一律用行動大學已驗證的登入（`requireMember`），不收前端傳的；回傳的連結只收站內路徑（`/` 開頭），否則改成 `/`。繳作業：`apps/check-api/src/routes/bridge.ts`（`POST /api/internal/notices`，body `{member_id, action: list|read|read_all, id?}`，不走一般登入、只讀只改該會員自己的通知）。
+- 手機畫面：`app/(tabs)/notices.tsx` 五個分頁並排（留言、審核、訂閱、成就、繳作業），標籤角標＝繳作業未讀數。
+- 以後別的 App 要把通知放進行動大學，照同樣做法（內部橋接＋即時讀），不要另存副本。

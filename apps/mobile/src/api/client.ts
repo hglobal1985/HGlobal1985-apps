@@ -63,6 +63,7 @@ export type {
   MuxAsset,
   MuxAssetPage,
   Notice,
+  CheckNotices,
   NoticeCategory,
   CentralReview,
   CentralReviews,

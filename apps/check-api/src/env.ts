@@ -29,6 +29,8 @@ export type Env = {
   VAPID_PRIVATE_JWK?: string;
   /** 中央 webhook 簽章金鑰（業主在 Cloudflare 後台設定的 Secret）。 */
   CENTRAL_WEBHOOK_SECRET?: string;
+  /** App 之間的內部橋接密鑰（行動大學通知頁讀「繳作業」通知用；杜杜龍在 Cloudflare 後台設定的 Secret，兩邊要相同）。沒設定就拒絕所有橋接請求。 */
+  APP_BRIDGE_SECRET?: string;
   /** 中央服務金鑰（Secret；查聯絡信箱寄 Email 用，杜杜龍在中央後台建立、Cloudflare 後台設定）。沒設定就不寄 Email。 */
   CENTRAL_SERVICE_SECRET?: string;
   /** Cloudflare Email Service 的寄信綁定（send_email）。沒綁定就不寄 Email。 */

@@ -22,6 +22,7 @@ import { API_VERSION, type Ctx, HttpError, type Row, authenticate, deleteR2, flu
 import { notSubmitted, purgeFiles, twTime } from "./routes/files.ts";
 import { clientError } from "./routes/system.ts";
 import { runCheckBackup } from "./weekly-backup.ts";
+import { bridgeNotices } from "./routes/bridge.ts";
 
 // ───────────── 進入點 ─────────────
 export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>) => void = () => {}): Promise<Response> {
@@ -30,6 +31,7 @@ export async function handleApi(req: Request, env: Env, bg: (p: Promise<unknown>
   try {
     if (path === "/version") return json({ version: API_VERSION, integrated: INTEGRATED_VERSION, sha: env.GIT_SHA ?? null });
     if (path === "/central/webhook" && req.method === "POST") return await webhook(req, env);
+    if (path === "/internal/notices" && req.method === "POST") return await bridgeNotices(req, env);
     if (path === "/client-errors" && req.method === "POST") return await clientError(req, bg);
     const auth = await authenticate(req, env);
     if (!auth) return json({ error: { code: "unauthenticated", message: "請先登入" } }, 401);
