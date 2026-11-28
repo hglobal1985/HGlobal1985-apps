@@ -11,7 +11,7 @@ import { createServiceClient } from "../../../packages/server-shared/src/central
 export const CENTRAL = "https://id.hglobal1985.com";
 export const APP_ID = "check";
 /** 採用的串接指令版本（每次依新版指令更新完才改）。 */
-export const INTEGRATED_VERSION = "2026-11-27.8";
+export const INTEGRATED_VERSION = "2026-11-28.2";
 /** 已做到的平台標準（只列真的做到的）。 */
 export const STANDARDS = ["webhook", "delete_copy", "no_email_copy", "least_scope", "in_app_delete"];
 
